@@ -1,56 +1,51 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)  
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)  
 [![bymecoffee](https://user-images.githubusercontent.com/60828821/212549591-950f90de-6884-4bc2-bb66-d2cd1d6f00b6.png)](https://www.buymeacoffee.com/alexarch)
 
 
 
 # History explorer card
 
-This is a custom history card for Home Assistant. This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
+> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024). The changes below are applied on top of version 1.0.54.
+
+This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
-- [Usage](#usage)
-  - [Overriding the HA more info history](#overriding-the-ha-more-info-history)
-- [Install and configuration](#install-and-configuration)
-  - [HACS](#hacs)
-  - [Manual install](#manual-install)
-  - [Full configuration reference](#full-configuration-reference)
-  - [Interactive configuration](#interactive-configuration)
-  - [Default view and time ranges](#default-view-and-time-ranges)
-  - [Auto refresh](#auto-refresh)
-  - [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)
-  - [Legend / entity labels](#legend--entity-labels)
-  - [Line interpolation modes](#line-interpolation-modes)
-  - [Y axis scaling](#y-axis-scaling)
-  - [Rounding](#rounding)
-  - [Line graphs and unavailable data](#line-graphs-and-unavailable-data)
-  - [Showing current sensor values](#showing-current-sensor-values)
-  - [Data decimation](#data-decimation)
-  - [Displaying individual samples](#displaying-individual-samples)
-  - [Bar graphs for total increasing entities](#bar-graphs-for-total-increasing-entities)
-    - [Color ranges](#color-ranges)
-    - [Net metering](#net-metering)
-  - [Timeline charts](#timeline-charts)
-    - [Customizing state colors](#customizing-state-colors)
-  - [Compass arrow graphs](#compass-arrow-graphs)
-  - [Customizing dynamically added graphs](#customizing-dynamically-added-graphs)
-  - [Long term statistics](#long-term-statistics)
-  - [Custom data processing functions](#custom-data-processing-functions)
-  - [Exporting data as CSV](#exporting-data-as-csv)
-  - [Configuring the UI](#configuring-the-ui)
-    - [Header text](#header-text)
-    - [Dark mode](#dark-mode)
-    - [Customizing the color of UI elements](#customizing-the-color-of-ui-elements)
-    - [Changing the UI layout](#changing-the-ui-layout)
-    - [Configuring the tooltip popup](#configuring-the-tooltip-popup)
-  - [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density)
-  - [Multiple cards](#multiple-cards)
-  - [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)
-  - [Running as a panel in the sidebar](#running-as-a-panel-in-the-sidebar)
+---
+
+## Changes vs upstream
+
+### New option — pattern-based entity configuration
+
+- **`entityPatterns`** — applies display options to groups of entities matched by a glob pattern (`*` and `?` wildcards), without having to list each entity individually under `entityOptions`. All entity options (`color`, `fill`, `width`, `lineMode`, `dashMode`, `showPoints`, `showMinMax`, `decimation`, `scale`, `hidden`, `type`, `process`, `ymin`, `ymax`, `ystepSize`, `height`, `interval`, `netBars`) are supported. Priority: `entityOptions` by entity id > by device class > by domain > `entityPatterns` (first matching pattern wins per property).
+
+### Bug fixes
+
+- **Line mode `lines` — spline overshoots corrected.** The original code applied Catmull-Rom interpolation (`cubicInterpolationMode: 'default'`) even in `lines` mode, causing visible spikes at measurement points. Fixed: `lines` and `stepped` now use strict monotone interpolation with zero tension, guaranteeing that the curve passes exactly through each data point without any deviation.
+
+- **Curve mode `curves` — unnatural transitions corrected.** The original used `monotone` (Steffen) interpolation for `curves`, which produced asymmetric, flattened transitions around plateaus. Fixed: `curves` now uses Catmull-Rom (`default`) with tension 0.3, giving smooth, natural-looking curves with a modest and acceptable overshoot.
+
+- **Cache anchor point — spurious vertical spikes on graph start.** When retrieving the last known state from the cache slot preceding the visible window, the original code forced its timestamp to the exact left edge of the window regardless of when the state actually occurred. This created an artificial instant transition at graph start. Fixed: the real `last_changed` timestamp of the cached state is now used.
+
+### New options — line appearance
+
+- **`dashMode`** — controls the stroke style of a line. Accepts the existing named modes (`points`, `shortlines`, `longlines`, `pointline`) and now also a custom Canvas `setLineDash` array, e.g. `dashMode: [10, 4, 2, 4]`. Previously only named modes were supported.
+
+- **`showPoints`** — permanently displays a dot at each measurement point on a line chart, independently per entity. Accepts `true` (radius 4 px) or a numeric radius in pixels. Available on individual entities, in `entityOptions` and in `entityPatterns`. The existing graph-level `showSamples` option has also been extended to accept a numeric radius.
+
+- **`showMinMax`** — draws a shaded band between the statistical min and max values, using the line color at low opacity (similar to the HA standard history panel). Two modes: `statistics` (band only on the long-term statistics portion of the graph) and `history` / `states` (band on the full graph, with a parallel statistics query for the short-term history portion). Available per entity, in `entityOptions` and in `entityPatterns`.
+
+### Bug fix — missing `entityOptions` wiring
+
+- **`decimation`** was read per-entity from `g.entities[j].decimation` in the rendering loop but was never populated from `entityOptions`. It is now correctly wired, making per-entity decimation control fully functional via `entityOptions` and `entityPatterns`.
+
+- **`showPoints`** was similarly missing from the entity options pipeline and is now fully wired through `entityOptions`, `entityPatterns`, and the datasets builder.
+
+---
 
 ## Usage
 
-The history explorer card can be configured interactively through the UI or manually through YAML. The card can contain one or multiple charts, every chart can display the history of one or multiple entities. Currently the card supports line charts for numerical entities and timeline charts for non-numerical ones. The order the charts are displayed in the history, as well as the colors used for charts and timeline states are all fully configurable.
+The history explorer card can be configured interactively through the UI or manually through YAML. The card can contain one or multiple charts, every chart can display the history of one or multiple entities. Currently the card supports line charts for numerical entities and timeline charts for non-numerical ones. The order the charts are displayed in the history, as well as the colors used for charts and timeline states are all fully configurable. 
 
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
@@ -113,8 +108,8 @@ recordedEntitiesOnly: true
 The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. Some examples:
 ```
 person.*      - Add all entities from the person domain
-*door*        - Add all entities that contain the term ‘door’ in the name, regardless of domain
-sensor.*door* - Add all entities that contain the term ‘door’ in the name, but only from the sensor domain
+*door*        - Add all entities that contain the term 'door' in the name, regardless of domain
+sensor.*door* - Add all entities that contain the term 'door' in the name, but only from the sensor domain
 *             - Add all available entities in the list
 ```
 The entities shown in the list can be further filtered using the `filterEntities` option. The same wildcard syntax applies here. For example:
@@ -156,7 +151,7 @@ defaultTimeOffset: 1O       # Show the entire current month, starting at the 1st
 
 ### Auto refresh
 
-By default the card will not refresh on its own when sensor values change. It can be manually refreshed by reloading the page. If you would like your card to automatically reflect changing values on the fly, two strategies can be enabled. Both can be combined if needed.
+By default the card will not refresh on its own when sensor values change. It can be manually refreshed by reloading the page. If you would like your card to automatically reflect changing values on the fly, two strategies can be enabled. Both can be combined if needed. 
 
 Automatic refresh will monitor the entities that are displayed in your graphs for changes and refresh the graphs as needed. This strategy will usually cover the most common use cases and is recommended if you have just a few entities display in your history explorer card and if these entities don't change too often.
 ```yaml
@@ -197,26 +192,76 @@ legendVisible: false
 
 ### Line interpolation modes
 
-Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines, the default, are the smoothest but can sometimes overshoot after steep gradients followed by longer constant sections. Line segments will connect your data points using straight lines. They are less smooth, but can't overshoot. Stepped mode will show the raw quantized data.
+Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines, the default, produce smooth natural-looking curves with a slight overshoot tolerance around steep gradients. Line segments connect data points with straight lines using strict linear interpolation — no overshoot possible. Stepped mode shows the raw quantized data as a staircase.
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves`, `lines` or `stepped`. The default if the option is not present is curves.
+You can specify the line mode in the YAML global settings. Possible options are `curves`, `lines` or `stepped`. The default if the option is not present is `curves`.
 
 ```yaml
 type: custom:history-explorer-card
 lineMode: lines
 ```
 
-The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see below).
+The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see the `entityOptions` and `entityPatterns` sections below).
 
-A small margin will be added to the top and bottom of line charts, so to give some headroom to curves should they overshoot and make it visually nicer. You can turn off these margins if you don't want the additional space. It's recommended to use lines or stepped mode if you remove both margins to avoid curves overshooting outside of the chart area:
+A small margin will be added to the top and bottom of line charts, so to give some headroom to curves should they overshoot and make it visually nicer. You can turn off these margins if you don't want the additional space. It's recommended to use `lines` or `stepped` mode if you remove both margins to avoid curves overshooting outside of the chart area:
 
 ```yaml
 type: custom:history-explorer-card
 axisAddMarginMin: false
 axisAddMarginMax: false
 ```
+
+### Line stroke style
+
+The stroke style of a line can be customized per entity using the `dashMode` option. It is available in `entityOptions`, `entityPatterns` and in the per-entity YAML under `graphs`.
+
+```yaml
+entities:
+  - entity: sensor.temperature
+    dashMode: shortlines     # Named mode
+  - entity: sensor.humidity
+    dashMode: [10, 4, 2, 4]  # Custom pattern
+```
+
+Named modes:
+
+| Value | Description |
+|---|---|
+| *(absent)* | Solid line (default) |
+| `points` | Fine dots |
+| `shortlines` | Short dashes |
+| `longlines` | Long dashes |
+| `pointline` | Long dash — dot alternation |
+
+Custom pattern: an array of pixel lengths `[on, off, on, off, ...]` following the Canvas `setLineDash` convention, repeated cyclically. For example `[10, 4]` draws 10 px dashes with 4 px gaps, and `[15, 3, 3, 3]` alternates a long dash and a short dot.
+
+### Displaying individual samples
+
+Holding the `Alt` key (or `Option` key on Mac) while hovering over a graph will reveal all the individual samples making up the line chart:
+
+![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
+
+If you would like to permanently show individual samples for certain graphs, this can be configured at the graph level using `showSamples`, or per entity using `showPoints`. Both options accept a boolean or a numeric radius in pixels:
+
+```yaml
+type: custom:history-explorer-card
+entityOptions:
+  humidity:
+    showSamples: true    # always show sample dots for humidity graphs (radius 4px)
+    showSamples: 6       # or specify the dot radius in pixels
+graphs:
+  - type: line
+    options:
+      showSamples: true  # show samples for this entire manually defined graph
+    entities:
+      - entity: sensor.outside_temperature
+        showPoints: true  # show dots on this entity only (radius 4px)
+        showPoints: 3     # or specify a custom radius in pixels
+```
+
+The `showPoints` option is also available in `entityOptions` and `entityPatterns` (see below), making it easy to apply uniformly across entity families.
 
 ### Y axis scaling
 
@@ -272,9 +317,9 @@ showCurrentValues: true
 
 ### Data decimation
 
-The card will automatically reduce the data shown in the charts and remove details that would not be visible or useful at a given time range. For example, if you view a per-hour history, nothing will be removed and you will be able to explore the raw data, point by point. If you view an entire week at once, there's no need to show data that changed every few seconds, you couldn't even see it. The card will simplify the curves and make the experience a lot faster that way.
+The card will automatically reduce the data shown in the charts and remove details that would not be visible or useful at a given time range. For example, if you view a per-hour history, nothing will be removed and you will be able to explore the raw data, point by point. If you view an entire week at once, there's no need to show data that changed every few seconds, you couldn't even see it. The card will simplify the curves and make the experience a lot faster that way. 
 
-This feature can be turned off in the options if you want, either globally or by entity. Two different decimation algorithms are available. By default, a fast approximate one is used, offering highest rendering performance and a relatively good approximation of the graph shape at lower zoom levels. Optionally, an accurate decimation mode can be enabled. It offers accurate representation of local minima and maxima, at all zoom ranges. But rendering will be slower. Decimation mode can be selected globally at the card level or per entity.
+This feature can be turned off in the options if you want, either globally or by entity. Two different decimation algorithms are available. By default, a fast approximate one is used, offering highest rendering performance and a relatively good approximation of the graph shape at lower zoom levels. Optionally, an accurate decimation mode can be enabled. It offers accurate representation of local minima and maxima, at all zoom ranges. But rendering will be slower. Decimation mode can be selected globally at the card level, or per entity via `entityOptions` or `entityPatterns`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -289,26 +334,15 @@ Decimation works on state timelines by merging very small state changes into 'mu
 
 ![history-panel-timeline-multiple](https://github.com/alexarch21/history-explorer-card/raw/main/images/screenshots/history-panel-timeline-multiple.png)
 
-
-### Displaying individual samples
-
-Holding the `Alt` key (or `Option` key on Mac) while hovering over a graph will reveal all the individual samples making up the line chart:
-
-![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
-
-If you would like to permanently show individual samples for certain graphs, this can be configured per graph using the `showSamples` option:
+Per-entity decimation example:
 
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
-  humidity:
-    showSamples: true      # always show samples for humidity graphs
-graphs:
-  - type: line
-    options:
-      showSamples: true    # explicitly show samples for this manually defined graph
-    entities:
-      - entity: sensor.outside_temperature
+  sensor.fast_sensor:
+    decimation: false    # always show raw data for this entity
+  temperature:
+    decimation: accurate # minmax preserving for all temperature sensors
 ```
 
 ### Bar graphs for total increasing entities
@@ -493,13 +527,78 @@ entityOptions:
     fill: rgba(0,0,0,0.2)   # Optional background color for the arrows
 ```
 
+#### Complete list of entityOptions properties
+
+All of the following properties can be used under `entityOptions` (keyed by entity id, device class or domain), under `entityPatterns` (matched by glob pattern, see below), and directly on entities in manually defined `graphs`.
+
+| Property | Type | Description |
+|---|---|---|
+| `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
+| `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
+| `fill` | string | Fill color under the line |
+| `width` | number | Line width in pixels |
+| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped` |
+| `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
+| `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
+| `scale` | number | Multiply all values by this factor before display |
+| `hidden` | boolean | Hide this entity by default in the legend |
+| `ymin` | number | Lock the Y axis minimum to this value |
+| `ymax` | number | Lock the Y axis maximum to this value |
+| `ystepSize` | number | Fix the Y axis tick step size |
+| `height` | number | Graph height in pixels (overrides global height settings) |
+| `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
+| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `netBars` | boolean | Enable net metering mode for bar graphs |
+| `process` | string | Javascript expression to transform state values before display |
+| `showMinMax` | string or boolean | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
+| `showSamples` | boolean or number | Show sample dots for this graph (graph-level option). `true` = radius 4px, or numeric radius |
+
+### Pattern-based entity options
+
+`entityPatterns` allows applying options to any set of entities matched by a glob pattern, without having to list them individually under `entityOptions`. This is particularly useful when you have many similar sensors and want to apply consistent styling across them.
+
+```yaml
+type: custom:history-explorer-card
+entityPatterns:
+  - match: "sensor.temperature*"
+    lineMode: curves
+    showPoints: true
+    color: '#3e95cd'
+
+  - match: "sensor.*_power"
+    lineMode: lines
+    dashMode: [10, 4]
+    width: 2
+
+  - match: "sensor.*_energy*"
+    type: bar
+    decimation: accurate
+
+  - match: ["sensor.pressure*", "sensor.humidity*"]
+    lineMode: lines
+    ymin: 0
+```
+
+The `match` field accepts a single glob pattern string or a list of patterns. `*` matches any sequence of characters, `?` matches a single character. Patterns are tested against the full entity id (e.g. `sensor.outside_temperature`).
+
+#### Priority rules
+
+When multiple sources provide options for the same entity, they are applied in this order (highest priority first):
+
+1. `entityOptions` keyed by exact entity id
+2. `entityOptions` keyed by device class
+3. `entityOptions` keyed by domain
+4. `entityPatterns` — first matching pattern wins per property; subsequent matching patterns fill in any remaining unset properties
+
+Options from a higher-priority source always override those from a lower-priority source.
+
 ### Long term statistics
 
 When this setting is enabled, the card will try to pull in long term statistics for an entity once the limit of the history data is reached. The integration of both history sources is entirely seamless. You keep scrolling and zooming in or out of your data, as usual. The statistics and history data will be combined on the fly at all time ranges. This only works for entities that have long term statistics available. Graphs for all other entities will just become blank as soon as the history data limit is reached.
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-In the screenshot above, the blue graph is the outdoor temperature, the red graph is the temperature of a barn. The outdoor temperature has statistics available, the barn temperature does not. So you see the red line stopping where the history database retention period ends (Oct 11th). The outdoor temperature continues way past this point, as the card will turn to long term statistics. Note that the card will always prefer history data over long term statistics data if available, because it’s more precise.
+In the screenshot above, the blue graph is the outdoor temperature, the red graph is the temperature of a barn. The outdoor temperature has statistics available, the barn temperature does not. So you see the red line stopping where the history database retention period ends (Oct 11th). The outdoor temperature continues way past this point, as the card will turn to long term statistics. Note that the card will always prefer history data over long term statistics data if available, because it's more precise.
 
 Long term statistics support is enabled by default and is configured to use average values and hourly intervals. You can optionally configure the feature (or turn it off) or even force the use of statistics only, effectively turning off the use of the short term history state DB, by adding the following to the card YAML:
 
@@ -514,9 +613,50 @@ statistics:
 
 The (optional) mode parameter controls how the statistics data is processed before being integrated into the history stream. `mean` = use the average value, `min` = minimum value, `max` = max value. The default if the option is not present is mean. This setting does not apply to total_increasing values like energy sensors, which are calculated differently.
 
+### Showing the min/max statistical range
+
+The `showMinMax` option draws a shaded band between the min and max values available for an entity, using the entity's line color at low opacity — similar to the confidence band shown in the standard HA history panel. The mean or raw curve is always drawn on top of the band.
+
+Three modes are available:
+
+| Value | Band source | Description |
+|---|---|---|
+| `false` / absent | — | No band drawn (default) |
+| `true` / `statistics` | Long term statistics only | Band visible only on the portion of the graph fed by LTS (hourly/daily/monthly min and max). No band on the short term history portion. |
+| `history` / `states` | Statistics + history | Band visible on the full graph. On the statistics portion the LTS min/max is used. On the short term history portion, an additional statistics query is made in parallel to retrieve the corresponding hourly min/max, which is overlaid as a background band even while raw data points are shown in the foreground. |
+
+The `history` / `states` mode is more informative but requires an extra statistics API call for the visible time window, even when short term history data is available.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.outside_temperature
+        color: '#3e95cd'
+        showMinMax: statistics   # band on LTS portion only
+      - entity: sensor.outside_pressure
+        color: '#3ecd95'
+        showMinMax: history      # band on full graph, including history portion
+```
+
+`showMinMax` is also available in `entityOptions` and `entityPatterns`:
+
+```yaml
+type: custom:history-explorer-card
+entityOptions:
+  temperature:
+    showMinMax: statistics   # LTS band for all temperature sensors
+
+entityPatterns:
+  - match: "sensor.*_power"
+    showMinMax: history      # full band for all power sensors
+    lineMode: lines
+```
+
 ### Custom data processing functions
 
-The card supports user defined Javascript expressions modifying the data right before display through the `process` option. This can be used to filter or shape data, apply non-linear scaling or transform data from one graph type to another. The supplied JS expression is provided with the original input `state` value (can be a string or a number, depending on the graph and data source). The expression must evaluate to the desired new state. Complex custom processing functions can degrade rendering performance.
+The card supports user defined Javascript expressions modifying the data right before display through the `process` option. This can be used to filter or shape data, apply non-linear scaling or transform data from one graph type to another. The supplied JS expression is provided with the original input `state` value (can be a string or a number, depending on the graph and data source). The expression must evaluate to the desired new state. Complex custom processing functions can degrade rendering performance. 
 
 Custom processing functions works for dyanmically added entities, manually defined YAML graphs and graphs in the more info panel.
 
@@ -534,7 +674,7 @@ Example of a spike rejection filter for dynamic temperature entities, removing i
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
-  temperature:
+  temperature:  
     process: '( Math.abs(state) < 100 ) ? state : "unavailable"'
 ```
 
@@ -555,7 +695,7 @@ csv:
   numberLocale: 'en-US'     # Format numbers using the given locale. If this settings is not defined, the raw DB values will be written (no formatting).
 ```
 
-### Configuring the UI
+### Configuring the UI 
 
 #### Header text
 
@@ -691,7 +831,7 @@ tooltip:
 
 ### Changing the horizontal time tick density
 
-By default, time tick density is automatic and adjusts to the width of your screen. That’s always a compromise between looking good (no clipping), being readable at all screensizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
+By default, time tick density is automatic and adjusts to the width of your screen. That's always a compromise between looking good (no clipping), being readable at all screensizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
 
 ```yaml
 timeTicks:
@@ -719,7 +859,7 @@ Overriding the density will disable automatic density calculations depending on 
 
 ### Multiple cards
 
-You can have multiple history explorer cards on the same view or over several views and dashboards. Each card has its own configuration. For the cards to be able to manage their respective configurations, each card needs its own unique name. When adding the card over the UI, a random name is assigned by default. You can adjust the name if needed. If you add the card manually over YAML, you will have to provide your own unique name for each card.
+You can have multiple history explorer cards on the same view or over several views and dashboards. Each card has its own configuration. For the cards to be able to manage their respective configurations, each card needs its own unique name. When adding the card over the UI, a random name is assigned by default. You can adjust the name if needed. If you add the card manually over YAML, you will have to provide your own unique name for each card. 
 
 If you only use a single history explorer card on your Lovelace, then the name is optional.
 
@@ -788,6 +928,16 @@ stateColors:
   person.not_home: yellow
 decimation: false
 header: 'My sample history'
+entityPatterns:
+  - match: "sensor.*_power"
+    lineMode: lines
+    dashMode: [10, 4]
+    width: 2
+    showPoints: true
+  - match: "sensor.temperature*"
+    lineMode: curves
+    color: '#3e95cd'
+    showMinMax: statistics
 graphs:
   - type: line
     options:
