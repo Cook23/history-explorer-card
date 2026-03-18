@@ -5,7 +5,7 @@ import "../deps/timeline.js";
 import "../deps/md5.js"
 import "../deps/FileSaver.js"
 
-import { vertline_plugin } from "./history-chart-vline.js";
+import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
 import { stateColors, stateColorsDark, defaultColors, parseColor, parseColorRange } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
@@ -934,7 +934,7 @@ export class HistoryCardState {
                             if( k >= 0 ) {
                                 let n = this.cache[i].data[k].length;
                                 if( n > 0 ) {
-                                    result[j].unshift({ "last_changed": this.cache[c0].start, "state": this.cache[i].data[k][n-1].state });
+                                    result[j].unshift({ "last_changed": this.cache[i].data[k][n-1].last_changed, "state": this.cache[i].data[k][n-1].state });
                                     break;
                                 }
                             }
@@ -1097,14 +1097,25 @@ export class HistoryCardState {
     {
         const m = this.statistics.mode;
 
+        // Build entity -> showMinMax lookup
+        const mmMap = {};
+        for( const g of this.graphs )
+            for( const e of g.entities )
+                if( e.showMinMax ) mmMap[e.entity] = e.showMinMax;
+
         let r = [];
 
         for( let entity in result ) {
             const a = result[entity];
+            const wantMM = mmMap[entity];
             let j = [];
-            j.push({'last_changed' : a[0].start, 'state' : a[0][m] ?? a[0].state, 'entity_id' : entity});
+            const pt0 = {'last_changed' : a[0].start, 'state' : a[0][m] ?? a[0].state, 'entity_id' : entity};
+            if( wantMM && a[0].min != null ) { pt0.yMin = a[0].min; pt0.yMax = a[0].max ?? a[0].min; }
+            j.push(pt0);
             for( let i = 1; i < a.length; i++ ) {
-                j.push({'last_changed' : a[i].start, 'state' : a[i][m] ?? a[i].state});
+                const pt = {'last_changed' : a[i].start, 'state' : a[i][m] ?? a[i].state};
+                if( wantMM && a[i].min != null ) { pt.yMin = a[i].min; pt.yMax = a[i].max ?? a[i].min; }
+                j.push(pt);
             }
             r.push(j);
         }
@@ -1112,6 +1123,21 @@ export class HistoryCardState {
         this.loader.loadingStats = true;
 
         this.loaderCallback(r);
+    }
+
+    minmaxCallback(result)
+    {
+        // Store hourly min/max keyed by entity then by hour-aligned timestamp (ms)
+        if( !this.minmaxCache ) this.minmaxCache = {};
+        for( const entity in result ) {
+            this.minmaxCache[entity] = {};
+            for( const pt of result[entity] ) {
+                if( pt.min != null ) {
+                    const ts = moment(pt.start).valueOf();
+                    this.minmaxCache[entity][ts] = { yMin: pt.min, yMax: pt.max ?? pt.min };
+                }
+            }
+        }
     }
 
     loaderCallbackWS(result)
@@ -1263,17 +1289,43 @@ export class HistoryCardState {
                             for( let i = 0; i < n; i++ ) {
                                 const state = this.process(result[id][i].state, process);
                                 if( isDataValid(state) ) {
-                                    s.push({ x: result[id][i].last_changed, y: state * scale});
+                                    {
+                                    const pt = { x: result[id][i].last_changed, y: state * scale };
+                                    const showMM = g.entities[j].showMinMax;
+                                    if( showMM ) {
+                                        if( result[id][i].yMin != null ) {
+                                            pt.yMin = result[id][i].yMin * scale;
+                                            pt.yMax = result[id][i].yMax * scale;
+                                        } else if( (showMM === 'history' || showMM === 'states') && this.minmaxCache?.[g.entities[j].entity] ) {
+                                            const mm = this.minmaxCache[g.entities[j].entity];
+                                            const ts = moment(result[id][i].last_changed).valueOf();
+                                            const bucket = Math.floor(ts / 3600000) * 3600000;
+                                            const slot = mm[bucket] ?? mm[bucket - 3600000];
+                                            if( slot ) { pt.yMin = slot.yMin * scale; pt.yMax = slot.yMax * scale; }
+                                        }
+                                    }
+                                    s.push(pt);
+                                }
                                 }
                             }
                         }
 
                         if( m_now > m_end && s.length > 0 && moment(s[s.length-1].x) < m_end ) {
                             const state = this.process(result[id][n-1].state, process);
-                            if( isDataValid(state) ) s.push({ x: m_end, y: state * scale});
+                            if( isDataValid(state) ) {
+                                const pt = { x: m_end, y: state * scale };
+                                const showMM = g.entities[j].showMinMax;
+                                if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
+                                s.push(pt);
+                            }
                         } else if( m_now <= m_end && s.length > 0 && moment(s[s.length-1].x) < m_now ) {
                             const state = this.process(result[id][n-1].state, process);
-                            if( isDataValid(state) ) s.push({ x: m_now, y: state * scale});
+                            if( isDataValid(state) ) {
+                                const pt = { x: m_now, y: state * scale };
+                                const showMM = g.entities[j].showMinMax;
+                                if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
+                                s.push(pt);
+                            }
                         }
 
                     } else if( g.type == 'bar' && n > 0 ) {
@@ -1470,18 +1522,35 @@ export class HistoryCardState {
                     borderColor: d.bColor,
                     backgroundColor: d.fillColor,
                     borderWidth: d.width,
-                    borderDash: ( d.dashMode === 'points' ) ? [1, 5] : ( d.dashMode === 'shortlines' ) ? [5, 5] : ( d.dashMode === 'longlines' ) ? [10, 8] : ( d.dashMode === 'pointline' ) ? [15, 3, 3, 3] : undefined,
-                    pointRadius: config?.showSamples ? 4 : 0,
+                    borderDash: Array.isArray(d.dashMode) ? d.dashMode : ( d.dashMode === 'points' ) ? [1, 5] : ( d.dashMode === 'shortlines' ) ? [5, 5] : ( d.dashMode === 'longlines' ) ? [10, 8] : ( d.dashMode === 'pointline' ) ? [15, 3, 3, 3] : undefined,
+                    pointRadius: (() => {
+                        if( d.showPoints !== undefined ) {
+                            if( d.showPoints === false || d.showPoints === 0 ) return 0;
+                            if( d.showPoints === true ) return 4;
+                            return +d.showPoints;
+                        }
+                        return config?.showSamples ? ( config.showSamples === true ? 4 : +config.showSamples ) : 0;
+                    })(),
+                    pointStyle: 'circle',
+                    pointBackgroundColor: d.bColor,
+                    pointHoverRadius: (() => {
+                        if( d.showPoints !== undefined && d.showPoints !== false && d.showPoints !== 0 ) {
+                            const r = d.showPoints === true ? 4 : +d.showPoints;
+                            return r + 2;
+                        }
+                        return config?.showSamples ? ( config.showSamples === true ? 6 : +config.showSamples + 2 ) : 5;
+                    })(),
                     hitRadius: 5,
                     label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit) : d.name,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
-                    cubicInterpolationMode: ( d.mode !== 'stepped' && d.mode !== 'lines' ) ? 'monotone' : 'default',
-                    lineTension: ( d.mode === 'lines' ) ? 0 : undefined,
+                    cubicInterpolationMode: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 'monotone' : 'default',
+                    lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.3,
                     domain: d.domain,
                     entity_id: d.entity_id,
                     unit: d.unit,
                     hidden: d.hidden,
+                    showMinMax: d.showMinMax ? true : false,
                     data: { }
                 });
                 scaleUnit = scaleUnit ?? d.unit;
@@ -1660,7 +1729,7 @@ export class HistoryCardState {
                 }
             },
 
-            plugins: [vertline_plugin]
+            plugins: [vertline_plugin, minmaxfill_plugin]
 
         });
 
@@ -1750,6 +1819,25 @@ export class HistoryCardState {
                         entity_ids: l
                     };
                     this._hass.callWS(d).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
+
+                    // Parallel statistics query for entities with showMinMax:'history'/'states'
+                    const lmm = [];
+                    for( const g of this.graphs )
+                        for( const e of g.entities ) {
+                            const v = e.showMinMax;
+                            if( v === 'history' || v === 'states' || v === true || v === 'statistics' )
+                                lmm.push(e.entity);
+                        }
+                    if( lmm.length ) {
+                        const dmm = {
+                            type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? 'recorder/statistics_during_period' : 'history/statistics_during_period',
+                            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+                            end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+                            period: this.statistics.period ?? 'hour',
+                            statistic_ids: lmm
+                        };
+                        this._hass.callWS(dmm).then(this.minmaxCallback.bind(this), () => {});
+                    }
 
                 } else {
 
@@ -2258,7 +2346,38 @@ export class HistoryCardState {
             }
         }
 
+        // Apply entityPatterns: glob matching, all matching patterns merged (first wins per key)
+        const patterns = this.pconfig.entityPatterns;
+        if( patterns && patterns.length ) {
+            let patched = {};
+            for( const p of patterns ) {
+                if( !p.match ) continue;
+                if( this._matchGlob(entity, p.match) ) {
+                    const { match, ...opts } = p;
+                    for( const k in opts ) {
+                        if( !(k in patched) ) patched[k] = opts[k];
+                    }
+                }
+            }
+            if( Object.keys(patched).length ) {
+                c = Object.assign({}, patched, c ?? {});
+            }
+        }
+
         return c ?? undefined;
+    }
+
+    _matchGlob(str, pattern)
+    {
+        // Supports * (any chars) and ? (single char); pattern can be a string or array of strings
+        if( Array.isArray(pattern) ) return pattern.some(p => this._matchGlob(str, p));
+        const parts = pattern.split('*');
+        const escaped = parts.map(function(seg) {
+            return seg.split('?').map(function(part) {
+                return part.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+            }).join('.');
+        });
+        return new RegExp('^' + escaped.join('.*') + '$').test(str);
     }
 
     calcGraphHeight(type, n, h)
@@ -2358,6 +2477,9 @@ export class HistoryCardState {
             entities[0].scale = entityOptions?.scale;
             entities[0].hidden = entityOptions?.hidden;
             entities[0].netBars = entityOptions?.netBars;
+            entities[0].showPoints = entityOptions?.showPoints;
+            entities[0].decimation = entityOptions?.decimation;
+            entities[0].showMinMax = entityOptions?.showMinMax;
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
@@ -2431,6 +2553,8 @@ export class HistoryCardState {
                 "dashMode": d.dashMode,
                 "mode": d.lineMode || this.pconfig.defaultLineMode, 
                 "width": d.width || this.pconfig.defaultLineWidth,
+                "showPoints": d.showPoints,
+                "showMinMax": d.showMinMax,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
@@ -3280,6 +3404,7 @@ class HistoryExplorerCard extends HTMLElement
         }
 
         this.instance.pconfig.entityOptions = config.entityOptions;
+        this.instance.pconfig.entityPatterns = config.entityPatterns ?? [];
 
         this.instance.pconfig.labelAreaWidth =         config.labelAreaWidth ?? 65;
         this.instance.pconfig.labelsVisible =          config.labelsVisible ?? true;
