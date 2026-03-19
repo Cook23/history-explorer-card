@@ -5,7 +5,7 @@
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024). The changes below are applied on top of version 1.0.54.
+> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024). The changes below are applied on top of version 1.0.54, released as version 1.1.0.
 
 This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
@@ -23,7 +23,9 @@ This card offers a highly interactive and configurable way to view the history o
 
 - **Line mode `lines` — spline overshoots corrected.** The original code applied Catmull-Rom interpolation (`cubicInterpolationMode: 'default'`) even in `lines` mode, causing visible spikes at measurement points. Fixed: `lines` and `stepped` now use strict monotone interpolation with zero tension, guaranteeing that the curve passes exactly through each data point without any deviation.
 
-- **Curve mode `curves` — unnatural transitions corrected.** The original used `monotone` (Steffen) interpolation for `curves`, which produced asymmetric, flattened transitions around plateaus. Fixed: `curves` now uses Catmull-Rom (`default`) with tension 0.3, giving smooth, natural-looking curves with a modest and acceptable overshoot.
+- **Curve mode `curves` — unnatural transitions and horizontal overshoots corrected.** The original used `monotone` (Steffen) interpolation for `curves` with undefined tension (Chart.js default 0.4), which produced asymmetric flattened transitions. Worse, switching to Catmull-Rom (`default`) introduced backward movement on the time axis on steep fronts. Fixed: all modes now use monotone interpolation (which mathematically guarantees no backward X movement), with tension 0.1 for `curves` — a good compromise between visual smoothness and data fidelity, appropriate for signals already filtered by a first-order low-pass.
+
+- **Line rendering — sharp pointed corners and tapering ends corrected.** Canvas HTML5 default join style (`miter`) caused the line to taper to a point at direction changes. Fixed: `borderJoinStyle` and `borderCapStyle` are now set to `round` for all line modes, giving constant stroke width at corners and rounded line ends.
 
 - **Cache anchor point — spurious vertical spikes on graph start.** When retrieving the last known state from the cache slot preceding the visible window, the original code forced its timestamp to the exact left edge of the window regardless of when the state actually occurred. This created an artificial instant transition at graph start. Fixed: the real `last_changed` timestamp of the cached state is now used.
 
@@ -40,6 +42,10 @@ This card offers a highly interactive and configurable way to view the history o
 - **`decimation`** was read per-entity from `g.entities[j].decimation` in the rendering loop but was never populated from `entityOptions`. It is now correctly wired, making per-entity decimation control fully functional via `entityOptions` and `entityPatterns`.
 
 - **`showPoints`** was similarly missing from the entity options pipeline and is now fully wired through `entityOptions`, `entityPatterns`, and the datasets builder.
+
+### Quality of life
+
+- **`lineMode` accepts singular aliases.** `line`, `curve` and `step` are now accepted in addition to `lines`, `curves` and `stepped`. The value is normalized at all entry points (global config, `entityOptions`, `entityPatterns`, and static YAML graphs).
 
 ---
 
@@ -192,11 +198,13 @@ legendVisible: false
 
 ### Line interpolation modes
 
-Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines, the default, produce smooth natural-looking curves with a slight overshoot tolerance around steep gradients. Line segments connect data points with straight lines using strict linear interpolation — no overshoot possible. Stepped mode shows the raw quantized data as a staircase.
+Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase.
+
+All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves`, `lines` or `stepped`. The default if the option is not present is `curves`.
+You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`) or `stepped` (or `step`). The default if the option is not present is `curves`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -205,7 +213,7 @@ lineMode: lines
 
 The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see the `entityOptions` and `entityPatterns` sections below).
 
-A small margin will be added to the top and bottom of line charts, so to give some headroom to curves should they overshoot and make it visually nicer. You can turn off these margins if you don't want the additional space. It's recommended to use `lines` or `stepped` mode if you remove both margins to avoid curves overshooting outside of the chart area:
+A small margin will be added to the top and bottom of line charts, so to give some headroom and make it visually nicer. You can turn off these margins if you don't want the additional space:
 
 ```yaml
 type: custom:history-explorer-card
