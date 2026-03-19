@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.0.54';
+const Version = '1.1.0';
 
 export const isMobile = ( navigator.appVersion.indexOf("Mobi") > -1 ) || ( navigator.userAgent.indexOf("HomeAssistant") > -1 );
 
@@ -202,6 +202,15 @@ export class HistoryCardState {
     // --------------------------------------------------------------------------------------
     // Color queries
     // --------------------------------------------------------------------------------------
+
+    normalizeLineMode(m)
+    {
+        // Accept singular aliases: 'line' -> 'lines', 'curve' -> 'curves', 'step' -> 'stepped'
+        if( m === 'line'  ) return 'lines';
+        if( m === 'curve' ) return 'curves';
+        if( m === 'step'  ) return 'stepped';
+        return m;
+    }
 
     getNextDefaultColor()
     {
@@ -1544,13 +1553,15 @@ export class HistoryCardState {
                     label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit) : d.name,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
-                    cubicInterpolationMode: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 'monotone' : 'default',
-                    lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.3,
+                    cubicInterpolationMode: 'monotone',
+                    lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
                     domain: d.domain,
                     entity_id: d.entity_id,
                     unit: d.unit,
                     hidden: d.hidden,
                     showMinMax: d.showMinMax ? true : false,
+                    borderJoinStyle: 'round',
+                    borderCapStyle: 'round',
                     data: { }
                 });
                 scaleUnit = scaleUnit ?? d.unit;
@@ -2473,7 +2484,7 @@ export class HistoryCardState {
 
             entities[0].dashMode = entityOptions?.dashMode;
             entities[0].width = entityOptions?.width;
-            entities[0].lineMode = entityOptions?.lineMode;
+            entities[0].lineMode = this.normalizeLineMode(entityOptions?.lineMode);
             entities[0].scale = entityOptions?.scale;
             entities[0].hidden = entityOptions?.hidden;
             entities[0].netBars = entityOptions?.netBars;
@@ -2483,7 +2494,7 @@ export class HistoryCardState {
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
-                entities[0].lineMode = entityOptions?.lineMode ?? 'lines';
+                entities[0].lineMode = this.normalizeLineMode(entityOptions?.lineMode) ?? 'lines';
             }
 
         }
@@ -2551,7 +2562,7 @@ export class HistoryCardState {
                 "bColor": parseColor(d.color),
                 "fillColor": parseColor(d.fill), 
                 "dashMode": d.dashMode,
-                "mode": d.lineMode || this.pconfig.defaultLineMode, 
+                "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode, 
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
@@ -3421,7 +3432,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.stateTextMode =          config.stateTextMode ?? 'auto';
         this.instance.pconfig.decimation =             config.decimation;
         this.instance.pconfig.roundingPrecision =      config.rounding || 2;
-        this.instance.pconfig.defaultLineMode =        config.lineMode;
+        this.instance.pconfig.defaultLineMode =        this.instance.normalizeLineMode(config.lineMode);
         this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? 2.0;
         this.instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
         this.instance.pconfig.showCurrentValues =      config.showCurrentValues ?? true;
