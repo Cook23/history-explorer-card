@@ -2507,36 +2507,31 @@ export class HistoryCardState {
 
     getEntityOptions(entity)
     {
-        let c;
+        let c = this.pconfig.entityOptions?.[entity];
+        if( !c ) {
+            const dc = this.getDeviceClass(entity);
+            c = dc ? this.pconfig.entityOptions?.[dc] : undefined;
+            if( !c ) {
+                const dm = this.getDomainForEntity(entity);
+                c = dm ? this.pconfig.entityOptions?.[dm] : undefined;
+            }
+        }
 
+        // If entityOptions is a list, apply glob matching (same logic as former entityPatterns)
         if( Array.isArray(this.pconfig.entityOptions) ) {
-            // List form: each entry has a 'match' glob pattern (or no match = exact entity id key)
-            // Entries without 'match' are treated as exact entity id matches using an 'entity' key,
-            // or skipped. First matching entry wins per key.
             let patched = {};
             for( const p of this.pconfig.entityOptions ) {
-                const matchKey = p.match ?? p.entity;
-                if( !matchKey ) continue;
-                if( this._matchGlob(entity, matchKey) ||
-                    matchKey === this.getDeviceClass(entity) ||
-                    matchKey === this.getDomainForEntity(entity) ) {
+                const key = p.match ?? p.entity;
+                if( !key ) continue;
+                if( this._matchGlob(entity, key) ) {
                     const { match, entity: _e, ...opts } = p;
                     for( const k in opts ) {
                         if( !(k in patched) ) patched[k] = opts[k];
                     }
                 }
             }
-            if( Object.keys(patched).length ) c = patched;
-        } else {
-            // Dict form (original behaviour): lookup by entity id, device class, domain
-            c = this.pconfig.entityOptions?.[entity];
-            if( !c ) {
-                const dc = this.getDeviceClass(entity);
-                c = dc ? this.pconfig.entityOptions?.[dc] : undefined;
-                if( !c ) {
-                    const dm = this.getDomainForEntity(entity);
-                    c = dm ? this.pconfig.entityOptions?.[dm] : undefined;
-                }
+            if( Object.keys(patched).length ) {
+                c = Object.assign({}, patched, c ?? {});
             }
         }
 

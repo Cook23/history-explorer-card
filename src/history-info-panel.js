@@ -55,7 +55,7 @@ function hecHookInfoPanel()
 
     __fn.prototype._setEntityOptions = function(instance)
     {
-        const entity_id = this.__entityId;
+        const entity_id = this.entityId;
 
         const entityOptions = instance.getEntityOptions(entity_id);
 
@@ -273,17 +273,17 @@ function hecHookInfoPanel()
             this.hec_instance = new HistoryCardState();
 
             this.hec_instance._this = this.shadowRoot;
-            this.hec_instance._hass = this.__hass;
+            this.hec_instance._hass = this.hass;
 
-            this.hec_instance.version = this.__hass.config.version.split('.').map(Number);
+            this.hec_instance.version = this.hass.config.version.split('.').map(Number);
 
-            if( isExcluded(this.__hass, this.__entityId) ) {
+            if( isExcluded(this.hass, this.entityId) ) {
                 return this._oldUpdated(changedProps);
             }
 
             this._injectHistoryExplorer(this.hec_instance);
 
-            hec_panel.lc = this.__hass.states[this.__entityId]?.last_changed;
+            hec_panel.lc = this.hass.states[this.entityId]?.last_changed;
 
         } else {
 
@@ -294,7 +294,7 @@ function hecHookInfoPanel()
                 this.hec_instance.updateHistoryWithClearCache();
             }
 
-            const lc = this.__hass.states[this.__entityId]?.last_changed;
+            const lc = this.hass.states[this.entityId]?.last_changed;
 
             // Update history when the shown entity state changes
             if( hec_panel.lc != lc ) {
@@ -323,16 +323,16 @@ function hecHookInfoPanel()
         if( !this.hec_instance ) 
             readLocalConfig();
 
-        const entity_id = this.__entityId;
+        const entity_id = this.entityId;
 
-        if( isExcluded(this.__hass, entity_id) ) {
+        if( isExcluded(this.hass, entity_id) ) {
             return this._oldRender();
         }
 
-        const entityOptions = getEntityOptions(this.__hass, hec_panel?.config?.entityOptions, entity_id);
+        const entityOptions = getEntityOptions(this.hass, hec_panel?.config?.entityOptions, entity_id);
 
-        const uom = this.__hass.states[entity_id]?.attributes?.unit_of_measurement;
-        const sc = this.__hass.states[entity_id]?.attributes?.state_class;
+        const uom = this.hass.states[entity_id]?.attributes?.unit_of_measurement;
+        const sc = this.hass.states[entity_id]?.attributes?.state_class;
         const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
         const h = calcGraphHeight(type);
@@ -346,8 +346,8 @@ function hecHookInfoPanel()
         const invertZoom = hec_panel?.config?.uiLayout?.invertZoom === true;
         const interval = hec_panel?.config?.uiLayout?.interval != 'hide';
 
-        if( hec_panel.entity !== this.__entityId ) {
-            hec_panel.entity = this.__entityId;
+        if( hec_panel.entity !== this.entityId ) {
+            hec_panel.entity = this.entityId;
             hec_panel.show = undefined;
             if( this.hec_instance ) this._recreate = true;
         }
