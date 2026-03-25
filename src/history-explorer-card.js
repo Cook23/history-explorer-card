@@ -40,6 +40,8 @@ var panstate = {};
     panstate.overlay = null;
     panstate.st0 = null;
     panstate.st1 = null;
+    panstate.yaxis = null;
+    panstate.pinch = null;  // { p1, p2, distY, y0, y1 } when two fingers active
 
 
 // --------------------------------------------------------------------------------------
@@ -1923,6 +1925,86 @@ export class HistoryCardState {
         return moment(this.startTime) + moment(this.endTime).diff(this.startTime) * f;
     }
 
+    yAxisTouchStart(event)
+    {
+        event.preventDefault();
+        const t = event.touches[0];
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#ya-${g.id}`) === event.target ) {
+                panstate.yaxis = {
+                    g,
+                    startY: t.clientY,
+                    y0: g.chart.scales['y-axis-0'].min,
+                    y1: g.chart.scales['y-axis-0'].max
+                };
+                break;
+            }
+        }
+    }
+
+    yAxisTouchMove(event)
+    {
+        event.preventDefault();
+        if( !panstate.yaxis ) return;
+        const t     = event.touches[0];
+        const p     = panstate.yaxis;
+        const g     = p.g;
+        const h     = g.chart.chartArea.bottom - g.chart.chartArea.top;
+        const dy    = t.clientY - p.startY;
+        const shift = dy * (p.y1 - p.y0) / h;
+        g.chart.options.scales.yAxes[0].ticks.min = p.y0 + shift;
+        g.chart.options.scales.yAxes[0].ticks.max = p.y1 + shift;
+        g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+        if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
+        g.yaxisLock = 2;
+        g.chart.update();
+    }
+
+    yAxisTouchEnd(event)
+    {
+        event.preventDefault();
+        panstate.yaxis = null;
+    }
+
+    yAxisPointerDown(event)
+    {
+        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#ya-${g.id}`) === event.target ) {
+                panstate.yaxis = {
+                    g,
+                    startY: event.clientY,
+                    y0: g.chart.scales['y-axis-0'].min,
+                    y1: g.chart.scales['y-axis-0'].max
+                };
+                break;
+            }
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    yAxisPointerMove(event)
+    {
+        if( !panstate.yaxis ) return;
+        const p     = panstate.yaxis;
+        const g     = p.g;
+        const h     = g.chart.chartArea.bottom - g.chart.chartArea.top;
+        const dy    = event.clientY - p.startY;
+        const shift = dy * (p.y1 - p.y0) / h;
+        g.chart.options.scales.yAxes[0].ticks.min = p.y0 + shift;
+        g.chart.options.scales.yAxes[0].ticks.max = p.y1 + shift;
+        g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+        if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
+        g.yaxisLock = 2;
+        g.chart.update();
+    }
+
+    yAxisPointerUp(event)
+    {
+        panstate.yaxis = null;
+    }
+
     pointerDown(event)
     {
         panstate.g = null;
@@ -1950,15 +2032,27 @@ export class HistoryCardState {
 
             event.target?.setPointerCapture(event.pointerId);
 
-            if( !this.state.zoomMode ) {            
+            if( !this.state.zoomMode ) {
 
-                this.state.drag = true;
+                if( this.state.drag && !panstate.pinch ) {
+                    // Second finger while panning — start vertical pinch zoom
+                    const p1 = { x: panstate.mx, y: panstate.my };
+                    const p2 = { x: event.clientX, y: event.clientY };
+                    const g  = panstate.g;
+                    panstate.pinch = {
+                        p1, p2,
+                        distY: Math.abs(p2.y - p1.y),
+                        y0: g.chart.scales['y-axis-0'].min,
+                        y1: g.chart.scales['y-axis-0'].max
+                    };
+                } else if( !panstate.pinch ) {
+                    // First finger — start pan
+                    this.state.drag = true;
+                    panstate.tc = this.startTime;
+                    this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : event.target;
+                }
 
-                panstate.tc = this.startTime;
-
-                this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : event.target;
-
-            } else {
+            } else if( this.state.zoomMode ) {
 
                 const x0 = panstate.mx - panstate.g.canvas.getBoundingClientRect().left;
 
@@ -2019,9 +2113,59 @@ export class HistoryCardState {
 
             }
 
-            if( event.shiftKey && Math.abs(event.clientY - panstate.ly) > 0 ) {
+            // Two-finger gestures: pinch zoom Y + pan Y
+            if( panstate.pinch ) {
+                const p = panstate.pinch;
 
-                // Drag with shift pressed, unlock the Y axis
+                // Track center of the two fingers before update
+                const prevCenterY = (p.p1.y + p.p2.y) / 2;
+
+                // Update whichever finger moved
+                const d1 = Math.abs(event.clientY - p.p1.y);
+                const d2 = Math.abs(event.clientY - p.p2.y);
+                if( d1 < d2 ) p.p1 = { x: event.clientX, y: event.clientY };
+                else           p.p2 = { x: event.clientX, y: event.clientY };
+
+                const newDistY   = Math.abs(p.p2.y - p.p1.y);
+                const newCenterY = (p.p1.y + p.p2.y) / 2;
+                const g          = panstate.g;
+                const h          = g.chart.chartArea.bottom - g.chart.chartArea.top;
+
+                // Pan Y: translate axis by center movement
+                const panDY = newCenterY - prevCenterY;
+                if( Math.abs(panDY) > 0 ) {
+                    const shift = panDY * (p.y1 - p.y0) / h;
+                    p.y0 -= shift;
+                    p.y1 -= shift;
+                    g.chart.options.scales.yAxes[0].ticks.min = p.y0;
+                    g.chart.options.scales.yAxes[0].ticks.max = p.y1;
+                    g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                    if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
+                    g.yaxisLock = 2;
+                    g.chart.update();
+                }
+
+                // Zoom Y: scale axis by finger spread change
+                if( p.distY > 5 && newDistY > 5 ) {
+                    const scale = p.distY / newDistY;
+                    const mid   = (p.y0 + p.y1) / 2;
+                    const half  = (p.y1 - p.y0) / 2 * scale;
+                    p.y0 = mid - half;
+                    p.y1 = mid + half;
+                    g.chart.options.scales.yAxes[0].ticks.min = p.y0;
+                    g.chart.options.scales.yAxes[0].ticks.max = p.y1;
+                    g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                    if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
+                    g.yaxisLock = 2;
+                    g.chart.update();
+                }
+
+                p.distY = newDistY;
+                return;
+            }
+
+            // Y drag — pan vertical axis (Shift on desktop, always on mobile)
+            if( (event.shiftKey || isMobile) && Math.abs(event.clientY - panstate.ly) > 0 ) {
 
                 panstate.ly = event.clientY;
 
@@ -2035,7 +2179,7 @@ export class HistoryCardState {
 
             }
 
-            if( !event.shiftKey ) {
+            if( !event.shiftKey && !isMobile ) {
                 panstate.ly = panstate.my = event.clientY;
                 panstate.y0 = panstate.g.chart.options.scales.yAxes[0].ticks.min;
                 panstate.y1 = panstate.g.chart.options.scales.yAxes[0].ticks.max;
@@ -2084,6 +2228,17 @@ export class HistoryCardState {
 
     pointerUp(event)
     {
+        if( panstate.pinch ) {
+            panstate.pinch = null;
+            // Resume pan with remaining finger
+            panstate.mx = event.clientX;
+            panstate.lx = event.clientX;
+            panstate.my = event.clientY;
+            panstate.ly = event.clientY;
+            panstate.tc = this.startTime;
+            return;
+        }
+
         if( this.state.drag ) {
 
             this.state.drag = false;
@@ -2165,6 +2320,11 @@ export class HistoryCardState {
 
     pointerCancel(event)
     {
+        if( panstate.pinch ) {
+            panstate.pinch = null;
+            return;
+        }
+
         if( this.state.drag ) {
 
             this.state.drag = false;
@@ -2347,31 +2507,36 @@ export class HistoryCardState {
 
     getEntityOptions(entity)
     {
-        let c = this.pconfig.entityOptions?.[entity];
-        if( !c ) {
-            const dc = this.getDeviceClass(entity);
-            c = dc ? this.pconfig.entityOptions?.[dc] : undefined;
-            if( !c ) {
-                const dm = this.getDomainForEntity(entity);
-                c = dm ? this.pconfig.entityOptions?.[dm] : undefined;
-            }
-        }
+        let c;
 
-        // Apply entityPatterns: glob matching, all matching patterns merged (first wins per key)
-        const patterns = this.pconfig.entityPatterns;
-        if( patterns && patterns.length ) {
+        if( Array.isArray(this.pconfig.entityOptions) ) {
+            // List form: each entry has a 'match' glob pattern (or no match = exact entity id key)
+            // Entries without 'match' are treated as exact entity id matches using an 'entity' key,
+            // or skipped. First matching entry wins per key.
             let patched = {};
-            for( const p of patterns ) {
-                if( !p.match ) continue;
-                if( this._matchGlob(entity, p.match) ) {
-                    const { match, ...opts } = p;
+            for( const p of this.pconfig.entityOptions ) {
+                const matchKey = p.match ?? p.entity;
+                if( !matchKey ) continue;
+                if( this._matchGlob(entity, matchKey) ||
+                    matchKey === this.getDeviceClass(entity) ||
+                    matchKey === this.getDomainForEntity(entity) ) {
+                    const { match, entity: _e, ...opts } = p;
                     for( const k in opts ) {
                         if( !(k in patched) ) patched[k] = opts[k];
                     }
                 }
             }
-            if( Object.keys(patched).length ) {
-                c = Object.assign({}, patched, c ?? {});
+            if( Object.keys(patched).length ) c = patched;
+        } else {
+            // Dict form (original behaviour): lookup by entity id, device class, domain
+            c = this.pconfig.entityOptions?.[entity];
+            if( !c ) {
+                const dc = this.getDeviceClass(entity);
+                c = dc ? this.pconfig.entityOptions?.[dc] : undefined;
+                if( !c ) {
+                    const dm = this.getDomainForEntity(entity);
+                    c = dm ? this.pconfig.entityOptions?.[dm] : undefined;
+                }
             }
         }
 
@@ -2453,6 +2618,15 @@ export class HistoryCardState {
         // For line and bar graphs connect the scale lock button listener
         if( g.graph.type == 'line' || g.graph.type == 'bar' ) {
             this._this.querySelector(`#ca-${g.id}`)?.addEventListener('click', this.scaleLockClicked.bind(this));
+            const yaEl1 = this._this.querySelector(`#ya-${g.id}`);
+            if( yaEl1 ) {
+                yaEl1.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
+                yaEl1.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
+                yaEl1.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
+                yaEl1.addEventListener('touchstart',  this.yAxisTouchStart.bind(this), { passive: false });
+                yaEl1.addEventListener('touchmove',   this.yAxisTouchMove.bind(this),  { passive: false });
+                yaEl1.addEventListener('touchend',    this.yAxisTouchEnd.bind(this),   { passive: false });
+            }
         }
     }
 
@@ -2521,13 +2695,15 @@ export class HistoryCardState {
         const h = this.calcGraphHeight(type, entities.length, entityOptions?.height);
 
         let html = '';
-        html += `<div style='height:${h}px'>`;
+        html += `<div style='height:${h}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
         html += `<button id='bc-${this.g_id}' style="position:absolute;right:20px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval ) 
             html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle);
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
+        if( type == 'line' || type == 'bar' )
+            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:${h}px;touch-action:none;cursor:ns-resize;"></div>`;
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -2541,8 +2717,18 @@ export class HistoryCardState {
             this._this.querySelector(`#bd-${this.g_id}`).addEventListener('change', this.selectBarInterval.bind(this));
 
         // For line and bar graphs connect the scale lock button listener
-        if( type == 'line' || type == 'bar' )
+        if( type == 'line' || type == 'bar' ) {
             this._this.querySelector(`#ca-${this.g_id}`)?.addEventListener('click', this.scaleLockClicked.bind(this));
+            const yaEl2 = this._this.querySelector(`#ya-${this.g_id}`);
+            if( yaEl2 ) {
+                yaEl2.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
+                yaEl2.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
+                yaEl2.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
+                yaEl2.addEventListener('touchstart',  this.yAxisTouchStart.bind(this), { passive: false });
+                yaEl2.addEventListener('touchmove',   this.yAxisTouchMove.bind(this),  { passive: false });
+                yaEl2.addEventListener('touchend',    this.yAxisTouchEnd.bind(this),   { passive: false });
+            }
+        }
 
         // Connect the close button event listener
         this._this.querySelector(`#bc-${this.g_id}`).addEventListener('click', this.removeGraph.bind(this));
@@ -3415,7 +3601,6 @@ class HistoryExplorerCard extends HTMLElement
         }
 
         this.instance.pconfig.entityOptions = config.entityOptions;
-        this.instance.pconfig.entityPatterns = config.entityPatterns ?? [];
 
         this.instance.pconfig.labelAreaWidth =         config.labelAreaWidth ?? 65;
         this.instance.pconfig.labelsVisible =          config.labelsVisible ?? true;
@@ -3506,12 +3691,14 @@ class HistoryExplorerCard extends HTMLElement
             if( g.id > 0 && spacing ) html += '<br>';
             if( g.graph.title !== undefined ) html += `<div style='text-align:center;'>${g.graph.title}</div>`;
             const h = this.instance.calcGraphHeight(g.graph.type, g.graph.entities.length, g.graph.options?.height);
-            html += `<div style='height:${h}px'>`;
+            html += `<div style='height:${h}px;position:relative'>`;
             html += `<canvas id="graph${g.id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
             if( g.graph.type == 'bar' && !this.instance.ui.hideInterval ) 
                 html += this.instance.createIntervalSelectorHtml(g.id, h, this.instance.parseIntervalConfig(g.graph.options?.interval), optionStyle);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += this.instance.createScaleLockIconHtml(g.id, h);
+            if( g.graph.type == 'line' || g.graph.type == 'bar' )
+                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:0;width:${this.instance.pconfig.labelAreaWidth}px;height:${h}px;touch-action:none;cursor:ns-resize;"></div>`;
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
