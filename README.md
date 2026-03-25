@@ -5,7 +5,7 @@
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024). The changes below are applied on top of version 1.0.54, released as version 1.1.0.
+> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024). The changes below are applied on top of version 1.0.54, released as version 1.1.4.
 
 This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
@@ -17,7 +17,30 @@ This card offers a highly interactive and configurable way to view the history o
 
 ### New option — pattern-based entity configuration
 
-- **`entityPatterns`** — applies display options to groups of entities matched by a glob pattern (`*` and `?` wildcards), without having to list each entity individually under `entityOptions`. All entity options (`color`, `fill`, `width`, `lineMode`, `dashMode`, `showPoints`, `showMinMax`, `decimation`, `scale`, `hidden`, `type`, `process`, `ymin`, `ymax`, `ystepSize`, `height`, `interval`, `netBars`) are supported. Priority: `entityOptions` by entity id > by device class > by domain > `entityPatterns` (first matching pattern wins per property).
+- **`entityOptions` now accepts a list form** with glob pattern matching, in addition to the original dict form. This makes it possible to apply display options to entire families of entities without listing them individually. All entity options are supported. The dict form is fully preserved for backward compatibility.
+
+```yaml
+# Dict form (original, unchanged)
+entityOptions:
+  sensor.temperature:
+    color: red
+  humidity:
+    lineMode: lines
+
+# List form (new) — supports glob patterns, entity ids, device classes and domains
+entityOptions:
+  - match: "sensor.*_power"
+    lineMode: lines
+    color: '#3e95cd'
+  - match: ["sensor.temperature*", "sensor.humidity*"]
+    lineMode: curves
+    showMinMax: statistics
+  - entity: sensor.sun_azimuth
+    type: arrowline
+    color: red
+```
+
+Priority in list form: first matching entry wins per property. Entries can match by exact entity id (`entity:` key), device class, domain, or glob pattern (`match:` key).
 
 ### Bug fixes
 
@@ -33,19 +56,24 @@ This card offers a highly interactive and configurable way to view the history o
 
 - **`dashMode`** — controls the stroke style of a line. Accepts the existing named modes (`points`, `shortlines`, `longlines`, `pointline`) and now also a custom Canvas `setLineDash` array, e.g. `dashMode: [10, 4, 2, 4]`. Previously only named modes were supported.
 
-- **`showPoints`** — permanently displays a dot at each measurement point on a line chart, independently per entity. Accepts `true` (radius 4 px) or a numeric radius in pixels. Available on individual entities, in `entityOptions` and in `entityPatterns`. The existing graph-level `showSamples` option has also been extended to accept a numeric radius.
+- **`showPoints`** — permanently displays a dot at each measurement point on a line chart, independently per entity. Accepts `true` (radius 4 px) or a numeric radius in pixels. Available on individual entities and in `entityOptions`. The existing graph-level `showSamples` option has also been extended to accept a numeric radius.
 
-- **`showMinMax`** — draws a shaded band between the statistical min and max values, using the line color at low opacity (similar to the HA standard history panel). Two modes: `statistics` (band only on the long-term statistics portion of the graph) and `history` / `states` (band on the full graph, with a parallel statistics query for the short-term history portion). Available per entity, in `entityOptions` and in `entityPatterns`.
+- **`showMinMax`** — draws a shaded band between the statistical min and max values, using the line color at low opacity (similar to the HA standard history panel). Two modes: `statistics` (band only on the long-term statistics portion of the graph) and `history` / `states` (band on the full graph, with a parallel statistics query for the short-term history portion). Available per entity and in `entityOptions`.
 
 ### Bug fix — missing `entityOptions` wiring
 
-- **`decimation`** was read per-entity from `g.entities[j].decimation` in the rendering loop but was never populated from `entityOptions`. It is now correctly wired, making per-entity decimation control fully functional via `entityOptions` and `entityPatterns`.
+- **`decimation`** was read per-entity from `g.entities[j].decimation` in the rendering loop but was never populated from `entityOptions`. It is now correctly wired, making per-entity decimation control fully functional via `entityOptions`.
 
-- **`showPoints`** was similarly missing from the entity options pipeline and is now fully wired through `entityOptions`, `entityPatterns`, and the datasets builder.
+- **`showPoints`** was similarly missing from the entity options pipeline and is now fully wired through `entityOptions` and the datasets builder.
 
 ### Quality of life
 
-- **`lineMode` accepts singular aliases.** `line`, `curve` and `step` are now accepted in addition to `lines`, `curves` and `stepped`. The value is normalized at all entry points (global config, `entityOptions`, `entityPatterns`, and static YAML graphs).
+- **`lineMode` accepts singular aliases.** `line`, `curve` and `step` are now accepted in addition to `lines`, `curves` and `stepped`. The value is normalized at all entry points (global config, `entityOptions`, and static YAML graphs).
+
+### New — mobile touch gestures
+
+- **Y axis drag** — dragging on the Y axis label area pans the Y scale vertically. Works on both desktop (cursor changes to `↕`) and mobile (dedicated touch handler with `preventDefault` to avoid page scroll interference).
+- **Two-finger pinch vertical** — zooms the Y axis in or out, centered on the current midpoint. Works on mobile via touch events.
 
 ---
 
@@ -211,7 +239,7 @@ type: custom:history-explorer-card
 lineMode: lines
 ```
 
-The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see the `entityOptions` and `entityPatterns` sections below).
+The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see the `entityOptions` section below).
 
 A small margin will be added to the top and bottom of line charts, so to give some headroom and make it visually nicer. You can turn off these margins if you don't want the additional space:
 
@@ -223,7 +251,7 @@ axisAddMarginMax: false
 
 ### Line stroke style
 
-The stroke style of a line can be customized per entity using the `dashMode` option. It is available in `entityOptions`, `entityPatterns` and in the per-entity YAML under `graphs`.
+The stroke style of a line can be customized per entity using the `dashMode` option. It is available in `entityOptions` and in the per-entity YAML under `graphs`.
 
 ```yaml
 entities:
@@ -269,7 +297,7 @@ graphs:
         showPoints: 3     # or specify a custom radius in pixels
 ```
 
-The `showPoints` option is also available in `entityOptions` and `entityPatterns` (see below), making it easy to apply uniformly across entity families.
+The `showPoints` option is also available in `entityOptions` (see below), making it easy to apply uniformly across entity families.
 
 ### Y axis scaling
 
@@ -280,6 +308,10 @@ Pressing the axis lock icon will temporarily disable autoscaling and lock the Y 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
 The Y axis can also be interactively modified. Pressing and holding the `SHIFT` key will unlock interactive zooming and panning of the graph in vertical direction. Pressing your mouse button while holding `SHIFT` over a graph will allow you to drag the graph into both horizontal and vertical directions. Using the mousewheel while holding `SHIFT` will change the Y axis scale. When interacting with the Y axis, the axis lock icon will automatically be enabled. Click the icon to go back to the default scale at any time.
+
+**On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
+
+**On mobile**, the same Y axis drag zone is available as a touch target. You can also use a two-finger vertical pinch on the graph to zoom the Y axis in or out.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
 
@@ -327,7 +359,7 @@ showCurrentValues: true
 
 The card will automatically reduce the data shown in the charts and remove details that would not be visible or useful at a given time range. For example, if you view a per-hour history, nothing will be removed and you will be able to explore the raw data, point by point. If you view an entire week at once, there's no need to show data that changed every few seconds, you couldn't even see it. The card will simplify the curves and make the experience a lot faster that way. 
 
-This feature can be turned off in the options if you want, either globally or by entity. Two different decimation algorithms are available. By default, a fast approximate one is used, offering highest rendering performance and a relatively good approximation of the graph shape at lower zoom levels. Optionally, an accurate decimation mode can be enabled. It offers accurate representation of local minima and maxima, at all zoom ranges. But rendering will be slower. Decimation mode can be selected globally at the card level, or per entity via `entityOptions` or `entityPatterns`.
+This feature can be turned off in the options if you want, either globally or by entity. Two different decimation algorithms are available. By default, a fast approximate one is used, offering highest rendering performance and a relatively good approximation of the graph shape at lower zoom levels. Optionally, an accurate decimation mode can be enabled. It offers accurate representation of local minima and maxima, at all zoom ranges. But rendering will be slower. Decimation mode can be selected globally at the card level, or per entity via `entityOptions`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -537,7 +569,7 @@ entityOptions:
 
 #### Complete list of entityOptions properties
 
-All of the following properties can be used under `entityOptions` (keyed by entity id, device class or domain), under `entityPatterns` (matched by glob pattern, see below), and directly on entities in manually defined `graphs`.
+All of the following properties can be used under `entityOptions` (keyed by entity id, device class or domain), and directly on entities in manually defined `graphs`.
 
 | Property | Type | Description |
 |---|---|---|
@@ -563,11 +595,11 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 
 ### Pattern-based entity options
 
-`entityPatterns` allows applying options to any set of entities matched by a glob pattern, without having to list them individually under `entityOptions`. This is particularly useful when you have many similar sensors and want to apply consistent styling across them.
+`entityOptions` accepts two forms: the original **dict form** (keyed by entity id, device class or domain) and a new **list form** that supports glob pattern matching. The list form is the recommended approach when you want to apply consistent styling across families of sensors.
 
 ```yaml
 type: custom:history-explorer-card
-entityPatterns:
+entityOptions:
   - match: "sensor.temperature*"
     lineMode: curves
     showPoints: true
@@ -585,18 +617,20 @@ entityPatterns:
   - match: ["sensor.pressure*", "sensor.humidity*"]
     lineMode: lines
     ymin: 0
+
+  - entity: sensor.sun_azimuth
+    type: arrowline
+    color: red
 ```
 
-The `match` field accepts a single glob pattern string or a list of patterns. `*` matches any sequence of characters, `?` matches a single character. Patterns are tested against the full entity id (e.g. `sensor.outside_temperature`).
+The `match` field accepts a single glob pattern string or a list of patterns. `*` matches any sequence of characters, `?` matches a single character. Patterns are tested against the full entity id (e.g. `sensor.outside_temperature`). The `entity` field can be used instead of `match` for exact entity id matches.
 
 #### Priority rules
 
 When multiple sources provide options for the same entity, they are applied in this order (highest priority first):
 
-1. `entityOptions` keyed by exact entity id
-2. `entityOptions` keyed by device class
-3. `entityOptions` keyed by domain
-4. `entityPatterns` — first matching pattern wins per property; subsequent matching patterns fill in any remaining unset properties
+1. `entityOptions` list — first matching entry wins per property; subsequent matching entries fill in any remaining unset properties
+2. `entityOptions` dict — keyed by exact entity id, then device class, then domain
 
 Options from a higher-priority source always override those from a lower-priority source.
 
@@ -648,15 +682,13 @@ graphs:
         showMinMax: history      # band on full graph, including history portion
 ```
 
-`showMinMax` is also available in `entityOptions` and `entityPatterns`:
+`showMinMax` is also available in `entityOptions`:
 
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
-  temperature:
+  - match: "temperature"
     showMinMax: statistics   # LTS band for all temperature sensors
-
-entityPatterns:
   - match: "sensor.*_power"
     showMinMax: history      # full band for all power sensors
     lineMode: lines
@@ -936,7 +968,7 @@ stateColors:
   person.not_home: yellow
 decimation: false
 header: 'My sample history'
-entityPatterns:
+entityOptions:
   - match: "sensor.*_power"
     lineMode: lines
     dashMode: [10, 4]
