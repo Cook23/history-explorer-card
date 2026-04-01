@@ -57,7 +57,7 @@ export let infoPanelEnabled = !!JSON.parse(window.localStorage.getItem('history-
 
 export class HistoryCardState {
 
-    constructor() 
+    constructor()
     {
 
         this.colorMap = new Map();
@@ -297,14 +297,14 @@ export class HistoryCardState {
 
         let v = this.stateTexts.get(s);
         if( !v ) {
-            v = ( device_class && this._hass.localize(`component.${domain}.entity_component.${device_class}.state.${state}`) ) || 
+            v = ( device_class && this._hass.localize(`component.${domain}.entity_component.${device_class}.state.${state}`) ) ||
                   this._hass.localize(`component.${domain}.entity_component._.state.${state}`) ||
-                ( device_class && this._hass.localize(`component.${domain}.state.${device_class}.${state}`) ) || 
-                  this._hass.localize(`component.${domain}.state._.${state}`) || 
+                ( device_class && this._hass.localize(`component.${domain}.state.${device_class}.${state}`) ) ||
+                  this._hass.localize(`component.${domain}.state._.${state}`) ||
                   state;
             this.stateTexts.set(s, v);
         }
-        
+
         return v;
     }
 
@@ -317,7 +317,7 @@ export class HistoryCardState {
     {
         if( !this.state.loading ) {
 
-            if( resetRange ) 
+            if( resetRange )
                 this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
 
             let endTime = moment();
@@ -351,7 +351,7 @@ export class HistoryCardState {
     todayNoReset()
     {
         this.today(false);
-    }    
+    }
 
     todayReset()
     {
@@ -462,11 +462,11 @@ export class HistoryCardState {
         }
 
         if( !this.activeRange.timeRangeMinutes ) {
-               
+
             let i = ranges.findIndex(e => e >= this.activeRange.timeRangeHours);
             if( i >= 0 ) {
                 if( ranges[i] > this.activeRange.timeRangeHours ) i--;
-                if( i < ranges.length-1 ) 
+                if( i < ranges.length-1 )
                     this.setTimeRange(ranges[i+1], true, t_center, t_position);
             }
 
@@ -478,7 +478,7 @@ export class HistoryCardState {
     incZoomStep(t_center = null, t_position = 0.5)
     {
         const i = ranges.findIndex(e => e >= this.activeRange.timeRangeHours);
-        if( i > 0 ) 
+        if( i > 0 )
             this.setTimeRange(ranges[i-1], true, t_center, t_position);
         else
             this.setTimeRangeMinutes((this.activeRange.timeRangeHours * 60 + this.activeRange.timeRangeMinutes) / 2, true, t_center, t_position);
@@ -502,7 +502,7 @@ export class HistoryCardState {
 
                 if( ntype !== this.graphs[i].type ) {
                     if( ntype == 'line' ) {
-                        for( let d of this.graphs[i].chart.data.datasets ) { 
+                        for( let d of this.graphs[i].chart.data.datasets ) {
                             d.backgroundColor = 'rgba(0,0,0,0)';
                             if( d.borderColor && Array.isArray(d.borderColor) ) d.borderColor = d.borderColor[0];
                         }
@@ -560,7 +560,7 @@ export class HistoryCardState {
                     c.options.scales.yAxes[0].ticks.removeEdgeTicks = false;
                     c.options.scales.yAxes[0].ticks.max = c.options.scales.yAxes[0].ticks.forceMax;
                     c.options.scales.yAxes[0].ticks.removeEdgeTicks = false;
-                    this.graphs[i].yaxisLock = 0;   
+                    this.graphs[i].yaxisLock = 0;
                 } else
                     this.graphs[i].yaxisLock = 1;
 
@@ -597,11 +597,11 @@ export class HistoryCardState {
     // --------------------------------------------------------------------------------------
 
     computeTickDensity(width)
-    {        
+    {
         const densities = { 'low' : 4, 'medium' : 3, 'high' : 2, 'higher' : 1, 'highest' : 0 };
         let densityLimit = densities[this.pconfig.timeTickDensity];
         if( densityLimit === undefined ) densityLimit = 2;
-        if( this.pconfig.timeTickOverride === undefined ) 
+        if( this.pconfig.timeTickOverride === undefined )
             return Math.max(( width < 650 ) ? 4 : ( width < 1100 ) ? 3 : ( width < 1300 ) ? 2 : ( width < 1900 ) ? 1 : 0, densityLimit);
         else
             return densities[this.pconfig.timeTickOverride] ?? 2;
@@ -752,7 +752,7 @@ export class HistoryCardState {
 
         if( update ) {
 
-            if( !t_center ) 
+            if( !t_center )
                 t_center = (moment(this.startTime) + moment(this.endTime)) / 2;
 
             let t1 = moment(t_center).add(this.activeRange.timeRangeMinutes * (1.0 - t_position), "minute");
@@ -832,7 +832,7 @@ export class HistoryCardState {
         if( !isNaN(v) ) {
             label += ' (' + v + (unit ? ' ' + unit : '') + ')';
         }
-        return label; 
+        return label;
     }
 
 
@@ -916,7 +916,7 @@ export class HistoryCardState {
             //console.log(`merge from ${c0} to ${c1}`);
 
             // Build partial data
-            // The result data for the charts is expected in order of the charts entities, but the cache might not hold data 
+            // The result data for the charts is expected in order of the charts entities, but the cache might not hold data
             // for all the entities or it might be in a different order. So for every chart entity, search the cache for a match.
             // If no match found, then add en empty record into the result, so to keep the indices in sync for buildChartData().
             let result = [];
@@ -926,7 +926,7 @@ export class HistoryCardState {
                     for( let e of g.entities ) {
                     if( result[j] == undefined ) result[j] = [];
                         const k = this.findCacheEntityIndex(i, e.entity);
-                        if( k >= 0 ) 
+                        if( k >= 0 )
                             result[j] = result[j].concat(this.cache[i].data[k]);
                         j++;
                     }
@@ -986,7 +986,7 @@ export class HistoryCardState {
         //console.log("database retrieval OK");
         //console.log(result);
 
-        if( this.databaseCallback ) 
+        if( this.databaseCallback )
             this.databaseCallback(result.length > 0);
 
         let reload = false;
@@ -1091,12 +1091,12 @@ export class HistoryCardState {
         if( reload ) this.updateHistory();
     }
 
-    loaderFailed(error) 
+    loaderFailed(error)
     {
         console.log("Database request failure");
         console.log(error);
 
-        if( this.databaseCallback ) 
+        if( this.databaseCallback )
             this.databaseCallback(false);
 
         this.buildChartData(null);
@@ -1222,7 +1222,7 @@ export class HistoryCardState {
             if( !this.timeCache.has(tc) ) {
                 r = moment(tc);
                 this.timeCache.set(tc, r);
-            } else 
+            } else
                 r = this.timeCache.get(tc);
         }
         return r;
@@ -1384,7 +1384,7 @@ export class HistoryCardState {
                             }
                             d += y1 - y0;
                             s.push({ x: t + td / 2.0, y: d * scale});
-                            if( colorRange ) 
+                            if( colorRange )
                                 bcol.push(parseColorRange(colorRange, d));
                             t = te;
                             y0 = y1;
@@ -1578,14 +1578,14 @@ export class HistoryCardState {
 
             for( let d of datasets ) {
                 datastructure.labels.push(this.pconfig.labelsVisible ? d.name : '');
-                datastructure.datasets.push({ 
+                datastructure.datasets.push({
                     domain: d.domain,
                     device_class: d.device_class,
                     entity_id: d.entity_id,
                     unit: d.unit,
                     arrowColor: d.bColor,
                     arrowBackground: d.fillColor,
-                    data: [ ] 
+                    data: [ ]
                 });
             }
 
@@ -1593,15 +1593,15 @@ export class HistoryCardState {
 
         const tooltipSize = this.pconfig.tooltipSize;
 
-        var chart = new Chart(ctx, { 
+        var chart = new Chart(ctx, {
 
-            type: graphtype, 
+            type: graphtype,
 
             data: datastructure,
 
             options: {
                 scales: {
-                    xAxes: [{ 
+                    xAxes: [{
                         type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
                         time: {
                             unit: this.activeRange.tickStepUnit,
@@ -1817,13 +1817,13 @@ export class HistoryCardState {
 
                 this.state.loading = true;
 
-                if( this.statistics.force ) 
+                if( this.statistics.force )
                     this.limitSlot = this.cacheSize + 1;
 
                 if( !this.statistics.enabled || l0 > this.limitSlot ) {
 
                     // Issue history retrieval call, initiate async cache loading
-                    const d = { 
+                    const d = {
                         type: "history/history_during_period",
                         start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
                         end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
@@ -1855,7 +1855,7 @@ export class HistoryCardState {
                 } else {
 
                     // Issue statistics retrieval call
-                    const d = { 
+                    const d = {
                         type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
                         start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
                         end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
@@ -2098,7 +2098,7 @@ export class HistoryCardState {
                     let t0 = moment(panstate.tc).add(-x, "second");
                     let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
                     this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");			
+                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
                 } else if( x > 0 ) {
                     let t0 = moment(panstate.tc).subtract(x, "second");
                     let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");;
@@ -2197,7 +2197,7 @@ export class HistoryCardState {
 
             const rect = panstate.overlay.getBoundingClientRect();
             const x0 = panstate.mx - rect.left;
-            const x1 = Math.max(Math.min(event.clientX - rect.left, panstate.g.chart.chartArea.right), panstate.g.chart.chartArea.left);        
+            const x1 = Math.max(Math.min(event.clientX - rect.left, panstate.g.chart.chartArea.right), panstate.g.chart.chartArea.left);
 
             ctx.fillStyle = this.ui.darkMode ? '#ffffff20' : '#00000020';
             ctx.fillRect(x0, panstate.g.chart.chartArea.top, x1-x0, panstate.g.chart.chartArea.bottom - panstate.g.chart.chartArea.top);
@@ -2255,7 +2255,7 @@ export class HistoryCardState {
             if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMax === undefined && !panstate.g.yaxisLock ) {
                 panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
                 panstate.g.chart.options.topClipMargin = 4;
-            } else 
+            } else
                 panstate.g.chart.options.topClipMargin = 1;
 
             this.updateHistory();
@@ -2280,7 +2280,7 @@ export class HistoryCardState {
 
             // Time delta in hours, ceiled
             let d = ( dt >= 60.0 ) ? Math.ceil(dt / 60.0) : 0;
-            
+
             if( d < 12 ) {
 
                 if( d < 1 )
@@ -2380,9 +2380,9 @@ export class HistoryCardState {
                     let f = ( wd < 0 ) ? 0.9 : 1.0/0.9;
 
                     let t = g.chart.options.scales.yAxes[0].ticks;
-                    if( t.min === undefined ) 
+                    if( t.min === undefined )
                         t.min = g.chart.scales["y-axis-0"].min;
-                    if( t.max === undefined ) 
+                    if( t.max === undefined )
                         t.max = g.chart.scales["y-axis-0"].max;
 
                     let d = t.max - t.min;
@@ -2468,7 +2468,7 @@ export class HistoryCardState {
         if( !confirm(i18n('ui.popup.remove_all')) ) return;
 
         let a = 0;
-        for( a = 0; a < this.graphs.length; a++ ) 
+        for( a = 0; a < this.graphs.length; a++ )
             if( this.graphs[a].id >= this.firstDynamicId ) break;
 
         for( let i = a; i < this.graphs.length; i++ )
@@ -2594,7 +2594,7 @@ export class HistoryCardState {
                 const color = d.color ?? dc.color;
                 let fill = d.fill ?? (d.color ? 'rgba(0,0,0,0)' : dc.fill);
                 if( g.graph.type == 'bar' ) fill = color;
-                entities.push({ ...d, 'color' : color, 'fill' : fill }); 
+                entities.push({ ...d, 'color' : color, 'fill' : fill });
             }
 
             this.addGraphToCanvas(g.id, g.graph.type, entities, g.graph.options);
@@ -2671,7 +2671,7 @@ export class HistoryCardState {
         const last = this.graphs.length - 1;
 
         // Add to an existing timeline graph and compatible line graph if possible
-        let combine = last >= 0 && 
+        let combine = last >= 0 &&
                       type != 'bar' &&
                       this.graphs[last].type === type &&
                       ( type == 'timeline' || this.pconfig.combineSameUnits && this.getUnitOfMeasure(entity_id) == this.getUnitOfMeasure(this.graphs[last].entities[0].entity) );
@@ -2693,7 +2693,7 @@ export class HistoryCardState {
         html += `<div style='height:${h}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
         html += `<button id='bc-${this.g_id}' style="position:absolute;right:20px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
-        if( type == 'bar' && !this.ui.hideInterval ) 
+        if( type == 'bar' && !this.ui.hideInterval )
             html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle);
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
@@ -2741,9 +2741,9 @@ export class HistoryCardState {
             datasets.push({
                 "name": ( d.name === undefined ) ? this._hass.states[d.entity]?.attributes?.friendly_name : d.name,
                 "bColor": parseColor(d.color),
-                "fillColor": parseColor(d.fill), 
+                "fillColor": parseColor(d.fill),
                 "dashMode": d.dashMode,
-                "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode, 
+                "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
@@ -2815,7 +2815,7 @@ export class HistoryCardState {
 
         if( selector && !isMobile ) html += `
             <div id='sl_${i}' style="background-color:${bgcol};display:none;padding-left:10px;padding-right:10px;">
-                <input id="b7_${i}" ${inputStyle} autoComplete="on" list="b6_${this.cid}" placeholder="Type to search for an entity to add"/>
+                <input id="b7_${i}" ${inputStyle} autoComplete="on" placeholder="Type to search for an entity to add"/>
                 <button id="b8_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:34px;margin-left:5px;">+</button>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
@@ -2876,7 +2876,7 @@ export class HistoryCardState {
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
         let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
-        let by = this._this.querySelector(`#by_${i}`); 
+        let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
             by.children[0].innerHTML = i18n('ui.ranges.l_hour');
             by.children[1].innerHTML = i18n('ui.ranges.hour');
@@ -2916,7 +2916,7 @@ export class HistoryCardState {
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             if( tickChanged ) this.setStepSize(true);
-        }        
+        }
 
         this.resizeSelector();
     }
@@ -2931,7 +2931,7 @@ export class HistoryCardState {
         const isReflown = rfdiv.style.display !== 'none';
 
         if( !reflow && isReflown ) {
-            rfdiv.style.display = 'none';     
+            rfdiv.style.display = 'none';
             const anchor = this._this.querySelector(`#dl_${i}`);
             anchor.after(selector);
         } else if( reflow && !isReflown ) {
@@ -2995,7 +2995,7 @@ export class HistoryCardState {
 
             this.resizeSelector();
 
-            /// 
+            ///
             for( let i = 0; i < 2; i++ ) {
 
                 this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
@@ -3024,13 +3024,26 @@ export class HistoryCardState {
 
             }
 
-            if( !isMobile ) 
-                this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false }); 
+            if( !isMobile ) {
+                this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
+                for( let i = 0; i < 2; ++i ) {
+                    const input = this._this.querySelector(`#b7_${i}`);
+                    if( input ) {
+                        input.addEventListener('keyup', () => {
+                            if( input.value && !input.getAttribute('list') )
+                                input.setAttribute('list', `b6_${this.cid}`);
+                        }, true);
+                        input.addEventListener('focusout', () => {
+                            input.removeAttribute('list');
+                        }, true);
+                    }
+                }
+            }
 
             this.readLocalState();
 
             this.pconfig.nextDefaultColor = 0;
-            
+
             // Add dynamically added graphs
             if( this.pconfig.entities ) {
                 for( let e of this.pconfig.entities ) this.addDynamicGraph(e);
@@ -3146,7 +3159,7 @@ export class HistoryCardState {
             this.focusListener = undefined;
             this.setDropdownVisibility(0, false);
             this.setDropdownVisibility(1, false);
-        } else 
+        } else
             this.focusClick = undefined;
     }
 
@@ -3205,7 +3218,7 @@ export class HistoryCardState {
     }
 
     entityCollectorCallback(result)
-    { 
+    {
         for( let i = 0; i < (isMobile ? 2 : 1); ++i ) {
 
             const datalist = this._this.querySelector(isMobile ? `#es_${i}` : `#b6_${this.cid}`);
@@ -3230,7 +3243,7 @@ export class HistoryCardState {
                     o.id = entity;
                     o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
                     o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
-                } else 
+                } else
                     o = document.createElement('option');
                 o.innerHTML = entity;
                 datalist.appendChild(o);
@@ -3242,7 +3255,7 @@ export class HistoryCardState {
             if( i ) i.placeholder = i18n("ui.label.type_to_search");
     }
 
-    entityCollectorFailed(error) 
+    entityCollectorFailed(error)
     {
         console.log(error);
 
@@ -3282,7 +3295,7 @@ export class HistoryCardState {
                     o.id = entity;
                     o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
                     o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
-                } else 
+                } else
                     o = document.createElement('option');
                 o.innerHTML = entity;
                 datalist.appendChild(o);
@@ -3322,7 +3335,7 @@ export class HistoryCardState {
                 if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) l.push(e);
             }
 
-            const d = { 
+            const d = {
                 type: "history/history_during_period",
                 start_time: t0,
                 minimal_response: true,
@@ -3389,7 +3402,7 @@ export class HistoryCardState {
             this.pconfig.entities = data.entities;
         } else {
             data = JSON.parse(window.localStorage.getItem('history-explorer-card'));
-            if( data ) 
+            if( data )
                 this.pconfig.entities = data;
             else
                 this.pconfig.entities = [];
@@ -3516,13 +3529,13 @@ function getLocalizedDateString(locale, style)
 
 var gcid = 0;
 
-class HistoryExplorerCard extends HTMLElement 
+class HistoryExplorerCard extends HTMLElement
 {
     instance = null;
     configSet = false;
 
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
-    set hass(hass) 
+    set hass(hass)
     {
         if( this.configSet ) {
             this.configSet = false;
@@ -3546,7 +3559,7 @@ class HistoryExplorerCard extends HTMLElement
             this.instance.iid = setInterval(this.instance.updateContent.bind(this.instance), 100);
 
         if( this.instance.contentValid && this.instance.handleChangedEntities() ) {
-            if( this.instance.pconfig.showCurrentValues ) 
+            if( this.instance.pconfig.showCurrentValues )
                 this.instance.updateHistory();
             if( this.instance.pconfig.refreshEnabled ) {
                 this.instance.cache[this.instance.cacheSize].valid = false;
@@ -3563,7 +3576,7 @@ class HistoryExplorerCard extends HTMLElement
     }
 
     // The user supplied configuration. Throw an exception and Lovelace will render an error card.
-    setConfig(config) 
+    setConfig(config)
     {
         this.config = config;
         this.configSet = true;
@@ -3582,7 +3595,7 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance.pconfig.graphConfig = [];
 
-        if( config.graphs ) 
+        if( config.graphs )
             this.instance.buildGraphListFromConfig(config.graphs)
 
         this.instance.firstDynamicId = this.instance.g_id;
@@ -3688,7 +3701,7 @@ class HistoryExplorerCard extends HTMLElement
             const h = this.instance.calcGraphHeight(g.graph.type, g.graph.entities.length, g.graph.options?.height);
             html += `<div style='height:${h}px;position:relative'>`;
             html += `<canvas id="graph${g.id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
-            if( g.graph.type == 'bar' && !this.instance.ui.hideInterval ) 
+            if( g.graph.type == 'bar' && !this.instance.ui.hideInterval )
                 html += this.instance.createIntervalSelectorHtml(g.id, h, this.instance.parseIntervalConfig(g.graph.options?.interval), optionStyle);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += this.instance.createScaleLockIconHtml(g.id, h);
@@ -3717,12 +3730,12 @@ class HistoryExplorerCard extends HTMLElement
     }
 
     // The height of your card. Home Assistant uses this to automatically distribute all cards over the available columns.
-    getCardSize() 
+    getCardSize()
     {
         return 3;
     }
 
-    static getStubConfig() 
+    static getStubConfig()
     {
         return { "cardName": "historycard-" + Math.floor(Math.random() * 99999999 + 1) };
     }
