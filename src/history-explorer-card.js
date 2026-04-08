@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.7';
+const Version = '1.1.8';
 
 export const isMobile = ( navigator.appVersion.indexOf("Mobi") > -1 ) || ( navigator.userAgent.indexOf("HomeAssistant") > -1 );
 
@@ -2013,8 +2013,10 @@ export class HistoryCardState {
             if( g.canvas === event.target ) {
                 panstate.g = g;
                 g.chart.options.tooltips.enabled = false;
-                g.chart.options.scales.yAxes[0].ticks.min = panstate.y0 = g.chart.scales["y-axis-0"].min;
-                g.chart.options.scales.yAxes[0].ticks.max = panstate.y1 = g.chart.scales["y-axis-0"].max;
+                if( g.type !== 'timeline' && g.type !== 'arrowline' ) {
+                    g.chart.options.scales.yAxes[0].ticks.min = panstate.y0 = g.chart.scales["y-axis-0"].min;
+                    g.chart.options.scales.yAxes[0].ticks.max = panstate.y1 = g.chart.scales["y-axis-0"].max;
+                }
                 g.chart.options.topClipMargin = 0;
                 g.chart.options.bottomClipMargin = 0;
                 break;
@@ -2164,8 +2166,9 @@ export class HistoryCardState {
                 return;
             }
 
-            // Y drag — pan vertical axis (Shift on desktop, always on mobile)
-            if( (event.shiftKey || isMobile) && Math.abs(event.clientY - panstate.ly) > 0 ) {
+            // Y drag — pan vertical axis (Shift+drag on desktop only, touch devices use #ya-N overlay)
+            if( event.shiftKey && panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline'
+                && Math.abs(event.clientY - panstate.ly) > 0 ) {
 
                 panstate.ly = event.clientY;
 
@@ -2177,15 +2180,9 @@ export class HistoryCardState {
                 panstate.g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
                 panstate.g.chart.update();
 
-            }
-
-            if( !event.shiftKey && !isMobile ) {
-                panstate.ly = panstate.my = event.clientY;
-                panstate.y0 = panstate.g.chart.options.scales.yAxes[0].ticks.min;
-                panstate.y1 = panstate.g.chart.options.scales.yAxes[0].ticks.max;
-            } else {
                 if( panstate.g.yaxisLock !== 2 ) this.updateScaleLockState(panstate.g, true);
                 panstate.g.yaxisLock = 2;
+
             }
 
         } else if( this.state.selecting && panstate.overlay ) {
@@ -2374,6 +2371,7 @@ export class HistoryCardState {
         if( event.shiftKey ) {
             let wd = ( Math.abs(event.deltaX) > Math.abs(event.deltaY) ) ? event.deltaX : event.deltaY;
             for( let g of this.graphs ) {
+                if( g.type === 'timeline' || g.type === 'arrowline' ) continue;
                 const rect = g.canvas.getBoundingClientRect();
                 if( event.clientY >= rect.top && event.clientY <= rect.bottom ) {
 
