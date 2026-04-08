@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.0';
+const Version = '1.1.7';
 
 export const isMobile = ( navigator.appVersion.indexOf("Mobi") > -1 ) || ( navigator.userAgent.indexOf("HomeAssistant") > -1 );
 
@@ -2698,7 +2698,7 @@ export class HistoryCardState {
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
-            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:${h}px;touch-action:none;cursor:ns-resize;"></div>`;
+            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -3666,7 +3666,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.contentValid = false;
         this.instance.entitiesPopulated = false;
 
-        const header = config.header || "History explorer";
+        const header = config.header || `History explorer v${Version}`;
         const bgcol = parseColor(config.uiColors?.buttons ?? getComputedStyle(document.body).getPropertyValue('--primary-color') + '1f');
 
         const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };
@@ -3706,7 +3706,7 @@ class HistoryExplorerCard extends HTMLElement
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
-                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:0;width:${this.instance.pconfig.labelAreaWidth}px;height:${h}px;touch-action:none;cursor:ns-resize;"></div>`;
+                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
