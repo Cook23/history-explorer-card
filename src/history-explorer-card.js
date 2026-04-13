@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.8';
+const Version = '1.1.9b1';
 
 export const isMobile = ( navigator.appVersion.indexOf("Mobi") > -1 ) || ( navigator.userAgent.indexOf("HomeAssistant") > -1 );
 
@@ -2037,16 +2037,18 @@ export class HistoryCardState {
             if( !this.state.zoomMode ) {
 
                 if( this.state.drag && !panstate.pinch ) {
-                    // Second finger while panning — start vertical pinch zoom
+                    // Second finger while panning — start vertical pinch zoom (line/bar only)
                     const p1 = { x: panstate.mx, y: panstate.my };
                     const p2 = { x: event.clientX, y: event.clientY };
                     const g  = panstate.g;
-                    panstate.pinch = {
-                        p1, p2,
-                        distY: Math.abs(p2.y - p1.y),
-                        y0: g.chart.scales['y-axis-0'].min,
-                        y1: g.chart.scales['y-axis-0'].max
-                    };
+                    if( g.type !== 'timeline' && g.type !== 'arrowline' ) {
+                        panstate.pinch = {
+                            p1, p2,
+                            distY: Math.abs(p2.y - p1.y),
+                            y0: g.chart.scales['y-axis-0'].min,
+                            y1: g.chart.scales['y-axis-0'].max
+                        };
+                    }
                 } else if( !panstate.pinch ) {
                     // First finger — start pan
                     this.state.drag = true;
@@ -2243,17 +2245,19 @@ export class HistoryCardState {
 
             panstate.g.chart.options.tooltips.enabled = true;
 
-            if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMin === undefined && !panstate.g.yaxisLock ) {
-                panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
-                panstate.g.chart.options.bottomClipMargin = 4;
-            } else
-                panstate.g.chart.options.bottomClipMargin = 1;
+            if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
+                if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMin === undefined && !panstate.g.yaxisLock ) {
+                    panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
+                    panstate.g.chart.options.bottomClipMargin = 4;
+                } else
+                    panstate.g.chart.options.bottomClipMargin = 1;
 
-            if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMax === undefined && !panstate.g.yaxisLock ) {
-                panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
-                panstate.g.chart.options.topClipMargin = 4;
-            } else
-                panstate.g.chart.options.topClipMargin = 1;
+                if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMax === undefined && !panstate.g.yaxisLock ) {
+                    panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
+                    panstate.g.chart.options.topClipMargin = 4;
+                } else
+                    panstate.g.chart.options.topClipMargin = 1;
+            }
 
             this.updateHistory();
 
@@ -2328,8 +2332,10 @@ export class HistoryCardState {
             this.state.updateCanvas = null;
 
             panstate.g.chart.options.tooltips.enabled = true;
-            panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
-            panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
+            if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
+                panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
+                panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
+            }
             panstate.g.chart.options.topClipMargin = 4;
             panstate.g.chart.options.bottomClipMargin = 4;
 
