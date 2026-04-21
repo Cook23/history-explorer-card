@@ -14,7 +14,52 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.9';
+const Version = '1.1.10b29';
+
+// --------------------------------------------------------------------------------------
+// SI prefix helpers
+// --------------------------------------------------------------------------------------
+
+const SI_PREFIXES = { 'm': 1e-3, '': 1, 'k': 1e3, 'M': 1e6 };
+
+function getSIFactor(unit) {
+    if( !unit ) return { base: unit, factor: 1 };
+    for( const [prefix, factor] of Object.entries(SI_PREFIXES) ) {
+        if( prefix && unit.startsWith(prefix) && unit.length > prefix.length ) {
+            return { base: unit.slice(prefix.length), factor };
+        }
+    }
+    return { base: unit, factor: 1 };
+}
+
+function areSICompatible(unitA, unitB) {
+    if( unitA === unitB ) return true;
+    if( !unitA || !unitB ) return false;
+    return getSIFactor(unitA).base === getSIFactor(unitB).base;
+}
+
+function chooseSIUnit(unitsWithMax) {
+    // unitsWithMax: array of { unit, maxVal }
+    // Choose the SI unit that minimises the number of digits for the max value
+    // Returns { unit, factor } where factor converts from each entity's unit to the chosen unit
+    if( !unitsWithMax.length ) return { unit: '', factor: 1 };
+    const base = getSIFactor(unitsWithMax[0].unit).base;
+    // Compute global max in base unit
+    const globalMaxBase = Math.max(...unitsWithMax.map(u => Math.abs(u.maxVal) * getSIFactor(u.unit).factor));
+    if( !isFinite(globalMaxBase) || globalMaxBase === 0 ) return { unit: unitsWithMax[0].unit, factor: 1 / getSIFactor(unitsWithMax[0].unit).factor };
+    // Pick prefix that gives value between 1 and 999
+    let bestPrefix = '', bestFactor = 1;
+    for( const [prefix, factor] of Object.entries(SI_PREFIXES) ) {
+        const val = globalMaxBase / factor;
+        const bestVal = globalMaxBase / bestFactor;
+        if( val >= 1 && ( bestVal < 1 || val < bestVal ) ) {
+            bestPrefix = prefix;
+            bestFactor = factor;
+        }
+    }
+    return { unit: bestPrefix + base, targetFactor: bestFactor };
+}
+
 
 export const isMobile = navigator.maxTouchPoints > 0;
 
@@ -139,6 +184,7 @@ export class HistoryCardState {
         this.pconfig.exportTimeFormat     = undefined;
         this.pconfig.exportStatsPeriod    = undefined;
         this.pconfig.entities             = [];
+        this._nextGroupId                  = 1;
         this.pconfig.infoPanelConfig      = null;
 
         this.loader = {};
@@ -1259,7 +1305,7 @@ export class HistoryCardState {
 
                         // Fill line chart buffer
 
-                        const scale = g.entities[j].scale ?? 1.0;
+                        const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
 
                         const clusterMode = g.entities[j].decimation ?? this.pconfig.decimation ?? 'fast';
 
@@ -1341,7 +1387,7 @@ export class HistoryCardState {
 
                     } else if( g.type == 'bar' && n > 0 ) {
 
-                        const scale = g.entities[j].scale ?? 1.0;
+                        const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
                         const netBars = g.entities[j].netBars ?? false;
 
                         const colorRange = ( g.entities[j].color && g.entities[j].color.constructor == Object ) ? g.entities[j].color : null;
@@ -1562,11 +1608,13 @@ export class HistoryCardState {
                     unit: d.unit,
                     hidden: d.hidden,
                     showMinMax: d.showMinMax ? true : false,
+                    siConversionFactor: d.siConversionFactor,
                     borderJoinStyle: 'round',
                     borderCapStyle: 'round',
                     data: { }
                 });
                 scaleUnit = scaleUnit ?? d.unit;
+                if( d.siConversionFactor !== undefined && datasets._siRefUnit ) scaleUnit = datasets._siRefUnit;
             }
 
         } else if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
@@ -1667,7 +1715,8 @@ export class HistoryCardState {
                                 if( this.pconfig.tooltipShowLabel ) label = data.datasets[item.datasetIndex].name || '';
                                 if( label ) label += ': ';
                                 const p = 10 ** this.pconfig.roundingPrecision;
-                                label += Math.round(item.yLabel * p) / p;
+                                const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
+                                label += Math.round(item.yLabel / _siFactor * p) / p;
                                 label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                                 return label;
                             } else if( graphtype == 'timeline' ) {
@@ -1712,6 +1761,72 @@ export class HistoryCardState {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || (graphtype == 'bar' && datasets.length > 1) ),
                         boxWidth: 0
+                    },
+                    onClick: (e, legendItem) => {
+                        // Double-click: uncombine the dataset into its own graph
+                        // Single-click: toggle visibility (default Chart.js behavior)
+                        const now = Date.now();
+                        const canvas = e.target?.closest('canvas');
+                        if( !canvas ) return;
+                        const g = this.graphs.find(g => g.canvas === canvas);
+                        const chart = g?.chart;
+                        if( !chart ) return;
+                        if( !g ) return;
+                        const idx = legendItem.datasetIndex;
+                        if( !this._uncombineInProgress && g._lastLegendClick && g._lastLegendClickIdx === idx && now - g._lastLegendClick < 400 ) {
+                            // Double-click — uncombine
+                            g._lastLegendClick = null;
+                            this._uncombineInProgress = true;
+                            setTimeout(() => { this._uncombineInProgress = false; }, 500);
+                            if( g.entities.length > 1 ) {
+                                const entity = g.entities[idx];
+                                const newEntities = g.entities.filter((_, i) => i !== idx);
+                                // Reset SI conversion factors
+                                entity.siConversionFactor = undefined;
+                                newEntities.forEach(en => { en.siConversionFactor = undefined; });
+                                // Assign a new unique groupId to the extracted entity
+                                const _newGroupId = this._nextGroupId++;
+                                const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === entity.entity);
+
+                                if( _eIdx >= 0 ) this.pconfig.entities[_eIdx] = { entity: entity.entity, groupId: _newGroupId, color: entity.color, fill: entity.fill };
+
+                                this.writeLocalState();
+                                // Remember insertion point before removing
+                                const _graphDiv = g.canvas.parentNode.parentNode; // wrapper e
+                                const _gl = _graphDiv.parentNode; // #graphlist
+                                // Find next sibling that is still in DOM (skip stale refs)
+                                let _nextSibling = _graphDiv.nextSibling;
+                                while( _nextSibling && !_gl.contains(_nextSibling) )
+                                    _nextSibling = _nextSibling.nextSibling;
+                                const _insertIdx = this.graphs.indexOf(g);
+                                // Remove current graph from DOM and graph list
+                                _graphDiv.remove();
+                                this.graphs.splice(_insertIdx, 1);
+                                // Re-add remaining entities then extracted entity (appended to end)
+                                const _graphsBefore = this.graphs.length;
+                                const _savedCombine = this.pconfig.combineSameUnits;
+                                this.pconfig.combineSameUnits = true;
+                                newEntities.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                                this.pconfig.combineSameUnits = _savedCombine;
+                                this.addDynamicGraph(entity.entity, true, entity.color, entity.fill);
+                                // Move newly created graph divs to correct position
+                                const _newDivs = [];
+                                for( let i = _graphsBefore; i < this.graphs.length; i++ )
+                                    _newDivs.push(this.graphs[i].canvas.parentNode.parentNode); // wrapper e
+                                for( let _div of _newDivs ) {
+                                    if( _nextSibling && _gl.contains(_nextSibling) ) _gl.insertBefore(_div, _nextSibling);
+                                    else _gl.appendChild(_div);
+                                }
+                                this.updateHistory();
+                            }
+                        } else {
+                            // Single-click — default toggle visibility
+                            g._lastLegendClick = now;
+                            g._lastLegendClickIdx = idx;
+                            const meta = chart.getDatasetMeta(idx);
+                            meta.hidden = meta.hidden === null ? !chart.data.datasets[idx].hidden : null;
+                            chart.update();
+                        }
                     }
                 },
                 elements: {
@@ -1964,6 +2079,151 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
+    _getScrollContainer() {
+        return document.scrollingElement || document.documentElement;
+    }
+
+    _startAutoScroll(event) {
+        this._stopAutoScroll();
+        const _scroll = () => {
+            if( !this._autoScrollActive ) return;
+            const _container = this._getScrollContainer();
+            if( !_container ) { this._autoScrollRaf = requestAnimationFrame(_scroll); return; }
+            const _threshold = 80;
+            const _y = this._autoScrollY;
+            const _viewH = window.innerHeight;
+            let _speed = 0;
+            if( _y < _threshold )
+                _speed = -Math.round((_threshold - _y) / 4);
+            else if( _y > _viewH - _threshold )
+                _speed = Math.round((_threshold - (_viewH - _y)) / 4);
+            if( _speed !== 0 ) _container.scrollTop += _speed;
+            this._autoScrollRaf = requestAnimationFrame(_scroll);
+        };
+        this._autoScrollActive = true;
+        this._autoScrollY = event.clientY;
+        this._autoScrollRaf = requestAnimationFrame(_scroll);
+    }
+
+    _stopAutoScroll() {
+        this._autoScrollActive = false;
+        if( this._autoScrollRaf ) { cancelAnimationFrame(this._autoScrollRaf); this._autoScrollRaf = null; }
+    }
+
+    graphMoveStart(event)
+    {
+        event.preventDefault();
+        event.stopPropagation();
+        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
+        // Find which graph this mo overlay belongs to
+        console.log('graphMoveStart called, target=', event.target.id);
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#mo-${g.id}`) === event.target ) {
+                panstate.moveGraph = { g, startX: event.clientX, startY: event.clientY };
+                event.target.style.cursor = 'grabbing';
+                this._startAutoScroll(event);
+                console.log('graphMoveStart: found graph, autoScrollActive=', this._autoScrollActive);
+                break;
+            }
+        }
+    }
+
+    graphMoveMove(event)
+    {
+        if( !panstate.moveGraph ) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.target.style.cursor = 'grabbing';
+        this._autoScrollY = event.clientY;
+        console.log('graphMoveMove y=', this._autoScrollY);
+    }
+
+    graphMoveEnd(event)
+    {
+        if( !panstate.moveGraph ) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const _srcG = panstate.moveGraph.g;
+        const _moveStartX = panstate.moveGraph.startX;
+        const _moveStartY = panstate.moveGraph.startY;
+        panstate.moveGraph = null;
+        event.target.style.cursor = 'grab';
+        this._stopAutoScroll();
+
+        // If movement < 5px, treat as click — forward to padlock
+        const _dx = Math.abs(event.clientX - _moveStartX);
+        const _dy = Math.abs(event.clientY - _moveStartY);
+        if( _dx < 5 && _dy < 5 ) {
+            this._this.querySelector(`#ca-${_srcG.id}`)?.click();
+            return;
+        }
+
+        // Find target graph under pointer
+        let _tgtG = null;
+        let _insertBefore = true; // above or below midpoint
+        for( let g of this.graphs ) {
+            if( g === _srcG ) continue;
+            const _rect = g.canvas.getBoundingClientRect();
+            if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
+                event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
+                _tgtG = g;
+                _insertBefore = event.clientY < _rect.top + _rect.height / 2;
+                break;
+            }
+        }
+
+        if( !_tgtG || _tgtG === _srcG ) return;
+
+        // Reorder in DOM — re-query by ID to get fresh refs after potential HA re-render
+        const _gl = this._this.querySelector('#graphlist');
+        const _srcCanvas = this._this.querySelector(`#graph${_srcG.id}`);
+        const _tgtCanvas = this._this.querySelector(`#graph${_tgtG.id}`);
+        if( !_srcCanvas || !_tgtCanvas || !_gl ) return;
+        // Canvas -> position:relative div -> wrapper div (direct child of #graphlist)
+        const _srcDiv = _srcCanvas.parentNode.parentNode;
+        const _tgtDiv = _tgtCanvas.parentNode.parentNode;
+        if( _srcDiv.parentNode !== _gl || _tgtDiv.parentNode !== _gl ) return;
+        if( _insertBefore ) {
+            _gl.insertBefore(_srcDiv, _tgtDiv);
+        } else {
+            const _next = _tgtDiv.nextSibling;
+            if( _next && _next.parentNode === _gl ) {
+                _gl.insertBefore(_srcDiv, _next);
+            } else {
+                _gl.appendChild(_srcDiv);
+            }
+        }
+
+        // Reorder in this.graphs
+        const _srcIdx = this.graphs.indexOf(_srcG);
+        const _tgtIdx = this.graphs.indexOf(_tgtG);
+        this.graphs.splice(_srcIdx, 1);
+        const _newTgtIdx = this.graphs.indexOf(_tgtG);
+        if( _insertBefore ) {
+            this.graphs.splice(_newTgtIdx, 0, _srcG);
+        } else {
+            this.graphs.splice(_newTgtIdx + 1, 0, _srcG);
+        }
+
+        // Reorder pconfig.entities to match new graph order
+        // Only reorder dynamic entities (those in pconfig.entities)
+        const _orderedEntities = [];
+        for( let g of this.graphs ) {
+            for( let en of g.entities ) {
+                const _found = this.pconfig.entities.find(e => (typeof e === 'string' ? e : e.entity) === en.entity);
+                if( _found ) _orderedEntities.push(_found);
+            }
+        }
+        // Keep any entities not in graphs (shouldn't happen but safety net)
+        for( let e of this.pconfig.entities ) {
+            const _eid = typeof e === 'string' ? e : e.entity;
+            if( !_orderedEntities.find(o => (typeof o === 'string' ? o : o.entity) === _eid) )
+                _orderedEntities.push(e);
+        }
+        this.pconfig.entities = _orderedEntities;
+        this.writeLocalState();
+    }
+
     pointerDown(event)
     {
         panstate.g = null;
@@ -1992,6 +2252,26 @@ export class HistoryCardState {
             panstate.ly = event.clientY;
 
             event.target?.setPointerCapture(event.pointerId);
+
+            // Check if click is on a legend item — start drag if so
+            panstate.dragDataset = null;
+            const _chart = panstate.g.chart;
+            if( _chart.legend && _chart.legend.legendHitBoxes ) {
+                const _rect = event.target.getBoundingClientRect();
+                const _cx = event.clientX - _rect.left;
+                const _cy = event.clientY - _rect.top;
+                const _hitBoxes = _chart.legend.legendHitBoxes;
+                for( let _i = 0; _i < _hitBoxes.length; _i++ ) {
+                    const _box = _hitBoxes[_i];
+                    if( _cx >= _box.left && _cx <= _box.left + _box.width &&
+                        _cy >= _box.top  && _cy <= _box.top  + _box.height ) {
+                        panstate.dragDataset = { g: panstate.g, datasetIdx: _i };
+                        event.target.style.cursor = 'grabbing';
+                        this._startAutoScroll(event);
+                        return; // Don't start pan
+                    }
+                }
+            }
 
             if( !this.state.zoomMode ) {
 
@@ -2047,6 +2327,11 @@ export class HistoryCardState {
 
     pointerMove(event)
     {
+        if( panstate.dragDataset ) {
+            event.target.style.cursor = 'grabbing';
+            this._autoScrollY = event.clientY;
+            return;
+        }
         if( this.state.drag ) {
 
             if( Math.abs(event.clientX - panstate.lx) > 0 ) {
@@ -2186,6 +2471,82 @@ export class HistoryCardState {
 
     pointerUp(event)
     {
+        // Handle legend drag & drop
+        if( panstate.dragDataset ) {
+            const _src = panstate.dragDataset.g;
+            const _srcIdx = panstate.dragDataset.datasetIdx;
+            panstate.dragDataset = null;
+            event.target.style.cursor = '';
+            this._stopAutoScroll();
+
+            // Find target graph under pointer
+            let _tgt = null;
+            for( let g of this.graphs ) {
+                if( g === _src ) continue;
+                const _rect = g.canvas.getBoundingClientRect();
+                if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
+                    event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
+                    _tgt = g;
+                    break;
+                }
+            }
+
+            if( _tgt && _tgt.type === _src.type ) {
+                // Check SI compatibility
+                const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
+                const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
+                if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Move entity from source to target
+                    const _entity = _src.entities[_srcIdx];
+                    // Update groupId in pconfig.entities
+                    const _tgtGroupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _tgt.entities[0].entity)?.groupId;
+                    const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === _entity.entity);
+                    if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
+                        this.pconfig.entities[_eIdx] = { entity: _entity.entity, groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
+                    }
+                    this.writeLocalState();
+                    // Rebuild: remove source graph if it becomes empty
+                    const _srcEmpty = _src.entities.length === 1;
+                    // Rebuild source graph without the moved entity
+                    const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
+                    const _srcDiv = _src.canvas.parentNode.parentNode; // wrapper e
+                    const _srcNext = _srcDiv.nextSibling;
+                    const _gl = _srcDiv.parentNode; // #graphlist
+                    _srcDiv.remove();
+                    this.graphs.splice(this.graphs.indexOf(_src), 1);
+                    if( !_srcEmpty ) {
+                        // Recreate source graph with remaining entities
+                        _srcRemaining.forEach(en => { en.siConversionFactor = undefined; });
+                        const _countBefore = this.graphs.length;
+                        const _savedCombine = this.pconfig.combineSameUnits;
+                        this.pconfig.combineSameUnits = true;
+                        _srcRemaining.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                        this.pconfig.combineSameUnits = _savedCombine;
+                        // Move to correct position
+                        for( let i = _countBefore; i < this.graphs.length; i++ )
+                            _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _srcNext);
+                    }
+                    // Rebuild target graph with added entity
+                    _entity.siConversionFactor = undefined;
+                    _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
+                    const _tgtDiv = _tgt.canvas.parentNode.parentNode; // wrapper e
+                    const _tgtNext = _tgtDiv.nextSibling;
+                    _tgtDiv.remove();
+                    this.graphs.splice(this.graphs.indexOf(_tgt), 1);
+                    const _allTgtEntities = [..._tgt.entities, _entity];
+                    const _countBefore2 = this.graphs.length;
+                    const _savedCombine2 = this.pconfig.combineSameUnits;
+                    this.pconfig.combineSameUnits = true;
+                    _allTgtEntities.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                    this.pconfig.combineSameUnits = _savedCombine2;
+                    for( let i = _countBefore2; i < this.graphs.length; i++ )
+                        _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _tgtNext);
+                    this.updateHistory();
+                }
+            }
+            return;
+        }
+
         if( panstate.pinch ) {
             panstate.pinch = null;
             // Resume pan with remaining finger
@@ -2408,18 +2769,30 @@ export class HistoryCardState {
                 const entity_id = e.innerText;
                 if( regex.test(entity_id) ) {
                     if( this._hass.states[entity_id] == undefined ) continue;
+                    if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === entity_id) ) continue;
+                    const _prevCount1 = this.graphs.length;
                     this.addDynamicGraph(entity_id);
-                    this.pconfig.entities.push(entity_id);
+                    const _wasCombined1 = this.graphs.length === _prevCount1;
+                    const _gid1 = _wasCombined1 ? this.pconfig.entities[this.pconfig.entities.length-1]?.groupId : this._nextGroupId++;
+                    const _lastG1 = this.graphs[this.graphs.length-1];
+                    const _addedEntity1 = _lastG1?.entities.find(e => e.entity === entity_id);
+                    this.pconfig.entities.push({ entity: entity_id, groupId: _gid1, color: _addedEntity1?.color, fill: _addedEntity1?.fill });
                 }
             }
 
         } else {
 
             if( this._hass.states[entity_id] == undefined ) return;
+            if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === entity_id) ) return;
 
+            const _prevGraphCount = this.graphs.length;
             this.addDynamicGraph(entity_id);
-
-            this.pconfig.entities.push(entity_id);
+            // If graphs.length didn't increase, entity was combined with previous graph
+            const _wasCombined = this.graphs.length === _prevGraphCount;
+            const _gid = _wasCombined ? this.pconfig.entities[this.pconfig.entities.length-1]?.groupId : this._nextGroupId++;
+            const _lastG = this.graphs[this.graphs.length-1];
+            const _addedEntity = _lastG?.entities.find(e => e.entity === entity_id);
+            this.pconfig.entities.push({ entity: entity_id, groupId: _gid, color: _addedEntity?.color, fill: _addedEntity?.fill });
 
         }
 
@@ -2440,7 +2813,7 @@ export class HistoryCardState {
             if( this.graphs[a].id >= this.firstDynamicId ) break;
 
         for( let i = a; i < this.graphs.length; i++ )
-            this.graphs[i].canvas.parentNode.remove();
+            this.graphs[i].canvas.parentNode.parentNode.remove();
 
         this.graphs.splice(a);
         this.pconfig.entities = [];
@@ -2536,9 +2909,9 @@ export class HistoryCardState {
 
         for( let i = 0; i < this.graphs.length; i++ ) {
             if( this.graphs[i].id == id ) {
-                this.graphs[i].canvas.parentNode.remove();
+                this.graphs[i].canvas.parentNode.parentNode.remove();
                 for( let e of this.graphs[i].entities ) {
-                    const j = this.pconfig.entities.indexOf(e.entity);
+                    const j = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === e.entity);
                     if( j >= 0 ) this.pconfig.entities.splice(j, 1);
                 }
                 this.graphs.splice(i, 1);
@@ -2591,7 +2964,7 @@ export class HistoryCardState {
         }
     }
 
-    addDynamicGraph(entity_id)
+    addDynamicGraph(entity_id, noAutoGroup = false, overrideColor = null, overrideFill = null)
     {
         // Add dynamic entity
 
@@ -2608,7 +2981,20 @@ export class HistoryCardState {
         // Get the options for line and arrow graphs (use per device_class options if available, otherwise use defaults)
         if( type == 'line' || type == 'arrowline' || type == 'bar' ) {
 
-            if( entityOptions?.color ) {
+            if( overrideColor ) {
+                // Check if overrideColor is already used in the last graph (drag&drop target)
+                const _lastG = this.graphs[this.graphs.length - 1];
+                const _usedColors = _lastG ? _lastG.entities.map(e => e.color) : [];
+                if( _usedColors.includes(overrideColor) ) {
+                    // Find a free color from defaultColors
+                    const _free = defaultColors.find(c => !_usedColors.includes(c.color));
+                    entities[0].color = _free ? _free.color : overrideColor;
+                    entities[0].fill = _free ? _free.fill : (overrideFill ?? 'rgba(0,0,0,0)');
+                } else {
+                    entities[0].color = overrideColor;
+                    entities[0].fill = overrideFill ?? 'rgba(0,0,0,0)';
+                }
+            } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
                 entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
             } else {
@@ -2637,10 +3023,11 @@ export class HistoryCardState {
         const last = this.graphs.length - 1;
 
         // Add to an existing timeline graph and compatible line graph if possible
-        let combine = last >= 0 &&
+        let combine = !noAutoGroup &&
+                      last >= 0 &&
                       type != 'bar' &&
                       this.graphs[last].type === type &&
-                      ( type == 'timeline' || this.pconfig.combineSameUnits && this.getUnitOfMeasure(entity_id) == this.getUnitOfMeasure(this.graphs[last].entities[0].entity) );
+                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(this.graphs[last].entities[0].entity)) );
 
         if( combine ) {
 
@@ -2648,7 +3035,7 @@ export class HistoryCardState {
             entities = this.graphs[this.graphs.length-1].entities.concat(entities);
 
             // Delete the old graph, will be regenerated below including the new entity
-            this.graphs[this.graphs.length-1].canvas.parentNode.remove();
+            this.graphs[this.graphs.length-1].canvas.parentNode.parentNode.remove();
             this.graphs.length--;
 
         }
@@ -2665,6 +3052,7 @@ export class HistoryCardState {
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
             html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
+            html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -2685,7 +3073,12 @@ export class HistoryCardState {
                 yaEl2.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
                 yaEl2.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
                 yaEl2.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
-
+            }
+            const moEl2 = this._this.querySelector(`#mo-${this.g_id}`);
+            if( moEl2 ) {
+                moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
+                moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
+                moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
             }
         }
 
@@ -2717,6 +3110,25 @@ export class HistoryCardState {
                 "hidden": d.hidden,
                 "entity_id" : d.entity
             });
+        }
+
+        // Compute SI conversion factors if all datasets share the same base SI unit
+        if( type === 'line' || type === 'bar' ) {
+            const _units = datasets.map(d => d.unit);
+            if( _units.length > 0 && _units.every(u => areSICompatible(u, _units[0])) && _units.some((u,i,a) => u !== a[0]) ) {
+                // Estimate max value from current HA state for each entity
+                const _unitsWithMax = datasets.map(d => ({
+                    unit: d.unit,
+                    maxVal: Math.abs(parseFloat(this._hass.states[d.entity_id]?.state) || 0)
+                }));
+                const { unit: _refUnit, targetFactor: _targetFactor } = chooseSIUnit(_unitsWithMax);
+                for( let i = 0; i < datasets.length; i++ ) {
+                    const { factor: _srcFactor } = getSIFactor(datasets[i].unit);
+                    datasets[i].siConversionFactor = _srcFactor / _targetFactor;
+                    entities[i].siConversionFactor = datasets[i].siConversionFactor;
+                }
+                datasets._siRefUnit = _refUnit;
+            }
         }
 
         const chart = this.newGraph(canvas, type, datasets, config);
@@ -3010,7 +3422,35 @@ export class HistoryCardState {
 
             // Add dynamically added graphs
             if( this.pconfig.entities ) {
-                for( let e of this.pconfig.entities ) this.addDynamicGraph(e);
+                // Group by groupId, preserving first-occurrence order
+                const _groupMap = new Map();
+                const _groupOrder = [];
+                for( let e of this.pconfig.entities ) {
+                    const _groupId = typeof e === 'object' ? e.groupId : undefined;
+                    const _key = _groupId ?? Symbol(); // undefined groupId = unique group
+                    if( !_groupMap.has(_key) ) {
+                        _groupMap.set(_key, { groupId: _groupId, entities: [] });
+                        _groupOrder.push(_key);
+                    }
+                    _groupMap.get(_key).entities.push(e);
+                }
+                // Add each group as a single graph, in first-occurrence order
+                for( let _key of _groupOrder ) {
+                    const _group = _groupMap.get(_key);
+                    if( _group.entities.length === 1 ) {
+                        const _e = _group.entities[0];
+                        this.addDynamicGraph(typeof _e === 'string' ? _e : _e.entity, true, _e.color, _e.fill);
+                    } else {
+                        // Multiple entities in same group — force-combine
+                        const _saved = this.pconfig.combineSameUnits;
+                        this.pconfig.combineSameUnits = true;
+                        _group.entities.forEach((_e, _i) => {
+                            const _eid = typeof _e === 'string' ? _e : _e.entity;
+                            this.addDynamicGraph(_eid, _i === 0, _e.color, _e.fill);
+                        });
+                        this.pconfig.combineSameUnits = _saved;
+                    }
+                }
             } else
                 this.pconfig.entities = [];
 
@@ -3363,14 +3803,17 @@ export class HistoryCardState {
         let data = JSON.parse(window.localStorage.getItem('history-explorer_card_' + this.id));
 
         if( data && data.version === 1 ) {
-            this.pconfig.entities = data.entities;
+            this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
         } else {
             data = JSON.parse(window.localStorage.getItem('history-explorer-card'));
             if( data )
-                this.pconfig.entities = data;
+                this.pconfig.entities = data.map(e => typeof e === 'string' ? { entity: e } : e);
             else
                 this.pconfig.entities = [];
         }
+        // Set _nextGroupId to max existing groupId + 1
+        const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
+        this._nextGroupId = _maxGroupId + 1;
     }
 
     writeInfoPanelConfig(forceUpdate = false)
@@ -3671,6 +4114,7 @@ class HistoryExplorerCard extends HTMLElement
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
+                html += `<div id="mo-${g.id}" style="position:absolute;left:0;top:0;width:${this.instance.pconfig.labelAreaWidth}px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
