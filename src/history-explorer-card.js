@@ -14,9 +14,9 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.9b1';
+const Version = '1.1.9';
 
-export const isMobile = ( navigator.appVersion.indexOf("Mobi") > -1 ) || ( navigator.userAgent.indexOf("HomeAssistant") > -1 );
+export const isMobile = navigator.maxTouchPoints > 0;
 
 
 // --------------------------------------------------------------------------------------
@@ -1925,47 +1925,6 @@ export class HistoryCardState {
         return moment(this.startTime) + moment(this.endTime).diff(this.startTime) * f;
     }
 
-    yAxisTouchStart(event)
-    {
-        event.preventDefault();
-        const t = event.touches[0];
-        for( let g of this.graphs ) {
-            if( this._this.querySelector(`#ya-${g.id}`) === event.target ) {
-                panstate.yaxis = {
-                    g,
-                    startY: t.clientY,
-                    y0: g.chart.scales['y-axis-0'].min,
-                    y1: g.chart.scales['y-axis-0'].max
-                };
-                break;
-            }
-        }
-    }
-
-    yAxisTouchMove(event)
-    {
-        event.preventDefault();
-        if( !panstate.yaxis ) return;
-        const t     = event.touches[0];
-        const p     = panstate.yaxis;
-        const g     = p.g;
-        const h     = g.chart.chartArea.bottom - g.chart.chartArea.top;
-        const dy    = t.clientY - p.startY;
-        const shift = dy * (p.y1 - p.y0) / h;
-        g.chart.options.scales.yAxes[0].ticks.min = p.y0 + shift;
-        g.chart.options.scales.yAxes[0].ticks.max = p.y1 + shift;
-        g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-        if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
-        g.yaxisLock = 2;
-        g.chart.update();
-    }
-
-    yAxisTouchEnd(event)
-    {
-        event.preventDefault();
-        panstate.yaxis = null;
-    }
-
     yAxisPointerDown(event)
     {
         try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
@@ -2360,6 +2319,10 @@ export class HistoryCardState {
 
     wheelScrolled(event)
     {
+        const now = Date.now();
+        if( this._wheelLast && now - this._wheelLast < 150 ) return;
+        this._wheelLast = now;
+
         // Zoom x time scale
         if( event.ctrlKey ) {
             event.preventDefault();
@@ -2376,6 +2339,7 @@ export class HistoryCardState {
         // Zoom Y axis
         if( event.shiftKey ) {
             let wd = ( Math.abs(event.deltaX) > Math.abs(event.deltaY) ) ? event.deltaX : event.deltaY;
+            if( wd === 0 ) return;
             for( let g of this.graphs ) {
                 if( g.type === 'timeline' || g.type === 'arrowline' ) continue;
                 const rect = g.canvas.getBoundingClientRect();
@@ -2622,9 +2586,7 @@ export class HistoryCardState {
                 yaEl1.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
                 yaEl1.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
                 yaEl1.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
-                yaEl1.addEventListener('touchstart',  this.yAxisTouchStart.bind(this), { passive: false });
-                yaEl1.addEventListener('touchmove',   this.yAxisTouchMove.bind(this),  { passive: false });
-                yaEl1.addEventListener('touchend',    this.yAxisTouchEnd.bind(this),   { passive: false });
+
             }
         }
     }
@@ -2723,9 +2685,7 @@ export class HistoryCardState {
                 yaEl2.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
                 yaEl2.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
                 yaEl2.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
-                yaEl2.addEventListener('touchstart',  this.yAxisTouchStart.bind(this), { passive: false });
-                yaEl2.addEventListener('touchmove',   this.yAxisTouchMove.bind(this),  { passive: false });
-                yaEl2.addEventListener('touchend',    this.yAxisTouchEnd.bind(this),   { passive: false });
+
             }
         }
 

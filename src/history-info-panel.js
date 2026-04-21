@@ -8,7 +8,7 @@ import { infoPanelEnabled, isMobile, HistoryCardState } from "./history-explorer
 
 const litHtml = (g) => {
     return (s, ...v) => {
-        return { 
+        return {
             _$litType$ : g,
             strings : s,
             values: v
@@ -46,7 +46,7 @@ function hecHookInfoPanel()
 
             if( !valid ) {
                 let selector = this.shadowRoot.querySelector('#maincard');
-                if( selector ) 
+                if( selector )
                     selector.style.display = 'none';
             }
 
@@ -128,17 +128,8 @@ function hecHookInfoPanel()
 
             }
 
-            instance._this.querySelector('#maincard').addEventListener('wheel', instance.wheelScrolled.bind(instance), { passive: false });
-
-            const yaEl = instance._this.querySelector('#ya-0');
-            if( yaEl ) {
-                yaEl.addEventListener('pointerdown', instance.yAxisPointerDown.bind(instance));
-                yaEl.addEventListener('pointermove', instance.yAxisPointerMove.bind(instance));
-                yaEl.addEventListener('pointerup',   instance.yAxisPointerUp.bind(instance));
-                yaEl.addEventListener('touchstart',  instance.yAxisTouchStart.bind(instance), { passive: false });
-                yaEl.addEventListener('touchmove',   instance.yAxisTouchMove.bind(instance),  { passive: false });
-                yaEl.addEventListener('touchend',    instance.yAxisTouchEnd.bind(instance),   { passive: false });
-            }
+            if( !isMobile )
+                instance._this.querySelector('#maincard').addEventListener('wheel', instance.wheelScrolled.bind(instance), { passive: false });
 
             const config = hec_panel.config ?? {};
 
@@ -220,6 +211,61 @@ function hecHookInfoPanel()
 
             this._setEntityOptions(instance);
 
+            // Add Y-axis drag overlay for line/bar graphs
+            const _type = instance.pconfig.graphConfig[0]?.graph?.type;
+            if( _type === 'line' || _type === 'bar' ) {
+                const _canvas = instance._this.querySelector('#graph0');
+                if( _canvas ) {
+                    const _h = _type === 'bar' ? instance.pconfig.barGraphHeight + 24 : instance.pconfig.lineGraphHeight;
+                    const yaEl = document.createElement('div');
+                    yaEl.id = 'ya-0';
+                    yaEl.style.cssText = `position:absolute;left:0;top:28px;width:55px;height:${_h-28}px;touch-action:none;cursor:ns-resize;`;
+                    _canvas.parentNode.appendChild(yaEl);
+                    yaEl.addEventListener('pointerdown', instance.yAxisPointerDown.bind(instance));
+                    yaEl.addEventListener('pointermove', instance.yAxisPointerMove.bind(instance));
+                    yaEl.addEventListener('pointerup',   instance.yAxisPointerUp.bind(instance));
+
+                    // Touch handlers for mobile info-panel (bottom sheet intercepts pointer events)
+                    // Use capture + stopPropagation to prevent bottom sheet drag
+                    let _touchYAxis = null;
+                    yaEl.addEventListener('touchstart', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const t = e.touches[0];
+                        const g = instance.graphs[0];
+                        if( !g ) return;
+                        _touchYAxis = {
+                            g,
+                            startY: t.clientY,
+                            y0: g.chart.scales['y-axis-0'].min,
+                            y1: g.chart.scales['y-axis-0'].max
+                        };
+                    }, { capture: true, passive: false });
+                    yaEl.addEventListener('touchmove', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if( !_touchYAxis ) return;
+                        const t = e.touches[0];
+                        const p = _touchYAxis;
+                        const g = p.g;
+                        const h = g.chart.chartArea.bottom - g.chart.chartArea.top;
+                        const dy = t.clientY - p.startY;
+                        const shift = dy * (p.y1 - p.y0) / h;
+                        g.chart.options.scales.yAxes[0].ticks.min = p.y0 + shift;
+                        g.chart.options.scales.yAxes[0].ticks.max = p.y1 + shift;
+                        g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                        if( g.yaxisLock !== 2 ) instance.updateScaleLockState(g, true);
+                        g.yaxisLock = 2;
+                        g.chart.update();
+                    }, { capture: true, passive: false });
+                    yaEl.addEventListener('touchend', (e) => {
+                        e.stopPropagation();
+                        _touchYAxis = null;
+                    }, { capture: true });
+
+                }
+            }
+
             instance.contentValid = true;
 
             instance.databaseCallback = this._databaseCallback.bind(this);
@@ -228,7 +274,7 @@ function hecHookInfoPanel()
 
             instance.today(false);
 
-            let ro = new ResizeObserver(entries => { 
+            let ro = new ResizeObserver(entries => {
                 for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
                 instance.setStepSize(true);
             });
@@ -263,14 +309,14 @@ function hecHookInfoPanel()
     function isExcluded(hass, entity_id)
     {
         if( hec_panel?.config?.exclude ) {
-            return hec_panel.config.exclude[entity_id] || 
-                   hec_panel.config.exclude[getDomainForEntity(entity_id)] || 
+            return hec_panel.config.exclude[entity_id] ||
+                   hec_panel.config.exclude[getDomainForEntity(entity_id)] ||
                    hec_panel.config.exclude[getDeviceClass(hass, entity_id)];
         }
         return false;
     }
 
-    __fn.prototype._hec_updated = function(changedProps) 
+    __fn.prototype._hec_updated = function(changedProps)
     {
 
         if( !this.hec_instance ) {
@@ -327,9 +373,9 @@ function hecHookInfoPanel()
         }
     }
 
-    __fn.prototype._hec_render = function() 
+    __fn.prototype._hec_render = function()
     {
-        if( !this.hec_instance ) 
+        if( !this.hec_instance )
             readLocalConfig();
 
         const entity_id = this.entityId;
@@ -408,7 +454,7 @@ function hecHookInfoPanel()
                     </div>
                 </div>
                 <div id='graphlist' style="margin-left:-2px;margin-right:-10px">
-                    <div style="position:relative;height:${h}px">
+                    <div style="position:relative">
                         <select id='bd-0' style="display:${(type == 'bar' && interval) ? 'block' : 'none'};position:relative;float:right;width:80px;right:10px;color:var(--primary-text-color);background-color:${cbcol};border:0px solid black;">
                             <option value="0" style="color:${optColor};background-color:${optBack}">10m</option>
                             <option value="1" style="color:${optColor};background-color:${optBack}" selected>Hourly</option>
@@ -420,7 +466,6 @@ function hecHookInfoPanel()
                             <svg style='display:none' width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" /></svg>
                         </button>
                         <canvas id="graph0" height="${h}px" style='touch-action:pan-y'></canvas>
-                        ${(type == 'line' || type == 'bar') ? `<div id="ya-0" style="position:absolute;left:0;top:28px;width:55px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>` : ''}
                     </div>
                 </div>
                 </div>
@@ -431,7 +476,7 @@ function hecHookInfoPanel()
             return html`
                 <div id="maincard" style="display:${(hec_panel.show === false) ? 'none' : 'block'};margin-bottom: 16px">
                 <div id='graphlist' style="margin-left:-2px;margin-right:-10px">
-                    <div style="position:relative;height:${h}px">
+                    <div style="position:relative">
                         <select id='bd-0' style="display:${(type == 'bar' && interval) ? 'block' : 'none'};position:relative;float:right;width:80px;right:10px;color:var(--primary-text-color);background-color:${cbcol};border:0px solid black;">
                             <option value="0" style="color:${optColor};background-color:${optBack}">10m</option>
                             <option value="1" style="color:${optColor};background-color:${optBack}" selected>Hourly</option>
@@ -443,7 +488,6 @@ function hecHookInfoPanel()
                             <svg style='display:none' width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" /></svg>
                         </button>
                         <canvas id="graph0" height="${h}px" style='touch-action:pan-y'></canvas>
-                        ${(type == 'line' || type == 'bar') ? `<div id="ya-0" style="position:absolute;left:0;top:28px;width:55px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>` : ''}
                     </div>
                 </div>
                 </div>
