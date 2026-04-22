@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.10b29';
+const Version = '1.1.11b12';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -1624,8 +1624,40 @@ export class HistoryCardState {
                 datasets: [ ]
             };
 
+            // Helper: wrap label to 2 lines if too long for labelAreaWidth
+            const _wrapLabel = (name) => {
+                if( !name || !this.pconfig.labelsVisible ) return '';
+                const _availW = this.pconfig.labelAreaWidth - 8;
+                // Use an offscreen canvas to measure text accurately
+                const _mc = document.createElement('canvas').getContext('2d');
+                _mc.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+                if( _mc.measureText(name).width <= _availW ) return name;
+                // Try to split at a word boundary
+                const _words = name.split(' ');
+                if( _words.length > 1 ) {
+                    let _line1 = '', _line2 = '';
+                    for( let _wi = 0; _wi < _words.length; _wi++ ) {
+                        const _try = _line1 ? _line1 + ' ' + _words[_wi] : _words[_wi];
+                        if( _mc.measureText(_try).width <= _availW ) {
+                            _line1 = _try;
+                        } else {
+                            _line2 = _words.slice(_wi).join(' ');
+                            break;
+                        }
+                    }
+                    if( _line1 && _line2 ) return [_line1, _line2];
+                }
+                // No word boundary — split at character level
+                let _split = 0;
+                for( let _ci = 1; _ci <= name.length; _ci++ ) {
+                    if( _mc.measureText(name.substring(0, _ci)).width <= _availW ) _split = _ci;
+                    else break;
+                }
+                return [name.substring(0, _split), name.substring(_split)];
+            };
+
             for( let d of datasets ) {
-                datastructure.labels.push(this.pconfig.labelsVisible ? d.name : '');
+                datastructure.labels.push(this.pconfig.labelsVisible ? _wrapLabel(d.name) : '');
                 datastructure.datasets.push({
                     domain: d.domain,
                     device_class: d.device_class,
@@ -1704,6 +1736,11 @@ export class HistoryCardState {
                 },
                 topClipMargin : ( config?.ymax == null ) ? 4 : 1,
                 bottomClipMargin: ( config?.ymin == null ) ? 4 : 1,
+                layout: {
+                    padding: {
+                        top: ( graphtype === 'timeline' || graphtype === 'arrowline' ) ? 24 : 0
+                    }
+                },
                 animation: {
                     duration: 0
                 },
@@ -2079,6 +2116,20 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
+    _showLabelTooltip(label, clientX, clientY) {
+        const _existing = document.getElementById('hec-label-tooltip');
+        if( _existing ) _existing.remove();
+        const _tip = document.createElement('div');
+        _tip.id = 'hec-label-tooltip';
+        _tip.textContent = label;
+        _tip.style.cssText = 'position:fixed;z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:1;';
+        _tip.style.left = (clientX + 10) + 'px';
+        _tip.style.top  = (clientY - 16) + 'px';
+        document.body.appendChild(_tip);
+        setTimeout(() => { _tip.style.opacity = '0'; }, 500);
+        setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, 2000);
+    }
+
     _getScrollContainer() {
         return document.scrollingElement || document.documentElement;
     }
@@ -2116,13 +2167,11 @@ export class HistoryCardState {
         event.stopPropagation();
         try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
         // Find which graph this mo overlay belongs to
-        console.log('graphMoveStart called, target=', event.target.id);
         for( let g of this.graphs ) {
             if( this._this.querySelector(`#mo-${g.id}`) === event.target ) {
                 panstate.moveGraph = { g, startX: event.clientX, startY: event.clientY };
                 event.target.style.cursor = 'grabbing';
                 this._startAutoScroll(event);
-                console.log('graphMoveStart: found graph, autoScrollActive=', this._autoScrollActive);
                 break;
             }
         }
@@ -2135,7 +2184,6 @@ export class HistoryCardState {
         event.stopPropagation();
         event.target.style.cursor = 'grabbing';
         this._autoScrollY = event.clientY;
-        console.log('graphMoveMove y=', this._autoScrollY);
     }
 
     graphMoveEnd(event)
@@ -2256,6 +2304,45 @@ export class HistoryCardState {
             // Check if click is on a legend item — start drag if so
             panstate.dragDataset = null;
             const _chart = panstate.g.chart;
+
+            // Check if click is on the label area of a timeline/arrowline graph
+            if( panstate.g.type === 'timeline' || panstate.g.type === 'arrowline' ) {
+                const _rect2 = event.target.getBoundingClientRect();
+                const _cx2 = event.clientX - _rect2.left;
+                const _cy2 = event.clientY - _rect2.top;
+                if( _chart.chartArea && _cx2 < _chart.chartArea.left ) {
+                    const _yScale = _chart.scales['y-axis-0'];
+                    if( _yScale && _chart.data.labels ) {
+                        let _closestIdx = -1;
+                        let _closestDist = Infinity;
+                        for( let _li = 0; _li < _chart.data.labels.length; _li++ ) {
+                            const _py = _yScale.getPixelForValue(null, _li, _li);
+                            const _dist = Math.abs(_cy2 - _py);
+                            if( _dist < _closestDist ) { _closestDist = _dist; _closestIdx = _li; }
+                        }
+                        if( _closestIdx >= 0 ) {
+                            const _lbl = _chart.data.labels[_closestIdx];
+                            const _labelStr = Array.isArray(_lbl) ? _lbl.join(' ') : _lbl;
+                            // Show tooltip if label is truncated
+                            const _ctx2 = event.target.getContext('2d');
+                            _ctx2.save();
+                            _ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+                            const _textW = _ctx2.measureText(_labelStr).width;
+                            _ctx2.restore();
+                            const _availW = _chart.chartArea.left - 8;
+                            if( _textW > _availW ) {
+                                this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
+                            }
+                            // Start timeline entity drag
+                            panstate.dragTimelineEntity = { g: panstate.g, entityIdx: _closestIdx };
+                            event.target.style.cursor = 'grabbing';
+                            this._startAutoScroll(event);
+                            return;
+                        }
+                    }
+                }
+            }
+
             if( _chart.legend && _chart.legend.legendHitBoxes ) {
                 const _rect = event.target.getBoundingClientRect();
                 const _cx = event.clientX - _rect.left;
@@ -2332,6 +2419,39 @@ export class HistoryCardState {
             this._autoScrollY = event.clientY;
             return;
         }
+        if( panstate.dragTimelineEntity ) {
+            event.target.style.cursor = 'grabbing';
+            this._autoScrollY = event.clientY;
+            return;
+        }
+
+        // Hover cursor: move over draggable legend or timeline label areas
+        if( !this.state.drag && !panstate.pinch ) {
+            let _hoverG = null;
+            for( let g of this.graphs ) {
+                if( g.canvas === event.target ) { _hoverG = g; break; }
+            }
+            if( _hoverG ) {
+                const _chart = _hoverG.chart;
+                const _rect = event.target.getBoundingClientRect();
+                const _cx = event.clientX - _rect.left;
+                const _cy = event.clientY - _rect.top;
+                let _onDraggable = false;
+                if( _hoverG.type === 'timeline' || _hoverG.type === 'arrowline' ) {
+                    if( _chart.chartArea && _cx < _chart.chartArea.left ) _onDraggable = true;
+                } else if( _chart.legend && _chart.legend.legendHitBoxes ) {
+                    for( let _box of _chart.legend.legendHitBoxes ) {
+                        if( _cx >= _box.left && _cx <= _box.left + _box.width &&
+                            _cy >= _box.top  && _cy <= _box.top  + _box.height ) {
+                            _onDraggable = true;
+                            break;
+                        }
+                    }
+                }
+                event.target.style.cursor = _onDraggable ? 'move' : '';
+            }
+        }
+
         if( this.state.drag ) {
 
             if( Math.abs(event.clientX - panstate.lx) > 0 ) {
@@ -2471,6 +2591,153 @@ export class HistoryCardState {
 
     pointerUp(event)
     {
+        // Handle timeline/arrowline entity drag & drop
+        if( panstate.dragTimelineEntity ) {
+            const _src = panstate.dragTimelineEntity.g;
+            const _srcIdx = panstate.dragTimelineEntity.entityIdx;
+            panstate.dragTimelineEntity = null;
+            event.target.style.cursor = '';
+            this._stopAutoScroll();
+
+            // Find target graph under pointer — same type only
+            let _tgt = null;
+            let _tgtWrongType = null; // graph found but wrong type
+            let _tgtInsertIdx = -1; // index in target entities to insert before (-1 = append)
+            for( let g of this.graphs ) {
+                const _rect0 = g.canvas.getBoundingClientRect();
+                if( event.clientX >= _rect0.left && event.clientX <= _rect0.right &&
+                    event.clientY >= _rect0.top  && event.clientY <= _rect0.bottom ) {
+                    if( g.type !== _src.type ) { _tgtWrongType = g; break; }
+                }
+                if( g.type !== _src.type ) continue;
+                const _rect = g.canvas.getBoundingClientRect();
+                if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
+                    event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
+                    _tgt = g;
+                    // Determine insertion position by Y proximity to each entity bar
+                    const _yScale = g.chart.scales['y-axis-0'];
+                    if( _yScale ) {
+                        let _closestDist = Infinity;
+                        let _closestI = 0;
+                        let _insertBefore = true;
+                        const _cy = event.clientY - _rect.top;
+                        for( let _ei = 0; _ei < g.entities.length; _ei++ ) {
+                            const _py = _yScale.getPixelForValue(null, _ei, _ei);
+                            const _dist = Math.abs(_cy - _py);
+                            if( _dist < _closestDist ) {
+                                _closestDist = _dist;
+                                _closestI = _ei;
+                                _insertBefore = _cy < _py;
+                            }
+                        }
+                        _tgtInsertIdx = _insertBefore ? _closestI : _closestI + 1;
+                    }
+                    break;
+                }
+            }
+
+            if( !_tgt ) {
+                if( _tgtWrongType ) this._showLabelTooltip(`${_src.type} ≠ ${_tgtWrongType.type}`, event.clientX, event.clientY);
+                return;
+            }
+
+            const _entity = _src.entities[_srcIdx];
+            const _srcEmpty = _src.entities.length === 1;
+            const _isSameGraph = _tgt === _src;
+
+            // Update pconfig.entities groupId and move entity adjacent to target group
+            if( !_isSameGraph ) {
+                const _tgtGroupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _tgt.entities[0].entity)?.groupId;
+                const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === _entity.entity);
+                if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
+                    const _updatedEntry = { entity: _entity.entity, groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
+                    // Remove entity from its current position
+                    this.pconfig.entities.splice(_eIdx, 1);
+                    // Find insertion position: after last member of target group
+                    const _tgtLastIdx = this.pconfig.entities.reduce((acc, en, i) =>
+                        (typeof en === 'object' && en.groupId === _tgtGroupId) ? i : acc, -1);
+                    if( _tgtLastIdx >= 0 ) {
+                        this.pconfig.entities.splice(_tgtLastIdx + 1, 0, _updatedEntry);
+                    } else {
+                        // Target group not found (shouldn't happen) — append
+                        this.pconfig.entities.push(_updatedEntry);
+                    }
+                }
+            }
+
+            // Rebuild source (remove entity)
+            const _gl = this._this.querySelector('#graphlist');
+            const _srcDiv = _src.canvas.parentNode.parentNode;
+            const _srcNext = _srcDiv.nextSibling;
+            _srcDiv.remove();
+            this.graphs.splice(this.graphs.indexOf(_src), 1);
+
+            // New entity lists
+            const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
+            const _allTgtEntities = _isSameGraph
+                ? (() => {
+                    const _arr = _src.entities.filter((_, i) => i !== _srcIdx);
+                    const _insertAt = _tgtInsertIdx > _srcIdx ? _tgtInsertIdx - 1 : _tgtInsertIdx;
+                    _arr.splice(_insertAt < 0 ? _arr.length : _insertAt, 0, _entity);
+                    return _arr;
+                })()
+                : null;
+
+            if( !_isSameGraph ) {
+                // Rebuild source without entity (if not empty)
+                if( !_srcEmpty ) {
+                    const _countBefore = this.graphs.length;
+                    const _saved = this.pconfig.combineSameUnits;
+                    this.pconfig.combineSameUnits = true;
+                    _srcRemaining.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                    this.pconfig.combineSameUnits = _saved;
+                    for( let i = _countBefore; i < this.graphs.length; i++ )
+                        _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _srcNext);
+                }
+                // Rebuild target with added entity at correct position
+                const _tgtDiv = _tgt.canvas.parentNode.parentNode;
+                const _tgtNext = _tgtDiv.nextSibling;
+                _tgtDiv.remove();
+                this.graphs.splice(this.graphs.indexOf(_tgt), 1);
+                const _newTgtEntities = [..._tgt.entities];
+                _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
+                const _countBefore2 = this.graphs.length;
+                const _saved2 = this.pconfig.combineSameUnits;
+                this.pconfig.combineSameUnits = true;
+                _newTgtEntities.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                this.pconfig.combineSameUnits = _saved2;
+                for( let i = _countBefore2; i < this.graphs.length; i++ ) {
+                    const _d = this.graphs[i].canvas.parentNode.parentNode;
+                    if( _tgtNext && _gl.contains(_tgtNext) ) _gl.insertBefore(_d, _tgtNext);
+                    else _gl.appendChild(_d);
+                }
+            } else {
+                // Same graph reorder — rebuild with new entity order
+                // Reorder pconfig.entities to match new order within the group
+                const _groupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _allTgtEntities[0].entity)?.groupId;
+                if( _groupId !== undefined ) {
+                    // Remove all entities of this group from pconfig.entities
+                    const _groupEntries = this.pconfig.entities.filter(en => (typeof en === 'string' ? false : en.groupId === _groupId));
+                    const _firstIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? false : en.groupId === _groupId));
+                    this.pconfig.entities = this.pconfig.entities.filter(en => (typeof en === 'string' ? true : en.groupId !== _groupId));
+                    // Re-insert in new order
+                    const _reordered = _allTgtEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
+                    this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
+                }
+                const _countBefore = this.graphs.length;
+                const _saved = this.pconfig.combineSameUnits;
+                this.pconfig.combineSameUnits = true;
+                _allTgtEntities.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                this.pconfig.combineSameUnits = _saved;
+                for( let i = _countBefore; i < this.graphs.length; i++ )
+                    _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _srcNext);
+            }
+
+            this.writeLocalState();
+            this.updateHistory();
+            return;
+        }
+
         // Handle legend drag & drop
         if( panstate.dragDataset ) {
             const _src = panstate.dragDataset.g;
@@ -2490,11 +2757,85 @@ export class HistoryCardState {
                     break;
                 }
             }
+            // Intra-graph reorder: drop on same graph canvas
+            if( !_tgt ) {
+                // Check if drop is on the source graph itself (same canvas)
+                const _srcRect = _src.canvas.getBoundingClientRect();
+                if( event.clientX >= _srcRect.left && event.clientX <= _srcRect.right &&
+                    event.clientY >= _srcRect.top  && event.clientY <= _srcRect.bottom ) {
+                    // Find target label by X position in legend
+                    const _hitBoxes = _src.chart.legend?.legendHitBoxes;
+                    if( _hitBoxes && _hitBoxes.length > 1 ) {
+                        const _rect = _src.canvas.getBoundingClientRect();
+                        const _cx = event.clientX - _rect.left;
+                        let _tgtLabelIdx = -1;
+                        let _insertBefore = true;
+                        for( let _li = 0; _li < _hitBoxes.length; _li++ ) {
+                            if( _li === _srcIdx ) continue;
+                            const _box = _hitBoxes[_li];
+                            if( _cx >= _box.left && _cx <= _box.left + _box.width ) {
+                                _tgtLabelIdx = _li;
+                                _insertBefore = _cx < _box.left + _box.width / 2;
+                                break;
+                            }
+                        }
+                        if( _tgtLabelIdx >= 0 ) {
+                            // Reorder entities
+                            const _newEntities = [..._src.entities];
+                            const [_moved] = _newEntities.splice(_srcIdx, 1);
+                            const _insertAt = _tgtLabelIdx > _srcIdx
+                                ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
+                                : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
+                            _newEntities.splice(_insertAt, 0, _moved);
+                            // Persist in pconfig.entities
+                            const _groupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _newEntities[0].entity)?.groupId;
+                            if( _groupId !== undefined ) {
+                                const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId);
+                                const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId);
+                                this.pconfig.entities = this.pconfig.entities.filter(en => typeof en === 'object' ? en.groupId !== _groupId : true);
+                                const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
+                                this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
+                            }
+                            // Rebuild graph
+                            const _gl = this._this.querySelector('#graphlist');
+                            const _srcDiv = _src.canvas.parentNode.parentNode;
+                            const _srcNext = _srcDiv.nextSibling;
+                            _srcDiv.remove();
+                            this.graphs.splice(this.graphs.indexOf(_src), 1);
+                            const _countBefore = this.graphs.length;
+                            const _saved = this.pconfig.combineSameUnits;
+                            this.pconfig.combineSameUnits = true;
+                            _newEntities.forEach((en, i) => this.addDynamicGraph(en.entity, i === 0, en.color, en.fill));
+                            this.pconfig.combineSameUnits = _saved;
+                            for( let i = _countBefore; i < this.graphs.length; i++ ) {
+                                const _d = this.graphs[i].canvas.parentNode.parentNode;
+                                if( _srcNext && _gl.contains(_srcNext) ) _gl.insertBefore(_d, _srcNext);
+                                else _gl.appendChild(_d);
+                            }
+                            this.writeLocalState();
+                            this.updateHistory();
+                        }
+                    }
+                }
+                return;
+            }
+
+            if( _tgt && _tgt.type !== _src.type ) {
+                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY);
+                return;
+            }
 
             if( _tgt && _tgt.type === _src.type ) {
                 // Check SI compatibility
                 const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
                 const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
+                if( _srcUnit !== undefined && _tgtUnit !== undefined && !areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Show incompatibility tooltip
+                    const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
+                    const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
+                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY);
+                    return;
+                }
                 if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
                     // Move entity from source to target
                     const _entity = _src.entities[_srcIdx];
@@ -2641,6 +2982,11 @@ export class HistoryCardState {
 
     pointerCancel(event)
     {
+        if( panstate.dragTimelineEntity ) {
+            panstate.dragTimelineEntity = null;
+            event.target.style.cursor = '';
+            this._stopAutoScroll();
+        }
         if( panstate.pinch ) {
             panstate.pinch = null;
             return;
@@ -3052,7 +3398,7 @@ export class HistoryCardState {
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
             html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
-            html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
+            html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -3074,12 +3420,13 @@ export class HistoryCardState {
                 yaEl2.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
                 yaEl2.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
             }
-            const moEl2 = this._this.querySelector(`#mo-${this.g_id}`);
-            if( moEl2 ) {
-                moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
-                moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
-                moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
-            }
+        }
+        // Connect graph move listeners for all graph types
+        const moEl2 = this._this.querySelector(`#mo-${this.g_id}`);
+        if( moEl2 ) {
+            moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
+            moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
+            moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
         }
 
         // Connect the close button event listener
@@ -4114,7 +4461,7 @@ class HistoryExplorerCard extends HTMLElement
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
-                html += `<div id="mo-${g.id}" style="position:absolute;left:0;top:0;width:${this.instance.pconfig.labelAreaWidth}px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
+                html += `<div id="mo-${g.id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
