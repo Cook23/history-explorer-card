@@ -1,13 +1,14 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)  
-[![bymecoffee](https://user-images.githubusercontent.com/60828821/212549591-950f90de-6884-4bc2-bb66-d2cd1d6f00b6.png)](https://www.buymeacoffee.com/alexarch)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/Cook23/history-explorer-card?style=for-the-badge)](https://github.com/Cook23/history-explorer-card/releases)
+[![GitHub stars](https://img.shields.io/github/stars/Cook23/history-explorer-card?style=for-the-badge)](https://github.com/Cook23/history-explorer-card/stargazers)
+![Experimental](https://img.shields.io/badge/status-experimental-yellow?style=for-the-badge)
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant — a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024).
+> **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
+> For the complete reference documentation, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md).
 
 A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
-
-> For the complete reference documentation including all technical details, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md).
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
@@ -17,7 +18,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ### HACS (recommended)
 
-The history explorer card is part of the default [HACS](https://hacs.xyz) store.
+Add this repository as a custom repository in HACS: `https://github.com/Cook23/history-explorer-card`
 
 ### Manual install
 
@@ -41,6 +42,8 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 ## Adding entities
 
 Entities can be added interactively through the UI selector, or defined statically in YAML. Both can be combined. Dynamically added entities are saved in the browser's local storage and restored on next visit.
+
+![history-panel-otf-entities](https://github.com/alexarch21/history-explorer-card/raw/main/images/screenshots/history-panel-otf-entities.png)
 
 The entity selector accepts `*` wildcards:
 ```
@@ -70,7 +73,9 @@ filterEntities:
 
 All changes made interactively are saved in the browser and survive a page refresh.
 
-### Grouping and ungrouping curves
+### Line graphs
+
+![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
 Enable automatic grouping of entities with compatible units (including SI prefix variants like W and kW) onto the same graph:
 ```yaml
@@ -78,13 +83,14 @@ type: custom:history-explorer-card
 combineSameUnits: true
 ```
 
-When multiple curves share a graph, the Y axis and tooltips always show each entity's value in its original unit.
+When multiple curves share a graph, the Y axis and tooltips always show each entity's value in its original unit. SI unit conversion also applies to graphs defined in YAML containing mixed units.
 
+- **Single-click** a curve label to show/hide it
 - **Double-click** a curve label to extract it into its own graph
 - **Drag** a curve label left or right to reorder curves within the same graph
-- **Drag** a curve label onto another graph to move it there (compatible units only). An incompatible drop shows a brief tooltip explaining the mismatch
+- **Drag** a curve label onto another graph to move it there (compatible units only)
 
-SI unit conversion also applies to graphs defined in YAML containing mixed units (e.g. W and kW sensors on the same graph).
+An incompatible drop shows a brief tooltip explaining the mismatch.
 
 ### Reordering graphs
 
@@ -92,9 +98,10 @@ Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the m
 
 ### Timeline and arrowline graphs
 
-Entities on timeline and arrowline graphs can also be reorganized interactively:
+![image](https://user-images.githubusercontent.com/60828821/198171854-f643a628-25f7-4f5a-ac50-f0914a5e265e.png)
+
 - **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph
-- Long labels that don't fit are truncated; click the label to see the full name in a tooltip
+- Click a truncated label to see the full name in a tooltip
 
 The page scrolls automatically when dragging near the top or bottom of the screen.
 
@@ -109,15 +116,15 @@ type: custom:history-explorer-card
 infoPanel: true
 ```
 
-Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. The popup supports pan, zoom, Y axis control, and long term statistics. The graph type and display options follow your `entityOptions` configuration. Ungrouping, drag & drop and CSV export are not available in the popup.
+Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. The popup supports pan, zoom, Y axis control, and long term statistics. Ungrouping, drag & drop and CSV export are not available in the popup.
 
 ---
 
 ## Y axis control
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range.
+![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-To pan the Y axis: drag directly on the label area (left side of the graph) — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, use a two-finger vertical pinch to zoom the Y axis.
+The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, use a two-finger vertical pinch to zoom the Y axis.
 
 To set fixed Y axis bounds in YAML:
 ```yaml
@@ -161,7 +168,7 @@ type: custom:history-explorer-card
 lineMode: curves   # curves (default), lines, or stepped
 ```
 
-Also available per entity in `entityOptions` and in YAML graphs.
+![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
 ### Stroke style
 
@@ -174,6 +181,8 @@ entities:
 ```
 
 ### Individual sample dots
+
+![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
 Hold **Alt** (Option on Mac) while hovering to reveal individual data points. To show them permanently:
 
@@ -203,6 +212,8 @@ showUnavailable: true
 
 ## Bar charts
 
+![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
+
 Entities with a `total_increasing` state class are automatically shown as bar charts. Use the interval selector on the graph to switch between 10m, hourly, daily and monthly views.
 
 ```yaml
@@ -210,17 +221,6 @@ entityOptions:
   sensor.rain_amount:
     type: bar
     interval: 10m
-```
-
-Multiple entities can be combined in a single bar graph (side by side or stacked):
-```yaml
-graphs:
-  - type: bar
-    options:
-      interval: daily
-      stacked: false
-    entities:
-      - entity: sensor.rain_amount
 ```
 
 Color ranges based on value:
@@ -234,18 +234,13 @@ entityOptions:
       '1.5': red
 ```
 
-Net metering (sensors that can decrease):
-```yaml
-entities:
-  - entity: sensor.net_meter
-    netBars: true
-```
-
 ---
 
 ## Timeline charts
 
-Non-numerical entities are shown as timelines automatically. State text display:
+![image](https://user-images.githubusercontent.com/60828821/198171854-f643a628-25f7-4f5a-ac50-f0914a5e265e.png)
+
+State text display:
 ```yaml
 stateTextMode: raw    # raw HA state names (default)
 stateTextMode: auto   # translated device class dependent names
@@ -265,7 +260,8 @@ stateColors:
 
 ## Compass arrow graphs
 
-For directional sensors like wind bearing:
+![image](https://user-images.githubusercontent.com/60828821/163562690-01002243-b6d3-4a55-8128-9d1dc89581c6.png)
+
 ```yaml
 entityOptions:
   sensor.wind_bearing:
@@ -278,7 +274,10 @@ entityOptions:
 
 ## Long term statistics
 
-The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. To configure:
+![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
+
+The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default.
+
 ```yaml
 statistics:
   enabled: true
@@ -286,8 +285,6 @@ statistics:
   period: hour     # hour, day, or month
   force: false     # true = use statistics only, no short-term history
 ```
-
-Min/max statistical band (`showMinMax`) works alongside long term statistics.
 
 ---
 
@@ -331,20 +328,9 @@ entityOptions:
 
 ---
 
-## Custom data processing
-
-Transform entity values before display using a JS expression:
-```yaml
-graphs:
-  - type: timeline
-    entities:
-      - entity: sensor.room_humidity
-        process: '( state < 30 ) ? "dry" : ( state > 70 ) ? "wet" : "normal"'
-```
-
----
-
 ## CSV export
+
+![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 
 Open the entity action menu and select **Export as CSV**. Not available in the HA Companion app.
 
@@ -400,8 +386,6 @@ timeTicks:
 
 ## YAML graph configuration
 
-Static graphs can be defined in YAML. They are always shown and cannot be removed via the UI.
-
 ```yaml
 type: custom:history-explorer-card
 graphs:
@@ -432,22 +416,12 @@ graphs:
         color: black
 ```
 
-Wildcards are supported in YAML entity lists:
-```yaml
-entities:
-  - entity: sensor.*temperature*
-    exclude:
-      - entity: '*fridge*'
-```
-
-For the full list of configuration options, see [full-reference-config.yaml](full-reference-config.yaml).
+For the full list of configuration options, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md).
 
 ---
 
 ### Running as a sidebar panel
 
+![image](https://user-images.githubusercontent.com/60828821/161340801-f1f97e90-73c4-44d9-8afa-ba858906a2c1.png)
+
 Add an empty dashboard with **Show in sidebar** checked, set the view type to **Panel (1 card)**, and add the history explorer card.
-
----
-
-<a href="https://www.buymeacoffee.com/alexarch" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/white_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>

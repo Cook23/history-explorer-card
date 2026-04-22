@@ -1,5 +1,7 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)  
-[![bymecoffee](https://user-images.githubusercontent.com/60828821/212549591-950f90de-6884-4bc2-bb66-d2cd1d6f00b6.png)](https://www.buymeacoffee.com/alexarch)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/Cook23/history-explorer-card?style=for-the-badge)](https://github.com/Cook23/history-explorer-card/releases)
+[![GitHub stars](https://img.shields.io/github/stars/Cook23/history-explorer-card?style=for-the-badge)](https://github.com/Cook23/history-explorer-card/stargazers)
+![Experimental](https://img.shields.io/badge/status-experimental-yellow?style=for-the-badge)
 
 
 
@@ -151,7 +153,7 @@ The graph type and display options for the entity are taken from the card's `ent
 
 ### HACS
 
-The history explorer card is now part of the default [HACS Home Assistant Community Store](https://hacs.xyz). This is the preferred way to install this card.
+Add this repository as a custom repository in HACS: `https://github.com/Cook23/history-explorer-card`
 
 ### Manual install
 
@@ -1111,6 +1113,4 @@ The history explorer can be run as a sidebar panel. Add a new empty dashboard wi
 
 ![image](https://user-images.githubusercontent.com/60828821/161340801-f1f97e90-73c4-44d9-8afa-ba858906a2c1.png)
 
----
 
-<a href="https://www.buymeacoffee.com/alexarch" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/white_img.png" alt="Buy Me A Coffee" style="height: auto !important;width: auto !important;" ></a>
