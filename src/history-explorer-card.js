@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.11b12';
+const Version = '1.1.12';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -3686,7 +3686,7 @@ export class HistoryCardState {
         }
     }
 
-    createContent()
+    async createContent()
     {
         // Initialize the content if it's not there yet.
         if( !this.contentValid ) {
@@ -3763,7 +3763,7 @@ export class HistoryCardState {
                 }
             }
 
-            this.readLocalState();
+            await this.readLocalState();
 
             this.pconfig.nextDefaultColor = 0;
 
@@ -3831,7 +3831,7 @@ export class HistoryCardState {
             let width = this._this.querySelector('#maincard').clientWidth;
             if( width > 0 ) {
                 clearInterval(this.iid);
-                this.createContent();
+                this.createContent().catch(e => console.error('history-explorer-card createContent error:', e));
                 this.iid = null;
             }
         }
@@ -4136,43 +4136,76 @@ export class HistoryCardState {
     // Dynamic data storage
     // --------------------------------------------------------------------------------------
 
-    writeLocalState()
+    async writeLocalState()
     {
         const data = { "version" : 1, "entities" : this.pconfig.entities };
+        const _json = JSON.stringify(data);
 
+        // Write to localStorage as backup
         window.localStorage.removeItem('history-explorer-card');
         window.localStorage.removeItem('history-explorer_card_' + this.id);
-        window.localStorage.setItem('history-explorer_card_' + this.id, JSON.stringify(data));
+        window.localStorage.setItem('history-explorer_card_' + this.id, _json);
+
+        // Write to HA user storage (persists across devices for same user)
+        try {
+            await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data });
+        } catch(e) {}
     }
 
-    readLocalState()
+    async readLocalState()
     {
-        let data = JSON.parse(window.localStorage.getItem('history-explorer_card_' + this.id));
+        let data = null;
+
+        // Try HA user storage first
+        try {
+            const _result = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer_card_' + this.id });
+            if( _result?.value ) data = _result.value;
+        } catch(e) {}
+
+        // Fallback to localStorage
+        if( !data ) {
+            const _local = window.localStorage.getItem('history-explorer_card_' + this.id);
+            if( _local ) {
+                data = JSON.parse(_local);
+                // Migrate to HA storage
+                if( data ) {
+                    try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data }); } catch(e) {}
+                }
+            }
+        }
 
         if( data && data.version === 1 ) {
             this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
         } else {
-            data = JSON.parse(window.localStorage.getItem('history-explorer-card'));
-            if( data )
-                this.pconfig.entities = data.map(e => typeof e === 'string' ? { entity: e } : e);
-            else
+            // Legacy format fallback
+            const _legacy = window.localStorage.getItem('history-explorer-card');
+            if( _legacy ) {
+                const _legacyData = JSON.parse(_legacy);
+                if( _legacyData )
+                    this.pconfig.entities = _legacyData.map(e => typeof e === 'string' ? { entity: e } : e);
+                else
+                    this.pconfig.entities = [];
+            } else {
                 this.pconfig.entities = [];
+            }
         }
         // Set _nextGroupId to max existing groupId + 1
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
         this._nextGroupId = _maxGroupId + 1;
     }
 
-    writeInfoPanelConfig(forceUpdate = false)
+    async writeInfoPanelConfig(forceUpdate = false)
     {
         if( !infoPanelEnabled ) {
             window.localStorage.removeItem('history-explorer-info-panel');
+            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-info-panel', value: null }); } catch(e) {}
         } else if( infoPanelEnabled && (this.pconfig.infoPanelConfig || forceUpdate) ) {
-            let data = {};
-            data.enabled = true;
-            data.config = this.pconfig.infoPanelConfig;
+            let _data = {};
+            _data.enabled = true;
+            _data.config = this.pconfig.infoPanelConfig;
             window.localStorage.removeItem('history-explorer-info-panel');
-            window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(data));
+            window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_data));
+            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-info-panel', value: _data }); } catch(e) {}
         }
     }
 
