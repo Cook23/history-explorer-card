@@ -3,13 +3,100 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.12] - 2026-04-23
+### Added
+- Per-user server-side persistence via HA `frontend/set_user_data` — graph configuration is now tied to the HA user account and synchronized across all devices
+- Automatic migration from browser local storage on first load
+- Local storage kept as fallback if HA storage is unavailable
+
+## [v1.1.11] - 2026-04-22
+### Added
+- Drag and drop entities between graphs of the same type (timeline→timeline, arrowline→arrowline)
+- Reorder entities within the same timeline or arrowline graph by dragging their label
+- Drag and drop graph reordering (⠿ symbol) extended to timeline and arrowline graphs
+- Long entity labels in timeline/arrowline graphs truncated with click-to-reveal tooltip
+- Hover cursor changes to `move` over draggable legend labels and timeline/arrowline entity labels
+### Changed
+- Incompatible drag & drop (wrong type or incompatible units) now shows an explanatory tooltip instead of failing silently
+
+## [v1.1.10] - 2026-04-20
+### Added
+- Automatic grouping of entities with compatible SI units (W/kW, m/km, etc.) onto the same graph with transparent unit conversion — applies to both dynamic and YAML-defined graphs
+- Double-click a curve label to ungroup it into its own graph
+- Drag curve labels between graphs (compatible units only) to move curves
+- Drag curve labels left or right to reorder curves within the same graph
+- Drag the ⠿ symbol at the top left of any graph to reorder graphs
+- Auto-scroll when dragging near the top or bottom of the screen
+- All grouping, ordering and color choices persist across page refreshes
+
+## [v1.1.9] - 2026-04-21
+### Changed
+- Mobile detection switched from `navigator.appVersion`/`userAgent` string matching to `navigator.maxTouchPoints > 0` — more reliable across browsers and devices
+- Y axis touch handling on mobile unified with desktop pointer events on the `#ya-N` overlay — dedicated `yAxisTouchStart/Move/End` handlers removed
+### Fixed
+- Two-finger pinch zoom and Y axis reset on pointer up now correctly excluded for timeline and arrowline graphs
+- Mouse wheel zoom debounced (150ms) to prevent excessively fast zoom steps
+
+## [v1.1.8] - 2026-04-08
+### Fixed
+- Y axis pan (Shift+drag and `#ya-N` overlay) now correctly excluded for timeline and arrowline graphs, which have no numerical Y axis — previously caused a crash when attempting to read `y-axis-0` min/max on these graph types
+
+## [v1.1.7] - 2026-04-08
+### Fixed
+- Y axis drag overlay (`#ya-N`) repositioned: now starts at `top:28px` instead of `top:0` — the overlay was covering the Y axis lock button (padlock), making it unreachable
+### Changed
+- Card header now displays the version number: `History explorer vX.X.X`
+
+## [v1.1.6] - 2026-03-30
+### Fixed
+- Mobile entity selector: suggestion list (`datalist`) now only attached after the first character is typed — prevents the list from appearing before the virtual keyboard, which would push the keyboard below the list and make it unusable
+### Changed
+- Code cleanup: trailing whitespace removed throughout
+
+## [v1.1.5] - 2026-03-25
+### Fixed
+- `entityOptions` list form: glob matching only (device class and domain matching removed from list form, handled by dict form). Dict form and list form results are now correctly merged (list form wins per property, dict form fills remaining unset properties)
+- `history-info-panel.js`: `__entityId` → `entityId` and `__hass` → `hass` throughout — compatibility fix with recent HA versions that removed double-underscore prefixed properties
+
+## [v1.1.4] - 2026-03-25
+### Changed
+- `entityOptions` list form and dict form unified in a single `getEntityOptions` lookup — list form now also matches by device class and domain (not just glob patterns). `entityPatterns` config key removed, superseded by `entityOptions` list form.
+
+## [v1.1.3] - 2026-03-25
+### Added
+- Y axis pan by dragging on the label area now also works on mobile (touch events with `preventDefault` to avoid page scroll interference)
+
+## [v1.1.2] - 2026-03-25
+### Added
+- Y axis pan by dragging directly on the label area (desktop) — `#ya-N` overlay with pointer events, cursor changes to `ns-resize`
+
+## [v1.1.1] - 2026-03-20
+### Added
+- `axisAddMarginMin` / `axisAddMarginMax` config options to control Y axis top/bottom margin
+- Two-finger vertical pinch zoom on the Y axis (mobile)
+### Fixed
+- Line interpolation: `lines` and `stepped` now use zero-tension monotone interpolation (no overshoots), `curves` uses tension 0.1
+- Line rendering: `borderJoinStyle` and `borderCapStyle` set to `round` — constant stroke width at corners, rounded ends
+- Mobile entity selector: autocomplete suggestion list no longer appears before the virtual keyboard
+
+## [v1.1.0] - 2026-03-18
+### Added
+- `showMinMax` option: shaded min/max statistical band per entity (`statistics` or `history` mode)
+- `showPoints` option: permanent dots at measurement points, per entity or via `entityOptions`
+- `dashMode` now accepts a custom Canvas `setLineDash` array in addition to named modes
+- `entityOptions` list form with glob pattern matching (`match:` key), supporting wildcards, entity ids, device classes and domains
+- `lineMode` accepts singular aliases: `line`, `curve`, `step`
+- `decimation` and `showPoints` correctly wired through `entityOptions`
+### Changed
+- First release from Cook23 fork, based on SpangleLabs v1.0.54
+
 ## [v1.0.54] - 2024-05-10
 ### Changed
-- Switch from concatenating files, to using normal JS imports and exports. Hopefully making the build process more reliable and repeatable
+- Switch from concatenating files, to using normal JS imports and exports
 
 ## [v1.0.53] - 2024-05-07
 ### Added
-- Adding full reference config, at full-reference-config.yaml, which explains all possible configuration options
+- Adding full reference config at full-reference-config.yaml
 
 ## [v1.0.52] - 2024-05-02
 ### Changed
