@@ -3,6 +3,15 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.14] - 2026-05-05
+### Changed
+- Legend overlay (`#lg-N`) now receives pointer events directly (`pointer-events:auto`) with `setPointerCapture` on `pointerdown`, matching the graph drag overlay (`#mo-N`) — eliminates page scroll when dragging legend labels outside the legend zone on mobile
+- Legend drag logic extracted into dedicated `legendDragStart/Move/End` handlers — no longer piggybacked on the canvas `pointerDown/Move/Up` handlers
+- Drag feedback (`_updateDragFeedback`) and drop finalization (`_finalizeLegendDrop`) refactored into shared methods called by both the legend overlay handlers and the canvas handlers — zero code duplication
+- `#lg-N` height now synchronized after every `chart.update()` via a Chart.js `afterUpdate` plugin — stays in sync when entities are added or removed
+### Fixed
+- Page scroll triggered when dragging a legend label beyond the legend zone on mobile (root cause: canvas `touch-action:pan-y` was never overridden once the pointer left `#lg-N`)
+
 ## [v1.1.13] - 2026-05-05
 ### Added
 - Visual drag & drop feedback: ghost element following the cursor, insertion markers (vertical for legend labels, horizontal for timelines/graphs), drop target highlighting, `not-allowed` cursor on incompatible targets
