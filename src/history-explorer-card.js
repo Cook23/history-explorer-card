@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.14';
+const Version = '1.1.15';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -2578,25 +2578,24 @@ export class HistoryCardState {
         for( let g of this.graphs ) {
             if( this._this.querySelector(`#lg-${g.id}`) === event.target ) {
                 const _chart = g.chart;
-                if( !_chart.legend || !_chart.legend.legendHitBoxes ) return;
-                const _rect    = event.target.getBoundingClientRect();
-                const _cx      = event.clientX - _rect.left;
-                const _cy      = event.clientY - _rect.top;
-                const _grabbed = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
-                if( _grabbed && _chart.data.datasets[_grabbed.idx] ) {
-                    const _i      = _grabbed.idx;
-                    const _box    = _chart.legend.legendHitBoxes[_i];
-                    panstate.pendingDragDataset = {
-                        g, datasetIdx: _i,
-                        color: _chart.data.datasets[_i]?.borderColor || null,
-                        text:  _chart.legend.legendItems[_i]?.text || '',
-                        boxW: _box.width, boxH: _box.height,
-                        startX: event.clientX, startY: event.clientY
-                    };
-                } else {
-                    // No label hit — forward as click to canvas (Chart.js hide/show)
-                    panstate.lgForwardClick = { g, clientX: event.clientX, clientY: event.clientY };
+                // Store pending state — drag or click decided on pointerup
+                const _lgPending = { g, startX: event.clientX, startY: event.clientY, datasetIdx: -1 };
+                if( _chart.legend && _chart.legend.legendHitBoxes ) {
+                    const _rect    = event.target.getBoundingClientRect();
+                    const _cx      = event.clientX - _rect.left;
+                    const _cy      = event.clientY - _rect.top;
+                    const _grabbed = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
+                    if( _grabbed && _chart.data.datasets[_grabbed.idx] ) {
+                        const _i  = _grabbed.idx;
+                        const _box = _chart.legend.legendHitBoxes[_i];
+                        _lgPending.datasetIdx = _i;
+                        _lgPending.color = _chart.data.datasets[_i]?.borderColor || null;
+                        _lgPending.text  = _chart.legend.legendItems[_i]?.text || '';
+                        _lgPending.boxW  = _box.width;
+                        _lgPending.boxH  = _box.height;
+                    }
                 }
+                panstate.lgPending = _lgPending;
                 break;
             }
         }
@@ -2604,11 +2603,11 @@ export class HistoryCardState {
 
     legendDragMove(event)
     {
-        if( panstate.pendingDragDataset ) {
-            const _p = panstate.pendingDragDataset;
-            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 ) {
+        if( panstate.lgPending ) {
+            const _p = panstate.lgPending;
+            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 && _p.datasetIdx >= 0 ) {
                 panstate.dragDataset = { g: _p.g, datasetIdx: _p.datasetIdx, color: _p.color };
-                panstate.pendingDragDataset = null;
+                panstate.lgPending = null;
                 this._createGhost(_p.text, _p.boxW, _p.boxH, event.clientX, event.clientY, 'center', _p.color);
                 this._startAutoScroll(event);
             } else {
@@ -2619,29 +2618,70 @@ export class HistoryCardState {
             event.preventDefault();
             event.stopPropagation();
             this._updateDragFeedback(event);
+            return;
         }
+        // Update cursor based on pointer position within lg-N
+        this._updateLegendCursor(event);
+    }
+
+    _updateLegendCursor(event)
+    {
+        // Find which graph owns this lg overlay
+        let _g = null;
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#lg-${g.id}`) === event.target ) { _g = g; break; }
+        }
+        if( !_g ) return;
+        const _lgEl = event.target;
+        // ca-N and bc-N always get default cursor — check them first
+        const _caEl = this._this.querySelector(`#ca-${_g.id}`);
+        const _bcEl = this._this.querySelector(`#bc-${_g.id}`);
+        for( const _el of [_caEl, _bcEl] ) {
+            if( !_el ) continue;
+            const _r = _el.getBoundingClientRect();
+            if( event.clientX >= _r.left && event.clientX <= _r.right &&
+                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
+                _lgEl.style.cursor = 'default';
+                return;
+            }
+        }
+        // Check if pointer is over a legend label — move cursor
+        const _chart = _g.chart;
+        if( _chart.legend && _chart.legend.legendHitBoxes ) {
+            const _rect = _lgEl.getBoundingClientRect();
+            const _cx   = event.clientX - _rect.left;
+            const _cy   = event.clientY - _rect.top;
+            const _hit  = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
+            if( _hit && _chart.data.datasets[_hit.idx] ) {
+                _lgEl.style.cursor = 'move';
+                return;
+            }
+        }
+        _lgEl.style.cursor = 'default';
     }
 
     legendDragEnd(event)
     {
         event.preventDefault();
         event.stopPropagation();
-        if( panstate.pendingDragDataset ) {
-            // Pointer released before threshold — treat as click, forward to canvas
-            const _g = panstate.pendingDragDataset.g;
-            panstate.pendingDragDataset = null;
-            _g.canvas.dispatchEvent(new MouseEvent('click', {
+        // Click (movement < 5px or no label hit) — forward to bc-N or canvas
+        if( panstate.lgPending ) {
+            const _p = panstate.lgPending;
+            panstate.lgPending = null;
+            // Check if pointer is over the close button (#bc-N) — forward click to it
+            const _bcEl = this._this.querySelector(`#bc-${_p.g.id}`);
+            if( _bcEl ) {
+                const _bcR = _bcEl.getBoundingClientRect();
+                if( event.clientX >= _bcR.left && event.clientX <= _bcR.right &&
+                    event.clientY >= _bcR.top  && event.clientY <= _bcR.bottom ) {
+                    _bcEl.click();
+                    return;
+                }
+            }
+            // Otherwise forward to canvas (Chart.js legend click: hide/show, double-click uncombine)
+            _p.g.canvas.dispatchEvent(new MouseEvent('click', {
                 bubbles: true, cancelable: true,
                 clientX: event.clientX, clientY: event.clientY
-            }));
-            return;
-        }
-        if( panstate.lgForwardClick ) {
-            const _fwd = panstate.lgForwardClick;
-            panstate.lgForwardClick = null;
-            _fwd.g.canvas.dispatchEvent(new MouseEvent('click', {
-                bubbles: true, cancelable: true,
-                clientX: _fwd.clientX, clientY: _fwd.clientY
             }));
             return;
         }
@@ -2656,20 +2696,34 @@ export class HistoryCardState {
         }
     }
 
+    _updateMoCursor(event)
+    {
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#mo-${g.id}`) === event.target ) {
+                const _caEl = this._this.querySelector(`#ca-${g.id}`);
+                if( _caEl ) {
+                    const _r = _caEl.getBoundingClientRect();
+                    if( event.clientX >= _r.left && event.clientX <= _r.right &&
+                        event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
+                        event.target.style.cursor = 'default';
+                        return;
+                    }
+                }
+                event.target.style.cursor = 'grab';
+                return;
+            }
+        }
+    }
+
     graphMoveStart(event)
     {
         event.preventDefault();
         event.stopPropagation();
         try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
-        // Find which graph this mo overlay belongs to
+        // Find which graph this mo overlay belongs to — store pending, activate after 5px
         for( let g of this.graphs ) {
             if( this._this.querySelector(`#mo-${g.id}`) === event.target ) {
-                panstate.moveGraph = { g, startX: event.clientX, startY: event.clientY };
-                event.target.style.cursor = 'grabbing';
-                // Ghost: full graph size, anchored at top-left (domino position)
-                const _gRect = g.canvas.getBoundingClientRect();
-                this._createGhost('', _gRect.width, _gRect.height, event.clientX, event.clientY, 'topleft');
-                this._startAutoScroll(event);
+                panstate.pendingMoveGraph = { g, startX: event.clientX, startY: event.clientY };
                 break;
             }
         }
@@ -2677,7 +2731,25 @@ export class HistoryCardState {
 
     graphMoveMove(event)
     {
-        if( !panstate.moveGraph ) return;
+        if( panstate.pendingMoveGraph ) {
+            const _p = panstate.pendingMoveGraph;
+            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 ) {
+                panstate.moveGraph = { g: _p.g, startX: _p.startX, startY: _p.startY };
+                panstate.pendingMoveGraph = null;
+                event.target.style.cursor = 'grabbing';
+                const _gRect = _p.g.canvas.getBoundingClientRect();
+                this._createGhost('', _gRect.width, _gRect.height, event.clientX, event.clientY, 'topleft');
+                this._startAutoScroll(event);
+            } else {
+                this._updateMoCursor(event);
+                return;
+            }
+        }
+        if( !panstate.moveGraph ) {
+            // No drag active — update cursor: default over ca-N, grab elsewhere
+            this._updateMoCursor(event);
+            return;
+        }
         event.preventDefault();
         event.stopPropagation();
         event.target.style.cursor = 'grabbing';
@@ -2702,24 +2774,22 @@ export class HistoryCardState {
 
     graphMoveEnd(event)
     {
+        // Released before threshold — treat as click, forward to ca-N
+        if( panstate.pendingMoveGraph ) {
+            const _g = panstate.pendingMoveGraph.g;
+            panstate.pendingMoveGraph = null;
+            event.target.style.cursor = 'grab';
+            this._this.querySelector(`#ca-${_g.id}`)?.click();
+            return;
+        }
         if( !panstate.moveGraph ) return;
         event.preventDefault();
         event.stopPropagation();
         const _srcG = panstate.moveGraph.g;
-        const _moveStartX = panstate.moveGraph.startX;
-        const _moveStartY = panstate.moveGraph.startY;
         panstate.moveGraph = null;
         event.target.style.cursor = 'grab';
         this._stopAutoScroll();
         this._clearAllDragFeedback();
-
-        // If movement < 5px, treat as click — forward to padlock
-        const _dx = Math.abs(event.clientX - _moveStartX);
-        const _dy = Math.abs(event.clientY - _moveStartY);
-        if( _dx < 5 && _dy < 5 ) {
-            this._this.querySelector(`#ca-${_srcG.id}`)?.click();
-            return;
-        }
 
         // Find target graph under pointer
         let _tgtG = null;
@@ -3864,12 +3934,15 @@ export class HistoryCardState {
         // Connect graph move listeners for all graph types
         const moEl2 = this._this.querySelector(`#mo-${this.g_id}`);
         if( moEl2 ) {
+            moEl2.addEventListener('pointerenter', this._updateMoCursor.bind(this));
             moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
             moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
             moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
+            moEl2.addEventListener('pointercancel', this.graphMoveEnd.bind(this));
         }
         const lgEl2 = this._this.querySelector(`#lg-${this.g_id}`);
         if( lgEl2 ) {
+            lgEl2.addEventListener('pointerenter',  this._updateLegendCursor.bind(this));
             lgEl2.addEventListener('pointerdown',   this.legendDragStart.bind(this));
             lgEl2.addEventListener('pointermove',   this.legendDragMove.bind(this));
             lgEl2.addEventListener('pointerup',     this.legendDragEnd.bind(this));
