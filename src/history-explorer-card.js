@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.13';
+const Version = '1.1.14';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -1901,7 +1901,15 @@ export class HistoryCardState {
                 }
             },
 
-            plugins: [vertline_plugin, minmaxfill_plugin]
+            plugins: [vertline_plugin, minmaxfill_plugin, {
+                afterUpdate: (chartInstance) => {
+                    const _gid = chartInstance.canvas?.id?.replace('graph', '');
+                    if( _gid === undefined ) return;
+                    const _lgEl = this._this.querySelector(`#lg-${_gid}`);
+                    if( _lgEl && chartInstance.legend )
+                        _lgEl.style.height = (chartInstance.legend.height || 0) + 'px';
+                }
+            }]
 
         });
 
@@ -2226,6 +2234,219 @@ export class HistoryCardState {
         }
     }
 
+    _updateDragFeedback(event)
+    {
+        this._autoScrollY = event.clientY;
+        this._moveGhost(event.clientX, event.clientY);
+        const _src = panstate.dragDataset.g;
+        const _srcIdx = panstate.dragDataset.datasetIdx;
+        // Find graph under pointer
+        let _overG = null;
+        for( let g of this.graphs ) {
+            const _r = g.canvas.getBoundingClientRect();
+            if( event.clientX >= _r.left && event.clientX <= _r.right &&
+                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
+                _overG = g; break;
+            }
+        }
+        if( _overG && _overG !== _src ) {
+            // Inter-graph: check compatibility
+            const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
+            const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
+            const _compatible = _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
+            event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
+            this._highlightDropTarget(_overG.canvas, _compatible);
+            this._hideInsertionMarker();
+            // Freeze target chart when over its legend overlay
+            const _lgEl = this._this.querySelector(`#lg-${_overG.id}`);
+            if( _lgEl ) {
+                const _lgR = _lgEl.getBoundingClientRect();
+                if( event.clientY >= _lgR.top && event.clientY <= _lgR.bottom )
+                    this._freezeChart(_overG);
+                else
+                    this._unfreezeChart();
+            }
+        } else if( _overG === _src ) {
+            // Intra-graph: show vertical insertion marker between legend labels
+            event.target.style.cursor = 'grabbing';
+            this._clearDropHighlight();
+            // Freeze when over legend overlay
+            const _lgElSrc = this._this.querySelector(`#lg-${_src.id}`);
+            if( _lgElSrc ) {
+                const _lgRSrc = _lgElSrc.getBoundingClientRect();
+                if( event.clientY >= _lgRSrc.top && event.clientY <= _lgRSrc.bottom )
+                    this._freezeChart(_src);
+                else
+                    this._unfreezeChart();
+            }
+            const _hitBoxes = _src.chart.legend?.legendHitBoxes;
+            if( _hitBoxes && _hitBoxes.length > 1 ) {
+                const _r = _src.canvas.getBoundingClientRect();
+                const _cx = event.clientX - _r.left;
+                const _cy = event.clientY - _r.top;
+                const _found = this._findLegendLabel(_hitBoxes, _cx, _cy, _srcIdx, true);
+                if( _found ) {
+                    this._showInsertionMarker(
+                        _r.left + _found.markerX + 2, _r.top + _found.markerY,
+                        3, _found.markerH, false, panstate.dragDataset?.color);
+                } else {
+                    this._hideInsertionMarker();
+                }
+            }
+        } else {
+            event.target.style.cursor = 'grabbing';
+            this._clearDropHighlight();
+            this._hideInsertionMarker();
+            this._unfreezeChart();
+        }
+        return;
+    }
+
+    _finalizeLegendDrop(event, _src, _srcIdx)
+    {
+            // Find target graph under pointer
+            let _tgt = null;
+            for( let g of this.graphs ) {
+                if( g === _src ) continue;
+                const _rect = g.canvas.getBoundingClientRect();
+                if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
+                    event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
+                    _tgt = g;
+                    break;
+                }
+            }
+            // Intra-graph reorder: drop on same graph canvas
+            if( !_tgt ) {
+                // Check if drop is on the source graph itself (same canvas)
+                const _srcRect = _src.canvas.getBoundingClientRect();
+                if( event.clientX >= _srcRect.left && event.clientX <= _srcRect.right &&
+                    event.clientY >= _srcRect.top  && event.clientY <= _srcRect.bottom ) {
+                    // Find target label by X position in legend
+                    const _hitBoxes = _src.chart.legend?.legendHitBoxes;
+                    if( _hitBoxes && _hitBoxes.length > 1 ) {
+                        const _rect = _src.canvas.getBoundingClientRect();
+                        const _cx = event.clientX - _rect.left;
+                        const _cy2 = event.clientY - _rect.top;
+                        const _dropTarget = this._findLegendLabel(_hitBoxes, _cx, _cy2, _srcIdx, true);
+                        let _tgtLabelIdx = _dropTarget ? _dropTarget.idx : -1;
+                        let _insertBefore = _dropTarget ? _dropTarget.insertBefore : true;
+                        if( _tgtLabelIdx >= 0 ) {
+                            // Reorder entities
+                            const _newEntities = [..._src.entities];
+                            const [_moved] = _newEntities.splice(_srcIdx, 1);
+                            const _insertAt = _tgtLabelIdx > _srcIdx
+                                ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
+                                : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
+                            _newEntities.splice(_insertAt, 0, _moved);
+                            // Persist in pconfig.entities
+                            const _groupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _newEntities[0].entity)?.groupId;
+                            if( _groupId !== undefined ) {
+                                const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId);
+                                const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId);
+                                this.pconfig.entities = this.pconfig.entities.filter(en => typeof en === 'object' ? en.groupId !== _groupId : true);
+                                const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
+                                this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
+                            }
+                            // Rebuild graph
+                            const _gl = this._this.querySelector('#graphlist');
+                            const _srcDiv = _src.canvas.parentNode.parentNode;
+                            const _srcNext = _srcDiv.nextSibling;
+                            _srcDiv.remove();
+                            this.graphs.splice(this.graphs.indexOf(_src), 1);
+                            const _countBefore = this.graphs.length;
+                            const _saved = this.pconfig.combineSameUnits;
+                            this.pconfig.combineSameUnits = true;
+                            let _rebuildTargetG = null;
+                            _newEntities.forEach((en, i) => {
+                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, _rebuildTargetG);
+                                if( i === 0 ) _rebuildTargetG = this.graphs[this.graphs.length - 1];
+                            });
+                            this.pconfig.combineSameUnits = _saved;
+                            for( let i = _countBefore; i < this.graphs.length; i++ ) {
+                                const _d = this.graphs[i].canvas.parentNode.parentNode;
+                                if( _srcNext && _gl.contains(_srcNext) ) _gl.insertBefore(_d, _srcNext);
+                                else _gl.appendChild(_d);
+                            }
+                            this.writeLocalState();
+                            this.updateHistory();
+                        }
+                    }
+                }
+                return;
+            }
+
+            if( _tgt && _tgt.type !== _src.type ) {
+                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY);
+                return;
+            }
+
+            if( _tgt && _tgt.type === _src.type ) {
+                // Check SI compatibility
+                const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
+                const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
+                if( _srcUnit !== undefined && _tgtUnit !== undefined && !areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Show incompatibility tooltip
+                    const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
+                    const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
+                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY);
+                    return;
+                }
+                if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Move entity from source to target
+                    const _entity = _src.entities[_srcIdx];
+                    // Update groupId in pconfig.entities
+                    const _tgtGroupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _tgt.entities[0].entity)?.groupId;
+                    const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === _entity.entity);
+                    if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
+                        this.pconfig.entities[_eIdx] = { entity: _entity.entity, groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
+                    }
+                    this.writeLocalState();
+                    // Rebuild: remove source graph if it becomes empty
+                    const _srcEmpty = _src.entities.length === 1;
+                    // Rebuild source graph without the moved entity
+                    const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
+                    const _srcDiv = _src.canvas.parentNode.parentNode; // wrapper e
+                    const _srcNext = _srcDiv.nextSibling;
+                    const _gl = _srcDiv.parentNode; // #graphlist
+                    _srcDiv.remove();
+                    this.graphs.splice(this.graphs.indexOf(_src), 1);
+                    if( !_srcEmpty ) {
+                        // Recreate source graph with remaining entities
+                        _srcRemaining.forEach(en => { en.siConversionFactor = undefined; });
+                        const _countBefore = this.graphs.length;
+                        const _savedCombine = this.pconfig.combineSameUnits;
+                        this.pconfig.combineSameUnits = true;
+                        _srcRemaining.forEach((en, i) => {
+                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1]);
+                            });
+                        this.pconfig.combineSameUnits = _savedCombine;
+                        // Move to correct position
+                        for( let i = _countBefore; i < this.graphs.length; i++ )
+                            _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _srcNext);
+                    }
+                    // Rebuild target graph with added entity
+                    _entity.siConversionFactor = undefined;
+                    _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
+                    const _tgtDiv = _tgt.canvas.parentNode.parentNode; // wrapper e
+                    const _tgtNext = _tgtDiv.nextSibling;
+                    _tgtDiv.remove();
+                    this.graphs.splice(this.graphs.indexOf(_tgt), 1);
+                    const _allTgtEntities = [..._tgt.entities, _entity];
+                    const _countBefore2 = this.graphs.length;
+                    const _savedCombine2 = this.pconfig.combineSameUnits;
+                    this.pconfig.combineSameUnits = true;
+                    _allTgtEntities.forEach((en, i) => {
+                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1]);
+                            });
+                    this.pconfig.combineSameUnits = _savedCombine2;
+                    for( let i = _countBefore2; i < this.graphs.length; i++ )
+                        _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _tgtNext);
+                    this.updateHistory();
+                }
+            }
+            return;
+    }
+
     _clearAllDragFeedback() {
         this._destroyGhost();
         this._hideInsertionMarker();
@@ -2347,6 +2568,92 @@ export class HistoryCardState {
     _stopAutoScroll() {
         this._autoScrollActive = false;
         if( this._autoScrollRaf ) { cancelAnimationFrame(this._autoScrollRaf); this._autoScrollRaf = null; }
+    }
+
+    legendDragStart(event)
+    {
+        event.preventDefault();
+        event.stopPropagation();
+        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
+        for( let g of this.graphs ) {
+            if( this._this.querySelector(`#lg-${g.id}`) === event.target ) {
+                const _chart = g.chart;
+                if( !_chart.legend || !_chart.legend.legendHitBoxes ) return;
+                const _rect    = event.target.getBoundingClientRect();
+                const _cx      = event.clientX - _rect.left;
+                const _cy      = event.clientY - _rect.top;
+                const _grabbed = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
+                if( _grabbed && _chart.data.datasets[_grabbed.idx] ) {
+                    const _i      = _grabbed.idx;
+                    const _box    = _chart.legend.legendHitBoxes[_i];
+                    panstate.pendingDragDataset = {
+                        g, datasetIdx: _i,
+                        color: _chart.data.datasets[_i]?.borderColor || null,
+                        text:  _chart.legend.legendItems[_i]?.text || '',
+                        boxW: _box.width, boxH: _box.height,
+                        startX: event.clientX, startY: event.clientY
+                    };
+                } else {
+                    // No label hit — forward as click to canvas (Chart.js hide/show)
+                    panstate.lgForwardClick = { g, clientX: event.clientX, clientY: event.clientY };
+                }
+                break;
+            }
+        }
+    }
+
+    legendDragMove(event)
+    {
+        if( panstate.pendingDragDataset ) {
+            const _p = panstate.pendingDragDataset;
+            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 ) {
+                panstate.dragDataset = { g: _p.g, datasetIdx: _p.datasetIdx, color: _p.color };
+                panstate.pendingDragDataset = null;
+                this._createGhost(_p.text, _p.boxW, _p.boxH, event.clientX, event.clientY, 'center', _p.color);
+                this._startAutoScroll(event);
+            } else {
+                return;
+            }
+        }
+        if( panstate.dragDataset ) {
+            event.preventDefault();
+            event.stopPropagation();
+            this._updateDragFeedback(event);
+        }
+    }
+
+    legendDragEnd(event)
+    {
+        event.preventDefault();
+        event.stopPropagation();
+        if( panstate.pendingDragDataset ) {
+            // Pointer released before threshold — treat as click, forward to canvas
+            const _g = panstate.pendingDragDataset.g;
+            panstate.pendingDragDataset = null;
+            _g.canvas.dispatchEvent(new MouseEvent('click', {
+                bubbles: true, cancelable: true,
+                clientX: event.clientX, clientY: event.clientY
+            }));
+            return;
+        }
+        if( panstate.lgForwardClick ) {
+            const _fwd = panstate.lgForwardClick;
+            panstate.lgForwardClick = null;
+            _fwd.g.canvas.dispatchEvent(new MouseEvent('click', {
+                bubbles: true, cancelable: true,
+                clientX: _fwd.clientX, clientY: _fwd.clientY
+            }));
+            return;
+        }
+        if( panstate.dragDataset ) {
+            const _src    = panstate.dragDataset.g;
+            const _srcIdx = panstate.dragDataset.datasetIdx;
+            panstate.dragDataset = null;
+            event.target.style.cursor = '';
+            this._stopAutoScroll();
+            this._clearAllDragFeedback();
+            this._finalizeLegendDrop(event, _src, _srcIdx);
+        }
     }
 
     graphMoveStart(event)
@@ -2555,27 +2862,7 @@ export class HistoryCardState {
                 }
             }
 
-            if( _chart.legend && _chart.legend.legendHitBoxes ) {
-                const _rect = event.target.getBoundingClientRect();
-                const _cx = event.clientX - _rect.left;
-                const _cy = event.clientY - _rect.top;
-                const _hitBoxes = _chart.legend.legendHitBoxes;
-                // Use closest-Y then closest-X to find grabbed label
-                const _grabbed = this._findLegendLabel(_hitBoxes, _cx, _cy, -1, false);
-                if( _grabbed && _chart.data.datasets[_grabbed.idx] ) {
-                    const _i = _grabbed.idx;
-                    const _box = _hitBoxes[_i];
-                    const _lgText = _chart.legend.legendItems[_i]?.text || '';
-                    const _lgColor = _chart.data.datasets[_i]?.borderColor || null;
-                    // Store pending drag — ghost and activation deferred until threshold moved
-                    panstate.pendingDragDataset = {
-                        g: panstate.g, datasetIdx: _i, color: _lgColor,
-                        text: _lgText, boxW: _box.width, boxH: _box.height,
-                        startX: event.clientX, startY: event.clientY
-                    };
-                    return; // Don't start pan
-                }
-            }
+
 
             if( !this.state.zoomMode ) {
 
@@ -2632,84 +2919,10 @@ export class HistoryCardState {
     pointerMove(event)
     {
         // Activate pending legend drag once pointer has moved enough
-        if( panstate.pendingDragDataset ) {
-            const _p = panstate.pendingDragDataset;
-            const _dist = Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY);
-            if( _dist > 5 ) {
-                panstate.dragDataset = { g: _p.g, datasetIdx: _p.datasetIdx, color: _p.color };
-                panstate.pendingDragDataset = null;
-                this._createGhost(_p.text, _p.boxW, _p.boxH, event.clientX, event.clientY, 'center', _p.color);
-                this._startAutoScroll(event);
-                // Block the click event that will follow pointerUp
-                event.target.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true });
-            }
-            return;
-        }
+
 
         if( panstate.dragDataset ) {
-            this._autoScrollY = event.clientY;
-            this._moveGhost(event.clientX, event.clientY);
-            const _src = panstate.dragDataset.g;
-            const _srcIdx = panstate.dragDataset.datasetIdx;
-            // Find graph under pointer
-            let _overG = null;
-            for( let g of this.graphs ) {
-                const _r = g.canvas.getBoundingClientRect();
-                if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                    event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                    _overG = g; break;
-                }
-            }
-            if( _overG && _overG !== _src ) {
-                // Inter-graph: check compatibility
-                const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
-                const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-                const _compatible = _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
-                event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
-                this._highlightDropTarget(_overG.canvas, _compatible);
-                this._hideInsertionMarker();
-                // Freeze target chart when over its legend overlay
-                const _lgEl = this._this.querySelector(`#lg-${_overG.id}`);
-                if( _lgEl ) {
-                    const _lgR = _lgEl.getBoundingClientRect();
-                    if( event.clientY >= _lgR.top && event.clientY <= _lgR.bottom )
-                        this._freezeChart(_overG);
-                    else
-                        this._unfreezeChart();
-                }
-            } else if( _overG === _src ) {
-                // Intra-graph: show vertical insertion marker between legend labels
-                event.target.style.cursor = 'grabbing';
-                this._clearDropHighlight();
-                // Freeze when over legend overlay
-                const _lgElSrc = this._this.querySelector(`#lg-${_src.id}`);
-                if( _lgElSrc ) {
-                    const _lgRSrc = _lgElSrc.getBoundingClientRect();
-                    if( event.clientY >= _lgRSrc.top && event.clientY <= _lgRSrc.bottom )
-                        this._freezeChart(_src);
-                    else
-                        this._unfreezeChart();
-                }
-                const _hitBoxes = _src.chart.legend?.legendHitBoxes;
-                if( _hitBoxes && _hitBoxes.length > 1 ) {
-                    const _r = _src.canvas.getBoundingClientRect();
-                    const _cx = event.clientX - _r.left;
-                    const _cy = event.clientY - _r.top;
-                    const _found = this._findLegendLabel(_hitBoxes, _cx, _cy, _srcIdx, true);
-                    if( _found ) {
-                        this._showInsertionMarker(
-                            _r.left + _found.markerX + 2, _r.top + _found.markerY,
-                            3, _found.markerH, false, panstate.dragDataset?.color);
-                    } else {
-                        this._hideInsertionMarker();
-                    }
-                }
-            } else {
-                event.target.style.cursor = 'grabbing';
-                this._clearDropHighlight();
-                this._hideInsertionMarker();
-                this._unfreezeChart();
-            }
+            this._updateDragFeedback(event);
             return;
         }
         if( panstate.pendingDragDataset ) {
@@ -3101,148 +3314,7 @@ export class HistoryCardState {
             event.target.style.cursor = '';
             this._stopAutoScroll();
             this._clearAllDragFeedback();
-
-            // Find target graph under pointer
-            let _tgt = null;
-            for( let g of this.graphs ) {
-                if( g === _src ) continue;
-                const _rect = g.canvas.getBoundingClientRect();
-                if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
-                    event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
-                    _tgt = g;
-                    break;
-                }
-            }
-            // Intra-graph reorder: drop on same graph canvas
-            if( !_tgt ) {
-                // Check if drop is on the source graph itself (same canvas)
-                const _srcRect = _src.canvas.getBoundingClientRect();
-                if( event.clientX >= _srcRect.left && event.clientX <= _srcRect.right &&
-                    event.clientY >= _srcRect.top  && event.clientY <= _srcRect.bottom ) {
-                    // Find target label by X position in legend
-                    const _hitBoxes = _src.chart.legend?.legendHitBoxes;
-                    if( _hitBoxes && _hitBoxes.length > 1 ) {
-                        const _rect = _src.canvas.getBoundingClientRect();
-                        const _cx = event.clientX - _rect.left;
-                        const _cy2 = event.clientY - _rect.top;
-                        const _dropTarget = this._findLegendLabel(_hitBoxes, _cx, _cy2, _srcIdx, true);
-                        let _tgtLabelIdx = _dropTarget ? _dropTarget.idx : -1;
-                        let _insertBefore = _dropTarget ? _dropTarget.insertBefore : true;
-                        if( _tgtLabelIdx >= 0 ) {
-                            // Reorder entities
-                            const _newEntities = [..._src.entities];
-                            const [_moved] = _newEntities.splice(_srcIdx, 1);
-                            const _insertAt = _tgtLabelIdx > _srcIdx
-                                ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
-                                : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
-                            _newEntities.splice(_insertAt, 0, _moved);
-                            // Persist in pconfig.entities
-                            const _groupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _newEntities[0].entity)?.groupId;
-                            if( _groupId !== undefined ) {
-                                const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId);
-                                const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId);
-                                this.pconfig.entities = this.pconfig.entities.filter(en => typeof en === 'object' ? en.groupId !== _groupId : true);
-                                const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
-                                this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
-                            }
-                            // Rebuild graph
-                            const _gl = this._this.querySelector('#graphlist');
-                            const _srcDiv = _src.canvas.parentNode.parentNode;
-                            const _srcNext = _srcDiv.nextSibling;
-                            _srcDiv.remove();
-                            this.graphs.splice(this.graphs.indexOf(_src), 1);
-                            const _countBefore = this.graphs.length;
-                            const _saved = this.pconfig.combineSameUnits;
-                            this.pconfig.combineSameUnits = true;
-                            let _rebuildTargetG = null;
-                            _newEntities.forEach((en, i) => {
-                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, _rebuildTargetG);
-                                if( i === 0 ) _rebuildTargetG = this.graphs[this.graphs.length - 1];
-                            });
-                            this.pconfig.combineSameUnits = _saved;
-                            for( let i = _countBefore; i < this.graphs.length; i++ ) {
-                                const _d = this.graphs[i].canvas.parentNode.parentNode;
-                                if( _srcNext && _gl.contains(_srcNext) ) _gl.insertBefore(_d, _srcNext);
-                                else _gl.appendChild(_d);
-                            }
-                            this.writeLocalState();
-                            this.updateHistory();
-                        }
-                    }
-                }
-                return;
-            }
-
-            if( _tgt && _tgt.type !== _src.type ) {
-                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY);
-                return;
-            }
-
-            if( _tgt && _tgt.type === _src.type ) {
-                // Check SI compatibility
-                const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
-                const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-                if( _srcUnit !== undefined && _tgtUnit !== undefined && !areSICompatible(_srcUnit, _tgtUnit) ) {
-                    // Show incompatibility tooltip
-                    const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
-                    const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
-                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY);
-                    return;
-                }
-                if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
-                    // Move entity from source to target
-                    const _entity = _src.entities[_srcIdx];
-                    // Update groupId in pconfig.entities
-                    const _tgtGroupId = this.pconfig.entities.find(en => (typeof en === 'string' ? en : en.entity) === _tgt.entities[0].entity)?.groupId;
-                    const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === _entity.entity);
-                    if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
-                        this.pconfig.entities[_eIdx] = { entity: _entity.entity, groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
-                    }
-                    this.writeLocalState();
-                    // Rebuild: remove source graph if it becomes empty
-                    const _srcEmpty = _src.entities.length === 1;
-                    // Rebuild source graph without the moved entity
-                    const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
-                    const _srcDiv = _src.canvas.parentNode.parentNode; // wrapper e
-                    const _srcNext = _srcDiv.nextSibling;
-                    const _gl = _srcDiv.parentNode; // #graphlist
-                    _srcDiv.remove();
-                    this.graphs.splice(this.graphs.indexOf(_src), 1);
-                    if( !_srcEmpty ) {
-                        // Recreate source graph with remaining entities
-                        _srcRemaining.forEach(en => { en.siConversionFactor = undefined; });
-                        const _countBefore = this.graphs.length;
-                        const _savedCombine = this.pconfig.combineSameUnits;
-                        this.pconfig.combineSameUnits = true;
-                        _srcRemaining.forEach((en, i) => {
-                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1]);
-                            });
-                        this.pconfig.combineSameUnits = _savedCombine;
-                        // Move to correct position
-                        for( let i = _countBefore; i < this.graphs.length; i++ )
-                            _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _srcNext);
-                    }
-                    // Rebuild target graph with added entity
-                    _entity.siConversionFactor = undefined;
-                    _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtDiv = _tgt.canvas.parentNode.parentNode; // wrapper e
-                    const _tgtNext = _tgtDiv.nextSibling;
-                    _tgtDiv.remove();
-                    this.graphs.splice(this.graphs.indexOf(_tgt), 1);
-                    const _allTgtEntities = [..._tgt.entities, _entity];
-                    const _countBefore2 = this.graphs.length;
-                    const _savedCombine2 = this.pconfig.combineSameUnits;
-                    this.pconfig.combineSameUnits = true;
-                    _allTgtEntities.forEach((en, i) => {
-                                this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1]);
-                            });
-                    this.pconfig.combineSameUnits = _savedCombine2;
-                    for( let i = _countBefore2; i < this.graphs.length; i++ )
-                        _gl.insertBefore(this.graphs[i].canvas.parentNode.parentNode, _tgtNext);
-                    this.updateHistory();
-                }
-            }
-            return;
+            this._finalizeLegendDrop(event, _src, _srcIdx);
         }
 
         if( panstate.pinch ) {
@@ -3766,7 +3838,7 @@ export class HistoryCardState {
             html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
             html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
             if( type == 'line' || type == 'bar' )
-                html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:none;"></div>`;
+                html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -3795,6 +3867,13 @@ export class HistoryCardState {
             moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
             moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
             moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
+        }
+        const lgEl2 = this._this.querySelector(`#lg-${this.g_id}`);
+        if( lgEl2 ) {
+            lgEl2.addEventListener('pointerdown',   this.legendDragStart.bind(this));
+            lgEl2.addEventListener('pointermove',   this.legendDragMove.bind(this));
+            lgEl2.addEventListener('pointerup',     this.legendDragEnd.bind(this));
+            lgEl2.addEventListener('pointercancel', this.legendDragEnd.bind(this));
         }
 
         // Connect the close button event listener
@@ -4872,7 +4951,7 @@ class HistoryExplorerCard extends HTMLElement
                 html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
                 html += `<div id="mo-${g.id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
                 if( type == 'line' || type == 'bar' )
-                    html += `<div id="lg-${g.id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:none;"></div>`;
+                    html += `<div id="lg-${g.id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
