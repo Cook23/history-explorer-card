@@ -3,6 +3,21 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.13] - 2026-05-05
+### Added
+- Visual drag & drop feedback: ghost element following the cursor, insertion markers (vertical for legend labels, horizontal for timelines/graphs), drop target highlighting, `not-allowed` cursor on incompatible targets
+- Legend overlay (`#lg-N`) with `touch-action:none` to prevent page scroll when dragging legend labels on mobile
+- Drag activation threshold (5px) — ghost and drag state only activate after the pointer has moved enough, preventing accidental drags on single clicks
+- `click` event blocked after a real drag to prevent Chart.js toggling label visibility on drop
+- Legend label detection unified in `_findLegendLabel(hitBoxes, cx, cy, excludeIdx, target)` — closest-Y then closest-X logic with strict line bounds, used consistently for grab (cursor), drag start and drop
+- Chart freeze on legend overlay hover during drag — prevents label position changes while positioning the insertion marker
+- Legend label visibility (hidden/shown) now persisted per entity in `pconfig.entities` and restored on reload
+### Fixed
+- Color deduplication in `addDynamicGraph` now only checks against the actual target graph, never against unrelated graphs — fixes color loss on reload and after intra-graph reorder with 2 curves
+- First entity of a rebuilt group no longer triggers a false color conflict (no target graph exists yet at that point)
+- Insertion marker correctly hidden when dragging a label over its own position (no-op detection uses same logic as the drop)
+- Legend label grab zone and cursor zone now use identical logic (`_findLegendLabel`) — no more asymmetric hit areas on first/last labels
+
 ## [v1.1.12] - 2026-04-23
 ### Added
 - Per-user server-side persistence via HA `frontend/set_user_data` — graph configuration is now tied to the HA user account and synchronized across all devices
