@@ -3,6 +3,15 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.15] - 2026-05-05
+### Changed
+- Legend overlay (`#lg-N`) now covers the close button (`#bc-N`) zone — clicks forwarded to `#bc-N` when pointer is over it, matching the existing `#mo-N` → `#ca-N` pattern
+- Graph move activation deferred to 5px threshold — ghost and drag state only activate after the pointer has moved enough, preventing accidental drags on single clicks (same logic as legend label drag)
+- Cursor management on `#mo-N` and `#lg-N` now position-aware: `default` over `#ca-N` and `#bc-N`, `grab` over the domino, `move` over legend labels, `default` elsewhere
+### Fixed
+- Close button (`#bc-N`) no longer blocked by legend overlay — clicks reach it correctly even when a legend label overlaps it visually
+- Clicking the domino/padlock zone no longer triggers accidental graph moves
+
 ## [v1.1.14] - 2026-05-05
 ### Changed
 - Legend overlay (`#lg-N`) now receives pointer events directly (`pointer-events:auto`) with `setPointerCapture` on `pointerdown`, matching the graph drag overlay (`#mo-N`) — eliminates page scroll when dragging legend labels outside the legend zone on mobile
