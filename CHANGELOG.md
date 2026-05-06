@@ -3,6 +3,14 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.16] - 2026-05-06
+### Fixed
+- `InitWithConfig`: `ReferenceError: type is not defined` on load when graphs are defined in YAML — caused no graphs to be displayed at all
+- `InitWithConfig`: removed `#mo-N` and `#lg-N` overlays from YAML graph HTML — these dynamic-only elements were incorrectly generated for YAML graphs, blocking the padlock button
+### Known issues
+- YAML graphs: `move` cursor still appears on legend labels (drag not available for YAML graphs)
+- YAML timeline/arrowline graphs: same cursor issue on label area
+
 ## [v1.1.15] - 2026-05-05
 ### Changed
 - Legend overlay (`#lg-N`) now covers the close button (`#bc-N`) zone — clicks forwarded to `#bc-N` when pointer is over it, matching the existing `#mo-N` → `#ca-N` pattern
