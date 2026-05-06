@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.15';
+const Version = '1.1.16';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -5022,9 +5022,7 @@ class HistoryExplorerCard extends HTMLElement
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
-                html += `<div id="mo-${g.id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
-                if( type == 'line' || type == 'bar' )
-                    html += `<div id="lg-${g.id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
+
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
         }
