@@ -3,6 +3,20 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.17] - 2026-05-07
+### Fixed
+- `timeline.js`: memory leak — `_tl_momentCache` grew without bound; `tl_momentCachePurge()` now caps it at 500 entries
+- `Chart.js`: legend labels no longer overlap padlock (`#ca-N`) and close (`#bc-N`) buttons — `me.leftMargin` / `me.rightMargin` constrain the available legend width
+- `Chart.js`: legend line count no longer jumps when entity values change label width slightly — ratchet prevents reducing line count unless dataset list changes
+### Performance
+- `timeline.js`: timestamp parsing results cached in `_tl_datasetsCache` — `parse()` skipped entirely when dataset data reference and length are unchanged, eliminating redundant moment object allocations on every `chart.update()`
+- `timeline.js`: bar color computation cached in `_tl_colorCache` — `colorFunction` not called on every redraw, cache invalidated on `colorFunction` change
+- `timeline.js`: `determineDataLimits` short-circuits min/max scan when explicit time range is set (`hasExplicitRange`)
+- `Chart.js`: `_dataLimitsCached` now only invalidated on canvas resize for `timeline`/`arrowline` scales — eliminates redundant `determineDataLimits` calls on every `chart.update()`
+### YAML graph fixes (from v1.1.16 known issues)
+- YAML graphs: `move` cursor still appears on legend labels (drag not available for YAML graphs)
+- YAML timeline/arrowline graphs: same cursor issue on label area
+
 ## [v1.1.16] - 2026-05-06
 ### Fixed
 - `InitWithConfig`: `ReferenceError: type is not defined` on load when graphs are defined in YAML — caused no graphs to be displayed at all
