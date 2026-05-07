@@ -6178,7 +6178,15 @@
             var topPadding = padding.top;
             var bottomPadding = padding.bottom;
 
-            for( let i = 0; i < chart.boxes.length; i++ ) chart.boxes[i]._dataLimitsCached = false;
+            var _sizeChanged = (chart._lastLayoutWidth !== width || chart._lastLayoutHeight !== height);
+            chart._lastLayoutWidth = width;
+            chart._lastLayoutHeight = height;
+            for( let i = 0; i < chart.boxes.length; i++ ) {
+                var _box = chart.boxes[i];
+                if (_sizeChanged || (_box.type !== 'timeline' && _box.type !== 'arrowline')) {
+                    _box._dataLimitsCached = false;
+                }
+            }
 
             var leftBoxes = filterByPosition(chart.boxes, 'left');
             var rightBoxes = filterByPosition(chart.boxes, 'right');
@@ -11600,19 +11608,30 @@
                 // Labels
 
                 // Width of each line of legend boxes. Labels wrap onto multiple lines when there are too many to fit on one
+                // Cook23: ratchet + marges fixes pour ca-N et bc-N
+                me.leftMargin = 30;
+                me.rightMargin = 25;
+                var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
+                if (me._ratchetBaseKey !== _baseKey) {
+                    me._ratchetBaseKey = _baseKey;
+                    me._ratchetLineCount = 0;
+                }
+
                 var lineWidths = me.lineWidths = [0];
                 var totalHeight = me.legendItems.length ? fontSize + labelOpts.padding : 0;
 
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
 
+                var _computedLineCount = 1;
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
                   var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
 
-                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width) {
+                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - me.leftMargin - me.rightMargin) {
                     totalHeight += fontSize + labelOpts.padding;
                     lineWidths[lineWidths.length] = me.left;
+                    _computedLineCount++;
                   }
 
                   // Store the hitbox width and height here. Final position will be updated in `draw`
@@ -11625,6 +11644,15 @@
 
                   lineWidths[lineWidths.length - 1] += width + labelOpts.padding;
                 });
+
+                // Cook23 ratchet: ne jamais réduire le nombre de lignes
+                if (_computedLineCount > me._ratchetLineCount) {
+                    me._ratchetLineCount = _computedLineCount;
+                }
+                var _extraLines = me._ratchetLineCount - _computedLineCount;
+                for (var _el = 0; _el < _extraLines; _el++) {
+                    totalHeight += fontSize + labelOpts.padding;
+                }
 
                 minSize.height += totalHeight;
 
@@ -11772,7 +11800,7 @@
               var isHorizontal = me.isHorizontal();
               if (isHorizontal) {
                 cursor = {
-                  x: me.left + (legendWidth - lineWidths[0]) / 2,
+                  x: me.left + me.leftMargin + (legendWidth - me.leftMargin - me.rightMargin - lineWidths[0]) / 2,
                   y: me.top + labelOpts.padding,
                   line: 0 };
 
@@ -11792,10 +11820,10 @@
                 var y = cursor.y;
 
                 if (isHorizontal) {
-                  if (x + width >= legendWidth) {
+                  if (x + width >= legendWidth - me.rightMargin) {
                     y = cursor.y += itemHeight;
                     cursor.line++;
-                    x = cursor.x = me.left + (legendWidth - lineWidths[cursor.line]) / 2;
+                    x = cursor.x = me.left + me.leftMargin + (legendWidth - me.leftMargin - me.rightMargin - lineWidths[cursor.line]) / 2;
                   }
                 } else if (y + itemHeight > me.bottom) {
                   x = cursor.x = x + me.columnWidths[cursor.line] + labelOpts.padding;

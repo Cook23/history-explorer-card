@@ -68,6 +68,16 @@ function tl_momentCache(tc)
     return r;
 }
 
+function tl_momentCachePurge(rangeMin, rangeMax)
+{
+    if( _tl_momentCache.size <= 500 ) return;
+    const margin = 86400000; // 1 day
+    for( const k of _tl_momentCache.keys() ) {
+        if( k < rangeMin - margin || k > rangeMax + margin )
+            _tl_momentCache.delete(k);
+    }
+}
+
 
 function momentify(value, options) {
     var parser = options.parser;
@@ -150,48 +160,76 @@ var TimelineScale = Chart.scaleService.getScaleConstructor('time').extend({
         var datasets = [];
         var i, j, ilen, jlen, data, timestamp0, timestamp1;
 
-
         // Convert data to timestamps
-        for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
-            if (chart.isDatasetVisible(i)) {
-                data = chart.data.datasets[i].data;
-                datasets[i] = [];
+        // Also used by getPixelForValue via _timestamps.datasets cache
+        var explicitMin = parse(timeOpts.min, me);
+        var explicitMax = parse(timeOpts.max, me);
+        var hasExplicitRange = explicitMin !== null && explicitMax !== null;
 
-                for (j = 0, jlen = data.length; j < jlen; ++j) {
-                    timestamp0 = parse(data[j][elemOpts.keyStart], me);
-                    timestamp1 = parse(data[j][elemOpts.keyEnd], me);
-                    if (timestamp0 > timestamp1) {
-                        [timestamp0, timestamp1] = [timestamp1, timestamp0];
-                    }
-                    if (min > timestamp0 && timestamp0) {
-                        min = timestamp0;
-                    }
-                    if (max < timestamp1 && timestamp1) {
-                        max = timestamp1;
-                    }
-                    datasets[i][j] = [timestamp0, timestamp1, data[j][elemOpts.keyValue]];
-                    if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp0)) {
-                        timestampobj[timestamp0] = true;
-                        timestamps.push(timestamp0);
-                    }
-                    if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp1)) {
-                        timestampobj[timestamp1] = true;
-                        timestamps.push(timestamp1);
-                    }
-                }
-            } else {
-                datasets[i] = [];
+        if( hasExplicitRange ) tl_momentCachePurge(explicitMin, explicitMax);
+
+        // Cache datasets timestamps: rebuild only when data reference or length changes
+        var chartDatasets = chart.data.datasets || [];
+        var needsRebuild = false;
+        if (!me._tl_datasetsCache || me._tl_datasetsCache.length !== chartDatasets.length) {
+            needsRebuild = true;
+        } else {
+            for (i = 0; i < chartDatasets.length; ++i) {
+                var cd = chartDatasets[i].data;
+                var cc = me._tl_datasetsCache[i];
+                if (!cc || cc._srcRef !== cd || cc._srcLen !== cd.length) { needsRebuild = true; break; }
             }
         }
 
-        if (timestamps.size) {
+        if (needsRebuild) {
+            me._tl_datasetsCache = [];
+            for (i = 0, ilen = chartDatasets.length; i < ilen; ++i) {
+                if (chart.isDatasetVisible(i)) {
+                    data = chartDatasets[i].data;
+                    datasets[i] = [];
+                    datasets[i]._srcRef = data;
+                    datasets[i]._srcLen = data.length;
+
+                    for (j = 0, jlen = data.length; j < jlen; ++j) {
+                        timestamp0 = parse(data[j][elemOpts.keyStart], me);
+                        timestamp1 = parse(data[j][elemOpts.keyEnd], me);
+                        if (timestamp0 > timestamp1) {
+                            [timestamp0, timestamp1] = [timestamp1, timestamp0];
+                        }
+                        datasets[i][j] = [timestamp0, timestamp1, data[j][elemOpts.keyValue]];
+                        if (!hasExplicitRange) {
+                            if (min > timestamp0 && timestamp0) { min = timestamp0; }
+                            if (max < timestamp1 && timestamp1) { max = timestamp1; }
+                            if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp0)) {
+                                timestampobj[timestamp0] = true;
+                                timestamps.push(timestamp0);
+                            }
+                            if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp1)) {
+                                timestampobj[timestamp1] = true;
+                                timestamps.push(timestamp1);
+                            }
+                        }
+                    }
+                } else {
+                    datasets[i] = [];
+                    datasets[i]._srcRef = null;
+                    datasets[i]._srcLen = 0;
+                }
+                me._tl_datasetsCache[i] = datasets[i];
+            }
+        } else {
+            // Reuse cached datasets, no parse() calls needed
+            datasets = me._tl_datasetsCache;
+        }
+
+        if (!hasExplicitRange && timestamps.size) {
             timestamps.sort(function (a, b){
                 return a - b;
             });
         }
 
-        min = parse(timeOpts.min, me) || min;
-        max = parse(timeOpts.max, me) || max;
+        min = explicitMin || min;
+        max = explicitMax || max;
 
         // In case there is no valid min/max, var's use today limits
         min = min === MAX_INTEGER ? +moment().startOf('day') : min;
@@ -291,7 +329,19 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
         var y = yScale.getPixelForValue(data, datasetIndex, datasetIndex);
         var width = end - x;
         var height = me.barHeight;
-        var color = _color(elemOpts.colorFunction(text, data, me.chart.data.datasets, datasetIndex));
+
+        // Cache couleur : clé = stateValue|datasetIndex, invalide si colorFunction change
+        var _cf = elemOpts.colorFunction;
+        if (!me._tl_colorCache || me._tl_colorCacheFn !== _cf) {
+            me._tl_colorCache = new Map();
+            me._tl_colorCacheFn = _cf;
+        }
+        var _colorKey = data[elemOpts.keyValue] + '|' + datasetIndex;
+        var color = me._tl_colorCache.get(_colorKey);
+        if (!color) {
+            color = _color(_cf(text, data, me.chart.data.datasets, datasetIndex));
+            me._tl_colorCache.set(_colorKey, color);
+        }
         var showText = elemOpts.showText;
 
         var font = elemOpts.font;
@@ -572,48 +622,76 @@ var ArrowlineScale = Chart.scaleService.getScaleConstructor('time').extend({
         var datasets = [];
         var i, j, ilen, jlen, data, timestamp0, timestamp1;
 
-
         // Convert data to timestamps
-        for (i = 0, ilen = (chart.data.datasets || []).length; i < ilen; ++i) {
-            if (chart.isDatasetVisible(i)) {
-                data = chart.data.datasets[i].data;
-                datasets[i] = [];
+        // Also used by getPixelForValue via _timestamps.datasets cache
+        var explicitMin = parse(timeOpts.min, me);
+        var explicitMax = parse(timeOpts.max, me);
+        var hasExplicitRange = explicitMin !== null && explicitMax !== null;
 
-                for (j = 0, jlen = data.length; j < jlen; ++j) {
-                    timestamp0 = parse(data[j][elemOpts.keyStart], me);
-                    timestamp1 = parse(data[j][elemOpts.keyEnd], me);
-                    if (timestamp0 > timestamp1) {
-                        [timestamp0, timestamp1] = [timestamp1, timestamp0];
-                    }
-                    if (min > timestamp0 && timestamp0) {
-                        min = timestamp0;
-                    }
-                    if (max < timestamp1 && timestamp1) {
-                        max = timestamp1;
-                    }
-                    datasets[i][j] = [timestamp0, timestamp1, data[j][elemOpts.keyValue]];
-                    if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp0)) {
-                        timestampobj[timestamp0] = true;
-                        timestamps.push(timestamp0);
-                    }
-                    if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp1)) {
-                        timestampobj[timestamp1] = true;
-                        timestamps.push(timestamp1);
-                    }
-                }
-            } else {
-                datasets[i] = [];
+        if( hasExplicitRange ) tl_momentCachePurge(explicitMin, explicitMax);
+
+        // Cache datasets timestamps: rebuild only when data reference or length changes
+        var chartDatasets = chart.data.datasets || [];
+        var needsRebuild = false;
+        if (!me._tl_datasetsCache || me._tl_datasetsCache.length !== chartDatasets.length) {
+            needsRebuild = true;
+        } else {
+            for (i = 0; i < chartDatasets.length; ++i) {
+                var cd = chartDatasets[i].data;
+                var cc = me._tl_datasetsCache[i];
+                if (!cc || cc._srcRef !== cd || cc._srcLen !== cd.length) { needsRebuild = true; break; }
             }
         }
 
-        if (timestamps.size) {
+        if (needsRebuild) {
+            me._tl_datasetsCache = [];
+            for (i = 0, ilen = chartDatasets.length; i < ilen; ++i) {
+                if (chart.isDatasetVisible(i)) {
+                    data = chartDatasets[i].data;
+                    datasets[i] = [];
+                    datasets[i]._srcRef = data;
+                    datasets[i]._srcLen = data.length;
+
+                    for (j = 0, jlen = data.length; j < jlen; ++j) {
+                        timestamp0 = parse(data[j][elemOpts.keyStart], me);
+                        timestamp1 = parse(data[j][elemOpts.keyEnd], me);
+                        if (timestamp0 > timestamp1) {
+                            [timestamp0, timestamp1] = [timestamp1, timestamp0];
+                        }
+                        datasets[i][j] = [timestamp0, timestamp1, data[j][elemOpts.keyValue]];
+                        if (!hasExplicitRange) {
+                            if (min > timestamp0 && timestamp0) { min = timestamp0; }
+                            if (max < timestamp1 && timestamp1) { max = timestamp1; }
+                            if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp0)) {
+                                timestampobj[timestamp0] = true;
+                                timestamps.push(timestamp0);
+                            }
+                            if (Object.prototype.hasOwnProperty.call(timestampobj, timestamp1)) {
+                                timestampobj[timestamp1] = true;
+                                timestamps.push(timestamp1);
+                            }
+                        }
+                    }
+                } else {
+                    datasets[i] = [];
+                    datasets[i]._srcRef = null;
+                    datasets[i]._srcLen = 0;
+                }
+                me._tl_datasetsCache[i] = datasets[i];
+            }
+        } else {
+            // Reuse cached datasets, no parse() calls needed
+            datasets = me._tl_datasetsCache;
+        }
+
+        if (!hasExplicitRange && timestamps.size) {
             timestamps.sort(function (a, b){
                 return a - b;
             });
         }
 
-        min = parse(timeOpts.min, me) || min;
-        max = parse(timeOpts.max, me) || max;
+        min = explicitMin || min;
+        max = explicitMax || max;
 
         // In case there is no valid min/max, var's use today limits
         min = min === MAX_INTEGER ? +moment().startOf('day') : min;
