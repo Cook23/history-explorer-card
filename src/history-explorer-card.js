@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.16';
+const Version = '1.1.17';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -2890,8 +2890,8 @@ export class HistoryCardState {
             panstate.dragDataset = null;
             const _chart = panstate.g.chart;
 
-            // Check if click is on the label area of a timeline/arrowline graph
-            if( panstate.g.type === 'timeline' || panstate.g.type === 'arrowline' ) {
+            // Check if click is on the label area of a timeline/arrowline graph (dynamic graphs only)
+            if( (panstate.g.type === 'timeline' || panstate.g.type === 'arrowline') && panstate.g.id >= this.firstDynamicId ) {
                 const _rect2 = event.target.getBoundingClientRect();
                 const _cx2 = event.clientX - _rect2.left;
                 const _cy2 = event.clientY - _rect2.top;
@@ -2918,14 +2918,13 @@ export class HistoryCardState {
                             if( _textW > _availW ) {
                                 this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
                             }
-                            // Start timeline entity drag
-                            panstate.dragTimelineEntity = { g: panstate.g, entityIdx: _closestIdx };
-                            event.target.style.cursor = 'grabbing';
-                            // Ghost from label area
-                            const _tlRect2 = event.target.getBoundingClientRect();
-                            const _tlLabelW = _chart.chartArea ? _chart.chartArea.left : 65;
-                            this._createGhost(_labelStr, _tlLabelW, 20, event.clientX, event.clientY);
-                            this._startAutoScroll(event);
+                            // Store pending — ghost and drag activate after 5px threshold
+                            panstate.pendingDragTimeline = {
+                                g: panstate.g, entityIdx: _closestIdx,
+                                labelStr: _labelStr,
+                                tlLabelW: _chart.chartArea ? _chart.chartArea.left : 65,
+                                startX: event.clientX, startY: event.clientY
+                            };
                             return;
                         }
                     }
@@ -2998,6 +2997,18 @@ export class HistoryCardState {
         if( panstate.pendingDragDataset ) {
             panstate.pendingDragDataset = null;
         }
+        if( panstate.pendingDragTimeline ) {
+            const _pt = panstate.pendingDragTimeline;
+            if( Math.abs(event.clientX - _pt.startX) + Math.abs(event.clientY - _pt.startY) > 5 ) {
+                panstate.dragTimelineEntity = { g: _pt.g, entityIdx: _pt.entityIdx };
+                panstate.pendingDragTimeline = null;
+                event.target.style.cursor = 'grabbing';
+                this._createGhost(_pt.labelStr, _pt.tlLabelW, 20, event.clientX, event.clientY);
+                this._startAutoScroll(event);
+            } else {
+                return;
+            }
+        }
         if( panstate.dragTimelineEntity ) {
             this._autoScrollY = event.clientY;
             this._moveGhost(event.clientX, event.clientY);
@@ -3060,14 +3071,16 @@ export class HistoryCardState {
                 const _cx = event.clientX - _rect.left;
                 const _cy = event.clientY - _rect.top;
                 let _onDraggable = false;
-                if( _hoverG.type === 'timeline' || _hoverG.type === 'arrowline' ) {
-                    if( _chart.chartArea && _cx < _chart.chartArea.left ) _onDraggable = true;
-                } else if( _chart.legend && _chart.legend.legendHitBoxes ) {
-                    for( let _box of _chart.legend.legendHitBoxes ) {
-                        if( _cx >= _box.left && _cx <= _box.left + _box.width &&
-                            _cy >= _box.top  && _cy <= _box.top  + _box.height ) {
-                            _onDraggable = true;
-                            break;
+                if( _hoverG.id >= this.firstDynamicId ) {
+                    if( _hoverG.type === 'timeline' || _hoverG.type === 'arrowline' ) {
+                        if( _chart.chartArea && _cx < _chart.chartArea.left ) _onDraggable = true;
+                    } else if( _chart.legend && _chart.legend.legendHitBoxes ) {
+                        for( let _box of _chart.legend.legendHitBoxes ) {
+                            if( _cx >= _box.left && _cx <= _box.left + _box.width &&
+                                _cy >= _box.top  && _cy <= _box.top  + _box.height ) {
+                                _onDraggable = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -3217,6 +3230,9 @@ export class HistoryCardState {
         // Handle timeline/arrowline entity drag & drop
         if( panstate.pendingDragDataset ) {
             panstate.pendingDragDataset = null;
+        }
+        if( panstate.pendingDragTimeline ) {
+            panstate.pendingDragTimeline = null;
         }
         if( panstate.dragTimelineEntity ) {
             const _src = panstate.dragTimelineEntity.g;
@@ -3483,6 +3499,9 @@ export class HistoryCardState {
     {
         if( panstate.pendingDragDataset ) {
             panstate.pendingDragDataset = null;
+        }
+        if( panstate.pendingDragTimeline ) {
+            panstate.pendingDragTimeline = null;
         }
         if( panstate.dragTimelineEntity ) {
             panstate.dragTimelineEntity = null;
