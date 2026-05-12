@@ -3,6 +3,11 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.19] - 2026-05-12
+### Fixed
+- Info panel (`history-info-panel.js`) no longer fails to activate after enabling via the menu — `infoPanelEnabled` is now correctly initialized from localStorage on module load, ensuring the panel hook runs with the right value on first cycle
+- `infoPanelEnabled` is now written to localStorage on toggle and on HA user storage sync, with a page reload if the two sources differ — guarantees consistency across devices and sessions
+
 ## [v1.1.18] - 2026-05-12
 ### Added
 - Inter-graph drag & drop on legend label zone (line/bar) now shows vertical insertion marker and inserts at exact position — same UX as intra-graph reorder
