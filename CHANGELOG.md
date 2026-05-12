@@ -3,6 +3,26 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.18] - 2026-05-12
+### Added
+- Inter-graph drag & drop on legend label zone (line/bar) now shows vertical insertion marker and inserts at exact position — same UX as intra-graph reorder
+- Inter-graph drag & drop on label zone (timeline/arrowline) now shows horizontal insertion marker and inserts at exact position — same UX as intra-graph reorder
+- Double-click on timeline/arrowline label now uncombines the entity into its own graph — same behavior as line/bar legend double-click
+- Duplicate entity detection now shows a tooltip and a red dashed highlight on the containing graph; highlight persists 10s if the graph is off-screen, fades after 1s once it enters the viewport
+- `history-default-colors.js`: comprehensive state color palette — cover, climate, alarm_control_panel, lock, media_player, vacuum, lawn_mower, water_heater, sun, fan, light, switch, device_tracker domains; consistent semantic logic (green = good/active, red = stopped/armed/locked, amber = transition, grey = unknown/unavailable only)
+- New YAML option `infoPanelActive` — sets the default enabled state of the info panel; admin change is detected at next load and overrides user preference; user preference is otherwise preserved across devices via HA user storage via a dedicated global key `history-explorer-infopanel-enabled`
+- Conflict detection for `infoPanelActive`: if the parameter is set with different values across multiple card instances, an alert lists the conflicting cards; the oldest conflicting entry is automatically removed from the registry on dismissal to manage removed instances and will reappear later if still conflicting
+- State persistence extended: time range and per-graph bar interval now persisted in HA user storage alongside entities; `infoPanelEnabled` stored in a dedicated global HA user key shared across all instances
+- `ui.label.already_exists` and `ui.label.infopanel_conflict` added to `languages.js` in all 10 supported languages
+### Fixed
+- Toolbar (date selector, duration selector) moved inside `card-content` — eliminates misalignment with graph area and close buttons, improves mobile layout
+- Timeline/arrowline label tooltip (truncated labels) restored for YAML graphs — was incorrectly blocked by the `firstDynamicId` guard introduced in v1.1.17
+- `datalist` `list=` attribute restored as static on desktop input — Firefox now shows the entity suggestion dropdown; dynamic `list=` management removed (no longer needed since `isMobile` now correctly identifies tablets)
+- Ghost activation threshold (5px) applied to timeline/arrowline entity drag — was triggering immediately on pointerdown, inconsistent with legend label and graph drag behavior
+- Pending graph move (`pendingMoveGraph`) now correctly forwarded as padlock click when movement is under 5px
+- Close button (`#bc-N`) right margin aligned with graph right edge
+- Info panel menu label (`#ei_N`) now correctly reflects `infoPanelEnabled` state after async restore from HA user storage
+
 ## [v1.1.17] - 2026-05-07
 ### Fixed
 - `timeline.js`: memory leak — `_tl_momentCache` grew without bound; `tl_momentCachePurge()` now caps it at 500 entries
