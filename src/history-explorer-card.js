@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.18';
+const Version = '1.1.19';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -93,7 +93,7 @@ var panstate = {};
 // HA entity history info panel enabled flag
 // --------------------------------------------------------------------------------------
 
-export let infoPanelEnabled = false; // restored from HA user global key in readLocalState
+export let infoPanelEnabled = !!(JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {}).enabled;
 
 
 // --------------------------------------------------------------------------------------
@@ -489,7 +489,11 @@ export class HistoryCardState {
         if( confirm(infoPanelEnabled ? i18n('ui.popup.disable_panel') : i18n('ui.popup.enable_panel')) ) {
             infoPanelEnabled = !infoPanelEnabled;
             await this.writeInfoPanelConfig(true);
-            // Persist infoPanelEnabled in dedicated global HA user key
+            // Persist infoPanelEnabled in localStorage (for sync init on reload)
+            const _lsData = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
+            _lsData.enabled = infoPanelEnabled;
+            window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_lsData));
+            // Persist in dedicated global HA user key
             try {
                 await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } });
             } catch(e) {}
@@ -4986,8 +4990,17 @@ export class HistoryCardState {
             }
 
             if( _globalData.enabled !== undefined ) {
+                const _lsEnabled = !!(JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {}).enabled;
+                if( _globalData.enabled !== _lsEnabled ) {
+                    // HA user differs from localStorage — sync and reload
+                    const _lsData = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
+                    _lsData.enabled = _globalData.enabled;
+                    window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_lsData));
+                    location.reload();
+                    return;
+                }
                 infoPanelEnabled = _globalData.enabled;
-                // Update info panel menu label now that infoPanelEnabled is correct
+                // Update info panel menu label
                 for( let i = 0; i < 2; i++ ) {
                     const ei = this._this.querySelector(`#ei_${i}`);
                     if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
