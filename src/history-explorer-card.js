@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.17';
+const Version = '1.1.18';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -93,7 +93,7 @@ var panstate = {};
 // HA entity history info panel enabled flag
 // --------------------------------------------------------------------------------------
 
-export let infoPanelEnabled = !!JSON.parse(window.localStorage.getItem('history-explorer-info-panel'));
+export let infoPanelEnabled = false; // restored from HA user global key in readLocalState
 
 
 // --------------------------------------------------------------------------------------
@@ -186,6 +186,7 @@ export class HistoryCardState {
         this.pconfig.entities             = [];
         this._nextGroupId                  = 1;
         this.pconfig.infoPanelConfig      = null;
+        this.pconfig.infoPanelActive      = undefined;
 
         this.loader = {};
         this.loader.startTime    = 0;
@@ -480,14 +481,18 @@ export class HistoryCardState {
         this.statsExporter.exportFile(this);
     }
 
-    toggleInfoPanel()
+    async toggleInfoPanel()
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
         if( confirm(infoPanelEnabled ? i18n('ui.popup.disable_panel') : i18n('ui.popup.enable_panel')) ) {
             infoPanelEnabled = !infoPanelEnabled;
-            this.writeInfoPanelConfig(true);
+            await this.writeInfoPanelConfig(true);
+            // Persist infoPanelEnabled in dedicated global HA user key
+            try {
+                await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } });
+            } catch(e) {}
             location.reload();
         }
     }
@@ -2131,15 +2136,23 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
-    _showLabelTooltip(label, clientX, clientY) {
+    _showLabelTooltip(label, clientX, clientY, align = 'left') {
         const _existing = document.getElementById('hec-label-tooltip');
         if( _existing ) _existing.remove();
         const _tip = document.createElement('div');
         _tip.id = 'hec-label-tooltip';
         _tip.textContent = label;
         _tip.style.cssText = 'position:fixed;z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:1;';
-        _tip.style.left = (clientX + 10) + 'px';
-        _tip.style.top  = (clientY - 16) + 'px';
+        if( align === 'center' ) {
+            _tip.style.left      = clientX + 'px';
+            _tip.style.transform = 'translateX(-50%)';
+        } else if( align === 'right' ) {
+            _tip.style.left      = clientX + 'px';
+            _tip.style.transform = 'translateX(-100%)';
+        } else {
+            _tip.style.left = (clientX + 10) + 'px';
+        }
+        _tip.style.top = (clientY - 16) + 'px';
         document.body.appendChild(_tip);
         setTimeout(() => { _tip.style.opacity = '0'; }, 500);
         setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, 2000);
@@ -2256,15 +2269,32 @@ export class HistoryCardState {
             const _compatible = _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
             this._highlightDropTarget(_overG.canvas, _compatible);
-            this._hideInsertionMarker();
             // Freeze target chart when over its legend overlay
             const _lgEl = this._this.querySelector(`#lg-${_overG.id}`);
             if( _lgEl ) {
                 const _lgR = _lgEl.getBoundingClientRect();
-                if( event.clientY >= _lgR.top && event.clientY <= _lgR.bottom )
+                if( event.clientY >= _lgR.top && event.clientY <= _lgR.bottom ) {
                     this._freezeChart(_overG);
-                else
+                    // Show insertion marker in legend zone (inter-graph)
+                    if( _compatible && _overG.chart.legend?.legendHitBoxes ) {
+                        const _r = _overG.canvas.getBoundingClientRect();
+                        const _cx = event.clientX - _r.left;
+                        const _cy = event.clientY - _r.top;
+                        const _found = this._findLegendLabel(_overG.chart.legend.legendHitBoxes, _cx, _cy, -2, true);
+                        if( _found ) {
+                            this._showInsertionMarker(
+                                _r.left + _found.markerX + 2, _r.top + _found.markerY,
+                                3, _found.markerH, false, panstate.dragDataset?.color);
+                        } else {
+                            this._hideInsertionMarker();
+                        }
+                    }
+                } else {
                     this._unfreezeChart();
+                    this._hideInsertionMarker();
+                }
+            } else {
+                this._hideInsertionMarker();
             }
         } else if( _overG === _src ) {
             // Intra-graph: show vertical insertion marker between legend labels
@@ -2392,6 +2422,15 @@ export class HistoryCardState {
                     return;
                 }
                 if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Check if drop is on legend label zone — find insertion position
+                    let _tgtLabelInsertIdx = -1;
+                    if( _tgt.chart.legend?.legendHitBoxes ) {
+                        const _r = _tgt.canvas.getBoundingClientRect();
+                        const _cx = event.clientX - _r.left;
+                        const _cy = event.clientY - _r.top;
+                        const _found = this._findLegendLabel(_tgt.chart.legend.legendHitBoxes, _cx, _cy, -2, true);
+                        if( _found ) _tgtLabelInsertIdx = _found.insertBefore ? _found.idx : _found.idx + 1;
+                    }
                     // Move entity from source to target
                     const _entity = _src.entities[_srcIdx];
                     // Update groupId in pconfig.entities
@@ -2431,7 +2470,11 @@ export class HistoryCardState {
                     const _tgtNext = _tgtDiv.nextSibling;
                     _tgtDiv.remove();
                     this.graphs.splice(this.graphs.indexOf(_tgt), 1);
-                    const _allTgtEntities = [..._tgt.entities, _entity];
+                    const _allTgtEntities = [..._tgt.entities];
+                    if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
+                        _allTgtEntities.splice(_tgtLabelInsertIdx, 0, _entity);
+                    else
+                        _allTgtEntities.push(_entity);
                     const _countBefore2 = this.graphs.length;
                     const _savedCombine2 = this.pconfig.combineSameUnits;
                     this.pconfig.combineSameUnits = true;
@@ -2891,7 +2934,7 @@ export class HistoryCardState {
             const _chart = panstate.g.chart;
 
             // Check if click is on the label area of a timeline/arrowline graph (dynamic graphs only)
-            if( (panstate.g.type === 'timeline' || panstate.g.type === 'arrowline') && panstate.g.id >= this.firstDynamicId ) {
+            if( panstate.g.type === 'timeline' || panstate.g.type === 'arrowline' ) {
                 const _rect2 = event.target.getBoundingClientRect();
                 const _cx2 = event.clientX - _rect2.left;
                 const _cy2 = event.clientY - _rect2.top;
@@ -2908,7 +2951,7 @@ export class HistoryCardState {
                         if( _closestIdx >= 0 ) {
                             const _lbl = _chart.data.labels[_closestIdx];
                             const _labelStr = Array.isArray(_lbl) ? _lbl.join(' ') : _lbl;
-                            // Show tooltip if label is truncated
+                            // Show tooltip if label is truncated (all graphs)
                             const _ctx2 = event.target.getContext('2d');
                             _ctx2.save();
                             _ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
@@ -2918,13 +2961,63 @@ export class HistoryCardState {
                             if( _textW > _availW ) {
                                 this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
                             }
-                            // Store pending — ghost and drag activate after 5px threshold
-                            panstate.pendingDragTimeline = {
-                                g: panstate.g, entityIdx: _closestIdx,
-                                labelStr: _labelStr,
-                                tlLabelW: _chart.chartArea ? _chart.chartArea.left : 65,
-                                startX: event.clientX, startY: event.clientY
-                            };
+                            // Double-click: uncombine entity into its own graph (dynamic graphs only)
+                            if( panstate.g.id >= this.firstDynamicId ) {
+                                const _now = Date.now();
+                                const _g = panstate.g;
+                                if( !this._uncombineInProgress &&
+                                    _g._lastTLClick && _g._lastTLClickIdx === _closestIdx &&
+                                    _now - _g._lastTLClick < 400 ) {
+                                    // Double-click — uncombine
+                                    _g._lastTLClick = null;
+                                    this._uncombineInProgress = true;
+                                    setTimeout(() => { this._uncombineInProgress = false; }, 500);
+                                    if( _g.entities.length > 1 ) {
+                                        const _entity = _g.entities[_closestIdx];
+                                        const _newEntities = _g.entities.filter((_, i) => i !== _closestIdx);
+                                        _entity.siConversionFactor = undefined;
+                                        _newEntities.forEach(en => { en.siConversionFactor = undefined; });
+                                        const _newGroupId = this._nextGroupId++;
+                                        const _eIdx = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === _entity.entity);
+                                        if( _eIdx >= 0 ) this.pconfig.entities[_eIdx] = { entity: _entity.entity, groupId: _newGroupId, color: _entity.color, fill: _entity.fill };
+                                        this.writeLocalState();
+                                        const _graphDiv = _g.canvas.parentNode.parentNode;
+                                        const _gl = _graphDiv.parentNode;
+                                        let _nextSibling = _graphDiv.nextSibling;
+                                        while( _nextSibling && !_gl.contains(_nextSibling) )
+                                            _nextSibling = _nextSibling.nextSibling;
+                                        const _insertIdx = this.graphs.indexOf(_g);
+                                        _graphDiv.remove();
+                                        this.graphs.splice(_insertIdx, 1);
+                                        const _graphsBefore = this.graphs.length;
+                                        const _savedCombine = this.pconfig.combineSameUnits;
+                                        this.pconfig.combineSameUnits = true;
+                                        _newEntities.forEach((en, i) => {
+                                            this.addDynamicGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1]);
+                                        });
+                                        this.pconfig.combineSameUnits = _savedCombine;
+                                        this.addDynamicGraph(_entity.entity, true, _entity.color, _entity.fill);
+                                        const _newDivs = [];
+                                        for( let i = _graphsBefore; i < this.graphs.length; i++ )
+                                            _newDivs.push(this.graphs[i].canvas.parentNode.parentNode);
+                                        for( let _div of _newDivs ) {
+                                            if( _nextSibling && _gl.contains(_nextSibling) ) _gl.insertBefore(_div, _nextSibling);
+                                            else _gl.appendChild(_div);
+                                        }
+                                        this.updateHistory();
+                                    }
+                                    return;
+                                }
+                                _g._lastTLClick = _now;
+                                _g._lastTLClickIdx = _closestIdx;
+                                // Store pending drag
+                                panstate.pendingDragTimeline = {
+                                    g: panstate.g, entityIdx: _closestIdx,
+                                    labelStr: _labelStr,
+                                    tlLabelW: _chart.chartArea ? _chart.chartArea.left : 65,
+                                    startX: event.clientX, startY: event.clientY
+                                };
+                            }
                             return;
                         }
                     }
@@ -3027,7 +3120,32 @@ export class HistoryCardState {
                 const _compatible = _overGTL.type === _srcTL.type;
                 event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
                 this._highlightDropTarget(_overGTL.canvas, _compatible);
-                this._hideInsertionMarker();
+                // Show insertion marker in label zone (inter-graph)
+                if( _compatible ) {
+                    const _r = _overGTL.canvas.getBoundingClientRect();
+                    const _cx = event.clientX - _r.left;
+                    const _cy = event.clientY - _r.top;
+                    const _yScale = _overGTL.chart.scales['y-axis-0'];
+                    if( _yScale && _overGTL.chart.chartArea && _cx < _overGTL.chart.chartArea.left ) {
+                        let _markerShown = false;
+                        for( let _ei = 0; _ei < _overGTL.entities.length; _ei++ ) {
+                            const _py = _yScale.getPixelForValue(null, _ei, _ei);
+                            const _halfH = (_yScale.height / _overGTL.entities.length) / 2;
+                            if( Math.abs(_cy - _py) < _halfH ) {
+                                const _insertBefore = _cy < _py;
+                                const _my = _r.top + _py + (_insertBefore ? -_halfH : _halfH);
+                                this._showInsertionMarker(_r.left, _my, _r.width, 3, true);
+                                _markerShown = true;
+                                break;
+                            }
+                        }
+                        if( !_markerShown ) this._hideInsertionMarker();
+                    } else {
+                        this._hideInsertionMarker();
+                    }
+                } else {
+                    this._hideInsertionMarker();
+                }
             } else if( _overGTL === _srcTL ) {
                 // Intra-graph: horizontal insertion marker
                 event.target.style.cursor = 'grabbing';
@@ -3651,7 +3769,40 @@ export class HistoryCardState {
         } else {
 
             if( this._hass.states[entity_id] == undefined ) return;
-            if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === entity_id) ) return;
+            if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === entity_id) ) {
+                // Entity already exists — show tooltip and highlight containing graph
+                const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === entity_id));
+                if( _existingG ) {
+                    const _r = _existingG.canvas.getBoundingClientRect();
+                    const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+                    const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
+                    const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
+                    this._showLabelTooltip(i18n('ui.label.already_exists'), _tx, _ty, 'center');
+                    this._highlightDropTarget(_existingG.canvas, false);
+                    // Keep highlight 1s if visible, 10s if out of viewport
+                    // If it enters viewport while highlighted, fade after 1s
+                    const _hlWrapper = _existingG.canvas.parentNode;
+                    const _wr = _hlWrapper?.getBoundingClientRect();
+                    const _inViewport = _wr && _wr.top >= 0 && _wr.bottom <= window.innerHeight;
+                    if( _inViewport ) {
+                        setTimeout(() => { this._clearDropHighlight(); }, 1000);
+                    } else {
+                        const _hlTimeout = setTimeout(() => {
+                            _hlObserver?.disconnect();
+                            this._clearDropHighlight();
+                        }, 10000);
+                        const _hlObserver = new IntersectionObserver((entries) => {
+                            if( entries[0].isIntersecting ) {
+                                _hlObserver.disconnect();
+                                clearTimeout(_hlTimeout);
+                                setTimeout(() => { this._clearDropHighlight(); }, 1000);
+                            }
+                        }, { threshold: 0.1 });
+                        if( _hlWrapper ) _hlObserver.observe(_hlWrapper);
+                    }
+                }
+                return;
+            }
 
             const _prevGraphCount = this.graphs.length;
             this.addDynamicGraph(entity_id);
@@ -3918,7 +4069,7 @@ export class HistoryCardState {
         let html = '';
         html += `<div style='height:${h}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
-        html += `<button id='bc-${this.g_id}' style="position:absolute;right:20px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
+        html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
             html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle);
         if( type == 'line' || type == 'bar' )
@@ -4085,7 +4236,7 @@ export class HistoryCardState {
 
         if( selector && !isMobile ) html += `
             <div id='sl_${i}' style="background-color:${bgcol};display:none;padding-left:10px;padding-right:10px;">
-                <input id="b7_${i}" ${inputStyle} autoComplete="on" placeholder="Type to search for an entity to add"/>
+                <input id="b7_${i}" ${inputStyle} autoComplete="on" list="b6_${this.cid}" placeholder="Type to search for an entity to add"/>
                 <button id="b8_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:34px;margin-left:5px;">+</button>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
@@ -4097,7 +4248,7 @@ export class HistoryCardState {
             </div>`;
 
         if( timeline ) html += `
-            <div id="dr_${i}" style="background-color:${bgcol};float:right;margin-right:10px;display:inline-block;padding-left:10px;padding-right:10px;">
+            <div id="dr_${i}" style="background-color:${bgcol};float:right;margin-right:10px;display:inline-block;padding-left:10px;">
                 <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
                 <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                 <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px">
@@ -4296,18 +4447,6 @@ export class HistoryCardState {
 
             if( !isMobile ) {
                 this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
-                for( let i = 0; i < 2; ++i ) {
-                    const input = this._this.querySelector(`#b7_${i}`);
-                    if( input ) {
-                        input.addEventListener('keyup', () => {
-                            if( input.value && !input.getAttribute('list') )
-                                input.setAttribute('list', `b6_${this.cid}`);
-                        }, true);
-                        input.addEventListener('focusout', () => {
-                            input.removeAttribute('list');
-                        }, true);
-                    }
-                }
             }
 
             await this.readLocalState();
@@ -4355,6 +4494,20 @@ export class HistoryCardState {
             // Register observer to resize the graphs whenever the maincard dimensions change
             let ro = new ResizeObserver(entries => { this.resize(); });
             ro.observe(this._this.querySelector('#maincard'));
+
+            // Apply persisted per-graph state (interval)
+            if( this._pendingGraphState ) {
+                for( let g of this.graphs ) {
+                    const _gs = this._pendingGraphState[g.id];
+                    if( !_gs ) continue;
+                    if( _gs.interval !== null && _gs.interval !== undefined && g.type === 'bar' ) {
+                        g.interval = _gs.interval;
+                        const _bd = this._this.querySelector(`#bd-${g.id}`);
+                        if( _bd ) _bd.value = _gs.interval;
+                    }
+                }
+                this._pendingGraphState = null;
+            }
 
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
@@ -4685,7 +4838,19 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
-        const data = { "version" : 1, "entities" : this.pconfig.entities };
+        // Collect per-graph state
+        const _graphState = {};
+        for( let g of this.graphs ) {
+            _graphState[g.id] = { interval: g.interval ?? null };
+        }
+        const data = {
+            version          : 2,
+            entities         : this.pconfig.entities,
+            infoPanelActive  : this.pconfig.infoPanelActive,
+            timeRangeHours   : this.activeRange.timeRangeHours,
+            timeRangeMinutes : this.activeRange.timeRangeMinutes,
+            graphState       : _graphState
+        };
         const _json = JSON.stringify(data);
 
         // Write to localStorage as backup
@@ -4721,8 +4886,37 @@ export class HistoryCardState {
             }
         }
 
-        if( data && data.version === 1 ) {
+        let _needsPersist = false;
+        if( data && data.version === 2 ) {
             this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
+
+            // Restore time range
+            if( data.timeRangeHours !== undefined )  this.activeRange.timeRangeHours   = data.timeRangeHours;
+            if( data.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = data.timeRangeMinutes;
+
+            // Restore per-graph state
+            this._pendingGraphState = data.graphState || {};
+
+            // infoPanelActive: read, compare, write
+            const _yamlActive = this.pconfig.infoPanelActive;
+            if( _yamlActive !== undefined ) {
+                if( _yamlActive !== data.infoPanelActive ) {
+                    infoPanelEnabled = _yamlActive;
+                    try {
+                        await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } });
+                    } catch(e) {}
+                }
+                _needsPersist = true;
+            }
+
+        } else if( data && data.version === 1 ) {
+            this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
+            // infoPanelActive first run
+            const _yamlActive = this.pconfig.infoPanelActive;
+            if( _yamlActive !== undefined ) {
+                infoPanelEnabled = _yamlActive;
+                _needsPersist = true;
+            }
         } else {
             // Legacy format fallback
             const _legacy = window.localStorage.getItem('history-explorer-card');
@@ -4735,10 +4929,71 @@ export class HistoryCardState {
             } else {
                 this.pconfig.entities = [];
             }
+            // infoPanelActive first run
+            const _yamlActive = this.pconfig.infoPanelActive;
+            if( _yamlActive !== undefined ) {
+                infoPanelEnabled = _yamlActive;
+                _needsPersist = true;
+            }
         }
+
         // Set _nextGroupId to max existing groupId + 1
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
         this._nextGroupId = _maxGroupId + 1;
+        if( _needsPersist ) setTimeout(() => { this.writeLocalState(); }, 0);
+
+        // Restore infoPanelEnabled from dedicated global HA user key
+        // Also register infoPanelActive with timestamp and detect conflicts
+        try {
+            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
+            const _globalData = _ipe?.value || {};
+            if( !_globalData.registry ) _globalData.registry = {};
+
+            const _yamlActiveVal = this.pconfig.infoPanelActive;
+            let _registryChanged = false;
+
+            if( _yamlActiveVal === undefined ) {
+                // infoPanelActive not defined — remove this card from registry if present
+                if( this.id in _globalData.registry ) {
+                    delete _globalData.registry[this.id];
+                    _registryChanged = true;
+                }
+            } else {
+                // Register this card with timestamp
+                _globalData.registry[this.id] = { value: _yamlActiveVal, ts: Date.now() };
+                _registryChanged = true;
+
+                // Detect conflicts: more than one distinct value in registry
+                const _entries = Object.entries(_globalData.registry);
+                const _vals = _entries.map(([, e]) => e.value);
+                const _hasConflict = _vals.some(v => v !== _vals[0]);
+                if( _hasConflict ) {
+                    const _conflictList = _entries
+                        .map(([id, e]) => id + ': ' + e.value)
+                        .join('\n');
+                    alert(i18n('ui.label.infopanel_conflict') + '\n' + _conflictList);
+                    // Remove oldest conflicting entry — excluding current instance
+                    const _conflicting = _entries.filter(([id, e]) => id !== this.id && e.value !== _yamlActiveVal);
+                    if( _conflicting.length ) {
+                        const _oldest = _conflicting.reduce((a, b) => a[1].ts < b[1].ts ? a : b);
+                        delete _globalData.registry[_oldest[0]];
+                    }
+                }
+            }
+
+            if( _registryChanged ) {
+                await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: _globalData });
+            }
+
+            if( _globalData.enabled !== undefined ) {
+                infoPanelEnabled = _globalData.enabled;
+                // Update info panel menu label now that infoPanelEnabled is correct
+                for( let i = 0; i < 2; i++ ) {
+                    const ei = this._this.querySelector(`#ei_${i}`);
+                    if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
+                }
+            }
+        } catch(e) {}
     }
 
     async writeInfoPanelConfig(forceUpdate = false)
@@ -4993,6 +5248,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 
         this.instance.pconfig.infoPanelConfig = config.infoPanel;
+        this.instance.pconfig.infoPanelActive  = config.infoPanelActive;
 
         this.instance.id = config.cardName ?? "default";
         this.instance.cid = gcid++;
@@ -5023,8 +5279,8 @@ class HistoryExplorerCard extends HTMLElement
         // Header
         let html = `
             <ha-card id="maincard" header="${this.instance.ui.hideHeader ? '' : header}">
+            <div id='graphlist' class='card-content' style='margin-top:0px;padding-top:0px;'>
             ${this.instance.addUIHtml(tools & 1, selector & 1, bgcol, optionStyle, inputStyle, invertZoom, 0)}
-            <div id='graphlist' class='card-content' style='margin-top:${(this.instance.ui.stickyTools & 1) ? '0px' : '8px'};'>
         `;
 
         // Graph area
@@ -5048,10 +5304,10 @@ class HistoryExplorerCard extends HTMLElement
 
         // Footer
         html += `
-            </div>
             ${this.instance.addUIHtml(tools & 2, selector & 2, bgcol, optionStyle, inputStyle, invertZoom, 1)}
             ${(((tools | selector) & 2) && !(this.instance.ui.stickyTools & 2)) ? '<br>' : ''}
             <datalist id="b6_${this.instance.cid}"></datalist>
+            </div>
             </ha-card>
         `;
 

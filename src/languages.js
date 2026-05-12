@@ -10,6 +10,8 @@ const lang_en =
             "type_to_search" : "Type to search for an entity to add",
             "error_retreiving" : "Could not retrieve available entities !",
             "loading" : "Loading available entities...",
+            "already_exists" : "Already in graph",
+            "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
         "popup" : {
             "remove_all" : "Remove all dynamically added graphs ?",
@@ -57,6 +59,8 @@ const lang_fr =
             "type_to_search" : "Tapez ici pour rechercher une entité à ajouter",
             "error_retreiving" : "Impossible de récupérer les entités !",
             "loading" : "Chargement des entités disponibles...",
+            "already_exists" : "Déjà dans un graphique",
+            "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
         }, 
         "popup" : {
             "remove_all" : "Supprimer tous les graphiques ajoutés dynamiquement ?",
@@ -104,6 +108,8 @@ const lang_de =
             "type_to_search" : "Entität suchen oder auswählen",
             "error_retreiving" : "Entitäten konnten nicht geladen werden !",
             "loading" : "Lade verfügbare Entitäten...",
+            "already_exists" : "Bereits im Diagramm",
+            "infopanel_conflict" : "YAML-Parameter infoPanelActive Konflikt:",
         }, 
         "popup" : {
             "remove_all" : "Alle dynamisch hinzugefügten Diagramme entfernen ?",
@@ -151,6 +157,8 @@ const lang_es =
             "type_to_search" : "Seleccionar entidad a añadir",
             "error_retreiving" : "No se encuentran entidades disponibles!",
             "loading" : "Cargando entidades ...",
+            "already_exists" : "Ya en un gráfico",
+            "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
         }, 
         "popup" : {
             "remove_all" : "Borrar gráficos añadidos dinámicamente ?",
@@ -198,6 +206,8 @@ const lang_nl =
             "type_to_search" : "Typ om te zoeken naar een entiteit om toe te voegen",
             "error_retreiving" : "Kan beschikbare entiteiten niet ophalen !",
             "loading" : "Beschikbare entiteiten laden...",
+            "already_exists" : "Al in een grafiek",
+            "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
         "popup" : {
             "remove_all" : "Alle dynamisch toegevoegde grafieken verwijderen ?",
@@ -245,6 +255,8 @@ const lang_pl =
             "type_to_search" : "Wpisz, aby wyszukać i dodać encję",
             "error_retreiving" : "Nie można pobrać dostępnych elementów !",
             "loading" : "Ładowanie dostępnych elementów...",
+            "already_exists" : "Już na wykresie",
+            "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
         }, 
         "popup" : {
             "remove_all" : "Usuń wszystkie wykresy ?",
@@ -287,44 +299,46 @@ const lang_pl =
 
 const lang_sv =
 {
-	"ui": {
-		"label": {
-			"type_to_search": "Skriv för att söka efter en enhet att lägga till",
-			"error_retreiving": "Kunde inte hämta tillgängliga enheter!",
-			"loading": "Laddar tillgängliga enheter..."
-		},
-		"popup": {
-			"remove_all": "Ta bort alla dynamiskt tillagda grafer?",
-			"enable_panel": "Aktivera panelen för enhetens historikinformation?",
-			"disable_panel": "Inaktivera panelen för enhetens historikinformation?"
-		},
-		"menu": {
-			"export_csv": "Exportera som CSV",
-			"export_stats": "Exportera statistik som CSV",
-			"remove_all": "Ta bort alla tillagda grafer",
-			"enable_panel": "Aktivera historikinfo-panelen",
-			"disable_panel": "Inaktivera historikinfo-panelen"
-		},
-		"ranges": {
-			"l_hour": "< 1 tim",
-			"hour": "1 tim",
-			"n_hours": "%1 timmar",
-			"day": "1 dag",
-			"n_days": "%1 dagar",
-			"week": "1 vecka",
-			"n_weeks": "%1 veckor",
-			"month": "1 månad",
-			"n_months": "%1 månader",
-			"year": "1 år"
-		},
-		"interval": {
-			"_10m": "10 min",
-			"hourly": "Varje timme",
-			"daily": "Varje dag",
-			"monthly": "Varje månad",
+    "ui": {
+        "label": {
+            "type_to_search": "Skriv för att söka efter en enhet att lägga till",
+            "error_retreiving": "Kunde inte hämta tillgängliga enheter!",
+            "loading": "Laddar tillgängliga enheter...",
+            "already_exists" : "Redan i ett diagram",
+            "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
+        },
+        "popup": {
+            "remove_all": "Ta bort alla dynamiskt tillagda grafer?",
+            "enable_panel": "Aktivera panelen för enhetens historikinformation?",
+            "disable_panel": "Inaktivera panelen för enhetens historikinformation?"
+        },
+        "menu": {
+            "export_csv": "Exportera som CSV",
+            "export_stats": "Exportera statistik som CSV",
+            "remove_all": "Ta bort alla tillagda grafer",
+            "enable_panel": "Aktivera historikinfo-panelen",
+            "disable_panel": "Inaktivera historikinfo-panelen"
+        },
+        "ranges": {
+            "l_hour": "< 1 tim",
+            "hour": "1 tim",
+            "n_hours": "%1 timmar",
+            "day": "1 dag",
+            "n_days": "%1 dagar",
+            "week": "1 vecka",
+            "n_weeks": "%1 veckor",
+            "month": "1 månad",
+            "n_months": "%1 månader",
+            "year": "1 år"
+        },
+        "interval": {
+            "_10m": "10 min",
+            "hourly": "Varje timme",
+            "daily": "Varje dag",
+            "monthly": "Varje månad",
             "rawline" : "As line"       // TODO
-		}
-	}
+        }
+    }
 }
 
 
@@ -339,6 +353,8 @@ const lang_da =
             "type_to_search" : "Indtast for at søge efter en entitet, der skal tilføjes",
             "error_retreiving" : "Fejl ved indlæsning af entiteter !",
             "loading" : "Indlæser tilgængelige entiteter...",
+            "already_exists" : "Allerede i et diagram",
+            "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
         }, 
         "popup" : {
             "remove_all" : "Fjern alle dynamisk tilføjede grafer ?",
@@ -386,6 +402,8 @@ const lang_sk =
             "type_to_search" : "Napíšte, ak chcete vyhľadať entitu, ktorú chcete pridať",
             "error_retreiving" : "Nepodarilo sa načítať dostupné entity !",
             "loading" : "Načitavanie dostupných entít...",
+            "already_exists" : "Už v grafe",
+            "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
         }, 
         "popup" : {
             "remove_all" : "Odstrániť všetky dynamicky pridané grafy ?",
@@ -433,6 +451,8 @@ const lang_ru =
             "type_to_search" : "Начните поиск объекта для добавления",
             "error_retreiving" : "Невозможно загрузить доступные объекты!",
             "loading" : "Загрузка доступных объектов...",
+            "already_exists" : "Уже в графике",
+            "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
         }, 
         "popup" : {
             "remove_all" : "Очистить все добавленные графики?",
