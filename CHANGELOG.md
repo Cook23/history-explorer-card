@@ -3,6 +3,9 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.20] - 2026-05-15
+### Changed
+- Version bump only — identical to v1.1.19; re-released to work around a HACS issue with versions that are withdrawn immediately and re-published lately
 
 ## [v1.1.19] - 2026-05-15
 ### Added
