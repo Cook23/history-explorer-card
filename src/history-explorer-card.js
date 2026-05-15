@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.19';
+const Version = '1.1.19b19';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -93,7 +93,7 @@ var panstate = {};
 // HA entity history info panel enabled flag
 // --------------------------------------------------------------------------------------
 
-export let infoPanelEnabled = !!(JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {}).enabled;
+export let infoPanelEnabled = !!JSON.parse(window.localStorage.getItem('history-explorer-info-panel'));
 
 
 // --------------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ export class HistoryCardState {
         this.pconfig.entities             = [];
         this._nextGroupId                  = 1;
         this.pconfig.infoPanelConfig      = null;
-        this.pconfig.infoPanelActive      = undefined;
+        this.pconfig.defaultInfoPanel     = undefined;
 
         this.loader = {};
         this.loader.startTime    = 0;
@@ -481,22 +481,24 @@ export class HistoryCardState {
         this.statsExporter.exportFile(this);
     }
 
-    async toggleInfoPanel()
+    toggleInfoPanel()
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
         if( confirm(infoPanelEnabled ? i18n('ui.popup.disable_panel') : i18n('ui.popup.enable_panel')) ) {
             infoPanelEnabled = !infoPanelEnabled;
-            await this.writeInfoPanelConfig(true);
-            // Persist infoPanelEnabled in localStorage (for sync init on reload)
-            const _lsData = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
-            _lsData.enabled = infoPanelEnabled;
-            window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_lsData));
-            // Persist in dedicated global HA user key
-            try {
-                await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } });
-            } catch(e) {}
+            // Persist in dedicated global HA user key (background)
+            this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
+            this.applyInfoPanelState();
+        }
+    }
+
+    applyInfoPanelState()
+    {
+        const _ls = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
+        if( infoPanelEnabled !== !!_ls.enabled ) {
+            this.writeInfoPanelConfig(true);
             location.reload();
         }
     }
@@ -4491,8 +4493,6 @@ export class HistoryCardState {
             } else
                 this.pconfig.entities = [];
 
-            this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
-
             this.today(false);
 
             // Register observer to resize the graphs whenever the maincard dimensions change
@@ -4848,16 +4848,23 @@ export class HistoryCardState {
             _graphState[g.id] = { interval: g.interval ?? null };
         }
         const data = {
-            version          : 2,
-            entities         : this.pconfig.entities,
-            infoPanelActive  : this.pconfig.infoPanelActive,
-            timeRangeHours   : this.activeRange.timeRangeHours,
-            timeRangeMinutes : this.activeRange.timeRangeMinutes,
-            graphState       : _graphState
+            version             : 2,
+            entities            : this.pconfig.entities,
+            graphState          : _graphState,
+            // YAML mirrors (for change detection)
+            yaml_defaultInfoPanel : this.pconfig.defaultInfoPanel,
+            yaml_defaultTimeRange : this.pconfig.defaultTimeRange,
+            // HA user mirrors (for change detection)
+            ha_infoPanelEnabled : this._lastHaUserInfoPanel,
+            ha_timeRangeHours   : this._lastHaUserTimeRangeHours,
+            ha_timeRangeMinutes : this._lastHaUserTimeRangeMinutes,
+            // Active values
+            timeRangeHours      : this.activeRange.timeRangeHours,
+            timeRangeMinutes    : this.activeRange.timeRangeMinutes,
         };
         const _json = JSON.stringify(data);
 
-        // Write to localStorage as backup
+        // Write to localStorage (source of truth for change detection)
         window.localStorage.removeItem('history-explorer-card');
         window.localStorage.removeItem('history-explorer_card_' + this.id);
         window.localStorage.setItem('history-explorer_card_' + this.id, _json);
@@ -4867,116 +4874,123 @@ export class HistoryCardState {
             await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data });
         } catch(e) {}
     }
-
     async readLocalState()
     {
-        let data = null;
+        // Read localStorage (source of truth for change detection — contains all mirrors)
+        const _lsRaw = window.localStorage.getItem('history-explorer_card_' + this.id);
+        const _ls = _lsRaw ? JSON.parse(_lsRaw) : null;
 
-        // Try HA user storage first
+        // Read HA user storage for card state (timeRange, entities — may come from another device)
+        let _haCard = null;
         try {
             const _result = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer_card_' + this.id });
-            if( _result?.value ) data = _result.value;
+            if( _result?.value ) _haCard = _result.value;
         } catch(e) {}
 
-        // Fallback to localStorage
-        if( !data ) {
-            const _local = window.localStorage.getItem('history-explorer_card_' + this.id);
-            if( _local ) {
-                data = JSON.parse(_local);
-                // Migrate to HA storage
-                if( data ) {
-                    try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data }); } catch(e) {}
-                }
-            }
+        // Read HA user storage for infoPanelEnabled (may come from another device)
+        let _haInfoEnabled = undefined;
+        try {
+            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
+            if( _ipe?.value?.enabled !== undefined ) _haInfoEnabled = !!_ipe.value.enabled;
+        } catch(e) {}
+
+        // Restore entities and graphState from HA user if available, else localStorage
+        const _data = _haCard || _ls;
+        if( _data?.entities ) {
+            this.pconfig.entities = _data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
+            this._pendingGraphState = _data.graphState || {};
+        } else {
+            this.pconfig.entities = [];
         }
 
-        let _needsPersist = false;
-        if( data && data.version === 2 ) {
-            this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
+        // --- "Last one to speak wins" front detection ---
+        // Each source is compared to its mirror in localStorage.
+        // If both YAML and HA user changed simultaneously, YAML wins.
 
-            // Restore time range
-            if( data.timeRangeHours !== undefined )  this.activeRange.timeRangeHours   = data.timeRangeHours;
-            if( data.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = data.timeRangeMinutes;
+        // YAML fronts
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
+                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
+        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined &&
+                                 String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
-            // Restore per-graph state
-            this._pendingGraphState = data.graphState || {};
+        // HA user fronts (compare HA user value to its mirror in localStorage)
+        const _haInfoChanged = _haInfoEnabled !== undefined &&
+                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
+        const _haTimeChanged = _haCard?.timeRangeHours !== undefined && (
+            _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
+            _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
+        );
 
-            // infoPanelActive: read, compare, write
-            const _yamlActive = this.pconfig.infoPanelActive;
-            if( _yamlActive !== undefined ) {
-                if( _yamlActive !== data.infoPanelActive ) {
-                    infoPanelEnabled = _yamlActive;
-                    try {
-                        await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } });
-                    } catch(e) {}
-                }
-                _needsPersist = true;
-            }
+        // Apply winning value to active variables — YAML wins if both changed simultaneously
+        let _infoPanelChanged = false;
 
-        } else if( data && data.version === 1 ) {
-            this.pconfig.entities = data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
-            // infoPanelActive first run
-            const _yamlActive = this.pconfig.infoPanelActive;
-            if( _yamlActive !== undefined ) {
-                infoPanelEnabled = _yamlActive;
-                _needsPersist = true;
+        if( _yamlInfoChanged || _haInfoChanged ) {
+            // YAML wins if both changed
+            const active_infoPanelEnabled = _yamlInfoChanged ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
+            if( active_infoPanelEnabled !== infoPanelEnabled ) {
+                infoPanelEnabled = active_infoPanelEnabled;
+                _infoPanelChanged = true;
             }
         } else {
-            // Legacy format fallback
-            const _legacy = window.localStorage.getItem('history-explorer-card');
-            if( _legacy ) {
-                const _legacyData = JSON.parse(_legacy);
-                if( _legacyData )
-                    this.pconfig.entities = _legacyData.map(e => typeof e === 'string' ? { entity: e } : e);
-                else
-                    this.pconfig.entities = [];
+            // No front — infoPanelEnabled already correctly set from localStorage at module load (line 96)
+        }
+
+        if( _yamlTimeChanged || _haTimeChanged ) {
+            // YAML wins if both changed
+            if( _yamlTimeChanged ) {
+                this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
             } else {
-                this.pconfig.entities = [];
+                // HA user wins
+                if( _haCard.timeRangeHours   !== undefined ) this.activeRange.timeRangeHours   = _haCard.timeRangeHours;
+                if( _haCard.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = _haCard.timeRangeMinutes;
             }
-            // infoPanelActive first run
-            const _yamlActive = this.pconfig.infoPanelActive;
-            if( _yamlActive !== undefined ) {
-                infoPanelEnabled = _yamlActive;
-                _needsPersist = true;
-            }
+        } else {
+            // No front — restore active values
+            if( _ls?.timeRangeHours   !== undefined ) this.activeRange.timeRangeHours   = _ls.timeRangeHours;
+            if( _ls?.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = _ls.timeRangeMinutes;
+        }
+
+        // Update HA user mirrors for next writeLocalState
+        this._lastHaUserInfoPanel         = _haInfoEnabled ?? _ls?.ha_infoPanelEnabled;
+        this._lastHaUserTimeRangeHours    = _haCard?.timeRangeHours   ?? _ls?.ha_timeRangeHours;
+        this._lastHaUserTimeRangeMinutes  = _haCard?.timeRangeMinutes ?? _ls?.ha_timeRangeMinutes;
+
+        // Persist updated state (including all mirrors) before any potential reload
+        await this.writeLocalState();
+
+        // If HA card data was missing from HA storage, migrate localStorage there
+        if( !_haCard && _ls ) {
+            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: _ls }); } catch(e) {}
         }
 
         // Set _nextGroupId to max existing groupId + 1
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
         this._nextGroupId = _maxGroupId + 1;
-        if( _needsPersist ) setTimeout(() => { this.writeLocalState(); }, 0);
 
-        // Restore infoPanelEnabled from dedicated global HA user key
-        // Also register infoPanelActive with timestamp and detect conflicts
+        // Register defaultInfoPanel with HA user key and detect conflicts across cards
         try {
-            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
-            const _globalData = _ipe?.value || {};
+            const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
+            const _globalData = _ipe2?.value || {};
             if( !_globalData.registry ) _globalData.registry = {};
 
-            const _yamlActiveVal = this.pconfig.infoPanelActive;
+            const _yamlActiveVal = this.pconfig.defaultInfoPanel;
             let _registryChanged = false;
 
             if( _yamlActiveVal === undefined ) {
-                // infoPanelActive not defined — remove this card from registry if present
                 if( this.id in _globalData.registry ) {
                     delete _globalData.registry[this.id];
                     _registryChanged = true;
                 }
             } else {
-                // Register this card with timestamp
                 _globalData.registry[this.id] = { value: _yamlActiveVal, ts: Date.now() };
                 _registryChanged = true;
 
-                // Detect conflicts: more than one distinct value in registry
                 const _entries = Object.entries(_globalData.registry);
                 const _vals = _entries.map(([, e]) => e.value);
                 const _hasConflict = _vals.some(v => v !== _vals[0]);
                 if( _hasConflict ) {
-                    const _conflictList = _entries
-                        .map(([id, e]) => id + ': ' + e.value)
-                        .join('\n');
+                    const _conflictList = _entries.map(([id, e]) => id + ': ' + e.value).join('\n');
                     alert(i18n('ui.label.infopanel_conflict') + '\n' + _conflictList);
-                    // Remove oldest conflicting entry — excluding current instance
                     const _conflicting = _entries.filter(([id, e]) => id !== this.id && e.value !== _yamlActiveVal);
                     if( _conflicting.length ) {
                         const _oldest = _conflicting.reduce((a, b) => a[1].ts < b[1].ts ? a : b);
@@ -4989,26 +5003,18 @@ export class HistoryCardState {
                 await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: _globalData });
             }
 
-            if( _globalData.enabled !== undefined ) {
-                const _lsEnabled = !!(JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {}).enabled;
-                if( _globalData.enabled !== _lsEnabled ) {
-                    // HA user differs from localStorage — sync and reload
-                    const _lsData = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
-                    _lsData.enabled = _globalData.enabled;
-                    window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_lsData));
-                    location.reload();
-                    return;
-                }
-                infoPanelEnabled = _globalData.enabled;
-                // Update info panel menu label
-                for( let i = 0; i < 2; i++ ) {
-                    const ei = this._this.querySelector(`#ei_${i}`);
-                    if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
-                }
+            // Update info panel menu label
+            for( let i = 0; i < 2; i++ ) {
+                const ei = this._this.querySelector(`#ei_${i}`);
+                if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
             }
         } catch(e) {}
-    }
 
+        // Apply infoPanel state last, after everything (including writeLocalState) is done
+        if( _infoPanelChanged ) {
+            this.applyInfoPanelState();
+        }
+    }
     async writeInfoPanelConfig(forceUpdate = false)
     {
         if( !infoPanelEnabled ) {
@@ -5261,7 +5267,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 
         this.instance.pconfig.infoPanelConfig = config.infoPanel;
-        this.instance.pconfig.infoPanelActive  = config.infoPanelActive;
+        this.instance.pconfig.defaultInfoPanel = config.defaultInfoPanel;
 
         this.instance.id = config.cardName ?? "default";
         this.instance.cid = gcid++;
