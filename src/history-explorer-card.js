@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.19b19';
+const Version = '1.1.20';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
