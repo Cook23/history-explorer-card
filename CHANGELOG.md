@@ -3,10 +3,24 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
-## [v1.1.19] - 2026-05-12
+
+## [v1.1.19] - 2026-05-15
+### Added
+- `defaultInfoPanel` YAML option (replaces `infoPanelActive`, never published) — "last one to speak wins" logic: YAML change is detected at next load by comparing to its persisted mirror; takes precedence over HA user sync if both change simultaneously
+- `defaultTimeRange` YAML option — same "last one to speak wins" logic: YAML change overrides user-adjusted time range only when the YAML value actually changes; user-adjusted time range is otherwise preserved across reloads and devices
+- `applyInfoPanelState()` — unified anti-loop handler for info panel activation: compares `infoPanelEnabled` to persisted state, writes config synchronously, then reloads; used by menu toggle, YAML change detection, and HA user sync
+- State persistence overhauled: `writeLocalState` now persists 2 YAML mirrors (`yaml_defaultInfoPanel`, `yaml_defaultTimeRange`), 2 HA user mirrors (`ha_infoPanelEnabled`, `ha_timeRangeHours/Minutes`), and active time range (`timeRangeHours/Minutes`); active `infoPanelEnabled` is stored implicitly via the existence/absence of the `history-explorer-info-panel` key — localStorage is the sole source of truth for all change detection
+- `readLocalState` now reads localStorage and HA user storage separately; front detection runs independently for each source before any value is applied or persisted; `writeLocalState` is called before any reload to guarantee all mirrors are up to date
+- Legacy v1/v2/format branching in `readLocalState` removed — unified single restore path
+
 ### Fixed
-- Info panel (`history-info-panel.js`) no longer fails to activate after enabling via the menu — `infoPanelEnabled` is now correctly initialized from localStorage on module load, ensuring the panel hook runs with the right value on first cycle
-- `infoPanelEnabled` is now written to localStorage on toggle and on HA user storage sync, with a page reload if the two sources differ — guarantees consistency across devices and sessions
+- `toggleInfoPanel`: `writeInfoPanelConfig` was called without `await`, causing `location.reload()` to fire before localStorage was written; info panel state was therefore not persisted across the reload
+- `defaultInfoPanel` change was never detected because `infoPanelActive` was not persisted in `writeLocalState`; the mirror value read at next load was always `undefined`, making every load look like a first run
+- Unconditional `setTimeRangeFromString(defaultTimeRange)` call after `readLocalState` was overwriting the user-adjusted time range on every reload; now only applied when `defaultTimeRange` actually changed
+- HA user restore could overwrite a YAML-driven `infoPanelEnabled` change because the HA user block ran after the YAML block without checking for priority
+
+### Known limitations
+- Info panel hook (`ha-more-info-history` patch) is only active in browser tabs that have loaded a History Explorer card; opening a new tab or refreshing a tab without the card requires navigating back to a page containing the card — to be addressed in a future release via a standalone Lovelace resource script
 
 ## [v1.1.18] - 2026-05-12
 ### Added
