@@ -3,6 +3,10 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.22] - 2026-05-16
+### Fixed
+- Time range was not persisted when changed by the user via the range selector, zoom buttons, or pinch-to-zoom — `writeLocalState` was not called after these interactions, causing the default or YAML value to be reapplied on every reload
+
 ## [v1.1.21] - 2026-05-16
 ### Fixed
 - Time range restore now goes through `setTimeRange`/`setTimeRangeMinutes` in all cases — direct assignment to `activeRange.timeRangeHours/Minutes` was bypassing `dataClusterSize` and `stepSize` recalculation, causing Chart.js to render hundreds of overlapping axis ticks when restoring a persisted or HA user-synced time range
