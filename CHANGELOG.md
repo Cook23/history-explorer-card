@@ -3,6 +3,10 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.21] - 2026-05-16
+### Fixed
+- Time range restore now goes through `setTimeRange`/`setTimeRangeMinutes` in all cases — direct assignment to `activeRange.timeRangeHours/Minutes` was bypassing `dataClusterSize` and `stepSize` recalculation, causing Chart.js to render hundreds of overlapping axis ticks when restoring a persisted or HA user-synced time range
+
 ## [v1.1.20] - 2026-05-15
 ### Changed
 - Version bump only — identical to v1.1.19; re-released to work around a HACS issue with versions that are withdrawn immediately and re-published lately
