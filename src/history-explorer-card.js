@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.21';
+const Version = '1.1.22';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -453,16 +453,19 @@ export class HistoryCardState {
     decZoom()
     {
         this.decZoomStep();
+        this.writeLocalState();
     }
 
     incZoom()
     {
         this.incZoomStep();
+        this.writeLocalState();
     }
 
     timeRangeSelected(event)
     {
         this.setTimeRange(event.target.value, true);
+        this.writeLocalState();
     }
 
     exportFile()
@@ -3610,6 +3613,7 @@ export class HistoryCardState {
             }
 
             this.toggleZoom();
+            this.writeLocalState();
 
         }
 
