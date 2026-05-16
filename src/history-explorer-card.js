@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.20';
+const Version = '1.1.21';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -4941,13 +4941,17 @@ export class HistoryCardState {
                 this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
             } else {
                 // HA user wins
-                if( _haCard.timeRangeHours   !== undefined ) this.activeRange.timeRangeHours   = _haCard.timeRangeHours;
-                if( _haCard.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = _haCard.timeRangeMinutes;
+                if( _haCard.timeRangeHours > 0 )
+                    this.setTimeRange(this.validateRange(_haCard.timeRangeHours, true));
+                else if( _haCard.timeRangeMinutes > 0 )
+                    this.setTimeRangeMinutes(_haCard.timeRangeMinutes);
             }
         } else {
             // No front — restore active values
-            if( _ls?.timeRangeHours   !== undefined ) this.activeRange.timeRangeHours   = _ls.timeRangeHours;
-            if( _ls?.timeRangeMinutes !== undefined ) this.activeRange.timeRangeMinutes = _ls.timeRangeMinutes;
+            if( _ls?.timeRangeHours > 0 )
+                this.setTimeRange(this.validateRange(_ls.timeRangeHours, true));
+            else if( _ls?.timeRangeMinutes > 0 )
+                this.setTimeRangeMinutes(_ls.timeRangeMinutes);
         }
 
         // Update HA user mirrors for next writeLocalState
