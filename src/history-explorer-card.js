@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.22';
+const Version = '1.1.23';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -241,7 +241,6 @@ export class HistoryCardState {
         this.tid = 0;
         this.lastWidth = 0;
 
-        this.defocusCall = this.entitySelectorDefocus.bind(this);
 
         this.databaseCallback = null;
 
@@ -2145,7 +2144,7 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
-    _showLabelTooltip(label, clientX, clientY, align = 'left') {
+    _showLabelTooltip(label, clientX, clientY, align = 'left', duration = 1500) {
         const _existing = document.getElementById('hec-label-tooltip');
         if( _existing ) _existing.remove();
         const _tip = document.createElement('div');
@@ -2163,8 +2162,8 @@ export class HistoryCardState {
         }
         _tip.style.top = (clientY - 16) + 'px';
         document.body.appendChild(_tip);
-        setTimeout(() => { _tip.style.opacity = '0'; }, 500);
-        setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, 2000);
+        setTimeout(() => { _tip.style.opacity = '0'; }, duration);
+        setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, duration + 1500);
     }
 
     _getScrollContainer() {
@@ -2243,16 +2242,53 @@ export class HistoryCardState {
         if( !wrapper ) return;
         wrapper._hec_prev_outline = wrapper.style.outline;
         wrapper._hec_prev_outline_offset = wrapper.style.outlineOffset;
-        wrapper.style.outline = `2px ${valid ? 'solid' : 'dashed'} ${valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)'}`;
+        wrapper._hec_prev_transition = wrapper.style.transition;
+        const color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
+        wrapper.style.transition = '';
+        wrapper.style.outline = `2px ${valid ? 'solid' : 'dashed'} ${color}`;
         wrapper.style.outlineOffset = '-2px';
+        if( !valid ) requestAnimationFrame(() => { wrapper.style.transition = 'outline-color 1.5s ease'; });
         this._hec_highlight_el = wrapper;
+    }
+
+    _highlightMultipleTargets(canvasEls) {
+        this._clearDropHighlight();
+        if( !canvasEls?.length ) return;
+        this._hec_highlight_els = [];
+        for( let canvasEl of canvasEls ) {
+            if( !canvasEl ) continue;
+            const wrapper = canvasEl.parentNode;
+            if( !wrapper ) continue;
+            wrapper._hec_prev_outline = wrapper.style.outline;
+            wrapper._hec_prev_outline_offset = wrapper.style.outlineOffset;
+            wrapper._hec_prev_transition = wrapper.style.transition;
+            wrapper.style.transition = '';
+            wrapper.style.outline = '2px dashed var(--error-color,#f44336)';
+            wrapper.style.outlineOffset = '-2px';
+            requestAnimationFrame(() => { wrapper.style.transition = 'outline-color 1.5s ease'; });
+            this._hec_highlight_els.push(wrapper);
+        }
     }
 
     _clearDropHighlight() {
         if( this._hec_highlight_el ) {
-            this._hec_highlight_el.style.outline = this._hec_highlight_el._hec_prev_outline || '';
-            this._hec_highlight_el.style.outlineOffset = this._hec_highlight_el._hec_prev_outline_offset || '';
+            const el = this._hec_highlight_el;
             this._hec_highlight_el = null;
+            if( el.style.transition?.includes('outline-color') ) {
+                el.style.outlineColor = 'transparent';
+                setTimeout(() => { el.style.outline = el._hec_prev_outline || ''; el.style.outlineOffset = el._hec_prev_outline_offset || ''; el.style.transition = el._hec_prev_transition || ''; }, 1500);
+            } else {
+                el.style.outline = el._hec_prev_outline || '';
+                el.style.outlineOffset = el._hec_prev_outline_offset || '';
+                el.style.transition = el._hec_prev_transition || '';
+            }
+        }
+        if( this._hec_highlight_els?.length ) {
+            for( let el of this._hec_highlight_els ) {
+                el.style.outlineColor = 'transparent';
+                setTimeout(() => { el.style.outline = el._hec_prev_outline || ''; el.style.outlineOffset = el._hec_prev_outline_offset || ''; el.style.transition = el._hec_prev_transition || ''; }, 1500);
+            }
+            this._hec_highlight_els = [];
         }
     }
 
@@ -3748,26 +3784,116 @@ export class HistoryCardState {
         let ii = event.target ? ( event.target.id == 'b8_0' ) ? 0 : 1 : -1;
         if( ii < 0 ) return;
 
-        const entity_id = this.ui.inputField[ii]?.value;
+        // Resolve entity_id: from dropdown selection, or first visible dropdown item, or raw input (wildcard)
+        const _input = this.ui.inputField[ii];
+        const _dropdown = this._this.querySelector(`#es_${ii}`);
+        let entity_id;
+        if( _input?.dataset.entityId ) {
+            entity_id = _input.dataset.entityId;
+        } else {
+            const _firstVisible = _dropdown ? Array.from(_dropdown.getElementsByTagName('a')).find(a => a.style.display !== 'none') : null;
+            entity_id = _firstVisible ? _firstVisible.dataset.entity : _input?.value;
+        }
 
-        for( let i of this.ui.inputField ) if( i ) i.value = "";
+        for( let i of this.ui.inputField ) if( i ) { delete i.dataset.entityId; i.style.fontWeight = ''; }
+        if( this._entitySelected ) this._entitySelected = [false, false];
+        this._justAdded = null;
+        const _addedNames = [];
 
-        // Single entity or wildcard ?
+        // Multi-entity from wildcard selection (ids separated by ';')
+        if( entity_id.indexOf(';') >= 0 ) {
+            const ids = entity_id.split(';').map(s => s.trim()).filter(Boolean);
+            const _duplicates = [];
+            const _duplicateGraphs = new Set();
+            for( let eid of ids ) {
+                if( this._hass.states[eid] === undefined ) continue;
+                if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === eid) ) {
+                    _duplicates.push(this._hass.states[eid]?.attributes?.friendly_name || eid);
+                    const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === eid));
+                    if( _existingG ) _duplicateGraphs.add(_existingG);
+                    continue;
+                }
+                const _prevCount = this.graphs.length;
+                this.addDynamicGraph(eid);
+                _addedNames.push(this._hass.states[eid]?.attributes?.friendly_name || eid);
+                const _wasCombined = this.graphs.length === _prevCount;
+                const _gid = _wasCombined ? this.pconfig.entities[this.pconfig.entities.length-1]?.groupId : this._nextGroupId++;
+                const _lastG = this.graphs[this.graphs.length-1];
+                const _addedEntity = _lastG?.entities.find(e => e.entity === eid);
+                this.pconfig.entities.push({ entity: eid, groupId: _gid, color: _addedEntity?.color, fill: _addedEntity?.fill });
+            }
+
+            if( _duplicates.length ) {
+                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
+                const _ty = _ir ? _ir.top : 0;
+                this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center');
+                const _dupCanvases = Array.from(_duplicateGraphs).map(g => g.canvas);
+                this._highlightMultipleTargets(_dupCanvases);
+                for( let _canvas of _dupCanvases ) {
+                    const _hlWrapper = _canvas.parentNode;
+                    if( !_hlWrapper ) continue;
+                    const _wr = _hlWrapper.getBoundingClientRect();
+                    const _inViewport = _wr.top >= 0 && _wr.bottom <= window.innerHeight;
+                    const _clearOne = () => {
+                        _hlWrapper.style.outlineColor = 'transparent';
+                        setTimeout(() => {
+                            _hlWrapper.style.outline = _hlWrapper._hec_prev_outline || '';
+                            _hlWrapper.style.outlineOffset = _hlWrapper._hec_prev_outline_offset || '';
+                            _hlWrapper.style.transition = _hlWrapper._hec_prev_transition || '';
+                            if( this._hec_highlight_els ) {
+                                this._hec_highlight_els = this._hec_highlight_els.filter(e => e !== _hlWrapper);
+                            }
+                        }, 1500);
+                    };
+                    if( _inViewport ) {
+                        setTimeout(_clearOne, 1500);
+                    } else {
+                        const _hlTimeout = setTimeout(() => {
+                            _hlObserver?.disconnect();
+                            _clearOne();
+                        }, 15000);
+                        const _hlObserver = new IntersectionObserver((entries) => {
+                            if( entries[0].isIntersecting ) {
+                                _hlObserver.disconnect();
+                                clearTimeout(_hlTimeout);
+                                setTimeout(_clearOne, 1500);
+                            }
+                        }, { threshold: 0.1 });
+                        _hlObserver.observe(_hlWrapper);
+                    }
+                }
+            }
+
+            if( _addedNames.length ) {
+                this._justAdded = _addedNames.join('; ');
+                const _fi1 = this.ui.inputField[ii];
+                _fi1.value = this._justAdded;
+                _fi1.style.fontWeight = 'bold';
+                setTimeout(() => { _fi1.value = ''; _fi1.style.fontWeight = ''; this._justAdded = null; }, 500);
+            }
+            this.updateHistoryWithClearCache();
+            this.writeLocalState();
+            return;
+        }
+
+        // Single entity or wildcard pattern ?
         if( entity_id.indexOf('*') >= 0 ) {
 
-            const datalist = this._this.querySelector(isMobile ? `#es_${ii}` : `#b6_${this.cid}`);
+            const datalist = this._this.querySelector(`#es_${ii}`);
             if( !datalist ) return;
 
             // Convert wildcard to regex
             const regex = this.matchWildcardPattern(entity_id);
 
             for( let e of Array.from(datalist.children) ) {
-                const entity_id = e.innerText;
+                const entity_id = e.dataset.entity;
                 if( regex.test(entity_id) ) {
                     if( this._hass.states[entity_id] == undefined ) continue;
                     if( this.pconfig.entities.some(en => (typeof en === 'string' ? en : en.entity) === entity_id) ) continue;
                     const _prevCount1 = this.graphs.length;
                     this.addDynamicGraph(entity_id);
+                    _addedNames.push(this._hass.states[entity_id]?.attributes?.friendly_name || entity_id);
                     const _wasCombined1 = this.graphs.length === _prevCount1;
                     const _gid1 = _wasCombined1 ? this.pconfig.entities[this.pconfig.entities.length-1]?.groupId : this._nextGroupId++;
                     const _lastG1 = this.graphs[this.graphs.length-1];
@@ -3789,23 +3915,23 @@ export class HistoryCardState {
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
                     this._showLabelTooltip(i18n('ui.label.already_exists'), _tx, _ty, 'center');
                     this._highlightDropTarget(_existingG.canvas, false);
-                    // Keep highlight 1s if visible, 10s if out of viewport
-                    // If it enters viewport while highlighted, fade after 1s
+                    // Keep highlight 1.5s if visible, 15s if out of viewport
+                    // If it enters viewport while highlighted, fade after 1.5s
                     const _hlWrapper = _existingG.canvas.parentNode;
                     const _wr = _hlWrapper?.getBoundingClientRect();
                     const _inViewport = _wr && _wr.top >= 0 && _wr.bottom <= window.innerHeight;
                     if( _inViewport ) {
-                        setTimeout(() => { this._clearDropHighlight(); }, 1000);
+                        setTimeout(() => { this._clearDropHighlight(); }, 1500);
                     } else {
                         const _hlTimeout = setTimeout(() => {
                             _hlObserver?.disconnect();
                             this._clearDropHighlight();
-                        }, 10000);
+                        }, 15000);
                         const _hlObserver = new IntersectionObserver((entries) => {
                             if( entries[0].isIntersecting ) {
                                 _hlObserver.disconnect();
                                 clearTimeout(_hlTimeout);
-                                setTimeout(() => { this._clearDropHighlight(); }, 1000);
+                                setTimeout(() => { this._clearDropHighlight(); }, 1500);
                             }
                         }, { threshold: 0.1 });
                         if( _hlWrapper ) _hlObserver.observe(_hlWrapper);
@@ -3816,6 +3942,7 @@ export class HistoryCardState {
 
             const _prevGraphCount = this.graphs.length;
             this.addDynamicGraph(entity_id);
+            _addedNames.push(this._hass.states[entity_id]?.attributes?.friendly_name || entity_id);
             // If graphs.length didn't increase, entity was combined with previous graph
             const _wasCombined = this.graphs.length === _prevGraphCount;
             const _gid = _wasCombined ? this.pconfig.entities[this.pconfig.entities.length-1]?.groupId : this._nextGroupId++;
@@ -3825,6 +3952,13 @@ export class HistoryCardState {
 
         }
 
+        if( _addedNames.length ) {
+            this._justAdded = _addedNames.join('; ');
+            const _fi2 = this.ui.inputField[ii];
+            _fi2.value = this._justAdded;
+            _fi2.style.fontWeight = 'bold';
+            setTimeout(() => { _fi2.value = ''; _fi2.style.fontWeight = ''; this._justAdded = null; }, 500);
+        }
         this.updateHistoryWithClearCache();
 
         this.writeLocalState();
@@ -4230,23 +4364,10 @@ export class HistoryCardState {
                 <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
             </div>`;
 
-        if( selector && isMobile ) html += `
+        if( selector ) html += `
             <div id='sl_${i}' style="background-color:${bgcol};display:none;padding-left:10px;padding-right:10px;">
-                <input id="b7_${i}" ${inputStyle} autoComplete="on"/>
+                <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:150px;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
-                <button id="b8_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:34px;margin-left:5px;">+</button>
-                <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
-                <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
-                    <a id="ef_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                    ${this.statistics.enabled ? eh : ''}
-                    <a id="eg_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                    <a id="ei_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                </div>
-            </div>`;
-
-        if( selector && !isMobile ) html += `
-            <div id='sl_${i}' style="background-color:${bgcol};display:none;padding-left:10px;padding-right:10px;">
-                <input id="b7_${i}" ${inputStyle} autoComplete="on" list="b6_${this.cid}" placeholder="Type to search for an entity to add"/>
                 <button id="b8_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:34px;margin-left:5px;">+</button>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
@@ -4444,10 +4565,11 @@ export class HistoryCardState {
                 this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
                 this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
 
-                if( isMobile ) {
-                    this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
-                    this._this.querySelector(`#b7_${i}`)?.addEventListener('keyup', this.entitySelectorEntered.bind(this), true);
-                }
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('keyup', this.entitySelectorEntered.bind(this), true);
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
 
                 this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
                 this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);
@@ -4455,9 +4577,7 @@ export class HistoryCardState {
 
             }
 
-            if( !isMobile ) {
-                this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
-            }
+            this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
 
             await this.readLocalState();
 
@@ -4589,7 +4709,27 @@ export class HistoryCardState {
         if( show ) {
             dropdown.style['min-width'] = input.clientWidth + 'px';
             dropdown.style.display = 'block';
-            for( let i of dropdown.getElementsByTagName('a') ) i.style.display = 'block';
+            const filter = input.value.toLowerCase();
+            const isWildcard = filter.indexOf('*') >= 0;
+            const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
+            for( let i of dropdown.getElementsByTagName('a') ) {
+                const friendly = i.textContent.toLowerCase();
+                const entity   = i.dataset.entity?.toLowerCase() || '';
+                const domain   = entity.split('.')[0] || '';
+                let match;
+                if( !filter ) {
+                    match = true;
+                } else if( isWildcard ) {
+                    match = wcRegex.test(friendly) || wcRegex.test(entity) || wcRegex.test(entity.split('.')[1] || '');
+                } else {
+                    match = friendly.indexOf(filter) >= 0 || entity.indexOf(filter) >= 0;
+                }
+                i.style.display = match ? 'block' : 'none';
+                i.style.fontWeight = (match && isWildcard) ? 'bold' : 'normal';
+            }
+            // Filtering means user is searching again — reset selection flag
+            if( !this._entitySelected ) this._entitySelected = [false, false];
+            this._entitySelected[input_idx] = false;
         } else
             dropdown.style.display = 'none';
     }
@@ -4602,54 +4742,129 @@ export class HistoryCardState {
 
         this.setDropdownVisibility(idx ^ 1, false);
         this.setDropdownVisibility(idx, true);
-
-        this.focusClick = true;
-
-        if( !this.focusListener ) {
-            this.focusListener = true;
-            window.addEventListener('click', this.defocusCall);
-        }
     }
 
-    entitySelectorDefocus(event)
+    entitySelectorFocusOut(event)
     {
-        if( !this.focusClick ) {
-            window.removeEventListener('click', this.defocusCall);
-            this.focusListener = undefined;
-            this.setDropdownVisibility(0, false);
-            this.setDropdownVisibility(1, false);
-        } else
-            this.focusClick = undefined;
+        if( !event.target ) return;
+        const idx = event.target.id.substr(3) * 1;
+        const dropdown = this._this.querySelector(`#es_${idx}`);
+        setTimeout(() => {
+            if( !dropdown.contains(document.activeElement) ) {
+                this.setDropdownVisibility(idx, false);
+            }
+        }, 150);
     }
 
     entitySelectorEntered(event)
     {
         if( !event.target ) return;
+        if( event.key === 'Escape' ) return;
 
         const idx = event.target.id.substr(3) * 1;
+        const dropdown = this._this.querySelector(`#es_${idx}`);
 
-        let dropdown = this._this.querySelector(`#es_${idx}`);
-        let input = this._this.querySelector(`#b7_${idx}`);
-        let filter = input.value.toLowerCase();
-        let tags = dropdown.getElementsByTagName('a');
-        for( let i of tags ) {
-            let txt = i.textContent;
-            if( txt.toLowerCase().indexOf(filter) >= 0 )
-                i.style.display = 'block';
-            else
-                i.style.display = 'none';
+        // For navigation/Enter keys: only reopen if closed AND nothing selected AND not just added
+        if( ['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) ) {
+            if( this._justAdded ) { this._justAdded = null; return; }
+            if( dropdown.style.display === 'none' && !this._entitySelected?.[idx] ) this.setDropdownVisibility(idx, true);
+            return;
         }
+
+        // For all other keys: reopen if closed, refilter if open
+        this.setDropdownVisibility(idx, true);
+
+        // Clear keyboard highlight on text change
+        const _highlighted = dropdown.querySelector('a[data-hec-selected]');
+        if( _highlighted ) {
+            _highlighted.style.background = '';
+            delete _highlighted.dataset.hecSelected;
+        }
+    }
+
+    entitySelectorKeyDown(event)
+    {
+        if( !event.target ) return;
+        if( !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key) ) return;
+
+        const idx = event.target.id.substr(3) * 1;
+        const dropdown = this._this.querySelector(`#es_${idx}`);
+        const input    = this._this.querySelector(`#b7_${idx}`);
+
+        if( event.key === 'Escape' ) {
+            event.preventDefault();
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
+
+        if( event.key === 'Enter' ) {
+            if( !this._entitySelected ) this._entitySelected = [false, false];
+            if( this._entitySelected[idx] ) {
+                // Already selected — trigger add (equivalent to clicking +)
+                event.preventDefault();
+                this._this.querySelector(`#b8_${idx}`)?.click();
+                return;
+            }
+            // If dropdown is closed — let keyup handle it (reopen)
+            if( dropdown.style.display === 'none' ) return;
+            event.preventDefault();
+            if( !visible.length ) return;
+            // Wildcard: select all visible entities
+            if( input.value.indexOf('*') >= 0 ) {
+                const ids      = visible.map(a => a.dataset.entity);
+                const names    = visible.map(a => a.textContent);
+                input.value = names.join('; ');
+                input.dataset.entityId = ids.join(';');
+                this._entitySelected[idx] = true;
+                dropdown.style.display = 'none';
+                return;
+            }
+            // Single: select first visible
+            const _sel = dropdown.querySelector('a[data-hec-selected]') || visible[0];
+            if( _sel ) _sel.click();
+            return;
+        }
+
+        if( !visible.length ) return;
+
+        // ArrowDown / ArrowUp
+        event.preventDefault();
+        const _cur = dropdown.querySelector('a[data-hec-selected]');
+        let _next;
+        if( !_cur ) {
+            _next = event.key === 'ArrowDown' ? visible[0] : visible[visible.length - 1];
+        } else {
+            const _idx = visible.indexOf(_cur);
+            if( event.key === 'ArrowDown' )
+                _next = visible[_idx + 1] || visible[0];
+            else
+                _next = visible[_idx - 1] || visible[visible.length - 1];
+            _cur.style.background = '';
+            delete _cur.dataset.hecSelected;
+        }
+        _next.style.background = 'var(--primary-color, #03a9f4)';
+        _next.dataset.hecSelected = '1';
+        _next.scrollIntoView({ block: 'nearest' });
     }
 
     entitySelectorEntryClicked(event)
     {
-        window.removeEventListener('click', this.defocusCall);
-        this.focusListener = undefined;
         const idx = event.target.href.slice(-1);
         let input = this._this.querySelector(`#b7_${idx}`);
         let dropdown = this._this.querySelector(`#es_${idx}`);
-        input.value = event.target.id;
+        const entity_id = event.target.dataset.entity;
+        const friendly = event.target.textContent;
+        input.value = friendly;
+        input.dataset.entityId = entity_id;
+        if( !this._entitySelected ) this._entitySelected = [false, false];
+        this._entitySelected[idx * 1] = true;
         dropdown.style.display = 'none';
+
+        // Show entity_id tooltip that autofades after 2s
+        const _r = input.getBoundingClientRect();
+        this._showLabelTooltip(entity_id, _r.left + _r.width / 2, _r.bottom + 4, 'center');
     }
 
 
@@ -4678,9 +4893,9 @@ export class HistoryCardState {
 
     entityCollectorCallback(result)
     {
-        for( let i = 0; i < (isMobile ? 2 : 1); ++i ) {
+        for( let i = 0; i < 2; ++i ) {
 
-            const datalist = this._this.querySelector(isMobile ? `#es_${i}` : `#b6_${this.cid}`);
+            const datalist = this._this.querySelector(`#es_${i}`);
             if( !datalist ) continue;
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
@@ -4692,19 +4907,25 @@ export class HistoryCardState {
                 if( this.matchRegexList(regex, entity) ) entities.push(entity);
             }
 
-            entities.sort();
+            // Sort by domain / friendly name / entity_id
+            entities.sort((a, b) => {
+                const da = a.split('.')[0], db = b.split('.')[0];
+                if( da !== db ) return da.localeCompare(db);
+                const fa = this._hass.states[a]?.attributes?.friendly_name || a;
+                const fb = this._hass.states[b]?.attributes?.friendly_name || b;
+                if( fa !== fb ) return fa.localeCompare(fb);
+                return a.localeCompare(b);
+            });
 
             for( let entity of entities ) {
-                let o;
-                if( isMobile ) {
-                    o = document.createElement('a');
-                    o.href = `#s_${i}`;
-                    o.id = entity;
-                    o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
-                    o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
-                } else
-                    o = document.createElement('option');
-                o.innerHTML = entity;
+                const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
+                const o = document.createElement('a');
+                o.href = `#s_${i}`;
+                o.id = entity;
+                o.dataset.entity = entity;
+                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
+                o.innerHTML = friendly;
+                o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
 
@@ -4726,9 +4947,9 @@ export class HistoryCardState {
 
     entityCollectAll()
     {
-        for( let i = 0; i < (isMobile ? 2 : 1); ++i ) {
+        for( let i = 0; i < 2; ++i ) {
 
-            const datalist = this._this.querySelector(isMobile ? `#es_${i}` : `#b6_${this.cid}`);
+            const datalist = this._this.querySelector(`#es_${i}`);
             if( !datalist ) continue;
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
@@ -4744,19 +4965,25 @@ export class HistoryCardState {
                 }
             }
 
-            entities.sort();
+            // Sort by domain / friendly name / entity_id
+            entities.sort((a, b) => {
+                const da = a.split('.')[0], db = b.split('.')[0];
+                if( da !== db ) return da.localeCompare(db);
+                const fa = this._hass.states[a]?.attributes?.friendly_name || a;
+                const fb = this._hass.states[b]?.attributes?.friendly_name || b;
+                if( fa !== fb ) return fa.localeCompare(fb);
+                return a.localeCompare(b);
+            });
 
             for( let entity of entities ) {
-                let o;
-                if( isMobile ) {
-                    o = document.createElement('a');
-                    o.href = `#s_${i}`;
-                    o.id = entity;
-                    o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
-                    o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
-                } else
-                    o = document.createElement('option');
-                o.innerHTML = entity;
+                const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
+                const o = document.createElement('a');
+                o.href = `#s_${i}`;
+                o.id = entity;
+                o.dataset.entity = entity;
+                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
+                o.innerHTML = friendly;
+                o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
 
@@ -5333,7 +5560,6 @@ class HistoryExplorerCard extends HTMLElement
         html += `
             ${this.instance.addUIHtml(tools & 2, selector & 2, bgcol, optionStyle, inputStyle, invertZoom, 1)}
             ${(((tools | selector) & 2) && !(this.instance.ui.stickyTools & 2)) ? '<br>' : ''}
-            <datalist id="b6_${this.instance.cid}"></datalist>
             </div>
             </ha-card>
         `;
