@@ -3,6 +3,26 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.23] - 2026-05-19
+### Added
+- Entity selector dropdown unified across desktop and mobile — desktop now uses the same custom dropdown as mobile, eliminating the native `<datalist>` with its display limitations
+- Friendly name displayed in dropdown and input field instead of entity ID; entity ID shown in a tooltip on selection
+- Dropdown filters on friendly name OR entity ID simultaneously
+- Keyboard navigation: ArrowUp/ArrowDown to navigate, Enter to select, Escape to close; second Enter triggers entity add
+- Wildcard matching in dropdown: entries matching the wildcard pattern are shown in bold; first Enter selects all matching entities, second Enter adds them all
+- Duplicate detection extended to wildcard multi-add: tooltip lists duplicate friendly names, all affected graphs highlighted with red dashed outline
+- `_highlightMultipleTargets()` — new helper to highlight multiple graphs simultaneously; `_clearDropHighlight()` updated to handle both single and multiple highlights
+- Duplicate highlight and type-mismatch tooltip now fade out via `outline-color` CSS transition (1.5s visible + 1.5s fade); timeout extended to 1.5s visible / 15s if off-screen
+- Tooltip default display duration extended from 500ms to 1500ms
+- Visual feedback on entity add: added entity names displayed in bold in the input field for 500ms
+- Dropdown reopens on focus, click, or any keypress when closed; `focusout` replaces the previous `window click` defocus mechanism for reliable cross-platform behavior (desktop, mobile, tablet)
+
+### Fixed
+- Entity selector dropdown did not close reliably on focus loss (tab, touch outside, HA navigation) — replaced `window click` listener with `focusout` + 150ms delay
+- Wheel scroll listener was guarded by `!isMobile` — removed since mobile devices have no mouse wheel
+- Sort order in entity dropdown now uses domain / friendly name / entity ID (three levels) instead of entity ID only
+- Wildcard add (`*`) now works correctly through the dropdown instead of bypassing it
+
 ## [v1.1.22] - 2026-05-16
 ### Fixed
 - Time range was not persisted when changed by the user via the range selector, zoom buttons, or pinch-to-zoom — `writeLocalState` was not called after these interactions, causing the default or YAML value to be reapplied on every reload
