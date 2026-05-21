@@ -3,7 +3,6 @@
 // Chartjs vertical line plugin
 // --------------------------------------------------------------------------------------
 
-import {isMobile} from "./history-explorer-card";
 
 export const vertline_plugin = {
 
@@ -15,7 +14,7 @@ export const vertline_plugin = {
 
     afterEvent: (chart, evt) => {
         const pconfig = chart.callerInstance.pconfig;
-        if( isMobile || pconfig.cursorMode === 'hide' ) return;
+        if( pconfig.cursorMode === 'hide' ) return;
         if( !pconfig.cursorTypes.includes('all') && !pconfig.cursorTypes.includes(chart.config.type) ) return;
         const {
             chartArea: { top, bottom, left, right }

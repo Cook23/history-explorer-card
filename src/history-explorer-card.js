@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.23';
+const Version = '1.1.24';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -61,7 +61,6 @@ function chooseSIUnit(unitsWithMax) {
 }
 
 
-export const isMobile = navigator.maxTouchPoints > 0;
 
 
 // --------------------------------------------------------------------------------------
@@ -666,9 +665,10 @@ export class HistoryCardState {
             return densities[this.pconfig.timeTickOverride] ?? 2;
     }
 
-    setStepSize(update = false)
+    setStepSize(update = false, tbw = null)
     {
         const width = this._this.querySelector('#maincard').clientWidth;
+        const _tbw = tbw ?? (this._this.querySelector('#tb_0')?.clientWidth || width);
 
         const tdensity = this.computeTickDensity(width);
 
@@ -689,6 +689,11 @@ export class HistoryCardState {
                 case 'h': this.activeRange.tickStepUnit = 'hour'; break;
                 case 'd': this.activeRange.tickStepUnit = 'day';  break;
                 case 'o': this.activeRange.tickStepUnit = 'month';  break;
+            }
+            // Compact: 1 year on narrow card → 2 months step
+            if( range === 8760 && _tbw < 300 ) {
+                this.activeRange.tickStepSize = 2;
+                this.activeRange.tickStepUnit = 'month';
             }
 
         } else if( this.activeRange.timeRangeMinutes ) {
@@ -749,7 +754,7 @@ export class HistoryCardState {
         this.activeRange.timeRangeHours = range;
         this.activeRange.timeRangeMinutes = 0;
 
-        this.setStepSize(!update);
+        this.setStepSize(!update, this._this.querySelector('#tb_0')?.clientWidth || null);
 
         for( let i of this.ui.rangeSelector ) if( i ) i.value = range;
 
@@ -805,7 +810,7 @@ export class HistoryCardState {
         this.activeRange.timeRangeHours = 0;
         this.activeRange.timeRangeMinutes = range;
 
-        this.setStepSize(!update);
+        this.setStepSize(!update, this._this.querySelector('#tb_0')?.clientWidth || null);
 
         for( let i of this.ui.rangeSelector ) if( i ) i.value = "0";
 
@@ -3784,15 +3789,17 @@ export class HistoryCardState {
         let ii = event.target ? ( event.target.id == 'b8_0' ) ? 0 : 1 : -1;
         if( ii < 0 ) return;
 
-        // Resolve entity_id: from dropdown selection, or first visible dropdown item, or raw input (wildcard)
+        // Resolve entity_id: only if something was actually selected
         const _input = this.ui.inputField[ii];
         const _dropdown = this._this.querySelector(`#es_${ii}`);
         let entity_id;
         if( _input?.dataset.entityId ) {
             entity_id = _input.dataset.entityId;
-        } else {
+        } else if( this._entitySelected?.[ii] ) {
             const _firstVisible = _dropdown ? Array.from(_dropdown.getElementsByTagName('a')).find(a => a.style.display !== 'none') : null;
             entity_id = _firstVisible ? _firstVisible.dataset.entity : _input?.value;
+        } else {
+            return; // Nothing selected, do nothing
         }
 
         for( let i of this.ui.inputField ) if( i ) { delete i.dataset.entityId; i.style.fontWeight = ''; }
@@ -3828,6 +3835,8 @@ export class HistoryCardState {
                 const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
                 const _ty = _ir ? _ir.top : 0;
                 this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center');
+                const _fi0 = this.ui.inputField[ii];
+                setTimeout(() => { _fi0.value = ''; _fi0.style.fontWeight = ''; _fi0.dataset.entityId = ''; this._justAdded = null; }, 500);
                 const _dupCanvases = Array.from(_duplicateGraphs).map(g => g.canvas);
                 this._highlightMultipleTargets(_dupCanvases);
                 for( let _canvas of _dupCanvases ) {
@@ -3870,7 +3879,7 @@ export class HistoryCardState {
                 const _fi1 = this.ui.inputField[ii];
                 _fi1.value = this._justAdded;
                 _fi1.style.fontWeight = 'bold';
-                setTimeout(() => { _fi1.value = ''; _fi1.style.fontWeight = ''; this._justAdded = null; }, 500);
+                setTimeout(() => { _fi1.value = ''; _fi1.style.fontWeight = ''; delete _fi1.dataset.entityId; this._justAdded = null; }, 500);
             }
             this.updateHistoryWithClearCache();
             this.writeLocalState();
@@ -3914,6 +3923,8 @@ export class HistoryCardState {
                     const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
                     this._showLabelTooltip(i18n('ui.label.already_exists'), _tx, _ty, 'center');
+                    const _fiErr = this.ui.inputField[ii];
+                    setTimeout(() => { _fiErr.value = ''; _fiErr.style.fontWeight = ''; delete _fiErr.dataset.entityId; this._justAdded = null; }, 500);
                     this._highlightDropTarget(_existingG.canvas, false);
                     // Keep highlight 1.5s if visible, 15s if out of viewport
                     // If it enters viewport while highlighted, fade after 1.5s
@@ -3957,7 +3968,7 @@ export class HistoryCardState {
             const _fi2 = this.ui.inputField[ii];
             _fi2.value = this._justAdded;
             _fi2.style.fontWeight = 'bold';
-            setTimeout(() => { _fi2.value = ''; _fi2.style.fontWeight = ''; this._justAdded = null; }, 500);
+            setTimeout(() => { _fi2.value = ''; _fi2.style.fontWeight = ''; delete _fi2.dataset.entityId; this._justAdded = null; }, 500);
         }
         this.updateHistoryWithClearCache();
 
@@ -4344,6 +4355,8 @@ export class HistoryCardState {
     // HTML generation
     // --------------------------------------------------------------------------------------
 
+    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
+    // !! Keep in sync with _hec_render() in history-info-panel.js !!
     addUIHtml(timeline, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
     {
         let html = '';
@@ -4353,21 +4366,21 @@ export class HistoryCardState {
             html = `<div style="position:sticky;${threshold};padding-top:${this.ui.hideHeader ? 0 : 15}px;padding-bottom:10px;margin-top:-${this.ui.hideHeader ? 0 : 15}px;z-index:1;background-color:var(--card-background-color);line-height:0px;">`;
         }
 
-        if( timeline || selector ) html += `<div style="margin-left:0px;width:100%;min-height:30px;text-align:center;display:block;line-height:normal;">`;
+        if( timeline || selector ) html += `<div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
 
-        const eh = `<a id="eh_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>`;
+        const eh = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit"></a>`;
 
         if( timeline ) html += `
-            <div id="dl_${i}" style="background-color:${bgcol};float:left;margin-left:10px;display:inline-block;padding-left:10px;padding-right:10px;">
+            <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
                 <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
                 <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                 <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
             </div>`;
 
         if( selector ) html += `
-            <div id='sl_${i}' style="background-color:${bgcol};display:none;padding-left:10px;padding-right:10px;">
+            <div id='sl_${i}' style="display:none;padding-left:10px;padding-right:10px;text-align:center;grid-area:sl;justify-self:center;min-width:0;overflow:hidden;">
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
-                <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:150px;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
+                <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <button id="b8_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:34px;margin-left:5px;">+</button>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
@@ -4379,7 +4392,7 @@ export class HistoryCardState {
             </div>`;
 
         if( timeline ) html += `
-            <div id="dr_${i}" style="background-color:${bgcol};float:right;margin-right:10px;display:inline-block;padding-left:10px;">
+            <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">
                 <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
                 <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                 <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px">
@@ -4467,7 +4480,8 @@ export class HistoryCardState {
             const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
-            if( tickChanged ) this.setStepSize(true);
+            const _tbEl = this._this.querySelector('#tb_0');
+            if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }
 
         this.resizeSelector();
@@ -4475,43 +4489,121 @@ export class HistoryCardState {
 
     adjustSelectorPosition(reflow, i)
     {
-        const rfdiv = this._this.querySelector(`#rf_${i}`);
-        const selector = this._this.querySelector(`#sl_${i}`);
-
-        selector.style.display = 'inline-block';
-
-        const isReflown = rfdiv.style.display !== 'none';
-
-        if( !reflow && isReflown ) {
-            rfdiv.style.display = 'none';
-            const anchor = this._this.querySelector(`#dl_${i}`);
-            anchor.after(selector);
-        } else if( reflow && !isReflown ) {
-            rfdiv.style.display = 'block';
-            rfdiv.appendChild(selector);
-        }
+        // Visibility and layout handled by resizeSelector
     }
 
     resizeSelector()
     {
-        const button_size = 120;
-        const min_selector_size = 220;
-        const max_selector_size = 500;
-
         const w = this._this.querySelector('#maincard').clientWidth;
 
         for( let i = 0; i < 2; ++i ) {
+            const tb = this._this.querySelector(`#tb_${i}`);
+            const dl = this._this.querySelector(`#dl_${i}`);
+            const dr = this._this.querySelector(`#dr_${i}`);
             const input = this._this.querySelector(`#b7_${i}`);
-            if( input ) {
-                let xw = w - button_size - (this._this.querySelector(`#dl_${i}`)?.clientWidth ?? 0) - (this._this.querySelector(`#dr_${i}`)?.clientWidth ?? 0);
-                const reflow = ( xw < min_selector_size && this._this.querySelector(`#dl_${i}`) != null );
-                this.adjustSelectorPosition(reflow, i);
-                if( !reflow ) {
-                    xw = Math.min(xw, max_selector_size);
-                    input.style.width = xw + "px";
-                } else
-                    input.style.width = (w - 108) + "px";
+            const sl = this._this.querySelector(`#sl_${i}`);
+
+            // Common: measure tbw and apply date format before any layout decision
+            const tbwNow = tb ? tb.clientWidth : w;
+            const _mw = (el) => {
+                if( !el ) return 0;
+                const pWS = el.style.whiteSpace, pW = el.style.width;
+                el.style.whiteSpace = 'nowrap'; el.style.width = 'max-content';
+                const nw = el.offsetWidth;
+                el.style.whiteSpace = pWS; el.style.width = pW;
+                return nw;
+            };
+
+            // Apply date format based on tbw (compact if < 300)
+            const bxEl = this._this.querySelector(`#bx_${i}`);
+            if( bxEl && this.i18n._styleDateLong && this.i18n._styleDateShort ) {
+                const fmt = tbwNow < 300 ? this.i18n._styleDateShort : this.i18n._styleDateLong;
+                this.i18n.styleDateSelector = fmt;
+                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
             }
+
+            // Apply compact range select width if tbw < 300
+            const byEl = this._this.querySelector(`#by_${i}`);
+            if( byEl ) byEl.style.maxWidth = tbwNow < 300 ? '50px' : '83px';
+
+            // Measure dl and dr natural widths (after date format applied)
+            const dlwNow = _mw(dl);
+            const drwNow = _mw(dr);
+            const totNow = dlwNow + drwNow || 1;
+            const dlFrNow = Math.round(dlwNow / totNow * 100);
+            const drFrNow = 100 - dlFrNow;
+
+            // Layout C : no selector, just dl and dr
+            if( !input || !sl ) {
+                if( tb && (dl || dr) ) {
+                    tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
+                    tb.style.gridTemplateAreas = "'dl dr'";
+                    console.log(`[HEC] i=${i} layout=C dl=${dlwNow} dr=${drwNow} ratio=${dlFrNow}fr/${drFrNow}fr`);
+                }
+                continue;
+            }
+
+            // Ensure sl is visible and in layout B first so it has dimensions
+            if( sl.style.display === 'none' ) {
+                if( tb ) {
+                    tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
+                    tb.style.gridTemplateAreas = "'dl dr' 'sl sl'";
+                }
+                sl.style.display = 'flex';
+                sl.style.alignItems = 'center';
+                sl.style.justifyContent = 'center';
+                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+                sl.style.display = 'flex';
+                sl.style.alignItems = 'center';
+                sl.style.justifyContent = 'center';
+            }
+
+            // dl and dr already measured above as dlwNow/drwNow
+            const dlw = dlwNow;
+            const drw = drwNow;
+
+            // sl buttons
+            const b8 = this._this.querySelector(`#b8_${i}`);
+            const bo = this._this.querySelector(`#bo_${i}`);
+            const b8w=_mw(b8), bow=_mw(bo);
+            const slCSS = getComputedStyle(sl);
+            const slPad = parseFloat(slCSS.paddingLeft||0)+parseFloat(slCSS.paddingRight||0);
+            const slBtnsW = b8w + bow + slPad;
+
+            // Compute input width for layout A and check if total fits
+            const tbw = tbwNow;
+            // Get actual margins of dl and dr
+            const dlMargin = dl ? (parseFloat(getComputedStyle(dl).marginLeft||0)+parseFloat(getComputedStyle(dl).marginRight||0)) : 0;
+            const drMargin = dr ? (parseFloat(getComputedStyle(dr).marginLeft||0)+parseFloat(getComputedStyle(dr).marginRight||0)) : 0;
+            // unexplained = gaps between flex children in sl (gap:normal resolves to ~5px in HA)
+            // Measure it: sl natural width - sum of children - padding
+            const CORRECTION = 23; // inputExtra(~8) + flex gap(~5) + safety margin(10)
+
+            const inputWA = Math.max(150, Math.min(500, tbw - 2*(Math.max(dlw, drw) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION));
+            const totalA = dlw + 10 + 400 + slBtnsW + drw + 10; // switch at 400px input width
+
+            const colW = Math.round((w - inputWA - slBtnsW) / 2);
+            console.log(`[HEC] i=${i} dl=${dlw} dr=${drw} slBtns=${slBtnsW} inputWA=${inputWA} totalA=${totalA} card=${w} colW=${colW} dlFits=${dlw<=colW} drFits=${drw<=colW} -> ${totalA+50<=w?'A':'B'}`);
+
+            if( totalA + 50 <= w ) {
+                // Layout A : dl | sl | dr on one line
+                if( tb ) {
+                    tb.style.gridTemplateColumns = '1fr auto 1fr';
+                    tb.style.gridTemplateAreas = "'dl sl dr'";
+                }
+                sl.style.display = 'flex';
+                sl.style.alignItems = 'center';
+                sl.style.justifyContent = 'center';
+                input.style.width = inputWA + 'px';
+            } else {
+                // Layout B : dl | dr on line 1, sl centered on line 2
+                if( tb ) {
+                    tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
+                    tb.style.gridTemplateAreas = "'dl dr' 'sl sl'";
+                }
+                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+            }
+            console.log(`[HEC] after i=${i} gridCols=${tb?.style.gridTemplateColumns} sl.gridCol=${sl.style.gridColumn} sl.gridRow=${sl.style.gridRow} inputW=${input.style.width}`);
         }
     }
 
@@ -4709,6 +4801,24 @@ export class HistoryCardState {
         if( show ) {
             dropdown.style['min-width'] = input.clientWidth + 'px';
             dropdown.style.display = 'block';
+            // Position relative to input: below if top selector (idx=0), above if bottom selector (idx=1)
+            const inputRect = input.getBoundingClientRect();
+            const parentRect = dropdown.offsetParent ? dropdown.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
+            const leftPos = inputRect.left - parentRect.left;
+            dropdown.style.left = leftPos + 'px';
+            if( input_idx === 0 ) {
+                // Top selector: show below
+                const maxH = Math.min(window.innerHeight * 0.5, window.innerHeight - inputRect.bottom);
+                dropdown.style.top = (inputRect.bottom - parentRect.top) + 'px';
+                dropdown.style.bottom = '';
+                dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
+            } else {
+                // Bottom selector: show above
+                const maxH = Math.min(window.innerHeight * 0.5, inputRect.top);
+                dropdown.style.top = '';
+                dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
+                dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
+            }
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
@@ -4794,6 +4904,10 @@ export class HistoryCardState {
         if( event.key === 'Escape' ) {
             event.preventDefault();
             dropdown.style.display = 'none';
+            input.value = '';
+            input.style.fontWeight = '';
+            delete input.dataset.entityId;
+            if( this._entitySelected ) this._entitySelected[idx] = false;
             return;
         }
 
@@ -5055,7 +5169,9 @@ export class HistoryCardState {
         const ds = getLocalizedDateString(locale, { dateStyle: 'medium' });
         const dt = ( ds[0] == 'D' ) ? 'D MMM' : 'MMM D';
         this.i18n.styleDateTicks = this.pconfig.timeTickShortDate ? 'D' : dt;
-        this.i18n.styleDateSelector = isMobile ? dt : ds;
+        this.i18n._styleDateLong = ds;
+        this.i18n._styleDateShort = dt;
+        this.i18n.styleDateSelector = ds; // will be updated by resizeSelector
 
         if( this._hass.locale?.time_format === '24' ) locale = 'en-GB';
         if( this._hass.locale?.time_format === '12' ) locale = 'en-US';
@@ -5515,7 +5631,7 @@ class HistoryExplorerCard extends HTMLElement
 
         const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };
         const tools = bitmask[config.uiLayout?.toolbar] ?? 1;
-        const selector = bitmask[config.uiLayout?.selector] ?? 2;
+        const selector = bitmask[config.uiLayout?.selector] ?? 1;
         this.instance.ui.stickyTools = bitmask[config.uiLayout?.sticky] ?? 0;
         this.instance.ui.hideSelector = selector === 0;
 

@@ -1,6 +1,6 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { infoPanelEnabled, isMobile, HistoryCardState } from "./history-explorer-card";
+import { infoPanelEnabled, HistoryCardState } from "./history-explorer-card";
 
 // --------------------------------------------------------------------------------------
 // Clone of lit html(), don't want to pull in the entire framework
@@ -128,8 +128,7 @@ function hecHookInfoPanel()
 
             }
 
-            if( !isMobile )
-                instance._this.querySelector('#maincard').addEventListener('wheel', instance.wheelScrolled.bind(instance), { passive: false });
+            instance._this.querySelector('#maincard').addEventListener('wheel', instance.wheelScrolled.bind(instance), { passive: false });
 
             const config = hec_panel.config ?? {};
 
@@ -274,9 +273,13 @@ function hecHookInfoPanel()
 
             instance.today(false);
 
+            // Apply correct toolbar layout (always layout C in info-panel — no sl)
+            instance.resizeSelector();
+
             let ro = new ResizeObserver(entries => {
                 for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
-                instance.setStepSize(true);
+                instance.setStepSize(true, instance._this.querySelector('#tb_0')?.clientWidth || null);
+                instance.resizeSelector();
             });
             ro.observe(this);
     };
@@ -409,17 +412,19 @@ function hecHookInfoPanel()
 
         const i = 0;
 
+        // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
+        // !! Keep in sync with addUIHtml() in history-explorer-card.js !!
         if( tools ) {
 
             return html`
                 <div id="maincard" style="display:${(hec_panel.show === false) ? 'none' : 'block'};margin-bottom: 16px">
-                <div style="margin-bottom:10px;width:100%;min-height:30px;text-align:center;display:block;line-height:normal;">
-                    <div id="dl_${i}" style="background-color:${bgcol};float:left;margin-left:${isMobile ? -12 : -4}px;display:inline-block;padding-left:10px;padding-right:10px;">
+                <div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">
+                    <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
                         <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
                         <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                         <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
                     </div>
-                    <div id="dr_${i}" style="background-color:${bgcol};float:right;margin-right:${isMobile ? -12 : -4}px;display:inline-block;padding-left:${isMobile ? 5 : 10}px;padding-right:10px;">
+                    <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">
                         <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
                         <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                         <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px">
