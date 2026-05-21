@@ -41,9 +41,17 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 
 ## Adding entities
 
-Entities can be added interactively through the UI selector, or defined statically in YAML. Both can be combined. Dynamically added entities are saved in the browser's local storage and restored on next visit.
+Entities can be added interactively through the UI selector, or defined statically in YAML. Both can be combined. Dynamically added entities are synchronized with your HA user account and restored across all devices.
 
 ![history-panel-otf-entities](https://github.com/alexarch21/history-explorer-card/raw/main/images/screenshots/history-panel-otf-entities.png)
+
+The entity selector shows friendly names and filters on both friendly name and entity ID simultaneously. The entity ID is shown in a tooltip on selection.
+
+**Keyboard navigation:**
+- **ArrowUp / ArrowDown** — navigate the dropdown list
+- **Enter** — select the highlighted entry; second Enter adds it to the graph
+- **Escape** — close the dropdown and clear the input field
+- **`+` button** — adds the selected entity (does nothing if nothing is selected)
 
 The entity selector accepts `*` wildcards:
 ```
@@ -51,6 +59,8 @@ person.*        all person domain entities
 *door*          all entities containing 'door'
 *               all available entities
 ```
+
+When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter adds them all. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
 
 To show only entities actually recorded in the database:
 ```yaml
@@ -71,7 +81,7 @@ filterEntities:
 
 ## Interactive graph management
 
-All changes made interactively are saved in the browser and survive a page refresh.
+All changes made interactively are synchronized with your HA user account and survive a page refresh across all devices.
 
 ### Line graphs
 
@@ -101,9 +111,12 @@ Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the m
 ![image](https://user-images.githubusercontent.com/60828821/198171854-f643a628-25f7-4f5a-ac50-f0914a5e265e.png)
 
 - **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph
+- **Double-click** an entity label to extract it into its own graph
 - Click a truncated label to see the full name in a tooltip
 
 The page scrolls automatically when dragging near the top or bottom of the screen.
+
+Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ---
 
@@ -114,6 +127,7 @@ Replace the default HA history graph in the more info popup with the history exp
 ```yaml
 type: custom:history-explorer-card
 infoPanel: true
+defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
 ```
 
 Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. The popup supports pan, zoom, Y axis control, and long term statistics. Ungrouping, drag & drop and CSV export are not available in the popup.
@@ -145,6 +159,8 @@ type: custom:history-explorer-card
 defaultTimeRange: 4h     # 4 hours (default is 24h). Units: m, h, d, w, o, y
 defaultTimeOffset: 1D    # Snap to current day from midnight. Use uppercase for snapped offsets
 ```
+
+`defaultTimeRange` uses a "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range, but only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
 
 ---
 

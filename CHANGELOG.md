@@ -3,6 +3,31 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+## [v1.1.24] - 2026-05-21
+### Added
+- Compact date format (`MMM D`) when toolbar width < 300px
+- Compact range selector display (`max-width: 50px`) when toolbar width < 300px
+- X-axis tick step increased to 2 months for 1-year range on narrow cards (toolbar width < 300px) to prevent label overlap
+- Entity selector dropdown now positions below the input field (selector top) or above (selector bottom), aligned to the input, with height capped to `min(50vh, available viewport space)`
+- `+` button now does nothing if no entity has been selected in the dropdown
+- Input field cleared after entity add (success or error) via timer
+- ESC key clears the input field and resets the selection state
+
+### Changed
+- Toolbar layout replaced from CSS floats (`float:left/right`) to CSS Grid (`grid-template-areas: 'dl sl dr'`) — resolves wrapping issues on Safari; applied to both `history-explorer-card` and `history-info-panel`
+- Three adaptive layouts: A (all on one line), B (`sl` on second line), C (no `sl`) — info-panel always uses layout C
+- Column ratio for `dl`/`dr` calculated dynamically (`dlw/(dlw+drw)`) in layouts B and C, measured after applying the correct date format
+- `dl` and `dr` padding reduced to 5px, margins removed
+- Entity selector dropdown `max-height` changed from 150px fixed to `min(50vh, available viewport space above or below the input field)`
+- Minimum entity input width reduced from 220px to 150px
+- `isMobile` removed from all source files — `history-chart-vline` cursor check simplified, wheel listener unconditional
+
+### Fixed
+- Date display flickered on graph refresh — removed unnecessary padding from the date anchor (`eh_`) that caused size changes between writes
+- Entity selector dropdown was centered instead of aligned to the input field
+- Entity selector dropdown appeared above the input instead of below
+- `history-info-panel` toolbar had no vertical spacing below it — added `margin-bottom: 10px` to match main card appearance
+
 ## [v1.1.23] - 2026-05-19
 ### Added
 - Entity selector dropdown unified across desktop and mobile — desktop now uses the same custom dropdown as mobile, eliminating the native `<datalist>` with its display limitations

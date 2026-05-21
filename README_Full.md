@@ -83,19 +83,61 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 - **Automatic SI unit grouping** — when `combineSameUnits` is enabled, dynamically added entities with compatible SI units (e.g. W and kW, m and km) are automatically grouped onto the same graph. Y axis values and tooltips are always displayed in the original unit of each entity. Grouping and the resulting unit conversions are fully transparent to the user. SI unit conversion also applies to graphs defined manually in the YAML.
 
-- **Ungroup by double-click** — double-clicking a curve label in the legend extracts that entity into its own separate graph, placed immediately below the original graph. The ungrouped state is remembered in the browser's local storage and survives a page refresh.
+- **Ungroup by double-click** — double-clicking a curve label in the legend extracts that entity into its own separate graph, placed immediately below the original graph. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh.
 
-- **Drag and drop curves between graphs** — a curve can be dragged from its legend label and dropped onto another graph. Only drops onto graphs with compatible SI units are accepted. The curve's color is preserved; if the target graph already uses that color, a free color is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch. The new grouping is persisted in the browser's local storage.
+- **Drag and drop curves between graphs** — a curve can be dragged from its legend label and dropped onto another graph. Only drops onto graphs with compatible SI units are accepted. The curve's color is preserved; if the target graph already uses that color, a free color is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch. The new grouping is synchronized with your HA user account.
 
 - **Reorder curves within a graph** — curve labels in the legend can be dragged left or right to reorder curves within the same graph. The new order is persisted.
 
-- **Drag and drop graphs to reorder** — graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (30 px wide zone). A simple click on that area still toggles the Y axis lock. The new order is persisted in the browser's local storage.
+- **Drag and drop graphs to reorder** — graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (30 px wide zone). A simple click on that area still toggles the Y axis lock. The new order is synchronized with your HA user account.
 
 - **Drag and drop timeline/arrowline entities** — timeline and arrowline entities can be dragged from their label area to another graph of the same type, or reordered within the same graph by dragging their label up or down. Long labels that don't fit are truncated and can be revealed in full by clicking them.
 
 - **Auto-scroll during drag** — when dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are off screen.
 
 - **Incompatible drop feedback** — any drag & drop onto an incompatible target (wrong unit, wrong graph type) shows a brief tooltip explaining the mismatch instead of silently failing.
+
+### New — drag & drop visual feedback
+
+- **Ghost element** — a semi-transparent copy of the dragged item follows the cursor during all drag operations (legend labels, timeline/arrowline entities, graph reorder).
+- **Insertion markers** — a vertical marker shows the exact insertion point when reordering legend labels; a horizontal marker shows it when reordering timeline/arrowline entities or graphs.
+- **Drop target highlighting** — the target graph is highlighted during a compatible drag-over.
+- **5 px activation threshold** — drag state activates only after the pointer has moved 5 px, preventing accidental drags on clicks.
+
+### New — timeline/arrowline double-click ungroup
+
+- **Double-click** an entity label in a timeline or arrowline graph to extract it into its own graph, placed immediately below the original — same behavior as line/bar legend double-click.
+
+### New — entity selector (v1.1.23+)
+
+- **Unified dropdown** — desktop and mobile now use the same custom dropdown, eliminating the native `<datalist>` with its display limitations.
+- **Friendly names** — the dropdown and input field display friendly names instead of entity IDs. The entity ID is shown in a tooltip on selection.
+- **Dual filtering** — the dropdown filters on both friendly name and entity ID simultaneously.
+- **Keyboard navigation** — ArrowUp/ArrowDown to navigate, Enter to select, Escape to close and clear; second Enter triggers entity add.
+- **Wildcard dropdown** — when a wildcard pattern is entered, matching entries are shown in bold; first Enter selects all matching entities, second Enter adds them all.
+- **Duplicate detection extended** — wildcard multi-add detects duplicates, lists them in a tooltip, and highlights all affected graphs with a red dashed outline.
+- **`+` button guard** — the `+` button does nothing if no entity has been selected in the dropdown.
+- **Input field cleared** after entity add (success or error) via a timer; ESC clears immediately.
+- **Dropdown positioning** — the dropdown appears below the input field for `selector: top` (default) and above for `selector: bottom`; height is capped to `min(50vh, available viewport space)`.
+
+### New — per-user server-side persistence (v1.1.12+)
+
+- Dynamically added entities, graph order, bar intervals, and time range are now stored in HA's `frontend/set_user_data` storage, tied to the HA user account and synchronized across all devices. Browser local storage is kept as a fallback.
+
+### New — info-panel default state (v1.1.19+)
+
+- **`defaultInfoPanel`** YAML option sets the default enabled state of the info panel. A "last one to speak wins" logic applies: changing the YAML value overrides user preference, but only when the YAML value actually changes.
+
+### New — time range persistence (v1.1.19+)
+
+- **`defaultTimeRange`** now uses "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
+
+### New — adaptive toolbar layout (v1.1.24+)
+
+- Toolbar layout replaced from CSS floats to CSS Grid, resolving wrapping issues on Safari and narrow cards.
+- Three adaptive layouts: A (all on one line), B (selector on second line), C (no selector).
+- Compact date and range display when toolbar width < 300px.
+- X-axis tick step automatically increased to 2 months for 1-year range on narrow cards.
 
 ---
 
@@ -126,9 +168,12 @@ To enable the feature, add the following to the card's YAML configuration:
 ```yaml
 type: custom:history-explorer-card
 infoPanel: true
+defaultInfoPanel: true   # optional: set default enabled state; user preference is otherwise preserved
 ```
 
 Once enabled, clicking any entity anywhere on your Lovelace dashboard will open the more info popup with the history explorer graph instead of the default HA history chart.
+
+The `defaultInfoPanel` option uses "last one to speak wins" logic: changing the YAML value overrides the user preference only when the YAML value actually changes. The user can still toggle the info panel on or off through the card UI.
 
 #### What the info-panel supports
 
@@ -171,7 +216,7 @@ To see a list of all possible configuration options, check the [Full reference c
 
 ### Interactive configuration
 
-The entities visible on the history explorer card can be defined in the card configuration or they can be added or removed on the fly through the card UI without changing the configuration. Both modes can be combined. The entities defined in the YAML will be displayed first and will always be visible when the dashboard is opened. Dynamically added entities will be displayed next. The entities you add or remove over the UI are remembered in your browsers local storage, so you don't to add them every time you reopen the HA page.
+The entities visible on the history explorer card can be defined in the card configuration or they can be added or removed on the fly through the card UI without changing the configuration. Both modes can be combined. The entities defined in the YAML will be displayed first and will always be visible when the dashboard is opened. Dynamically added entities will be displayed next. The entities you add or remove over the UI are synchronized with your HA user account and restored across all devices. Browser local storage is kept as a fallback.
 
 You can manage your dynamically configured entities like this:
 
@@ -189,7 +234,14 @@ By default the UI entity dropdown will list all entities known to HA. This can b
 type: custom:history-explorer-card
 recordedEntitiesOnly: true
 ```
-The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. Some examples:
+The entity selector shows friendly names and filters on both friendly name and entity ID simultaneously. The entity ID is shown in a tooltip on selection. Keyboard navigation is fully supported:
+
+- **ArrowUp / ArrowDown** — navigate the dropdown list
+- **Enter** — select the highlighted entry; second Enter adds it to the graph
+- **Escape** — close the dropdown and clear the input field
+- **`+` button** — adds the selected entity (does nothing if nothing is selected in the dropdown)
+
+The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. When a wildcard is entered, matching entries appear in bold in the dropdown. The first Enter selects all matching entities; the second Enter adds them all. Some examples:
 ```
 person.*      - Add all entities from the person domain
 *door*        - Add all entities that contain the term 'door' in the name, regardless of domain
@@ -212,6 +264,8 @@ Dynamically added entities can be individually removed by clicking the `x` close
 ### Default view and time ranges
 
 When the dashboard is opened, the card will show the last 24 hours by default. You can select a different default time range in the YAML. Use m, h, d, and w to denote minutes, hours, days and weeks respectively. For longer time scale, o and y denote months and year. Currently the maximum range is one year. If no postfix is given, hours are assumed.
+
+`defaultTimeRange` uses "last one to speak wins" logic: changing the YAML value overrides the user-adjusted time range only when the YAML value actually changes. The user-adjusted time range is otherwise preserved across reloads and devices via HA user storage.
 
 ```yaml
 type: custom:history-explorer-card
@@ -270,7 +324,7 @@ Timeline graphs will always automatically group if possible. Graphs defined manu
 
 #### Ungrouping a curve
 
-A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the browser's local storage and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
+A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
 #### Moving curves between graphs
 
@@ -278,22 +332,23 @@ A curve can be moved to another graph by dragging its legend label and dropping 
 
 #### Reordering curves within a graph
 
-Curve labels in the legend can be dragged left or right to change their display order within the same graph. The new order is persisted in the browser's local storage.
+Curve labels in the legend can be dragged left or right to change their display order within the same graph. The new order is synchronized with your HA user account.
 
 #### Reordering graphs
 
-Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area still toggles the Y axis lock as before. The new order is persisted in the browser's local storage.
+Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area still toggles the Y axis lock as before. The new order is synchronized with your HA user account.
 
 When dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are not currently visible.
 
 #### Timeline and arrowline entity management
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
+- **Double-click** an entity label to extract it into its own graph, placed immediately below the original
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
 
-All changes are persisted in the browser's local storage.
+All drag operations show a ghost element and horizontal insertion marker for precise positioning. All changes are synchronized with your HA user account.
 
 ### Legend / entity labels
 
