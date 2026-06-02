@@ -11609,8 +11609,8 @@
 
                 // Width of each line of legend boxes. Labels wrap onto multiple lines when there are too many to fit on one
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
-                me.leftMargin = 30;
-                me.rightMargin = 25;
+                me.leftMargin = me.chart._legendLeftMargin ?? 30;
+                me.rightMargin = me.chart._legendRightMargin ?? 25;
                 var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
                 if (me._ratchetBaseKey !== _baseKey) {
                     me._ratchetBaseKey = _baseKey;
