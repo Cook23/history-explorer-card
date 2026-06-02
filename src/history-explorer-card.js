@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.24';
+const Version = '1.1.25b33';
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -579,18 +579,17 @@ export class HistoryCardState {
         }
 
         this.updateHistory();
+        this.writeLocalState();
     }
 
-    createIntervalSelectorHtml(gid, h, selected, optionStyle)
+    createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
-        if( selected === undefined ) selected = 1;
-
-        return `<select id='bd-${gid}' style="position:absolute;right:50px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
-                    <option value="0" ${optionStyle} ${(selected == 0) ? 'selected' : ''}>${i18n('ui.interval._10m')}</option>
-                    <option value="1" ${optionStyle} ${(selected == 1) ? 'selected' : ''}>${i18n('ui.interval.hourly')}</option>
-                    <option value="2" ${optionStyle} ${(selected == 2) ? 'selected' : ''}>${i18n('ui.interval.daily')}</option>
-                    <option value="3" ${optionStyle} ${(selected == 3) ? 'selected' : ''}>${i18n('ui.interval.monthly')}</option>
-                    <option value="4" ${optionStyle} ${(selected == 4) ? 'selected' : ''}>${i18n('ui.interval.rawline')}</option>
+        return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
+                    <option value="0" ${optionStyle}>${i18n('ui.interval._10m')}</option>
+                    <option value="1" ${optionStyle}>${i18n('ui.interval.hourly')}</option>
+                    <option value="2" ${optionStyle}>${i18n('ui.interval.daily')}</option>
+                    <option value="3" ${optionStyle}>${i18n('ui.interval.monthly')}</option>
+                    <option value="4" ${optionStyle}>${i18n('ui.interval.rawline')}</option>
                 </select>`;
     }
 
@@ -1543,6 +1542,7 @@ export class HistoryCardState {
             }
 
             if( updated ) {
+
                 g.chart.options.scales.xAxes[0].time.unit = this.activeRange.tickStepUnit;
                 g.chart.options.scales.xAxes[0].time.stepSize = this.activeRange.tickStepSize;
                 g.chart.options.scales.xAxes[0].time.min = this.startTime;
@@ -4112,11 +4112,11 @@ export class HistoryCardState {
                 entities.push({ ...d, 'color' : color, 'fill' : fill });
             }
 
-            this.addGraphToCanvas(g.id, g.graph.type, entities, g.graph.options);
+            this.addGraphToCanvas(g.id, g.graph.type, entities, g.graph.options, true);
 
         } else {
 
-            this.addGraphToCanvas(g.id, g.graph.type, g.graph.entities, g.graph.options);
+            this.addGraphToCanvas(g.id, g.graph.type, g.graph.entities, g.graph.options, true);
 
         }
 
@@ -4226,7 +4226,7 @@ export class HistoryCardState {
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
         html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle);
+            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle, 40);
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
@@ -4245,6 +4245,7 @@ export class HistoryCardState {
         // For bar graphs, connect the interval selector dropdown listener
         if( type == 'bar' && !this.ui.hideInterval )
             this._this.querySelector(`#bd-${this.g_id}`).addEventListener('change', this.selectBarInterval.bind(this));
+
 
         // For line and bar graphs connect the scale lock button listener
         if( type == 'line' || type == 'bar' ) {
@@ -4274,14 +4275,15 @@ export class HistoryCardState {
             lgEl2.addEventListener('pointercancel', this.legendDragEnd.bind(this));
         }
 
-        // Connect the close button event listener
-        this._this.querySelector(`#bc-${this.g_id}`).addEventListener('click', this.removeGraph.bind(this));
-
         // Create the graph
+        const _dynGid = this.g_id;
         this.addGraphToCanvas(this.g_id++, type, entities, entityOptions);
+
+        // Connect the close button event listener (after addGraphToCanvas which creates bc-)
+        this._this.querySelector(`#bc-${_dynGid}`)?.addEventListener('click', this.removeGraph.bind(this));
     }
 
-    addGraphToCanvas(gid, type, entities, config)
+    addGraphToCanvas(gid, type, entities, config, isFixed = false)
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
 
@@ -4514,21 +4516,47 @@ export class HistoryCardState {
                 return nw;
             };
 
-            // Apply date format based on tbw (compact if < 300)
+            // Measure dl (LONG) and dr (NORMAL: maxWidth=83px)
             const bxEl = this._this.querySelector(`#bx_${i}`);
-            if( bxEl && this.i18n._styleDateLong && this.i18n._styleDateShort ) {
-                const fmt = tbwNow < 300 ? this.i18n._styleDateShort : this.i18n._styleDateLong;
+            const byEl = this._this.querySelector(`#by_${i}`);
+            if( bxEl && this.i18n._styleDateLong )
+                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(this.i18n._styleDateLong)}</a>`;
+            if( byEl ) byEl.style.maxWidth = '83px';
+            const dlwLong = _mw(dl);
+            const drwLong = _mw(dr);
+
+            // Measure dl (SHORT) and dr (COMPACT: maxWidth=50px)
+            if( bxEl && this.i18n._styleDateShort )
+                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(this.i18n._styleDateShort)}</a>`;
+            if( byEl ) byEl.style.maxWidth = '50px';
+            const dlwShort = _mw(dl);
+            const drwShort = _mw(dr);
+
+            // Decide format with hysteresis
+            if( !this._isCompact ) this._isCompact = [];
+            const _prevCompact = this._isCompact[i] || false;
+            let isCompact;
+            if( dlwLong + drwLong > tbwNow - 10 ) {
+                isCompact = true;   // NORMAL doesn't fit → go COMPACT
+            } else if( dlwLong + drwLong < tbwNow - 20 ) {
+                isCompact = false;  // clearly fits → go NORMAL
+            } else {
+                isCompact = _prevCompact; // hysteresis zone → keep previous state
+            }
+            this._isCompact[i] = isCompact;
+
+            const dlwNow = isCompact ? dlwShort : dlwLong;
+            const drwNow = isCompact ? drwShort : drwLong;
+
+            // Apply chosen format and range width
+            const fmt = isCompact ? this.i18n._styleDateShort : this.i18n._styleDateLong;
+            if( bxEl && fmt ) {
                 this.i18n.styleDateSelector = fmt;
                 bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
             }
+            if( byEl ) byEl.style.maxWidth = isCompact ? '50px' : '83px';
 
-            // Apply compact range select width if tbw < 300
-            const byEl = this._this.querySelector(`#by_${i}`);
-            if( byEl ) byEl.style.maxWidth = tbwNow < 300 ? '50px' : '83px';
 
-            // Measure dl and dr natural widths (after date format applied)
-            const dlwNow = _mw(dl);
-            const drwNow = _mw(dr);
             const totNow = dlwNow + drwNow || 1;
             const dlFrNow = Math.round(dlwNow / totNow * 100);
             const drFrNow = 100 - dlFrNow;
@@ -4538,7 +4566,6 @@ export class HistoryCardState {
                 if( tb && (dl || dr) ) {
                     tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
                     tb.style.gridTemplateAreas = "'dl dr'";
-                    console.log(`[HEC] i=${i} layout=C dl=${dlwNow} dr=${drwNow} ratio=${dlFrNow}fr/${drFrNow}fr`);
                 }
                 continue;
             }
@@ -4580,10 +4607,11 @@ export class HistoryCardState {
             const CORRECTION = 23; // inputExtra(~8) + flex gap(~5) + safety margin(10)
 
             const inputWA = Math.max(150, Math.min(500, tbw - 2*(Math.max(dlw, drw) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION));
+            if( !this._inputWidth ) this._inputWidth = [];
+            this._inputWidth[i] = inputWA;
             const totalA = dlw + 10 + 400 + slBtnsW + drw + 10; // switch at 400px input width
 
             const colW = Math.round((w - inputWA - slBtnsW) / 2);
-            console.log(`[HEC] i=${i} dl=${dlw} dr=${drw} slBtns=${slBtnsW} inputWA=${inputWA} totalA=${totalA} card=${w} colW=${colW} dlFits=${dlw<=colW} drFits=${drw<=colW} -> ${totalA+50<=w?'A':'B'}`);
 
             if( totalA + 50 <= w ) {
                 // Layout A : dl | sl | dr on one line
@@ -4603,7 +4631,6 @@ export class HistoryCardState {
                 }
                 input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
             }
-            console.log(`[HEC] after i=${i} gridCols=${tb?.style.gridTemplateColumns} sl.gridCol=${sl.style.gridColumn} sl.gridRow=${sl.style.gridRow} inputW=${input.style.width}`);
         }
     }
 
@@ -4636,6 +4663,24 @@ export class HistoryCardState {
 
             // Add fixed YAML defined graphs
             for( let g of this.pconfig.graphConfig ) this.addFixedGraph(g);
+
+            // Update bd- text and value after graphs exist (like insertUIHtmlText + setTimeRange for by)
+            for( let g of this.graphs ) {
+                if( g.type !== 'bar' ) continue;
+                const bd = this._this.querySelector(`#bd-${g.id}`);
+                if( !bd ) continue;
+                bd.children[0].innerHTML = i18n('ui.interval._10m');
+                bd.children[1].innerHTML = i18n('ui.interval.hourly');
+                bd.children[2].innerHTML = i18n('ui.interval.daily');
+                bd.children[3].innerHTML = i18n('ui.interval.monthly');
+                if( bd.children[4] ) bd.children[4].innerHTML = i18n('ui.interval.rawline');
+                bd.value = g.interval ?? 1;
+                // Set legend right margin to account for interval selector width
+                // For fixed graphs: bd is at right:10px, for dynamic: right:40px + bc button
+                const _isFixed = g.id < this.firstDynamicId;
+                g.chart._legendRightMargin = bd.offsetWidth + (_isFixed ? 15 : 45);
+                g.chart._legendLeftMargin = undefined; // reserved for future use
+            }
 
             this.resizeSelector();
 
@@ -4671,7 +4716,7 @@ export class HistoryCardState {
 
             this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
 
-            await this.readLocalState();
+            const _needsIntervalRedraw = await this.readLocalState();
 
             this.pconfig.nextDefaultColor = 0;
 
@@ -4711,23 +4756,15 @@ export class HistoryCardState {
 
             this.today(false);
 
+            // Now that startTime/endTime are initialized, apply interval restoration if needed
+            if( _needsIntervalRedraw ) this.updateHistoryWithClearCache();
+
             // Register observer to resize the graphs whenever the maincard dimensions change
             let ro = new ResizeObserver(entries => { this.resize(); });
             ro.observe(this._this.querySelector('#maincard'));
 
-            // Apply persisted per-graph state (interval)
-            if( this._pendingGraphState ) {
-                for( let g of this.graphs ) {
-                    const _gs = this._pendingGraphState[g.id];
-                    if( !_gs ) continue;
-                    if( _gs.interval !== null && _gs.interval !== undefined && g.type === 'bar' ) {
-                        g.interval = _gs.interval;
-                        const _bd = this._this.querySelector(`#bd-${g.id}`);
-                        if( _bd ) _bd.value = _gs.interval;
-                    }
-                }
-                this._pendingGraphState = null;
-            }
+            // Per-graph interval now restored in readLocalState (last-one-to-speak-wins)
+            this._pendingGraphState = null;
 
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
@@ -5033,12 +5070,32 @@ export class HistoryCardState {
 
             for( let entity of entities ) {
                 const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
+                const _state = this._hass.states[entity];
+                const _stateVal = _state?.state;
+                const _unit = _state?.attributes?.unit_of_measurement;
+                // Format value like legend labels: rounded to roundingPrecision
+                let _valStr = '';
+                try {
+                    if( _stateVal !== undefined && _stateVal !== 'unavailable' && _stateVal !== 'unknown' ) {
+                        const _p = 10 ** this.pconfig.roundingPrecision;
+                        const _numVal = Number(_stateVal);
+                        const _v = Math.round(_numVal * _p) / _p;
+                        if( isNaN(_numVal) ) {
+                            // Try to parse as date and show HH:MM
+                            const _d = new Date(_stateVal);
+                            _valStr = isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
+                        } else {
+                            _valStr = _v + (_unit ? ' ' + _unit : '');
+                        }
+                    }
+                } catch(e) { _valStr = ''; }
+                const _label = _valStr ? `${friendly} (${_valStr})` : friendly;
                 const o = document.createElement('a');
                 o.href = `#s_${i}`;
                 o.id = entity;
                 o.dataset.entity = entity;
-                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
-                o.innerHTML = friendly;
+                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden";
+                o.innerHTML = _label;
                 o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
@@ -5091,12 +5148,32 @@ export class HistoryCardState {
 
             for( let entity of entities ) {
                 const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
+                const _state = this._hass.states[entity];
+                const _stateVal = _state?.state;
+                const _unit = _state?.attributes?.unit_of_measurement;
+                // Format value like legend labels: rounded to roundingPrecision
+                let _valStr = '';
+                try {
+                    if( _stateVal !== undefined && _stateVal !== 'unavailable' && _stateVal !== 'unknown' ) {
+                        const _p = 10 ** this.pconfig.roundingPrecision;
+                        const _numVal = Number(_stateVal);
+                        const _v = Math.round(_numVal * _p) / _p;
+                        if( isNaN(_numVal) ) {
+                            // Try to parse as date and show HH:MM
+                            const _d = new Date(_stateVal);
+                            _valStr = isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
+                        } else {
+                            _valStr = _v + (_unit ? ' ' + _unit : '');
+                        }
+                    }
+                } catch(e) { _valStr = ''; }
+                const _label = _valStr ? `${friendly} (${_valStr})` : friendly;
                 const o = document.createElement('a');
                 o.href = `#s_${i}`;
                 o.id = entity;
                 o.dataset.entity = entity;
-                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit";
-                o.innerHTML = friendly;
+                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden";
+                o.innerHTML = _label;
                 o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
@@ -5194,13 +5271,21 @@ export class HistoryCardState {
         for( let g of this.graphs ) {
             _graphState[g.id] = { interval: g.interval ?? null };
         }
+        // Build YAML interval mirrors for bar graphs
+        const _yamlGraphIntervals = {};
+        for( let gc of (this.pconfig.graphConfig || []) ) {
+            if( gc.graph?.options?.interval !== undefined )
+                _yamlGraphIntervals[gc.id] = this.parseIntervalConfig(gc.graph.options.interval) ?? null;
+        }
+
         const data = {
             version             : 2,
             entities            : this.pconfig.entities,
             graphState          : _graphState,
             // YAML mirrors (for change detection)
-            yaml_defaultInfoPanel : this.pconfig.defaultInfoPanel,
-            yaml_defaultTimeRange : this.pconfig.defaultTimeRange,
+            yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
+            yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
+            yaml_graphIntervals    : _yamlGraphIntervals,
             // HA user mirrors (for change detection)
             ha_infoPanelEnabled : this._lastHaUserInfoPanel,
             ha_timeRangeHours   : this._lastHaUserTimeRangeHours,
@@ -5301,13 +5386,56 @@ export class HistoryCardState {
                 this.setTimeRangeMinutes(_ls.timeRangeMinutes);
         }
 
+        // Sync time.min/time.max on all charts so determineDataLimits is constrained
+        // by the active time window before any updateHistory call (prevents stale data
+        // from previous session from extending the X axis range)
+        for( let g of this.graphs ) {
+            g.chart.options.scales.xAxes[0].time.min = this.startTime;
+            g.chart.options.scales.xAxes[0].time.max = this.endTime;
+        }
+
         // Update HA user mirrors for next writeLocalState
         this._lastHaUserInfoPanel         = _haInfoEnabled ?? _ls?.ha_infoPanelEnabled;
         this._lastHaUserTimeRangeHours    = _haCard?.timeRangeHours   ?? _ls?.ha_timeRangeHours;
         this._lastHaUserTimeRangeMinutes  = _haCard?.timeRangeMinutes ?? _ls?.ha_timeRangeMinutes;
 
+        // --- Graph interval front detection (bar graphs) ---
+        // Detect YAML change per graph and HA user change, restore correct interval
+        let _intervalNeedsRedraw = false;
+        for( let g of this.graphs ) {
+            if( g.type !== 'bar' ) continue;
+            const _gs = ((_data?.graphState) || {})[g.id];
+            const _persistedInterval = _gs?.interval ?? null;
+            // YAML front: current YAML interval vs mirror in localStorage
+            const _yamlNow = this.pconfig.graphConfig?.find(gc => gc.id === g.id)?.graph?.options?.interval;
+            const _yamlNowParsed = _yamlNow !== undefined ? (this.parseIntervalConfig(_yamlNow) ?? null) : null;
+            const _yamlIntervalChanged = _yamlNowParsed !== null &&
+                                         _yamlNowParsed !== (_ls?.yaml_graphIntervals?.[g.id] ?? null);
+            // HA user front: HA user graphState vs localStorage graphState
+            const _haInterval = _haCard?.graphState?.[g.id]?.interval ?? null;
+            const _lsInterval  = _ls?.graphState?.[g.id]?.interval ?? null;
+            const _haIntervalChanged = _haInterval !== null && _haInterval !== _lsInterval;
+
+            let _activeInterval;
+            if( _yamlIntervalChanged ) {
+                _activeInterval = _yamlNowParsed; // YAML wins
+            } else if( _haIntervalChanged ) {
+                _activeInterval = _haInterval;    // HA user wins
+            } else {
+                _activeInterval = _persistedInterval; // no front — restore active
+            }
+            if( _activeInterval !== null && _activeInterval !== undefined && _activeInterval !== g.interval ) {
+                g.interval = _activeInterval;
+                const _bd = this._this.querySelector(`#bd-${g.id}`);
+                if( _bd ) _bd.value = _activeInterval;
+                _intervalNeedsRedraw = true;
+            }
+        }
+
         // Persist updated state (including all mirrors) before any potential reload
         await this.writeLocalState();
+
+        return _intervalNeedsRedraw;
 
         // If HA card data was missing from HA storage, migrate localStorage there
         if( !_haCard && _ls ) {
@@ -5662,7 +5790,7 @@ class HistoryExplorerCard extends HTMLElement
             html += `<div style='height:${h}px;position:relative'>`;
             html += `<canvas id="graph${g.id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
             if( g.graph.type == 'bar' && !this.instance.ui.hideInterval )
-                html += this.instance.createIntervalSelectorHtml(g.id, h, this.instance.parseIntervalConfig(g.graph.options?.interval), optionStyle);
+                html += this.instance.createIntervalSelectorHtml(g.id, h, this.instance.parseIntervalConfig(g.graph.options?.interval), optionStyle, 10);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
