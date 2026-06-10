@@ -3,6 +3,30 @@
 Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
+
+## [v1.1.26] - 2026-06-10
+### Added
+- Touch long-press gate on Y axis pan (`ya-N` overlay): on touch screens, pan Y activates only after holding the finger still for 500ms (≤ `TOUCH_SLOP` movement), preventing accidental Y axis interaction during page scroll; padlock activates automatically on long-press confirmation; subsequent touches with active padlock bypass the gate entirely
+- `ylock` YAML graph option (`options.ylock: true`): disables all interactive Y axis modifications (pan Y via `ya-N`, pinch zoom Y) on all platforms (desktop, mobile, tablet, stylus); `ymin`/`ymax` remain usable as initial bounds alongside `ylock`
+- `TOUCH_SLOP` constant (10px) centralises all pointer immobility thresholds — replaces hardcoded 5px values in `legendDragMove`, `graphMoveMove`, timeline drag activation (`pointerMove`), and the new long-press gate
+- `event.buttons === 0` guard in `yAxisPointerMove` — blocks pan Y move events triggered by stylus hover (no physical contact)
+- `pointercancel` event connected to `yAxisPointerUp` on `ya-N` for both fixed and dynamic graphs — ensures `panstate.yaxis` is cleaned up if the browser cancels the pointer
+
+### Fixed
+- Y axis unit label (`scaleLabel`) was hidden whenever `labelsVisible` was `false` — which is always the case in the info-panel; unit is now displayed independently of `labelsVisible`
+- `touch-action:none` on `ya-N` statically blocked page scroll even when no pan Y interaction was intended; replaced by `pan-y` as default, set to `none` dynamically only after long-press confirmation
+- `yAxisPointerUp` now resets `touch-action` to `''` (restores HTML default `pan-y`) when pan Y ends without active padlock
+- Padlock unlock (`scaleLockClicked`) now restores `touch-action` to `pan-y` on the corresponding `ya-N` element
+
+### Changed
+- `ya-N` overlay: static `touch-action:none` → `touch-action:pan-y` on both dynamic and fixed graphs
+- `yAxisPointerDown`: refactored — `setPointerCapture` + `preventDefault` + `stopPropagation` are now immediate for mouse/stylus/active padlock; long-press timer path used for touch without active padlock
+- `g.ylock` stored on graph object at creation time from `config?.ylock ?? false`
+- Pinch zoom Y start blocked in `pointerDown` when `g.ylock` is set
+- `yAxisPointerUp`: longpress cleanup added; conditional `touch-action` restoration
+- README and README_Full: reorganised with table of contents and intra-document anchor links; README links to README_Full anchors for detailed sections; info-panel promoted to top-level section; corrected `stateTextMode` default (`auto`, not `raw`); corrected `showCurrentValues` default (enabled by default); corrected `ymin`/`ymax` description (initial bounds, not locks); added missing options: `lineWidth`, `stateColorSeed`, `statistics.retention`, `timeTicks.density`, `uiColors.cursorline/selector/closeButton`, `showTimeLabels`, `stacked`; added Buy Me A Coffee button
+
+
 ## [v1.1.25] - 2026-06-02
 ### Added
 - Bar graph interval (10min/hourly/daily/monthly) is now persisted across reloads using localStorage and HA user storage
