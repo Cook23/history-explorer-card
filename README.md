@@ -3,6 +3,8 @@
 [![GitHub stars](https://img.shields.io/github/stars/Cook23/history-explorer-card?style=for-the-badge)](https://github.com/Cook23/history-explorer-card/stargazers)
 ![Experimental](https://img.shields.io/badge/status-experimental-yellow?style=for-the-badge)
 
+<a href="https://buymeacoffee.com/thierry_couquillou" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a>
+
 # History explorer card
 
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
@@ -11,6 +13,29 @@
 A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
+
+---
+
+## Table of contents
+
+- [Install](#install)
+- [Basic usage](#basic-usage)
+- [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
+- [Adding entities](#adding-entities)
+- [Interactive graph management](#interactive-graph-management)
+- [Y axis control](#y-axis-control)
+- [Time range and display defaults](#time-range-and-display-defaults)
+- [Auto refresh](#auto-refresh)
+- [Line chart appearance](#line-chart-appearance)
+- [Bar charts](#bar-charts)
+- [Timeline charts](#timeline-charts)
+- [Compass arrow graphs](#compass-arrow-graphs)
+- [Long term statistics](#long-term-statistics)
+- [Entity options](#entity-options)
+- [CSV export](#csv-export)
+- [UI configuration](#ui-configuration)
+- [YAML graph configuration](#yaml-graph-configuration)
+- [Running as a sidebar panel](#running-as-a-sidebar-panel)
 
 ---
 
@@ -36,6 +61,22 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
 - **Tooltip**: hover over any graph to see values or state details
+
+---
+
+## Info panel — replacing the HA more info popup
+
+The card can replace the default HA history graph in the more info popup that appears when you click any entity on your dashboard. Once enabled, the history explorer opens instead — with full pan, zoom, Y axis control and long term statistics support.
+
+```yaml
+type: custom:history-explorer-card
+infoPanel: true
+defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
+```
+
+Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. Ungrouping, drag & drop and CSV export are not available in the popup.
+
+> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#overriding-the-ha-more-info-history-info-panel)
 
 ---
 
@@ -120,27 +161,13 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ---
 
-## Overriding the HA more info popup (info-panel)
-
-Replace the default HA history graph in the more info popup with the history explorer:
-
-```yaml
-type: custom:history-explorer-card
-infoPanel: true
-defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
-```
-
-Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. The popup supports pan, zoom, Y axis control, and long term statistics. Ungrouping, drag & drop and CSV export are not available in the popup.
-
----
-
 ## Y axis control
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
 The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, use a two-finger vertical pinch to zoom the Y axis.
 
-To set fixed Y axis bounds in YAML:
+To set initial Y axis bounds in YAML:
 ```yaml
 graphs:
   - type: line
@@ -148,7 +175,12 @@ graphs:
       ymin: 0
       ymax: 100
       ystepSize: 10
+      ylock: true   # disable all interactive Y axis pan and zoom
 ```
+
+`ymin` and `ymax` set the initial Y axis range and the range restored when the padlock is unlocked. They do not prevent the user from modifying the axis interactively. Use `ylock: true` to fully disable interactive Y axis changes.
+
+> For full details → [README_Full.md — Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#y-axis-scaling)
 
 ---
 
@@ -161,6 +193,8 @@ defaultTimeOffset: 1D    # Snap to current day from midnight. Use uppercase for 
 ```
 
 `defaultTimeRange` uses a "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range, but only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
+
+> For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
 
 ---
 
@@ -224,6 +258,8 @@ By default the card interpolates over unavailable states. To show gaps instead:
 showUnavailable: true
 ```
 
+> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#line-interpolation-modes)
+
 ---
 
 ## Bar charts
@@ -250,6 +286,8 @@ entityOptions:
       '1.5': red
 ```
 
+> For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#bar-graphs-for-total-increasing-entities)
+
 ---
 
 ## Timeline charts
@@ -258,8 +296,8 @@ entityOptions:
 
 State text display:
 ```yaml
-stateTextMode: raw    # raw HA state names (default)
-stateTextMode: auto   # translated device class dependent names
+stateTextMode: raw    # raw HA state names
+stateTextMode: auto   # translated device class dependent names (default)
 stateTextMode: hide   # no state labels
 ```
 
@@ -271,6 +309,8 @@ stateColors:
   binary_sensor.off: purple
   off: '#ff0000'
 ```
+
+> For full details (color priority rules, stateColorSeed) → [README_Full.md — Timeline charts](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#timeline-charts)
 
 ---
 
@@ -300,7 +340,10 @@ statistics:
   mode: mean       # mean, min, or max
   period: hour     # hour, day, or month
   force: false     # true = use statistics only, no short-term history
+  retention: 90    # optional: override history retention period in days
 ```
+
+> For full details → [README_Full.md — Long term statistics](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#long-term-statistics)
 
 ---
 
@@ -333,14 +376,19 @@ entityOptions:
 | `showMinMax` | Min/max band: `statistics` or `history` |
 | `scale` | Multiply values by this factor before display |
 | `hidden` | Hide by default in legend |
-| `ymin` / `ymax` | Lock Y axis bounds |
+| `ymin` / `ymax` | Set initial Y axis bounds (can still be modified interactively) |
 | `ystepSize` | Fix Y axis tick step |
+| `ylock` | Disable all interactive Y axis pan and zoom |
+| `stacked` | Stack bars (bar graphs with multiple entities) |
+| `showTimeLabels` | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
 | `height` | Graph height in pixels |
 | `decimation` | `fast` (default), `accurate`, or `false` |
 | `interval` | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
 | `netBars` | Net metering mode for bar graphs |
 | `process` | JS expression to transform values before display |
 | `showSamples` | Permanently show sample dots (graph-level) |
+
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
 
 ---
 
@@ -373,6 +421,9 @@ uiColors:
   gridlines: '#ff000040'
   labels: green
   buttons: '#80f00050'
+  cursorline: '#ff000080'  # vertical cursor line color
+  selector: 'rgba(255,255,255,255)'
+  closeButton: '#0000001f'
 
 uiLayout:
   toolbar: top         # top, bottom, both, hide
@@ -389,14 +440,27 @@ barGraphHeight: 150
 timelineBarHeight: 24
 timelineBarSpacing: 40
 
-showCurrentValues: true   # show live values next to legend labels
+showCurrentValues: false  # live values next to legend labels are shown by default; set false to hide
 legendVisible: false       # hide the legend entirely
 rounding: 2               # decimal digits in tooltips
 
+lineWidth: 2              # default line width in pixels
+stateColorSeed: 137       # seed for automatic state colors
+
 timeTicks:
-  densityOverride: higher  # low, medium, high, higher, highest
-  dateFormat: short        # normal or short
+  density: high           # base density: low, medium, high, higher, highest
+  densityOverride: higher # skip auto-density and force this level
+  dateFormat: short       # normal or short
+
+statistics:
+  enabled: true
+  mode: mean              # mean, min, max
+  period: hour            # hour, day, month
+  force: false
+  retention: 90           # optional: override history retention period in days
 ```
+
+> For full details → [README_Full.md — Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#configuring-the-ui)
 
 ---
 
@@ -432,11 +496,11 @@ graphs:
         color: black
 ```
 
-For the full list of configuration options, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md).
+> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
 
 ---
 
-### Running as a sidebar panel
+## Running as a sidebar panel
 
 ![image](https://user-images.githubusercontent.com/60828821/161340801-f1f97e90-73c4-44d9-8afa-ba858906a2c1.png)
 
