@@ -14,7 +14,9 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.25b33';
+const Version = '1.1.26b21';
+
+const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -86,6 +88,7 @@ var panstate = {};
     panstate.st1 = null;
     panstate.yaxis = null;
     panstate.pinch = null;  // { p1, p2, distY, y0, y1 } when two fingers active
+    panstate.longpress = null; // { timer, pointerId, x0, y0 } — touch long-press gate
 
 
 // --------------------------------------------------------------------------------------
@@ -618,6 +621,8 @@ export class HistoryCardState {
                     c.options.scales.yAxes[0].ticks.max = c.options.scales.yAxes[0].ticks.forceMax;
                     c.options.scales.yAxes[0].ticks.removeEdgeTicks = false;
                     this.graphs[i].yaxisLock = 0;
+                    const _ya = this._this.querySelector(`#ya-${this.graphs[i].id}`);
+                    if( _ya ) _ya.style.touchAction = '';
                 } else
                     this.graphs[i].yaxisLock = 1;
 
@@ -1744,7 +1749,7 @@ export class HistoryCardState {
                             color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
                         },
                         scaleLabel: {
-                            display: scaleUnit !== undefined && scaleUnit !== '' && this.pconfig.labelsVisible,
+                            display: scaleUnit !== undefined && scaleUnit !== '',
                             labelString: scaleUnit,
                             fontColor: this.pconfig.graphLabelColor
                         },
@@ -2112,10 +2117,12 @@ export class HistoryCardState {
 
     yAxisPointerDown(event)
     {
-        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
+        const _el = event.target;
+        const _pid = event.pointerId;
+        let _pending = null;
         for( let g of this.graphs ) {
-            if( this._this.querySelector(`#ya-${g.id}`) === event.target ) {
-                panstate.yaxis = {
+            if( this._this.querySelector(`#ya-${g.id}`) === _el ) {
+                _pending = {
                     g,
                     startY: event.clientY,
                     y0: g.chart.scales['y-axis-0'].min,
@@ -2124,13 +2131,43 @@ export class HistoryCardState {
                 break;
             }
         }
-        event.preventDefault();
-        event.stopPropagation();
+        if( !_pending ) return;
+        if( _pending.g.ylock ) return;
+        if( event.pointerType !== 'touch' || _pending.g.yaxisLock === 2 ) {
+            event.preventDefault();
+            event.stopPropagation();
+            try { _el.setPointerCapture(_pid); } catch(e) {}
+            _el.style.touchAction = 'none';
+            panstate.yaxis = _pending;
+        } else {
+            panstate.longpress = {
+                pointerId : _pid,
+                x0        : event.clientX,
+                y0        : event.clientY,
+                timer     : setTimeout(() => {
+                    panstate.longpress = null;
+                    try { _el.setPointerCapture(_pid); } catch(e) {}
+                    _el.style.touchAction = 'none';
+                    panstate.yaxis = _pending;
+                    _pending.g.yaxisLock = 2;
+                    this.updateScaleLockState(_pending.g, true);
+                }, 500)
+            };
+        }
     }
 
     yAxisPointerMove(event)
     {
+        if( event.buttons === 0 ) return;
+        if( panstate.longpress && event.pointerId === panstate.longpress.pointerId ) {
+            if( Math.abs(event.clientX - panstate.longpress.x0) + Math.abs(event.clientY - panstate.longpress.y0) > TOUCH_SLOP ) {
+                clearTimeout(panstate.longpress.timer);
+                panstate.longpress = null;
+            }
+            return;
+        }
         if( !panstate.yaxis ) return;
+        event.preventDefault();
         const p     = panstate.yaxis;
         const g     = p.g;
         const h     = g.chart.chartArea.bottom - g.chart.chartArea.top;
@@ -2146,6 +2183,13 @@ export class HistoryCardState {
 
     yAxisPointerUp(event)
     {
+        if( panstate.longpress ) {
+            clearTimeout(panstate.longpress.timer);
+            panstate.longpress = null;
+        }
+        if( panstate.yaxis && panstate.yaxis.g.yaxisLock !== 2 ) {
+            event.target.style.touchAction = '';
+        }
         panstate.yaxis = null;
     }
 
@@ -2698,7 +2742,7 @@ export class HistoryCardState {
     {
         if( panstate.lgPending ) {
             const _p = panstate.lgPending;
-            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 && _p.datasetIdx >= 0 ) {
+            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > TOUCH_SLOP && _p.datasetIdx >= 0 ) {
                 panstate.dragDataset = { g: _p.g, datasetIdx: _p.datasetIdx, color: _p.color };
                 panstate.lgPending = null;
                 this._createGhost(_p.text, _p.boxW, _p.boxH, event.clientX, event.clientY, 'center', _p.color);
@@ -2826,7 +2870,7 @@ export class HistoryCardState {
     {
         if( panstate.pendingMoveGraph ) {
             const _p = panstate.pendingMoveGraph;
-            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > 5 ) {
+            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > TOUCH_SLOP ) {
                 panstate.moveGraph = { g: _p.g, startX: _p.startX, startY: _p.startY };
                 panstate.pendingMoveGraph = null;
                 event.target.style.cursor = 'grabbing';
@@ -3083,7 +3127,7 @@ export class HistoryCardState {
                     const p1 = { x: panstate.mx, y: panstate.my };
                     const p2 = { x: event.clientX, y: event.clientY };
                     const g  = panstate.g;
-                    if( g.type !== 'timeline' && g.type !== 'arrowline' ) {
+                    if( g.type !== 'timeline' && g.type !== 'arrowline' && !g.ylock ) {
                         panstate.pinch = {
                             p1, p2,
                             distY: Math.abs(p2.y - p1.y),
@@ -3142,7 +3186,7 @@ export class HistoryCardState {
         }
         if( panstate.pendingDragTimeline ) {
             const _pt = panstate.pendingDragTimeline;
-            if( Math.abs(event.clientX - _pt.startX) + Math.abs(event.clientY - _pt.startY) > 5 ) {
+            if( Math.abs(event.clientX - _pt.startX) + Math.abs(event.clientY - _pt.startY) > TOUCH_SLOP ) {
                 panstate.dragTimelineEntity = { g: _pt.g, entityIdx: _pt.entityIdx };
                 panstate.pendingDragTimeline = null;
                 event.target.style.cursor = 'grabbing';
@@ -4230,7 +4274,7 @@ export class HistoryCardState {
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
-            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
+            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
             html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
             if( type == 'line' || type == 'bar' )
                 html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
@@ -4339,7 +4383,7 @@ export class HistoryCardState {
 
         const interval = this.parseIntervalConfig(config?.interval) ?? 1;
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false };
 
         this.graphs.push(g);
 
@@ -5794,7 +5838,7 @@ class HistoryExplorerCard extends HTMLElement
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
                 html += this.instance.createScaleLockIconHtml(g.id, h);
             if( g.graph.type == 'line' || g.graph.type == 'bar' )
-                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:none;cursor:ns-resize;"></div>`;
+                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
 
             html += `</div>`;
             spacing = !( g.graph.options?.showTimeLabels === false );
