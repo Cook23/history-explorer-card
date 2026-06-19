@@ -10,13 +10,15 @@ Changelog for the HA History Explorer Card.
 - **Architecture refactoring: unified static/dynamic graph pipeline.** Static YAML graphs are now treated as dynamic graphs with YAML-initialized parameters and restricted UI interaction — a single code path handles both, eliminating all special-case branching between static and dynamic graphs
 - `pconfig.graphConfig` replaced by `pconfig.graphs` — a dictionary indexed by `groupId` storing graph-level properties (`title`, `showTimeLabels`, `height`, `stacked`, `ylock`) derived from YAML; never persisted, rebuilt at each startup from YAML only
 - `pconfig.entities` is now the single source of truth for all graphs (static and dynamic); static entities are injected by `buildGraphListFromConfig` with `isStatic: true` and a stable `groupId`
-- `addDynamicGraph` now handles static graphs via `isStatic` and `overrideInterval` parameters; `addFixedGraph` removed entirely
+- `addDynamicGraph` now handles static graphs via `isStatic`, `overrideInterval` and `groupId` parameters; `addFixedGraph` removed entirely
 - Canvas elements for static graphs are no longer pre-generated in `insertUIHtmlText` — all canvases (static and dynamic) are created dynamically by `addGraphToCanvas`; static graph HTML pipeline (`graphConfig` loop in `insertUIHtmlText`) removed
 - Graph `interval` is now a property of the entity (`pconfig.entities[i].interval`) rather than a separate per-graph state object; persisted atomically with entities
 - `isFixed` flag on graph objects replaces all `id >= firstDynamicId` comparisons; `firstDynamicId` removed
 - `removeAllEntities` preserves static entities (`filter(e => e.isStatic)`) instead of clearing `pconfig.entities` entirely
 - `removeGraph` guards against removing static entities from `pconfig.entities`
-- Double-click uncombine and drag-out blocked on `isFixed` graphs; close button not connected for static graphs
+- Double-click uncombine and drag-out blocked on `isFixed` graphs; close button not generated for static graphs (`isStatic: true`)
+- Graph title (`title:` YAML option) now rendered for all graph types via unified pipeline
+- `_updateMoVisibility()` added — hides the reorder handle (`mo-N`) and moves the scale lock button (`ca-N`) to `left:0` when only one graph is present; restores default layout when multiple graphs are present; called after every `addDynamicGraph` and `removeGraph`
 - Legend dot now displayed for bar graphs regardless of dataset count (`usePointStyle` condition simplified)
 - Legend overlay (`lg-N`) left and right margins set dynamically after graph creation via `_updateLegendMargins()`
 
@@ -27,8 +29,15 @@ Changelog for the HA History Explorer Card.
 - Code path after `return` in `readLocalState` (defaultInfoPanel registry, menu label update, `applyInfoPanelState`) moved before the return statement — was unreachable dead code
 - `_pendingGraphState` removed
 
+### Changed — history-info-panel.js
+- Panel migrated to unified pipeline: `graphConfig` + `addFixedGraph` replaced by `pconfig.entities` + `pconfig.graphs` + `addDynamicGraph` with `isStatic: true`
+- Pre-generated canvas, `bd-0`, `ca-0` removed from `_hec_render` static HTML — created dynamically by `addDynamicGraph`
+- Manual creation of `ya-0` overlay and its touch handlers removed from `_injectHistoryExplorer` — handled by unified pipeline
+- Reorder handle (`mo-0`) hidden and scale lock button repositioned to `left:0` via `_updateMoVisibility()` — single-graph layout with no wasted space
+
 ### Fixed
 - Bar graph interval selector had no effect on dynamic graphs — root cause was interval stored separately from entities and not restored through the unified rebuild path; fixed by storing interval in `pconfig.entities` and passing it via `overrideInterval` through `addDynamicGraph`
+
 
 ## [v1.1.26] - 2026-06-10
 ### Added
