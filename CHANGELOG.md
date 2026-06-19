@@ -4,6 +4,32 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.27] - 2026-06-19
+
+### Changed
+- **Architecture refactoring: unified static/dynamic graph pipeline.** Static YAML graphs are now treated as dynamic graphs with YAML-initialized parameters and restricted UI interaction — a single code path handles both, eliminating all special-case branching between static and dynamic graphs
+- `pconfig.graphConfig` replaced by `pconfig.graphs` — a dictionary indexed by `groupId` storing graph-level properties (`title`, `showTimeLabels`, `height`, `stacked`, `ylock`) derived from YAML; never persisted, rebuilt at each startup from YAML only
+- `pconfig.entities` is now the single source of truth for all graphs (static and dynamic); static entities are injected by `buildGraphListFromConfig` with `isStatic: true` and a stable `groupId`
+- `addDynamicGraph` now handles static graphs via `isStatic` and `overrideInterval` parameters; `addFixedGraph` removed entirely
+- Canvas elements for static graphs are no longer pre-generated in `insertUIHtmlText` — all canvases (static and dynamic) are created dynamically by `addGraphToCanvas`; static graph HTML pipeline (`graphConfig` loop in `insertUIHtmlText`) removed
+- Graph `interval` is now a property of the entity (`pconfig.entities[i].interval`) rather than a separate per-graph state object; persisted atomically with entities
+- `isFixed` flag on graph objects replaces all `id >= firstDynamicId` comparisons; `firstDynamicId` removed
+- `removeAllEntities` preserves static entities (`filter(e => e.isStatic)`) instead of clearing `pconfig.entities` entirely
+- `removeGraph` guards against removing static entities from `pconfig.entities`
+- Double-click uncombine and drag-out blocked on `isFixed` graphs; close button not connected for static graphs
+- Legend dot now displayed for bar graphs regardless of dataset count (`usePointStyle` condition simplified)
+- Legend overlay (`lg-N`) left and right margins set dynamically after graph creation via `_updateLegendMargins()`
+
+### Changed — persistence
+- Storage format simplified: `graphState`, `yaml_graphIntervals`, `version`, `yaml_defaultInfoPanel` removed from persisted payload
+- `pconfig.entities` persistence uses "last one to speak wins" logic with three sources: YAML (mirror `yaml_entities`), HA user (mirror `ha_entities`), UI (localStorage active value); each source compared only to its own mirror
+- `ha_entities`, `ha_timeRangeHours`, `ha_timeRangeMinutes` replace `_lastHaUserInfoPanel`/`_lastHaUserTimeRangeHours`/`_lastHaUserTimeRangeMinutes` as HA user mirrors
+- Code path after `return` in `readLocalState` (defaultInfoPanel registry, menu label update, `applyInfoPanelState`) moved before the return statement — was unreachable dead code
+- `_pendingGraphState` removed
+
+### Fixed
+- Bar graph interval selector had no effect on dynamic graphs — root cause was interval stored separately from entities and not restored through the unified rebuild path; fixed by storing interval in `pconfig.entities` and passing it via `overrideInterval` through `addDynamicGraph`
+
 ## [v1.1.26] - 2026-06-10
 ### Added
 - Touch long-press gate on Y axis pan (`ya-N` overlay): on touch screens, pan Y activates only after holding the finger still for 500ms (≤ `TOUCH_SLOP` movement), preventing accidental Y axis interaction during page scroll; padlock activates automatically on long-press confirmation; subsequent touches with active padlock bypass the gate entirely
