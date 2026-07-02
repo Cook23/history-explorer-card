@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.26b21';
+const Version = '1.1.27b17';
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
@@ -160,7 +160,7 @@ export class HistoryCardState {
         this.pconfig.customStateColors    = undefined;
         this.pconfig.colorSeed            = 137;
         this.pconfig.stateTextMode        = 'raw';
-        this.pconfig.graphConfig          = [];
+        this.pconfig.graphs               = {};
         this.pconfig.entityOptions        = undefined;
         this.pconfig.lockAllGraphs        = false;
         this.pconfig.combineSameUnits     = false;
@@ -224,7 +224,6 @@ export class HistoryCardState {
         this.graphs = [];
 
         this.g_id = 0;
-        this.firstDynamicId = 0;
 
         this.startTime;
         this.endTime;
@@ -558,6 +557,16 @@ export class HistoryCardState {
             if( this.graphs[i].id == id ) {
 
                 this.graphs[i].interval = event.target.value;
+
+                // Persist interval in pconfig.entities for all graphs (static and dynamic)
+                for( let en of this.graphs[i].entities ) {
+                    const _eIdx = this.pconfig.entities.findIndex(e => (typeof e === 'string' ? e : e.entity) === en.entity);
+                    if( _eIdx >= 0 ) {
+                        if( typeof this.pconfig.entities[_eIdx] === 'string' )
+                            this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
+                        this.pconfig.entities[_eIdx].interval = parseInt(event.target.value);
+                    }
+                }
 
                 const ntype = ( event.target.value == 4 ) ? 'line' : 'bar';
 
@@ -1819,7 +1828,7 @@ export class HistoryCardState {
                     display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true,
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
-                        usePointStyle: ( graphtype == 'line' || (graphtype == 'bar' && datasets.length > 1) ),
+                        usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
                         boxWidth: 0
                     },
                     onClick: (e, legendItem) => {
@@ -1834,7 +1843,11 @@ export class HistoryCardState {
                         if( !g ) return;
                         const idx = legendItem.datasetIndex;
                         if( !this._uncombineInProgress && g._lastLegendClick && g._lastLegendClickIdx === idx && now - g._lastLegendClick < 400 ) {
-                            // Double-click — uncombine
+                            // Double-click — uncombine (not allowed on static/fixed graphs)
+                            if( g.isFixed ) {
+                                g._lastLegendClick = null;
+                                return;
+                            }
                             g._lastLegendClick = null;
                             this._uncombineInProgress = true;
                             setTimeout(() => { this._uncombineInProgress = false; }, 500);
@@ -1929,8 +1942,12 @@ export class HistoryCardState {
                     const _gid = chartInstance.canvas?.id?.replace('graph', '');
                     if( _gid === undefined ) return;
                     const _lgEl = this._this.querySelector(`#lg-${_gid}`);
-                    if( _lgEl && chartInstance.legend )
+                    if( _lgEl && chartInstance.legend ) {
                         _lgEl.style.height = (chartInstance.legend.height || 0) + 'px';
+                        _lgEl.style.left   = this.pconfig.labelAreaWidth + 'px';
+                        _lgEl.style.right  = (chartInstance._legendRightMargin ?? 25) + 'px';
+                        _lgEl.style.width  = '';
+                    }
                 }
             }]
 
@@ -2714,6 +2731,7 @@ export class HistoryCardState {
         try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
         for( let g of this.graphs ) {
             if( this._this.querySelector(`#lg-${g.id}`) === event.target ) {
+                if( g.isFixed ) return; // static graphs: no drag out
                 const _chart = g.chart;
                 // Store pending state — drag or click decided on pointerup
                 const _lgPending = { g, startX: event.clientX, startY: event.clientY, datasetIdx: -1 };
@@ -3055,8 +3073,8 @@ export class HistoryCardState {
                             if( _textW > _availW ) {
                                 this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
                             }
-                            // Double-click: uncombine entity into its own graph (dynamic graphs only)
-                            if( panstate.g.id >= this.firstDynamicId ) {
+                            // Double-click: uncombine entity into its own graph (non-fixed graphs only)
+                            if( !panstate.g.isFixed ) {
                                 const _now = Date.now();
                                 const _g = panstate.g;
                                 if( !this._uncombineInProgress &&
@@ -3283,7 +3301,7 @@ export class HistoryCardState {
                 const _cx = event.clientX - _rect.left;
                 const _cy = event.clientY - _rect.top;
                 let _onDraggable = false;
-                if( _hoverG.id >= this.firstDynamicId ) {
+                if( !_hoverG.isFixed ) {
                     if( _hoverG.type === 'timeline' || _hoverG.type === 'arrowline' ) {
                         if( _chart.chartArea && _cx < _chart.chartArea.left ) _onDraggable = true;
                     } else if( _chart.legend && _chart.legend.legendHitBoxes ) {
@@ -4028,13 +4046,13 @@ export class HistoryCardState {
 
         let a = 0;
         for( a = 0; a < this.graphs.length; a++ )
-            if( this.graphs[a].id >= this.firstDynamicId ) break;
+            if( !this.graphs[a].isFixed ) break;
 
         for( let i = a; i < this.graphs.length; i++ )
             this.graphs[i].canvas.parentNode.parentNode.remove();
 
         this.graphs.splice(a);
-        this.pconfig.entities = [];
+        this.pconfig.entities = this.pconfig.entities.filter(e => e.isStatic);
 
         this.writeLocalState();
     }
@@ -4121,6 +4139,17 @@ export class HistoryCardState {
         }
     }
 
+    _updateMoVisibility()
+    {
+        const _single = this.graphs.length <= 1;
+        for( let g of this.graphs ) {
+            const _mo = this._this.querySelector(`#mo-${g.id}`);
+            const _ca = this._this.querySelector(`#ca-${g.id}`);
+            if( _mo ) _mo.style.display = _single ? 'none' : 'flex';
+            if( _ca ) _ca.style.left = _single ? '0px' : '10px';
+        }
+    }
+
     removeGraph(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
@@ -4129,7 +4158,7 @@ export class HistoryCardState {
             if( this.graphs[i].id == id ) {
                 this.graphs[i].canvas.parentNode.parentNode.remove();
                 for( let e of this.graphs[i].entities ) {
-                    const j = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === e.entity);
+                    const j = this.pconfig.entities.findIndex(en => (typeof en === 'string' ? en : en.entity) === e.entity && !en.isStatic);
                     if( j >= 0 ) this.pconfig.entities.splice(j, 1);
                 }
                 this.graphs.splice(i, 1);
@@ -4137,52 +4166,14 @@ export class HistoryCardState {
             }
         }
 
+        this._updateMoVisibility();
+
         this.updateHistoryWithClearCache();
 
         this.writeLocalState();
     }
 
-    addFixedGraph(g)
-    {
-        // Add fixed graphs from YAML
-        if( g.graph.type == 'line' || g.graph.type == 'bar' ) {
-
-            let entities = [];
-            for( let d of g.graph.entities ) {
-                const dc = this.getNextDefaultColor();
-                const color = d.color ?? dc.color;
-                let fill = d.fill ?? (d.color ? 'rgba(0,0,0,0)' : dc.fill);
-                if( g.graph.type == 'bar' ) fill = color;
-                entities.push({ ...d, 'color' : color, 'fill' : fill });
-            }
-
-            this.addGraphToCanvas(g.id, g.graph.type, entities, g.graph.options, true);
-
-        } else {
-
-            this.addGraphToCanvas(g.id, g.graph.type, g.graph.entities, g.graph.options, true);
-
-        }
-
-        // For bar graphs, connect the interval selector dropdown listener
-        if( g.graph.type == 'bar' ) {
-            this._this.querySelector(`#bd-${g.id}`)?.addEventListener('change', this.selectBarInterval.bind(this));
-        }
-
-        // For line and bar graphs connect the scale lock button listener
-        if( g.graph.type == 'line' || g.graph.type == 'bar' ) {
-            this._this.querySelector(`#ca-${g.id}`)?.addEventListener('click', this.scaleLockClicked.bind(this));
-            const yaEl1 = this._this.querySelector(`#ya-${g.id}`);
-            if( yaEl1 ) {
-                yaEl1.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
-                yaEl1.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
-                yaEl1.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
-
-            }
-        }
-    }
-
-    addDynamicGraph(entity_id, noAutoGroup = false, overrideColor = null, overrideFill = null, targetGraph = null, overrideHidden = undefined)
+    addDynamicGraph(entity_id, noAutoGroup = false, overrideColor = null, overrideFill = null, targetGraph = null, overrideHidden = undefined, isStatic = false, overrideInterval = null, groupId = null)
     {
         // Add dynamic entity
 
@@ -4248,7 +4239,6 @@ export class HistoryCardState {
         // Add to an existing timeline graph and compatible line graph if possible
         let combine = !noAutoGroup &&
                       last >= 0 &&
-                      type != 'bar' &&
                       this.graphs[last].type === type &&
                       ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(this.graphs[last].entities[0].entity)) );
 
@@ -4263,12 +4253,22 @@ export class HistoryCardState {
 
         }
 
-        const h = this.calcGraphHeight(type, entities.length, entityOptions?.height);
+        // Graph-level properties from YAML (only for static graphs, undefined for dynamic)
+        const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
+        const _graphHeight = _graphProps.height ?? entityOptions?.height;
+        const h = this.calcGraphHeight(type, entities.length, _graphHeight);
 
         let html = '';
+        // Spacing between graphs (skip if previous graph has showTimeLabels === false)
+        const _prevG = this.graphs.length > 0 ? this.graphs[this.graphs.length - 1] : null;
+        const _prevShowTimeLabels = _prevG ? (this.pconfig.graphs[_prevG.groupId ?? null]?.showTimeLabels ?? true) : true;
+        if( this.graphs.length > 0 && _prevShowTimeLabels !== false ) html += '<br>';
+        // Optional title
+        if( _graphProps.title !== undefined ) html += `<div style='text-align:center;'>${_graphProps.title}</div>`;
         html += `<div style='height:${h}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
-        html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
+        if( !isStatic )
+            html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
             html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle, 40);
         if( type == 'line' || type == 'bar' )
@@ -4319,12 +4319,42 @@ export class HistoryCardState {
             lgEl2.addEventListener('pointercancel', this.legendDragEnd.bind(this));
         }
 
+        // Merge graph-level properties + groupId into entityOptions so addGraphToCanvas can use them
+        entityOptions = { ...entityOptions, ..._graphProps, groupId };
+
         // Create the graph
         const _dynGid = this.g_id;
-        this.addGraphToCanvas(this.g_id++, type, entities, entityOptions);
+        this.addGraphToCanvas(this.g_id++, type, entities, entityOptions, isStatic);
 
-        // Connect the close button event listener (after addGraphToCanvas which creates bc-)
-        this._this.querySelector(`#bc-${_dynGid}`)?.addEventListener('click', this.removeGraph.bind(this));
+        // Apply interval override if provided
+        const _dynG = this.graphs.find(g => g.id === _dynGid);
+        if( _dynG && overrideInterval !== null && overrideInterval !== undefined ) {
+            _dynG.interval = overrideInterval;
+            const _bd = this._this.querySelector(`#bd-${_dynGid}`);
+            if( _bd ) _bd.value = overrideInterval;
+        }
+
+        // Connect the close button event listener (only for dynamic graphs)
+        if( !isStatic )
+            this._this.querySelector(`#bc-${_dynGid}`)?.addEventListener('click', this.removeGraph.bind(this));
+
+        // Update legend margins now that elements are in the DOM with real widths
+        if( _dynG ) this._updateLegendMargins(_dynG);
+
+        // Update mo/ca visibility based on graph count
+        this._updateMoVisibility();
+    }
+
+    _updateLegendMargins(g)
+    {
+        const _isFixed = g.isFixed;
+        if( g.type === 'bar' ) {
+            const bd = this._this.querySelector(`#bd-${g.id}`);
+            if( bd ) g.chart._legendRightMargin = bd.offsetWidth + (_isFixed ? 15 : 45);
+        } else {
+            g.chart._legendRightMargin = _isFixed ? 25 : 45;
+        }
+        g.chart._legendLeftMargin = undefined;
     }
 
     addGraphToCanvas(gid, type, entities, config, isFixed = false)
@@ -4383,7 +4413,7 @@ export class HistoryCardState {
 
         const interval = this.parseIntervalConfig(config?.interval) ?? 1;
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isFixed": isFixed, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
 
@@ -4705,30 +4735,8 @@ export class HistoryCardState {
 
             this.graphs = [];
 
-            // Add fixed YAML defined graphs
-            for( let g of this.pconfig.graphConfig ) this.addFixedGraph(g);
-
-            // Update bd- text and value after graphs exist (like insertUIHtmlText + setTimeRange for by)
-            for( let g of this.graphs ) {
-                if( g.type !== 'bar' ) continue;
-                const bd = this._this.querySelector(`#bd-${g.id}`);
-                if( !bd ) continue;
-                bd.children[0].innerHTML = i18n('ui.interval._10m');
-                bd.children[1].innerHTML = i18n('ui.interval.hourly');
-                bd.children[2].innerHTML = i18n('ui.interval.daily');
-                bd.children[3].innerHTML = i18n('ui.interval.monthly');
-                if( bd.children[4] ) bd.children[4].innerHTML = i18n('ui.interval.rawline');
-                bd.value = g.interval ?? 1;
-                // Set legend right margin to account for interval selector width
-                // For fixed graphs: bd is at right:10px, for dynamic: right:40px + bc button
-                const _isFixed = g.id < this.firstDynamicId;
-                g.chart._legendRightMargin = bd.offsetWidth + (_isFixed ? 15 : 45);
-                g.chart._legendLeftMargin = undefined; // reserved for future use
-            }
-
             this.resizeSelector();
 
-            ///
             for( let i = 0; i < 2; i++ ) {
 
                 this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
@@ -4764,33 +4772,32 @@ export class HistoryCardState {
 
             this.pconfig.nextDefaultColor = 0;
 
-            // Add dynamically added graphs
+            // Rebuild all graphs (static and dynamic) from pconfig.entities
             if( this.pconfig.entities ) {
                 // Group by groupId, preserving first-occurrence order
                 const _groupMap = new Map();
                 const _groupOrder = [];
                 for( let e of this.pconfig.entities ) {
                     const _groupId = typeof e === 'object' ? e.groupId : undefined;
-                    const _key = _groupId ?? Symbol(); // undefined groupId = unique group
+                    const _key = _groupId ?? Symbol();
                     if( !_groupMap.has(_key) ) {
                         _groupMap.set(_key, { groupId: _groupId, entities: [] });
                         _groupOrder.push(_key);
                     }
                     _groupMap.get(_key).entities.push(e);
                 }
-                // Add each group as a single graph, in first-occurrence order
                 for( let _key of _groupOrder ) {
                     const _group = _groupMap.get(_key);
                     if( _group.entities.length === 1 ) {
                         const _e = _group.entities[0];
-                        this.addDynamicGraph(typeof _e === 'string' ? _e : _e.entity, true, _e.color, _e.fill, null, _e.hidden);
+                        const _eid = typeof _e === 'string' ? _e : _e.entity;
+                        this.addDynamicGraph(_eid, true, _e.color, _e.fill, null, _e.hidden, _e.isStatic, _e.interval, _group.groupId);
                     } else {
-                        // Multiple entities in same group — force-combine
                         const _saved = this.pconfig.combineSameUnits;
                         this.pconfig.combineSameUnits = true;
                         _group.entities.forEach((_e, _i) => {
                             const _eid = typeof _e === 'string' ? _e : _e.entity;
-                            this.addDynamicGraph(_eid, _i === 0, _e.color, _e.fill, _i === 0 ? null : this.graphs[this.graphs.length - 1], _e.hidden);
+                            this.addDynamicGraph(_eid, _i === 0, _e.color, _e.fill, _i === 0 ? null : this.graphs[this.graphs.length - 1], _e.hidden, _e.isStatic, _e.interval, _group.groupId);
                         });
                         this.pconfig.combineSameUnits = _saved;
                     }
@@ -4808,7 +4815,6 @@ export class HistoryCardState {
             ro.observe(this._this.querySelector('#maincard'));
 
             // Per-graph interval now restored in readLocalState (last-one-to-speak-wins)
-            this._pendingGraphState = null;
 
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
@@ -5310,33 +5316,18 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
-        // Collect per-graph state
-        const _graphState = {};
-        for( let g of this.graphs ) {
-            _graphState[g.id] = { interval: g.interval ?? null };
-        }
-        // Build YAML interval mirrors for bar graphs
-        const _yamlGraphIntervals = {};
-        for( let gc of (this.pconfig.graphConfig || []) ) {
-            if( gc.graph?.options?.interval !== undefined )
-                _yamlGraphIntervals[gc.id] = this.parseIntervalConfig(gc.graph.options.interval) ?? null;
-        }
-
         const data = {
-            version             : 2,
-            entities            : this.pconfig.entities,
-            graphState          : _graphState,
-            // YAML mirrors (for change detection)
-            yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
-            yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
-            yaml_graphIntervals    : _yamlGraphIntervals,
-            // HA user mirrors (for change detection)
-            ha_infoPanelEnabled : this._lastHaUserInfoPanel,
-            ha_timeRangeHours   : this._lastHaUserTimeRangeHours,
-            ha_timeRangeMinutes : this._lastHaUserTimeRangeMinutes,
             // Active values
+            entities            : this.pconfig.entities,
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
+            // YAML mirrors (last YAML value seen — detect YAML change across restarts)
+            yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
+            yaml_entities          : this.pconfig.entities.filter(e => e.isStatic),
+            // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
+            ha_entities         : this._lastHaEntities,
+            ha_timeRangeHours   : this._lastHaTimeRangeHours,
+            ha_timeRangeMinutes : this._lastHaTimeRangeMinutes,
         };
         const _json = JSON.stringify(data);
 
@@ -5370,18 +5361,31 @@ export class HistoryCardState {
             if( _ipe?.value?.enabled !== undefined ) _haInfoEnabled = !!_ipe.value.enabled;
         } catch(e) {}
 
-        // Restore entities and graphState from HA user if available, else localStorage
-        const _data = _haCard || _ls;
-        if( _data?.entities ) {
-            this.pconfig.entities = _data.entities.map(e => typeof e === 'string' ? { entity: e } : e);
-            this._pendingGraphState = _data.graphState || {};
-        } else {
-            this.pconfig.entities = [];
-        }
+        // --- Last one to speak wins — entities ---
+        // YAML source: static entities from pconfig (initialized from YAML before this call)
+        // HA user source: compared to ha_entities mirror in localStorage
+        // UI source: localStorage active value — wins if no YAML or HA front
+        const _lsEntities    = _ls?.entities;
+        const _haEntities    = _haCard?.entities;
+        const _yamlEntities  = this.pconfig.entities.filter(e => e.isStatic);
+        const _yamlEntitiesChanged = JSON.stringify(_yamlEntities) !== JSON.stringify(_ls?.yaml_entities ?? null);
+        const _haEntitiesChanged   = _haEntities !== undefined &&
+                                     JSON.stringify(_haEntities) !== JSON.stringify(_ls?.ha_entities ?? null);
 
-        // --- "Last one to speak wins" front detection ---
-        // Each source is compared to its mirror in localStorage.
-        // If both YAML and HA user changed simultaneously, YAML wins.
+        if( _yamlEntitiesChanged ) {
+            // YAML wins — keep static from YAML, keep dynamic from localStorage
+            const _dynStored = (_lsEntities ?? []).filter(e => !e.isStatic);
+            this.pconfig.entities = [ ..._yamlEntities, ..._dynStored ];
+        } else if( _haEntitiesChanged ) {
+            // HA user wins (change from another device)
+            this.pconfig.entities = _haEntities.map(e => typeof e === 'string' ? { entity: e } : e);
+        } else if( _lsEntities ) {
+            // UI wins — restore from localStorage
+            this.pconfig.entities = _lsEntities.map(e => typeof e === 'string' ? { entity: e } : e);
+        }
+        // else: first run — keep pconfig.entities as initialized from YAML
+
+        // --- Last one to speak wins — timeRange and infoPanelEnabled ---
 
         // YAML fronts
         const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
@@ -5439,52 +5443,9 @@ export class HistoryCardState {
         }
 
         // Update HA user mirrors for next writeLocalState
-        this._lastHaUserInfoPanel         = _haInfoEnabled ?? _ls?.ha_infoPanelEnabled;
-        this._lastHaUserTimeRangeHours    = _haCard?.timeRangeHours   ?? _ls?.ha_timeRangeHours;
-        this._lastHaUserTimeRangeMinutes  = _haCard?.timeRangeMinutes ?? _ls?.ha_timeRangeMinutes;
-
-        // --- Graph interval front detection (bar graphs) ---
-        // Detect YAML change per graph and HA user change, restore correct interval
-        let _intervalNeedsRedraw = false;
-        for( let g of this.graphs ) {
-            if( g.type !== 'bar' ) continue;
-            const _gs = ((_data?.graphState) || {})[g.id];
-            const _persistedInterval = _gs?.interval ?? null;
-            // YAML front: current YAML interval vs mirror in localStorage
-            const _yamlNow = this.pconfig.graphConfig?.find(gc => gc.id === g.id)?.graph?.options?.interval;
-            const _yamlNowParsed = _yamlNow !== undefined ? (this.parseIntervalConfig(_yamlNow) ?? null) : null;
-            const _yamlIntervalChanged = _yamlNowParsed !== null &&
-                                         _yamlNowParsed !== (_ls?.yaml_graphIntervals?.[g.id] ?? null);
-            // HA user front: HA user graphState vs localStorage graphState
-            const _haInterval = _haCard?.graphState?.[g.id]?.interval ?? null;
-            const _lsInterval  = _ls?.graphState?.[g.id]?.interval ?? null;
-            const _haIntervalChanged = _haInterval !== null && _haInterval !== _lsInterval;
-
-            let _activeInterval;
-            if( _yamlIntervalChanged ) {
-                _activeInterval = _yamlNowParsed; // YAML wins
-            } else if( _haIntervalChanged ) {
-                _activeInterval = _haInterval;    // HA user wins
-            } else {
-                _activeInterval = _persistedInterval; // no front — restore active
-            }
-            if( _activeInterval !== null && _activeInterval !== undefined && _activeInterval !== g.interval ) {
-                g.interval = _activeInterval;
-                const _bd = this._this.querySelector(`#bd-${g.id}`);
-                if( _bd ) _bd.value = _activeInterval;
-                _intervalNeedsRedraw = true;
-            }
-        }
-
-        // Persist updated state (including all mirrors) before any potential reload
-        await this.writeLocalState();
-
-        return _intervalNeedsRedraw;
-
-        // If HA card data was missing from HA storage, migrate localStorage there
-        if( !_haCard && _ls ) {
-            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: _ls }); } catch(e) {}
-        }
+        this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
+        this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
+        this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
 
         // Set _nextGroupId to max existing groupId + 1
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
@@ -5533,10 +5494,15 @@ export class HistoryCardState {
             }
         } catch(e) {}
 
+        // Persist updated state (mirrors included) before any potential reload
+        await this.writeLocalState();
+
         // Apply infoPanel state last, after everything (including writeLocalState) is done
         if( _infoPanelChanged ) {
             this.applyInfoPanelState();
         }
+
+        return false; // interval redraw handled via pconfig.entities in createContent
     }
     async writeInfoPanelConfig(forceUpdate = false)
     {
@@ -5608,19 +5574,51 @@ export class HistoryCardState {
         for( let graph of graphs ) {
             if( !graph.entities ) continue;
             let l = { ...graph, 'entities' : [] };
+            const _gid = this.g_id++;
+            const _groupId = _gid; // use graph index as groupId for static graphs
+
             for( let e of graph.entities ) {
                 if( e.entity.indexOf('*') >= 0 ) {
                     const regexExcludes = this.buildEntityExclusionList(e.exclude);
                     const regex = this.matchWildcardPattern(e.entity);
                     for( let s in this._hass.states ) {
                         if( regex && regex.test(s) && !testEntityExclusionList(s, regexExcludes) ) {
-                            l.entities.push({...e, 'entity' : s});
+                            const _ent = {...e, 'entity': s};
+                            l.entities.push(_ent);
+                            // Add to pconfig.entities as static entry
+                            this.pconfig.entities.push({
+                                entity   : s,
+                                groupId  : _groupId,
+                                color    : _ent.color,
+                                fill     : _ent.fill,
+                                hidden   : _ent.hidden,
+                                interval : this.parseIntervalConfig(graph.options?.interval) ?? null,
+                                isStatic : true
+                            });
                         }
                     }
-                } else
+                } else {
                     l.entities.push(e);
+                    // Add to pconfig.entities as static entry
+                    this.pconfig.entities.push({
+                        entity   : e.entity,
+                        groupId  : _groupId,
+                        color    : e.color,
+                        fill     : e.fill,
+                        hidden   : e.hidden,
+                        interval : this.parseIntervalConfig(graph.options?.interval) ?? null,
+                        isStatic : true
+                    });
+                }
             }
-            this.pconfig.graphConfig.push({ graph: l, id:this.g_id++ });
+            // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted
+            this.pconfig.graphs[_groupId] = {
+                title          : graph.title,
+                showTimeLabels : graph.options?.showTimeLabels,
+                height         : graph.options?.height,
+                stacked        : graph.options?.stacked,
+                ylock          : graph.options?.ylock,
+            };
         }
     }
 }
@@ -5724,12 +5722,11 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance.g_id = 0;
 
-        this.instance.pconfig.graphConfig = [];
+        this.instance.pconfig.graphs = {};
 
         if( config.graphs )
             this.instance.buildGraphListFromConfig(config.graphs)
 
-        this.instance.firstDynamicId = this.instance.g_id;
 
         this.instance.pconfig.customStateColors = {};
 
@@ -5825,26 +5822,8 @@ class HistoryExplorerCard extends HTMLElement
             ${this.instance.addUIHtml(tools & 1, selector & 1, bgcol, optionStyle, inputStyle, invertZoom, 0)}
         `;
 
-        // Graph area
-        let spacing = true;
-        for( let g of this.instance.pconfig.graphConfig ) {
-            if( g.id > 0 && spacing ) html += '<br>';
-            if( g.graph.title !== undefined ) html += `<div style='text-align:center;'>${g.graph.title}</div>`;
-            const h = this.instance.calcGraphHeight(g.graph.type, g.graph.entities.length, g.graph.options?.height);
-            html += `<div style='height:${h}px;position:relative'>`;
-            html += `<canvas id="graph${g.id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
-            if( g.graph.type == 'bar' && !this.instance.ui.hideInterval )
-                html += this.instance.createIntervalSelectorHtml(g.id, h, this.instance.parseIntervalConfig(g.graph.options?.interval), optionStyle, 10);
-            if( g.graph.type == 'line' || g.graph.type == 'bar' )
-                html += this.instance.createScaleLockIconHtml(g.id, h);
-            if( g.graph.type == 'line' || g.graph.type == 'bar' )
-                html += `<div id="ya-${g.id}" style="position:absolute;left:0;top:28px;width:${this.instance.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
-
-            html += `</div>`;
-            spacing = !( g.graph.options?.showTimeLabels === false );
-        }
-
         // Footer
+        // Note: graph canvas elements are created dynamically by addGraphToCanvas (static and dynamic unified)
         html += `
             ${this.instance.addUIHtml(tools & 2, selector & 2, bgcol, optionStyle, inputStyle, invertZoom, 1)}
             ${(((tools | selector) & 2) && !(this.instance.ui.stickyTools & 2)) ? '<br>' : ''}
