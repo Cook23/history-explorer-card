@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.27b17';
+const Version = '1.1.28b5';
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
@@ -2377,7 +2377,7 @@ export class HistoryCardState {
             // Inter-graph: check compatibility
             const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
             const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
+            const _compatible = !_overG.isFixed && _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
             this._highlightDropTarget(_overG.canvas, _compatible);
             // Freeze target chart when over its legend overlay
@@ -2513,6 +2513,11 @@ export class HistoryCardState {
                         }
                     }
                 }
+                return;
+            }
+
+            if( _tgt && _tgt.isFixed ) {
+                this._showLabelTooltip('Static', event.clientX, event.clientY);
                 return;
             }
 
@@ -2731,7 +2736,6 @@ export class HistoryCardState {
         try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
         for( let g of this.graphs ) {
             if( this._this.querySelector(`#lg-${g.id}`) === event.target ) {
-                if( g.isFixed ) return; // static graphs: no drag out
                 const _chart = g.chart;
                 // Store pending state — drag or click decided on pointerup
                 const _lgPending = { g, startX: event.clientX, startY: event.clientY, datasetIdx: -1 };
@@ -4181,6 +4185,10 @@ export class HistoryCardState {
 
         var entityOptions = this.getEntityOptions(entity_id);
 
+        // Merge graph-level properties before type detection so graph.type from YAML wins
+        const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
+        entityOptions = { ...entityOptions, ..._graphProps, groupId };
+
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
         const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
@@ -4237,7 +4245,10 @@ export class HistoryCardState {
         const last = this.graphs.length - 1;
 
         // Add to an existing timeline graph and compatible line graph if possible
-        let combine = !noAutoGroup &&
+        // For static multi-entity groups (isStatic + targetGraph provided), force combine
+        // without type/unit compatibility checks — YAML author is responsible for the grouping
+        let combine = (isStatic && targetGraph !== null) ? true :
+                      !noAutoGroup &&
                       last >= 0 &&
                       this.graphs[last].type === type &&
                       ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(this.graphs[last].entities[0].entity)) );
@@ -4253,8 +4264,6 @@ export class HistoryCardState {
 
         }
 
-        // Graph-level properties from YAML (only for static graphs, undefined for dynamic)
-        const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
         const h = this.calcGraphHeight(type, entities.length, _graphHeight);
 
@@ -4276,7 +4285,7 @@ export class HistoryCardState {
         if( type == 'line' || type == 'bar' )
             html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
             html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
-            if( type == 'line' || type == 'bar' )
+            if( (type == 'line' || type == 'bar') && !isStatic )
                 html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
         html += `</div>`;
 
@@ -4318,9 +4327,6 @@ export class HistoryCardState {
             lgEl2.addEventListener('pointerup',     this.legendDragEnd.bind(this));
             lgEl2.addEventListener('pointercancel', this.legendDragEnd.bind(this));
         }
-
-        // Merge graph-level properties + groupId into entityOptions so addGraphToCanvas can use them
-        entityOptions = { ...entityOptions, ..._graphProps, groupId };
 
         // Create the graph
         const _dynGid = this.g_id;
@@ -5385,6 +5391,22 @@ export class HistoryCardState {
         }
         // else: first run — keep pconfig.entities as initialized from YAML
 
+        // Migration: renumber dynamic entities with groupId < 1000 to groupId + 1000
+        // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
+        // sequentially from g_id. Dynamic graphs now always use groupId >= 1000.
+        const _yamlGroupIds = new Set(this.pconfig.entities.filter(e => e.isStatic).map(e => e.groupId));
+        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId < 1000);
+        if( _needsRenumber ) {
+            const _remap = new Map();
+            this.pconfig.entities = this.pconfig.entities.map(e => {
+                if( !e.isStatic && e.groupId !== undefined && e.groupId < 1000 ) {
+                    if( !_remap.has(e.groupId) ) _remap.set(e.groupId, e.groupId + 1000);
+                    return { ...e, groupId: _remap.get(e.groupId) };
+                }
+                return e;
+            });
+        }
+
         // --- Last one to speak wins — timeRange and infoPanelEnabled ---
 
         // YAML fronts
@@ -5447,9 +5469,9 @@ export class HistoryCardState {
         this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
         this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
 
-        // Set _nextGroupId to max existing groupId + 1
+        // Set _nextGroupId to max(1000, maxGroupId + 1) — dynamic groupIds always >= 1000
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
-        this._nextGroupId = _maxGroupId + 1;
+        this._nextGroupId = Math.max(1000, _maxGroupId + 1);
 
         // Register defaultInfoPanel with HA user key and detect conflicts across cards
         try {
@@ -5613,6 +5635,7 @@ export class HistoryCardState {
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted
             this.pconfig.graphs[_groupId] = {
+                type           : graph.type,
                 title          : graph.title,
                 showTimeLabels : graph.options?.showTimeLabels,
                 height         : graph.options?.height,
