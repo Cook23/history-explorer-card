@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.28] - 2026-07-04
+
+### Fixed
+- Static YAML graphs with mixed entity types or incompatible units were split into separate graphs instead of being combined — root cause was the auto-combine logic applying type/unit compatibility checks to static groups; fixed by forcing combine when `isStatic && targetGraph !== null`
+- `graph.type` YAML option was ignored for static graphs — root cause was `_graphProps` being merged into `entityOptions` after type detection; fixed by moving the merge before type detection so YAML `graph.type` correctly overrides automatic state-class-based detection; `type` added to `pconfig.graphs`
+- Legend click (toggle entity visibility) had no effect on static YAML graphs — root cause was the legend drag overlay (`lg-N`) capturing pointer events and blocking click forwarding to Chart.js; fixed by not generating `lg-N` for static graphs, letting Chart.js receive clicks directly
+- Dragging an entity from a dynamic graph onto a static YAML graph was incorrectly allowed — static graphs now reject incoming drops with a "Static" tooltip and red highlight, consistent with other incompatibility feedback
+- Static YAML graph `groupId` values (sequential from 0) could collide with dynamic graph `groupId` values from a previous session, causing entities from different graphs to be incorrectly merged — fixed by migrating existing dynamic `groupId` values below 1000 to `groupId + 1000` on first load, and initialising `_nextGroupId` to `Math.max(1000, maxGroupId + 1)` so all newly created dynamic graphs always use `groupId >= 1000`
+
+
 ## [v1.1.27] - 2026-06-19
 
 ### Changed
