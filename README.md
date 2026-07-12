@@ -20,7 +20,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
-- **v1.1.30** — New `disable_persistence` option (card-wide, or per entity down to individual fields) to stop a device from picking up graph or time-range changes synced from another device on your Home Assistant account — your own local changes are still saved as usual.
+- **v1.1.30** — New `disable_multidevice_persistence` and `disable_persistence` options (card-wide, or per entity down to individual fields) to keep a device's time range and entities from being overwritten — by another device's sync, or even by this device's own past changes — and always fall back to the YAML default instead.
 - **v1.1.29** — Change any entity's display type on the fly (line, bar, arrowline, timeline) from a simple menu — no need to remove and re-add it.
 - **v1.1.26** — Touch-friendly Y axis panning (long-press to activate) and a new `ylock` option to lock a graph's Y axis range.
 - **v1.1.25** — Bar graph interval (10 min / hourly / daily / monthly) is now remembered across reloads.
@@ -234,11 +234,19 @@ defaultTimeOffset: 1D    # Snap to current day from midnight. Use uppercase for 
 
 `defaultTimeRange` uses a "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range, but only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
 
-Time range and entities normally sync across all your devices via your HA account. If you'd rather keep a device's own range or entity choices independent from the others, `disable_persistence` blocks that specific cross-device sync (YAML and this device's own local changes keep working as usual):
+Time range and entities normally sync across all your devices via your HA account. If you'd rather keep a device's own range or entity choices independent from the others, `disable_multidevice_persistence` blocks that specific cross-device sync (YAML and this device's own local changes keep working as usual):
 
 ```yaml
 type: custom:history-explorer-card
-disable_persistence: range   # this device keeps its own time range, ignoring other devices
+disable_multidevice_persistence: range   # this device keeps its own time range, ignoring other devices
+```
+
+If you'd rather this device always reset to the YAML default — ignoring both other devices' changes *and* its own past zoom/pan — use `disable_persistence` instead. It does everything `disable_multidevice_persistence` does, plus blocks this device's own local memory:
+
+```yaml
+type: custom:history-explorer-card
+defaultTimeRange: 24h
+disable_persistence: range   # always reopen at 24h, regardless of any past zoom on any device
 ```
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)

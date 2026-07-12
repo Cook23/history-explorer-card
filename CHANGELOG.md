@@ -4,6 +4,23 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.30] - 2026-07-12
+
+### Added — persistence control options
+- New `disable_multidevice_persistence` YAML option blocks the HA per-user storage restore front (cross-device sync via `frontend/set_user_data`) — a device stops adopting graph or time-range changes made on another device under the same HA account. YAML changes and this device's own local (browser storage) changes keep working exactly as before
+- New `disable_persistence` YAML option does everything `disable_multidevice_persistence` does, plus blocks this device's own local restore for the same scope — when both the cross-device and local fronts are blocked, the card always falls back to the YAML value. Useful for dashboard views meant to always reopen at their YAML default (e.g. several fixed-range views — 24h/30-day/1-year — where a temporary zoom should never "stick"), regardless of device
+- Both options accept `range`, `entities`, or `all` (both) at the card level (top-level YAML key, alongside `defaultTimeRange`)
+- Both options can also be set per entity, inside a `graphs:` entity item — either as `entities`/`all` (protect the whole entity) or as a precise list of fields to protect (`color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`); an entity without its own setting falls back to the corresponding card-level option
+- Neither option affects entities added dynamically through the UI (rather than defined in `graphs:`) for the local-restore part of `disable_persistence` — there is no YAML value to fall back to for them
+
+### Changed — entity persistence resolution
+- `readLocalState`'s "last one to speak wins" entity merge changed from a single whole-array decision (YAML wins entirely / HA wins entirely / UI wins entirely) to a per-entity, per-field resolution: each field of each entity independently resolves through YAML (always wins when changed) → HA (unless blocked by either option) → local (unless blocked by `disable_persistence`) → YAML as final fallback
+- Shared helpers added: `normalizeDisablePersistence()`, `_entityPersistenceFields()`, `resolveEntityPersistenceFields()` — reused identically by both options at both scopes
+
+### Fixed
+- `uiLayout.toolbar: bottom` rendered the toolbar above the graphs instead of below — root cause: since the v1.1.27 unified pipeline, `#graphlist` holds both toolbars and graphs (unlike the pre-1.1.27 layout where toolbars lived outside it), while graph creation always appended new graph divs to the very end of `#graphlist`, landing them after the bottom toolbar/refresh-footer block (`#tb_1`/`#rf_1`). Fixed via a shared `_footerAnchor()` helper — used at graph creation, drag-and-drop reorder fallback, and `_moveNewGraphsToPosition` (combine/split rebuild) — that inserts graphs before the bottom toolbar block instead of unconditionally appending
+
+
 ## [v1.1.29] - 2026-07-12
 
 ### Changed — display parameter handling made homogeneous (bug fixes)
