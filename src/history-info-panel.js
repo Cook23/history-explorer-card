@@ -1,6 +1,7 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { infoPanelEnabled, HistoryCardState } from "./history-explorer-card";
+import { infoPanelEnabled, HistoryCardState, _TYPE_MENU_DEFS } from "./history-explorer-card";
+import { i18n } from "./languages.js";
 
 // --------------------------------------------------------------------------------------
 // Clone of lit html(), don't want to pull in the entire framework
@@ -116,7 +117,7 @@ function hecHookInfoPanel()
         }];
 
         instance.graphs = [];
-        instance.addDynamicGraph(entity_id, true, entities[0].color, entities[0].fill, null, entities[0].hidden, true, instance.parseIntervalConfig(entityOptions?.interval) ?? null, instance.g_id);
+        instance.addGraph(entity_id, true, entities[0].color, entities[0].fill, null, entities[0].hidden, true, instance.parseIntervalConfig(entityOptions?.interval) ?? null, instance.g_id);
     }
 
     __fn.prototype._injectHistoryExplorer = function(instance)
@@ -224,6 +225,65 @@ function hecHookInfoPanel()
             instance.pconfig.cursorLineColor = parseColor(config.uiColors?.cursorline ?? instance.pconfig.graphGridColor);
 
             this._setEntityOptions(instance);
+
+            // Entity type menu — "Type" link click opens the same menu as the main card,
+            // conditioned identically (numeric entity state → full menu, otherwise not rendered)
+            const _tf0 = instance._this.querySelector('#tf_0');
+            if( _tf0 ) {
+                const _etMenu = instance._this.querySelector('#et_0');
+                _TYPE_MENU_DEFS.forEach((_def, _idx) => {
+                    instance._this.querySelector(`#et_0_${_idx}`)?.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        instance.entityTypeMenuClicked(0, _def.type, _def.lineMode);
+                    }, true);
+                });
+                _tf0.addEventListener('click', () => {
+                    const _g = instance.graphs[0];
+                    if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g);
+                });
+                if( _etMenu ) {
+                    // Keyboard navigation — same as main card
+                    _etMenu.addEventListener('keydown', (e) => {
+                        const _visible = Array.from(_etMenu.getElementsByTagName('a'));
+                        if( e.key === 'Escape' ) {
+                            e.preventDefault();
+                            instance.hideEntityTypeMenu(0);
+                            return;
+                        }
+                        if( e.key === 'Enter' ) {
+                            e.preventDefault();
+                            const _sel = _etMenu.querySelector('a[data-hec-selected]') || _visible[0];
+                            if( _sel ) _sel.click();
+                            return;
+                        }
+                        if( e.key === 'ArrowDown' || e.key === 'ArrowUp' ) {
+                            e.preventDefault();
+                            const _cur = _etMenu.querySelector('a[data-hec-selected]');
+                            let _next;
+                            if( !_cur ) {
+                                _next = e.key === 'ArrowDown' ? _visible[0] : _visible[_visible.length - 1];
+                            } else {
+                                const _i = _visible.indexOf(_cur);
+                                _next = e.key === 'ArrowDown' ? (_visible[_i + 1] || _visible[0]) : (_visible[_i - 1] || _visible[_visible.length - 1]);
+                                _cur.style.background = '';
+                                _cur.style.fontWeight = '';
+                                delete _cur.dataset.hecSelected;
+                            }
+                            _next.style.background = 'var(--primary-color, #03a9f4)';
+                            _next.style.fontWeight = '';
+                            _next.dataset.hecSelected = '1';
+                        }
+                    });
+                    // Close on focusout — same as main card
+                    _etMenu.addEventListener('focusout', () => {
+                        setTimeout(() => {
+                            if( !_etMenu.contains(document.activeElement) ) {
+                                instance.hideEntityTypeMenu(0);
+                            }
+                        }, 150);
+                    });
+                }
+            }
 
             instance.contentValid = true;
 
@@ -355,6 +415,11 @@ function hecHookInfoPanel()
 
         const h = calcGraphHeight(type);
 
+        // Entity type menu access — same all-or-nothing rule as the main card:
+        // only offered when the entity's current state is numeric-convertible
+        const _state = this.hass.states[entity_id]?.state;
+        const _isNumeric = _state !== undefined && _state !== null && !isNaN(Number(_state));
+
         const optColor = 'var(--primary-text-color)';
         const optBack = 'var(--card-background-color)';
 
@@ -378,13 +443,26 @@ function hecHookInfoPanel()
 
             return html`
                 <div id="maincard" style="display:${(hec_panel.show === false) ? 'none' : 'block'};margin-bottom: 16px">
-                <div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">
-                    <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
+                <div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:flex;align-items:center;line-height:normal;">
+                    <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">
                         <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
                         <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                         <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
                     </div>
-                    <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">
+                    <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;position:relative;">
+                    ${_isNumeric ? html`
+                        <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
+                        <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
+                            <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
+                            <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
+                            <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
+                            <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
+                            <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
+                            <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
+                        </div>
+                    ` : ''}
+                    </div>
+                    <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">
                         <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
                         <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                         <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px">

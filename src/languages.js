@@ -23,7 +23,16 @@ const lang_en =
             "export_stats" : "Export statistics as CSV",
             "remove_all" : "Remove all added graphs",
             "enable_panel" : "Enable history info panel",
-            "disable_panel" : "Disable history info panel"
+            "disable_panel" : "Disable history info panel",
+            "type_line_straight" : "Line straight",
+            "type_line_curves"   : "Line curves",
+            "type_line_stepped"  : "Line stepped",
+            "type_bar"           : "Bar",
+            "type_arrowline"     : "Arrowline",
+            "type_timeline"      : "Timeline",
+            "type_static"        : "Static",
+            "type_label"         : "Type",
+            "type_default"       : "Default"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -72,7 +81,16 @@ const lang_fr =
             "export_stats" : "Exporter le CSV des statistiques",
             "remove_all" : "Supprimer tous les graphiques",
             "enable_panel" : "Activer le panneau d'historique",
-            "disable_panel" : "Déactiver le panneau d'historique"
+            "disable_panel" : "Déactiver le panneau d'historique",
+            "type_line_straight" : "Ligne droite",
+            "type_line_curves"   : "Ligne courbe",
+            "type_line_stepped"  : "Ligne en escalier",
+            "type_bar"           : "Barres",
+            "type_arrowline"     : "Flèche directionnelle",
+            "type_timeline"      : "Chronologie",
+            "type_static"        : "Statique",
+            "type_label"         : "Type",
+            "type_default"       : "Par défaut"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -121,7 +139,16 @@ const lang_de =
             "export_stats" : "Statistik als CSV exportieren",
             "remove_all" : "Alle Diagramme entfernen",
             "enable_panel" : "Verlaufsinfo aktivieren",
-            "disable_panel" : "Verlaufsinfo deaktivieren"
+            "disable_panel" : "Verlaufsinfo deaktivieren",
+            "type_line_straight" : "Linie gerade",
+            "type_line_curves"   : "Linie kurvig",
+            "type_line_stepped"  : "Linie gestuft",
+            "type_bar"           : "Balken",
+            "type_arrowline"     : "Pfeillinie",
+            "type_timeline"      : "Zeitachse",
+            "type_static"        : "Statisch",
+            "type_label"         : "Typ",
+            "type_default"       : "Standard"
         },
         "ranges" : {
             "l_hour" : "< 1 Std",
@@ -170,7 +197,16 @@ const lang_es =
             "export_stats" : "Exportar estadísticas como CSV",
             "remove_all" : "Borrar gráficos añadidos",
             "enable_panel" : "Activar panel info historia",
-            "disable_panel" : "Desactivar panel info historia"
+            "disable_panel" : "Desactivar panel info historia",
+            "type_line_straight" : "Línea recta",
+            "type_line_curves"   : "Línea curva",
+            "type_line_stepped"  : "Línea escalonada",
+            "type_bar"           : "Barras",
+            "type_arrowline"     : "Línea de flecha",
+            "type_timeline"      : "Cronología",
+            "type_static"        : "Estático",
+            "type_label"         : "Tipo",
+            "type_default"       : "Predeterminado"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -219,7 +255,16 @@ const lang_nl =
             "export_stats" : "Exporteer statistieken als CSV",
             "remove_all" : "Verwijder alle toegevoegde grafieken",
             "enable_panel" : "Deelvenster Geschiedenisinfo inschakelen",
-            "disable_panel" : "Schakel geschiedenisinfopaneel uit"
+            "disable_panel" : "Schakel geschiedenisinfopaneel uit",
+            "type_line_straight" : "Lijn recht",
+            "type_line_curves"   : "Lijn gebogen",
+            "type_line_stepped"  : "Lijn getrapt",
+            "type_bar"           : "Staaf",
+            "type_arrowline"     : "Pijllijn",
+            "type_timeline"      : "Tijdlijn",
+            "type_static"        : "Statisch",
+            "type_label"         : "Type",
+            "type_default"       : "Standaard"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -268,7 +313,16 @@ const lang_pl =
             "export_stats" : "Eksportuj statystyki w CSV",
             "remove_all" : "Usuń wszystkie dodane grafiki",
             "enable_panel" : "Włącz panel historia",
-            "disable_panel" : "Wyłącz panel historia"
+            "disable_panel" : "Wyłącz panel historia",
+            "type_line_straight" : "Linia prosta",
+            "type_line_curves"   : "Linia krzywa",
+            "type_line_stepped"  : "Linia schodkowa",
+            "type_bar"           : "Słupek",
+            "type_arrowline"     : "Linia strzałki",
+            "type_timeline"      : "Oś czasu",
+            "type_static"        : "Statyczny",
+            "type_label"         : "Typ",
+            "type_default"       : "Domyślny"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -317,7 +371,16 @@ const lang_sv =
             "export_stats": "Exportera statistik som CSV",
             "remove_all": "Ta bort alla tillagda grafer",
             "enable_panel": "Aktivera historikinfo-panelen",
-            "disable_panel": "Inaktivera historikinfo-panelen"
+            "disable_panel": "Inaktivera historikinfo-panelen",
+            "type_line_straight" : "Rak linje",
+            "type_line_curves"   : "Kurvig linje",
+            "type_line_stepped"  : "Stegad linje",
+            "type_bar"           : "Stapel",
+            "type_arrowline"     : "Pillinje",
+            "type_timeline"      : "Tidslinje",
+            "type_static"        : "Statisk",
+            "type_label"         : "Typ",
+            "type_default"       : "Standard"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -366,7 +429,16 @@ const lang_da =
             "export_stats" : "Eksporter statistik som CSV",
             "remove_all" : "Fjern alle tilføjede grafer ",
             "enable_panel" : "Brug historik graf som standard",
-            "disable_panel" : "Deaktivér historik graf som standard"
+            "disable_panel" : "Deaktivér historik graf som standard",
+            "type_line_straight" : "Ret linje",
+            "type_line_curves"   : "Kurvet linje",
+            "type_line_stepped"  : "Trappelinje",
+            "type_bar"           : "Søjle",
+            "type_arrowline"     : "Pillinje",
+            "type_timeline"      : "Tidslinje",
+            "type_static"        : "Statisk",
+            "type_label"         : "Type",
+            "type_default"       : "Standard"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -415,7 +487,16 @@ const lang_sk =
             "export_stats" : "Export štatistiky ako CSV",
             "remove_all" : "Odstrániť všetky pridané grafy",
             "enable_panel" : "Povoliť informačný panel histórie",
-            "disable_panel" : "Zakázať informačný panel histórie"
+            "disable_panel" : "Zakázať informačný panel histórie",
+            "type_line_straight" : "Priama čiara",
+            "type_line_curves"   : "Krivka",
+            "type_line_stepped"  : "Schodová čiara",
+            "type_bar"           : "Stĺpec",
+            "type_arrowline"     : "Šípová čiara",
+            "type_timeline"      : "Časová os",
+            "type_static"        : "Statický",
+            "type_label"         : "Typ",
+            "type_default"       : "Predvolené"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -464,7 +545,16 @@ const lang_ru =
             "export_stats" : "Экспортировать статистику как CSV",
             "remove_all" : "Очистить все добавленные графики",
             "enable_panel" : "Активировать историю в панели информации",
-            "disable_panel" : "Деактивировать историю в панели информации"
+            "disable_panel" : "Деактивировать историю в панели информации",
+            "type_line_straight" : "Прямая линия",
+            "type_line_curves"   : "Кривая линия",
+            "type_line_stepped"  : "Ступенчатая линия",
+            "type_bar"           : "Столбик",
+            "type_arrowline"     : "Линия стрелки",
+            "type_timeline"      : "Хронология",
+            "type_static"        : "Статичный",
+            "type_label"         : "Тип",
+            "type_default"       : "По умолчанию"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",
