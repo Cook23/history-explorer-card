@@ -22,6 +22,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
 - [Adding entities](#adding-entities)
+- [Choosing an entity's display type](#choosing-an-entitys-display-type)
 - [Interactive graph management](#interactive-graph-management)
 - [Y axis control](#y-axis-control)
 - [Time range and display defaults](#time-range-and-display-defaults)
@@ -92,7 +93,10 @@ The entity selector shows friendly names and filters on both friendly name and e
 - **ArrowUp / ArrowDown** — navigate the dropdown list
 - **Enter** — select the highlighted entry; second Enter adds it to the graph
 - **Escape** — close the dropdown and clear the input field
-- **`+` button** — adds the selected entity (does nothing if nothing is selected)
+
+Clicking an entry in the dropdown adds it directly — no separate button required.
+
+For a numeric entity, a menu pops up right after selection (click or second Enter) letting you choose how it should be displayed (line, bar, arrowline or timeline) before it's actually added — see [Choosing an entity's display type](#choosing-an-entitys-display-type) below. Non-numeric entities (on/off, text states) are added directly as a timeline, since that's the only representation that makes sense for them.
 
 The entity selector accepts `*` wildcards:
 ```
@@ -101,7 +105,7 @@ person.*        all person domain entities
 *               all available entities
 ```
 
-When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter adds them all. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
+When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter (or clicking an entry) opens the type menu for the whole batch, with an extra "Default" option to apply each entity's own natural type instead of a single chosen type for all of them. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
 
 To show only entities actually recorded in the database:
 ```yaml
@@ -117,6 +121,22 @@ filterEntities:
   - '*power*'
   - 'sensor.*energy*'
 ```
+
+---
+
+## Choosing an entity's display type
+
+Any numeric entity can be shown as a line (straight, curved or stepped), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
+
+- Right after selecting a new numeric entity in the dropdown (see [Adding entities](#adding-entities))
+- On a 700ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
+- When re-selecting an entity that's already added, to change its type
+
+![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
+
+The currently active type is shown in bold. Use ArrowUp/ArrowDown and Enter to pick with the keyboard, or click directly. Non-numeric entities (on/off, text states) never show this menu — they can only be a timeline, and are added as such automatically.
+
+In the info panel, a "Type" link appears between the date and range selectors for numeric entities, opening the same menu.
 
 ---
 
@@ -138,6 +158,7 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 
 - **Single-click** a curve label to show/hide it
 - **Double-click** a curve label to extract it into its own graph
+- **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph
 - **Drag** a curve label onto another graph to move it there (compatible units only)
 
@@ -153,6 +174,7 @@ Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the m
 
 - **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph
 - **Double-click** an entity label to extract it into its own graph
+- **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Click a truncated label to see the full name in a tooltip
 
 The page scrolls automatically when dragging near the top or bottom of the screen.

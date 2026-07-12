@@ -4,6 +4,49 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.29] - 2026-07-12
+
+### Changed — display parameter handling made homogeneous (bug fixes)
+- All entity-level display parameters (`name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`) are now correctly stored and applied for static YAML graph entities — previously only `color`, `fill`, `hidden` and `interval` were honored, the rest were silently ignored regardless of YAML configuration
+- `netBars` and `decimation` were missing from static graph entity storage entirely (unlike the ten parameters above) — added to `_makeStaticEntityEntry`; `decimation`'s resolution in `addGraph` was also missing the `overrideEntityProps` fallback every other parameter has, reading only from card-level `entityOptions` — fixed to match the standard pattern
+- Color/fill resolution block extended to cover the `timeline` type as well as `line`/`bar`/`arrowline` — entity color was previously left at its meaningless default (`#000000`) for timeline entities, causing incorrect colors to surface after a type change back to `line`/`bar`
+- `fill` is no longer treated as a persistable, type-independent value: it is derived fresh from color and target type on every type change (transparent for `line`/`arrowline`/`timeline`, solid for `bar`) instead of being carried over from whatever type the entity previously had — fixes solid ("bar") fill incorrectly appearing after switching to `line`
+- Color-conflict avoidance on combine (preventing two entities in the same graph from sharing a color) moved to run *after* the real combine target is resolved, instead of depending on a `targetGraph` parameter the caller may not have known in advance — fixes duplicate colors appearing when a freshly-created entity auto-combines with an existing graph
+- `groupId` adoption on combine fixed: `entityOptions.groupId` was frozen before the combine logic resolved the adopted `groupId`, so the newly created graph object kept the stale (`null`) value even after a successful combine; now resynced immediately after resolution
+- `groupId` assignment on entity add no longer guessed from `pconfig.entities` array position (a fragile heuristic that could pick the wrong value once array order and graph order diverge) — read directly from the resulting graph object instead
+- Reordering entities within a single graph (legend drag and timeline drag) could silently delete entities belonging to a *different* graph that happened to share the same `groupId` (possible since a type change intentionally keeps an entity's original `groupId` to allow automatic re-combining later) — fixed by filtering on actual graph membership in addition to `groupId`
+- Double-click uncombine and cross-graph drag-and-drop (6 locations across the legend and timeline/arrowline rebuild paths) passed the runtime entity object — which never carries `type`/`lineMode` — as the source for the rebuilt entity instead of its actual persisted entry, stripping `type`, `lineMode` and every other persisted field and reverting the entity to its auto-detected default type; all 6 locations now look up and use the correct persisted entry
+- Uncombine via double-click also carried over the *stale* `hidden` state left by the first click of the double-click sequence (processed as an ordinary single click before the second click is recognized as a double-click) — the extracted entity could reappear hidden; now forced visible on extraction, since showing the curve is always the intent of an uncombine
+- The bar-graph interval selector's "as line" toggle (`selectBarInterval`) changed the graph's type live but never persisted it to `pconfig.entities` — the choice was silently lost on refresh; now persisted alongside `interval` in the same pass
+- Fixed a `ReferenceError` in the timeline/arrowline drag-drop rebuild (`_finalizeTimelineDrop`): a `groupId` variable was declared inside one conditional block and referenced from a second, separate block of the same condition later in the function, where it was out of scope — this crashed mid-rebuild after both the source and target graphs had already been detached from the DOM but before their replacements were created, making both entities disappear from the live view; since the crash happened before persistence, a refresh reverted to the pre-drop state. Fixed by hoisting the variable to function scope, computed once
+
+### Added — entity type menu
+- New menu (line straight / line curves / line stepped / bar / arrowline / timeline) lets the user change an entity's display type, accessible via: selecting an entity from the dropdown, a 700ms long-press on a legend label (line/bar), a 700ms long-press on a timeline/arrowline label, or re-selecting an already-added entity
+- Menu visibility is all-or-nothing: shown in full only when the entity's current state is numeric-convertible; not shown at all otherwise (no partial or greyed-out state) — a non-numeric entity can only ever be a timeline
+- "Default" option added at the top of the menu for wildcard-matched batches: applies each matched entity's own auto-detected type individually, as opposed to picking one type for the whole batch
+- Entity creation is now deferred until a type is chosen: nothing is added to `pconfig.entities` or `this.graphs` for a brand-new entity until the menu selection is made (click or keyboard) — the choice both defines the type and performs the creation in one action
+- Info panel: "Type" text link added between the date and range selectors (shown only when the entity's state is numeric), opening the same menu as the main card
+- New `tl-N` overlay built for timeline/arrowline graphs, mirroring the existing `lg-N` legend overlay, to support long-press detection — previously this drag/click handling was inline in the general `pointerDown`/`pointerMove`/`pointerUp` handlers with no dedicated overlay, an inconsistency inherited from the pre-1.1.27 codebase
+- `_TYPE_MENU_DEFS` exported from `history-explorer-card.js` and reused by `history-info-panel.js` instead of being duplicated
+
+### Changed — architecture
+- `addDynamicGraph` renamed to `addGraph` — the static/dynamic split no longer exists structurally, the old name was a vestige of the pre-1.1.27 architecture
+- Combine logic rewritten to search the whole `this.graphs` array for a graph sharing the target `groupId`, instead of only ever considering the last graph created — fixes combine failing when re-joining an existing, non-last group after a type change or uncombine
+- Merged graphs are now reinserted at the removed target's original DOM position instead of always being appended at the end of `#graphlist`
+- New architecture rule: entities of different types are allowed to share the same `groupId` following a type change (the original `groupId` is deliberately kept so the entity can automatically re-combine once compatible again) — this is intentional and symmetric between live session and refresh
+- The "+" button removed from the entity selector: clicking a dropdown entry now adds the entity directly; keyboard flow unchanged (first `Enter` still previews the selection, second `Enter` confirms — internally calling the add function directly instead of simulating a click on the now-removed button)
+
+### Changed — factoring / cleanup
+- Shared helpers added: `entityIdOf(e)`, `_graphDiv(g)`, `_resetEntityInput(fi)`, `_pcEntryIndex(entityId)`, `_pcGroupIdOf(entityId)`, `_graphByOverlay(prefix, target)`, `_uncombineEntity(g, idx)` (single implementation now shared by line/bar legend and timeline/arrowline label double-click uncombine, previously duplicated), `_isNumericEntity(entity_id)`, `_detectDefaultType(entity_id)`, `_createAndPersistEntity(eid, type, lineMode)`
+- Further factoring pass: `_pcEntryInGroup(entityId, groupId)` replaces 7 duplicated lookups of an entity's persisted entry scoped to a groupId; `_detachGraph(g)` combines DOM insertion-point capture, div removal and `this.graphs` splice into one call, replacing 8 near-identical occurrences across uncombine, type-change and drag-drop code (several were missing the "skip stale DOM node" safety check present in others — now uniform); `_moveNewGraphsToPosition(graphsBefore, gl, nextSibling)` replaces 8 occurrences of the "reinsert rebuilt graphs at the original position" loop, same consistency fix; `_navigateMenuArrowKey(visible, key, clearFontWeight)` unifies the ArrowUp/ArrowDown highlight logic previously implemented separately for the entity type menu and the entity selector dropdown
+- Dead code removed: `adjustSelectorPosition` (empty method, never called), `panstate.pendingDragDataset` (never assigned a value other than `null`), stale menu-preselection comment and duplicated color/fill resolution branches
+- Menu spacing bug fixed: "Exporter le CSV des statistiques" entry was missing the padding applied to its siblings
+
+### Changed — history-info-panel.js
+- Migrated to the same `addGraph` rename and unaffected by any of the renamed/relocated internal properties (`tlPending`, `dragEntity`, etc.) since the panel never referenced them directly
+- "Type" link and menu wiring added (see above)
+
+
 ## [v1.1.28] - 2026-07-04
 
 ### Fixed

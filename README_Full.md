@@ -24,6 +24,7 @@ This card offers a highly interactive and configurable way to view the history o
 - [Usage](#usage)
   - [Interactive navigation](#interactive-navigation)
   - [Adding entities](#adding-entities)
+  - [Choosing an entity's display type](#choosing-an-entitys-display-type)
   - [Interactive graph management](#interactive-graph-management)
 - [Info panel — replacing the HA more info popup](#overriding-the-ha-more-info-history-info-panel)
 - [Graph types](#graph-types)
@@ -160,9 +161,19 @@ Priority in list form: first matching entry wins per property. Entries can match
 - **Keyboard navigation** — ArrowUp/ArrowDown to navigate, Enter to select, Escape to close and clear; second Enter triggers entity add.
 - **Wildcard dropdown** — when a wildcard pattern is entered, matching entries are shown in bold; first Enter selects all matching entities, second Enter adds them all.
 - **Duplicate detection extended** — wildcard multi-add detects duplicates, lists them in a tooltip, and highlights all affected graphs with a red dashed outline.
-- **`+` button guard** — the `+` button does nothing if no entity has been selected in the dropdown.
+- **Dropdown click adds directly** — clicking an entry in the dropdown adds the entity immediately; no separate `+` button is needed (removed in v1.1.29). Keyboard flow is unchanged: second Enter still confirms.
 - **Input field cleared** after entity add (success or error) via a timer; ESC clears immediately.
 - **Dropdown positioning** — the dropdown appears below the input field for `selector: top` (default) and above for `selector: bottom`; height is capped to `min(50vh, available viewport space)`.
+
+### New — entity display type menu (v1.1.29+)
+
+- A menu lets you choose how any numeric entity is displayed: line (straight, curved or stepped), bar, arrowline or timeline.
+- Opens right after selecting a new numeric entity in the dropdown — nothing is added until a type is chosen (click or keyboard); the choice both sets the type and performs the add in one step.
+- Also opens on a 700ms long-press of a legend label (line/bar) or a timeline/arrowline label, and when re-selecting an already-added entity, to change its type.
+- All-or-nothing: shown in full only for entities whose current state is numeric-convertible; not shown at all otherwise, since a non-numeric entity (on/off, text) can only ever be a timeline — it's added as one directly, no menu.
+- For a wildcard match, an extra **"Default"** option (pre-selected) applies each matched entity's own auto-detected type individually; picking any other option applies that one type to the whole batch.
+- The currently active type is pre-selected in bold; ArrowUp/ArrowDown and Enter navigate and confirm with the keyboard.
+- Available in the info panel too, via a "Type" link shown between the date and range selectors for numeric entities.
 
 ### New — per-user server-side persistence (v1.1.12+)
 
@@ -248,9 +259,12 @@ The entity selector shows friendly names and filters on both friendly name and e
 - **ArrowUp / ArrowDown** — navigate the dropdown list
 - **Enter** — select the highlighted entry; second Enter adds it to the graph
 - **Escape** — close the dropdown and clear the input field
-- **`+` button** — adds the selected entity (does nothing if nothing is selected in the dropdown)
 
-The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. When a wildcard is entered, matching entries appear in bold in the dropdown. The first Enter selects all matching entities; the second Enter adds them all. Some examples:
+Clicking an entry in the dropdown adds it directly — there is no separate `+` button to press afterwards.
+
+For a numeric entity, adding it (by click, or by the second Enter) doesn't add it right away: a menu pops up first letting you choose its display type — line (straight, curved or stepped), bar, arrowline or timeline. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. Non-numeric entities (on/off, text states) skip this menu entirely and are added directly as a timeline, since that's the only representation that makes sense for them. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
+
+The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. When a wildcard is entered, matching entries appear in bold in the dropdown. The first Enter selects all matching entities; the second Enter (or clicking an entry) opens the display type menu for the whole matched batch — see below. Some examples:
 ```
 person.*      - Add all entities from the person domain
 *door*        - Add all entities that contain the term 'door' in the name, regardless of domain
@@ -269,6 +283,26 @@ filterEntities:                     # Or use multiple filters, entities matching
 Dynamically added entities can be individually removed by clicking the `x` close button next to them or all together using the option in the entity action dropdown menu:
 
 ![image](https://user-images.githubusercontent.com/60828821/186549959-cd3705b6-229a-46c5-abcf-6a9f3b675f0b.png)
+
+### Choosing an entity's display type
+
+Any numeric entity — one whose current state can be read as a number — can be shown as a line (straight, curved or stepped), a bar, an arrowline (bearing) or a timeline. A menu for making this choice opens automatically wherever it's relevant:
+
+- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The currently auto-detected type (based on the entity's `state_class`/`unit_of_measurement`, or an explicit `entityOptions` override) is pre-selected in bold.
+- **On a 700ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
+- **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
+
+The menu is all-or-nothing: it is shown in full only when the entity's current state is numeric-convertible. It is not shown at all otherwise — a non-numeric entity (an `on`/`off` state, free text, etc.) can only ever be represented as a timeline, so it is added directly as one, with no menu and no partial/greyed-out state to choose from.
+
+For a **wildcard match** (multiple new entities added at once), the menu gets an extra **"Default"** entry at the top, pre-selected by default:
+- Choosing **"Default"** creates each matched entity with its own individually auto-detected type — exactly as if each had been added on its own.
+- Choosing any other option (line/bar/arrowline/timeline) applies that single type to every entity in the batch. A non-numeric entity within the batch is still always created as a timeline regardless of this choice, per the rule above.
+
+Keyboard use: ArrowUp/ArrowDown moves a highlight between the options (starting from the pre-selected one), Enter confirms; pressing Enter without moving the highlight confirms the pre-selected/default option directly.
+
+The type chosen this way is persisted the same way as everything else added through the UI — synchronized with your HA user account and restored across all devices.
+
+In the [info panel](#overriding-the-ha-more-info-history-info-panel), a **"Type"** text link appears between the date and range selectors whenever the panel's entity is numeric, opening the same menu.
 
 ### Interactive graph management
 
@@ -293,6 +327,8 @@ Timeline graphs will always automatically group if possible. Graphs defined manu
 
 A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
+A long-press (700ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+
 #### Moving curves between graphs
 
 A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`).
@@ -311,6 +347,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
+- **Long-press** (700ms) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
