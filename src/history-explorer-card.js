@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.29b58';
+const Version = '1.1.30b8';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -625,6 +625,35 @@ export class HistoryCardState {
     {
         const options = { '10m' : 0, 'hourly' : 1, 'daily' : 2, 'monthly' : 3 };
         return options[s];
+    }
+
+    // Normalizes a disable-persistence-style YAML value (string, array, or undefined) into a
+    // Set of categories. 'all' expands to every category valid for the given scope. Returns
+    // undefined when unset, so callers can fall back with `entity.xxx ?? card`.
+    normalizeDisablePersistence(value, allCategories)
+    {
+        if( value === undefined || value === null ) return undefined;
+        const _arr = Array.isArray(value) ? value : [value];
+        return new Set(_arr.includes('all') ? allCategories : _arr.filter(c => allCategories.includes(c)));
+    }
+
+    // Fields of a static entity that can be individually protected via a per-entity
+    // disable-persistence-style field list.
+    _entityPersistenceFields()
+    {
+        return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
+                'dashMode', 'lineMode', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
+                'netBars', 'decimation', 'groupId'];
+    }
+
+    // Entity-scope disable-persistence-style option: a list of specific field names, or
+    // 'entities'/'all' as a shorthand for all protectable fields (protect the whole entity).
+    // Shared by disable_multidevice_persistence and disable_persistence entity-level parsing.
+    resolveEntityPersistenceFields(value)
+    {
+        if( value === undefined || value === null ) return undefined;
+        const _arr = (Array.isArray(value) ? value : [value]).map(v => v === 'entities' ? 'all' : v);
+        return this.normalizeDisablePersistence(_arr, this._entityPersistenceFields());
     }
 
 
@@ -3325,7 +3354,8 @@ export class HistoryCardState {
             if( _next && _next.parentNode === _gl ) {
                 _gl.insertBefore(_srcDiv, _next);
             } else {
-                _gl.appendChild(_srcDiv);
+                const _footer = this._footerAnchor(_gl);
+                if( _footer ) _gl.insertBefore(_srcDiv, _footer); else _gl.appendChild(_srcDiv);
             }
         }
 
@@ -4167,6 +4197,22 @@ export class HistoryCardState {
         return g.canvas.parentNode.parentNode;
     }
 
+    _footerAnchor(gl)
+    {
+        // Returns the top-level child of #graphlist where the bottom toolbar block starts:
+        // #tb_1 when the bottom toolbar/selector are shown (it renders before #rf_1), or
+        // #rf_1 as a fallback — it's always rendered, even when both are hidden, so this
+        // anchor always exists once the bottom section has been rendered at all. Graphs
+        // must be inserted before it, never appended after — #graphlist holds both the
+        // toolbars and the graphs since the v1.1.27 unified pipeline, unlike the pre-1.1.27
+        // layout where toolbars lived outside it.
+        const _anchorEl = this._this.querySelector('#tb_1') ?? this._this.querySelector('#rf_1');
+        if( !_anchorEl ) return null;
+        let _node = _anchorEl;
+        while( _node && _node.parentNode !== gl ) _node = _node.parentNode;
+        return _node;
+    }
+
     _graphByOverlay(prefix, target)
     {
         // Find which graph owns a given overlay element (lg-N, tl-N, mo-N, ...)
@@ -4248,11 +4294,13 @@ export class HistoryCardState {
     _moveNewGraphsToPosition(graphsBefore, gl, nextSibling)
     {
         // Moves every graph created since `graphsBefore` (this.graphs.length at the time)
-        // to sit right before `nextSibling` in the DOM, or appends if it's no longer there —
-        // used after rebuilding one or more graphs in place of a removed one
+        // to sit right before `nextSibling` in the DOM, or before the footer if it's no
+        // longer there — used after rebuilding one or more graphs in place of a removed one
+        const _footer = this._footerAnchor(gl);
         for( let i = graphsBefore; i < this.graphs.length; i++ ) {
             const _div = this._graphDiv(this.graphs[i]);
             if( nextSibling && gl.contains(nextSibling) ) gl.insertBefore(_div, nextSibling);
+            else if( _footer ) gl.insertBefore(_div, _footer);
             else gl.appendChild(_div);
         }
     }
@@ -4491,8 +4539,10 @@ export class HistoryCardState {
         let gl = this._this.querySelector('#graphlist');
         if( _combineInsertBefore && (_combineGl ?? gl).contains(_combineInsertBefore) )
             (_combineGl ?? gl).insertBefore(e, _combineInsertBefore);
-        else
-            gl.appendChild(e);
+        else {
+            const _footer = this._footerAnchor(gl);
+            if( _footer ) gl.insertBefore(e, _footer); else gl.appendChild(e);
+        }
 
         // For bar graphs, connect the interval selector dropdown listener
         if( type == 'bar' && !this.ui.hideInterval )
@@ -5826,29 +5876,67 @@ export class HistoryCardState {
             if( _ipe?.value?.enabled !== undefined ) _haInfoEnabled = !!_ipe.value.enabled;
         } catch(e) {}
 
-        // --- Last one to speak wins — entities ---
-        // YAML source: static entities from pconfig (initialized from YAML before this call)
-        // HA user source: compared to ha_entities mirror in localStorage
-        // UI source: localStorage active value — wins if no YAML or HA front
-        const _lsEntities    = _ls?.entities;
-        const _haEntities    = _haCard?.entities;
-        const _yamlEntities  = this.pconfig.entities.filter(e => e.isStatic);
-        const _yamlEntitiesChanged = JSON.stringify(_yamlEntities) !== JSON.stringify(_ls?.yaml_entities ?? null);
-        const _haEntitiesChanged   = _haEntities !== undefined &&
-                                     JSON.stringify(_haEntities) !== JSON.stringify(_ls?.ha_entities ?? null);
+        // --- Last one to speak wins — entities, resolved per entity ---
+        // YAML source: static entities from pconfig (initialized from YAML before this call).
+        //              Always wins for a given entity when changed — never blocked.
+        // HA user source: compared to ha_entities mirror in localStorage — may come from
+        //              another device. Blocked per entity via disable_multidevice_persistence
+        //              (entity-level `disable_multidevice_persistence`, falling back to the
+        //              card-level option) — a device then never adopts another device's HA
+        //              value for that entity, though it still keeps writing its own local changes.
+        // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
+        const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
+        const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
+        const _yamlEntities = this.pconfig.entities.filter(e => e.isStatic);
+        const _yamlMirror   = _ls?.yaml_entities ?? [];
+        const _haMirror     = _ls?.ha_entities ?? [];
 
-        if( _yamlEntitiesChanged ) {
-            // YAML wins — keep static from YAML, keep dynamic from localStorage
-            const _dynStored = (_lsEntities ?? []).filter(e => !e.isStatic);
-            this.pconfig.entities = [ ..._yamlEntities, ..._dynStored ];
-        } else if( _haEntitiesChanged ) {
-            // HA user wins (change from another device)
-            this.pconfig.entities = _haEntities.map(e => typeof e === 'string' ? { entity: e } : e);
-        } else if( _lsEntities ) {
-            // UI wins — restore from localStorage
-            this.pconfig.entities = _lsEntities.map(e => typeof e === 'string' ? { entity: e } : e);
-        }
-        // else: first run — keep pconfig.entities as initialized from YAML
+        const _findEntity = (arr, id) => arr.find(e => e.entity === id);
+
+        // Union of entity ids to resolve: current YAML statics, plus any genuinely dynamic
+        // entity (isStatic falsy) known from localStorage or HA. A static entity removed
+        // from YAML is dropped — never resurrected from a stale local/HA snapshot.
+        const _entityIds = new Set([
+            ..._yamlEntities.map(e => e.entity),
+            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
+        ]);
+
+        this.pconfig.entities = [..._entityIds].map(id => {
+            const _yamlE = _findEntity(_yamlEntities, id);
+
+            // YAML front — per entity, never blocked by either option
+            if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_findEntity(_yamlMirror, id) ?? null) )
+                return _yamlE;
+
+            // Resolve protected-field sets: entity-level first, falling back to the
+            // card-level 'entities' switch (which, when set, protects every field).
+            // disable_persistence blocks everything disable_multidevice_persistence blocks
+            // (the HA/cross-device front), plus this device's own local restore.
+            const _resolveBlockedFields = (_entityFields, _cardSet) =>
+                _entityFields ?? (_cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set());
+            const _mdpFields = _resolveBlockedFields(_yamlE?.disableMultidevicePersistence, this.pconfig.disableMultidevicePersistence);
+            const _dpFields  = _resolveBlockedFields(_yamlE?.disablePersistence, this.pconfig.disablePersistence);
+            const _haBlockedFields = new Set([..._mdpFields, ..._dpFields]);
+
+            const _haE = _findEntity(_haEntities, id);
+            const _haChanged = _haE && JSON.stringify(_haE) !== JSON.stringify(_findEntity(_haMirror, id) ?? null);
+
+            // Base: this device's local value (or YAML/HA fallback on first run), then apply
+            // HA on top wherever it's allowed to win, then force fields disable_persistence
+            // covers back to YAML — overriding both the local and the just-applied HA value.
+            // disable_persistence has no effect on a dynamic entity: there's no YAML value to
+            // fall back to, so only the (unset) `_dpFields` from the card fallback ever apply.
+            const _localE = _findEntity(_lsEntities, id) ?? _yamlE ?? _haE;
+            const _result = { ..._localE };
+            if( _haChanged )
+                for( const _f of this._entityPersistenceFields() )
+                    if( !_haBlockedFields.has(_f) && _f in _haE ) _result[_f] = _haE[_f];
+            if( _yamlE )
+                for( const _f of _dpFields )
+                    if( _f in _yamlE ) _result[_f] = _yamlE[_f];
+            return _result;
+        });
 
         // Migration: renumber dynamic entities with groupId < 1000 to groupId + 1000
         // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
@@ -5877,7 +5965,8 @@ export class HistoryCardState {
         // HA user fronts (compare HA user value to its mirror in localStorage)
         const _haInfoChanged = _haInfoEnabled !== undefined &&
                                _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
-        const _haTimeChanged = _haCard?.timeRangeHours !== undefined && (
+        const _haTimeChanged = !(this.pconfig.disableMultidevicePersistence.has('range') || this.pconfig.disablePersistence.has('range')) &&
+            _haCard?.timeRangeHours !== undefined && (
             _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
@@ -5907,6 +5996,9 @@ export class HistoryCardState {
                 else if( _haCard.timeRangeMinutes > 0 )
                     this.setTimeRangeMinutes(_haCard.timeRangeMinutes);
             }
+        } else if( this.pconfig.disablePersistence.has('range') ) {
+            // Local restore also blocked — always fall back to the YAML default
+            this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
         } else {
             // No front — restore active values
             if( _ls?.timeRangeHours > 0 )
@@ -6070,6 +6162,8 @@ export class HistoryCardState {
             process           : ent.process,
             netBars           : ent.netBars,
             decimation        : ent.decimation,
+            disableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.disable_multidevice_persistence),
+            disablePersistence: this.resolveEntityPersistenceFields(ent.disable_persistence),
         };
     }
 
@@ -6253,6 +6347,8 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.filterEntities  =        config.filterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
+        this.instance.pconfig.disableMultidevicePersistence = this.instance.normalizeDisablePersistence(config.disable_multidevice_persistence, ['range', 'entities']) ?? new Set();
+        this.instance.pconfig.disablePersistence = this.instance.normalizeDisablePersistence(config.disable_persistence, ['range', 'entities']) ?? new Set();
         this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
         this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
         this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
