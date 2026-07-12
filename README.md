@@ -16,8 +16,26 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
+## Version highlights
+
+A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
+
+- **v1.1.30** — New `disable_persistence` option (card-wide, or per entity down to individual fields) to stop a device from picking up graph or time-range changes synced from another device on your Home Assistant account — your own local changes are still saved as usual.
+- **v1.1.29** — Change any entity's display type on the fly (line, bar, arrowline, timeline) from a simple menu — no need to remove and re-add it.
+- **v1.1.26** — Touch-friendly Y axis panning (long-press to activate) and a new `ylock` option to lock a graph's Y axis range.
+- **v1.1.25** — Bar graph interval (10 min / hourly / daily / monthly) is now remembered across reloads.
+- **v1.1.23** — New unified entity picker (desktop and mobile) showing friendly names, with wildcard bulk-add.
+- **v1.1.19** — Default info panel state and default time range can be set in YAML, and are remembered per user across devices.
+- **v1.1.18** — Info panel can be turned on by default; richer default state colors across most Home Assistant domains.
+- **v1.1.12** — Your graph layout and preferences now sync across devices through your Home Assistant account.
+- **v1.1.10** — Drag & drop to reorder and combine graphs, plus automatic grouping of entities sharing compatible units.
+- **v1.1.0** — First release of this fork: pattern-based entity options, min/max band, and sample point display.
+
+---
+
 ## Table of contents
 
+- [Version highlights](#version-highlights)
 - [Install](#install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
@@ -215,6 +233,13 @@ defaultTimeOffset: 1D    # Snap to current day from midnight. Use uppercase for 
 ```
 
 `defaultTimeRange` uses a "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range, but only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
+
+Time range and entities normally sync across all your devices via your HA account. If you'd rather keep a device's own range or entity choices independent from the others, `disable_persistence` blocks that specific cross-device sync (YAML and this device's own local changes keep working as usual):
+
+```yaml
+type: custom:history-explorer-card
+disable_persistence: range   # this device keeps its own time range, ignoring other devices
+```
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
 

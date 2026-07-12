@@ -19,6 +19,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 ## Table of contents
 
+- [Version highlights](#version-highlights)
 - [Changes vs upstream](#changes-vs-upstream)
 - [Install and configuration](#install-and-configuration)
 - [Usage](#usage)
@@ -43,6 +44,7 @@ This card offers a highly interactive and configurable way to view the history o
 - [Long term statistics](#long-term-statistics)
 - [Display defaults](#default-view-and-time-ranges)
   - [Time range and offset](#default-view-and-time-ranges)
+  - [Disabling cross-device sync](#disabling-cross-device-sync-disable_persistence)
   - [Auto refresh](#auto-refresh)
   - [Current values and rounding](#showing-current-sensor-values)
   - [Data decimation](#data-decimation)
@@ -58,7 +60,30 @@ This card offers a highly interactive and configurable way to view the history o
 - [Multiple cards](#multiple-cards)
 - [CSV export](#exporting-data-as-csv)
 - [YAML graph configuration](#yaml-configuration-for-preconfigured-graphs)
+  - [Protecting entities from cross-device sync](#protecting-specific-entities-from-cross-device-sync)
 - [Running as a sidebar panel](#running-as-a-panel-in-the-sidebar)
+
+---
+
+## Version highlights
+
+A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
+
+- **v1.1.30** — New `disable_persistence` option to block the HA-user-storage restore front (cross-device sync) while leaving YAML and local (per-device) restore untouched. Card-level scope: `range` and/or `entities` (or `all`). Entity-level scope: a specific list of protected fields (`color`, `groupId`, `interval`, etc.) or `entities`/`all` as shorthand for every field — falls back to the card-level setting when unset on the entity.
+- **v1.1.29** — New entity type menu: change a numeric entity between line (straight/curved/stepped), bar, arrowline or timeline directly from the legend, a timeline label, or the entity selector — no need to remove and re-add it; a "Default" option re-applies each entity's auto-detected type for wildcard batches.
+- **v1.1.28** — Static YAML graphs fixed to combine correctly regardless of entity type/unit mix, honor the `graph.type` option, and correctly forward legend clicks and drag-and-drop rejection like dynamic graphs.
+- **v1.1.27** — Internal architecture unification: static (YAML) and dynamic (user-added) graphs now share a single code path (`pconfig.entities` + `pconfig.graphs`), simplifying maintenance and enabling later features such as the entity type menu.
+- **v1.1.26** — Touch ergonomics: Y axis pan on touch screens now requires a 500ms long-press before activating, avoiding accidental triggers while scrolling through graphs; new `ylock` YAML option locks a graph's Y axis against all interactive changes.
+- **v1.1.25** — Bar graph interval selection (10 min / hourly / daily / monthly) is now persisted across reloads with the same "last one to speak wins" logic used for the time range; entity selector dropdown shows each entity's current state value.
+- **v1.1.24** — Toolbar switches between three adaptive layouts depending on available width, replacing the previous fixed-width breakpoint logic; fixes wrapping issues on Safari.
+- **v1.1.23** — Entity selector unified across desktop and mobile into a single custom dropdown showing friendly names, with keyboard navigation and wildcard bulk-add.
+- **v1.1.19** — `defaultInfoPanel` and `defaultTimeRange` YAML options introduced, with a "last one to speak wins" persistence model reconciling YAML, per-device, and per-HA-user state.
+- **v1.1.18** — `infoPanelActive` YAML option (info panel enabled by default), with cross-card conflict detection; comprehensive default state color palette covering most Home Assistant domains.
+- **v1.1.13** — Visual drag-and-drop feedback (ghost element, insertion markers, drop-target highlighting) and persisted legend label visibility (hidden/shown state survives reload).
+- **v1.1.12** — Per-user server-side persistence: graph configuration now syncs across devices via Home Assistant's `frontend/set_user_data`, with automatic migration from local browser storage.
+- **v1.1.10** — Automatic grouping of entities sharing compatible SI units onto the same graph (with unit conversion), plus drag & drop to reorder curves and graphs.
+- **v1.1.4** — `entityOptions` dict form and pattern-based list form unified into a single lookup, matching by glob pattern, device class, or domain.
+- **v1.1.0** — First release of the Cook23 fork: pattern-based `entityOptions`, `showMinMax` statistical band, `showPoints`, custom dash patterns.
 
 ---
 
@@ -819,6 +844,27 @@ defaultTimeOffset: 1D       # Show the current day from midnight to midnight
 defaultTimeOffset: 1O       # Show the entire current month, starting at the 1st
 ```
 
+### Disabling cross-device sync (`disable_persistence`)
+
+Time range, and entities added or changed through the UI, are normally synchronized across all your devices via your Home Assistant user account (see [per-user server-side persistence](#new--per-user-server-side-persistence-v1112)). If you run several dashboard views with distinct default ranges configured in YAML (a 24h view, a 30-day view, a 1-year view...), this sync can work against you: zooming in on one view on one device gets remembered and reapplied on every device, overriding the YAML default intended for that view.
+
+`disable_persistence` stops a device from adopting changes synced from another device. YAML changes, and this device's own local changes (kept in browser storage), keep working exactly as before — this option only blocks the cross-device (HA user account) restore.
+
+At the card level, it accepts `range`, `entities`, or `all` (both):
+
+```yaml
+type: custom:history-explorer-card
+defaultTimeRange: 24h
+disable_persistence: range   # this device always keeps its own time range,
+                              # ignoring range changes made on other devices
+```
+
+- `range` — the time range shown on this device is never overridden by another device's range; only a YAML change to `defaultTimeRange`, or your own local adjustment on this device, can change it.
+- `entities` — entities added, recolored, regrouped, etc. on another device are never adopted on this device; only YAML and this device's own changes apply.
+- `all` — both of the above.
+
+Entities defined in `graphs:` can also set their own `disable_persistence`, either as a shorthand (`entities` or `all`, protecting the whole entity) or as a precise list of fields to protect, falling back to the card-level setting above when unset — see [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs) for the entity-level syntax.
+
 ### Auto refresh
 
 By default the card will not refresh on its own when sensor values change. It can be manually refreshed by reloading the page. If you would like your card to automatically reflect changing values on the fly, two strategies can be enabled. Both can be combined if needed. 
@@ -1305,6 +1351,24 @@ graphs:
 ```
 
 Replace the entities and structure as needed.
+
+### Protecting specific entities from cross-device sync
+
+Any entity inside `graphs:` can declare its own `disable_persistence`, protecting it individually from changes synced from another device on your Home Assistant account (see [Disabling cross-device sync](#disabling-cross-device-sync-disable_persistence) for the card-wide version). It accepts either `entities` / `all` — protecting the entity entirely, exactly like the card-level setting — or a list of specific fields to protect, leaving every other field free to keep syncing normally:
+
+```yaml
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.living_room_target_temp
+        color: '#3e95cd'
+        disable_persistence: [color, groupId]   # keep this device's color and grouping,
+                                                 # let interval/fill/etc. keep syncing
+      - entity: sensor.boiler_state
+        disable_persistence: all                # freeze this entity entirely on this device
+```
+
+Protectable fields: `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`. An entity without its own `disable_persistence` falls back to the card-level setting, if any.
 
 ---
 
