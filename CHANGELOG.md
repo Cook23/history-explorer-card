@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.31] - 2026-07-14
+
+### Fixed — popups and menus clipped by the viewport
+- Four floating UI elements (label tooltip, entity type menu, entity selector dropdown, combine/options menu) had no guard against overflowing the browser viewport — truncated content, or menu options rendered off-screen and unclickable near an edge
+- New shared `_clampToViewport(el)` helper: reads the element's actual rendered position via `getBoundingClientRect()` and nudges it back on screen if any edge overflows — works uniformly for `position:fixed`/`absolute`, elements anchored via `top` or `bottom`, and elements using a CSS transform (e.g. `translateX` for center/right-aligned tooltips)
+- Applied to all four sites; replaces the previous ad-hoc horizontal-only clamp in the combine/options menu (which only checked against the card's own width, not the viewport)
+
+### Changed — Chart.js hover tooltip converted from canvas to DOM
+- The built-in Chart.js tooltip (shown on mouse/touch/stylus hover over a graph) was drawn directly on each graph's own `<canvas>`, hard-clipped to that canvas's bounds — truncated whenever a graph was shorter than the tooltip content, with no way to fix that from within canvas drawing, regardless of viewport position
+- Chart.js: restored the `tooltips.custom` hook in `Tooltip.prototype.draw` — the option already existed in the default config but was never actually consulted by this vendored copy
+- Card: new `_renderCustomTooltip()` method renders the tooltip as a floating `<div>` instead, positioned via `_clampToViewport` — no longer clipped by its own graph's canvas, and consistent with the other four popups
+- Content (title, body lines, per-line color swatches) and the caret/pointer triangle are rebuilt to match the original canvas rendering, using DOM APIs (`createElement`/`textContent`) rather than `innerHTML`
+- Colors (background, border, title, body, per-line labels) are read directly from Chart.js's own resolved tooltip model rather than a card theme variable, keeping the original dark-box/light-text appearance
+- Caret geometry matches Chart.js's own `getCaretPosition` (corner-relative offset for top/bottom alignment, vertically centered for left/right), adjusted for the tooltip element's own padding and border width, which the raw canvas-derived offsets don't account for
+
+### Fixed — tooltip hover reliability
+- With `intersect:true` (used for bar/timeline/arrowline graphs), the tooltip could flicker or disappear on the smallest pointer jitter (mouse, touch, or stylus) landing a pixel outside the hovered element
+- Chart.js tracks hover state independently in two places — the chart controller (drives hover styling) and the tooltip itself (drives tooltip content) — both needed the same fix: a small dead zone (4px radius) that ignores a transition to "nothing active" if the pointer landed close to the last position that actually hit something; a genuine move to a different element still updates immediately
+
+### Fixed — viewport-aware tooltip alignment
+- Chart.js's own `determineAlignment` only kept the tooltip within its graph's canvas bounds, never the browser viewport — extended to also flip the tooltip's side (top/bottom/left/right) when the canvas-based choice would still overflow the viewport, using the canvas's actual on-screen position (`canvas.getBoundingClientRect()`). This gives the DOM tooltip a better starting position before `_clampToViewport` applies any final correction
+
+
 ## [v1.1.30] - 2026-07-12
 
 ### Added — persistence control options
