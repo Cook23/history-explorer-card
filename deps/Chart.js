@@ -4545,6 +4545,7 @@
             var options = me.options || {};
             var hoverOptions = options.hover;
             var changed = false;
+            var HOVER_DEAD_ZONE_SQ = 16; // 4px radius — see comment below
 
             me.lastActive = me.lastActive || [];
 
@@ -4553,6 +4554,21 @@
               me.active = [];
             } else {
               me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+              // Dead zone: with intersect:true (bar/timeline/arrowline), the tooltip would
+              // otherwise flicker off on every sub-pixel jitter of a mouse, touch, or stylus
+              // — the moment the pointer strays a hair outside the element it was hovering.
+              // Ignore a transition to "nothing active" if this event landed within a few
+              // pixels of the last one that actually found something; a real, deliberate
+              // move to a different point (active still non-empty) always updates normally.
+              if (!me.active.length && me.lastActive.length && me._hecLastHitXY && e.x !== null && e.y !== null) {
+                var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
+                if (_dx * _dx + _dy * _dy < HOVER_DEAD_ZONE_SQ) {
+                  me.active = me.lastActive;
+                }
+              }
+              if (me.active.length && e.x !== null && e.y !== null) {
+                me._hecLastHitXY = { x: e.x, y: e.y };
+              }
             }
 
             // Invoke onHover hook
@@ -8356,9 +8372,17 @@
 
           const yMargin = ( tooltip._options?.yAlign === 'nocenter' ) ? 11 : 0;
 
-          if (model.y < size.height) {
+          // The canvas-relative checks below only guarantee the tooltip stays within the
+          // canvas — if the canvas itself sits close to a viewport edge (or is larger than
+          // the viewport, e.g. a tall graph on a short screen), that's not enough to keep
+          // the tooltip fully on screen. canvasRect gives the canvas's actual viewport
+          // position; chart.width/height are in the same CSS-pixel space (see retinaScale),
+          // so canvasRect.left/top + model.x/y converts a canvas-local point to viewport space.
+          var canvasRect = chart.canvas.getBoundingClientRect();
+
+          if (model.y < size.height || canvasRect.top + model.y - size.height / 2 < 0) {
             yAlign = 'top';
-          } else if (model.y > chart.height - size.height - yMargin) {
+          } else if (model.y > chart.height - size.height - yMargin || canvasRect.top + model.y + size.height / 2 > window.innerHeight) {
             yAlign = 'bottom';
           }
 
@@ -8385,10 +8409,10 @@
           }
 
           olf = function (x) {
-            return x + size.width > chart.width;
+            return x + size.width > chart.width || canvasRect.left + x + size.width > window.innerWidth;
           };
           orf = function (x) {
-            return x - size.width < 0;
+            return x - size.width < 0 || canvasRect.left + x - size.width < 0;
           };
           yf = function (y) {
             return y <= midY ? 'top' : 'bottom';
@@ -8873,6 +8897,15 @@
             var ctx = this._chart.ctx;
             var vm = this._view;
 
+            // Lets the caller take over rendering entirely (e.g. a DOM tooltip that isn't
+            // clipped by this chart's own canvas bounds) instead of the built-in on-canvas
+            // draw below. Must run before the opacity===0 early return so the callback is
+            // also invoked when the tooltip should hide.
+            if (this._options.custom) {
+              this._options.custom.call(this);
+              return;
+            }
+
             if (vm.opacity === 0) {
               return;
             }
@@ -8932,6 +8965,19 @@
               me._active = [];
             } else {
               me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
+              // Dead zone — same fix as Chart.Controller.handleEvent above, needed again
+              // here because the tooltip's active-element computation is independent of
+              // the chart's own (this one drives what shows IN the tooltip, the other
+              // drives hover styling) and was missing the same guard.
+              if (!me._active.length && me._lastActive.length && me._hecLastHitXY && e.x !== null && e.y !== null) {
+                var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
+                if (_dx * _dx + _dy * _dy < 16) {
+                  me._active = me._lastActive;
+                }
+              }
+              if (me._active.length && e.x !== null && e.y !== null) {
+                me._hecLastHitXY = { x: e.x, y: e.y };
+              }
             }
 
             // Remember Last Actives
