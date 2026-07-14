@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.30b8';
+const Version = '1.1.31b7';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1749,6 +1749,7 @@ export class HistoryCardState {
         }
 
         const tooltipSize = this.pconfig.tooltipSize;
+        const _self = this; // captured for tooltips.custom below — `this` there is the Chart.js Tooltip instance
 
         var chart = new Chart(ctx, {
 
@@ -1863,7 +1864,8 @@ export class HistoryCardState {
                     },
                     yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
                     caretPadding: 8,
-                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
+                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false,
+                    custom: function() { _self._renderCustomTooltip(this); }
                 },
                 hover: {
                     mode: 'nearest',
@@ -2219,6 +2221,117 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
+    _renderCustomTooltip(tooltip) {
+        // Replaces Chart.js's built-in on-canvas tooltip draw (see the `custom` hook added
+        // to Tooltip.prototype.draw in Chart.js) with a floating DOM element. The on-canvas
+        // version is hard-clipped to its own graph's canvas — if a graph is shorter than the
+        // tooltip, or sits near a viewport edge, the tooltip gets truncated with no way to
+        // fix that from within canvas drawing. A DOM element isn't clipped by the canvas at
+        // all, and can be kept fully on screen via _clampToViewport, same as the other popups.
+        const _vm = tooltip._view;
+        let _el = document.getElementById('hec-chart-tooltip');
+
+        // Match the pre-existing "don't fade tooltip, but keep delay" behavior from the
+        // canvas draw path this replaces: any opacity below 1 (mid-fade, or nothing active)
+        // is treated as fully hidden. Also guards the next block: title/body/etc. are only
+        // ever populated by Chart.js when opacity reaches 1 — undefined otherwise.
+        if( !tooltip._options.enabled || !_vm || _vm.opacity < 1 ) {
+            if( _el ) _el.style.display = 'none';
+            return;
+        }
+        const _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+        if( !_hasContent ) {
+            if( _el ) _el.style.display = 'none';
+            return;
+        }
+
+        // Shared with the caret math below: position:absolute offsets on the caret are
+        // measured from _el's padding edge, not its visible (border/background) edge, so
+        // the caret's "stick out" offsets must account for this same padding to actually
+        // clear the box instead of landing inside it.
+        const _padY = 6, _padX = 8;
+
+        if( !_el ) {
+            _el = document.createElement('div');
+            _el.id = 'hec-chart-tooltip';
+            _el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;`;
+            document.body.appendChild(_el);
+        }
+        // Colors come from the tooltip's own resolved model, not a card theme var — this is
+        // the same dark-box/light-text combo (backgroundColor/bodyFontColor) the canvas draw
+        // used, already internally consistent (unlike mixing in an unrelated light theme,
+        // which left body text — forced to the model's own white bodyFontColor — invisible
+        // against a light background).
+        _el.style.background = _vm.backgroundColor;
+        _el.style.border = `${_vm.borderWidth}px solid ${_vm.borderColor}`;
+        _el.style.color = _vm.bodyFontColor;
+
+        const _addLine = (text, color, swatch) => {
+            const _row = document.createElement('div');
+            if( color ) _row.style.color = color;
+            if( swatch ) {
+                const _sw = document.createElement('span');
+                _sw.style.cssText = `display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle;border-radius:2px;border:1px solid ${swatch.borderColor};background:${swatch.backgroundColor};`;
+                _row.appendChild(_sw);
+            }
+            _row.appendChild(document.createTextNode(text));
+            _el.appendChild(_row);
+        };
+
+        _el.innerHTML = '';
+        for( const _t of _vm.title ) {
+            const _row = document.createElement('div');
+            _row.style.fontWeight = '600';
+            _row.style.marginBottom = '2px';
+            _row.style.color = _vm.titleFontColor;
+            _row.appendChild(document.createTextNode(_t));
+            _el.appendChild(_row);
+        }
+        for( const _l of _vm.beforeBody ) _addLine(_l);
+        _vm.body.forEach((_item, _i) => {
+            for( const _l of _item.before ) _addLine(_l);
+            for( const _l of _item.lines ) _addLine(_l, _vm.labelTextColors[_i], _vm.displayColors ? _vm.labelColors[_i] : null);
+            for( const _l of _item.after ) _addLine(_l);
+        });
+        for( const _l of _vm.afterBody ) _addLine(_l);
+
+        // Caret indicator — same geometry as Chart.js's own getCaretPosition: offset from
+        // a corner (by cornerRadius) for top/bottom alignment, or vertically centered for
+        // left/right alignment. A CSS border-triangle, colored to match the tooltip's own
+        // background so it reads as a continuation of the box pointing at the hovered point.
+        // Offsets add borderWidth + the relevant padding (see _padY/_padX above) on top of
+        // caretSize/cornerRadius — without that, the negative offsets meant to push the
+        // caret outside the box are instead absorbed by _el's own padding and it renders
+        // inside the box instead of sticking out past its edge.
+        const _caret = document.createElement('div');
+        const _cs = _vm.caretSize, _cr = _vm.cornerRadius, _bw = _vm.borderWidth;
+        const _bg = _vm.backgroundColor;
+        _caret.style.cssText = `position:absolute;width:0;height:0;border:${_cs}px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;`;
+        if( _vm.yAlign === 'center' ) {
+            _caret.style.top = '50%';
+            _caret.style.marginTop = -_cs + 'px';
+            // -4px vs. the top/bottom formula below: measured empirically (Thierry counted
+            // pixels) — the same padX/padY-based formula overshoots by 6px here instead of
+            // the 2px it gives top/bottom, for a box-model reason not fully accounted for
+            // above. Corrected by the measured difference rather than by theory.
+            if( _vm.xAlign === 'left' ) { _caret.style.left = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderRightColor = _bg; }
+            else                        { _caret.style.right = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderLeftColor = _bg; }
+        } else {
+            if( _vm.xAlign === 'left' )       _caret.style.left = (_cr - _padX) + 'px';
+            else if( _vm.xAlign === 'right' ) _caret.style.right = (_cr - _padX) + 'px';
+            else                               { _caret.style.left = '50%'; _caret.style.marginLeft = -_cs + 'px'; }
+            if( _vm.yAlign === 'top' ) { _caret.style.top = -(_bw + _padY + _cs) + 'px'; _caret.style.borderBottomColor = _bg; }
+            else                        { _caret.style.bottom = -(_bw + _padY + _cs) + 'px'; _caret.style.borderTopColor = _bg; }
+        }
+        _el.appendChild(_caret);
+
+        _el.style.display = 'block';
+        const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
+        _el.style.left = (_canvasRect.left + _vm.x) + 'px';
+        _el.style.top  = (_canvasRect.top  + _vm.y) + 'px';
+        this._clampToViewport(_el);
+    }
+
     _showLabelTooltip(label, clientX, clientY, align = 'left', duration = 1500) {
         const _existing = document.getElementById('hec-label-tooltip');
         if( _existing ) _existing.remove();
@@ -2237,6 +2350,7 @@ export class HistoryCardState {
         }
         _tip.style.top = (clientY - 16) + 'px';
         document.body.appendChild(_tip);
+        this._clampToViewport(_tip);
         setTimeout(() => { _tip.style.opacity = '0'; }, duration);
         setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, duration + 1500);
     }
@@ -4197,6 +4311,33 @@ export class HistoryCardState {
         return g.canvas.parentNode.parentNode;
     }
 
+    _clampToViewport(el)
+    {
+        // Nudges an already-positioned, already-visible floating element (menu, dropdown,
+        // tooltip) back fully inside the viewport if any edge overflows. Call once after
+        // display:block and left/top/bottom/transform are set. Reads back the actual
+        // rendered box via getBoundingClientRect() rather than assuming how the position
+        // was computed, so this works uniformly for position:fixed and position:absolute,
+        // for elements anchored via `top` or `bottom`, and for elements using a CSS
+        // transform (e.g. translateX for center/right-aligned tooltips) — a translation
+        // delta applied to `left`/`top` shifts the final rendered position by the same
+        // delta regardless of any transform already in effect.
+        const _r = el.getBoundingClientRect();
+        let _dx = 0, _dy = 0;
+        if( _r.right > window.innerWidth ) _dx = window.innerWidth - _r.right;
+        else if( _r.left < 0 ) _dx = -_r.left;
+        if( _r.bottom > window.innerHeight ) _dy = window.innerHeight - _r.bottom;
+        else if( _r.top < 0 ) _dy = -_r.top;
+        // offsetLeft/offsetTop reflect the actual current rendered offset whether it came
+        // from an explicit style.left/top or from the element's normal/auto flow position —
+        // safer baseline than parsing style strings, which can be empty.
+        if( _dx ) el.style.left = (el.offsetLeft + _dx) + 'px';
+        if( _dy ) {
+            if( el.style.bottom !== '' ) el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
+            else el.style.top = (el.offsetTop + _dy) + 'px';
+        }
+    }
+
     _footerAnchor(gl)
     {
         // Returns the top-level child of #graphlist where the bottom toolbar block starts:
@@ -5197,6 +5338,7 @@ export class HistoryCardState {
             _menu.style.top  = (_inputRect.bottom - _parentRect.top) + 'px';
             _menu.style.left = (_inputRect.left   - _parentRect.left + 30) + 'px';
         }
+        this._clampToViewport(_menu);
         _menu.focus();
     }
 
@@ -5343,12 +5485,8 @@ export class HistoryCardState {
 
         if( show ) {
             dropdown.style.display = 'block';
-            const w = this._this.querySelector('#maincard').clientWidth - 4;
-            let p = this._this.querySelector(`#bo_${idx}`).offsetLeft - 30;
-            if( p + dropdown.clientWidth >= w ) {
-                p = w - dropdown.clientWidth;
-            }
-            dropdown.style.left = p + "px";
+            dropdown.style.left = (this._this.querySelector(`#bo_${idx}`).offsetLeft - 30) + 'px';
+            this._clampToViewport(dropdown);
         } else
             dropdown.style.display = 'none';
     }
@@ -5391,6 +5529,7 @@ export class HistoryCardState {
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
+            this._clampToViewport(dropdown);
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
