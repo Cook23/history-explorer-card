@@ -11,10 +11,75 @@ graphs:
   entities:
       # Each entity can be specified individually by name, or with wildcards
     - entity: null
-      
-      # Additional entity options can be specified, much like `$.entityOptions`, for example scale
+
+      # Every option below is optional — shown here with its effective default (or 'null' where
+      # there is none). All of them can also be set for dynamically-added entities via `$.entityOptions`
+
+      # Which type of graph this entity should be displayed as. See $.graphs.type below — same options,
+      # but per entity instead of per graph. By default, determined from the entity's state class/units
+      type: ? line, bar, arrowline, timeline
+
+      # Custom display name, overriding the entity's friendly name
+      name: null
+
+      # Colour of the line/bar in the graph, defaults to automatically assigning a colour
+      color: null
+
+      # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'
+      fill: null
+
+      # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
+      dashMode: "solid"
+
+      # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
+      lineMode: null
+
+      # Line width, otherwise defaults to the card's value at $.lineWidth
+      width: null
+
+      # If true, hide this entity from the graph
+      hidden: False
+
+      # Can be used to scale this entity's value by the given factor
       scale: 1.0
-  
+
+      # Unit conversion factor applied on top of `scale` when this entity is auto-grouped with others
+      # sharing compatible SI units (see $.combineSameUnits) — usually left to be calculated automatically
+      siConversionFactor: null
+
+      # Overrides the unit of measurement shown for this entity, instead of the one reported by HA
+      unit: null
+
+      # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
+      showMinMax: False
+
+      # (line graph only) If true, show permanent dots at each measurement point making up the line
+      showPoints: False
+
+      # (bar graph only) If true, this entity is treated as net-metering — its value can go down as
+      # well as up, rather than a decrease being interpreted as the state having been reset
+      netBars: False
+
+      # Default interval that a bar graph containing this entity is summarised over. See $.graphs.options.interval
+      interval: "hourly"
+
+      # Overrides $.decimation for this entity specifically
+      decimation: "fast"
+
+      # Can be used to define a custom JS expression to post-process the state data before it goes into the graph.
+      # Should be defined as a JS expression taking one argument called `state` containing the value of the data
+      # series at a given point
+      process: null
+
+      # Turns on persistence for this entity's fields — a specific list (e.g. [color, groupId]), or 'entities'/'all'
+      # for every field, or 'none'. Local browser storage only, no cross-device sync. Falls back to the card-level
+      # setting when unset here. See $.enable_persistence for what this means and what it defaults to
+      enable_persistence: null
+
+      # Same as `enable_persistence` above, but also syncs across your other devices via your HA account.
+      # Where both cover the same field, this one always wins. See $.enable_multidevice_persistence
+      enable_multidevice_persistence: null
+
   # Each graph can be given its own title, by default they will not have one
   title: undefined
 
@@ -30,9 +95,10 @@ graphs:
 
     # The default interval that bar graphs will be summarised over. Can be one of "10m", "hourly", "daily", or "monthly".
     interval: "hourly"
-    
-    # (line graph only) If true, show the individual samples making up the line graph
-    showSamples: False
+
+    # (line graph only) If true, show permanent dots at each measurement point making up the line, for every
+    # entity in this graph (unless overridden per entity — see $.graphs.entities above)
+    showPoints: False
 
     # If true, show the time labels on graph
     showTimeLabels: True
@@ -40,14 +106,18 @@ graphs:
     # For bar charts, this can be set to True to enable stacking the values
     stacked: False
 
-    # Minimum value of the Y-axis (automatically calculated by default)
+    # Minimum value of the Y-axis (initial bound — automatically calculated by default)
     ymin: null
 
-    # Maximum value of the Y-axis (automatically calculated by default)
+    # Maximum value of the Y-axis (initial bound — automatically calculated by default)
     ymax: null
 
     # Step size to display on the Y-axis (automatically calculated by default)
     ystepsize: null
+
+    # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
+    # platform. `ymin`/`ymax` above still work as initial bounds alongside this
+    ylock: False
 
 
 # Dictionary of colour overrides for specified sensor states
@@ -61,11 +131,22 @@ stateColors:
 entityOptions:
   # Keys in this dictionary should be the name (or device class, or domain) of whichever entity is being configured, for example "humidity"
   humidity:
+    # Which type of graph an entity matching this key should be displayed as when added. See $.graphs.type —
+    # same options, applied here instead by entity/device-class/domain match. By default, determined from the
+    # entity's state class/units
+    type: ? line, bar, arrowline, timeline
+
+    # Custom display name, overriding the entity's friendly name
+    name: null
+
     # If true, hide the entity in the graphs
     hidden: False
     
-    # (line graph only) If true, show the individual samples making up the line graph
-    showSamples: False
+    # (line graph only) If true, show permanent dots at each measurement point making up the line
+    showPoints: False
+
+    # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
+    showMinMax: False
 
     # Can be used to define a custom JS expression to post-process the state data before it goes into the graph. Should be defined as a JS expression taking one argument called `state` containing the value of the data series at a given point.
     process: null
@@ -88,6 +169,13 @@ entityOptions:
     # Can be used to scale a specified entity's value by the given factor
     scale: 1.0
 
+    # Unit conversion factor applied on top of `scale` when this entity is auto-grouped with others sharing
+    # compatible SI units (see $.combineSameUnits) — usually left to be calculated automatically
+    siConversionFactor: null
+
+    # Overrides the unit of measurement shown for this entity, instead of the one reported by HA
+    unit: null
+
     # (bar graph only) If true, specifies that an entity should be considered to be net-metering for bar charts, and that the value can go down as well as up (rather than being interpreted as the state being reset)
     netBars: False
     
@@ -96,6 +184,9 @@ entityOptions:
     
     # Default interval of the graph created when a user adds this entity. See $graphs.options.interval
     interval: "hourly"
+
+    # Overrides $.decimation for this entity specifically
+    decimation: "fast"
 
 # Width of the Y-axis label area on the left side of the graph
 labelAreaWidth: 65
@@ -182,6 +273,26 @@ defaultTimeRange: '24'
 # By default, the right side of the graph will be the current time. Use this to offset the time range the graph should display. Using lower case suffices for relative offsets, and using upper case units to display the current hour, day, month or year.
 defaultTimeOffset: undefined
 
+# Whether the info panel (see $.infoPanel below) is enabled by default, replacing HA's native more-info
+# history for every entity — a super-global setting shared by every History Explorer card on the page/HA
+# instance, not just this one. If several cards set this to different values, a conflict alert is shown
+# and the oldest conflicting registration is cleaned up automatically. Once set, the user's own choice
+# (via the menu toggle) is preserved across devices — only an actual YAML edit re-forces this default
+defaultInfoPanel: undefined
+
+# By default, nothing about this card's state persists across reloads — every graph and the time range
+# always show exactly what YAML says. The two exceptions: entities added dynamically through the UI (not
+# listed under $.graphs.entities) and the time range on a card with no static entities at all — these
+# default to full persistence instead, since they have no YAML value to fall back to. Set this (or
+# $.enable_multidevice_persistence below) to change either default explicitly
+# Accepts 'range', 'entities', 'all' (both), or 'none' (force off where something would default on)
+enable_persistence: undefined
+
+# Same as `enable_persistence` above, but also syncs the persisted value across your other devices via
+# your Home Assistant user account, instead of staying local to this browser/device only. Where both
+# options cover the same scope, this one always wins
+enable_multidevice_persistence: undefined
+
 # Settings for the time ticks, the vertical lines in the background of the graph
 timeTicks:
   # The maximum density of time ticks, while allowing the actual density to be determined by the width of the graph on the display
@@ -255,7 +366,7 @@ uiColors:
   cursorline: undefined
 
 # If you choose to enable history explorer graphs to override the default HA history info panel, config options here can be used to configure those graphs.
-# You will have to set the options here (which can be much the same as history explorer card options elsewhere in this config), then you will click "Enable history info panel" on this card, and all HA history info panels will be replaced with history explorer graphs
+# You will have to set the options here (which can be much the same as history explorer card options elsewhere in this config), then either click "Enable history info panel" on this card, or set $.defaultInfoPanel above, and all HA history info panels will be replaced with history explorer graphs
 infoPanel: {}
 
 # You can use these to configure where various UI elements of the card will be displayed, or hide them completely.
