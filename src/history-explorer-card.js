@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.31b7';
+const Version = '1.1.32b15';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -627,18 +627,34 @@ export class HistoryCardState {
         return options[s];
     }
 
-    // Normalizes a disable-persistence-style YAML value (string, array, or undefined) into a
-    // Set of categories. 'all' expands to every category valid for the given scope. Returns
-    // undefined when unset, so callers can fall back with `entity.xxx ?? card`.
-    normalizeDisablePersistence(value, allCategories)
+    // Normalizes a persistence-scope YAML value (string, array, or undefined) into a Set of
+    // categories. 'all' expands to every category valid for the given scope; 'none' resolves
+    // to an explicitly empty Set — distinct from returning undefined for an unset value, so
+    // callers can tell "explicitly disabled" apart from "not configured, use the contextual
+    // default" (see _resolvePersistenceDefault).
+    normalizePersistenceCategories(value, allCategories)
     {
         if( value === undefined || value === null ) return undefined;
         const _arr = Array.isArray(value) ? value : [value];
+        if( _arr.includes('none') ) return new Set();
         return new Set(_arr.includes('all') ? allCategories : _arr.filter(c => allCategories.includes(c)));
     }
 
-    // Fields of a static entity that can be individually protected via a per-entity
-    // disable-persistence-style field list.
+    // Resolves the effective category Set for a card-level persistence option, applying the
+    // contextual default only when the option was never configured at all (raw === undefined
+    // — an explicit 'none' already normalizes to an empty Set, which is left as-is here).
+    // The default differs by context: dynamic entities (added through the UI, no YAML entry
+    // to fall back to) default to 'all' — restoring the pre-1.1.32 behavior unless explicitly
+    // overridden with 'none' — while static entities and range default to 'none', since they
+    // always have a YAML value to fall back to.
+    _resolvePersistenceDefault(raw, allCategories, defaultAll)
+    {
+        if( raw !== undefined ) return raw;
+        return defaultAll ? new Set(allCategories) : new Set();
+    }
+
+    // Fields of a static entity that enable_persistence/enable_multidevice_persistence can
+    // individually cover via a per-entity field list.
     _entityPersistenceFields()
     {
         return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
@@ -646,14 +662,15 @@ export class HistoryCardState {
                 'netBars', 'decimation', 'groupId'];
     }
 
-    // Entity-scope disable-persistence-style option: a list of specific field names, or
-    // 'entities'/'all' as a shorthand for all protectable fields (protect the whole entity).
-    // Shared by disable_multidevice_persistence and disable_persistence entity-level parsing.
+    // Entity-scope persistence option: a list of specific field names, or 'entities'/'all' as
+    // a shorthand for all coverable fields (the whole entity), or 'none' to explicitly cover
+    // none of them. Shared by enable_multidevice_persistence and enable_persistence
+    // entity-level parsing.
     resolveEntityPersistenceFields(value)
     {
         if( value === undefined || value === null ) return undefined;
         const _arr = (Array.isArray(value) ? value : [value]).map(v => v === 'entities' ? 'all' : v);
-        return this.normalizeDisablePersistence(_arr, this._entityPersistenceFields());
+        return this.normalizePersistenceCategories(_arr, this._entityPersistenceFields());
     }
 
 
@@ -1869,7 +1886,13 @@ export class HistoryCardState {
                 },
                 hover: {
                     mode: 'nearest',
-                    intersect: graphtype != 'line'
+                    intersect: graphtype != 'line',
+                    // Default is 400ms — was likely relied on as a rough anti-flicker delay
+                    // before the dead zone in Chart.js's handleEvent existed; that's now a
+                    // deliberate, precise mechanism for the same problem, so this generic
+                    // delay is just latency with no remaining purpose. Also governs hover
+                    // style updates (point/line highlighting), not just the tooltip.
+                    animationDuration: 0
                 },
                 legend: {
                     display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true,
@@ -2229,7 +2252,7 @@ export class HistoryCardState {
         // fix that from within canvas drawing. A DOM element isn't clipped by the canvas at
         // all, and can be kept fully on screen via _clampToViewport, same as the other popups.
         const _vm = tooltip._view;
-        let _el = document.getElementById('hec-chart-tooltip');
+        let _el = this._chartTooltipEl;
 
         // Match the pre-existing "don't fade tooltip, but keep delay" behavior from the
         // canvas draw path this replaces: any opacity below 1 (mid-fade, or nothing active)
@@ -2251,11 +2274,24 @@ export class HistoryCardState {
         // clear the box instead of landing inside it.
         const _padY = 6, _padX = 8;
 
+        // Anchor inside the graph's own <dialog> ancestor if there is one (the info panel,
+        // shown inside HA's native more-info popup), otherwise document.body (the main
+        // card) — see _findAncestorDialog for why this matters. The tooltip element is
+        // shared/reused across every graph on the page, so if it already exists but is
+        // currently attached to the wrong parent (e.g. last shown in the main card, now
+        // hovering a graph inside the info panel, or vice versa), move it — appendChild on
+        // a node already in the DOM relocates it rather than erroring.
+        const _targetParent = this._findAncestorDialog(tooltip._chart.canvas) || document.body;
         if( !_el ) {
             _el = document.createElement('div');
             _el.id = 'hec-chart-tooltip';
-            _el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;`;
-            document.body.appendChild(_el);
+            _el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:none;will-change:left,top;`;
+            _targetParent.appendChild(_el);
+            _el._hecOffset = null;
+            this._chartTooltipEl = _el;
+        } else if( _el.parentNode !== _targetParent ) {
+            _targetParent.appendChild(_el);
+            _el._hecOffset = null;
         }
         // Colors come from the tooltip's own resolved model, not a card theme var — this is
         // the same dark-box/light-text combo (backgroundColor/bodyFontColor) the canvas draw
@@ -2327,8 +2363,27 @@ export class HistoryCardState {
 
         _el.style.display = 'block';
         const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
-        _el.style.left = (_canvasRect.left + _vm.x) + 'px';
-        _el.style.top  = (_canvasRect.top  + _vm.y) + 'px';
+        const _targetX = _canvasRect.left + _vm.x, _targetY = _canvasRect.top + _vm.y;
+        _el.style.left = _targetX + 'px';
+        _el.style.top  = _targetY + 'px';
+        // If some ancestor (e.g. a dialog mid open-animation with a CSS transform) changed
+        // position:fixed's containing block away from the viewport, the values above land in
+        // the wrong place. The correction (measure once, then reuse) doesn't need to know
+        // what the containing block is, only the gap between target and actual result — and
+        // that gap is constant for a given parent context, so it's computed once per
+        // attachment (see _hecOffset reset above) rather than via a forced layout read on
+        // every single render, which was the likely cause of the stale-paint trail: writing
+        // left/top then immediately reading getBoundingClientRect (forcing synchronous
+        // layout) on every hover update, repeatedly, right after moving into a newly
+        // slotted/top-layer context.
+        if( _el._hecOffset == null ) {
+            const _actual = _el.getBoundingClientRect();
+            _el._hecOffset = { dx: _targetX - _actual.left, dy: _targetY - _actual.top };
+        }
+        if( _el._hecOffset.dx || _el._hecOffset.dy ) {
+            _el.style.left = (_targetX + _el._hecOffset.dx) + 'px';
+            _el.style.top  = (_targetY + _el._hecOffset.dy) + 'px';
+        }
         this._clampToViewport(_el);
     }
 
@@ -4338,6 +4393,31 @@ export class HistoryCardState {
         }
     }
 
+    _findAncestorDialog(el)
+    {
+        // Walks up from el looking for a dialog-like ancestor, crossing Shadow DOM
+        // boundaries (parentElement stops at a shadow root's edge; getRootNode().host
+        // jumps from there to the host element in the outer tree, so the climb continues).
+        // Needed because Home Assistant's more-info popup — which the info panel replaces —
+        // is promoted to the browser's top layer, rendering above the normal stacking
+        // context regardless of z-index. An element appended to document.body sits in that
+        // normal stacking context, so it renders behind the dialog — a floating element
+        // meant to appear over graphs shown inside it must instead be a DOM descendant of
+        // whatever got promoted, not merely nested near it.
+        // Matches the native <dialog> tag AND any custom element tag ending in "DIALOG" —
+        // HA's own dialog wrapper has changed tag names across versions (ha-dialog,
+        // mwc-dialog, and — since HA 2026.3.0 — wa-dialog from Web Awesome). A child
+        // appended without a `slot` attribute lands in that component's default slot,
+        // which HA/Web Awesome route to the same place as the dialog's own content, so it
+        // still ends up inside the promoted subtree.
+        let _node = el;
+        while( _node ) {
+            if( _node.nodeType === 1 && /DIALOG$/.test(_node.tagName) ) return _node;
+            _node = _node.parentElement || _node.getRootNode()?.host || null;
+        }
+        return null;
+    }
+
     _footerAnchor(gl)
     {
         // Returns the top-level child of #graphlist where the bottom toolbar block starts:
@@ -5976,9 +6056,12 @@ export class HistoryCardState {
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
+            // infoPanelEnabled deliberately has NO mirror here — see the warning comment at
+            // its "last one to speak wins" block in readLocalState for why.
             yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
-            yaml_entities          : this.pconfig.entities.filter(e => e.isStatic),
+            yaml_entities          : this._pureYamlEntities ?? this.pconfig.entities.filter(e => e.isStatic),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
+            // infoPanelEnabled deliberately has NO mirror here either — same reason as above.
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
             ha_timeRangeMinutes : this._lastHaTimeRangeMinutes,
@@ -6027,53 +6110,74 @@ export class HistoryCardState {
         const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _yamlEntities = this.pconfig.entities.filter(e => e.isStatic);
+        // Saved as-is (pure, pre-merge) for writeLocalState — the yaml_entities mirror must
+        // reflect only what YAML said, uncontaminated by whichever field values HA/local
+        // ended up winning below, or the YAML-changed detection breaks: a field overridden
+        // once by HA/local would get baked into the mirror, permanently masking later
+        // genuine YAML edits to that same field.
+        this._pureYamlEntities = _yamlEntities;
         const _yamlMirror   = _ls?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
 
         const _findEntity = (arr, id) => arr.find(e => e.entity === id);
 
-        // Union of entity ids to resolve: current YAML statics, plus any genuinely dynamic
-        // entity (isStatic falsy) known from localStorage or HA. A static entity removed
-        // from YAML is dropped — never resurrected from a stale local/HA snapshot.
+        // Union of entity ids to resolve: current YAML statics, always. A genuinely dynamic
+        // entity (isStatic falsy, known only from localStorage or HA) has no YAML entry to
+        // fall back to, so — unlike static entities — it defaults to full persistence
+        // ('all') when the card-level option isn't configured at all, restoring the
+        // pre-1.1.32 behavior; an explicit `enable_multidevice_persistence: none` (or
+        // `enable_persistence: none`) opts back out. A static entity removed from YAML is
+        // dropped either way — never resurrected from a stale local/HA snapshot.
+        const _dynamicEntitiesAllowed =
+            this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities'], true).has('entities') ||
+            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities'], true).has('entities');
         const _entityIds = new Set([
             ..._yamlEntities.map(e => e.entity),
-            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
-            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ...(_dynamicEntitiesAllowed ? _lsEntities.filter(e => !e.isStatic).map(e => e.entity) : []),
+            ...(_dynamicEntitiesAllowed ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : []),
         ]);
 
         this.pconfig.entities = [..._entityIds].map(id => {
             const _yamlE = _findEntity(_yamlEntities, id);
 
-            // YAML front — per entity, never blocked by either option
+            // YAML front — per entity, always wins on change, unaffected by the enable flags
             if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_findEntity(_yamlMirror, id) ?? null) )
                 return _yamlE;
 
-            // Resolve protected-field sets: entity-level first, falling back to the
-            // card-level 'entities' switch (which, when set, protects every field).
-            // disable_persistence blocks everything disable_multidevice_persistence blocks
-            // (the HA/cross-device front), plus this device's own local restore.
-            const _resolveBlockedFields = (_entityFields, _cardSet) =>
-                _entityFields ?? (_cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set());
-            const _mdpFields = _resolveBlockedFields(_yamlE?.disableMultidevicePersistence, this.pconfig.disableMultidevicePersistence);
-            const _dpFields  = _resolveBlockedFields(_yamlE?.disablePersistence, this.pconfig.disablePersistence);
-            const _haBlockedFields = new Set([..._mdpFields, ..._dpFields]);
+            // Resolve which fields have persistence enabled at all — entity-level first,
+            // falling back to the card-level 'entities' switch, itself defaulting to 'all'
+            // for a dynamic entity (no YAML to fall back to) or 'none' for a static one (see
+            // _resolvePersistenceDefault) when the card-level option isn't configured at all.
+            // enable_multidevice_persistence additionally allows the HA/cross-device front to
+            // win for its fields; enable_persistence only allows this device's own local
+            // storage — multidevice always wins over local for whatever it covers, since a
+            // field enabled by either ends up in _enabledFields regardless, while only
+            // _multiFields fields can also be won by the HA front below.
+            const _resolveEnabledFields = (_entityFields, _cardRaw) => {
+                if( _entityFields !== undefined ) return _entityFields;
+                const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities'], !_yamlE);
+                return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
+            };
+            const _multiFields = _resolveEnabledFields(_yamlE?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence);
+            const _localFields = _resolveEnabledFields(_yamlE?.enablePersistence, this.pconfig.enablePersistence);
+            const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
             const _haE = _findEntity(_haEntities, id);
             const _haChanged = _haE && JSON.stringify(_haE) !== JSON.stringify(_findEntity(_haMirror, id) ?? null);
-
-            // Base: this device's local value (or YAML/HA fallback on first run), then apply
-            // HA on top wherever it's allowed to win, then force fields disable_persistence
-            // covers back to YAML — overriding both the local and the just-applied HA value.
-            // disable_persistence has no effect on a dynamic entity: there's no YAML value to
-            // fall back to, so only the (unset) `_dpFields` from the card fallback ever apply.
             const _localE = _findEntity(_lsEntities, id) ?? _yamlE ?? _haE;
-            const _result = { ..._localE };
+
+            // Base: the YAML value for every field — nothing persists unless explicitly
+            // enabled. Then layer in the local value for fields with some persistence
+            // enabled, then further layer in the HA value for the multidevice-enabled subset
+            // if it actually changed. A dynamic entity has no YAML value; its base is the
+            // local/HA snapshot instead — it only exists here at all because persistence was
+            // enabled for it (see _entityIds above), so there's always something to base on.
+            const _result = _yamlE ? { ..._yamlE } : { ..._localE };
+            for( const _f of _enabledFields )
+                if( _localE && _f in _localE ) _result[_f] = _localE[_f];
             if( _haChanged )
-                for( const _f of this._entityPersistenceFields() )
-                    if( !_haBlockedFields.has(_f) && _f in _haE ) _result[_f] = _haE[_f];
-            if( _yamlE )
-                for( const _f of _dpFields )
-                    if( _f in _yamlE ) _result[_f] = _yamlE[_f];
+                for( const _f of _multiFields )
+                    if( _f in _haE ) _result[_f] = _haE[_f];
             return _result;
         });
 
@@ -6093,22 +6197,59 @@ export class HistoryCardState {
             });
         }
 
-        // --- Last one to speak wins — timeRange and infoPanelEnabled ---
+        // --- Last one to speak wins — timeRange ---
+        // infoPanelEnabled is handled separately below — see the warning comment there,
+        // it deliberately does NOT follow this pattern.
 
-        // YAML fronts
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
+        // YAML front
         const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined &&
                                  String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
-        // HA user fronts (compare HA user value to its mirror in localStorage)
-        const _haInfoChanged = _haInfoEnabled !== undefined &&
-                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
-        const _haTimeChanged = !(this.pconfig.disableMultidevicePersistence.has('range') || this.pconfig.disablePersistence.has('range')) &&
+        // HA user front (compare HA user value to its mirror in localStorage)
+        // range defaults to 'all' when this card has no static (YAML) entities at all —
+        // a purely dynamic card has nothing fixed to anchor to, so it's treated the same
+        // way dynamic entities are: persist by default. A card with at least one static
+        // entity still defaults to 'none' for range, same as before.
+        const _rangeDefaultAll = _yamlEntities.length === 0;
+        const _multiRange = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities'], _rangeDefaultAll).has('range');
+        const _localRange = this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities'], _rangeDefaultAll).has('range');
+        const _haTimeChanged = _multiRange &&
             _haCard?.timeRangeHours !== undefined && (
             _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
+
+        // !!! infoPanelEnabled — DO NOT "fix" this into a normal mirror-compared
+        // last-one-to-speak-wins front. It looks like the same pattern as timeRange/entities
+        // above, but it is NOT: infoPanelEnabled is a single super-global variable shared by
+        // every history-explorer-card instance on the page (not per-card state), and it has
+        // its own separate cross-card conflict-detection mechanism further below (the
+        // registry in `history-explorer-infopanel-enabled`'s `.registry`), which alerts the
+        // user and tries to delete the oldest conflicting card's registration — e.g. because
+        // that card no longer exists on any dashboard.
+        //
+        // WHY this has to work this way: deleting a card or a whole view generates no HA
+        // event of any kind — there is nothing to listen for, no hook to trigger a cleanup
+        // at the moment of deletion. The only way a stale registration ever gets removed is
+        // for the surviving cards to notice it and clean it up themselves, repeatedly, since
+        // none of them can ever know when (or whether) a deletion happened.
+        //
+        // That cleanup only works if every card with `defaultInfoPanel` set in YAML
+        // RE-ASSERTS its own choice on every single load, unconditionally — not just when it
+        // detects its own value "changed". If a card only reasserted on change, it would
+        // reassert once, then go quiet; a stale registry entry from a now-deleted card would
+        // never be re-detected as conflicting and never get cleaned up, because nothing would
+        // ever re-trigger the conflict check for it again.
+        //
+        // So `_yamlInfoChanged`/`_haInfoChanged` below are intentionally "true whenever the
+        // source has a value at all" — not "true when the value differs from a stored mirror"
+        // — and there is deliberately no yaml_defaultInfoPanel/ha_infoPanelEnabled mirror
+        // written in writeLocalState. Adding one (as a previous pass here did) silently
+        // breaks the conflict-cleanup mechanism without throwing any error — it just stops
+        // reliably catching stale/removed cards. If you're tempted to "fix" this into the
+        // same shape as timeRange, read this comment twice first, then don't.
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined;
+        const _haInfoChanged   = _haInfoEnabled !== undefined;
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;
@@ -6124,22 +6265,22 @@ export class HistoryCardState {
             // No front — infoPanelEnabled already correctly set from localStorage at module load (line 96)
         }
 
-        if( _yamlTimeChanged || _haTimeChanged ) {
+        if( !_multiRange && !_localRange ) {
+            // Nothing enabled for range — nothing persists, always the YAML default
+            this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+        } else if( _yamlTimeChanged || _haTimeChanged ) {
             // YAML wins if both changed
             if( _yamlTimeChanged ) {
                 this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
             } else {
-                // HA user wins
+                // HA user wins (only reachable when enable_multidevice_persistence covers range)
                 if( _haCard.timeRangeHours > 0 )
                     this.setTimeRange(this.validateRange(_haCard.timeRangeHours, true));
                 else if( _haCard.timeRangeMinutes > 0 )
                     this.setTimeRangeMinutes(_haCard.timeRangeMinutes);
             }
-        } else if( this.pconfig.disablePersistence.has('range') ) {
-            // Local restore also blocked — always fall back to the YAML default
-            this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
         } else {
-            // No front — restore active values
+            // Local restore — reachable since at least one of the two options is enabled
             if( _ls?.timeRangeHours > 0 )
                 this.setTimeRange(this.validateRange(_ls.timeRangeHours, true));
             else if( _ls?.timeRangeMinutes > 0 )
@@ -6163,7 +6304,11 @@ export class HistoryCardState {
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
         this._nextGroupId = Math.max(1000, _maxGroupId + 1);
 
-        // Register defaultInfoPanel with HA user key and detect conflicts across cards
+        // Register defaultInfoPanel with HA user key and detect conflicts across cards.
+        // This re-registers with a fresh timestamp on every load, unconditionally — that's
+        // required for cleanup of stale/removed cards to work at all. See the big warning
+        // comment above the infoPanelEnabled "last one to speak wins" block for why; the two
+        // are connected even though this block never reads _yamlInfoChanged/_haInfoChanged.
         try {
             const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
             const _globalData = _ipe2?.value || {};
@@ -6301,8 +6446,8 @@ export class HistoryCardState {
             process           : ent.process,
             netBars           : ent.netBars,
             decimation        : ent.decimation,
-            disableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.disable_multidevice_persistence),
-            disablePersistence: this.resolveEntityPersistenceFields(ent.disable_persistence),
+            enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
+            enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
     }
 
@@ -6486,8 +6631,8 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.filterEntities  =        config.filterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-        this.instance.pconfig.disableMultidevicePersistence = this.instance.normalizeDisablePersistence(config.disable_multidevice_persistence, ['range', 'entities']) ?? new Set();
-        this.instance.pconfig.disablePersistence = this.instance.normalizeDisablePersistence(config.disable_persistence, ['range', 'entities']) ?? new Set();
+        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities']);
+        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities']);
         this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
         this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
         this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
