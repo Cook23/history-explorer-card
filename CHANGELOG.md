@@ -4,6 +4,20 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.32] - 2026-07-15
+
+### Changed — persistence options renamed and inverted to opt-in
+- `disable_multidevice_persistence`/`disable_persistence` renamed to `enable_multidevice_persistence`/`enable_persistence`, and their logic inverted: instead of persisting by default and blocking selectively, nothing persists by default and you turn it on selectively
+- `enable_persistence` turns on persistence in local browser storage only (no cross-device sync); `enable_multidevice_persistence` turns on persistence in local storage *and* your Home Assistant user account, syncing across your other devices — where both cover the same field, `enable_multidevice_persistence` always wins
+- New `none` value explicitly turns persistence off for a scope that would otherwise default on
+- Two exceptions default to `all` instead of `none`, since they have no YAML value to fall back to: entities added dynamically through the UI (not defined in `graphs:`), and the time range on a card with no static entities at all. Everything else — every field of a static entity, and the time range on a card that has at least one — defaults to `none` (always YAML)
+- Same card-level (`range`/`entities`/`all`/`none`) and entity-level (a specific field list, or `entities`/`all`/`none`) scope as before
+
+### Fixed — YAML mirror contaminated by HA/local values
+- `writeLocalState` built the `yaml_entities` mirror (used to detect a genuine YAML edit) from `pconfig.entities` *after* the HA/local merge, instead of the freshly-parsed YAML source — once a field such as `fill` got overridden by HA or local storage even once, the mirror stopped reflecting true YAML, breaking change detection for that field, potentially permanently
+- Fixed: a pure, pre-merge snapshot of the YAML entities is now saved and used for the mirror instead
+
+
 ## [v1.1.31] - 2026-07-14
 
 ### Fixed — popups and menus clipped by the viewport

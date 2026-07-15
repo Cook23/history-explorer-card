@@ -44,8 +44,7 @@ This card offers a highly interactive and configurable way to view the history o
 - [Long term statistics](#long-term-statistics)
 - [Display defaults](#default-view-and-time-ranges)
   - [Time range and offset](#default-view-and-time-ranges)
-  - [Disabling cross-device sync](#disabling-cross-device-sync-disable_multidevice_persistence)
-  - [Disabling all persistence](#disabling-all-persistence-including-local-disable_persistence)
+  - [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
   - [Auto refresh](#auto-refresh)
   - [Current values and rounding](#showing-current-sensor-values)
   - [Data decimation](#data-decimation)
@@ -61,7 +60,7 @@ This card offers a highly interactive and configurable way to view the history o
 - [Multiple cards](#multiple-cards)
 - [CSV export](#exporting-data-as-csv)
 - [YAML graph configuration](#yaml-configuration-for-preconfigured-graphs)
-  - [Protecting entities from persistence](#protecting-specific-entities-from-persistence)
+  - [Persistence for specific entities](#persistence-for-specific-entities)
 - [Running as a sidebar panel](#running-as-a-panel-in-the-sidebar)
 
 ---
@@ -70,7 +69,9 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
-- **v1.1.30** — New `disable_multidevice_persistence` and `disable_persistence` options. `disable_multidevice_persistence` blocks the HA-user-storage restore front (cross-device sync) while leaving YAML and local (per-device) restore untouched. `disable_persistence` blocks that same cross-device front *and* this device's own local restore, always falling back to the YAML value instead. Card-level scope: `range` and/or `entities` (or `all`). Entity-level scope: a specific list of protected fields (`color`, `groupId`, `interval`, etc.) or `entities`/`all` as shorthand for every field — each option falls back to its own card-level setting when unset on the entity.
+- **v1.1.32** — Persistence options renamed and inverted to opt-in: `enable_persistence`/`enable_multidevice_persistence` replace `disable_multidevice_persistence`/`disable_persistence`. Nothing persists by default except dynamically-added entities; `none` opts back out where that default applies.
+- **v1.1.31** — Popups and menus no longer get clipped near a viewport edge (`_clampToViewport()`); the graph hover tooltip is now a floating element instead of canvas-drawn, fixing size limits and touch/stylus flicker.
+- **v1.1.30** — Added persistence-control options for time range and entities, card-wide or per entity. Renamed in v1.1.32, see above.
 - **v1.1.29** — New entity type menu: change a numeric entity between line (straight/curved/stepped), bar, arrowline or timeline directly from the legend, a timeline label, or the entity selector — no need to remove and re-add it; a "Default" option re-applies each entity's auto-detected type for wildcard batches.
 - **v1.1.28** — Static YAML graphs fixed to combine correctly regardless of entity type/unit mix, honor the `graph.type` option, and correctly forward legend clicks and drag-and-drop rejection like dynamic graphs.
 - **v1.1.27** — Internal architecture unification: static (YAML) and dynamic (user-added) graphs now share a single code path (`pconfig.entities` + `pconfig.graphs`), simplifying maintenance and enabling later features such as the entity type menu.
@@ -845,42 +846,54 @@ defaultTimeOffset: 1D       # Show the current day from midnight to midnight
 defaultTimeOffset: 1O       # Show the entire current month, starting at the 1st
 ```
 
-### Disabling cross-device sync (`disable_multidevice_persistence`)
+### Enabling persistence (`enable_persistence` / `enable_multidevice_persistence`)
 
-Time range, and entities added or changed through the UI, are normally synchronized across all your devices via your Home Assistant user account (see [per-user server-side persistence](#new--per-user-server-side-persistence-v1112)). If you run several dashboard views with distinct default ranges configured in YAML (a 24h view, a 30-day view, a 1-year view...), this sync can work against you: zooming in on one view on one device gets remembered and reapplied on every device, overriding the YAML default intended for that view.
+By default, nothing about this card's state persists across reloads: the time range always reopens at `defaultTimeRange`, and every static (YAML-defined) entity always shows exactly what YAML says, regardless of any zoom, pan, or edit made through the UI on any device.
 
-`disable_multidevice_persistence` stops a device from adopting changes synced from another device. YAML changes, and this device's own local changes (kept in browser storage), keep working exactly as before — this option only blocks the cross-device (HA user account) restore.
+There are two exceptions to that default, because they'd otherwise behave in a way nobody wants:
 
-At the card level, it accepts `range`, `entities`, or `all` (both):
+- **Entities added dynamically through the UI** (not defined in `graphs:`) have no YAML value to fall back to — if nothing remembered them, they'd vanish on every reload. So they default to full persistence (both local and cross-device, see below) instead.
+- **The time range on a card with no static entities at all** — a purely dynamic card has nothing fixed to anchor its range to either, so it defaults to full persistence too, for the same reason.
 
-```yaml
-type: custom:history-explorer-card
-defaultTimeRange: 24h
-disable_multidevice_persistence: range   # this device always keeps its own time range,
-                                          # ignoring range changes made on other devices
-```
+Everything else (the time range on a card that *does* have static entities, and every field of every static entity) defaults to `none`, i.e. always YAML.
 
-- `range` — the time range shown on this device is never overridden by another device's range; only a YAML change to `defaultTimeRange`, or your own local adjustment on this device, can change it.
-- `entities` — entities added, recolored, regrouped, etc. on another device are never adopted on this device; only YAML and this device's own changes apply.
-- `all` — both of the above.
-
-Entities defined in `graphs:` can also set their own `disable_multidevice_persistence`, either as a shorthand (`entities` or `all`, protecting the whole entity) or as a precise list of fields to protect, falling back to the card-level setting above when unset — see [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs) for the entity-level syntax.
-
-### Disabling all persistence, including local (`disable_persistence`)
-
-`disable_multidevice_persistence` only blocks the cross-device front — this device still remembers its *own* past zoom, pan, or entity changes, restoring them on every reload via browser storage. That's fine for most setups, but it doesn't help if you want a view to always reopen at its YAML default, even on the same device: for example, several fixed-range dashboard views (a 24h view, a 30-day view, a 1-year view) where a temporary zoom on any one of them should never "stick".
-
-`disable_persistence` does everything `disable_multidevice_persistence` does, plus blocks this device's own local restore for the same scope. When both the cross-device and local fronts are blocked, the card always falls back to the YAML value:
+Two options let you change either default explicitly, at the card level or per entity:
 
 ```yaml
 type: custom:history-explorer-card
 defaultTimeRange: 24h
-disable_persistence: range   # always reopens at 24h — a zoom on this view, on any device, never sticks
+enable_persistence: entities              # this device remembers on its own — no cross-device sync
+enable_multidevice_persistence: range     # this device's time range syncs across your devices via HA
 ```
 
-It accepts the same `range`, `entities`, or `all` values as `disable_multidevice_persistence`, at both the card and entity level (see below for the entity-level syntax) — the two options can be set independently, per field, if you want some fields to only ignore other devices while others should never be remembered at all, even locally.
+- **`enable_persistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
+- **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account (see [per-user server-side persistence](#new--per-user-server-side-persistence-v1112)), so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
+- **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
-`disable_persistence` has no effect on entities added dynamically through the UI (rather than defined in `graphs:`): there is no YAML value to fall back to for them, so only `disable_multidevice_persistence` applies to those.
+Both accept `range`, `entities`, or `all` at the card level (top-level YAML key, alongside `defaultTimeRange`):
+
+```yaml
+type: custom:history-explorer-card
+enable_multidevice_persistence: all   # persist everything, synced across devices — the pre-v1.1.32 default
+```
+
+If your card has only dynamic entities and you'd rather it behaved like a normal fixed dashboard (nothing remembered), turn the default persistence off explicitly:
+
+```yaml
+type: custom:history-explorer-card
+enable_multidevice_persistence: none   # this device never syncs its dynamically-added entities or range
+enable_persistence: none               # ...and doesn't remember them locally either
+```
+
+Or keep local memory but drop cross-device sync for a dynamic card:
+
+```yaml
+type: custom:history-explorer-card
+enable_multidevice_persistence: none   # no HA sync
+# enable_persistence left unset — defaults to 'all' for a purely dynamic card, so local memory stays on
+```
+
+See [Persistence for specific entities](#persistence-for-specific-entities) for the entity-level syntax (a precise list of fields, or `entities`/`all`/`none`, falling back to the card-level default above when unset).
 
 ### Auto refresh
 
@@ -1369,9 +1382,9 @@ graphs:
 
 Replace the entities and structure as needed.
 
-### Protecting specific entities from persistence
+### Persistence for specific entities
 
-Any entity inside `graphs:` can declare its own `disable_multidevice_persistence` and/or `disable_persistence`, protecting it individually — see [Disabling cross-device sync](#disabling-cross-device-sync-disable_multidevice_persistence) and [Disabling all persistence](#disabling-all-persistence-including-local-disable_persistence) for what each one blocks at the card level. Both accept either `entities` / `all` — protecting the entity entirely, exactly like the card-level setting — or a list of specific fields to protect, leaving every other field free to keep syncing normally:
+Any static entity inside `graphs:` can declare its own `enable_persistence` and/or `enable_multidevice_persistence`, either as a precise list of fields to cover, or `entities`/`all` as a shorthand for every field, or `none` to explicitly cover nothing — see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence) for what each option does at the card level. A field without its own entity-level setting falls back to the card-level default for that option — which, for a static entity, is `none` (always YAML) unless the card explicitly says otherwise:
 
 ```yaml
 graphs:
@@ -1379,14 +1392,16 @@ graphs:
     entities:
       - entity: sensor.living_room_target_temp
         color: '#3e95cd'
-        disable_multidevice_persistence: [color, groupId]   # keep this device's color and grouping,
-                                                             # let interval/fill/etc. keep syncing
+        enable_multidevice_persistence: [color, groupId]   # sync this device's color and grouping choices
+                                                             # across your other devices too
       - entity: sensor.boiler_state
-        disable_persistence: all                            # this entity always resets to its YAML
-                                                             # values, on every device, every reload
+        enable_persistence: all                             # this device remembers everything about this
+                                                             # entity on its own — no cross-device sync
 ```
 
-Protectable fields: `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`. An entity without its own `disable_multidevice_persistence`/`disable_persistence` falls back to the corresponding card-level setting, if any. `disable_persistence` has no effect on entities added dynamically through the UI (only on entities defined here, in `graphs:`), since there's no YAML value to fall back to for them.
+Protectable/coverable fields: `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`.
+
+This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
 ---
 
