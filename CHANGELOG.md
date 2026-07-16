@@ -4,6 +4,40 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.33] - 2026-07-17
+
+### Added — `order` persistence category
+- New `order` category for `enable_persistence`/`enable_multidevice_persistence`, alongside `range` and `entities` — controls whether the display order of graphs persists and syncs. Card-level only, never per entity: a position only means something relative to every other graph, not a property of one entity on its own
+- Same defaults as `range`: `none` (always YAML order) on a card with at least one static entity, `all` on a card with none — nothing prevents reordering a static graph, so its order is now covered by the same persistence rules as everything else
+- Resolved through the same three-step "last one to speak wins" priority as any other value: YAML wins unconditionally on change, then HA (if multidevice is enabled and its order changed), then local
+
+### Fixed — info panel enable/disable sync and conflict detection
+- The `defaultInfoPanel` YAML front had stopped comparing against its stored mirror at some point after v1.1.27's storage-format simplification — an unrelated side effect of that refactor, which never targeted or re-tested the info panel — making the option always reassert instead of only reacting to a genuine change
+- Restored the mirror comparison validated in v1.1.19: a YAML or HA change is only applied when it actually differs from what was last seen, exactly like every other persisted value. The separate cross-card conflict-detection registry (alerts when multiple cards declare a different `defaultInfoPanel`) is unaffected — it always re-registers unconditionally on every load, regardless of this comparison
+
+### Fixed — options menu (export CSV, remove all graphs, info panel toggle)
+- The menu never closed on an outside click, unlike every other popup in the card — it had never been given the same focus-based auto-close wiring the others use
+- The menu opened directly on top of its own toggle button instead of below it (only its horizontal position was ever calculated) — the button became invisible underneath the open menu, making it impossible to click again to close it
+- Both fixed with the pattern already used elsewhere in the card
+
+### Fixed — CSV/statistics export crashing with "moment is not defined"
+- The export code used `moment` and `saveAs` as if they were globally available, without importing them itself — relying entirely on another file having already done so, a fragile assumption that could silently break depending on load order
+- Now imports its own dependencies directly, the same way the rest of the card does
+
+### Fixed — "Remove all graphs" deleting static graphs
+- Assumed graphs were always ordered "statics first, then dynamics" — a leftover from before today's static/dynamic flag existed. Once graphs can be reordered (drag & drop, or the new `order` persistence above), that assumption breaks: the button could delete static graphs caught after the first dynamic one in the list, while leaving dynamic graphs positioned earlier untouched
+- Now checks each graph's own static/dynamic status directly, regardless of where it sits in the list
+
+### Fixed — entity ID not shown when adding or already present
+- Selecting a new entity in the dropdown, or one that's already on the card, used to show its ID (or an "already in graph" message) in a tooltip before the type menu appeared — lost at some point after the separate "+" confirmation step was removed
+- Restored and made fully symmetric: adding shows "Add: [entity ID]" (or the full list for a wildcard match), an existing entity shows "Already in graph: [entity ID]" — same wording pattern, same position, for both single and wildcard selections
+- Tooltip display time now scales with how much text it holds (roughly one second plus half a second per word) instead of a fixed duration, so longer messages don't disappear before they can be read
+
+### Fixed — graph hover tooltip flickering with `cursor: mode: all`
+- With multiple graphs and the cursor line synced across all of them, every graph processes each mouse movement, including graphs the pointer isn't actually over. Since all graphs share one tooltip element, a non-hovered graph's own "nothing to show" state could immediately hide the tooltip a different, actually-hovered graph had just shown — visible as a flash on, then off
+- The tooltip element now tracks which graph currently owns it, and only that graph is allowed to hide it
+
+
 ## [v1.1.32] - 2026-07-15
 
 ### Changed — persistence options renamed and inverted to opt-in

@@ -234,9 +234,9 @@ defaultTimeRange: 4h     # 4 hours (default is 24h). Units: m, h, d, w, o, y
 defaultTimeOffset: 1D    # Snap to current day from midnight. Use uppercase for snapped offsets
 ```
 
-By default, nothing about the card's state persists across reloads — `defaultTimeRange` (and every static entity) always shows exactly what YAML says. Two exceptions: entities added dynamically through the UI (not defined in `graphs:`) remember themselves fully by default, since there's no YAML value to fall back to for them — and a card with no static entities at all behaves the same way for its time range, since it has nothing fixed to anchor to either.
+By default, nothing about the card's state persists across reloads — `defaultTimeRange`, graph order, and every static entity always show exactly what YAML says. Two exceptions: entities added dynamically through the UI (not defined in `graphs:`) remember themselves fully by default, since there's no YAML value to fall back to for them — and a card with no static entities at all behaves the same way for its time range and graph order, since it has nothing fixed to anchor to either.
 
-Two options turn persistence on or off, at the card level or per entity:
+Two options turn persistence on or off, at the card level (or per entity for individual fields):
 
 ```yaml
 type: custom:history-explorer-card
@@ -246,7 +246,7 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 
 - `enable_persistence` — this device remembers on its own (local browser storage only).
 - `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account.
-- `none` explicitly turns persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
+- Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
 

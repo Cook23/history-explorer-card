@@ -73,7 +73,8 @@ graphs:
 
       # Turns on persistence for this entity's fields — a specific list (e.g. [color, groupId]), or 'entities'/'all'
       # for every field, or 'none'. Local browser storage only, no cross-device sync. Falls back to the card-level
-      # setting when unset here. See $.enable_persistence for what this means and what it defaults to
+      # setting when unset here. See $.enable_persistence for what this means and what it defaults to.
+      # (The 'order' category isn't available at entity level — it's card-only, see $.enable_persistence above)
       enable_persistence: null
 
       # Same as `enable_persistence` above, but also syncs across your other devices via your HA account.
@@ -280,12 +281,14 @@ defaultTimeOffset: undefined
 # (via the menu toggle) is preserved across devices — only an actual YAML edit re-forces this default
 defaultInfoPanel: undefined
 
-# By default, nothing about this card's state persists across reloads — every graph and the time range
-# always show exactly what YAML says. The two exceptions: entities added dynamically through the UI (not
-# listed under $.graphs.entities) and the time range on a card with no static entities at all — these
-# default to full persistence instead, since they have no YAML value to fall back to. Set this (or
-# $.enable_multidevice_persistence below) to change either default explicitly
-# Accepts 'range', 'entities', 'all' (both), or 'none' (force off where something would default on)
+# By default, nothing about this card's state persists across reloads — every graph, the time range, and
+# their display order always show exactly what YAML says. Two exceptions default to full persistence
+# instead, since they have no YAML value to fall back to: entities added dynamically through the UI (not
+# listed under $.graphs.entities), and — for time range and order specifically — a card with no static
+# entities at all. Set this (or $.enable_multidevice_persistence below) to change either default explicitly
+# Accepts 'range', 'entities', 'order', 'all' (every category), or 'none' (force off where something would
+# default on). 'order' controls the display order of graphs — card-level only, since a position only means
+# something relative to every other graph, not as a property of a single entity
 enable_persistence: undefined
 
 # Same as `enable_persistence` above, but also syncs the persisted value across your other devices via

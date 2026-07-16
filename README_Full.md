@@ -180,7 +180,7 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 - **Double-click** an entity label in a timeline or arrowline graph to extract it into its own graph, placed immediately below the original — same behavior as line/bar legend double-click.
 
-### New — entity selector (v1.1.23+)
+### Entity selector
 
 - **Unified dropdown** — desktop and mobile now use the same custom dropdown, eliminating the native `<datalist>` with its display limitations.
 - **Friendly names** — the dropdown and input field display friendly names instead of entity IDs. The entity ID is shown in a tooltip on selection.
@@ -188,11 +188,11 @@ Priority in list form: first matching entry wins per property. Entries can match
 - **Keyboard navigation** — ArrowUp/ArrowDown to navigate, Enter to select, Escape to close and clear; second Enter triggers entity add.
 - **Wildcard dropdown** — when a wildcard pattern is entered, matching entries are shown in bold; first Enter selects all matching entities, second Enter adds them all.
 - **Duplicate detection extended** — wildcard multi-add detects duplicates, lists them in a tooltip, and highlights all affected graphs with a red dashed outline.
-- **Dropdown click adds directly** — clicking an entry in the dropdown adds the entity immediately; no separate `+` button is needed (removed in v1.1.29). Keyboard flow is unchanged: second Enter still confirms.
+- **Dropdown click adds directly** — clicking an entry in the dropdown adds the entity immediately; no separate `+` button is needed. Keyboard flow is unchanged: second Enter still confirms.
 - **Input field cleared** after entity add (success or error) via a timer; ESC clears immediately.
 - **Dropdown positioning** — the dropdown appears below the input field for `selector: top` (default) and above for `selector: bottom`; height is capped to `min(50vh, available viewport space)`.
 
-### New — entity display type menu (v1.1.29+)
+### Entity display type menu
 
 - A menu lets you choose how any numeric entity is displayed: line (straight, curved or stepped), bar, arrowline or timeline.
 - Opens right after selecting a new numeric entity in the dropdown — nothing is added until a type is chosen (click or keyboard); the choice both sets the type and performs the add in one step.
@@ -202,19 +202,19 @@ Priority in list form: first matching entry wins per property. Entries can match
 - The currently active type is pre-selected in bold; ArrowUp/ArrowDown and Enter navigate and confirm with the keyboard.
 - Available in the info panel too, via a "Type" link shown between the date and range selectors for numeric entities.
 
-### New — per-user server-side persistence (v1.1.12+)
+### Per-user server-side persistence
 
 - Dynamically added entities, graph order, bar intervals, and time range are now stored in HA's `frontend/set_user_data` storage, tied to the HA user account and synchronized across all devices. Browser local storage is kept as a fallback.
 
-### New — info-panel default state (v1.1.19+)
+### Info-panel default state
 
 - **`defaultInfoPanel`** YAML option sets the default enabled state of the info panel. A "last one to speak wins" logic applies: changing the YAML value overrides user preference, but only when the YAML value actually changes.
 
-### New — time range persistence (v1.1.19+)
+### Time range persistence
 
 - **`defaultTimeRange`** now uses "last one to speak wins" logic: changing the YAML value overrides the user-adjusted range only when the YAML value actually changes. The user-adjusted range is otherwise preserved across reloads and devices.
 
-### New — adaptive toolbar layout (v1.1.24+)
+### Adaptive toolbar layout
 
 - Toolbar layout replaced from CSS floats to CSS Grid, resolving wrapping issues on Safari and narrow cards.
 - Three adaptive layouts: A (all on one line), B (selector on second line), C (no selector).
@@ -848,16 +848,16 @@ defaultTimeOffset: 1O       # Show the entire current month, starting at the 1st
 
 ### Enabling persistence (`enable_persistence` / `enable_multidevice_persistence`)
 
-By default, nothing about this card's state persists across reloads: the time range always reopens at `defaultTimeRange`, and every static (YAML-defined) entity always shows exactly what YAML says, regardless of any zoom, pan, or edit made through the UI on any device.
+By default, nothing about this card's state persists across reloads: the time range always reopens at `defaultTimeRange`, graphs always display in their YAML order, and every static (YAML-defined) entity always shows exactly what YAML says, regardless of any zoom, pan, reorder, or edit made through the UI on any device.
 
 There are two exceptions to that default, because they'd otherwise behave in a way nobody wants:
 
 - **Entities added dynamically through the UI** (not defined in `graphs:`) have no YAML value to fall back to — if nothing remembered them, they'd vanish on every reload. So they default to full persistence (both local and cross-device, see below) instead.
-- **The time range on a card with no static entities at all** — a purely dynamic card has nothing fixed to anchor its range to either, so it defaults to full persistence too, for the same reason.
+- **The time range and graph order on a card with no static entities at all** — a purely dynamic card has nothing fixed to anchor either of those to, so they default to full persistence too, for the same reason.
 
-Everything else (the time range on a card that *does* have static entities, and every field of every static entity) defaults to `none`, i.e. always YAML.
+Everything else (the time range and graph order on a card that *does* have static entities, and every field of every static entity) defaults to `none`, i.e. always YAML.
 
-Two options let you change either default explicitly, at the card level or per entity:
+Three options let you change any of these defaults explicitly, at the card level (`enable_persistence`/`enable_multidevice_persistence` cover `range`, `entities`, and `order`) or per entity (individual fields only — see below):
 
 ```yaml
 type: custom:history-explorer-card
@@ -867,21 +867,21 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```
 
 - **`enable_persistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
-- **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account (see [per-user server-side persistence](#new--per-user-server-side-persistence-v1112)), so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
+- **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account (see [per-user server-side persistence](#per-user-server-side-persistence)), so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
-Both accept `range`, `entities`, or `all` at the card level (top-level YAML key, alongside `defaultTimeRange`):
+Both accept `range`, `entities`, `order` (the display order of your graphs — card-level only, since a position only means something relative to every other graph, not a property of one entity), or `all` at the card level (top-level YAML key, alongside `defaultTimeRange`):
 
 ```yaml
 type: custom:history-explorer-card
-enable_multidevice_persistence: all   # persist everything, synced across devices — the pre-v1.1.32 default
+enable_multidevice_persistence: all   # persist everything, synced across devices
 ```
 
 If your card has only dynamic entities and you'd rather it behaved like a normal fixed dashboard (nothing remembered), turn the default persistence off explicitly:
 
 ```yaml
 type: custom:history-explorer-card
-enable_multidevice_persistence: none   # this device never syncs its dynamically-added entities or range
+enable_multidevice_persistence: none   # this device never syncs its dynamically-added entities, range, or order
 enable_persistence: none               # ...and doesn't remember them locally either
 ```
 
@@ -893,7 +893,7 @@ enable_multidevice_persistence: none   # no HA sync
 # enable_persistence left unset — defaults to 'all' for a purely dynamic card, so local memory stays on
 ```
 
-See [Persistence for specific entities](#persistence-for-specific-entities) for the entity-level syntax (a precise list of fields, or `entities`/`all`/`none`, falling back to the card-level default above when unset).
+See [Persistence for specific entities](#persistence-for-specific-entities) for the entity-level syntax (a precise list of fields, or `entities`/`all`/`none`, falling back to the card-level default above when unset — `order` isn't available at this level, see above).
 
 ### Auto refresh
 
@@ -1399,7 +1399,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields: `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
