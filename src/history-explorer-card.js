@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.32b15';
+const Version = '1.1.33b13';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -651,6 +651,48 @@ export class HistoryCardState {
     {
         if( raw !== undefined ) return raw;
         return defaultAll ? new Set(allCategories) : new Set();
+    }
+
+    // Resolves the display order of a set of entity ids — static or dynamic — following the
+    // exact same "last one to speak wins" priority as any other persisted property, expressed
+    // as the same three independent, sequential steps used for a field's own value: YAML
+    // wins unconditionally on change; if nothing is enabled, the order stays at its base
+    // (YAML's own order for static entities); otherwise HA wins if multidevice is enabled and
+    // its order changed since its own mirror, else local wins. `yamlIds` is null for dynamic
+    // entities, which have no YAML order concept — steps 1 and the YAML half of step 2 are
+    // skipped for them. Ids present in `candidateIds` but missing from the resolved order
+    // (e.g. a newly-added entity) are appended at the end; ids in the resolved order but no
+    // longer in `candidateIds` (e.g. an entity removed from YAML) are dropped.
+    // Order is card-only (see the 'order' category, alongside 'range'/'entities') — not a
+    // per-entity field: a position only means something relative to every other entity, so
+    // there's no coherent way to persist one entity's position independently of the rest.
+    _resolveOrder(candidateIds, yamlIds, yamlIdsMirror, haIds, haIdsMirror, lsIds, orderEnabled, orderMultidevice)
+    {
+        // YAML front — always wins on change, unconditionally, exactly like any other field
+        if( yamlIds ) {
+            const _yamlChanged = JSON.stringify(yamlIds) !== JSON.stringify(yamlIdsMirror);
+            if( _yamlChanged ) return this._finishOrder(yamlIds, candidateIds);
+        }
+
+        // Nothing persists unless explicitly enabled — the order stays at its base (YAML's
+        // own order for static entities), mirroring how a field with nothing enabled simply
+        // keeps its initial YAML value
+        if( !orderEnabled ) return this._finishOrder(yamlIds ?? lsIds, candidateIds);
+
+        // HA front — only when multidevice is enabled, same as for individual fields
+        const _haChanged = orderMultidevice && JSON.stringify(haIds) !== JSON.stringify(haIdsMirror);
+        return this._finishOrder(_haChanged ? haIds : lsIds, candidateIds);
+    }
+
+    // Shared tail for _resolveOrder: drops ids no longer present in candidateIds (e.g. an
+    // entity removed from YAML), then appends any candidate missing from the chosen order
+    // (e.g. a newly-added entity) at the end.
+    _finishOrder(order, candidateIds)
+    {
+        const _known = new Set(candidateIds);
+        const _result = order.filter(id => _known.has(id));
+        for( const id of candidateIds ) if( !_result.includes(id) ) _result.push(id);
+        return _result;
     }
 
     // Fields of a static entity that enable_persistence/enable_multidevice_persistence can
@@ -1914,7 +1956,7 @@ export class HistoryCardState {
                         const idx = legendItem.datasetIndex;
                         if( !this._uncombineInProgress && g._lastLegendClick && g._lastLegendClickIdx === idx && now - g._lastLegendClick < 400 ) {
                             // Double-click — uncombine (not allowed on static/fixed graphs)
-                            if( g.isFixed ) {
+                            if( g.isStatic ) {
                                 g._lastLegendClick = null;
                                 return;
                             }
@@ -2258,13 +2300,23 @@ export class HistoryCardState {
         // canvas draw path this replaces: any opacity below 1 (mid-fade, or nothing active)
         // is treated as fully hidden. Also guards the next block: title/body/etc. are only
         // ever populated by Chart.js when opacity reaches 1 — undefined otherwise.
+        //
+        // _el (this._chartTooltipEl) is ONE element shared by every graph on the card — but
+        // this callback runs separately per graph's own Chart.js instance. With
+        // cursor.mode: 'all', every graph processes each mousemove to keep the vertical
+        // cursor line synced across all of them, including graphs the pointer isn't actually
+        // over — those graphs' own tooltip state is inactive (opacity < 1) on every such
+        // call. Without the ownership check below, a non-hovered graph's own "nothing
+        // active" state would hide the tooltip a DIFFERENT, actually-hovered graph just
+        // showed in the same cycle — visible as the tooltip flashing on then immediately
+        // off. Only the graph that currently owns the visible tooltip may hide it.
         if( !tooltip._options.enabled || !_vm || _vm.opacity < 1 ) {
-            if( _el ) _el.style.display = 'none';
+            if( _el && this._chartTooltipOwner === tooltip._chart ) _el.style.display = 'none';
             return;
         }
         const _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
         if( !_hasContent ) {
-            if( _el ) _el.style.display = 'none';
+            if( _el && this._chartTooltipOwner === tooltip._chart ) _el.style.display = 'none';
             return;
         }
 
@@ -2361,6 +2413,7 @@ export class HistoryCardState {
         }
         _el.appendChild(_caret);
 
+        this._chartTooltipOwner = tooltip._chart;
         _el.style.display = 'block';
         const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
         const _targetX = _canvasRect.left + _vm.x, _targetY = _canvasRect.top + _vm.y;
@@ -2387,7 +2440,7 @@ export class HistoryCardState {
         this._clampToViewport(_el);
     }
 
-    _showLabelTooltip(label, clientX, clientY, align = 'left', duration = 1500) {
+    _showLabelTooltip(label, clientX, clientY, align = 'left', duration = 1000 + 500 * label.split(/[\s_]+/).filter(Boolean).length) {
         const _existing = document.getElementById('hec-label-tooltip');
         if( _existing ) _existing.remove();
         const _tip = document.createElement('div');
@@ -2555,7 +2608,7 @@ export class HistoryCardState {
             // Inter-graph: check compatibility
             const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
             const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = !_overG.isFixed && _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
+            const _compatible = !_overG.isStatic && _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
             this._highlightDropTarget(_overG.canvas, _compatible);
             // Freeze target chart when over its legend overlay
@@ -2692,7 +2745,7 @@ export class HistoryCardState {
                 return;
             }
 
-            if( _tgt && _tgt.isFixed ) {
+            if( _tgt && _tgt.isStatic ) {
                 this._showLabelTooltip(i18n('ui.menu.type_static'), event.clientX, event.clientY);
                 return;
             }
@@ -3122,7 +3175,7 @@ export class HistoryCardState {
                 this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
             }
             // Double-click: uncombine (non-fixed graphs only)
-            if( !g.isFixed ) {
+            if( !g.isStatic ) {
                 const _now = Date.now();
                 if( !this._uncombineInProgress &&
                     g._lastTLClick && g._lastTLClickIdx === _closestIdx &&
@@ -3250,7 +3303,7 @@ export class HistoryCardState {
     {
         const _g = this._graphByOverlay('tl', event.target);
         if( !_g ) return;
-        event.target.style.cursor = _g.isFixed ? 'default' : 'move';
+        event.target.style.cursor = _g.isStatic ? 'default' : 'move';
     }
 
     timelineDragEnd(event)
@@ -3664,7 +3717,7 @@ export class HistoryCardState {
                 const _cx = event.clientX - _rect.left;
                 const _cy = event.clientY - _rect.top;
                 let _onDraggable = false;
-                if( !_hoverG.isFixed && _hoverG.type !== 'timeline' && _hoverG.type !== 'arrowline' ) {
+                if( !_hoverG.isStatic && _hoverG.type !== 'timeline' && _hoverG.type !== 'arrowline' ) {
                     if( _chart.legend && _chart.legend.legendHitBoxes ) {
                         for( let _box of _chart.legend.legendHitBoxes ) {
                             if( _cx >= _box.left && _cx <= _box.left + _box.width &&
@@ -4065,7 +4118,7 @@ export class HistoryCardState {
             for( let eid of ids ) {
                 if( this._hass.states[eid] === undefined ) continue;
                 if( this.pconfig.entities.some(en => entityIdOf(en) === eid) ) {
-                    _duplicates.push(this._hass.states[eid]?.attributes?.friendly_name || eid);
+                    _duplicates.push(eid);
                     const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === eid));
                     if( _existingG ) _duplicateGraphs.add(_existingG);
                     continue;
@@ -4076,6 +4129,10 @@ export class HistoryCardState {
             // New entities take priority: defer creation, show the type menu for them
             if( _newIds.length ) {
                 if( _newIds.some(eid => this._isNumericEntity(eid)) ) {
+                    const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+                    const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
+                    const _ty = _ir ? _ir.top : 0;
+                    this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center');
                     this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
                 } else {
                     for( let eid of _newIds ) {
@@ -4093,7 +4150,7 @@ export class HistoryCardState {
                 // Show type-change menu for a duplicate only if no new-entity menu is already
                 // shown above (avoid two competing menus for one combined action)
                 const _dupG = Array.from(_duplicateGraphs)[0];
-                const _dupEntityId = _dupG?.entities.find(e => _duplicates.includes(this._hass.states[e.entity]?.attributes?.friendly_name || e.entity))?.entity;
+                const _dupEntityId = _dupG?.entities.find(e => _duplicates.includes(e.entity))?.entity;
                 if( !_newIds.length && _dupEntityId && this._isNumericEntity(_dupEntityId) ) {
                     this.showEntityTypeMenu(ii, _dupEntityId, _dupG);
                 } else if( !_newIds.length ) {
@@ -4191,7 +4248,7 @@ export class HistoryCardState {
                     const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
                     const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
-                    this._showLabelTooltip(i18n('ui.label.already_exists'), _tx, _ty, 'center');
+                    this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center');
                     const _fiErr = this.ui.inputField[ii];
                     if( this._isNumericEntity(entity_id) ) {
                         this.showEntityTypeMenu(ii, entity_id, _existingG);
@@ -4228,6 +4285,10 @@ export class HistoryCardState {
             // and let the user's choice both define the type and perform the creation.
             // If non-numeric, the only valid representation is timeline: create directly.
             if( this._isNumericEntity(entity_id) ) {
+                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
+                const _ty = _ir ? _ir.top : 0;
+                this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center');
                 this.showEntityTypeMenu(ii, entity_id, null);
             } else {
                 const _name = this._createAndPersistEntity(entity_id, 'timeline', null);
@@ -4265,16 +4326,23 @@ export class HistoryCardState {
 
         if( !confirm(i18n('ui.popup.remove_all')) ) return;
 
-        let a = 0;
-        for( a = 0; a < this.graphs.length; a++ )
-            if( !this.graphs[a].isFixed ) break;
+        // Remove only actually non-fixed graphs, wherever they sit in the array — the old
+        // "first non-fixed index, then everything after it" logic predates `isStatic` and
+        // assumed statics always came first with dynamics strictly after; that assumption
+        // breaks the moment graphs are reordered (drag & drop, or synced order), silently
+        // deleting static graphs caught after the first dynamic one while leaving dynamic
+        // graphs before it untouched. Iterate backwards so splice() doesn't shift the
+        // indices of entries still to be checked.
+        for( let i = this.graphs.length - 1; i >= 0; i-- ) {
+            if( !this.graphs[i].isStatic ) {
+                this._graphDiv(this.graphs[i]).remove();
+                this.graphs.splice(i, 1);
+            }
+        }
 
-        for( let i = a; i < this.graphs.length; i++ )
-            this._graphDiv(this.graphs[i]).remove();
-
-        this.graphs.splice(a);
         this.pconfig.entities = this.pconfig.entities.filter(e => e.isStatic);
 
+        this._updateMoVisibility();
         this.writeLocalState();
     }
 
@@ -4831,17 +4899,17 @@ export class HistoryCardState {
 
     _updateLegendMargins(g)
     {
-        const _isFixed = g.isFixed;
+        const _isStatic = g.isStatic;
         if( g.type === 'bar' ) {
             const bd = this._this.querySelector(`#bd-${g.id}`);
-            if( bd ) g.chart._legendRightMargin = bd.offsetWidth + (_isFixed ? 15 : 45);
+            if( bd ) g.chart._legendRightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
         } else {
-            g.chart._legendRightMargin = _isFixed ? 25 : 45;
+            g.chart._legendRightMargin = _isStatic ? 25 : 45;
         }
         g.chart._legendLeftMargin = undefined;
     }
 
-    addGraphToCanvas(gid, type, entities, config, isFixed = false)
+    addGraphToCanvas(gid, type, entities, config, isStatic = false)
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
 
@@ -4897,7 +4965,7 @@ export class HistoryCardState {
 
         const interval = this.parseIntervalConfig(config?.interval) ?? 1;
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isFixed": isFixed, "groupId": config?.groupId ?? null };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
 
@@ -4951,7 +5019,7 @@ export class HistoryCardState {
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
                 </div>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
-                <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)">
+                <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <a id="ef_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
                     ${this.statistics.enabled ? eh : ''}
                     <a id="eg_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
@@ -5246,6 +5314,19 @@ export class HistoryCardState {
                 this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
                 this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
                 this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
+                // Close on focusout — same as es_N/et_N. eo_N needs a tabIndex to be
+                // focusable at all (unlike et_N, it isn't focusable by default in the HTML
+                // template), and menuSetVisibility() must call .focus() when opening it, or
+                // this listener would never fire in the first place.
+                const _eoMenu = this._this.querySelector(`#eo_${i}`);
+                if( _eoMenu ) {
+                    _eoMenu.tabIndex = 0;
+                    _eoMenu.addEventListener('focusout', () => {
+                        setTimeout(() => {
+                            if( !_eoMenu.contains(document.activeElement) ) this.menuSetVisibility(i, false);
+                        }, 150);
+                    });
+                }
 
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
@@ -5565,8 +5646,17 @@ export class HistoryCardState {
 
         if( show ) {
             dropdown.style.display = 'block';
-            dropdown.style.left = (this._this.querySelector(`#bo_${idx}`).offsetLeft - 30) + 'px';
+            // Position below the toggle button, same pattern as et_N (getBoundingClientRect
+            // converted through offsetParent) — previously only `left` was set, `top` stayed
+            // at its default "auto" (static-flow) position, which could land the menu
+            // directly over the button instead of below it, making the button unclickable
+            // to close the menu while it's open.
+            const _boRect = this._this.querySelector(`#bo_${idx}`).getBoundingClientRect();
+            const _parentRect = dropdown.offsetParent ? dropdown.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
+            dropdown.style.top  = (_boRect.bottom - _parentRect.top) + 'px';
+            dropdown.style.left = (_boRect.left   - _parentRect.left - 30) + 'px';
             this._clampToViewport(dropdown);
+            dropdown.focus();
         } else
             dropdown.style.display = 'none';
     }
@@ -6056,15 +6146,14 @@ export class HistoryCardState {
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
-            // infoPanelEnabled deliberately has NO mirror here — see the warning comment at
-            // its "last one to speak wins" block in readLocalState for why.
             yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
+            yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_entities          : this._pureYamlEntities ?? this.pconfig.entities.filter(e => e.isStatic),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
-            // infoPanelEnabled deliberately has NO mirror here either — same reason as above.
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
             ha_timeRangeMinutes : this._lastHaTimeRangeMinutes,
+            ha_infoPanelEnabled : this._lastHaInfoEnabled,
         };
         const _json = JSON.stringify(data);
 
@@ -6110,6 +6199,10 @@ export class HistoryCardState {
         const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _yamlEntities = this.pconfig.entities.filter(e => e.isStatic);
+        // Shared by range and order below: a card with no static entities at all has nothing
+        // fixed to anchor to, so both default to 'all' (persist by default) instead of the
+        // usual 'none' — same reasoning as dynamic entities defaulting to 'all'.
+        const _noStaticsDefaultAll = _yamlEntities.length === 0;
         // Saved as-is (pure, pre-merge) for writeLocalState — the yaml_entities mirror must
         // reflect only what YAML said, uncontaminated by whichever field values HA/local
         // ended up winning below, or the YAML-changed detection breaks: a field overridden
@@ -6129,12 +6222,47 @@ export class HistoryCardState {
         // `enable_persistence: none`) opts back out. A static entity removed from YAML is
         // dropped either way — never resurrected from a stale local/HA snapshot.
         const _dynamicEntitiesAllowed =
-            this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities'], true).has('entities') ||
-            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities'], true).has('entities');
+            this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities') ||
+            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], true).has('entities');
+
+        // Display order (which id comes before which — not a per-entity field, see 'order'
+        // in _resolveOrder above) follows the same last-one-to-speak-wins priority as
+        // anything else, resolved separately for statics (YAML order as the base, default
+        // 'none' unless the card has no statics at all — same rule as range) and dynamics
+        // (no YAML order concept, default 'all' like their own field persistence).
+        const _dynamicOrderMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('order');
+        const _dynamicOrderEnabled =
+            _dynamicOrderMultidevice ||
+            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], true).has('order');
+        const _staticOrderMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('order');
+        const _staticOrderEnabled =
+            _staticOrderMultidevice ||
+            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('order');
+
+        const _yamlIds = _yamlEntities.map(e => e.entity);
+        const _staticOrder = this._resolveOrder(
+            _yamlIds, _yamlIds, _yamlMirror.map(e => e.entity),
+            _haEntities.filter(e => e.isStatic).map(e => e.entity),
+            (_ls?.ha_entities ?? []).filter(e => e.isStatic).map(e => e.entity),
+            _lsEntities.filter(e => e.isStatic).map(e => e.entity),
+            _staticOrderEnabled, _staticOrderMultidevice
+        );
+
+        const _dynamicCandidates = [...new Set([
+            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
+        ])];
+        const _dynamicOrder = this._resolveOrder(
+            _dynamicCandidates, null, null,
+            _haEntities.filter(e => !e.isStatic).map(e => e.entity),
+            (_ls?.ha_entities ?? []).filter(e => !e.isStatic).map(e => e.entity),
+            _lsEntities.filter(e => !e.isStatic).map(e => e.entity),
+            _dynamicOrderEnabled, _dynamicOrderMultidevice
+        );
+
         const _entityIds = new Set([
-            ..._yamlEntities.map(e => e.entity),
-            ...(_dynamicEntitiesAllowed ? _lsEntities.filter(e => !e.isStatic).map(e => e.entity) : []),
-            ...(_dynamicEntitiesAllowed ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : []),
+            ..._staticOrder,
+            ...(_dynamicEntitiesAllowed ? _dynamicOrder : []),
         ]);
 
         this.pconfig.entities = [..._entityIds].map(id => {
@@ -6155,7 +6283,7 @@ export class HistoryCardState {
             // _multiFields fields can also be won by the HA front below.
             const _resolveEnabledFields = (_entityFields, _cardRaw) => {
                 if( _entityFields !== undefined ) return _entityFields;
-                const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities'], !_yamlE);
+                const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities', 'order'], !_yamlE);
                 return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
             };
             const _multiFields = _resolveEnabledFields(_yamlE?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence);
@@ -6209,47 +6337,33 @@ export class HistoryCardState {
         // range defaults to 'all' when this card has no static (YAML) entities at all —
         // a purely dynamic card has nothing fixed to anchor to, so it's treated the same
         // way dynamic entities are: persist by default. A card with at least one static
-        // entity still defaults to 'none' for range, same as before.
-        const _rangeDefaultAll = _yamlEntities.length === 0;
-        const _multiRange = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities'], _rangeDefaultAll).has('range');
-        const _localRange = this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities'], _rangeDefaultAll).has('range');
+        // entity still defaults to 'none' for range, same as before. See _noStaticsDefaultAll
+        // above (shared with order — same reasoning applies to both).
+        const _multiRange = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('range');
+        const _localRange = this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('range');
         const _haTimeChanged = _multiRange &&
             _haCard?.timeRangeHours !== undefined && (
             _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
 
-        // !!! infoPanelEnabled — DO NOT "fix" this into a normal mirror-compared
-        // last-one-to-speak-wins front. It looks like the same pattern as timeRange/entities
-        // above, but it is NOT: infoPanelEnabled is a single super-global variable shared by
-        // every history-explorer-card instance on the page (not per-card state), and it has
-        // its own separate cross-card conflict-detection mechanism further below (the
-        // registry in `history-explorer-infopanel-enabled`'s `.registry`), which alerts the
-        // user and tries to delete the oldest conflicting card's registration — e.g. because
-        // that card no longer exists on any dashboard.
-        //
-        // WHY this has to work this way: deleting a card or a whole view generates no HA
-        // event of any kind — there is nothing to listen for, no hook to trigger a cleanup
-        // at the moment of deletion. The only way a stale registration ever gets removed is
-        // for the surviving cards to notice it and clean it up themselves, repeatedly, since
-        // none of them can ever know when (or whether) a deletion happened.
-        //
-        // That cleanup only works if every card with `defaultInfoPanel` set in YAML
-        // RE-ASSERTS its own choice on every single load, unconditionally — not just when it
-        // detects its own value "changed". If a card only reasserted on change, it would
-        // reassert once, then go quiet; a stale registry entry from a now-deleted card would
-        // never be re-detected as conflicting and never get cleaned up, because nothing would
-        // ever re-trigger the conflict check for it again.
-        //
-        // So `_yamlInfoChanged`/`_haInfoChanged` below are intentionally "true whenever the
-        // source has a value at all" — not "true when the value differs from a stored mirror"
-        // — and there is deliberately no yaml_defaultInfoPanel/ha_infoPanelEnabled mirror
-        // written in writeLocalState. Adding one (as a previous pass here did) silently
-        // breaks the conflict-cleanup mechanism without throwing any error — it just stops
-        // reliably catching stale/removed cards. If you're tempted to "fix" this into the
-        // same shape as timeRange, read this comment twice first, then don't.
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined;
-        const _haInfoChanged   = _haInfoEnabled !== undefined;
+        // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
+        // as everything else. This was broken as an unrelated side effect of the v1.1.27
+        // storage-format simplification (which dropped `yaml_defaultInfoPanel` from the
+        // persisted payload while unifying the static/dynamic graph pipeline — info panel
+        // was never the target of that refactor and was never re-tested after it), then
+        // "fixed" back to a permanently-true comparison mid-session under the mistaken
+        // belief that the cross-card conflict-detection registry below (in
+        // `history-explorer-infopanel-enabled`.registry) needed it to always fire in order
+        // to keep re-registering and cleaning up stale/removed cards. It doesn't: that
+        // registry block is entirely unconditional already (re-registers with a fresh
+        // timestamp on every load regardless of this comparison, see below) — verified
+        // against the last version with a properly tested info panel (v1.1.19), which used
+        // this exact mirror comparison.
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
+                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
+        const _haInfoChanged = _haInfoEnabled !== undefined &&
+                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;
@@ -6299,6 +6413,7 @@ export class HistoryCardState {
         this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
         this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
         this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
+        this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
 
         // Set _nextGroupId to max(1000, maxGroupId + 1) — dynamic groupIds always >= 1000
         const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
@@ -6306,9 +6421,10 @@ export class HistoryCardState {
 
         // Register defaultInfoPanel with HA user key and detect conflicts across cards.
         // This re-registers with a fresh timestamp on every load, unconditionally — that's
-        // required for cleanup of stale/removed cards to work at all. See the big warning
-        // comment above the infoPanelEnabled "last one to speak wins" block for why; the two
-        // are connected even though this block never reads _yamlInfoChanged/_haInfoChanged.
+        // required for cleanup of stale/removed cards to work at all (deleting a card/view
+        // generates no HA event, so only surviving cards reasserting themselves can ever
+        // detect and clean up a stale entry). This is entirely independent of
+        // _yamlInfoChanged/_haInfoChanged above — it never reads them, and never needed to.
         try {
             const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
             const _globalData = _ipe2?.value || {};
@@ -6631,8 +6747,8 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.filterEntities  =        config.filterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities']);
-        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities']);
+        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
+        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
         this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
         this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;

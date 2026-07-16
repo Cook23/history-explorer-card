@@ -11,6 +11,7 @@ const lang_en =
             "error_retreiving" : "Could not retrieve available entities !",
             "loading" : "Loading available entities...",
             "already_exists" : "Already in graph",
+            "add" : "Add",
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
         "popup" : {
@@ -69,6 +70,7 @@ const lang_fr =
             "error_retreiving" : "Impossible de récupérer les entités !",
             "loading" : "Chargement des entités disponibles...",
             "already_exists" : "Déjà dans un graphique",
+            "add" : "Ajouter",
             "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
         }, 
         "popup" : {
@@ -127,6 +129,7 @@ const lang_de =
             "error_retreiving" : "Entitäten konnten nicht geladen werden !",
             "loading" : "Lade verfügbare Entitäten...",
             "already_exists" : "Bereits im Diagramm",
+            "add" : "Hinzufügen",
             "infopanel_conflict" : "YAML-Parameter infoPanelActive Konflikt:",
         }, 
         "popup" : {
@@ -185,6 +188,7 @@ const lang_es =
             "error_retreiving" : "No se encuentran entidades disponibles!",
             "loading" : "Cargando entidades ...",
             "already_exists" : "Ya en un gráfico",
+            "add" : "Añadir",
             "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
         }, 
         "popup" : {
@@ -243,6 +247,7 @@ const lang_nl =
             "error_retreiving" : "Kan beschikbare entiteiten niet ophalen !",
             "loading" : "Beschikbare entiteiten laden...",
             "already_exists" : "Al in een grafiek",
+            "add" : "Toevoegen",
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
         "popup" : {
@@ -301,6 +306,7 @@ const lang_pl =
             "error_retreiving" : "Nie można pobrać dostępnych elementów !",
             "loading" : "Ładowanie dostępnych elementów...",
             "already_exists" : "Już na wykresie",
+            "add" : "Dodaj",
             "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
         }, 
         "popup" : {
@@ -359,6 +365,7 @@ const lang_sv =
             "error_retreiving": "Kunde inte hämta tillgängliga enheter!",
             "loading": "Laddar tillgängliga enheter...",
             "already_exists" : "Redan i ett diagram",
+            "add" : "Lägg till",
             "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
         },
         "popup": {
@@ -417,6 +424,7 @@ const lang_da =
             "error_retreiving" : "Fejl ved indlæsning af entiteter !",
             "loading" : "Indlæser tilgængelige entiteter...",
             "already_exists" : "Allerede i et diagram",
+            "add" : "Tilføj",
             "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
         }, 
         "popup" : {
@@ -475,6 +483,7 @@ const lang_sk =
             "error_retreiving" : "Nepodarilo sa načítať dostupné entity !",
             "loading" : "Načitavanie dostupných entít...",
             "already_exists" : "Už v grafe",
+            "add" : "Pridať",
             "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
         }, 
         "popup" : {
@@ -533,6 +542,7 @@ const lang_ru =
             "error_retreiving" : "Невозможно загрузить доступные объекты!",
             "loading" : "Загрузка доступных объектов...",
             "already_exists" : "Уже в графике",
+            "add" : "Добавить",
             "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
         }, 
         "popup" : {
