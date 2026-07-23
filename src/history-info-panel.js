@@ -1,6 +1,6 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { infoPanelEnabled, HistoryCardState, _TYPE_MENU_DEFS } from "./history-explorer-card";
+import { infoPanelEnabled, HistoryCardState, _TYPE_MENU_DEFS, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
 import { i18n } from "./languages.js";
 
 // --------------------------------------------------------------------------------------
@@ -70,32 +70,6 @@ function hecHookInfoPanel()
         // No label area for timelines
         instance.pconfig.labelAreaWidth = ( type == 'timeline' || type == 'arrowline' ) ? 0 : 55;
 
-        // Init entity object
-        let entities = [ { 'entity' : entity_id, "process": entityOptions?.process } ];
-
-        // Get the options for line and arrow graphs (use per device_class options if available, otherwise use defaults)
-        if( type == 'line' || type == 'arrowline' || type == 'bar' ) {
-
-            if( entityOptions?.color ) {
-                entities[0].color = entityOptions?.color;
-                entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
-            } else {
-                const c = instance.getNextDefaultColor();
-                entities[0].color = c.color;
-                entities[0].fill = entityOptions?.fill ?? c.fill;
-            }
-
-            entities[0].width = entityOptions?.width ?? 1.001;
-            entities[0].lineMode = entityOptions?.lineMode;
-            entities[0].scale = entityOptions?.scale;
-
-            if( type == 'bar' ) {
-                entities[0].fill = entities[0].color;
-                entities[0].lineMode = entityOptions?.lineMode ?? 'lines';
-            }
-
-        }
-
         // Unified pipeline — static graph = dynamic graph with isStatic:true
         instance.pconfig.graphs = {};
         instance.pconfig.graphs[instance.g_id] = {
@@ -106,18 +80,23 @@ function hecHookInfoPanel()
             ylock          : entityOptions?.ylock,
         };
 
-        instance.pconfig.entities = [{
+        // Not persisted (this panel has nothing to save) — same pconfig.entities shape as
+        // history-explorer-card, just never written to storage. addGraph computes color,
+        // fill, lineMode, scale, process, etc. itself (via its own getEntityOptions call)
+        // and writes them into this same entry — it's now the single source for entity
+        // data, no separate copy. width is set explicitly here: this panel's default
+        // (1.001) differs from the main card's (pconfig.defaultLineWidth, 2.0).
+        const _pcEntry = {
             entity   : entity_id,
             groupId  : instance.g_id,
-            color    : entities[0].color,
-            fill     : entities[0].fill,
-            hidden   : entities[0].hidden,
+            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.width ?? 1.001) : undefined,
             interval : instance.parseIntervalConfig(entityOptions?.interval) ?? null,
             isStatic : true,
-        }];
+        };
+        instance.pconfig.entities = [_pcEntry];
 
         instance.graphs = [];
-        instance.addGraph(entity_id, true, entities[0].color, entities[0].fill, null, entities[0].hidden, true, instance.parseIntervalConfig(entityOptions?.interval) ?? null, instance.g_id);
+        instance.addGraph(entity_id, true, entityOptions?.color, entityOptions?.fill, null, undefined, true, instance.parseIntervalConfig(entityOptions?.interval) ?? null, instance.g_id, _pcEntry);
     }
 
     __fn.prototype._injectHistoryExplorer = function(instance)
@@ -304,37 +283,12 @@ function hecHookInfoPanel()
             ro.observe(this);
     };
 
-    function getDomainForEntity(entity)
-    {
-        return entity.substr(0, entity.indexOf("."));
-    }
-
-    function getDeviceClass(hass, entity)
-    {
-        return hass.states[entity]?.attributes?.device_class;
-    }
-
-    function getEntityOptions(hass, entityOptions, entity)
-    {
-        let c = entityOptions?.[entity];
-        if( !c ) {
-            const dc = getDeviceClass(hass, entity);
-            c = dc ? entityOptions?.[dc] : undefined;
-            if( !c ) {
-                const dm = getDomainForEntity(entity);
-                c = dm ? entityOptions?.[dm] : undefined;
-            }
-        }
-
-        return c ?? undefined;
-    }
-
     function isExcluded(hass, entity_id)
     {
         if( hec_panel?.config?.exclude ) {
             return hec_panel.config.exclude[entity_id] ||
-                   hec_panel.config.exclude[getDomainForEntity(entity_id)] ||
-                   hec_panel.config.exclude[getDeviceClass(hass, entity_id)];
+                   hec_panel.config.exclude[getDomainForEntityPure(entity_id)] ||
+                   hec_panel.config.exclude[getDeviceClassPure(hass, entity_id)];
         }
         return false;
     }
@@ -407,7 +361,7 @@ function hecHookInfoPanel()
             return this._oldRender();
         }
 
-        const entityOptions = getEntityOptions(this.hass, hec_panel?.config?.entityOptions, entity_id);
+        const entityOptions = getEntityOptionsPure(this.hass, hec_panel?.config?.entityOptions, entity_id);
 
         const uom = this.hass.states[entity_id]?.attributes?.unit_of_measurement;
         const sc = this.hass.states[entity_id]?.attributes?.state_class;

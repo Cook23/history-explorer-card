@@ -33,7 +33,8 @@ const lang_en =
             "type_timeline"      : "Timeline",
             "type_static"        : "Static",
             "type_label"         : "Type",
-            "type_default"       : "Default"
+            "type_default"       : "Default",
+            "linked_graphs"      : "Linked graphs"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -92,7 +93,8 @@ const lang_fr =
             "type_timeline"      : "Chronologie",
             "type_static"        : "Statique",
             "type_label"         : "Type",
-            "type_default"       : "Par défaut"
+            "type_default"       : "Par défaut",
+            "linked_graphs"      : "Graphiques liés"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -151,7 +153,8 @@ const lang_de =
             "type_timeline"      : "Zeitachse",
             "type_static"        : "Statisch",
             "type_label"         : "Typ",
-            "type_default"       : "Standard"
+            "type_default"       : "Standard",
+            "linked_graphs"      : "Verknüpfte Diagramme"
         },
         "ranges" : {
             "l_hour" : "< 1 Std",
@@ -210,7 +213,8 @@ const lang_es =
             "type_timeline"      : "Cronología",
             "type_static"        : "Estático",
             "type_label"         : "Tipo",
-            "type_default"       : "Predeterminado"
+            "type_default"       : "Predeterminado",
+            "linked_graphs"      : "Gráficos vinculados"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -269,7 +273,8 @@ const lang_nl =
             "type_timeline"      : "Tijdlijn",
             "type_static"        : "Statisch",
             "type_label"         : "Type",
-            "type_default"       : "Standaard"
+            "type_default"       : "Standaard",
+            "linked_graphs"      : "Gekoppelde grafieken"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -328,7 +333,8 @@ const lang_pl =
             "type_timeline"      : "Oś czasu",
             "type_static"        : "Statyczny",
             "type_label"         : "Typ",
-            "type_default"       : "Domyślny"
+            "type_default"       : "Domyślny",
+            "linked_graphs"      : "Połączone wykresy"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -387,7 +393,8 @@ const lang_sv =
             "type_timeline"      : "Tidslinje",
             "type_static"        : "Statisk",
             "type_label"         : "Typ",
-            "type_default"       : "Standard"
+            "type_default"       : "Standard",
+            "linked_graphs": "Länkade grafer"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -446,7 +453,8 @@ const lang_da =
             "type_timeline"      : "Tidslinje",
             "type_static"        : "Statisk",
             "type_label"         : "Type",
-            "type_default"       : "Standard"
+            "type_default"       : "Standard",
+            "linked_graphs"      : "Sammenkædede grafer"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -505,7 +513,8 @@ const lang_sk =
             "type_timeline"      : "Časová os",
             "type_static"        : "Statický",
             "type_label"         : "Typ",
-            "type_default"       : "Predvolené"
+            "type_default"       : "Predvolené",
+            "linked_graphs"      : "Prepojené grafy"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -564,7 +573,8 @@ const lang_ru =
             "type_timeline"      : "Хронология",
             "type_static"        : "Статичный",
             "type_label"         : "Тип",
-            "type_default"       : "По умолчанию"
+            "type_default"       : "По умолчанию",
+            "linked_graphs"      : "Связанные графики"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",

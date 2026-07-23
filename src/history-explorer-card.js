@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.33b13';
+const Version = '1.1.34b41';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -27,6 +27,38 @@ export const _TYPE_MENU_DEFS = [
 ];
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
+
+// Pure versions of a few HistoryCardState entity-lookup helpers, needed by
+// history-info-panel.js before an HistoryCardState instance exists (its very first
+// render can happen before _hec_instance is created). HistoryCardState's own methods
+// below just delegate to these, so there's one implementation, not two.
+export function getDomainForEntityPure(entity)
+{
+    return entity.substr(0, entity.indexOf("."));
+}
+
+export function getDeviceClassPure(hass, entity)
+{
+    return hass.states[entity]?.attributes?.device_class;
+}
+
+export function getEntityOptionsPure(hass, entityOptions, entity)
+{
+    // Simplified version of HistoryCardState.getEntityOptions: no glob/pattern-list
+    // matching, since history-info-panel.js's very first render (before an instance
+    // exists) only ever needs the direct entity/device_class/domain lookup.
+    let c = entityOptions?.[entity];
+    if( !c ) {
+        const dc = getDeviceClassPure(hass, entity);
+        c = dc ? entityOptions?.[dc] : undefined;
+        if( !c ) {
+            const dm = getDomainForEntityPure(entity);
+            c = dm ? entityOptions?.[dm] : undefined;
+        }
+    }
+
+    return c ?? undefined;
+}
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
@@ -1799,6 +1831,7 @@ export class HistoryCardState {
                     device_class: d.device_class,
                     entity_id: d.entity_id,
                     unit: d.unit,
+                    name: d.name,
                     arrowColor: d.bColor,
                     arrowBackground: d.fillColor,
                     data: [ ]
@@ -1914,8 +1947,7 @@ export class HistoryCardState {
                                 if( graphtype == 'line' || graphtype == 'bar' ) {
                                     title = tooltipItems[0].xLabel;
                                 } else {
-                                    let d = data.labels[tooltipItems[0].datasetIndex];
-                                    title = ( tooltipSize !== 'slim' ) ? d : '';
+                                    title = ( tooltipSize !== 'slim' ) ? ( data.datasets[tooltipItems[0].datasetIndex]?.name ?? '' ) : '';
                                 }
                             }
                             return title;
@@ -1963,7 +1995,8 @@ export class HistoryCardState {
                             g._lastLegendClick = null;
                             this._uncombineInProgress = true;
                             setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                            if( g.entities.length > 1 ) this._uncombineEntity(g, idx);
+                            const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
+                            if( _groupSize > 1 ) this._uncombineEntity(g, idx);
                         } else {
                             // Single-click — default toggle visibility
                             g._lastLegendClick = now;
@@ -2724,19 +2757,19 @@ export class HistoryCardState {
                                 const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
                                 this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
                             }
-                            // Rebuild graph
-                            const { gl: _gl, nextSibling: _srcNext } = this._detachGraph(_src);
-                            const _countBefore = this.graphs.length;
+                            // Rebuild graph — capture the graph right after _src (if any) so
+                            // the first rebuilt entity can be anchored there (targetGraph
+                            // means "insert right before this graph"); addGraph inserts
+                            // directly at the right spot, no post-hoc DOM move needed.
+                            const _nextG = this._nextGroup(_src);
+                            this._detachGraph(_src);
                             const _saved = this.pconfig.combineSameUnits;
                             this.pconfig.combineSameUnits = true;
-                            let _rebuildTargetG = null;
                             _newEntities.forEach((en, i) => {
                                 const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, _rebuildTargetG, undefined, false, null, _groupId ?? null, _pe ?? en);
-                                if( i === 0 ) _rebuildTargetG = this.graphs[this.graphs.length - 1];
+                                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId ?? null, _pe ?? en);
                             });
                             this.pconfig.combineSameUnits = _saved;
-                            this._moveNewGraphsToPosition(_countBefore, _gl, _srcNext);
                             this.writeLocalState();
                             this.updateHistory();
                         }
@@ -2783,49 +2816,57 @@ export class HistoryCardState {
                     const _eIdx = this._pcEntryIndex(_entity.entity);
                     if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
                         // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
-                        // only groupId/color/fill change on a cross-graph move
-                        this.pconfig.entities[_eIdx] = { ...this.pconfig.entities[_eIdx], groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
+                        // only groupId/color/fill change on a cross-graph move.
+                        // Mutate in place (not a replacement object) — _entity IS this same
+                        // pconfig.entities entry now that there's no separate runtime copy.
+                        const _pcE = this.pconfig.entities[_eIdx];
+                        _pcE.groupId = _tgtGroupId;
+                        _pcE.color = _entity.color;
+                        _pcE.fill = _entity.fill;
+                        // Same reason as _uncombineEntity: the entry's groupId just changed
+                        // but it's still at its old array position — regroup now.
+                        this._regroupPcEntities();
                     }
-                    this.writeLocalState();
                     // Rebuild: remove source graph if it becomes empty
                     const _srcEmpty = _src.entities.length === 1;
                     // Rebuild source graph without the moved entity
                     const _srcOrigGroupId = _src.groupId;
                     const _tgtOrigGroupId = _tgt.groupId;
                     const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
-                    const { gl: _gl, nextSibling: _srcNext } = this._detachGraph(_src);
+                    const _srcNextG = this._nextGroup(_src);
+                    this._detachGraph(_src);
                     if( !_srcEmpty ) {
                         // Recreate source graph with remaining entities
                         _srcRemaining.forEach(en => { en.siConversionFactor = undefined; });
-                        const _countBefore = this.graphs.length;
                         const _savedCombine = this.pconfig.combineSameUnits;
                         this.pconfig.combineSameUnits = true;
                         _srcRemaining.forEach((en, i) => {
                                 const _pe = this._pcEntryInGroup(en.entity, _srcOrigGroupId);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _srcOrigGroupId, _pe ?? en);
+                                this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG, undefined, false, null, _srcOrigGroupId, _pe ?? en);
                             });
                         this.pconfig.combineSameUnits = _savedCombine;
-                        // Move to correct position
-                        this._moveNewGraphsToPosition(_countBefore, _gl, _srcNext);
                     }
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const { nextSibling: _tgtNext } = this._detachGraph(_tgt);
+                    const _tgtNextG = this._nextGroup(_tgt);
+                    this._detachGraph(_tgt);
                     const _allTgtEntities = [..._tgt.entities];
                     if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
                         _allTgtEntities.splice(_tgtLabelInsertIdx, 0, _entity);
                     else
                         _allTgtEntities.push(_entity);
-                    const _countBefore2 = this.graphs.length;
                     const _savedCombine2 = this.pconfig.combineSameUnits;
                     this.pconfig.combineSameUnits = true;
                     _allTgtEntities.forEach((en, i) => {
                                 const _pe = this._pcEntryInGroup(en.entity, _tgtOrigGroupId);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _tgtOrigGroupId, _pe ?? en);
+                                this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG, undefined, false, null, _tgtOrigGroupId, _pe ?? en);
                             });
                     this.pconfig.combineSameUnits = _savedCombine2;
-                    this._moveNewGraphsToPosition(_countBefore2, _gl, _tgtNext);
+                    // Persist now — after the reconstruction, not before — so the freshly
+                    // computed graphIndex (and everything else addGraph resolved) is what
+                    // actually gets saved.
+                    this.writeLocalState();
                     this.updateHistory();
                 }
             }
@@ -3118,23 +3159,39 @@ export class HistoryCardState {
         const _eIdx = this._pcEntryIndex(_entity.entity);
         let _pcExtracted = null;
         if( _eIdx >= 0 ) {
-            this.pconfig.entities[_eIdx] = { ...this.pconfig.entities[_eIdx], groupId: _newGroupId, color: _entity.color, fill: _entity.fill, hidden: undefined };
-            _pcExtracted = this.pconfig.entities[_eIdx];
+            // Mutate in place (not a replacement object) — _entity/g.entities[idx] IS this
+            // same pconfig.entities entry now that there's no separate runtime copy; a
+            // reassignment here would silently detach that reference.
+            const _pcE = this.pconfig.entities[_eIdx];
+            _pcE.groupId = _newGroupId;
+            _pcE.color = _entity.color;
+            _pcE.fill = _entity.fill;
+            _pcE.hidden = undefined;
+            _pcExtracted = _pcE;
+            // The entity's groupId just changed but it's still sitting at its old array
+            // position — regroup now, before anything else relies on pconfig.entities'
+            // array order (e.g. finding the next graph below).
+            this._regroupPcEntities();
         }
-        this.writeLocalState();
-        const { gl: _gl, nextSibling: _nextSibling } = this._detachGraph(g);
-        const _graphsBefore = this.graphs.length;
+        const _nextG = this._nextGroup(g);
+        this._detachGraph(g);
         const _savedCombine = this.pconfig.combineSameUnits;
         this.pconfig.combineSameUnits = true;
         _newEntities.forEach((en, i) => {
-            // Use each entity's own persisted entry (has type/lineMode) instead of the
-            // runtime object (which never carries .type), so their display type survives
+            // en already IS the pconfig.entities entry (has type/lineMode/etc.) — this
+            // lookup is just a defensive fallback for the rare case where entity+groupId
+            // is ambiguous (see _pcEntryInGroup).
             const _pe = this._pcEntryInGroup(en.entity, g.groupId);
-            this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, g.groupId, _pe ?? en);
+            this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, g.groupId, _pe ?? en);
         });
         this.pconfig.combineSameUnits = _savedCombine;
-        this.addGraph(_entity.entity, true, _entity.color, _entity.fill, null, false, false, null, _newGroupId, _pcExtracted ?? _entity);
-        this._moveNewGraphsToPosition(_graphsBefore, _gl, _nextSibling);
+        // Extracted entity goes right before whatever followed the original graph g —
+        // i.e. right after the just-rebuilt remaining-entities graph (addGraph inserting
+        // before _nextG naturally lands it there).
+        this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, false, null, _newGroupId, _pcExtracted ?? _entity);
+        // Persist now — after the reconstruction, not before — so the freshly computed
+        // graphIndex (and everything else addGraph resolved) is what actually gets saved.
+        this.writeLocalState();
         this.updateHistory();
     }
 
@@ -3164,15 +3221,20 @@ export class HistoryCardState {
             const _labelStr = Array.isArray(_lbl) ? _lbl.join(' ') : _lbl;
             _tlPending.labelStr = _labelStr;
             _tlPending.tlLabelW = _chart.chartArea ? _chart.chartArea.left : this.pconfig.labelAreaWidth;
+            // Original, unwrapped name — source of truth for anything meant to be read in full
+            // (tooltip below). _labelStr above is the wrapped/hyphenated display form, kept
+            // separate because it's still needed as-is for the drag ghost (_createGhost),
+            // which must reflect what actually fits in the label column.
+            const _origName = _chart.data.datasets[_closestIdx]?.name ?? _labelStr;
             // Show tooltip if label is truncated
             const _ctx2 = g.canvas.getContext('2d');
             _ctx2.save();
             _ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
-            const _textW = _ctx2.measureText(_labelStr).width;
+            const _textW = _ctx2.measureText(_origName).width;
             _ctx2.restore();
             const _availW = (_chart.chartArea ? _chart.chartArea.left : this.pconfig.labelAreaWidth) - 8;
             if( _textW > _availW ) {
-                this._showLabelTooltip(_labelStr, event.clientX, event.clientY);
+                this._showLabelTooltip(_origName, event.clientX, event.clientY);
             }
             // Double-click: uncombine (non-fixed graphs only)
             if( !g.isStatic ) {
@@ -3183,7 +3245,8 @@ export class HistoryCardState {
                     g._lastTLClick = null;
                     this._uncombineInProgress = true;
                     setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                    if( g.entities.length > 1 ) this._uncombineEntity(g, _closestIdx);
+                    const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
+                    if( _groupSize > 1 ) this._uncombineEntity(g, _closestIdx);
                     return;
                 }
                 g._lastTLClick = _now;
@@ -3380,8 +3443,15 @@ export class HistoryCardState {
             const _eIdx = this._pcEntryIndex(_entity.entity);
             if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
                 // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
-                // only groupId/color/fill change on a cross-graph move
-                const _updatedEntry = { ...this.pconfig.entities[_eIdx], groupId: _tgtGroupId, color: _entity.color, fill: _entity.fill };
+                // only groupId/color/fill change on a cross-graph move.
+                // Mutate in place (not a replacement object) — _entity/this.pconfig.entities[_eIdx]
+                // IS the same object as g.entities[...] now that there's no separate runtime
+                // copy; reassigning here would silently detach that reference. The entry is
+                // still moved to a new array position below, just never replaced.
+                const _updatedEntry = this.pconfig.entities[_eIdx];
+                _updatedEntry.groupId = _tgtGroupId;
+                _updatedEntry.color = _entity.color;
+                _updatedEntry.fill = _entity.fill;
                 this.pconfig.entities.splice(_eIdx, 1);
                 const _tgtLastIdx = this.pconfig.entities.reduce((acc, en, i) =>
                     (typeof en === 'object' && en.groupId === _tgtGroupId) ? i : acc, -1);
@@ -3394,7 +3464,8 @@ export class HistoryCardState {
         }
 
         const _srcOrigGroupId = _src.groupId;
-        const { gl: _gl, nextSibling: _srcNext } = this._detachGraph(_src);
+        const _srcNextG0 = this._nextGroup(_src);
+        this._detachGraph(_src);
 
         const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
         const _allTgtEntities = _isSameGraph
@@ -3408,28 +3479,25 @@ export class HistoryCardState {
 
         if( !_isSameGraph ) {
             if( !_srcEmpty ) {
-                const _countBefore = this.graphs.length;
                 const _saved = this.pconfig.combineSameUnits;
                 this.pconfig.combineSameUnits = true;
                 _srcRemaining.forEach((en, i) => {
                             const _pe = this._pcEntryInGroup(en.entity, _srcOrigGroupId);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _srcOrigGroupId, _pe ?? en);
+                            this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG0, undefined, false, null, _srcOrigGroupId, _pe ?? en);
                         });
                 this.pconfig.combineSameUnits = _saved;
-                this._moveNewGraphsToPosition(_countBefore, _gl, _srcNext);
             }
-            const { nextSibling: _tgtNext } = this._detachGraph(_tgt);
+            const _tgtNextG0 = this._nextGroup(_tgt);
+            this._detachGraph(_tgt);
             const _newTgtEntities = [..._tgt.entities];
             _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
-            const _countBefore2 = this.graphs.length;
             const _saved2 = this.pconfig.combineSameUnits;
             this.pconfig.combineSameUnits = true;
             _newTgtEntities.forEach((en, i) => {
                             const _pe = this._pcEntryInGroup(en.entity, _tgtGroupId);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _tgtGroupId, _pe ?? en);
+                            this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG0, undefined, false, null, _tgtGroupId, _pe ?? en);
                         });
             this.pconfig.combineSameUnits = _saved2;
-            this._moveNewGraphsToPosition(_countBefore2, _gl, _tgtNext);
         } else {
             const _groupId = this._pcGroupIdOf(_allTgtEntities[0].entity);
             if( _groupId !== undefined ) {
@@ -3441,15 +3509,13 @@ export class HistoryCardState {
                 const _reordered = _allTgtEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
                 this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
             }
-            const _countBefore = this.graphs.length;
             const _saved = this.pconfig.combineSameUnits;
             this.pconfig.combineSameUnits = true;
             _allTgtEntities.forEach((en, i) => {
                             const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _groupId ?? null, _pe ?? en);
+                            this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG0, undefined, false, null, _groupId ?? null, _pe ?? en);
                         });
             this.pconfig.combineSameUnits = _saved;
-            this._moveNewGraphsToPosition(_countBefore, _gl, _srcNext);
         }
 
         this.writeLocalState();
@@ -3470,6 +3536,24 @@ export class HistoryCardState {
             }
         }
         event.target.style.cursor = 'grab';
+    }
+
+    // Would inserting srcG right before/after tgtG (per _insertBefore) split a group of
+    // linked graphs (same non-null groupId)? Groups are always consecutive by graphIndex
+    // (the stable display-order field — see addGraph/graphMoveEnd), so this only has to
+    // check the one neighbor on the insertion side, found via graphIndex order rather than
+    // this.graphs' own (not guaranteed to already match it) array order.
+    // Reordering srcG within its OWN group is allowed — only an outsider (a different
+    // group, or no group) landing between two members of an existing group is forbidden.
+    _wouldSplitGroup(srcG, tgtG, _insertBefore) {
+        if( tgtG.groupId === null || tgtG.groupId === undefined ) return false;
+        if( srcG.groupId === tgtG.groupId ) return false;
+        const _sorted = [...this.graphs].sort((a, b) =>
+            (a.entities?.[0]?.graphIndex ?? 0) - (b.entities?.[0]?.graphIndex ?? 0));
+        const _tgtIdx = _sorted.indexOf(tgtG);
+        const _neighbor = _insertBefore ? _sorted[_tgtIdx - 1] : _sorted[_tgtIdx + 1];
+        if( !_neighbor || _neighbor === srcG ) return false;
+        return _neighbor.groupId === tgtG.groupId;
     }
 
     graphMoveStart(event)
@@ -3517,7 +3601,9 @@ export class HistoryCardState {
                 event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
                 const _insertBefore = event.clientY < _r.top + _r.height / 2;
                 const _y = _insertBefore ? _r.top : _r.bottom;
-                this._showInsertionMarker(_r.left, _y, _r.width, 3, true);
+                const _forbidden = this._wouldSplitGroup(panstate.moveGraph.g, g, _insertBefore);
+                event.target.style.cursor = _forbidden ? 'not-allowed' : 'grabbing';
+                this._showInsertionMarker(_r.left, _y, _r.width, 3, true, _forbidden ? 'var(--error-color,#f44336)' : undefined);
                 _found = true;
                 break;
             }
@@ -3560,6 +3646,11 @@ export class HistoryCardState {
 
         if( !_tgtG || _tgtG === _srcG ) return;
 
+        if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY);
+            return;
+        }
+
         // Reorder in DOM — re-query by ID to get fresh refs after potential HA re-render
         const _gl = this._this.querySelector('#graphlist');
         const _srcCanvas = this._this.querySelector(`#graph${_srcG.id}`);
@@ -3583,7 +3674,6 @@ export class HistoryCardState {
 
         // Reorder in this.graphs
         const _srcIdx = this.graphs.indexOf(_srcG);
-        const _tgtIdx = this.graphs.indexOf(_tgtG);
         this.graphs.splice(_srcIdx, 1);
         const _newTgtIdx = this.graphs.indexOf(_tgtG);
         if( _insertBefore ) {
@@ -3592,22 +3682,39 @@ export class HistoryCardState {
             this.graphs.splice(_newTgtIdx + 1, 0, _srcG);
         }
 
-        // Reorder pconfig.entities to match new graph order
-        // Only reorder dynamic entities (those in pconfig.entities)
-        const _orderedEntities = [];
-        for( let g of this.graphs ) {
-            for( let en of g.entities ) {
-                const _found = this.pconfig.entities.find(e => entityIdOf(e) === en.entity);
-                if( _found ) _orderedEntities.push(_found);
-            }
-        }
-        // Keep any entities not in graphs (shouldn't happen but safety net)
-        for( let e of this.pconfig.entities ) {
-            const _eid = entityIdOf(e);
-            if( !_orderedEntities.find(o => entityIdOf(o) === _eid) )
-                _orderedEntities.push(e);
-        }
-        this.pconfig.entities = _orderedEntities;
+        // Reorder pconfig.entities directly — never derive it from this.graphs, which is
+        // only guaranteed correct for the _srcG/_tgtG pair just moved, not for the rest of
+        // the page. Pull _srcG's entities out and reinsert them right before/after _tgtG's,
+        // exactly like the DOM move above, leaving everything else untouched. Done before
+        // the graphIndex calculation below, which reads pconfig.entities' order.
+        const _srcEntityIds = new Set(_srcG.entities.map(e => e.entity));
+        const _movedEntries = this.pconfig.entities.filter(e => typeof e === 'object' && _srcEntityIds.has(e.entity));
+        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && _srcEntityIds.has(e.entity)));
+        const _tgtEntityIds = new Set(_tgtG.entities.map(e => e.entity));
+        const _tgtRestIdx = _insertBefore
+            ? _rest.findIndex(e => typeof e === 'object' && _tgtEntityIds.has(e.entity))
+            : (() => {
+                let _last = -1;
+                _rest.forEach((e, i) => { if( typeof e === 'object' && _tgtEntityIds.has(e.entity) ) _last = i; });
+                return _last;
+            })();
+        const _insertAt = _insertBefore ? _tgtRestIdx : (_tgtRestIdx < 0 ? _rest.length : _tgtRestIdx + 1);
+        _rest.splice(_insertAt < 0 ? _rest.length : _insertAt, 0, ..._movedEntries);
+        this.pconfig.entities = _rest;
+
+        // graphIndex: same real-number ordering scheme as addGraph — look at the insertion
+        // point (_tgtG, _insertBefore), not at _srcG (looking at _srcG's own neighbors
+        // would just find the position its graphIndex was already computed at, so it could
+        // never actually change).
+        const _tgtPrev = this._previousGraph(_tgtG);
+        const _tgtNext = this._nextGraph(_tgtG);
+        const _prevG = _insertBefore ? _tgtPrev : _tgtG;
+        const _nextGraphForIdx = _insertBefore ? _tgtG : _tgtNext;
+        const _prevIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
+        const _nextIdx = _nextGraphForIdx?.entities?.[0]?.graphIndex;
+        const _newGraphIndex = _nextIdx !== undefined ? (_prevIdx + _nextIdx) / 2 : _prevIdx + 1;
+        for( let e of _srcG.entities ) e.graphIndex = _newGraphIndex;
+        this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
 
@@ -3992,7 +4099,6 @@ export class HistoryCardState {
             this.state.drag = false;
             this.state.updateCanvas = null;
 
-            panstate.g.chart.options.tooltips.enabled = true;
             if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
                 panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
                 panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
@@ -4336,6 +4442,7 @@ export class HistoryCardState {
         for( let i = this.graphs.length - 1; i >= 0; i-- ) {
             if( !this.graphs[i].isStatic ) {
                 this._graphDiv(this.graphs[i]).remove();
+                this._this.querySelector(`#gc-${this.graphs[i].id}`)?.remove();
                 this.graphs.splice(i, 1);
             }
         }
@@ -4343,6 +4450,7 @@ export class HistoryCardState {
         this.pconfig.entities = this.pconfig.entities.filter(e => e.isStatic);
 
         this._updateMoVisibility();
+        this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
 
@@ -4353,12 +4461,12 @@ export class HistoryCardState {
 
     getDomainForEntity(entity)
     {
-        return entity.substr(0, entity.indexOf("."));
+        return getDomainForEntityPure(entity);
     }
 
     getDeviceClass(entity)
     {
-        return this._hass.states[entity]?.attributes?.device_class;
+        return getDeviceClassPure(this._hass, entity);
     }
 
     getUnitOfMeasure(entity, manualUnit)
@@ -4556,42 +4664,151 @@ export class HistoryCardState {
         return this.pconfig.entities.find(en => entityIdOf(en) === entityId)?.groupId;
     }
 
+    // Physically groups pconfig.entities by groupId (first-occurrence order) — the same
+    // grouping the rebuild and display already apply implicitly. Called by anything that
+    // can leave entries interleaved (e.g. mutating one entity's groupId in place without
+    // moving it, as _uncombineEntity does), so pconfig.entities' own array order stays the
+    // single source of truth for display order — trivial to read (just walk the array),
+    // no need to re-derive a "true" order via a search/lookup rule anywhere else.
+    _regroupPcEntities()
+    {
+        const _groupMap = new Map();
+        const _groupOrder = [];
+        for( let e of this.pconfig.entities ) {
+            const _groupId = typeof e === 'object' ? e.groupId : undefined;
+            const _key = _groupId ?? Symbol();
+            if( !_groupMap.has(_key) ) { _groupMap.set(_key, []); _groupOrder.push(_key); }
+            _groupMap.get(_key).push(e);
+        }
+        const _reordered = [];
+        for( let _key of _groupOrder ) _reordered.push(..._groupMap.get(_key));
+        this.pconfig.entities = _reordered;
+    }
+
+    // All graphs on the page, in true display order: pconfig.entities' own order decides
+    // between different groupId blocks; within one groupId block (usually a single graph,
+    // exceptionally several linked ones), graphIndex decides — position in pconfig.entities
+    // does NOT reflect a block's internal graph order, that's the whole reason graphIndex
+    // exists.
+    // --- GRAPH-level order helpers (groupId + graphIndex — the full on-screen order) ---
+
+    _allGraphsInDisplayOrder()
+    {
+        const _seen = new Set();
+        const _result = [];
+        let _blockGroupId = Symbol();
+        let _blockGraphs = [];
+        const _flushBlock = () => {
+            _blockGraphs.sort((a, b) => (a.entities[0]?.graphIndex ?? 0) - (b.entities[0]?.graphIndex ?? 0));
+            _result.push(..._blockGraphs);
+            _blockGraphs = [];
+        };
+        for( let en of this.pconfig.entities ) {
+            if( typeof en !== 'object' ) continue;
+            const _g = this.graphs.find(gr => gr.entities.some(e => e.entity === en.entity));
+            if( !_g || _seen.has(_g) ) continue;
+            if( en.groupId !== _blockGroupId ) { _flushBlock(); _blockGroupId = en.groupId; }
+            _seen.add(_g);
+            _blockGraphs.push(_g);
+        }
+        _flushBlock();
+        return _result;
+    }
+
+    _firstGraph()
+    {
+        return this._allGraphsInDisplayOrder()[0] ?? null;
+    }
+
+    _lastGraph()
+    {
+        const _all = this._allGraphsInDisplayOrder();
+        return _all[_all.length - 1] ?? null;
+    }
+
+    _isFirstGraph(g)
+    {
+        return this._firstGraph() === g;
+    }
+
+    _isLastGraph(g)
+    {
+        return this._lastGraph() === g;
+    }
+
+    // The graph immediately before/after g on screen — needed to number a new graph's
+    // graphIndex correctly in every situation, including inside a solid block of several
+    // linked graphs.
+    _previousGraph(g)
+    {
+        const _all = this._allGraphsInDisplayOrder();
+        const _idx = _all.indexOf(g);
+        return (_idx > 0) ? _all[_idx - 1] : null;
+    }
+
+    _nextGraph(g)
+    {
+        const _all = this._allGraphsInDisplayOrder();
+        const _idx = _all.indexOf(g);
+        return (_idx >= 0 && _idx < _all.length - 1) ? _all[_idx + 1] : null;
+    }
+
+    // --- GROUP-level order helpers (groupId only — a solid block of one or more linked
+    // graphs is treated as a single unit; nothing can ever be inserted inside it) ---
+
+    // The graph that follows g's whole group, per pconfig.entities' order — the source of
+    // truth for display order (this.graphs is a working structure only, never reliable for
+    // order). Scans forward from g's last entity in pconfig.entities for the next entry
+    // whose groupId differs from g's — a run of same-groupId entries is one solid block, so
+    // the first differing groupId is always the true next group.
+    _nextGroup(g)
+    {
+        const _lastEntity = g.entities[g.entities.length - 1];
+        const _startIdx = this._pcEntryIndex(_lastEntity.entity);
+        if( _startIdx < 0 ) return null;
+        for( let i = _startIdx + 1; i < this.pconfig.entities.length; i++ ) {
+            const _e = this.pconfig.entities[i];
+            if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
+            const _eid = entityIdOf(_e);
+            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
+            if( _candidateG ) return _candidateG;
+        }
+        return null;
+    }
+
+    // Symmetric to _nextGroup — scans backward from g's first entity for the previous
+    // entry whose groupId differs from g's.
+    _previousGroup(g)
+    {
+        const _firstEntity = g.entities[0];
+        const _startIdx = this._pcEntryIndex(_firstEntity.entity);
+        if( _startIdx < 0 ) return null;
+        for( let i = _startIdx - 1; i >= 0; i-- ) {
+            const _e = this.pconfig.entities[i];
+            if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
+            const _eid = entityIdOf(_e);
+            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
+            if( _candidateG ) return _candidateG;
+        }
+        return null;
+    }
+
     _pcEntryInGroup(entityId, groupId)
     {
-        // Find an entity's persisted entry, scoped to a specific groupId — used when
-        // rebuilding a graph after uncombine/drag/reorder, so type/lineMode/etc. are
-        // read from the correct persisted entry rather than the runtime object
-        // (which never carries these fields)
+        // Find an entity's persisted entry, scoped to a specific groupId — groupId alone
+        // doesn't uniquely identify one graph (an entity id could in principle appear in
+        // more than one group across renames/edits), so this disambiguates.
         return this.pconfig.entities.find(e => typeof e === 'object' && e.entity === entityId && e.groupId === groupId);
     }
 
     _detachGraph(g)
     {
-        // Removes a graph's wrapper div from the DOM and from this.graphs, returning
-        // the DOM insertion point (parent + next sibling still attached) so whatever
-        // gets rebuilt in its place can be reinserted at the same visual position.
-        const _div = this._graphDiv(g);
-        const _gl = _div.parentNode;
-        let _nextSibling = _div.nextSibling;
-        while( _nextSibling && !_gl.contains(_nextSibling) )
-            _nextSibling = _nextSibling.nextSibling;
-        _div.remove();
+        // Removes a graph's wrapper div from the DOM and from this.graphs. Callers capture
+        // the graph right after g in this.graphs BEFORE calling this, to use as addGraph's
+        // targetGraph (insertBefore semantics) for whatever gets rebuilt in its place.
+        this._graphDiv(g).remove();
+        this._this.querySelector(`#gc-${g.id}`)?.remove();
         this.graphs.splice(this.graphs.indexOf(g), 1);
-        return { gl: _gl, nextSibling: _nextSibling };
-    }
-
-    _moveNewGraphsToPosition(graphsBefore, gl, nextSibling)
-    {
-        // Moves every graph created since `graphsBefore` (this.graphs.length at the time)
-        // to sit right before `nextSibling` in the DOM, or before the footer if it's no
-        // longer there — used after rebuilding one or more graphs in place of a removed one
-        const _footer = this._footerAnchor(gl);
-        for( let i = graphsBefore; i < this.graphs.length; i++ ) {
-            const _div = this._graphDiv(this.graphs[i]);
-            if( nextSibling && gl.contains(nextSibling) ) gl.insertBefore(_div, nextSibling);
-            else if( _footer ) gl.insertBefore(_div, _footer);
-            else gl.appendChild(_div);
-        }
     }
 
     _isNumericEntity(entity_id)
@@ -4643,6 +4860,44 @@ export class HistoryCardState {
         }
     }
 
+    // Shows a chain-link icon between two consecutive graphs that share the same non-null
+    // groupId (linked graphs — see _wouldSplitGroup) so the link is visible even outside a
+    // drag gesture. Called after anything that can change graph composition or order.
+    // Takes no vertical space (height:0 wrapper, icon floated up over it) and is always
+    // re-inserted at its correct DOM position even if it already existed, as a cheap safety
+    // net — addGraph now inserts each graph div directly at its final spot via targetGraph.
+    _updateGroupLinkMarkers()
+    {
+        // Sort by graphIndex — the stable, persisted display-order field — rather than
+        // relying on this.graphs' own array order to already match it.
+        const _sorted = [...this.graphs].sort((a, b) =>
+            (a.entities?.[0]?.graphIndex ?? 0) - (b.entities?.[0]?.graphIndex ?? 0));
+        for( let i = 0; i < _sorted.length; i++ ) {
+            const g = _sorted[i];
+            const _linked = i > 0 && _sorted[i - 1].groupId !== null &&
+                            _sorted[i - 1].groupId !== undefined &&
+                            _sorted[i - 1].groupId === g.groupId;
+            let _el = this._this.querySelector(`#gc-${g.id}`);
+            if( _linked ) {
+                const _div = this._graphDiv(g);
+                if( !_div ) continue;
+                if( !_el ) {
+                    _el = document.createElement('div');
+                    _el.id = `gc-${g.id}`;
+                    _el.title = i18n('ui.menu.linked_graphs');
+                    _el.style.cssText = 'height:0;text-align:center;pointer-events:none;';
+                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.75);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
+                }
+                // Always reposition (cheap no-op if already correct) — a caller earlier
+                // in the same operation may have created this marker before the graph's
+                // own div reached its final DOM position.
+                _div.parentNode.insertBefore(_el, _div);
+            } else if( _el ) {
+                _el.remove();
+            }
+        }
+    }
+
     removeGraph(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
@@ -4650,6 +4905,7 @@ export class HistoryCardState {
         for( let i = 0; i < this.graphs.length; i++ ) {
             if( this.graphs[i].id == id ) {
                 this._graphDiv(this.graphs[i]).remove();
+                this._this.querySelector(`#gc-${this.graphs[i].id}`)?.remove();
                 for( let e of this.graphs[i].entities ) {
                     const j = this.pconfig.entities.findIndex(en => entityIdOf(en) === e.entity && !en.isStatic);
                     if( j >= 0 ) this.pconfig.entities.splice(j, 1);
@@ -4660,6 +4916,7 @@ export class HistoryCardState {
         }
 
         this._updateMoVisibility();
+        this._updateGroupLinkMarkers();
 
         this.updateHistoryWithClearCache();
 
@@ -4683,7 +4940,26 @@ export class HistoryCardState {
         const _overrideType = overrideEntityProps?.type ?? entityOptions?.type;
         const type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
-        let entities = [{ "entity": entity_id, "color": "#000000", "fill": "#00000000" }];
+        // The entity's single source of truth: overrideEntityProps is already the
+        // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
+        // throughout this file). If not (a genuinely new entity), create one now and use
+        // it — g.entities[0] below is this SAME object, never a copy, so there is nothing
+        // left to keep in sync between "session" and "persisted" entity data.
+        let _pcEntry = overrideEntityProps;
+        if( !_pcEntry ) {
+            _pcEntry = { entity: entity_id };
+            this.pconfig.entities.push(_pcEntry);
+        } else if( !this.pconfig.entities.includes(_pcEntry) ) {
+            // Defensive: overrideEntityProps was provided but isn't actually a live
+            // pconfig.entities entry (e.g. a plain runtime object) — register it so it
+            // becomes one, rather than silently creating a second, disconnected copy.
+            this.pconfig.entities.push(_pcEntry);
+        }
+        _pcEntry.entity = entity_id;
+
+        let entities = [_pcEntry];
+        entities[0].color = entities[0].color ?? "#000000";
+        entities[0].fill = entities[0].fill ?? "#00000000";
 
         // Resolve color/fill for all types — including timeline, whose rendering doesn't use
         // entities[i].color directly but must still round-trip correctly through drag/uncombine/type-switch
@@ -4695,29 +4971,29 @@ export class HistoryCardState {
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
                 entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
-            } else {
+            } else if( entities[0].color === "#000000" ) {
                 const c = this.getNextDefaultColor();
                 entities[0].color = c.color;
                 entities[0].fill = entityOptions?.fill ?? c.fill;
             }
 
-            entities[0].dashMode   = overrideEntityProps?.dashMode    ?? entityOptions?.dashMode;
-            entities[0].width     = overrideEntityProps?.width       ?? entityOptions?.width;
-            entities[0].lineMode  = this.normalizeLineMode(overrideEntityProps?.lineMode ?? entityOptions?.lineMode);
-            entities[0].scale     = overrideEntityProps?.scale       ?? entityOptions?.scale;
-            entities[0].hidden    = overrideHidden !== undefined ? overrideHidden : (overrideEntityProps?.hidden ?? entityOptions?.hidden);
-            entities[0].netBars   = overrideEntityProps?.netBars    ?? entityOptions?.netBars;
-            entities[0].showPoints= overrideEntityProps?.showPoints  ?? entityOptions?.showPoints;
-            entities[0].decimation= overrideEntityProps?.decimation  ?? entityOptions?.decimation;
-            entities[0].showMinMax= overrideEntityProps?.showMinMax  ?? entityOptions?.showMinMax;
-            entities[0].name      = overrideEntityProps?.name        ?? entityOptions?.name;
-            entities[0].siConversionFactor = overrideEntityProps?.siConversionFactor ?? entityOptions?.siConversionFactor;
-            entities[0].unit      = overrideEntityProps?.unit        ?? entityOptions?.unit;
-            entities[0].process   = overrideEntityProps?.process     ?? entityOptions?.process;
+            entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode;
+            entities[0].width     = entities[0].width       ?? entityOptions?.width;
+            entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode);
+            entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
+            entities[0].hidden    = overrideHidden !== undefined ? overrideHidden : (entities[0].hidden ?? entityOptions?.hidden);
+            entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars;
+            entities[0].showPoints= entities[0].showPoints  ?? entityOptions?.showPoints;
+            entities[0].decimation= entities[0].decimation  ?? entityOptions?.decimation;
+            entities[0].showMinMax= entities[0].showMinMax  ?? entityOptions?.showMinMax;
+            entities[0].name      = entities[0].name        ?? entityOptions?.name;
+            entities[0].siConversionFactor = entities[0].siConversionFactor ?? entityOptions?.siConversionFactor;
+            entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
+            entities[0].process   = entities[0].process     ?? entityOptions?.process;
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
-                entities[0].lineMode = this.normalizeLineMode(overrideEntityProps?.lineMode ?? entityOptions?.lineMode) ?? 'lines';
+                entities[0].lineMode = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? 'lines';
             }
 
         }
@@ -4725,9 +5001,12 @@ export class HistoryCardState {
         // Find a graph to combine with:
         // - Static multi-entity groups (isStatic + targetGraph): always the last graph
         //   (YAML author responsible for contiguous grouping in the rebuild)
-        // - Dynamic with an explicit groupId: search the WHOLE graphs array for a graph
-        //   sharing that groupId — the target may not be the last graph created (e.g. when
-        //   re-adding a single entity to an existing group after a type change or uncombine)
+        // - Dynamic with an explicit groupId: search for the LAST graph sharing that
+        //   groupId — not the first. A groupId's graphs are always built in sequence (the
+        //   rebuild walks each group in graphIndex order), so the last one built is always
+        //   the right compatibility candidate; the first one found could be an earlier,
+        //   type-incompatible graph of the same solid block (a group of several linked
+        //   graphs), which would wrongly fail every later entity's combine attempt.
         // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
         //   considered, and its groupId is adopted if compatible
         const _isStaticForce = isStatic && targetGraph !== null;
@@ -4736,13 +5015,15 @@ export class HistoryCardState {
             _combineIdx = this.graphs.length - 1;
         } else if( !noAutoGroup ) {
             _combineIdx = (groupId !== null) ?
-                this.graphs.findIndex(g => g.groupId === groupId) :
+                this.graphs.reduce((_last, g, i) => g.groupId === groupId ? i : _last, -1) :
                 this.graphs.length - 1;
         }
 
         let combine = false;
+        let _cand = null;
+        let _adoptedGraphIndex = null;
         if( _combineIdx >= 0 ) {
-            const _cand = this.graphs[_combineIdx];
+            _cand = this.graphs[_combineIdx];
             combine = _isStaticForce ? true :
                       _cand.type === type &&
                       ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(_cand.entities[0].entity)) );
@@ -4755,10 +5036,15 @@ export class HistoryCardState {
 
         if( combine ) {
 
-            const _cand = this.graphs[_combineIdx];
-
             // If no groupId provided, adopt the target graph's groupId
             if( groupId === null ) groupId = _cand.groupId;
+
+            // Joining an existing graph always adopts its groupId AND its graphIndex —
+            // same rule, same reasoning: this is still the same displayed graph, and
+            // inserting into a solid block of several linked graphs (the only case where
+            // a groupId's members could have different graphIndex values) is forbidden
+            // elsewhere, so every entity of _cand already shares one value.
+            _adoptedGraphIndex = _cand.entities[0].graphIndex;
 
             // Color conflict check now happens here, against the REAL combine target —
             // works regardless of whether the caller knew about this target in advance
@@ -4781,10 +5067,11 @@ export class HistoryCardState {
             const _candDiv = this._graphDiv(_cand);
             _combineGl = _candDiv.parentNode;
             let _sib = _candDiv.nextSibling;
-            while( _sib && !_combineGl.contains(_sib) ) _sib = _sib.nextSibling;
+            while( _sib && (!_combineGl.contains(_sib) || _sib.id?.startsWith('gc-')) ) _sib = _sib.nextSibling;
             _combineInsertBefore = _sib;
 
             // Delete the old graph, will be regenerated below including the new entity
+            this._this.querySelector(`#gc-${_cand.id}`)?.remove();
             _candDiv.remove();
             this.graphs.splice(_combineIdx, 1);
 
@@ -4792,20 +5079,55 @@ export class HistoryCardState {
 
         // entityOptions.groupId was frozen before the combine block resolved the final
         // groupId (e.g. adopting the target graph's groupId when it was null) — resync it
-        // here so the graph object built below gets the correct, final groupId.
+        // here so the graph object built below gets the correct, final groupId. _pcEntry
+        // is now g.entities[0] itself (no separate copy), so it must be kept in step too.
         entityOptions.groupId = groupId;
+        _pcEntry.groupId = groupId;
+
+        // graphIndex: a real number giving each graph's display order (1 = topmost page-
+        // wide), tracked per entity (all entities of one displayed graph share the same
+        // value) since there's no separate per-graph persisted structure. Combine already
+        // adopted the target graph's value above (_adoptedGraphIndex). A genuinely new
+        // graph is placed right before targetGraph (see insertion below) — its index is
+        // the average of targetGraph's index and its true on-screen previous neighbor's
+        // (0 if none, i.e. inserting at the very top). targetGraph=null means nothing
+        // follows: index is the last on-screen graph's, rounded up, + 1 (or 1 if there are
+        // no graphs yet).
+        let _graphIndex;
+        if( combine ) {
+            _graphIndex = _adoptedGraphIndex ?? 1;
+        } else if( targetGraph?.entities?.[0]?.graphIndex !== undefined ) {
+            const _prevG = this._previousGraph(targetGraph);
+            const _beforeIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
+            _graphIndex = (_beforeIdx + targetGraph.entities[0].graphIndex) / 2;
+        } else {
+            const _all = this._allGraphsInDisplayOrder();
+            const _lastIdx = _all[_all.length - 1]?.entities?.[0]?.graphIndex;
+            _graphIndex = _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
+        }
+        for( let e of entities ) e.graphIndex = _graphIndex;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
         const h = this.calcGraphHeight(type, entities.length, _graphHeight);
 
         let html = '';
-        // Spacing between graphs (skip if previous graph has showTimeLabels === false)
-        const _prevG = this.graphs.length > 0 ? this.graphs[this.graphs.length - 1] : null;
+        // Spacing between graphs: a margin-top on this graph's own container unless it's
+        // the very first one on the page — found by comparing its own graphIndex to the
+        // current first graph's (this graph doesn't exist in this.graphs yet, so
+        // _isFirstGraph itself doesn't apply here). Not by this.graphs.length (a transient
+        // count during construction that doesn't reflect final display order — e.g.
+        // rebuilding a graph in the middle of the page still finds this.graphs empty at
+        // that moment). Also skipped if the previous graph has showTimeLabels === false.
+        // A margin (not a <br> sibling) is structurally part of this graph's own div, so
+        // it can never end up misplaced relative to it — same reasoning as the toolbar.
+        const _currentFirst = this._firstGraph();
+        const _isFirstOnPage = !_currentFirst || _graphIndex <= (_currentFirst.entities?.[0]?.graphIndex ?? Infinity);
+        const _prevG = _isFirstOnPage ? null : this._allGraphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < _graphIndex).pop();
         const _prevShowTimeLabels = _prevG ? (this.pconfig.graphs[_prevG.groupId ?? null]?.showTimeLabels ?? true) : true;
-        if( this.graphs.length > 0 && _prevShowTimeLabels !== false ) html += '<br>';
+        const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
         // Optional title
         if( _graphProps.title !== undefined ) html += `<div style='text-align:center;'>${_graphProps.title}</div>`;
-        html += `<div style='height:${h}px;position:relative'>`;
+        html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
@@ -4826,9 +5148,15 @@ export class HistoryCardState {
         e.innerHTML = html;
 
         let gl = this._this.querySelector('#graphlist');
-        if( _combineInsertBefore && (_combineGl ?? gl).contains(_combineInsertBefore) )
+        const _tgtDiv = ( targetGraph && targetGraph.canvas?.parentNode ) ? this._graphDiv(targetGraph) : null;
+        if( _combineInsertBefore && (_combineGl ?? gl).contains(_combineInsertBefore) ) {
             (_combineGl ?? gl).insertBefore(e, _combineInsertBefore);
-        else {
+        } else if( _tgtDiv && _tgtDiv.parentNode ) {
+            // Insert right before targetGraph — "the graph this one belongs right before".
+            // targetGraph=null (or no longer valid) falls through to the last-position
+            // fallback below, same as "nothing after it, insert last".
+            _tgtDiv.parentNode.insertBefore(e, _tgtDiv);
+        } else {
             const _footer = this._footerAnchor(gl);
             if( _footer ) gl.insertBefore(e, _footer); else gl.appendChild(e);
         }
@@ -4895,6 +5223,7 @@ export class HistoryCardState {
 
         // Update mo/ca visibility based on graph count
         this._updateMoVisibility();
+        this._updateGroupLinkMarkers();
     }
 
     _updateLegendMargins(g)
@@ -4985,20 +5314,29 @@ export class HistoryCardState {
 
     // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
     // !! Keep in sync with _hec_render() in history-info-panel.js !!
-    addUIHtml(timeline, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
+    addUIHtml(tools, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
     {
         let html = '';
 
-        if( (timeline || selector) && (this.ui.stickyTools & (1<<i)) ) {
+        if( (tools || selector) && (this.ui.stickyTools & (1<<i)) ) {
             const threshold = i ? 'bottom:0px' : 'top:var(--header-height)';
             html = `<div style="position:sticky;${threshold};padding-top:${this.ui.hideHeader ? 0 : 15}px;padding-bottom:10px;margin-top:-${this.ui.hideHeader ? 0 : 15}px;z-index:1;background-color:var(--card-background-color);line-height:0px;">`;
+        } else if( tools || selector ) {
+            // Always wrap in a div, sticky or not — _footerAnchor()'s walk-up-to-gl's-
+            // direct-child loop already targets this wrapper automatically (same mechanism
+            // as the sticky case). The spacing margin lives on the wrapper itself (not a
+            // <br> sibling), so it's structurally inseparable from the toolbar — a graph
+            // being inserted before this whole block can never end up between them.
+            // Bottom toolbar: margin-top (space above it); top toolbar: margin-bottom
+            // (space below it). 0 when sticky — the wrapper's own padding already covers it.
+            html = `<div style="margin-${i ? 'top' : 'bottom'}:8px;">`;
         }
 
-        if( timeline || selector ) html += `<div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
+        if( tools || selector ) html += `<div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
 
         const eh = `<a id="eh_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>`;
 
-        if( timeline ) html += `
+        if( tools ) html += `
             <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
                 <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
                 <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
@@ -5027,7 +5365,7 @@ export class HistoryCardState {
                 </div>
             </div>`;
 
-        if( timeline ) html += `
+        if( tools ) html += `
             <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">
                 <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
                 <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
@@ -5062,11 +5400,11 @@ export class HistoryCardState {
                 <button id="b${invertZoom ? 4 : 5}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">+</button>
             </div>`;
 
-        if( timeline || selector ) html += `</div>`;
+        if( tools || selector ) html += `</div>`;
 
         html += `<div id='rf_${i}' style="margin-left:0px;margin-top:10px;margin-bottom:0px;width:100%;text-align:center;display:none;line-height:normal;"></div>`;
 
-        if( (timeline || selector) && (this.ui.stickyTools & (1<<i)) ) html += `</div>`;
+        if( tools || selector ) html += `</div>`;
 
         return html;
     }
@@ -5360,6 +5698,20 @@ export class HistoryCardState {
                     }
                     _groupMap.get(_key).entities.push(e);
                 }
+                // Sort each group's entities by their initial graphIndex — captured here,
+                // before any recomputation — so a solid block of several linked graphs
+                // (same groupId, different graphIndex) gets rebuilt in the order it was
+                // actually displayed in, not pconfig.entities' array order (which must stay
+                // untouched below for re-combine to keep working when a type becomes
+                // compatible again). Stable sort: entities that already share one
+                // graphIndex (one graph) keep their relative order.
+                for( let _group of _groupMap.values() )
+                    _group.entities.sort((a, b) => (a.graphIndex ?? 0) - (b.graphIndex ?? 0));
+                // Physically reorder pconfig.entities to match this grouping — never
+                // interleaved again, so its array order stays the single source of truth
+                // for display order everywhere else (neighbor lookups, graphIndex averaging).
+                this._regroupPcEntities();
+
                 // Rebuild: call addGraph one entity at a time
                 // For statics: force combineSameUnits (YAML author responsible for grouping)
                 // For dynamics: combine logic in addGraph handles groupId + compatibility
@@ -5368,12 +5720,22 @@ export class HistoryCardState {
                     const _isStaticGroup = _group.entities.some(e => e.isStatic);
                     const _saved = this.pconfig.combineSameUnits;
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = true;
-                    _group.entities.forEach((_e, _i) => {
+                    // _group.entities is sorted by graphIndex above — walk it in that order
+                    // and always pass targetGraph=null: addGraph's own combine logic
+                    // (matched by groupId) merges compatible entities regardless, and any
+                    // entity that can't combine simply becomes a new graph appended after
+                    // whatever's been built so far — correct precisely because we're
+                    // walking the group in its true display order already.
+                    _group.entities.forEach((_e) => {
                         const _eid = entityIdOf(_e);
-                        this.addGraph(_eid, _i === 0, _e.color, _e.fill, _i === 0 ? null : this.graphs[this.graphs.length - 1], _e.hidden, _e.isStatic, _e.interval, _group.groupId, _e);
+                        this.addGraph(_eid, false, _e.color, _e.fill, null, _e.hidden, _e.isStatic, _e.interval, _group.groupId, _e);
                     });
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
                 }
+                // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
+                // from scratch — persist that result now rather than leaving storage stale
+                // until some unrelated later action happens to call writeLocalState.
+                this.writeLocalState();
             } else
                 this.pconfig.entities = [];
 
@@ -5600,10 +5962,10 @@ export class HistoryCardState {
                 // Keep original groupId — noAutoGroup=false allows natural re-combine
                 // A new groupId would prevent re-combine after refresh
                 const _origGroupId = _g.groupId;
-                const { gl: _gl, nextSibling: _nextSibling } = this._detachGraph(_g);
+                const _nextG = this._nextGroup(_g);
+                this._detachGraph(_g);
                 // Re-add remaining entities — color from pconfig.entities (g.entities' color
                 // is meaningless, always black, coming from a timeline graph); fill recomputed below
-                const _graphsBefore = this.graphs.length;
                 const _savedCombine = this.pconfig.combineSameUnits;
                 this.pconfig.combineSameUnits = true;
                 _newEntities.forEach((en, i) => {
@@ -5611,11 +5973,13 @@ export class HistoryCardState {
                     // fill is not persisted across a type change: it's derived from color+type,
                     // not a type-independent value. Pass null so addGraph recomputes it correctly
                     // for the target type (transparent for line/arrowline/timeline, solid for bar).
-                    this.addGraph(en.entity, i === 0, _pe?.color ?? en.color, null, i === 0 ? null : this.graphs[this.graphs.length - 1], undefined, false, null, _origGroupId, _pe ?? en);
+                    this.addGraph(en.entity, i === 0, _pe?.color ?? en.color, null, _nextG, undefined, false, null, _origGroupId, _pe ?? en);
                 });
                 this.pconfig.combineSameUnits = _savedCombine;
-                // Re-add extracted entity — color only; fill recomputed for the new type (see above)
-                this.addGraph(_entity.entity, false, _pcEntry?.color ?? _entity.color, null, null, undefined, false, _entity.interval ?? null, _origGroupId, _pcEntry ?? _entity);
+                // Re-add extracted entity — color only; fill recomputed for the new type (see
+                // above). Goes right before whatever followed the original graph _g — i.e.
+                // right after the just-rebuilt remaining-entities graph.
+                this.addGraph(_entity.entity, false, _pcEntry?.color ?? _entity.color, null, _nextG, undefined, false, _entity.interval ?? null, _origGroupId, _pcEntry ?? _entity);
                 // Sync the freshly-computed fill (correct for the NEW type) back into
                 // pconfig.entities, so persistence stays consistent with what the next
                 // rebuild will read as overrideFill — no need to special-case fill at rebuild time
@@ -5624,9 +5988,8 @@ export class HistoryCardState {
                     const _updatedEntity = _updatedG?.entities.find(e => e.entity === _entity.entity);
                     if( _updatedEntity ) _pcEntry.fill = _updatedEntity.fill;
                 }
-                // Move newly created divs to correct position
-                this._moveNewGraphsToPosition(_graphsBefore, _gl, _nextSibling);
                 this._updateMoVisibility();
+                this._updateGroupLinkMarkers();
                 this.updateHistoryWithClearCache();
             }
         }
@@ -6573,7 +6936,6 @@ export class HistoryCardState {
 
         for( let graph of graphs ) {
             if( !graph.entities ) continue;
-            let l = { ...graph, 'entities' : [] };
             const _gid = this.g_id++;
             const _groupId = _gid; // use graph index as groupId for static graphs
             const _interval = this.parseIntervalConfig(graph.options?.interval) ?? null;
@@ -6585,12 +6947,10 @@ export class HistoryCardState {
                     for( let s in this._hass.states ) {
                         if( regex && regex.test(s) && !testEntityExclusionList(s, regexExcludes) ) {
                             const _ent = {...e, 'entity': s};
-                            l.entities.push(_ent);
                             this.pconfig.entities.push(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
                         }
                     }
                 } else {
-                    l.entities.push(e);
                     this.pconfig.entities.push(this._makeStaticEntityEntry(e.entity, _groupId, e, _interval));
                 }
             }
@@ -6812,7 +7172,6 @@ class HistoryExplorerCard extends HTMLElement
         // Note: graph canvas elements are created dynamically by addGraphToCanvas (static and dynamic unified)
         html += `
             ${this.instance.addUIHtml(tools & 2, selector & 2, bgcol, optionStyle, inputStyle, invertZoom, 1)}
-            ${(((tools | selector) & 2) && !(this.instance.ui.stickyTools & 2)) ? '<br>' : ''}
             </div>
             </ha-card>
         `;
