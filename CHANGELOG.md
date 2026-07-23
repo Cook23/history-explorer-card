@@ -4,6 +4,56 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.34] - 2026-07-23
+
+### Changed — `pconfig.entities` as the single source of entity data, no more duplicate copy in `this.graphs`
+- `this.graphs[i].entities[j]` used to be a separate object rebuilt from scratch by `addGraph`, holding its own copy of every persisted field (`color`, `fill`, `lineMode`, `type`, etc.) alongside the real entry in `pconfig.entities` — two objects that could silently drift apart whenever one was updated without the other
+- `addGraph` now resolves or creates the `pconfig.entities` entry directly and uses that same object as `g.entities[j]` — one object, one place to update, no synchronization to get wrong
+- `this.graphs` remains a session-only working structure (canvas, chart instance, per-graph state), but it never again holds a second copy of anything that's actually persisted
+
+### Changed — refresh and live interaction rebuild graphs through the exact same path
+- A refresh (full rebuild from `pconfig.entities`) and a live action (split, combine, drag, type change) used to diverge in how they built and positioned graphs, sometimes producing a different result for the same underlying data
+- Both now go through `addGraph` the same way, deriving insertion point, combine candidate, and `graphIndex` with the same helper functions — a refresh and a live rebuild of the same state produce the identical result
+
+### Added — `graphIndex`, real-number display order within a solid block
+- A group of several linked graphs sharing one `groupId` (e.g. after a type change makes one entity incompatible with the rest) has its internal display order tracked explicitly by this new field. `pconfig.entities`' own array order can't carry it: that array must stay stable for re-combine to keep working when a type becomes compatible again, so a separate field was needed
+- Real number rather than an integer, so inserting between two existing graphs is always just the average of their two values — no renumbering needed
+- Combining into an existing graph adopts that graph's value (same rule as `groupId`); a genuinely new graph is placed relative to `targetGraph` and gets the average of its two true on-screen neighbors, found by matching the *last* graph built for a given `groupId` (the right compatibility candidate in a group built in sequence) rather than the first one found
+
+### Added — `_nextGroup`/`_previousGroup`/`_allGraphsInDisplayOrder`/`_firstGraph`/`_lastGraph`/`_isFirstGraph`/`_isLastGraph`/`_previousGraph`/`_nextGraph`
+- Consistent naming for order lookups: `Group`-suffixed functions reason on `groupId` alone (a solid block is one unit, nothing inserts inside it); `Graph`-suffixed functions reason on the full `groupId`+`graphIndex` order
+- `_regroupPcEntities()` added alongside — physically reorders `pconfig.entities` by `groupId` (first-occurrence order) whenever an entity's `groupId` is mutated in place without moving it, so the array itself never goes back to being interleaved
+
+### Added — chain-link marker between graphs of a linked group
+- A group of several linked graphs sharing one `groupId` (e.g. after a type change splits one entity off the rest) now shows a small chain-link icon between each consecutive pair — visible at all times, not just during a drag
+- Drawn on a semi-opaque white circle so it stays legible over whatever curve happens to pass underneath it, and fully transparent to clicks and any user interaction
+
+### Added — visible feedback when a drag would break apart a linked group
+- Inserting a foreign graph between two members of an already-linked group was already silently rejected by the persistence layer — the drag looked like it worked, but the group snapped back together on the next rebuild, without ever telling the user their drop hadn't actually stuck
+- The same rule is now enforced directly during the drag itself, with immediate visual feedback (red marker, "not allowed" cursor, and a tooltip) instead of a delayed, unexplained reset. Reordering a graph within its own group is still allowed — only an outsider landing between two existing members is blocked
+
+### Fixed — split graph landing in the wrong position, before/after a solid block
+- `addGraph` accepted a `targetGraph` parameter but never actually read its value — only tested it for nullity, as a flag combined with `isStatic` to force a static combine, never used for dynamic entities at all. Callers computed and passed a real graph reference anyway wherever they thought the insertion point mattered, with no effect
+- `addGraph` genuinely uses `targetGraph` as its insertion point; every rebuild and split/uncombine/drag call site derives it via `_nextGroup(g)` ("what graph follows this whole group") or `_previousGraph`/`_nextGraph` (the true on-screen neighbor within a solid block)
+
+### Fixed — rebuild never persisting its own recomputed state
+- A refresh recalculates default colors, `graphIndex`, and everything else `addGraph` resolves, but nothing wrote that result back to storage afterward — it stayed correct only in memory until some unrelated later action happened to call `writeLocalState()`. Same gap found in `_uncombineEntity` (double-click split) and the cross-graph legend drag: both persisted before finishing their reconstruction, saving a stale snapshot instead of the final one
+- All three save once, after the work is done
+
+### Fixed — double-click to uncombine silently doing nothing on a lone entity within a solid block
+- Checked the clicked graph's own entity count, not the group's — a group of 4 entities split across several graphs by an incompatible type could leave one graph with just that single entity, which the check then read as "nothing to ungroup" and refused to act on
+- Counts entities sharing the same `groupId` across `pconfig.entities`, regardless of how many separate graphs they're currently split into
+
+### Fixed — vertical spacing between graphs, and around top/bottom toolbars
+- Between two graphs: a `margin-top` on the graph's own container, sized by comparing its `graphIndex` against the true first graph on the page — never a `<br>` sibling, which a graph being inserted before it could displace
+- The toolbar is always wrapped in its own div (sticky or not — previously only the sticky case had one), with the spacing as a `margin` on that wrapper: structurally inseparable from the toolbar, since nothing is ever inserted inside it
+- `addUIHtml`'s `timeline` parameter — actually meaning "is a toolbar shown", nothing to do with the `timeline` graph type — renamed to `tools`
+
+### Fixed — hover tooltip re-enabled too early during a vertical page scroll
+- On mobile, scrolling the page vertically over a graph is handled natively by the browser (`touch-action:pan-y`), which cancels the pointer with a `pointercancel` event while the scroll continues — but the card was treating that exact event as "the pan gesture ended", re-enabling the hover tooltip mid-scroll and letting it flash on screen
+- `pointercancel`'s `state.drag` branch no longer re-enables the tooltip; that only happens on the real end of contact (`pointerup`) now. The unrelated `state.selecting` branch (zoom-by-selection) is untouched
+
+
 ## [v1.1.33] - 2026-07-17
 
 ### Added — `order` persistence category
