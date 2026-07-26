@@ -34,6 +34,7 @@ const lang_en =
             "type_static"        : "Static",
             "type_label"         : "Type",
             "type_default"       : "Default",
+            "entity_delete"      : "Delete",
             "linked_graphs"      : "Linked graphs"
         },
         "ranges" : {
@@ -94,6 +95,7 @@ const lang_fr =
             "type_static"        : "Statique",
             "type_label"         : "Type",
             "type_default"       : "Par défaut",
+            "entity_delete"      : "Supprimer",
             "linked_graphs"      : "Graphiques liés"
         },
         "ranges" : {
@@ -154,6 +156,7 @@ const lang_de =
             "type_static"        : "Statisch",
             "type_label"         : "Typ",
             "type_default"       : "Standard",
+            "entity_delete"      : "Löschen",
             "linked_graphs"      : "Verknüpfte Diagramme"
         },
         "ranges" : {
@@ -214,6 +217,7 @@ const lang_es =
             "type_static"        : "Estático",
             "type_label"         : "Tipo",
             "type_default"       : "Predeterminado",
+            "entity_delete"      : "Eliminar",
             "linked_graphs"      : "Gráficos vinculados"
         },
         "ranges" : {
@@ -274,6 +278,7 @@ const lang_nl =
             "type_static"        : "Statisch",
             "type_label"         : "Type",
             "type_default"       : "Standaard",
+            "entity_delete"      : "Verwijderen",
             "linked_graphs"      : "Gekoppelde grafieken"
         },
         "ranges" : {
@@ -334,6 +339,7 @@ const lang_pl =
             "type_static"        : "Statyczny",
             "type_label"         : "Typ",
             "type_default"       : "Domyślny",
+            "entity_delete"      : "Usuń",
             "linked_graphs"      : "Połączone wykresy"
         },
         "ranges" : {
@@ -394,6 +400,7 @@ const lang_sv =
             "type_static"        : "Statisk",
             "type_label"         : "Typ",
             "type_default"       : "Standard",
+            "entity_delete": "Ta bort",
             "linked_graphs": "Länkade grafer"
         },
         "ranges": {
@@ -454,6 +461,7 @@ const lang_da =
             "type_static"        : "Statisk",
             "type_label"         : "Type",
             "type_default"       : "Standard",
+            "entity_delete"      : "Slet",
             "linked_graphs"      : "Sammenkædede grafer"
         },
         "ranges" : {
@@ -514,6 +522,7 @@ const lang_sk =
             "type_static"        : "Statický",
             "type_label"         : "Typ",
             "type_default"       : "Predvolené",
+            "entity_delete"      : "Odstrániť",
             "linked_graphs"      : "Prepojené grafy"
         },
         "ranges" : {
@@ -574,6 +583,7 @@ const lang_ru =
             "type_static"        : "Статичный",
             "type_label"         : "Тип",
             "type_default"       : "По умолчанию",
+            "entity_delete"      : "Удалить",
             "linked_graphs"      : "Связанные графики"
         },
         "ranges" : {

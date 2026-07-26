@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.35b13';
+const Version = '1.1.36b12';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2374,23 +2374,28 @@ export class HistoryCardState {
         if( _el.parentNode ) _el.remove();
     }
 
-    // Ensures _el sits as a child of anchorEl's own parent (the position:relative
-    // div that wraps every graph's canvas — see graph creation HTML — with no
-    // overflow:hidden of its own, so an overflowing tooltip is never clipped by it;
-    // it only stays visually above a neighboring graph via the tooltip's own
-    // z-index, not because of a stacking context). Falls back to anchorEl itself if
-    // it has no parent yet. position:absolute against that parent makes the
-    // tooltip scroll together with the graph natively, with no scroll listener.
+    // Anchors _el against anchorEl.offsetParent — the real positioned ancestor the browser
+    // has already resolved, exactly the same mechanism already used (and already reliable)
+    // elsewhere in this file for other floating menus (see setDropdownVisibility,
+    // showEntityTypeMenu): read what's already there, never force one. A previous version
+    // instead forced position:relative directly onto anchorEl.parentNode whenever it wasn't
+    // already positioned — but that parent can be a shared, structural UI container (e.g.
+    // the entity selector's own wrapper, which also holds its input, its dropdown-open
+    // caret, its dropdown, and its type menu): forcing position:relative onto it changed
+    // what THEIR OWN offsetParent resolved to, permanently (the style was never removed) —
+    // they'd been positioning themselves correctly against a distant ancestor all along, and
+    // suddenly started resolving against this one instead, breaking their layout and
+    // stacking at the same time. Reading offsetParent instead finds that same distant
+    // ancestor without ever touching it, so _el scrolls together with anchorEl there too —
+    // same behavior as the canvas case, no longer a special case for UI elements.
+    // document.body + position:fixed remains the fallback for the rare case offsetParent is
+    // null (anchorEl hidden, or detached) — never touching anyone else's style either way.
     _attachFloatingTooltip(_el, anchorEl) {
-        const _parent = anchorEl.parentNode || anchorEl;
-        // absolute positions against the nearest *positioned* ancestor, not necessarily
-        // _parent itself — canvas wrapper divs already have position:relative (see graph
-        // creation HTML), but anchorEl may be some other element (e.g. event.target during
-        // a drag) whose parent has no position set, which would silently anchor far
-        // higher up the tree and break every coordinate computed relative to _parent.
-        if( getComputedStyle(_parent).position === 'static' ) _parent.style.position = 'relative';
-        if( _el.parentNode !== _parent ) _parent.appendChild(_el);
-        if( _el.style.position !== 'absolute' ) _el.style.position = 'absolute';
+        const _offsetParent = anchorEl.offsetParent;
+        const _targetParent = _offsetParent || document.body;
+        if( _el.parentNode !== _targetParent ) _targetParent.appendChild(_el);
+        const _wantPosition = _offsetParent ? 'absolute' : 'fixed';
+        if( _el.style.position !== _wantPosition ) _el.style.position = _wantPosition;
         // (Re)watch anchorEl: fires immediately with isIntersecting === false if
         // anchorEl is already offscreen or already detached, and again the moment
         // either becomes true later — either way, that's this tooltip's cue to die.
@@ -2522,13 +2527,12 @@ export class HistoryCardState {
 
         this._chartTooltipOwner = tooltip._chart;
         _el.style.display = 'block';
-        // Position relative to the anchor's own parent (absolute's containing block),
-        // not the viewport — canvas rect and parent rect share the same origin ancestor,
-        // so their difference is the canvas's offset within that positioned parent.
         const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
-        const _parentRect = _el.parentNode.getBoundingClientRect();
-        _el.style.left = (_canvasRect.left - _parentRect.left + _vm.x) + 'px';
-        _el.style.top  = (_canvasRect.top  - _parentRect.top  + _vm.y) + 'px';
+        // fixed positions directly against the viewport; absolute positions against the
+        // parent it was actually attached to (see _attachFloatingTooltip).
+        const _origin = ( _el.style.position === 'fixed' ) ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+        _el.style.left = (_canvasRect.left - _origin.left + _vm.x) + 'px';
+        _el.style.top  = (_canvasRect.top  - _origin.top  + _vm.y) + 'px';
         this._clampToViewport(_el);
         // Key identifies the hovered point(s) themselves (dataset+index from
         // _vm.dataPoints, populated by Chart.js's own model.dataPoints = tooltipItems), not
@@ -2551,18 +2555,20 @@ export class HistoryCardState {
         }
         this._attachFloatingTooltip(_tip, anchorEl);
         _tip.textContent = label;
-        const _parentRect = _tip.parentNode.getBoundingClientRect();
+        // fixed positions directly against the viewport (clientX/Y as-is); absolute positions
+        // against the parent it was actually attached to (see _attachFloatingTooltip).
+        const _origin = ( _tip.style.position === 'fixed' ) ? { left: 0, top: 0 } : _tip.parentNode.getBoundingClientRect();
         if( align === 'center' ) {
-            _tip.style.left      = (clientX - _parentRect.left) + 'px';
+            _tip.style.left      = (clientX - _origin.left) + 'px';
             _tip.style.transform = 'translateX(-50%)';
         } else if( align === 'right' ) {
-            _tip.style.left      = (clientX - _parentRect.left) + 'px';
+            _tip.style.left      = (clientX - _origin.left) + 'px';
             _tip.style.transform = 'translateX(-100%)';
         } else {
-            _tip.style.left = (clientX - _parentRect.left + 10) + 'px';
+            _tip.style.left = (clientX - _origin.left + 10) + 'px';
             _tip.style.transform = '';
         }
-        _tip.style.top = (clientY - _parentRect.top - 16) + 'px';
+        _tip.style.top = (clientY - _origin.top - 16) + 'px';
         this._clampToViewport(_tip);
         this._armTooltipAutoFade(_tip, this._wordBasedFadeDuration(this._countWords(label)));
     }
@@ -2898,25 +2904,10 @@ export class HistoryCardState {
                         // but it's still at its old array position — regroup now.
                         this._regroupPcEntities();
                     }
-                    // Rebuild: remove source graph if it becomes empty
-                    const _srcEmpty = _src.entities.length === 1;
-                    // Rebuild source graph without the moved entity
-                    const _srcOrigGroupId = _src.groupId;
+                    // Rebuild source graph without the moved entity (removes the source
+                    // graph entirely if it becomes empty)
                     const _tgtOrigGroupId = _tgt.groupId;
-                    const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
-                    const _srcNextG = this._nextGroup(_src);
-                    this._detachGraph(_src);
-                    if( !_srcEmpty ) {
-                        // Recreate source graph with remaining entities
-                        _srcRemaining.forEach(en => { en.siConversionFactor = undefined; });
-                        const _savedCombine = this.pconfig.combineSameUnits;
-                        this.pconfig.combineSameUnits = true;
-                        _srcRemaining.forEach((en, i) => {
-                                const _pe = this._pcEntryInGroup(en.entity, _srcOrigGroupId);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG, undefined, false, null, _srcOrigGroupId, _pe ?? en);
-                            });
-                        this.pconfig.combineSameUnits = _savedCombine;
-                    }
+                    this._detachAndRebuildRemaining(_src, _srcIdx);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
@@ -3217,9 +3208,7 @@ export class HistoryCardState {
         // Extract one entity from a combined graph into its own graph.
         // Type-agnostic: used for line/bar legend double-click and timeline/arrowline label double-click.
         const _entity = g.entities[idx];
-        const _newEntities = g.entities.filter((_, i) => i !== idx);
         _entity.siConversionFactor = undefined;
-        _newEntities.forEach(en => { en.siConversionFactor = undefined; });
         const _newGroupId = this._nextGroupId++;
         // Preserve all existing persisted fields (type, lineMode, interval, ...) —
         // only groupId/color/fill change on uncombine, EXCEPT hidden: the first click of
@@ -3245,17 +3234,7 @@ export class HistoryCardState {
             this._regroupPcEntities();
         }
         const _nextG = this._nextGroup(g);
-        this._detachGraph(g);
-        const _savedCombine = this.pconfig.combineSameUnits;
-        this.pconfig.combineSameUnits = true;
-        _newEntities.forEach((en, i) => {
-            // en already IS the pconfig.entities entry (has type/lineMode/etc.) — this
-            // lookup is just a defensive fallback for the rare case where entity+groupId
-            // is ambiguous (see _pcEntryInGroup).
-            const _pe = this._pcEntryInGroup(en.entity, g.groupId);
-            this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, g.groupId, _pe ?? en);
-        });
-        this.pconfig.combineSameUnits = _savedCombine;
+        this._detachAndRebuildRemaining(g, idx, _nextG);
         // Extracted entity goes right before whatever followed the original graph g —
         // i.e. right after the just-rebuilt remaining-entities graph (addGraph inserting
         // before _nextG naturally lands it there).
@@ -3334,7 +3313,7 @@ export class HistoryCardState {
             panstate.tlLongPressTimer = null;
             if( _pp.entityIdx >= 0 ) {
                 const _entity = _pp.g.entities[_pp.entityIdx];
-                if( _entity && this._isNumericEntity(_entity.entity) ) {
+                if( _entity ) {
                     const _canvasR = _pp.g.canvas.getBoundingClientRect();
                     this.showEntityTypeMenu(0, _entity.entity, _pp.g, _canvasR.left + 30, event.clientY);
                 }
@@ -4316,19 +4295,14 @@ export class HistoryCardState {
                 _newIds.push(eid);
             }
 
-            // New entities take priority: defer creation, show the type menu for them
+            // New entities take priority: defer creation, show the type menu for them —
+            // always, even if none is numeric (reduced to timeline only in that case)
             if( _newIds.length ) {
-                if( _newIds.some(eid => this._isNumericEntity(eid)) ) {
-                    const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-                    const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
-                    const _ty = _ir ? _ir.top : 0;
-                    this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
-                    this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
-                } else {
-                    for( let eid of _newIds ) {
-                        _addedNames.push(this._createAndPersistEntity(eid, 'timeline', null));
-                    }
-                }
+                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
+                const _ty = _ir ? _ir.top : 0;
+                this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
+                this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
             }
 
             if( _duplicates.length ) {
@@ -4336,15 +4310,14 @@ export class HistoryCardState {
                 const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
                 const _ty = _ir ? _ir.top : 0;
                 this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
-                const _fi0 = this.ui.inputField[ii];
                 // Show type-change menu for a duplicate only if no new-entity menu is already
-                // shown above (avoid two competing menus for one combined action)
+                // shown above (avoid two competing menus for one combined action) — shown
+                // even for a non-numeric duplicate (reduced to timeline only, nothing to
+                // actually change there, but keeps the process standard/homogeneous)
                 const _dupG = Array.from(_duplicateGraphs)[0];
                 const _dupEntityId = _dupG?.entities.find(e => _duplicates.includes(e.entity))?.entity;
-                if( !_newIds.length && _dupEntityId && this._isNumericEntity(_dupEntityId) ) {
+                if( !_newIds.length && _dupEntityId ) {
                     this.showEntityTypeMenu(ii, _dupEntityId, _dupG);
-                } else if( !_newIds.length ) {
-                    setTimeout(() => { this._resetEntityInput(_fi0); }, 500);
                 }
                 const _dupCanvases = Array.from(_duplicateGraphs).map(g => g.canvas);
                 this._highlightMultipleTargets(_dupCanvases);
@@ -4415,16 +4388,10 @@ export class HistoryCardState {
             }
 
             if( _matchedIds.length ) {
-                if( _matchedIds.some(eid => this._isNumericEntity(eid)) ) {
-                    // At least one numeric entity — show the type menu (with "Default"),
-                    // defer creation of the whole batch until the user chooses
-                    this.showEntityTypeMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null);
-                } else {
-                    // None numeric — only valid representation is timeline for all, create directly
-                    for( let eid of _matchedIds ) {
-                        _addedNames.push(this._createAndPersistEntity(eid, 'timeline', null));
-                    }
-                }
+                // Show the type menu (with "Default"), even if none matched is numeric
+                // (reduced to timeline only in that case) — deferred creation of the whole
+                // batch until the user chooses
+                this.showEntityTypeMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null);
             }
 
         } else {
@@ -4439,12 +4406,7 @@ export class HistoryCardState {
                     const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
                     this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG.canvas);
-                    const _fiErr = this.ui.inputField[ii];
-                    if( this._isNumericEntity(entity_id) ) {
-                        this.showEntityTypeMenu(ii, entity_id, _existingG);
-                    } else {
-                        setTimeout(() => { this._resetEntityInput(_fiErr); }, 500);
-                    }
+                    this.showEntityTypeMenu(ii, entity_id, _existingG);
                     this._highlightDropTarget(_existingG.canvas, false);
                     // Keep highlight 1.5s if visible, 15s if out of viewport
                     // If it enters viewport while highlighted, fade after 1.5s
@@ -4471,27 +4433,14 @@ export class HistoryCardState {
                 return;
             }
 
-            // Brand-new entity — nothing created yet. If numeric, show the type menu
-            // and let the user's choice both define the type and perform the creation.
-            // If non-numeric, the only valid representation is timeline: create directly.
-            if( this._isNumericEntity(entity_id) ) {
-                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
-                const _ty = _ir ? _ir.top : 0;
-                this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
-                this.showEntityTypeMenu(ii, entity_id, null);
-            } else {
-                const _name = this._createAndPersistEntity(entity_id, 'timeline', null);
-                this._justAdded = _name;
-                const _fi3 = this.ui.inputField[ii];
-                if( _fi3 ) {
-                    _fi3.value = _name;
-                    _fi3.style.fontWeight = 'bold';
-                    setTimeout(() => { this._resetEntityInput(_fi3); }, 500);
-                }
-                this.updateHistoryWithClearCache();
-                this.writeLocalState();
-            }
+            // Brand-new entity — nothing created yet. Always show the type menu, even for
+            // a non-numeric entity (reduced to timeline only, its one valid representation)
+            // — keeps the same two-step add/cancel process homogeneous for every entity.
+            const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+            const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
+            const _ty = _ir ? _ir.top : 0;
+            this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
+            this.showEntityTypeMenu(ii, entity_id, null);
 
         }
 
@@ -4538,6 +4487,23 @@ export class HistoryCardState {
         this.writeLocalState();
     }
 
+
+    // Deletes one entity entirely — removes it from its graph (rebuilding that graph with
+    // whatever entities remain, or removing it outright if this was its last entity) AND
+    // from pconfig.entities, so it's gone for good rather than split off into its own graph
+    // (that's what _uncombineEntity does instead). Currently only reachable via the entity
+    // type menu opened by a long-press on a legend/timeline label — deleting from the
+    // entity selector's own type menu (a not-yet-created entity) wouldn't make sense there.
+    _deleteEntity(g, idx)
+    {
+        const _entity = this._detachAndRebuildRemaining(g, idx);
+        const _eIdx = this._pcEntryIndex(_entity.entity);
+        if( _eIdx >= 0 ) this.pconfig.entities.splice(_eIdx, 1);
+        this._updateMoVisibility();
+        this._updateGroupLinkMarkers();
+        this.writeLocalState();
+        this.updateHistory();
+    }
 
     // --------------------------------------------------------------------------------------
     // Adding and removing graphs from the view
@@ -4678,24 +4644,33 @@ export class HistoryCardState {
         return null;
     }
 
-    _navigateMenuArrowKey(visible, key, clearFontWeight)
+    _navigateMenuArrowKey(visible, key)
     {
         // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity type menu
-        // (et_N) and the entity selector dropdown (es_N) — moves the highlighted <a>
-        // to the next/previous visible item, wrapping at either end.
+        // (et_N), the entity selector dropdown (es_N), and the export menu (eo_N) — moves
+        // the highlighted <a> to the next/previous visible item, wrapping at either end.
+        // Only ever touches the navigation highlight (background + hecSelected marker) —
+        // never fontWeight, which is menu-specific business state (e.g. the entity type
+        // menu's "bold = default/currently active type", or the selector's wildcard-match
+        // bolding) set by the caller, not by this generic navigation logic.
         const _cur = visible.find(a => a.dataset.hecSelected);
+        // The entity type menu marks its default/active option with hecSelected right when
+        // the menu opens (see showEntityTypeMenu), before any key is pressed — no blue
+        // highlight is shown yet at that point. So hecSelected alone doesn't mean "there's
+        // already a highlight to move from" — check the highlight itself (background) too.
+        // The very first arrow key press makes the highlight appear at that starting
+        // position instead of moving away from it; only once it's actually showing does a
+        // further press move it to the next/previous item.
         let _next;
-        if( !_cur ) {
-            _next = key === 'ArrowDown' ? visible[0] : visible[visible.length - 1];
+        if( !_cur || !_cur.style.background ) {
+            _next = _cur || (key === 'ArrowDown' ? visible[0] : visible[visible.length - 1]);
         } else {
             const _i = visible.indexOf(_cur);
             _next = key === 'ArrowDown' ? (visible[_i + 1] || visible[0]) : (visible[_i - 1] || visible[visible.length - 1]);
             _cur.style.background = '';
-            if( clearFontWeight ) _cur.style.fontWeight = '';
             delete _cur.dataset.hecSelected;
         }
         _next.style.background = 'var(--primary-color, #03a9f4)';
-        if( clearFontWeight ) _next.style.fontWeight = '';
         _next.dataset.hecSelected = '1';
         return _next;
     }
@@ -4709,6 +4684,10 @@ export class HistoryCardState {
         fi.style.fontWeight = '';
         delete fi.dataset.entityId;
         this._justAdded = null;
+        // Programmatically setting .value doesn't fire 'input' on its own — dispatch it so
+        // the dropdown (if open) refilters/re-populates against the now-empty field, exactly
+        // as it would for the user clearing the field by hand.
+        fi.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     _pcEntryIndex(entityId)
@@ -4870,12 +4849,43 @@ export class HistoryCardState {
         this.graphs.splice(this.graphs.indexOf(g), 1);
     }
 
+    // Removes g.entities[idx] and detaches g. If any entities remain, rebuilds g's
+    // replacement in the same spot (targetGraph = whatever graph followed g) with the same
+    // groupId — same "remove one entity from a combined graph" shared by _uncombineEntity,
+    // the cross-graph legend drag (source side), and entity removal. Callers still handle
+    // whatever they do with the removed entity afterward (recreate it elsewhere, drop it,
+    // move it into a target graph, etc.) — this only ever rebuilds what's LEFT of g.
+    // nextG defaults to _nextGroup(g), computed here — but a caller that mutates
+    // pconfig.entities' order or groupIds BEFORE calling this (e.g. _uncombineEntity,
+    // regrouping the just-extracted entity under its new groupId first) must compute and
+    // pass its own, since _nextGroup's scan depends on that order already being final.
+    // Returns the removed entity.
+    _detachAndRebuildRemaining(g, idx, nextG = undefined)
+    {
+        const _entity = g.entities[idx];
+        const _remaining = g.entities.filter((_, i) => i !== idx);
+        const _origGroupId = g.groupId;
+        const _nextG = nextG !== undefined ? nextG : this._nextGroup(g);
+        this._detachGraph(g);
+        if( _remaining.length ) {
+            _remaining.forEach(en => { en.siConversionFactor = undefined; });
+            const _savedCombine = this.pconfig.combineSameUnits;
+            this.pconfig.combineSameUnits = true;
+            _remaining.forEach((en, i) => {
+                const _pe = this._pcEntryInGroup(en.entity, _origGroupId);
+                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _origGroupId, _pe ?? en);
+            });
+            this.pconfig.combineSameUnits = _savedCombine;
+        }
+        return _entity;
+    }
+
     _isNumericEntity(entity_id)
     {
-        // The entity type menu (line/bar/arrowline/timeline) only makes sense for entities
-        // whose current state can be treated as a number. Non-numeric states (on/off, text)
-        // can only ever be represented as a timeline, so the menu offers nothing useful there
-        // and is not shown at all — no partial/greyed-out version.
+        // The entity type menu (line/bar/arrowline/timeline) only offers a real choice for
+        // entities whose current state can be treated as a number. Non-numeric states
+        // (on/off, text) can only ever be represented as a timeline — the menu is still
+        // shown for these (see showEntityTypeMenu), just reduced to timeline only.
         const state = this._hass.states[entity_id]?.state;
         return state !== undefined && state !== null && !isNaN(Number(state));
     }
@@ -5407,6 +5417,7 @@ export class HistoryCardState {
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
+                    <div id="et_${i}_title" style="padding:5px 10px;font-weight:600;background-color:var(--secondary-background-color);border-bottom:1px solid #444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
                     <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
@@ -5414,6 +5425,7 @@ export class HistoryCardState {
                     <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
+                    <a id="et_${i}_delete" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-top:1px solid #444;">${i18n('ui.menu.entity_delete')}</a>
                 </div>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
@@ -5479,6 +5491,7 @@ export class HistoryCardState {
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
+        const _etDelete = this._this.querySelector(`#et_${i}_delete`); if( _etDelete ) _etDelete.innerHTML = i18n('ui.menu.entity_delete');
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
         let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
@@ -5723,12 +5736,18 @@ export class HistoryCardState {
                             if( !_eoMenu.contains(document.activeElement) ) this.menuSetVisibility(i, false);
                         }, 150);
                     });
+                    // Keyboard navigation — same as es_N/et_N. menuSetVisibility(i,false) as
+                    // onClose (rather than duplicating display:none here) also resets the
+                    // toggle button's caret icon back to its closed-state arrow.
+                    _eoMenu.addEventListener('keydown', (e) => {
+                        this._menuKeyDown(e, _eoMenu, { onClose: () => this.menuSetVisibility(i, false) });
+                    });
                 }
 
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('keyup', this.entitySelectorEntered.bind(this), true);
+                this._this.querySelector(`#b7_${i}`)?.addEventListener('input', this.entitySelectorEntered.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
 
                 this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
@@ -5854,17 +5873,33 @@ export class HistoryCardState {
         _menu._hec_graph_id  = graph ? graph.id : null;
 
         const _defaultEl = this._this.querySelector(`#et_${input_idx}_default`);
+        const _deleteEl  = this._this.querySelector(`#et_${input_idx}_delete`);
+        const _titleEl   = this._this.querySelector(`#et_${input_idx}_title`);
         const _isWildcard = Array.isArray(entity_id);
+        if( _titleEl ) _titleEl.textContent = _isWildcard ? '*' : entity_id;
+
+        // Delete only makes sense for an entity that already has a graph, and only when
+        // opened via a long-press on its own label — not from the entity selector's own
+        // type menu (anchorClientX/Y null there), where the entity may not even exist yet.
+        const _showDelete = !!graph && anchorClientX !== null && anchorClientY !== null;
+        if( _deleteEl ) {
+            _deleteEl.style.display = _showDelete ? 'block' : 'none';
+            _menu._hec_delete_idx = _showDelete ? graph.entities.findIndex(e => e.entity === entity_id) : -1;
+        }
 
         if( graph ) {
-            // Existing entity — change type. "Default" option not applicable.
+            // Existing entity — change type. "Default" option not applicable. Non-numeric
+            // entity (only ever timeline): the only choice is timeline itself, reduced menu.
             if( _defaultEl ) _defaultEl.style.display = 'none';
             const _curType     = graph.type;
             const _entity      = graph.entities.find(e => e.entity === entity_id);
             const _curLineMode = this.normalizeLineMode(_entity?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+            const _numeric = this._isNumericEntity(entity_id);
             _TYPE_MENU_DEFS.forEach((_def, _idx) => {
                 const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
                 if( !_el ) return;
+                if( !_numeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
+                _el.style.display = 'block';
                 const _active = _def.type === _curType && (_def.lineMode === null || _def.lineMode === _curLineMode);
                 _el.style.background = '';
                 _el.style.fontWeight = '';
@@ -5876,28 +5911,44 @@ export class HistoryCardState {
             });
         } else if( _isWildcard ) {
             // Brand-new entities from a wildcard match — nothing created yet.
-            // "Default" (apply each entity's own auto-detected type) is offered and pre-selected.
+            // "Default" (apply each entity's own auto-detected type) is offered and
+            // pre-selected — unless NONE of the matched entities is numeric, in which case
+            // timeline is the only possible outcome anyway: reduced menu, no need for
+            // "Default" as a separate choice.
+            const _anyNumeric = entity_id.some(eid => this._isNumericEntity(eid));
             if( _defaultEl ) {
-                _defaultEl.style.display = 'block';
-                _defaultEl.style.background = '';
-                _defaultEl.style.fontWeight = 'bold';
-                _defaultEl.dataset.hecSelected = '1';
+                _defaultEl.style.display = _anyNumeric ? 'block' : 'none';
+                if( _anyNumeric ) {
+                    _defaultEl.style.background = '';
+                    _defaultEl.style.fontWeight = 'bold';
+                    _defaultEl.dataset.hecSelected = '1';
+                }
             }
             _TYPE_MENU_DEFS.forEach((_def, _idx) => {
                 const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
                 if( !_el ) return;
+                if( !_anyNumeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
+                _el.style.display = 'block';
                 _el.style.background = '';
                 _el.style.fontWeight = '';
                 delete _el.dataset.hecSelected;
+                if( !_anyNumeric && _def.type === 'timeline' ) {
+                    _el.style.fontWeight = 'bold';
+                    _el.dataset.hecSelected = '1';
+                }
             });
         } else {
             // Brand-new single entity — nothing created yet. Pre-select its own
-            // auto-detected type (YAML/state/unit), same as what addGraph would pick.
+            // auto-detected type (YAML/state/unit), same as what addGraph would pick —
+            // for a non-numeric entity that's always timeline, reduced menu.
             if( _defaultEl ) _defaultEl.style.display = 'none';
-            const _detected = this._detectDefaultType(entity_id);
+            const _numeric = this._isNumericEntity(entity_id);
+            const _detected = _numeric ? this._detectDefaultType(entity_id) : { type: 'timeline', lineMode: null };
             _TYPE_MENU_DEFS.forEach((_def, _idx) => {
                 const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
                 if( !_el ) return;
+                if( !_numeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
+                _el.style.display = 'block';
                 const _active = _def.type === _detected.type && (_def.lineMode === null || _def.lineMode === _detected.lineMode);
                 _el.style.background = '';
                 _el.style.fontWeight = '';
@@ -6169,22 +6220,72 @@ export class HistoryCardState {
         }, 150);
     }
 
+    // Shared keyboard navigation for any open floating menu (entity selector dropdown,
+    // entity type menu, export menu) — Escape closes, ArrowUp/ArrowDown move the highlight,
+    // Enter activates the highlighted item (or the first visible one). This is purely menu
+    // navigation, the same regardless of what the menu actually contains — any
+    // menu-specific business logic (e.g. the entity selector's wildcard/multi-select/
+    // already-selected handling, or the entity type menu's default/active-type bolding)
+    // stays with the caller, hooked in via the optional callbacks rather than living inside
+    // this function. Never touches fontWeight anywhere — that's business state, not
+    // navigation state.
+    //   menuEl        — the menu container to read visible <a> items from
+    //   onClose()     — called after Escape closes+clears the menu; caller does its own
+    //                   extra cleanup on top (e.g. clearing the selector's text field)
+    //   onEnter(sel)  — called instead of the default sel.click() if provided; return true
+    //                   to signal "handled, don't also click" (used by the entity selector
+    //                   for its wildcard/already-selected cases), or false/undefined to let
+    //                   the default click still happen
+    _menuKeyDown(event, menuEl, { onClose, onEnter } = {}) {
+        if( !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key) ) return;
+        if( !menuEl || menuEl.style.display === 'none' ) return;
+
+        if( event.key === 'Escape' ) {
+            event.preventDefault();
+            // Clears the keyboard-navigation highlight only (background + hecSelected
+            // marker) — never fontWeight, which is menu-specific business state (e.g. the
+            // entity type menu's "bold = currently active type") set by the caller, not by
+            // this generic navigation logic, and must survive closing/reopening the menu.
+            for( let _a of menuEl.getElementsByTagName('a') ) {
+                _a.style.background = '';
+                delete _a.dataset.hecSelected;
+            }
+            menuEl.style.display = 'none';
+            onClose?.();
+            return;
+        }
+
+        const _visible = Array.from(menuEl.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
+        if( !_visible.length ) return;
+
+        if( event.key === 'Enter' ) {
+            event.preventDefault();
+            const _sel = menuEl.querySelector('a[data-hec-selected]') || _visible[0];
+            if( !_sel ) return;
+            if( onEnter?.(_sel) ) return;
+            _sel.click();
+            return;
+        }
+
+        // ArrowDown / ArrowUp
+        event.preventDefault();
+        const _next = this._navigateMenuArrowKey(_visible, event.key);
+        _next.scrollIntoView({ block: 'nearest' });
+    }
+
     entitySelectorEntered(event)
     {
         if( !event.target ) return;
-        if( event.key === 'Escape' ) return;
 
         const idx = event.target.id.substr(3) * 1;
         const dropdown = this._this.querySelector(`#es_${idx}`);
 
-        // For navigation/Enter keys: only reopen if closed AND nothing selected AND not just added
-        if( ['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) ) {
-            if( this._justAdded ) { this._justAdded = null; return; }
-            if( dropdown.style.display === 'none' && !this._entitySelected?.[idx] ) this.setDropdownVisibility(idx, true);
-            return;
-        }
-
-        // For all other keys: reopen if closed, refilter if open
+        // Refilter if already open (typing, paste, voice input, autofill, or a script
+        // setting .value and firing this same event to keep the dropdown in sync). Only
+        // reopen a closed dropdown if the field genuinely has focus — a synthetic 'input'
+        // fired by _resetEntityInput after the user has already moved away from the field
+        // must not pop the dropdown back open.
+        if( dropdown.style.display === 'none' && document.activeElement !== event.target ) return;
         this.setDropdownVisibility(idx, true);
 
         // Clear keyboard highlight on text change
@@ -6198,58 +6299,44 @@ export class HistoryCardState {
     entitySelectorKeyDown(event)
     {
         if( !event.target ) return;
-        if( !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key) ) return;
 
         const idx = event.target.id.substr(3) * 1;
         const dropdown = this._this.querySelector(`#es_${idx}`);
         const input    = this._this.querySelector(`#b7_${idx}`);
 
-        if( event.key === 'Escape' ) {
+        // Entity selector-specific: Enter with an entity already selected triggers add
+        // regardless of whether the dropdown happens to be open or closed — checked before
+        // the generic menu navigation below, which only acts on an open menu.
+        if( event.key === 'Enter' && this._entitySelected?.[idx] ) {
             event.preventDefault();
-            dropdown.style.display = 'none';
-            input.value = '';
-            input.style.fontWeight = '';
-            delete input.dataset.entityId;
-            if( this._entitySelected ) this._entitySelected[idx] = false;
+            this.addEntitySelected(idx);
             return;
         }
 
-        const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
-
-        if( event.key === 'Enter' ) {
-            if( !this._entitySelected ) this._entitySelected = [false, false];
-            if( this._entitySelected[idx] ) {
-                // Already selected — trigger add (equivalent to clicking the old + button)
-                event.preventDefault();
-                this.addEntitySelected(idx);
-                return;
-            }
-            // If dropdown is closed — let keyup handle it (reopen)
-            if( dropdown.style.display === 'none' ) return;
-            event.preventDefault();
-            if( !visible.length ) return;
-            // Wildcard: select all visible entities
-            if( input.value.indexOf('*') >= 0 ) {
-                const ids      = visible.map(a => a.dataset.entity);
-                const names    = visible.map(a => a.textContent);
-                input.value = names.join('; ');
-                input.dataset.entityId = ids.join(';');
-                this._entitySelected[idx] = true;
-                dropdown.style.display = 'none';
-                return;
-            }
-            // Single: select first visible
-            const _sel = dropdown.querySelector('a[data-hec-selected]') || visible[0];
-            if( _sel ) _sel.click();
-            return;
-        }
-
-        if( !visible.length ) return;
-
-        // ArrowDown / ArrowUp
-        event.preventDefault();
-        const _next = this._navigateMenuArrowKey(visible, event.key, false);
-        _next.scrollIntoView({ block: 'nearest' });
+        this._menuKeyDown(event, dropdown, {
+            onClose: () => {
+                input.value = '';
+                input.style.fontWeight = '';
+                delete input.dataset.entityId;
+                if( this._entitySelected ) this._entitySelected[idx] = false;
+            },
+            onEnter: (_sel) => {
+                if( !this._entitySelected ) this._entitySelected = [false, false];
+                // Entity selector-specific: a wildcard pattern selects every currently
+                // visible entity at once, instead of activating a single item.
+                if( input.value.indexOf('*') >= 0 ) {
+                    const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
+                    const ids   = visible.map(a => a.dataset.entity);
+                    const names = visible.map(a => a.textContent);
+                    input.value = names.join('; ');
+                    input.dataset.entityId = ids.join(';');
+                    this._entitySelected[idx] = true;
+                    dropdown.style.display = 'none';
+                    return true; // handled — don't also click _sel
+                }
+                return false; // let the default click on _sel happen
+            },
+        });
     }
 
     entitySelectorEntryClicked(event)
@@ -6476,24 +6563,20 @@ export class HistoryCardState {
                     this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode);
                 }, true);
             });
+            this._this.querySelector(`#et_${_ii}_delete`)?.addEventListener('click', (e) => {
+                e.preventDefault();
+                const _graph_id = _etMenu._hec_graph_id;
+                const _idx = _etMenu._hec_delete_idx;
+                this.hideEntityTypeMenu(_ii);
+                if( _graph_id === null || _idx === undefined || _idx < 0 ) return;
+                const _g = this.graphs.find(gr => gr.id === _graph_id);
+                if( _g ) this._deleteEntity(_g, _idx);
+            }, true);
             // Keyboard navigation
             _etMenu.addEventListener('keydown', (e) => {
-                const _visible = Array.from(_etMenu.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
-                if( e.key === 'Escape' ) {
-                    e.preventDefault();
-                    this.hideEntityTypeMenu(_ii);
-                    return;
-                }
-                if( e.key === 'Enter' ) {
-                    e.preventDefault();
-                    const _sel = _etMenu.querySelector('a[data-hec-selected]') || _visible[0];
-                    if( _sel ) _sel.click();
-                    return;
-                }
-                if( e.key === 'ArrowDown' || e.key === 'ArrowUp' ) {
-                    e.preventDefault();
-                    this._navigateMenuArrowKey(_visible, e.key, true);
-                }
+                this._menuKeyDown(e, _etMenu, {
+                    onClose: () => this._resetEntityInput(this.ui.inputField[_ii]),
+                });
             });
             // Close on focusout — same as es_N
             _etMenu.addEventListener('focusout', (e) => {

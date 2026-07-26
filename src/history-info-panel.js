@@ -221,37 +221,11 @@ function hecHookInfoPanel()
                     if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g);
                 });
                 if( _etMenu ) {
-                    // Keyboard navigation — same as main card
+                    // Keyboard navigation — same shared logic as the main card
                     _etMenu.addEventListener('keydown', (e) => {
-                        const _visible = Array.from(_etMenu.getElementsByTagName('a'));
-                        if( e.key === 'Escape' ) {
-                            e.preventDefault();
-                            instance.hideEntityTypeMenu(0);
-                            return;
-                        }
-                        if( e.key === 'Enter' ) {
-                            e.preventDefault();
-                            const _sel = _etMenu.querySelector('a[data-hec-selected]') || _visible[0];
-                            if( _sel ) _sel.click();
-                            return;
-                        }
-                        if( e.key === 'ArrowDown' || e.key === 'ArrowUp' ) {
-                            e.preventDefault();
-                            const _cur = _etMenu.querySelector('a[data-hec-selected]');
-                            let _next;
-                            if( !_cur ) {
-                                _next = e.key === 'ArrowDown' ? _visible[0] : _visible[_visible.length - 1];
-                            } else {
-                                const _i = _visible.indexOf(_cur);
-                                _next = e.key === 'ArrowDown' ? (_visible[_i + 1] || _visible[0]) : (_visible[_i - 1] || _visible[_visible.length - 1]);
-                                _cur.style.background = '';
-                                _cur.style.fontWeight = '';
-                                delete _cur.dataset.hecSelected;
-                            }
-                            _next.style.background = 'var(--primary-color, #03a9f4)';
-                            _next.style.fontWeight = '';
-                            _next.dataset.hecSelected = '1';
-                        }
+                        instance._menuKeyDown(e, _etMenu, {
+                            onClose: () => instance._resetEntityInput(instance.ui.inputField[0]),
+                        });
                     });
                     // Close on focusout — same as main card
                     _etMenu.addEventListener('focusout', () => {
