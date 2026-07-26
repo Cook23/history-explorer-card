@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.34b41';
+const Version = '1.1.35b13';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -213,6 +213,7 @@ export class HistoryCardState {
         this.pconfig.combineSameUnits     = false;
         this.pconfig.recordedEntitiesOnly = false;
         this.pconfig.filterEntities       = undefined;
+        this.pconfig.excludeFilterEntities = undefined;
         this.pconfig.decimation           = 'fast';
         this.pconfig.roundingPrecision    = 2;
         this.pconfig.defaultLineMode      = undefined;
@@ -2319,6 +2320,90 @@ export class HistoryCardState {
         panstate.yaxis = null;
     }
 
+    // ── Shared floating-tooltip lifecycle ──────────────────────────────────────
+    // Both tooltip kinds (chart hover tooltip, label tooltip) share one lifecycle:
+    // anchor to the nearest positioned ancestor of a given element (so the tooltip
+    // scrolls with its content instead of staying pinned to the viewport), fade out
+    // after a duration proportional to how much text is shown, and get force-killed
+    // by an IntersectionObserver the moment their anchor stops intersecting the
+    // viewport — which fires both for an ordinary scroll-out AND for the anchor
+    // being removed from the DOM entirely (e.g. HA tearing the card down on a view
+    // change), since a detached element can never intersect. That single observer
+    // covers every "card no longer on screen" case without needing a separate
+    // disconnectedCallback.
+    _countWords(text) {
+        return text.split(/[\s_]+/).filter(Boolean).length;
+    }
+
+    _wordBasedFadeDuration(wordCount) {
+        return 1000 + 500 * wordCount;
+    }
+
+    // Resets visibility to fully shown (needed on every re-render, e.g. content refreshed
+    // mid-fade) but only (re)starts the fade countdown when `changeKey` differs from the
+    // last call — passing the same key on every call (e.g. because the hovered point
+    // hasn't changed, just the data underneath it) no longer keeps re-arming the timer
+    // indefinitely. Symmetric with the fade-out: if the element isn't already fully shown
+    // (freshly created, or mid fade-out from a previous hide), it fades in the same way
+    // instead of snapping straight to opacity:1 — the two style writes must land in
+    // separate frames or the browser coalesces them and skips the transition entirely.
+    _armTooltipAutoFade(_el, duration, changeKey) {
+        if( _el.style.opacity !== '1' ) {
+            _el.style.opacity = '0';
+            requestAnimationFrame(() => { _el.style.opacity = '1'; });
+        }
+        if( changeKey !== undefined && _el._hecFadeKey === changeKey ) return;
+        _el._hecFadeKey = changeKey;
+        this._startTooltipFade(_el, duration);
+    }
+
+    // Starts the fade-then-remove countdown without first forcing opacity back to 1 — used
+    // when hover has just genuinely ended (as opposed to a re-render of still-active
+    // content, which goes through _armTooltipAutoFade above instead).
+    _startTooltipFade(_el, duration) {
+        clearTimeout(_el._hecFadeTimer);
+        clearTimeout(_el._hecRemoveTimer);
+        _el._hecFadeTimer = setTimeout(() => { _el.style.opacity = '0'; }, duration);
+        _el._hecRemoveTimer = setTimeout(() => { this._killFloatingTooltip(_el); }, duration + 1500);
+    }
+
+    _killFloatingTooltip(_el) {
+        clearTimeout(_el._hecFadeTimer);
+        clearTimeout(_el._hecRemoveTimer);
+        _el._hecObserver?.disconnect();
+        if( _el.parentNode ) _el.remove();
+    }
+
+    // Ensures _el sits as a child of anchorEl's own parent (the position:relative
+    // div that wraps every graph's canvas — see graph creation HTML — with no
+    // overflow:hidden of its own, so an overflowing tooltip is never clipped by it;
+    // it only stays visually above a neighboring graph via the tooltip's own
+    // z-index, not because of a stacking context). Falls back to anchorEl itself if
+    // it has no parent yet. position:absolute against that parent makes the
+    // tooltip scroll together with the graph natively, with no scroll listener.
+    _attachFloatingTooltip(_el, anchorEl) {
+        const _parent = anchorEl.parentNode || anchorEl;
+        // absolute positions against the nearest *positioned* ancestor, not necessarily
+        // _parent itself — canvas wrapper divs already have position:relative (see graph
+        // creation HTML), but anchorEl may be some other element (e.g. event.target during
+        // a drag) whose parent has no position set, which would silently anchor far
+        // higher up the tree and break every coordinate computed relative to _parent.
+        if( getComputedStyle(_parent).position === 'static' ) _parent.style.position = 'relative';
+        if( _el.parentNode !== _parent ) _parent.appendChild(_el);
+        if( _el.style.position !== 'absolute' ) _el.style.position = 'absolute';
+        // (Re)watch anchorEl: fires immediately with isIntersecting === false if
+        // anchorEl is already offscreen or already detached, and again the moment
+        // either becomes true later — either way, that's this tooltip's cue to die.
+        if( _el._hecObserverTarget !== anchorEl ) {
+            _el._hecObserver?.disconnect();
+            _el._hecObserverTarget = anchorEl;
+            _el._hecObserver = new IntersectionObserver((entries) => {
+                if( !entries[0].isIntersecting ) this._killFloatingTooltip(_el);
+            }, { threshold: 0 });
+            _el._hecObserver.observe(anchorEl);
+        }
+    }
+
     _renderCustomTooltip(tooltip) {
         // Replaces Chart.js's built-in on-canvas tooltip draw (see the `custom` hook added
         // to Tooltip.prototype.draw in Chart.js) with a floating DOM element. The on-canvas
@@ -2329,27 +2414,25 @@ export class HistoryCardState {
         const _vm = tooltip._view;
         let _el = this._chartTooltipEl;
 
-        // Match the pre-existing "don't fade tooltip, but keep delay" behavior from the
-        // canvas draw path this replaces: any opacity below 1 (mid-fade, or nothing active)
-        // is treated as fully hidden. Also guards the next block: title/body/etc. are only
-        // ever populated by Chart.js when opacity reaches 1 — undefined otherwise.
-        //
         // _el (this._chartTooltipEl) is ONE element shared by every graph on the card — but
         // this callback runs separately per graph's own Chart.js instance. With
         // cursor.mode: 'all', every graph processes each mousemove to keep the vertical
         // cursor line synced across all of them, including graphs the pointer isn't actually
         // over — those graphs' own tooltip state is inactive (opacity < 1) on every such
         // call. Without the ownership check below, a non-hovered graph's own "nothing
-        // active" state would hide the tooltip a DIFFERENT, actually-hovered graph just
-        // showed in the same cycle — visible as the tooltip flashing on then immediately
-        // off. Only the graph that currently owns the visible tooltip may hide it.
+        // active" state would fade out the tooltip a DIFFERENT, actually-hovered graph just
+        // showed in the same cycle. Only the graph that currently owns the visible tooltip
+        // may trigger its fade-out.
+        //
+        // Also undefined otherwise: title/body/etc. below are only ever populated by
+        // Chart.js when opacity reaches 1.
         if( !tooltip._options.enabled || !_vm || _vm.opacity < 1 ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) _el.style.display = 'none';
+            if( _el && this._chartTooltipOwner === tooltip._chart ) { _el._hecFadeKey = undefined; this._startTooltipFade(_el, 0); }
             return;
         }
         const _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
         if( !_hasContent ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) _el.style.display = 'none';
+            if( _el && this._chartTooltipOwner === tooltip._chart ) { _el._hecFadeKey = undefined; this._startTooltipFade(_el, 0); }
             return;
         }
 
@@ -2359,25 +2442,13 @@ export class HistoryCardState {
         // clear the box instead of landing inside it.
         const _padY = 6, _padX = 8;
 
-        // Anchor inside the graph's own <dialog> ancestor if there is one (the info panel,
-        // shown inside HA's native more-info popup), otherwise document.body (the main
-        // card) — see _findAncestorDialog for why this matters. The tooltip element is
-        // shared/reused across every graph on the page, so if it already exists but is
-        // currently attached to the wrong parent (e.g. last shown in the main card, now
-        // hovering a graph inside the info panel, or vice versa), move it — appendChild on
-        // a node already in the DOM relocates it rather than erroring.
-        const _targetParent = this._findAncestorDialog(tooltip._chart.canvas) || document.body;
         if( !_el ) {
             _el = document.createElement('div');
             _el.id = 'hec-chart-tooltip';
-            _el.style.cssText = `position:fixed;z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:none;will-change:left,top;`;
-            _targetParent.appendChild(_el);
-            _el._hecOffset = null;
+            _el.style.cssText = `z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1.5s ease;opacity:0;`;
             this._chartTooltipEl = _el;
-        } else if( _el.parentNode !== _targetParent ) {
-            _targetParent.appendChild(_el);
-            _el._hecOffset = null;
         }
+        this._attachFloatingTooltip(_el, tooltip._chart.canvas);
         // Colors come from the tooltip's own resolved model, not a card theme var — this is
         // the same dark-box/light-text combo (backgroundColor/bodyFontColor) the canvas draw
         // used, already internally consistent (unlike mixing in an unrelated light theme,
@@ -2387,6 +2458,7 @@ export class HistoryCardState {
         _el.style.border = `${_vm.borderWidth}px solid ${_vm.borderColor}`;
         _el.style.color = _vm.bodyFontColor;
 
+        let _wordCount = 0;
         const _addLine = (text, color, swatch) => {
             const _row = document.createElement('div');
             if( color ) _row.style.color = color;
@@ -2397,6 +2469,7 @@ export class HistoryCardState {
             }
             _row.appendChild(document.createTextNode(text));
             _el.appendChild(_row);
+            _wordCount += this._countWords(text);
         };
 
         _el.innerHTML = '';
@@ -2407,6 +2480,7 @@ export class HistoryCardState {
             _row.style.color = _vm.titleFontColor;
             _row.appendChild(document.createTextNode(_t));
             _el.appendChild(_row);
+            _wordCount += this._countWords(_t);
         }
         for( const _l of _vm.beforeBody ) _addLine(_l);
         _vm.body.forEach((_item, _i) => {
@@ -2448,52 +2522,49 @@ export class HistoryCardState {
 
         this._chartTooltipOwner = tooltip._chart;
         _el.style.display = 'block';
+        // Position relative to the anchor's own parent (absolute's containing block),
+        // not the viewport — canvas rect and parent rect share the same origin ancestor,
+        // so their difference is the canvas's offset within that positioned parent.
         const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
-        const _targetX = _canvasRect.left + _vm.x, _targetY = _canvasRect.top + _vm.y;
-        _el.style.left = _targetX + 'px';
-        _el.style.top  = _targetY + 'px';
-        // If some ancestor (e.g. a dialog mid open-animation with a CSS transform) changed
-        // position:fixed's containing block away from the viewport, the values above land in
-        // the wrong place. The correction (measure once, then reuse) doesn't need to know
-        // what the containing block is, only the gap between target and actual result — and
-        // that gap is constant for a given parent context, so it's computed once per
-        // attachment (see _hecOffset reset above) rather than via a forced layout read on
-        // every single render, which was the likely cause of the stale-paint trail: writing
-        // left/top then immediately reading getBoundingClientRect (forcing synchronous
-        // layout) on every hover update, repeatedly, right after moving into a newly
-        // slotted/top-layer context.
-        if( _el._hecOffset == null ) {
-            const _actual = _el.getBoundingClientRect();
-            _el._hecOffset = { dx: _targetX - _actual.left, dy: _targetY - _actual.top };
-        }
-        if( _el._hecOffset.dx || _el._hecOffset.dy ) {
-            _el.style.left = (_targetX + _el._hecOffset.dx) + 'px';
-            _el.style.top  = (_targetY + _el._hecOffset.dy) + 'px';
-        }
+        const _parentRect = _el.parentNode.getBoundingClientRect();
+        _el.style.left = (_canvasRect.left - _parentRect.left + _vm.x) + 'px';
+        _el.style.top  = (_canvasRect.top  - _parentRect.top  + _vm.y) + 'px';
         this._clampToViewport(_el);
+        // Key identifies the hovered point(s) themselves (dataset+index from
+        // _vm.dataPoints, populated by Chart.js's own model.dataPoints = tooltipItems), not
+        // pixel position (shifts on pan/zoom/scroll without the point changing) nor the data
+        // value (exactly what a live refresh updates while still the same point) — so a
+        // refresh arriving while the same point stays hovered no longer re-arms the fade
+        // countdown; only actually hovering a different point does. dataPoints was chosen
+        // over tooltip._active (which also holds this) simply because it was already at
+        // hand here as _vm.dataPoints.
+        const _changeKey = _vm.dataPoints.map((p) => p.datasetIndex + ':' + p.index).join(',');
+        this._armTooltipAutoFade(_el, this._wordBasedFadeDuration(_wordCount), _changeKey);
     }
 
-    _showLabelTooltip(label, clientX, clientY, align = 'left', duration = 1000 + 500 * label.split(/[\s_]+/).filter(Boolean).length) {
-        const _existing = document.getElementById('hec-label-tooltip');
-        if( _existing ) _existing.remove();
-        const _tip = document.createElement('div');
-        _tip.id = 'hec-label-tooltip';
+    _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
+        let _tip = document.getElementById('hec-label-tooltip');
+        if( !_tip ) {
+            _tip = document.createElement('div');
+            _tip.id = 'hec-label-tooltip';
+            _tip.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
+        }
+        this._attachFloatingTooltip(_tip, anchorEl);
         _tip.textContent = label;
-        _tip.style.cssText = 'position:fixed;z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:1;';
+        const _parentRect = _tip.parentNode.getBoundingClientRect();
         if( align === 'center' ) {
-            _tip.style.left      = clientX + 'px';
+            _tip.style.left      = (clientX - _parentRect.left) + 'px';
             _tip.style.transform = 'translateX(-50%)';
         } else if( align === 'right' ) {
-            _tip.style.left      = clientX + 'px';
+            _tip.style.left      = (clientX - _parentRect.left) + 'px';
             _tip.style.transform = 'translateX(-100%)';
         } else {
-            _tip.style.left = (clientX + 10) + 'px';
+            _tip.style.left = (clientX - _parentRect.left + 10) + 'px';
+            _tip.style.transform = '';
         }
-        _tip.style.top = (clientY - 16) + 'px';
-        document.body.appendChild(_tip);
+        _tip.style.top = (clientY - _parentRect.top - 16) + 'px';
         this._clampToViewport(_tip);
-        setTimeout(() => { _tip.style.opacity = '0'; }, duration);
-        setTimeout(() => { if( _tip.parentNode ) _tip.remove(); }, duration + 1500);
+        this._armTooltipAutoFade(_tip, this._wordBasedFadeDuration(this._countWords(label)));
     }
 
     _getScrollContainer() {
@@ -2779,12 +2850,12 @@ export class HistoryCardState {
             }
 
             if( _tgt && _tgt.isStatic ) {
-                this._showLabelTooltip(i18n('ui.menu.type_static'), event.clientX, event.clientY);
+                this._showLabelTooltip(i18n('ui.menu.type_static'), event.clientX, event.clientY, 'left', event.target);
                 return;
             }
 
             if( _tgt && _tgt.type !== _src.type ) {
-                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY);
+                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY, 'left', event.target);
                 return;
             }
 
@@ -2796,7 +2867,7 @@ export class HistoryCardState {
                     // Show incompatibility tooltip
                     const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
                     const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
-                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY);
+                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY, 'left', event.target);
                     return;
                 }
                 if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
@@ -3234,7 +3305,7 @@ export class HistoryCardState {
             _ctx2.restore();
             const _availW = (_chart.chartArea ? _chart.chartArea.left : this.pconfig.labelAreaWidth) - 8;
             if( _textW > _availW ) {
-                this._showLabelTooltip(_origName, event.clientX, event.clientY);
+                this._showLabelTooltip(_origName, event.clientX, event.clientY, 'left', g.canvas);
             }
             // Double-click: uncombine (non-fixed graphs only)
             if( !g.isStatic ) {
@@ -3428,7 +3499,7 @@ export class HistoryCardState {
         }
 
         if( !_tgt ) {
-            if( _tgtWrongType ) this._showLabelTooltip(`${_src.type} ≠ ${_tgtWrongType.type}`, event.clientX, event.clientY);
+            if( _tgtWrongType ) this._showLabelTooltip(`${_src.type} ≠ ${_tgtWrongType.type}`, event.clientX, event.clientY, 'left', event.target);
             return;
         }
 
@@ -3647,7 +3718,7 @@ export class HistoryCardState {
         if( !_tgtG || _tgtG === _srcG ) return;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
-            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY);
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', event.target);
             return;
         }
 
@@ -4085,6 +4156,19 @@ export class HistoryCardState {
 
         // Allow auto scroll on refresh if the user dragged at or past the current time
         this.state.autoScroll = moment() <= moment(this.endTime);
+
+        // Touch/pen has no equivalent of mouseout when the finger/stylus simply lifts off —
+        // Chart.js's own event list doesn't even include touchend (see events: [...] in
+        // defaults), so _active is never cleared and the tooltip would otherwise stay shown
+        // forever after a tap. Start the normal fade countdown here instead of hiding
+        // immediately — with slow refreshes this is closer to how the tooltip already
+        // behaves for a mouse that simply stops moving. pointerCancel intentionally does NOT
+        // get this: it also fires on ordinary browser scroll, not just a real lift-off, and
+        // the IntersectionObserver already covers the scroll-out-of-view case.
+        if( this._chartTooltipEl && this._chartTooltipOwner ) {
+            this._chartTooltipEl._hecFadeKey = undefined;
+            this._startTooltipFade(this._chartTooltipEl, this._wordBasedFadeDuration(0));
+        }
     }
 
     pointerCancel(event)
@@ -4238,7 +4322,7 @@ export class HistoryCardState {
                     const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
                     const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
                     const _ty = _ir ? _ir.top : 0;
-                    this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center');
+                    this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
                     this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
                 } else {
                     for( let eid of _newIds ) {
@@ -4251,7 +4335,7 @@ export class HistoryCardState {
                 const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
                 const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
                 const _ty = _ir ? _ir.top : 0;
-                this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center');
+                this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
                 const _fi0 = this.ui.inputField[ii];
                 // Show type-change menu for a duplicate only if no new-entity menu is already
                 // shown above (avoid two competing menus for one combined action)
@@ -4354,7 +4438,7 @@ export class HistoryCardState {
                     const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
                     const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
-                    this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center');
+                    this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG.canvas);
                     const _fiErr = this.ui.inputField[ii];
                     if( this._isNumericEntity(entity_id) ) {
                         this.showEntityTypeMenu(ii, entity_id, _existingG);
@@ -4394,7 +4478,7 @@ export class HistoryCardState {
                 const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
                 const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
                 const _ty = _ir ? _ir.top : 0;
-                this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center');
+                this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
                 this.showEntityTypeMenu(ii, entity_id, null);
             } else {
                 const _name = this._createAndPersistEntity(entity_id, 'timeline', null);
@@ -4567,31 +4651,6 @@ export class HistoryCardState {
             if( el.style.bottom !== '' ) el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
             else el.style.top = (el.offsetTop + _dy) + 'px';
         }
-    }
-
-    _findAncestorDialog(el)
-    {
-        // Walks up from el looking for a dialog-like ancestor, crossing Shadow DOM
-        // boundaries (parentElement stops at a shadow root's edge; getRootNode().host
-        // jumps from there to the host element in the outer tree, so the climb continues).
-        // Needed because Home Assistant's more-info popup — which the info panel replaces —
-        // is promoted to the browser's top layer, rendering above the normal stacking
-        // context regardless of z-index. An element appended to document.body sits in that
-        // normal stacking context, so it renders behind the dialog — a floating element
-        // meant to appear over graphs shown inside it must instead be a DOM descendant of
-        // whatever got promoted, not merely nested near it.
-        // Matches the native <dialog> tag AND any custom element tag ending in "DIALOG" —
-        // HA's own dialog wrapper has changed tag names across versions (ha-dialog,
-        // mwc-dialog, and — since HA 2026.3.0 — wa-dialog from Web Awesome). A child
-        // appended without a `slot` attribute lands in that component's default slot,
-        // which HA/Web Awesome route to the same place as the dialog's own content, so it
-        // still ends up inside the promoted subtree.
-        let _node = el;
-        while( _node ) {
-            if( _node.nodeType === 1 && /DIALOG$/.test(_node.tagName) ) return _node;
-            _node = _node.parentElement || _node.getRootNode()?.host || null;
-        }
-        return null;
     }
 
     _footerAnchor(gl)
@@ -4886,7 +4945,7 @@ export class HistoryCardState {
                     _el.id = `gc-${g.id}`;
                     _el.title = i18n('ui.menu.linked_graphs');
                     _el.style.cssText = 'height:0;text-align:center;pointer-events:none;';
-                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.75);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
+                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(var(--rgb-primary-background-color),0.5);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
                 }
                 // Always reposition (cheap no-op if already correct) — a caller earlier
                 // in the same operation may have created this marker before the graph's
@@ -6216,14 +6275,14 @@ export class HistoryCardState {
     // Entity listbox populators
     // --------------------------------------------------------------------------------------
 
-    buildFilterRegexList()
+    buildFilterRegexList(filterValue)
     {
         let regex = [];
-        if( this.pconfig.filterEntities ) {
-            if( Array.isArray(this.pconfig.filterEntities) ) {
-                for( let j of this.pconfig.filterEntities ) if( j ) regex.push(this.matchWildcardPattern(j));
+        if( filterValue ) {
+            if( Array.isArray(filterValue) ) {
+                for( let j of filterValue ) if( j ) regex.push(this.matchWildcardPattern(j));
             } else
-                regex.push(this.matchWildcardPattern(this.pconfig.filterEntities));
+                regex.push(this.matchWildcardPattern(filterValue));
         }
         return regex;
     }
@@ -6231,6 +6290,17 @@ export class HistoryCardState {
     matchRegexList(regex, v)
     {
         if( !regex.length ) return true;
+        for( let j of regex ) if( j.test(v) ) return true;
+        return false;
+    }
+
+    // Distinct from matchRegexList: an empty exclude list must mean "exclude nothing", not
+    // "matches everything" (which is matchRegexList's behavior for an empty include list —
+    // reusing it directly here would have excluded every entity for anyone who hasn't set
+    // excludeFilterEntities at all).
+    matchExcludeRegexList(regex, v)
+    {
+        if( !regex.length ) return false;
         for( let j of regex ) if( j.test(v) ) return true;
         return false;
     }
@@ -6244,11 +6314,12 @@ export class HistoryCardState {
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
 
-            const regex = this.buildFilterRegexList();
+            const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
+            const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
 
             let entities = [];
             for( let entity in result ) {
-                if( this.matchRegexList(regex, entity) ) entities.push(entity);
+                if( this.matchRegexList(regex, entity) && !this.matchExcludeRegexList(excludeRegex, entity) ) entities.push(entity);
             }
 
             // Sort by domain / friendly name / entity_id
@@ -6318,11 +6389,12 @@ export class HistoryCardState {
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
 
-            const regex = this.buildFilterRegexList();
+            const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
+            const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
 
             let entities = [];
             for( let e in this._hass.states ) {
-                if( !this.matchRegexList(regex, e) ) continue;
+                if( !this.matchRegexList(regex, e) || this.matchExcludeRegexList(excludeRegex, e) ) continue;
                 const d = this.getDomainForEntity(e);
                 if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) {
                     entities.push(e);
@@ -6440,11 +6512,12 @@ export class HistoryCardState {
 
             const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ss');
 
-            const regex = this.buildFilterRegexList();
+            const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
+            const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
 
             let l = [];
             for( let e in this._hass.states ) {
-                if( !this.matchRegexList(regex, e) ) continue;
+                if( !this.matchRegexList(regex, e) || this.matchExcludeRegexList(excludeRegex, e) ) continue;
                 const d = this.getDomainForEntity(e);
                 if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) l.push(e);
             }
@@ -7105,6 +7178,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.axisAddMarginMax =     ( config.axisAddMarginMax !== undefined ) ? config.axisAddMarginMax : false;
         this.instance.pconfig.recordedEntitiesOnly =   config.recordedEntitiesOnly ?? false;
         this.instance.pconfig.filterEntities  =        config.filterEntities;
+        this.instance.pconfig.excludeFilterEntities =   config.excludeFilterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
