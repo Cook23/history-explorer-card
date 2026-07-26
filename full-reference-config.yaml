@@ -265,6 +265,9 @@ recordedEntitiesOnly: False
 # Which entities to show in the UI dropdown list. Can be provided as a string, or a list of strings, with wildcards. 
 filterEntities: undefined
 
+# Entities to remove from the filterEntities result, applied after it. Same string/list/wildcard syntax. Useful for excluding a specific entity that would otherwise be matched by a broader filterEntities pattern.
+excludeFilterEntities: undefined
+
 # Whether to combine all data series which use the same units, into the same graphs, when adding entities through the UI.
 combineSameUnits: False
 

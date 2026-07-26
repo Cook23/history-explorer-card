@@ -4,6 +4,25 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.35] - 2026-07-26
+
+### Fixed — hover tooltip staying on screen forever, visible on any HA view
+- The tooltip was a floating DOM element attached to `document.body` (or the info panel's own dialog), positioned once per hover with fixed viewport coordinates — nothing ever cleared it beyond a fresh hover redrawing it, so switching HA views while one was showing left it stuck on screen indefinitely, visible over whatever view was opened next
+- It's now anchored as a child of the graph's own canvas wrapper instead, using `position:absolute` rather than `position:fixed` — it's torn down along with the graph itself when HA discards the view, and it now scrolls, pans, and follows live data updates together with its graph natively, with no scroll listener needed
+- An `IntersectionObserver` on that same anchor is the remaining safety net: if the graph scrolls out of view without being removed from the DOM, the tooltip is destroyed outright rather than drifting off-screen and silently reappearing, stale, if the user scrolls back
+
+### Changed — hover tooltip and label tooltip now share one consistent fade behavior
+- Both floating tooltips (chart hover tooltip, and the short label tooltip used for add/duplicate/type-mismatch notices) now go through the same fade-in/fade-out lifecycle instead of two different ad-hoc treatments — appearing and disappearing with the same 1.5s opacity transition, timed to how much text is actually shown, everywhere either of them is used
+- The hover tooltip in particular used to vanish abruptly the instant the pointer left a graph; it now fades out the same way as everything else
+
+### Fixed — touch/pen leaves the hover tooltip stuck open with no equivalent of a mouse leaving the graph
+- Chart.js's own event list doesn't include `touchend`, so lifting a finger or stylus off the graph never cleared the active hover state the way moving a mouse away does — the tooltip had no trigger to ever start fading
+- The card's own `pointerup` handler on the canvas now starts the same fade countdown in that case
+
+### Added — `excludeFilterEntities`
+- `filterEntities` had no way to drop one specific entity that a broader wildcard pattern would otherwise still pick up
+- `excludeFilterEntities` takes the same string/list/wildcard syntax as `filterEntities` and is applied after it — entities matching `filterEntities` and *not* matching `excludeFilterEntities` are the ones shown
+
 ## [v1.1.34] - 2026-07-23
 
 ### Changed — `pconfig.entities` as the single source of entity data, no more duplicate copy in `this.graphs`

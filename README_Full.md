@@ -306,6 +306,12 @@ filterEntities:                     # Or use multiple filters, entities matching
   - '*power*'
   - 'sensor.*energy*'
 ```
+Entities matching `filterEntities` can in turn be excluded with `excludeFilterEntities`, applied after it and using the same string/list/wildcard syntax. This is useful when a broad `filterEntities` pattern also picks up one or two entities that shouldn't be included:
+```yaml
+filterEntities: '*power*'
+excludeFilterEntities:
+  - 'sensor.power_supply_test'
+```
 
 Dynamically added entities can be individually removed by clicking the `x` close button next to them or all together using the option in the entity action dropdown menu:
 

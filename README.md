@@ -140,6 +140,9 @@ filterEntities: 'binary_sensor.*'
 filterEntities:
   - '*power*'
   - 'sensor.*energy*'
+# entities matching filterEntities can be excluded again with excludeFilterEntities (same syntax):
+excludeFilterEntities:
+  - 'sensor.energy_cost'
 ```
 
 ---
