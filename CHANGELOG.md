@@ -4,6 +4,26 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.36] - 2026-07-26
+
+### Fixed — entity selector, its dropdown, and the type/export menus breaking after any hover tooltip appeared
+- A fix in v1.1.35 anchored the hover tooltip by forcing `position:relative` onto whatever element happened to be its target's parent — for the entity selector's input, that parent is the same wrapper that also holds the entity dropdown, the type menu, and the export menu's toggle. Forcing that style onto it silently changed what all of those had been positioning themselves against, so the very first tooltip shown left the selector field invisible and the menus stuck behind the graphs or in the wrong spot from then on
+- The tooltip now anchors against `offsetParent` — the real positioned ancestor the browser already resolves — the same approach the dropdown and menus were already using safely; nothing else's style is ever touched
+
+### Added — a "Delete" option in the entity type menu, reachable by long-pressing a legend or timeline label
+- Removing a single entity from a combined graph used to require splitting it into its own graph first, then deleting that graph separately
+- Long-pressing an entity's label now opens the type menu with a "Delete" option at the bottom — removes just that entity, rebuilding the graph with whatever else remains (or removing it outright if it was the only one)
+
+### Changed — the entity type menu is now shown for every entity, including non-numeric ones
+- A non-numeric entity (its only valid representation is a timeline) used to skip the type menu entirely and get added or have its type changed directly, with no way to back out of that
+- It now goes through the same menu as everything else, just reduced to the timeline option (and Delete, when opened via long-press) — clicking outside or pressing Escape cancels it the same way it does for every other entity
+- The menu's first line now shows the entity ID it applies to (a `*` for a wildcard match with several entities)
+
+### Changed — keyboard navigation in the entity dropdown, type menu, and export menu now behaves identically
+- Each of the three menus had its own slightly different Escape/Enter/arrow-key handling — the export menu had none at all, and pressing an arrow key for the first time in the type menu could jump straight past the already-selected option instead of landing on it
+- All three now share one navigation behavior: arrow keys move a highlight that starts on whatever's already selected, Enter activates the highlighted item, Escape closes and cancels
+
+
 ## [v1.1.35] - 2026-07-26
 
 ### Fixed — hover tooltip staying on screen forever, visible on any HA view
