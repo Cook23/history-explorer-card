@@ -4,6 +4,20 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.37] - 2026-07-27
+
+### Added — a blue/dashed-red border on the entity type menu's title
+- The menu already showed which entity it applies to; it now also borders that line the same way drag targets are already marked elsewhere — solid blue when it's about to add a new entity, dashed red when the entity is a duplicate, no border when opened by long-pressing a label
+
+### Added — a preview of the add/duplicate tooltip while browsing the entity dropdown, before committing to a selection
+- Resolving an ambiguous or duplicate friendly name used to mean picking it and finding out afterward
+- Hovering an entry with a mouse or pen, or moving the keyboard highlight onto it, now shows the same "add"/"already exists" tooltip that used to only appear after the pick. Touch shows it as the finger moves, while the tap itself still makes the actual selection
+
+### Fixed — two long-standing bugs the changes above ended up triggering
+- A floating tooltip could pile up several copies of itself instead of replacing the previous one — every tooltip lives inside the card's shadow DOM, but the lookup was starting from the page's own document, which never found it and created a new one each time. This bug was already present before this release; it just needed frequent enough tooltips to show up, which the preview feature above provided
+- The entity dropdown, type menu, and export menu could anchor themselves against the wrong reference point and end up positioned off-screen or clipped — also already present before this release, previously masked by conditions that happened not to trigger it. The info panel's own type menu was brought in line with the same fix so it isn't left out
+
+
 ## [v1.1.36] - 2026-07-26
 
 ### Fixed — entity selector, its dropdown, and the type/export menus breaking after any hover tooltip appeared
