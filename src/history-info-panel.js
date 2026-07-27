@@ -209,6 +209,7 @@ function hecHookInfoPanel()
             // conditioned identically (numeric entity state → full menu, otherwise not rendered)
             const _tf0 = instance._this.querySelector('#tf_0');
             if( _tf0 ) {
+                instance.ui.inputField[0] = _tf0;
                 const _etMenu = instance._this.querySelector('#et_0');
                 _TYPE_MENU_DEFS.forEach((_def, _idx) => {
                     instance._this.querySelector(`#et_0_${_idx}`)?.addEventListener('click', (e) => {
@@ -218,7 +219,7 @@ function hecHookInfoPanel()
                 });
                 _tf0.addEventListener('click', () => {
                     const _g = instance.graphs[0];
-                    if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g);
+                    if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');
                 });
                 if( _etMenu ) {
                     // Keyboard navigation — same shared logic as the main card
@@ -371,13 +372,13 @@ function hecHookInfoPanel()
 
             return html`
                 <div id="maincard" style="display:${(hec_panel.show === false) ? 'none' : 'block'};margin-bottom: 16px">
-                <div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:flex;align-items:center;line-height:normal;">
+                <div id="tb_${i}" style="position:relative;margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:flex;align-items:center;line-height:normal;">
                     <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">
                         <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
                         <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
                         <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
                     </div>
-                    <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;position:relative;">
+                    <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;">
                     ${_isNumeric ? html`
                         <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
                         <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">

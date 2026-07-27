@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.36b12';
+const Version = '1.1.37b9';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2547,11 +2547,19 @@ export class HistoryCardState {
     }
 
     _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
-        let _tip = document.getElementById('hec-label-tooltip');
+        // Looked up via this._this (the component's shadow root) first, since that's
+        // where _attachFloatingTooltip normally places it — document.getElementById/
+        // querySelectorAll never cross a Shadow DOM boundary, so searching document alone
+        // always came back empty even though the tooltip was very much alive inside the
+        // shadow root; every call believed none existed yet and created a brand new one,
+        // stacking them up instead of reusing the same element. Also checked in document
+        // as a fallback, for the rarer case _attachFloatingTooltip's own fallback placed it
+        // in document.body instead (anchorEl.offsetParent was null).
+        let _tip = this._this.querySelector('#hec-label-tooltip') || document.getElementById('hec-label-tooltip');
         if( !_tip ) {
             _tip = document.createElement('div');
             _tip.id = 'hec-label-tooltip';
-            _tip.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
+            _tip.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;line-height:normal;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
         }
         this._attachFloatingTooltip(_tip, anchorEl);
         _tip.textContent = label;
@@ -4255,6 +4263,26 @@ export class HistoryCardState {
         return new RegExp('^'+s+'$', 'i');
     }
 
+    // Shows the add/already-exists tooltip for a given entity_id, without any of the
+    // side effects that come with actually committing to it (no type menu, no graph
+    // highlight) — a preview only. Used both on keyboard highlight (see
+    // entitySelectorKeyDown's onHighlight) and on pointer hover over a dropdown entry, so
+    // an ambiguous or duplicate friendly name can be resolved to its real entity_id before
+    // the user commits to a selection. Wildcard patterns aren't previewed here (only single
+    // resolved entity_ids reach this, one per dropdown entry).
+    _previewEntityTooltip(entity_id, ii)
+    {
+        if( this._hass.states[entity_id] === undefined ) return;
+        const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+        const _exists = this.pconfig.entities.some(en => entityIdOf(en) === entity_id);
+        const _existingG = _exists ? this.graphs.find(g => g.entities.some(e => e.entity === entity_id)) : null;
+        const _r = _existingG?.canvas.getBoundingClientRect();
+        const _tx = _ir ? _ir.left + _ir.width / 2 : (_r ? _r.left + _r.width / 2 : window.innerWidth / 2);
+        const _ty = _ir ? _ir.top : (_r ? _r.top + _r.height / 2 : 0);
+        const _label = (_exists ? i18n('ui.label.already_exists') : i18n('ui.label.add')) + ': ' + entity_id;
+        this._showLabelTooltip(_label, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG?.canvas ?? document.body);
+    }
+
     addEntitySelected(ii)
     {
         if( this.state.loading ) return;
@@ -4642,6 +4670,29 @@ export class HistoryCardState {
             if( this._this.querySelector(`#${prefix}-${g.id}`) === target ) return g;
         }
         return null;
+    }
+
+    // Generic menu-opening action, shared by all 3 menus (entity selector dropdown, entity
+    // type menu, export menu): makes the menu visible, applies the position its caller
+    // already computed (each menu's own placement logic — above/below, anchored to a
+    // button or an input, or at pointer coordinates — stays with the caller, since that
+    // part genuinely differs), clears any leftover navigation highlight (background only)
+    // from a previous use of this same menu, and clamps the result to the viewport. Never
+    // touches hecSelected — that's entirely business logic: each menu's own caller decides
+    // whether to pre-select an option (and mark it hecSelected) as part of populating the
+    // menu's content, before this function is even called.
+    //   align — 'left' (default), 'center', or 'right': the caller passes `left` as the
+    //           point to align against (the anchor's left edge, center, or right edge,
+    //           whichever makes sense for it) — center/right shift the menu natively via
+    //           CSS transform, same mechanism already used for _showLabelTooltip, so there's
+    //           no need to measure the menu's rendered width and recompute afterward.
+    _openMenu(menuEl, top, left, align = 'left') {
+        menuEl.style.display = 'block';
+        if( top  !== undefined ) menuEl.style.top  = top;
+        if( left !== undefined ) menuEl.style.left = left;
+        menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
+        for( let _a of menuEl.getElementsByTagName('a') ) _a.style.background = '';
+        this._clampToViewport(menuEl);
     }
 
     _navigateMenuArrowKey(visible, key)
@@ -5401,7 +5452,7 @@ export class HistoryCardState {
             html = `<div style="margin-${i ? 'top' : 'bottom'}:8px;">`;
         }
 
-        if( tools || selector ) html += `<div id="tb_${i}" style="margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
+        if( tools || selector ) html += `<div id="tb_${i}" style="position:relative;margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
 
         const eh = `<a id="eh_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>`;
 
@@ -5417,7 +5468,7 @@ export class HistoryCardState {
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                    <div id="et_${i}_title" style="padding:5px 10px;font-weight:600;background-color:var(--secondary-background-color);border-bottom:1px solid #444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                    <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
                     <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
@@ -5749,6 +5800,26 @@ export class HistoryCardState {
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('input', this.entitySelectorEntered.bind(this), true);
                 this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
+                // Pointer hover preview — mouse/pen only (touch has no hover event; it
+                // stays on pointerdown/pointerup, see the dropdown entry's own handling).
+                // Delegated on the dropdown container so it survives entries being
+                // recreated on every re-filter, instead of re-attaching per entry.
+                this._this.querySelector(`#es_${i}`)?.addEventListener('pointerover', (e) => {
+                    if( e.pointerType === 'touch' ) return;
+                    const _a = e.target.closest('a[data-entity]');
+                    if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+                });
+                // Touch has no hover event at all — preview on pointerdown/pointermove
+                // instead, while the finger can still be dragged to a different entry
+                // before lifting. Actual selection still only happens on the entry's own
+                // click handler (pointerup), unchanged.
+                const _touchPreview = (e) => {
+                    if( e.pointerType !== 'touch' ) return;
+                    const _a = e.target.closest('a[data-entity]');
+                    if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+                };
+                this._this.querySelector(`#es_${i}`)?.addEventListener('pointerdown', _touchPreview);
+                this._this.querySelector(`#es_${i}`)?.addEventListener('pointermove', _touchPreview);
 
                 this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
                 this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);
@@ -5861,7 +5932,7 @@ export class HistoryCardState {
     // Entity type menu (line straight / line curves / line stepped / bar)
     // --------------------------------------------------------------------------------------
 
-    showEntityTypeMenu(input_idx, entity_id, graph, anchorClientX = null, anchorClientY = null)
+    showEntityTypeMenu(input_idx, entity_id, graph, anchorClientX = null, anchorClientY = null, align = 'left')
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         const _input = this.ui.inputField[input_idx];
@@ -5885,6 +5956,29 @@ export class HistoryCardState {
         if( _deleteEl ) {
             _deleteEl.style.display = _showDelete ? 'block' : 'none';
             _menu._hec_delete_idx = _showDelete ? graph.entities.findIndex(e => e.entity === entity_id) : -1;
+        }
+
+        // Title border — same blue/red convention used elsewhere for allowed/forbidden
+        // drag targets: solid blue for a brand-new entity about to be added (graph null),
+        // dashed red for a duplicate found in the entity selector (graph set, no anchor
+        // coordinates — that's what distinguishes it from a long-press, which gets no
+        // border at all since it's neither an add nor a duplicate).
+        if( _titleEl ) {
+            if( !graph ) {
+                _titleEl.style.borderWidth = '2px';
+                _titleEl.style.borderStyle = 'solid';
+                _titleEl.style.borderColor = 'var(--primary-color,#03a9f4)';
+            } else if( !_showDelete ) {
+                _titleEl.style.borderWidth = '2px';
+                _titleEl.style.borderStyle = 'dashed';
+                _titleEl.style.borderColor = 'var(--error-color,#f44336)';
+            } else {
+                // Long-press menu: no add/duplicate border — just the plain bottom
+                // separator this title already had before borders were added elsewhere.
+                _titleEl.style.borderWidth = '0 0 1px 0';
+                _titleEl.style.borderStyle = 'solid';
+                _titleEl.style.borderColor = '#444';
+            }
         }
 
         if( graph ) {
@@ -5960,18 +6054,26 @@ export class HistoryCardState {
             });
         }
 
-        // Position — same as es_N: display:block first so offsetParent is valid
-        _menu.style.display = 'block';
-        const _parentRect = _menu.offsetParent ? _menu.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
+        // Position — #tb_N directly, not _menu.offsetParent — offsetParent of a display:none
+        // element is always null, and _menu still has display:none at this exact point
+        // (before _openMenu turns it on). #tb_N is already known to be the real positioned
+        // ancestor (see its position:relative in the HTML), no need to read it back off an
+        // element that isn't shown yet.
+        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+        let _top, _left;
         if( anchorClientX !== null && anchorClientY !== null ) {
-            _menu.style.top  = (anchorClientY - _parentRect.top)  + 'px';
-            _menu.style.left = (anchorClientX - _parentRect.left) + 'px';
+            _top  = (anchorClientY - _parentRect.top)  + 'px';
+            _left = (anchorClientX - _parentRect.left) + 'px';
         } else if( _input ) {
             const _inputRect = _input.getBoundingClientRect();
-            _menu.style.top  = (_inputRect.bottom - _parentRect.top) + 'px';
-            _menu.style.left = (_inputRect.left   - _parentRect.left + 30) + 'px';
+            _top = (_inputRect.bottom - _parentRect.top) + 'px';
+            const _anchorX = align === 'center' ? (_inputRect.left + _inputRect.width / 2)
+                            : align === 'right'  ? _inputRect.right
+                            : _inputRect.left + 30;
+            _left = (_anchorX - _parentRect.left) + 'px';
         }
-        this._clampToViewport(_menu);
+        this._openMenu(_menu, _top, _left, align);
         _menu.focus();
     }
 
@@ -6118,17 +6220,19 @@ export class HistoryCardState {
         this._this.querySelector(`#bo_${idx}`).style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
 
         if( show ) {
-            dropdown.style.display = 'block';
             // Position below the toggle button, same pattern as et_N (getBoundingClientRect
             // converted through offsetParent) — previously only `left` was set, `top` stayed
             // at its default "auto" (static-flow) position, which could land the menu
             // directly over the button instead of below it, making the button unclickable
             // to close the menu while it's open.
             const _boRect = this._this.querySelector(`#bo_${idx}`).getBoundingClientRect();
-            const _parentRect = dropdown.offsetParent ? dropdown.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
-            dropdown.style.top  = (_boRect.bottom - _parentRect.top) + 'px';
-            dropdown.style.left = (_boRect.left   - _parentRect.left - 30) + 'px';
-            this._clampToViewport(dropdown);
+            // #tb_N directly, not dropdown.offsetParent — same reason as setDropdownVisibility
+            // and showEntityTypeMenu: dropdown still has display:none at this exact point.
+            const _tb = this._this.querySelector(`#tb_${idx}`);
+            const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+            const _top  = (_boRect.bottom - _parentRect.top) + 'px';
+            const _left = (_boRect.left   - _parentRect.left - 30) + 'px';
+            this._openMenu(dropdown, _top, _left);
             dropdown.focus();
         } else
             dropdown.style.display = 'none';
@@ -6153,16 +6257,21 @@ export class HistoryCardState {
         if( !input || !dropdown ) return;
         if( show ) {
             dropdown.style['min-width'] = input.clientWidth + 'px';
-            dropdown.style.display = 'block';
             // Position relative to input: below if top selector (idx=0), above if bottom selector (idx=1)
             const inputRect = input.getBoundingClientRect();
-            const parentRect = dropdown.offsetParent ? dropdown.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
-            const leftPos = inputRect.left - parentRect.left;
-            dropdown.style.left = leftPos + 'px';
+            // #tb_N directly, not dropdown.offsetParent — offsetParent of a display:none
+            // element is always null, and dropdown still has display:none at this exact
+            // point (before _openMenu turns it on) on its very first open. #tb_N is already
+            // known to be the real positioned ancestor (see its position:relative in the
+            // HTML), so there's no need to read it back off an element that isn't shown yet.
+            const _tb = this._this.querySelector(`#tb_${input_idx}`);
+            const parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+            const leftPos = (inputRect.left - parentRect.left) + 'px';
+            let topPos;
             if( input_idx === 0 ) {
                 // Top selector: show below
                 const maxH = Math.min(window.innerHeight * 0.5, window.innerHeight - inputRect.bottom);
-                dropdown.style.top = (inputRect.bottom - parentRect.top) + 'px';
+                topPos = (inputRect.bottom - parentRect.top) + 'px';
                 dropdown.style.bottom = '';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             } else {
@@ -6172,7 +6281,7 @@ export class HistoryCardState {
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
-            this._clampToViewport(dropdown);
+            this._openMenu(dropdown, topPos, leftPos);
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
@@ -6236,7 +6345,13 @@ export class HistoryCardState {
     //                   to signal "handled, don't also click" (used by the entity selector
     //                   for its wildcard/already-selected cases), or false/undefined to let
     //                   the default click still happen
-    _menuKeyDown(event, menuEl, { onClose, onEnter } = {}) {
+    //   onHighlight(el) — called with the newly highlighted item after ArrowUp/ArrowDown,
+    //                   whether it just appeared (first press) or moved. This is still
+    //                   generic menu behavior — the menu already knows which item is
+    //                   highlighted — only the entity selector currently uses it, to preview
+    //                   what an ambiguous friendly name actually resolves to before the user
+    //                   commits, but nothing here is specific to that use.
+    _menuKeyDown(event, menuEl, { onClose, onEnter, onHighlight } = {}) {
         if( !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key) ) return;
         if( !menuEl || menuEl.style.display === 'none' ) return;
 
@@ -6260,7 +6375,7 @@ export class HistoryCardState {
 
         if( event.key === 'Enter' ) {
             event.preventDefault();
-            const _sel = menuEl.querySelector('a[data-hec-selected]') || _visible[0];
+            const _sel = menuEl.querySelector('a[data-hec-selected]');
             if( !_sel ) return;
             if( onEnter?.(_sel) ) return;
             _sel.click();
@@ -6271,6 +6386,7 @@ export class HistoryCardState {
         event.preventDefault();
         const _next = this._navigateMenuArrowKey(_visible, event.key);
         _next.scrollIntoView({ block: 'nearest' });
+        onHighlight?.(_next);
     }
 
     entitySelectorEntered(event)
@@ -6335,6 +6451,9 @@ export class HistoryCardState {
                     return true; // handled — don't also click _sel
                 }
                 return false; // let the default click on _sel happen
+            },
+            onHighlight: (_el) => {
+                this._previewEntityTooltip(_el.dataset.entity, idx);
             },
         });
     }
