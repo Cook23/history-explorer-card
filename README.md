@@ -54,6 +54,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 - [Compass arrow graphs](#compass-arrow-graphs)
 - [Long term statistics](#long-term-statistics)
 - [Entity options](#entity-options)
+- [Card, graph, and entity-level options](#card-graph-and-entity-level-options)
 - [CSV export](#csv-export)
 - [UI configuration](#ui-configuration)
 - [YAML graph configuration](#yaml-graph-configuration)
@@ -411,6 +412,23 @@ statistics:
 
 ## Entity options
 
+All display options can be applied globally via `entityOptions`, keyed by entity id, device class, or domain. A list form with glob patterns is also supported:
+
+```yaml
+entityOptions:
+  - match: "sensor.*_power"
+    lineMode: lines
+    color: '#3e95cd'
+  - entity: sensor.wind_bearing
+    type: arrowline
+```
+
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
+
+---
+
+## Card, graph, and entity-level options
+
 Every display/behavior property below can be set at up to three levels — as a shared default for the whole **card**, as a shared default for one **graph** (`graphs: - options:`), or directly on one **entity**. The most specific level wins: entity beats graph, graph beats card.
 
 ```yaml
@@ -456,14 +474,18 @@ graphs:
 | `stacked` | | ✓ | | Stack bars (bar graphs with multiple entities) |
 | `showTimeLabels` | | ✓ | | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
 | `showSamples` | | ✓ | | Permanently show sample dots |
-| `height` | ✓ (global) | ✓ | | Graph height in pixels |
+| `height` | | ✓ | | Graph height in pixels — see *4 |
 | `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *1 |
 | `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *2 |
 | `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *2. Graph-level and entity-level excludes combine rather than override |
 
 *1 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
+
 *2 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
+
 *3 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
+
+*4 — there's no single card-level default for `height` — line and bar graphs each have their own global default instead, `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)).
 
 > For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
 
