@@ -85,11 +85,12 @@ function hecHookInfoPanel()
         // fill, lineMode, scale, process, etc. itself (via its own getEntityOptions call)
         // and writes them into this same entry — it's now the single source for entity
         // data, no separate copy. width is set explicitly here: this panel's default
-        // (1.001) differs from the main card's (pconfig.defaultLineWidth, 2.0).
+        // (1.001) differs from the main card's (pconfig.defaultLineWidth, 2.0). lineWidth
+        // is accepted as a synonym of width, same as the main card.
         const _pcEntry = {
             entity   : entity_id,
             groupId  : instance.g_id,
-            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.width ?? 1.001) : undefined,
+            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.width ?? entityOptions?.lineWidth ?? 1.001) : undefined,
             interval : instance.parseIntervalConfig(entityOptions?.interval) ?? null,
             isStatic : true,
         };
@@ -167,7 +168,7 @@ function hecHookInfoPanel()
             instance.pconfig.decimation =             config.decimation;
             instance.pconfig.roundingPrecision =      config.rounding || 2;
             instance.pconfig.defaultLineMode =        config.lineMode ?? 'lines';
-            instance.pconfig.defaultLineWidth =       config.lineWidth ?? 2.0;
+            instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
             instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
             instance.pconfig.showCurrentValues =      false;
             instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;

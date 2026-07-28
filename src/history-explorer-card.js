@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.37b9';
+const Version = '1.1.38b4';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -218,6 +218,11 @@ export class HistoryCardState {
         this.pconfig.roundingPrecision    = 2;
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultLineWidth     = undefined;
+        this.pconfig.defaultDashMode      = undefined;
+        this.pconfig.defaultNetBars       = undefined;
+        this.pconfig.defaultInterval      = undefined;
+        this.pconfig.defaultShowMinMax    = undefined;
+        this.pconfig.defaultShowPoints    = undefined;
         this.pconfig.nextDefaultColor     = 0;
         this.pconfig.showUnavailable      = true;
         this.pconfig.showCurrentValues    = false;
@@ -4258,6 +4263,10 @@ export class HistoryCardState {
 
     matchWildcardPattern(s)
     {
+        if( typeof s !== 'string' || s === '' ) {
+            console.warn(`history-explorer-card: invalid entity pattern in configuration (expected a non-empty string, got ${JSON.stringify(s)}) — ignored`);
+            return null;
+        }
         s = s.replace(new RegExp('[.\\\\+*?\\[\\^\\]$(){}=!<>|:\\-]', 'g'), '\\$&');
         s = s.replace(/\\\*/g, '.*')
         return new RegExp('^'+s+'$', 'i');
@@ -5097,15 +5106,15 @@ export class HistoryCardState {
                 entities[0].fill = entityOptions?.fill ?? c.fill;
             }
 
-            entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode;
-            entities[0].width     = entities[0].width       ?? entityOptions?.width;
-            entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode);
+            entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
+            entities[0].width     = entities[0].width       ?? entityOptions?.width ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
+            entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
             entities[0].hidden    = overrideHidden !== undefined ? overrideHidden : (entities[0].hidden ?? entityOptions?.hidden);
-            entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars;
-            entities[0].showPoints= entities[0].showPoints  ?? entityOptions?.showPoints;
+            entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
+            entities[0].showPoints= entities[0].showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
             entities[0].decimation= entities[0].decimation  ?? entityOptions?.decimation;
-            entities[0].showMinMax= entities[0].showMinMax  ?? entityOptions?.showMinMax;
+            entities[0].showMinMax= entities[0].showMinMax  ?? entityOptions?.showMinMax ?? this.pconfig.defaultShowMinMax;
             entities[0].name      = entities[0].name        ?? entityOptions?.name;
             entities[0].siConversionFactor = entities[0].siConversionFactor ?? entityOptions?.siConversionFactor;
             entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
@@ -5252,7 +5261,7 @@ export class HistoryCardState {
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval), this.ui.optionStyle, 40);
+            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval), this.ui.optionStyle, 40);
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
@@ -6481,16 +6490,37 @@ export class HistoryCardState {
     // Entity listbox populators
     // --------------------------------------------------------------------------------------
 
+    // Normalizes a YAML entity-pattern option into a list of compiled regexes. Accepts, for
+    // each element (or the value itself, if not an array): a plain string pattern, or an
+    // object with an 'entity' string field (the older `- entity: ...` form still used by
+    // per-entity `exclude:`). Anything else is logged and skipped rather than thrown —
+    // one malformed element never prevents the valid ones around it from working.
+    // Used for both the global filterEntities/excludeFilterEntities options and the
+    // per-entity exclude option, so both accept the same set of formats.
     buildFilterRegexList(filterValue)
     {
         let regex = [];
         if( filterValue ) {
-            if( Array.isArray(filterValue) ) {
-                for( let j of filterValue ) if( j ) regex.push(this.matchWildcardPattern(j));
-            } else
-                regex.push(this.matchWildcardPattern(filterValue));
+            const _list = Array.isArray(filterValue) ? filterValue : [filterValue];
+            for( let j of _list ) {
+                if( !j ) continue;
+                const _pattern = (typeof j === 'object') ? j.entity : j;
+                if( typeof _pattern !== 'string' || _pattern === '' ) {
+                    console.warn(`history-explorer-card: invalid entry in entity filter/exclude list (expected a string or {entity: string}, got ${JSON.stringify(j)}) — ignored`);
+                    continue;
+                }
+                const _regex = this.matchWildcardPattern(_pattern);
+                if( _regex ) regex.push(_regex);
+            }
         }
         return regex;
+    }
+
+    // Back-compat alias: per-entity `exclude:` used to require a distinct function name,
+    // but the normalization logic is now identical to buildFilterRegexList.
+    buildEntityExclusionList(exclude)
+    {
+        return this.buildFilterRegexList(exclude);
     }
 
     matchRegexList(regex, v)
@@ -7165,19 +7195,6 @@ export class HistoryCardState {
     // Build initial graph list from YAML
     // --------------------------------------------------------------------------------------
 
-    buildEntityExclusionList(exclude)
-    {
-        let exregex = [];
-
-        if( exclude )
-            for( let i of exclude ) {
-                const regex = this.matchWildcardPattern(i.entity);
-                if( regex ) exregex.push(regex);
-            }
-
-        return exregex;
-    }
-
     _makeStaticEntityEntry(entity, groupId, ent, interval)
     {
         return {
@@ -7205,31 +7222,74 @@ export class HistoryCardState {
         };
     }
 
+    // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
+    // level so a single malformed graph or entity is logged and skipped rather than throwing
+    // and losing every graph on the card (see history-explorer-card.md changelog for the bug
+    // this was written to prevent: a bad `exclude:` entry used to blank the whole card).
     buildGraphListFromConfig(graphs)
     {
         const testEntityExclusionList = function(entity, excludes) { for( let i of excludes ) if( i.test(entity) ) return true; return false; };
 
+        if( !Array.isArray(graphs) ) {
+            console.warn(`history-explorer-card: 'graphs' must be a list — got ${JSON.stringify(graphs)}. No graphs loaded.`);
+            return;
+        }
+
         for( let graph of graphs ) {
-            if( !graph.entities ) continue;
+            if( !graph || typeof graph !== 'object' ) {
+                console.warn(`history-explorer-card: skipping invalid graph entry (expected an object, got ${JSON.stringify(graph)})`);
+                continue;
+            }
+            if( !Array.isArray(graph.entities) ) {
+                if( graph.entities !== undefined )
+                    console.warn(`history-explorer-card: graph '${graph.title ?? graph.type ?? '?'}' has an invalid 'entities' (expected a list, got ${JSON.stringify(graph.entities)}) — graph skipped`);
+                continue;
+            }
             const _gid = this.g_id++;
             const _groupId = _gid; // use graph index as groupId for static graphs
             const _interval = this.parseIntervalConfig(graph.options?.interval) ?? null;
 
             for( let e of graph.entities ) {
+                if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
+                    console.warn(`history-explorer-card: skipping invalid entity entry in graph '${graph.title ?? graph.type ?? '?'}' (expected an object with a non-empty 'entity' string, got ${JSON.stringify(e)})`);
+                    continue;
+                }
                 if( e.entity.indexOf('*') >= 0 ) {
-                    const regexExcludes = this.buildEntityExclusionList(e.exclude);
+                    // graph.options.exclude applies to every wildcard entity in this graph;
+                    // combined with (not replacing) this entity's own exclude, same pattern
+                    // as the other graph-level defaults above.
+                    const _graphExclude = graph.options?.exclude;
+                    const _combinedExclude = _graphExclude
+                        ? [ ...(Array.isArray(_graphExclude) ? _graphExclude : [_graphExclude]),
+                            ...(Array.isArray(e.exclude) ? e.exclude : (e.exclude ? [e.exclude] : [])) ]
+                        : e.exclude;
+                    const regexExcludes = this.buildEntityExclusionList(_combinedExclude);
                     const regex = this.matchWildcardPattern(e.entity);
-                    for( let s in this._hass.states ) {
-                        if( regex && regex.test(s) && !testEntityExclusionList(s, regexExcludes) ) {
-                            const _ent = {...e, 'entity': s};
-                            this.pconfig.entities.push(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
-                        }
+                    // Collect matches first, then add in natural alphabetical order —
+                    // HA's state object iterates in entity creation order, which carries
+                    // no meaningful logic a user could rely on (unlike entity_id/friendly_name,
+                    // which the user actually names with intent).
+                    const _matched = [];
+                    for( let s in this._hass.states )
+                        if( regex && regex.test(s) && !testEntityExclusionList(s, regexExcludes) )
+                            _matched.push(s);
+                    _matched.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+                    for( let s of _matched ) {
+                        const _ent = {...e, 'entity': s};
+                        this.pconfig.entities.push(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
                     }
                 } else {
                     this.pconfig.entities.push(this._makeStaticEntityEntry(e.entity, _groupId, e, _interval));
                 }
             }
-            // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted
+            // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.
+            // fill/showMinMax/dashMode/lineMode/width/showPoints/decimation/netBars act as
+            // per-entity defaults here (see addGraph's entityOptions merge) — same role as
+            // entityOptions matched by entity_id/device_class/domain, but scoped to entities
+            // sharing this graph instead. Deliberately excluded: color/name/scale/
+            // siConversionFactor/unit/process/hidden — each is inherently per-entity, a
+            // shared default for any of them would be meaningless or actively wrong (e.g. a
+            // shared 'hidden' default would hide every entity in the graph by default).
             this.pconfig.graphs[_groupId] = {
                 type           : graph.type,
                 title          : graph.title,
@@ -7237,6 +7297,15 @@ export class HistoryCardState {
                 height         : graph.options?.height,
                 stacked        : graph.options?.stacked,
                 ylock          : graph.options?.ylock,
+                fill           : graph.options?.fill,
+                showMinMax     : graph.options?.showMinMax,
+                dashMode       : graph.options?.dashMode,
+                lineMode       : graph.options?.lineMode,
+                width          : graph.options?.width ?? graph.options?.lineWidth,
+                showPoints     : graph.options?.showPoints,
+                decimation     : graph.options?.decimation,
+                netBars        : graph.options?.netBars,
+                showSamples    : graph.options?.showSamples,
             };
         }
     }
@@ -7373,7 +7442,12 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.decimation =             config.decimation;
         this.instance.pconfig.roundingPrecision =      config.rounding || 2;
         this.instance.pconfig.defaultLineMode =        this.instance.normalizeLineMode(config.lineMode);
-        this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? 2.0;
+        this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
+        this.instance.pconfig.defaultDashMode =        config.dashMode;
+        this.instance.pconfig.defaultNetBars =         config.netBars;
+        this.instance.pconfig.defaultInterval =        config.interval;
+        this.instance.pconfig.defaultShowMinMax =      config.showMinMax;
+        this.instance.pconfig.defaultShowPoints =      config.showPoints;
         this.instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
         this.instance.pconfig.showCurrentValues =      config.showCurrentValues ?? true;
         this.instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;
