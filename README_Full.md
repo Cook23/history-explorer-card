@@ -69,6 +69,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
+- **v1.1.38** — `exclude:` (per-entity) and `filterEntities`/`excludeFilterEntities` now accept a plain string or a list of plain strings, in addition to the `{entity: ...}` object form — all mixable in the same list. Malformed YAML values across the card now log a console warning and are skipped individually instead of blanking the whole card. Entities added via a wildcard `entity:` pattern are now added in natural alphabetical order instead of Home Assistant's entity creation order. `fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can now be set under a graph's `options:` as a shared default for every entity in that graph (`options.exclude` combines with, rather than replacing, each wildcard entity's own `exclude:`). `width` remains accepted everywhere as an alias for `lineWidth`. `dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can now also be set once for the whole card, the same way `lineMode`, `lineWidth` and `decimation` already could.
 - **v1.1.32** — Persistence options renamed and inverted to opt-in: `enable_persistence`/`enable_multidevice_persistence` replace `disable_multidevice_persistence`/`disable_persistence`. Nothing persists by default except dynamically-added entities; `none` opts back out where that default applies.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge (`_clampToViewport()`); the graph hover tooltip is now a floating element instead of canvas-drawn, fixing size limits and touch/stylus flicker.
 - **v1.1.30** — Added persistence-control options for time range and entities, card-wide or per entity. Renamed in v1.1.32, see above.
@@ -986,9 +987,7 @@ entityOptions:
   sensor.outside_pressure:  # Apply these settings specifically to this entity if added
     color: green
     fill: rgba(0,255,0,0.2)
-    ymin: 900
-    ymax: 1100
-    width: 2
+    lineWidth: 2
   sensor:                   # Apply these settings to all other entities in the sensor domain
     color: red
     fill: rgba(0,0,0,0)
@@ -1014,7 +1013,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
 | `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
 | `fill` | string | Fill color under the line |
-| `width` | number | Line width in pixels |
+| `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped` |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
@@ -1033,6 +1032,33 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `showMinMax` | string or boolean | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
 | `showSamples` | boolean or number | Show sample dots for this graph (graph-level option). `true` = radius 4px, or numeric radius |
 | `showTimeLabels` | boolean | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
+| `exclude` | string, list, or `{entity: ...}` | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
+
+`width` is still accepted everywhere as an alias for `lineWidth` (for backward compatibility with existing configurations) — both names work identically at every level.
+
+`fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can also be set under a manually defined graph's own `options:`, acting as the default for every entity in that graph — the same role `height` already plays above. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    options:
+      fill: rgba(0,0,0,0)
+      showMinMax: statistics
+      exclude: '*fridge*'   # applies to every wildcard entity below
+    entities:
+      - entity: sensor.*puissance*
+      - entity: sensor.*power*
+```
+
+`dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can additionally be set once at the card's root level, the same way `lineMode`, `lineWidth` and `decimation` already could — acting as the fallback default when neither the entity nor its graph specify a value:
+
+```yaml
+type: custom:history-explorer-card
+lineWidth: 2
+dashMode: shortlines
+showMinMax: statistics
+```
 
 ### Pattern-based entity options
 
@@ -1049,7 +1075,7 @@ entityOptions:
   - match: "sensor.*_power"
     lineMode: lines
     dashMode: [10, 4]
-    width: 2
+    lineWidth: 2
 
   - match: "sensor.*_energy*"
     type: bar
@@ -1312,7 +1338,7 @@ graphs:
 
 ```
 
-Use wildcards to automatically add multiple entities. The following snippet will add all sensors with `temperature` in their name to a line graph, except for entities with `fridge` in their name and the `cpu_temperature` sensor:
+Use wildcards to automatically add multiple entities. Matches are added in natural alphabetical order (e.g. `sensor.power_2` before `sensor.power_10`) rather than Home Assistant's entity creation order. The following snippet will add all sensors with `temperature` in their name to a line graph, except for entities with `fridge` in their name and the `cpu_temperature` sensor:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1325,6 +1351,20 @@ graphs:
           - entity: sensor.cpu_temperature
         fill: rgba(0,0,0,0)
 ```
+
+`exclude` also accepts plain strings, a single string, or a mix of both forms — these are all equivalent to the list above:
+
+```yaml
+        exclude: '*fridge*'          # single string
+        exclude:                     # list of plain strings
+          - '*fridge*'
+          - sensor.cpu_temperature
+        exclude:                     # mixed forms
+          - '*fridge*'
+          - entity: sensor.cpu_temperature
+```
+
+The same string/list/object forms are accepted by `filterEntities` and `excludeFilterEntities` (see [Adding entities](#adding-entities)). `exclude` can also be set once under a graph's `options:` to apply to every wildcard entity in that graph — see [Complete list of entityOptions properties](#complete-list-of-entityoptions-properties).
 
 And a more advanced example:
 
@@ -1341,7 +1381,7 @@ entityOptions:
   - match: "sensor.*_power"
     lineMode: lines
     dashMode: [10, 4]
-    width: 2
+    lineWidth: 2
     showPoints: true
   - match: "sensor.temperature*"
     lineMode: curves
@@ -1357,7 +1397,7 @@ graphs:
       - entity: sensor.outside_temperature
         color: '#3e95cd'
         fill: rgba(151,187,205,0.15)
-        width: 4
+        lineWidth: 4
         lineMode: stepped
       - entity: sensor.annexe_temperature
         color: '#ee3452'

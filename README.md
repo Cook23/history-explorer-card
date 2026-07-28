@@ -20,6 +20,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
 - **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
 - **v1.1.30** — Added persistence-control options for time range and entities — renamed in v1.1.32, see above.
@@ -127,6 +128,8 @@ person.*        all person domain entities
 
 When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter (or clicking an entry) opens the type menu for the whole batch, with an extra "Default" option to apply each entity's own natural type instead of a single chosen type for all of them. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
 
+The same `*` wildcards work in YAML `graphs:` (see [YAML graph configuration](#yaml-graph-configuration) below); matches are added in natural alphabetical order.
+
 To show only entities actually recorded in the database:
 ```yaml
 type: custom:history-explorer-card
@@ -144,6 +147,8 @@ filterEntities:
 excludeFilterEntities:
   - 'sensor.energy_cost'
 ```
+
+`filterEntities` and `excludeFilterEntities` accept a single string, a list of strings, or (for `exclude:` under a YAML entity) the object form `{entity: '...'}` — see [README_Full.md — YAML graph configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs) for the per-entity `exclude:` option and examples.
 
 ---
 
@@ -406,44 +411,59 @@ statistics:
 
 ## Entity options
 
-All display options can be applied globally via `entityOptions`, keyed by entity id, device class, or domain. A list form with glob patterns is also supported:
+Every display/behavior property below can be set at up to three levels — as a shared default for the whole **card**, as a shared default for one **graph** (`graphs: - options:`), or directly on one **entity**. The most specific level wins: entity beats graph, graph beats card.
 
 ```yaml
-entityOptions:
+type: custom:history-explorer-card
+lineWidth: 2                     # card-level default
+
+entityOptions:                   # targeted defaults — see *1 below
   - match: "sensor.*_power"
     lineMode: lines
     color: '#3e95cd'
-    width: 2
-  - match: ["sensor.temperature*", "sensor.humidity*"]
-    lineMode: curves
-    showMinMax: statistics
   - entity: sensor.wind_bearing
     type: arrowline
+
+graphs:
+  - type: line
+    options:                     # graph-level default, applies to every entity below
+      fill: rgba(0,0,0,0)
+      showMinMax: statistics
+    entities:
+      - entity: sensor.*temperature*
+        exclude: '*fridge*'      # entity-level filter — see *2 below
 ```
 
-| Option | Description |
-|---|---|
-| `type` | `line`, `bar`, `timeline`, `arrowline` |
-| `color` | Line/bar color (HTML, CSS variable, or color range object) |
-| `fill` | Fill color under the line |
-| `width` | Line width in pixels |
-| `lineMode` | `curves`, `lines`, or `stepped` |
-| `dashMode` | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
-| `showPoints` | Dots at measurement points (`true` = 4px, or numeric radius) |
-| `showMinMax` | Min/max band: `statistics` or `history` |
-| `scale` | Multiply values by this factor before display |
-| `hidden` | Hide by default in legend |
-| `ymin` / `ymax` | Set initial Y axis bounds (can still be modified interactively) |
-| `ystepSize` | Fix Y axis tick step |
-| `ylock` | Disable all interactive Y axis pan and zoom |
-| `stacked` | Stack bars (bar graphs with multiple entities) |
-| `showTimeLabels` | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
-| `height` | Graph height in pixels |
-| `decimation` | `fast` (default), `accurate`, or `false` |
-| `interval` | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
-| `netBars` | Net metering mode for bar graphs |
-| `process` | JS expression to transform values before display |
-| `showSamples` | Permanently show sample dots (graph-level) |
+| Option | Card | Graph | Entity | Description |
+|---|:-:|:-:|:-:|---|
+| `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
+| `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
+| `fill` | | ✓ | ✓ | Fill color under the line |
+| `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *3 |
+| `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, or `stepped` |
+| `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
+| `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) |
+| `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
+| `decimation` | ✓ | ✓ | ✓ | `fast` (default), `accurate`, or `false` |
+| `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
+| `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `scale` | | | ✓ | Multiply values by this factor before display |
+| `hidden` | | | ✓ | Hide by default in legend |
+| `process` | | | ✓ | JS expression to transform values before display |
+| `ymin` / `ymax` | | | ✓ | Set initial Y axis bounds (can still be modified interactively) |
+| `ystepSize` | | | ✓ | Fix Y axis tick step |
+| `ylock` | | ✓ | | Disable all interactive Y axis pan and zoom |
+| `stacked` | | ✓ | | Stack bars (bar graphs with multiple entities) |
+| `showTimeLabels` | | ✓ | | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
+| `showSamples` | | ✓ | | Permanently show sample dots |
+| `height` | ✓ (global) | ✓ | | Graph height in pixels |
+| `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *1 |
+| `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *2 |
+| `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *2. Graph-level and entity-level excludes combine rather than override |
+
+*1 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
+*2 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
+*3 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
 
 > For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
 
@@ -554,6 +574,8 @@ graphs:
 ```
 
 > For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
+
+`options:` can also carry styling properties (`fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars`) as a shared default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
 
 ---
 
