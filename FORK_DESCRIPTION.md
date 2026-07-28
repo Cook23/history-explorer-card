@@ -2,7 +2,7 @@
 
 ## Adding and organizing entities
 
-Entities can be added through a searchable dropdown showing friendly names (with the entity ID available in a tooltip), or defined statically in YAML — the two can be freely combined on the same card. Wildcard patterns (`sensor.*power*`) add every matching entity at once, sorted alphabetically.
+Entities can be added through a searchable dropdown showing friendly names (with the entity ID available in a tooltip) and each entity's current state value, or defined statically in YAML — the two can be freely combined on the same card. Wildcard patterns (`sensor.*power*`) add every matching entity at once, sorted alphabetically. Hovering or keyboard-highlighting an entry previews whether it will be added or is already present, before the selection is confirmed; if it's already on the card, a tooltip and a highlight on the containing graph flag the duplicate.
 
 Every new numeric entity goes through a display type menu — line (straight, curved, or stepped), bar, arrowline, or timeline — and that same menu reopens at any time afterward to change the type, or delete the entity from a combined graph.
 
@@ -14,7 +14,7 @@ A single click on a curve or entity label shows or hides it. A double-click extr
 
 ## Line appearance and statistics
 
-Line graphs support a shaded min/max statistical band (drawn from either long-term statistics or full history), permanent sample point dots at each measurement, and custom dash patterns (including a full custom Canvas dash array, not just the built-in named styles). Display options — color, fill, line width, dash style, and more — can be set per entity, or targeted at a whole family of sensors at once by device class, domain, or glob pattern.
+Line graphs support a shaded min/max statistical band (drawn from either long-term statistics or full history), permanent sample point dots at each measurement, and custom dash patterns (including a full custom Canvas dash array, not just the built-in named styles). Display options — color, fill, line width, dash style, and more — can be set per entity, or targeted at a whole family of sensors at once using `entityOptions`'s list form, matching by device class, domain, or a glob/wildcard pattern (e.g. `match: "sensor.*_power"`). Timeline graphs come with a broad set of sensible default state colors across most Home Assistant domains (green for active/good, red for stopped/armed/locked, amber for transitional, grey for unknown), customizable per state via `stateColors`.
 
 ## Persistence and multi-device sync
 
