@@ -457,7 +457,7 @@ graphs:
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
 | `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
 | `fill` | | ✓ | ✓ | Fill color under the line |
-| `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *3 |
+| `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, or `stepped` |
 | `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) |
@@ -474,18 +474,18 @@ graphs:
 | `stacked` | | ✓ | | Stack bars (bar graphs with multiple entities) |
 | `showTimeLabels` | | ✓ | | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
 | `showSamples` | | ✓ | | Permanently show sample dots |
-| `height` | | ✓ | | Graph height in pixels — see *4 |
-| `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *1 |
-| `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *2 |
-| `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *2. Graph-level and entity-level excludes combine rather than override |
+| `height` | | ✓ | | Graph height in pixels — see *2 |
+| `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
+| `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *4 |
+| `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
 
-*1 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
+*1 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
 
-*2 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
+*2 — there's no single card-level default for `height` — line and bar graphs each have their own global default instead, `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)).
 
-*3 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
+*3 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
 
-*4 — there's no single card-level default for `height` — line and bar graphs each have their own global default instead, `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)).
+*4 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
 
 > For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
 
