@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.38] - 2026-07-28
+
+### Added — shared style defaults at the graph level
+- Setting `fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation` and `netBars` on every wildcard `entity:` pattern combined onto the same graph used to mean repeating the same options on each one
+- These can now be set once under a graph's `options:`, acting as the default for every entity in that graph — an entity's own value still wins over it
+
+### Added — `exclude` at the graph level, and wider input formats for `exclude`/`filterEntities`/`excludeFilterEntities`
+- `exclude` (per-entity) and `filterEntities`/`excludeFilterEntities` now accept a plain string or a list of plain strings, in addition to the existing `{entity: ...}` object form — all forms are mixable in the same list
+- `exclude` can now also be set once under a graph's `options:`, applying to every wildcard entity in that graph — it combines with (rather than overriding) each entity's own `exclude:`, the one exception to "most specific wins" in this release
+
+### Added — the same style defaults, once for the whole card
+- `dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can now also be set once at the card's root level, the same way `lineMode`, `lineWidth` and `decimation` already could
+- `width` remains accepted everywhere as an alias for `lineWidth`, for backward compatibility
+
+### Changed — wildcard entities are now added in alphabetical order
+- `entity:` wildcard patterns used to add matching entities in whatever order Home Assistant's own entity state object iterated them in — its entity creation order, which carries no logic a user could rely on
+- Matches are now added in natural alphabetical order instead (e.g. `sensor.power_2` before `sensor.power_10`), matching how a user actually names their entities with intent
+
+### Fixed — malformed YAML in `graphs:` could blank the whole card instead of just the broken part
+- A per-entity `exclude:` given as a plain string list (rather than the `{entity: ...}` form) reached a function expecting the object shape, threw, and took down the entire card's graph construction with it — with no error shown anywhere
+- `graphs:`, each graph's `entities:`, and each entity's `entity:` are now validated on the way in; a malformed value is logged to the console and that one entry is skipped, leaving every other graph and entity on the card working normally
+
+
 ## [v1.1.37] - 2026-07-27
 
 ### Added — a blue/dashed-red border on the entity type menu's title

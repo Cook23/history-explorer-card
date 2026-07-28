@@ -12,8 +12,15 @@ graphs:
       # Each entity can be specified individually by name, or with wildcards
     - entity: null
 
+      # Only relevant for a wildcard `entity:` pattern. Entities matching `entity:` that should still be
+      # excluded from the result. Accepts a single string, a list of strings, or the object form
+      # {entity: '...'} — wildcards allowed. Combines with (does not override) any `exclude` set at
+      # $.graphs.options for the same graph
+      exclude: null
+
       # Every option below is optional — shown here with its effective default (or 'null' where
-      # there is none). All of them can also be set for dynamically-added entities via `$.entityOptions`
+      # there is none). All of them can also be set for dynamically-added entities via `$.entityOptions`,
+      # or shared by every entity in this graph via `$.graphs.options` (most specific value always wins)
 
       # Which type of graph this entity should be displayed as. See $.graphs.type below — same options,
       # but per entity instead of per graph. By default, determined from the entity's state class/units
@@ -34,8 +41,8 @@ graphs:
       # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
       lineMode: null
 
-      # Line width, otherwise defaults to the card's value at $.lineWidth
-      width: null
+      # Line width, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+      lineWidth: null
 
       # If true, hide this entity from the graph
       hidden: False
@@ -89,13 +96,40 @@ graphs:
   # By default, type is determined by the entity's state class and units
   type: ? line, bar, arrowline, timeline
 
-  # Additional options for the graph
+  # Additional options for the graph. Every option below acts as a shared default for every entity in
+  # this graph (an entity's own value, set directly under $.graphs.entities, always wins over it)
   options:
     # Height of the graph, in pixels. Defaults to being either `lineGraphHeight`, `barGraphHeight` or calculated, depending on graph type
     height: null
 
     # The default interval that bar graphs will be summarised over. Can be one of "10m", "hourly", "daily", or "monthly".
     interval: "hourly"
+
+    # Fill colour of the area under each line in this graph, defaults to a lighter shade of each entity's own colour
+    fill: null
+
+    # Style of the line for every entity in this graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
+    dashMode: "solid"
+
+    # (line graph only) Line interpolation mode for every entity in this graph
+    lineMode: null
+
+    # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+    lineWidth: null
+
+    # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode), for every entity in this graph
+    showMinMax: False
+
+    # Overrides $.decimation for every entity in this graph
+    decimation: "fast"
+
+    # (bar graph only) If true, every entity in this graph is treated as net-metering — see $.graphs.entities.netBars above
+    netBars: False
+
+    # Only relevant for wildcard `entity:` patterns in this graph. Entities to exclude from every wildcard
+    # match in this graph. Same string/list/{entity: '...'} syntax as $.graphs.entities.exclude above —
+    # combines with (does not override) each entity's own `exclude`
+    exclude: null
 
     # (line graph only) If true, show permanent dots at each measurement point making up the line, for every
     # entity in this graph (unless overridden per entity — see $.graphs.entities above)
@@ -161,8 +195,8 @@ entityOptions:
     # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
     dashMode: "solid"
 
-    # Line width, otherwise defaults to the card's value at $.lineWidth
-    width: null
+    # Line width, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+    lineWidth: null
 
     # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
     lineMode: null
@@ -244,8 +278,28 @@ rounding: 2
 # Line interpolation mode. Can be: curves, lines, or stepped
 lineMode: "curves"
 
-# Line width for lines in line graphs
+# Line width for lines in line graphs. `width` is also accepted as an alias
 lineWidth: 2.0
+
+# Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
+# Can be: points, shortlines, longlines, pointline, or default which is a solid line
+dashMode: "solid"
+
+# (line graph only) Default min/max statistical band setting for every line graph on the card, unless
+# overridden at the graph or entity level. Can be: statistics, history, or False to disable
+showMinMax: False
+
+# (line graph only) Default "show sample points" setting for every line graph on the card, unless
+# overridden at the graph or entity level
+showPoints: False
+
+# (bar graph only) Default net-metering setting for every bar graph on the card, unless overridden at
+# the graph or entity level — see $.graphs.entities.netBars above
+netBars: False
+
+# Default interval that every bar graph on the card is summarised over, unless overridden at the graph
+# or entity level. Can be one of "10m", "hourly", "daily", or "monthly"
+interval: "hourly"
 
 # By default, line graphs will interpolate curves over missing data. Enable this config option to show gaps for unavailable data 
 showUnavailable: False
