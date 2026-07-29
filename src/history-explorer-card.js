@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.39b23';
+const Version = '1.1.40b4';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1961,8 +1961,7 @@ export class HistoryCardState {
                     },
                     yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
                     caretPadding: 8,
-                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false,
-                    custom: function() { _self._renderCustomTooltip(this); }
+                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
                 },
                 hover: {
                     mode: 'nearest',
@@ -2345,7 +2344,7 @@ export class HistoryCardState {
     // covers every "card no longer on screen" case without needing a separate
     // disconnectedCallback.
     _countWords(text) {
-        return text.split(/[\s_]+/).filter(Boolean).length;
+        return text.split(/[\s_]+/).filter(w => (w.match(/[a-zA-Z0-9]/g) || []).length >= 2).length;
     }
 
     _wordBasedFadeDuration(wordCount) {
@@ -2371,12 +2370,13 @@ export class HistoryCardState {
     // the same point has already finished fading: the tooltip stays gone until the
     // pointer actually does something new. Deliberately never inferred from the DOM's
     // current opacity, which is a pure visual side effect of the cycle, not a signal to
-    // decide from. The caller (_renderCustomTooltip) is the flag's actual point of
-    // consumption — see the comment there for why clearing it happens there, not here.
+    // decide from. Consumed inside Chart.js itself (Tooltip._hecRenderFloatingTooltip) —
+    // see the comment there for why clearing it happens there, not here.
     //
-    // justMoved is only meaningful for the curve-hover tooltip (_renderCustomTooltip),
-    // which is driven by Chart.js's own hover cycle and can be re-invoked by an unrelated
-    // data refresh. The entity-preview tooltip (_previewEntityTooltip) has no such refresh
+    // The curve-hover tooltip is now rendered entirely inside Chart.js (see
+    // Tooltip._hecRenderFloatingTooltip there), driven by Chart.js's own hover cycle and
+    // re-invocable by an unrelated data refresh — that's what this justMoved guard exists
+    // for. The entity-preview tooltip (_previewEntityTooltip) below has no such refresh
     // to guard against — every call it makes already corresponds to a real highlight
     // change — so it calls this without a third argument at all; leaving justMoved
     // undefined there always arms, exactly as before this guard existed.
@@ -2447,149 +2447,6 @@ export class HistoryCardState {
             });
             _el._hecObserver.observe(anchorEl);
         }
-    }
-
-    _renderCustomTooltip(tooltip) {
-        // Replaces Chart.js's built-in on-canvas tooltip draw (see the `custom` hook added
-        // to Tooltip.prototype.draw in Chart.js) with a floating DOM element. The on-canvas
-        // version is hard-clipped to its own graph's canvas — if a graph is shorter than the
-        // tooltip, or sits near a viewport edge, the tooltip gets truncated with no way to
-        // fix that from within canvas drawing. A DOM element isn't clipped by the canvas at
-        // all, and can be kept fully on screen via _clampToViewport, same as the other popups.
-        const _vm = tooltip._view;
-        let _el = this._chartTooltipEl;
-        // Consumed here, at the very top, before any early return below: Chart.js's
-        // Tooltip.draw() re-invokes this callback on EVERY render frame (resize,
-        // animation, a data refresh redrawing the chart) — not just on a real pointer
-        // gesture — reusing the same _vm/model object until Tooltip.update() next runs.
-        // hecJustMoved is true only on the render immediately following a real gesture
-        // (contact, or a move past the 4px threshold — minted fresh in Chart.js's
-        // Tooltip.handleEvent). Reading it anywhere other than this first line — after an
-        // early return has already been possible — would let a later, unrelated frame that
-        // happens to reach further into the function find a true that was never really
-        // meant for it. Handshake discipline: read, then clear, on the same two lines,
-        // before anything else runs.
-        const _justMoved = !!(_vm && _vm.hecJustMoved);
-        if( _vm ) _vm.hecJustMoved = false;
-
-        // _el (this._chartTooltipEl) is ONE element shared by every graph on the card — but
-        // this callback runs separately per graph's own Chart.js instance. With
-        // cursor.mode: 'all', every graph processes each mousemove to keep the vertical
-        // cursor line synced across all of them, including graphs the pointer isn't actually
-        // over — those graphs' own tooltip state is inactive (opacity < 1) on every such
-        // call. Without the ownership check below, a non-hovered graph's own "nothing
-        // active" state would fade out the tooltip a DIFFERENT, actually-hovered graph just
-        // showed in the same cycle. Only the graph that currently owns the visible tooltip
-        // may trigger its fade-out.
-        //
-        // Also undefined otherwise: title/body/etc. below are only ever populated by
-        // Chart.js when tooltipActive is true.
-        if( !tooltip._options.enabled || !_vm || _vm.tooltipActive !== true ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) this._startTooltipFade(_el, 0);
-            return;
-        }
-        const _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
-        if( !_hasContent ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) this._startTooltipFade(_el, 0);
-            return;
-        }
-
-        // Shared with the caret math below: position:absolute offsets on the caret are
-        // measured from _el's padding edge, not its visible (border/background) edge, so
-        // the caret's "stick out" offsets must account for this same padding to actually
-        // clear the box instead of landing inside it.
-        const _padY = 6, _padX = 8;
-
-        if( !_el ) {
-            _el = document.createElement('div');
-            _el.id = 'hec-chart-tooltip';
-            _el.style.cssText = `z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;`;
-            this._chartTooltipEl = _el;
-        }
-        this._attachFloatingTooltip(_el, tooltip._chart.canvas);
-        // Colors come from the tooltip's own resolved model, not a card theme var — this is
-        // the same dark-box/light-text combo (backgroundColor/bodyFontColor) the canvas draw
-        // used, already internally consistent (unlike mixing in an unrelated light theme,
-        // which left body text — forced to the model's own white bodyFontColor — invisible
-        // against a light background).
-        _el.style.background = _vm.backgroundColor;
-        _el.style.border = `${_vm.borderWidth}px solid ${_vm.borderColor}`;
-        _el.style.color = _vm.bodyFontColor;
-
-        let _wordCount = 0;
-        const _addLine = (text, color, swatch) => {
-            const _row = document.createElement('div');
-            if( color ) _row.style.color = color;
-            if( swatch ) {
-                const _sw = document.createElement('span');
-                _sw.style.cssText = `display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle;border-radius:2px;border:1px solid ${swatch.borderColor};background:${swatch.backgroundColor};`;
-                _row.appendChild(_sw);
-            }
-            _row.appendChild(document.createTextNode(text));
-            _el.appendChild(_row);
-            _wordCount += this._countWords(text);
-        };
-
-        _el.innerHTML = '';
-        for( const _t of _vm.title ) {
-            const _row = document.createElement('div');
-            _row.style.fontWeight = '600';
-            _row.style.marginBottom = '2px';
-            _row.style.color = _vm.titleFontColor;
-            _row.appendChild(document.createTextNode(_t));
-            _el.appendChild(_row);
-            _wordCount += this._countWords(_t);
-        }
-        for( const _l of _vm.beforeBody ) _addLine(_l);
-        _vm.body.forEach((_item, _i) => {
-            for( const _l of _item.before ) _addLine(_l);
-            for( const _l of _item.lines ) _addLine(_l, _vm.labelTextColors[_i], _vm.displayColors ? _vm.labelColors[_i] : null);
-            for( const _l of _item.after ) _addLine(_l);
-        });
-        for( const _l of _vm.afterBody ) _addLine(_l);
-
-        // Caret indicator — same geometry as Chart.js's own getCaretPosition: offset from
-        // a corner (by cornerRadius) for top/bottom alignment, or vertically centered for
-        // left/right alignment. A CSS border-triangle, colored to match the tooltip's own
-        // background so it reads as a continuation of the box pointing at the hovered point.
-        // Offsets add borderWidth + the relevant padding (see _padY/_padX above) on top of
-        // caretSize/cornerRadius — without that, the negative offsets meant to push the
-        // caret outside the box are instead absorbed by _el's own padding and it renders
-        // inside the box instead of sticking out past its edge.
-        const _caret = document.createElement('div');
-        const _cs = _vm.caretSize, _cr = _vm.cornerRadius, _bw = _vm.borderWidth;
-        const _bg = _vm.backgroundColor;
-        _caret.style.cssText = `position:absolute;width:0;height:0;border:${_cs}px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;`;
-        if( _vm.yAlign === 'center' ) {
-            _caret.style.top = '50%';
-            _caret.style.marginTop = -_cs + 'px';
-            // -4px vs. the top/bottom formula below: measured empirically (Thierry counted
-            // pixels) — the same padX/padY-based formula overshoots by 6px here instead of
-            // the 2px it gives top/bottom, for a box-model reason not fully accounted for
-            // above. Corrected by the measured difference rather than by theory.
-            if( _vm.xAlign === 'left' ) { _caret.style.left = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderRightColor = _bg; }
-            else                        { _caret.style.right = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderLeftColor = _bg; }
-        } else {
-            if( _vm.xAlign === 'left' )       _caret.style.left = (_cr - _padX) + 'px';
-            else if( _vm.xAlign === 'right' ) _caret.style.right = (_cr - _padX) + 'px';
-            else                               { _caret.style.left = '50%'; _caret.style.marginLeft = -_cs + 'px'; }
-            if( _vm.yAlign === 'top' ) { _caret.style.top = -(_bw + _padY + _cs) + 'px'; _caret.style.borderBottomColor = _bg; }
-            else                        { _caret.style.bottom = -(_bw + _padY + _cs) + 'px'; _caret.style.borderTopColor = _bg; }
-        }
-        _el.appendChild(_caret);
-
-        this._chartTooltipOwner = tooltip._chart;
-        _el.style.display = 'block';
-        const _canvasRect = tooltip._chart.canvas.getBoundingClientRect();
-        // fixed positions directly against the viewport; absolute positions against the
-        // parent it was actually attached to (see _attachFloatingTooltip).
-        const _origin = ( _el.style.position === 'fixed' ) ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
-        _el.style.left = (_canvasRect.left - _origin.left + _vm.x) + 'px';
-        _el.style.top  = (_canvasRect.top  - _origin.top  + _vm.y) + 'px';
-        this._clampToViewport(_el);
-        // _justMoved was already read and cleared at the very top of this function,
-        // before any early return — see the comment there.
-        this._armTooltipAutoFade(_el, this._wordBasedFadeDuration(_wordCount), _justMoved);
     }
 
     _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
@@ -3873,7 +3730,6 @@ export class HistoryCardState {
                     this.state.drag = true;
                     panstate.tc = this.startTime;
                     this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : event.target;
-                    panstate.g.chart.options.tooltips.enabled = false;
                 }
 
             } else if( this.state.zoomMode ) {
@@ -3946,12 +3802,6 @@ export class HistoryCardState {
 
 
         if( this.state.drag ) {
-
-            // Idempotent: guarantees the tooltip stays off for the whole duration of the
-            // pan, even if it was briefly re-enabled elsewhere (e.g. a two-finger pinch
-            // ending mid-pan, which must never leave the function with tooltips disabled —
-            // see pointerUp/pointerCancel) while this pan is still ongoing.
-            panstate.g.chart.options.tooltips.enabled = false;
 
             if( Math.abs(event.clientX - panstate.lx) > 0 ) {
 
@@ -4113,7 +3963,6 @@ export class HistoryCardState {
             panstate.my = event.clientY;
             panstate.ly = event.clientY;
             panstate.tc = this.startTime;
-            if( panstate.g ) panstate.g.chart.options.tooltips.enabled = true;
             return;
         }
 
@@ -4121,7 +3970,6 @@ export class HistoryCardState {
 
             this.state.drag = false;
             this.state.updateCanvas = null;
-            panstate.g.chart.options.tooltips.enabled = true;
 
             if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
                 if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMin === undefined && !panstate.g.yaxisLock ) {
@@ -4205,7 +4053,6 @@ export class HistoryCardState {
             if( this.state.drag && panstate.g ) {
                 this.state.drag = false;
                 this.state.updateCanvas = null;
-                panstate.g.chart.options.tooltips.enabled = true;
             }
             return;
         }
@@ -4214,7 +4061,6 @@ export class HistoryCardState {
 
             this.state.drag = false;
             this.state.updateCanvas = null;
-            panstate.g.chart.options.tooltips.enabled = true;
 
             if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
                 panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
@@ -4673,20 +4519,25 @@ export class HistoryCardState {
     _clampToViewport(el)
     {
         // Nudges an already-positioned, already-visible floating element (menu, dropdown,
-        // tooltip) back fully inside the viewport if any edge overflows. Call once after
-        // display:block and left/top/bottom/transform are set. Reads back the actual
-        // rendered box via getBoundingClientRect() rather than assuming how the position
-        // was computed, so this works uniformly for position:fixed and position:absolute,
-        // for elements anchored via `top` or `bottom`, and for elements using a CSS
-        // transform (e.g. translateX for center/right-aligned tooltips) — a translation
-        // delta applied to `left`/`top` shifts the final rendered position by the same
-        // delta regardless of any transform already in effect.
+        // tooltip) back fully inside the card itself, not the whole browser window — it may
+        // overflow anywhere over the card, but never onto Home Assistant's own surrounding
+        // UI (side menu, header, etc). Falls back to the full window if #maincard can't be
+        // found for any reason, matching the previous behavior rather than failing silently.
+        // Call once after display:block and left/top/bottom/transform are set. Reads back
+        // the actual rendered box via getBoundingClientRect() rather than assuming how the
+        // position was computed, so this works uniformly for position:fixed and
+        // position:absolute, for elements anchored via `top` or `bottom`, and for elements
+        // using a CSS transform (e.g. translateX for center/right-aligned tooltips) — a
+        // translation delta applied to `left`/`top` shifts the final rendered position by
+        // the same delta regardless of any transform already in effect.
+        const _cardEl = this._this?.querySelector('#maincard');
+        const _bounds = _cardEl ? _cardEl.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
         const _r = el.getBoundingClientRect();
         let _dx = 0, _dy = 0;
-        if( _r.right > window.innerWidth ) _dx = window.innerWidth - _r.right;
-        else if( _r.left < 0 ) _dx = -_r.left;
-        if( _r.bottom > window.innerHeight ) _dy = window.innerHeight - _r.bottom;
-        else if( _r.top < 0 ) _dy = -_r.top;
+        if( _r.right > _bounds.right ) _dx = _bounds.right - _r.right;
+        else if( _r.left < _bounds.left ) _dx = _bounds.left - _r.left;
+        if( _r.bottom > _bounds.bottom ) _dy = _bounds.bottom - _r.bottom;
+        else if( _r.top < _bounds.top ) _dy = _bounds.top - _r.top;
         // offsetLeft/offsetTop reflect the actual current rendered offset whether it came
         // from an explicit style.left/top or from the element's normal/auto flow position —
         // safer baseline than parsing style strings, which can be empty.
