@@ -22,6 +22,10 @@ Changelog for the HA History Explorer Card.
 - These floating elements were only ever kept inside the browser window as a whole, not the card itself
 - They now stay within the card's own boundaries instead, falling back to the full window only if the card's own position can't be determined
 
+### Fixed — the point highlight and tooltip could end up on two different graphs
+- Clicking around on several graphs one after another could leave a point lit up on one graph while the tooltip showed on another — they shared the same underlying floating element and timer instead of each graph having its own
+- Each graph now has its own independent tooltip element and timer, so this can no longer happen
+
 
 ## [v1.1.39] - 2026-07-29
 
