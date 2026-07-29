@@ -8601,14 +8601,6 @@
 
         }
 
-        // Shared across every Chart.Tooltip instance on the page (one per graph/canvas) —
-        // exactly one floating tooltip element exists at a time, same as when this state
-        // lived on the card itself. A module-level closure variable is the equivalent here:
-        // each Tooltip instance's own `this` is per-graph, but the DOM element and which
-        // graph currently owns it must be shared, not duplicated per instance.
-        var _hecTooltipEl = null;
-        var _hecTooltipOwner = null;
-
         Chart.Tooltip = Element.extend({
           initialize: function () {
             this._model = getBaseModel(this._options);
@@ -8716,18 +8708,18 @@
           _hecRenderFloatingTooltip: function () {
             var me = this;
             var _vm = this._view;
-            var _el = _hecTooltipEl;
+            var _el = this._hecTooltipEl;
 
             var _justMoved = !!(_vm && _vm.hecJustMoved);
             if (_vm) _vm.hecJustMoved = false;
 
             if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
-              if (_el && _hecTooltipOwner === this._chart) this._hecStartTooltipFade(_el, 0);
+              if (_el) this._hecStartTooltipFade(_el, 0);
               return;
             }
             var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
             if (!_hasContent) {
-              if (_el && _hecTooltipOwner === this._chart) this._hecStartTooltipFade(_el, 0);
+              if (_el) this._hecStartTooltipFade(_el, 0);
               return;
             }
 
@@ -8737,7 +8729,7 @@
               _el = document.createElement('div');
               _el.id = 'hec-chart-tooltip';
               _el.style.cssText = 'z-index:9999;pointer-events:none;border-radius:4px;padding:' + _padY + 'px ' + _padX + 'px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
-              _hecTooltipEl = _el;
+              this._hecTooltipEl = _el;
             }
             this._hecAttachFloatingTooltip(_el, this._chart.canvas);
             _el.style.background = _vm.backgroundColor;
@@ -8795,7 +8787,6 @@
             }
             _el.appendChild(_caret);
 
-            _hecTooltipOwner = this._chart;
             _el.style.display = 'block';
             var _canvasRect = this._chart.canvas.getBoundingClientRect();
             var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
