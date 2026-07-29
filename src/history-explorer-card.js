@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.38b4';
+const Version = '1.1.39b23';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1967,11 +1967,19 @@ export class HistoryCardState {
                 hover: {
                     mode: 'nearest',
                     intersect: graphtype != 'line',
+                    // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
+                    // trigger on a pure hover move (no button/contact needed) since
+                    // hoverEnabled is true — matching this card's desktop behaviour. See
+                    // Chart.Controller.handleEvent / Tooltip.handleEvent in Chart.js: the
+                    // hit-test only ever re-runs on a real contact or on a pointer move of at
+                    // least 4px since the last one that found something, never as a side
+                    // effect of the chart's own data refreshing under a still pointer.
+                    hoverEnabled: true,
                     // Default is 400ms — was likely relied on as a rough anti-flicker delay
-                    // before the dead zone in Chart.js's handleEvent existed; that's now a
-                    // deliberate, precise mechanism for the same problem, so this generic
-                    // delay is just latency with no remaining purpose. Also governs hover
-                    // style updates (point/line highlighting), not just the tooltip.
+                    // before handleEvent's own move-threshold existed; that threshold is now
+                    // what actually prevents flicker, so this generic delay is just latency
+                    // with no remaining purpose. Also governs hover style updates (point/line
+                    // highlighting), not just the tooltip.
                     animationDuration: 0
                 },
                 legend: {
@@ -2352,13 +2360,30 @@ export class HistoryCardState {
     // (freshly created, or mid fade-out from a previous hide), it fades in the same way
     // instead of snapping straight to opacity:1 — the two style writes must land in
     // separate frames or the browser coalesces them and skips the transition entirely.
-    _armTooltipAutoFade(_el, duration, changeKey) {
-        if( _el.style.opacity !== '1' ) {
-            _el.style.opacity = '0';
-            requestAnimationFrame(() => { _el.style.opacity = '1'; });
-        }
-        if( changeKey !== undefined && _el._hecFadeKey === changeKey ) return;
-        _el._hecFadeKey = changeKey;
+    // Arms (or re-confirms) the tooltip's lifecycle. justMoved is true only on the exact
+    // render that immediately follows a real pointer gesture (contact, or a move past the
+    // 4px threshold — see Chart.js's Tooltip.handleEvent, where it's minted fresh on that
+    // exact edge as a call-local variable) and false on every other render, including one
+    // triggered by the chart's data refreshing while the pointer sits still on the very
+    // same point. Per the card's tooltip spec, only that gesture may open or restart a
+    // tooltip — a point drifting under an unmoving pointer/contact must not. So a render
+    // with justMoved false is always a plain no-op here, even once an earlier cycle for
+    // the same point has already finished fading: the tooltip stays gone until the
+    // pointer actually does something new. Deliberately never inferred from the DOM's
+    // current opacity, which is a pure visual side effect of the cycle, not a signal to
+    // decide from. The caller (_renderCustomTooltip) is the flag's actual point of
+    // consumption — see the comment there for why clearing it happens there, not here.
+    //
+    // justMoved is only meaningful for the curve-hover tooltip (_renderCustomTooltip),
+    // which is driven by Chart.js's own hover cycle and can be re-invoked by an unrelated
+    // data refresh. The entity-preview tooltip (_previewEntityTooltip) has no such refresh
+    // to guard against — every call it makes already corresponds to a real highlight
+    // change — so it calls this without a third argument at all; leaving justMoved
+    // undefined there always arms, exactly as before this guard existed.
+    _armTooltipAutoFade(_el, duration, justMoved) {
+        if( arguments.length >= 3 && justMoved !== true ) return;
+        _el.style.opacity = '0';
+        requestAnimationFrame(() => { _el.style.opacity = '1'; });
         this._startTooltipFade(_el, duration);
     }
 
@@ -2369,7 +2394,7 @@ export class HistoryCardState {
         clearTimeout(_el._hecFadeTimer);
         clearTimeout(_el._hecRemoveTimer);
         _el._hecFadeTimer = setTimeout(() => { _el.style.opacity = '0'; }, duration);
-        _el._hecRemoveTimer = setTimeout(() => { this._killFloatingTooltip(_el); }, duration + 1500);
+        _el._hecRemoveTimer = setTimeout(() => { this._killFloatingTooltip(_el); }, duration + 1000);
     }
 
     _killFloatingTooltip(_el) {
@@ -2401,15 +2426,25 @@ export class HistoryCardState {
         if( _el.parentNode !== _targetParent ) _targetParent.appendChild(_el);
         const _wantPosition = _offsetParent ? 'absolute' : 'fixed';
         if( _el.style.position !== _wantPosition ) _el.style.position = _wantPosition;
-        // (Re)watch anchorEl: fires immediately with isIntersecting === false if
-        // anchorEl is already offscreen or already detached, and again the moment
-        // either becomes true later — either way, that's this tooltip's cue to die.
+        // (Re)watch anchorEl with a ResizeObserver — deliberately not an
+        // IntersectionObserver: per the Resize Observer spec, a ResizeObserver fires ON
+        // ITS OWN whenever the watched element's rendered size changes, INCLUDING when it
+        // (or any ancestor) goes display:none, and INCLUDING when it's removed from the
+        // DOM entirely — both real-world cases this tooltip needs to react to (Home
+        // Assistant caching a previously-shown Lovelace view instead of unmounting it on
+        // tab switch; a graph/entity being deleted while its tooltip is showing). Unlike
+        // IntersectionObserver, this needs no other system (a data refresh, a render loop)
+        // to ever call back into this function again for the death to be noticed — the
+        // browser notifies the observer itself, the moment the size actually changes.
         if( _el._hecObserverTarget !== anchorEl ) {
             _el._hecObserver?.disconnect();
             _el._hecObserverTarget = anchorEl;
-            _el._hecObserver = new IntersectionObserver((entries) => {
-                if( !entries[0].isIntersecting ) this._killFloatingTooltip(_el);
-            }, { threshold: 0 });
+            _el._hecObserver = new ResizeObserver((entries) => {
+                const _box = entries[0].borderBoxSize?.[0];
+                const _w = _box ? _box.inlineSize : entries[0].contentRect.width;
+                const _h = _box ? _box.blockSize : entries[0].contentRect.height;
+                if( _w === 0 && _h === 0 ) this._killFloatingTooltip(_el);
+            });
             _el._hecObserver.observe(anchorEl);
         }
     }
@@ -2423,6 +2458,19 @@ export class HistoryCardState {
         // all, and can be kept fully on screen via _clampToViewport, same as the other popups.
         const _vm = tooltip._view;
         let _el = this._chartTooltipEl;
+        // Consumed here, at the very top, before any early return below: Chart.js's
+        // Tooltip.draw() re-invokes this callback on EVERY render frame (resize,
+        // animation, a data refresh redrawing the chart) — not just on a real pointer
+        // gesture — reusing the same _vm/model object until Tooltip.update() next runs.
+        // hecJustMoved is true only on the render immediately following a real gesture
+        // (contact, or a move past the 4px threshold — minted fresh in Chart.js's
+        // Tooltip.handleEvent). Reading it anywhere other than this first line — after an
+        // early return has already been possible — would let a later, unrelated frame that
+        // happens to reach further into the function find a true that was never really
+        // meant for it. Handshake discipline: read, then clear, on the same two lines,
+        // before anything else runs.
+        const _justMoved = !!(_vm && _vm.hecJustMoved);
+        if( _vm ) _vm.hecJustMoved = false;
 
         // _el (this._chartTooltipEl) is ONE element shared by every graph on the card — but
         // this callback runs separately per graph's own Chart.js instance. With
@@ -2435,14 +2483,14 @@ export class HistoryCardState {
         // may trigger its fade-out.
         //
         // Also undefined otherwise: title/body/etc. below are only ever populated by
-        // Chart.js when opacity reaches 1.
-        if( !tooltip._options.enabled || !_vm || _vm.opacity < 1 ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) { _el._hecFadeKey = undefined; this._startTooltipFade(_el, 0); }
+        // Chart.js when tooltipActive is true.
+        if( !tooltip._options.enabled || !_vm || _vm.tooltipActive !== true ) {
+            if( _el && this._chartTooltipOwner === tooltip._chart ) this._startTooltipFade(_el, 0);
             return;
         }
         const _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
         if( !_hasContent ) {
-            if( _el && this._chartTooltipOwner === tooltip._chart ) { _el._hecFadeKey = undefined; this._startTooltipFade(_el, 0); }
+            if( _el && this._chartTooltipOwner === tooltip._chart ) this._startTooltipFade(_el, 0);
             return;
         }
 
@@ -2455,7 +2503,7 @@ export class HistoryCardState {
         if( !_el ) {
             _el = document.createElement('div');
             _el.id = 'hec-chart-tooltip';
-            _el.style.cssText = `z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1.5s ease;opacity:0;`;
+            _el.style.cssText = `z-index:9999;pointer-events:none;border-radius:4px;padding:${_padY}px ${_padX}px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;`;
             this._chartTooltipEl = _el;
         }
         this._attachFloatingTooltip(_el, tooltip._chart.canvas);
@@ -2539,16 +2587,9 @@ export class HistoryCardState {
         _el.style.left = (_canvasRect.left - _origin.left + _vm.x) + 'px';
         _el.style.top  = (_canvasRect.top  - _origin.top  + _vm.y) + 'px';
         this._clampToViewport(_el);
-        // Key identifies the hovered point(s) themselves (dataset+index from
-        // _vm.dataPoints, populated by Chart.js's own model.dataPoints = tooltipItems), not
-        // pixel position (shifts on pan/zoom/scroll without the point changing) nor the data
-        // value (exactly what a live refresh updates while still the same point) — so a
-        // refresh arriving while the same point stays hovered no longer re-arms the fade
-        // countdown; only actually hovering a different point does. dataPoints was chosen
-        // over tooltip._active (which also holds this) simply because it was already at
-        // hand here as _vm.dataPoints.
-        const _changeKey = _vm.dataPoints.map((p) => p.datasetIndex + ':' + p.index).join(',');
-        this._armTooltipAutoFade(_el, this._wordBasedFadeDuration(_wordCount), _changeKey);
+        // _justMoved was already read and cleared at the very top of this function,
+        // before any early return — see the comment there.
+        this._armTooltipAutoFade(_el, this._wordBasedFadeDuration(_wordCount), _justMoved);
     }
 
     _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
@@ -3788,7 +3829,6 @@ export class HistoryCardState {
         for( let g of this.graphs ) {
             if( g.canvas === event.target ) {
                 panstate.g = g;
-                g.chart.options.tooltips.enabled = false;
                 if( g.type !== 'timeline' && g.type !== 'arrowline' ) {
                     g.chart.options.scales.yAxes[0].ticks.min = panstate.y0 = g.chart.scales["y-axis-0"].min;
                     g.chart.options.scales.yAxes[0].ticks.max = panstate.y1 = g.chart.scales["y-axis-0"].max;
@@ -3833,6 +3873,7 @@ export class HistoryCardState {
                     this.state.drag = true;
                     panstate.tc = this.startTime;
                     this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : event.target;
+                    panstate.g.chart.options.tooltips.enabled = false;
                 }
 
             } else if( this.state.zoomMode ) {
@@ -3857,6 +3898,7 @@ export class HistoryCardState {
                     panstate.st0 = this.pixelPositionToTimecode(x0);
 
                     this.state.selecting = true;
+                    panstate.g.chart.options.tooltips.enabled = false;
 
                 }
 
@@ -3904,6 +3946,12 @@ export class HistoryCardState {
 
 
         if( this.state.drag ) {
+
+            // Idempotent: guarantees the tooltip stays off for the whole duration of the
+            // pan, even if it was briefly re-enabled elsewhere (e.g. a two-finger pinch
+            // ending mid-pan, which must never leave the function with tooltips disabled —
+            // see pointerUp/pointerCancel) while this pan is still ongoing.
+            panstate.g.chart.options.tooltips.enabled = false;
 
             if( Math.abs(event.clientX - panstate.lx) > 0 ) {
 
@@ -4065,6 +4113,7 @@ export class HistoryCardState {
             panstate.my = event.clientY;
             panstate.ly = event.clientY;
             panstate.tc = this.startTime;
+            if( panstate.g ) panstate.g.chart.options.tooltips.enabled = true;
             return;
         }
 
@@ -4072,7 +4121,6 @@ export class HistoryCardState {
 
             this.state.drag = false;
             this.state.updateCanvas = null;
-
             panstate.g.chart.options.tooltips.enabled = true;
 
             if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
@@ -4148,25 +4196,17 @@ export class HistoryCardState {
 
         // Allow auto scroll on refresh if the user dragged at or past the current time
         this.state.autoScroll = moment() <= moment(this.endTime);
-
-        // Touch/pen has no equivalent of mouseout when the finger/stylus simply lifts off —
-        // Chart.js's own event list doesn't even include touchend (see events: [...] in
-        // defaults), so _active is never cleared and the tooltip would otherwise stay shown
-        // forever after a tap. Start the normal fade countdown here instead of hiding
-        // immediately — with slow refreshes this is closer to how the tooltip already
-        // behaves for a mouse that simply stops moving. pointerCancel intentionally does NOT
-        // get this: it also fires on ordinary browser scroll, not just a real lift-off, and
-        // the IntersectionObserver already covers the scroll-out-of-view case.
-        if( this._chartTooltipEl && this._chartTooltipOwner ) {
-            this._chartTooltipEl._hecFadeKey = undefined;
-            this._startTooltipFade(this._chartTooltipEl, this._wordBasedFadeDuration(0));
-        }
     }
 
     pointerCancel(event)
     {
         if( panstate.pinch ) {
             panstate.pinch = null;
+            if( this.state.drag && panstate.g ) {
+                this.state.drag = false;
+                this.state.updateCanvas = null;
+                panstate.g.chart.options.tooltips.enabled = true;
+            }
             return;
         }
 
@@ -4174,6 +4214,7 @@ export class HistoryCardState {
 
             this.state.drag = false;
             this.state.updateCanvas = null;
+            panstate.g.chart.options.tooltips.enabled = true;
 
             if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
                 panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
@@ -5015,7 +5056,7 @@ export class HistoryCardState {
                     _el.id = `gc-${g.id}`;
                     _el.title = i18n('ui.menu.linked_graphs');
                     _el.style.cssText = 'height:0;text-align:center;pointer-events:none;';
-                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(var(--rgb-primary-background-color),0.5);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
+                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
                 }
                 // Always reposition (cheap no-op if already correct) — a caller earlier
                 // in the same operation may have created this marker before the graph's
