@@ -4063,13 +4063,22 @@
 
             me.updateDatasets();
 
-            // Need to reset tooltip in case it is displayed with elements that are removed
-            // after update.
-            me.tooltip.initialize();
-
-            // Last active contains items that were previously in the tooltip.
-            // When we reset the tooltip, we need to clear it
-            me.lastActive = [];
+            // updateDataset()'s own updateElement() rebuilds each element's _model from
+            // scratch on every call (base colors, base radius — see Point.updateElement),
+            // with no notion of hover: it always overwrites whatever setHoverStyle had set.
+            // This is not a new event-detection point — me.active is only ever written by
+            // Controller.handleEvent, in direct response to a genuine pointer gesture (a
+            // real contact, or a move past the 4px threshold); nothing here re-derives or
+            // re-decides it. This just re-applies that already-decided state so a refresh
+            // between two gestures doesn't visually erase it.
+            if (me.active && me.active.length && me.options.hover) {
+              var _stillValid = me.active.filter(function(el) {
+                return el && me.data.datasets[el._datasetIndex];
+              });
+              if (_stillValid.length) {
+                me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
+              }
+            }
 
             // Do this before render so that any plugins that need final scale updates can use it
             plugins.notify(me, 'afterUpdate');
@@ -4545,37 +4554,73 @@
             var options = me.options || {};
             var hoverOptions = options.hover;
             var changed = false;
-            var HOVER_DEAD_ZONE_SQ = 16; // 4px radius — see comment below
+            var HOVER_MOVE_THRESHOLD_SQ = 16; // 4px radius
 
+            me.active = me.active || [];
             me.lastActive = me.lastActive || [];
 
-            // Find Active Elements for hover and tooltips
+            // Find Active Elements for hover and tooltips.
+            //
+            // The hit-test below only ever runs in response to a genuine pointer event —
+            // never as a side effect of the chart's data being refreshed while the pointer
+            // sits still. Two things can trigger it:
+            //   - a real contact (mousedown, translated from pointerdown/touchstart/click
+            //     by EVENT_TYPES) — always searches, regardless of hoverEnabled;
+            //   - a pointer move (mousemove, translated from pointermove/touchmove) that
+            //     travelled at least 4px since the position that produced the current
+            //     active element — only searches when hoverOptions.hoverEnabled is true.
+            // A move under that threshold, or any move at all when hover is disabled,
+            // changes nothing: active stays exactly what it was.
             if (e.type === 'mouseout') {
-              me.active = [];
-            } else {
-              me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
-              // Dead zone: with intersect:true (bar/timeline/arrowline), the tooltip would
-              // otherwise flicker off on every sub-pixel jitter of a mouse, touch, or stylus
-              // — the moment the pointer strays a hair outside the element it was hovering.
-              // Ignore a transition to "nothing active" if this event landed within a few
-              // pixels of the last one that actually found something; a real, deliberate
-              // move to a different point (active still non-empty) always updates normally.
-              if (!me.active.length && me.lastActive.length && me._hecLastHitXY && e.x !== null && e.y !== null) {
-                var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
-                if (_dx * _dx + _dy * _dy < HOVER_DEAD_ZONE_SQ) {
-                  me.active = me.lastActive;
-                }
+              // Per the W3C Pointer Events spec, a device that does not support hover
+              // (touch) fires pointerout (translated to mouseout here) automatically right
+              // after pointerup, EVEN WITHOUT any pointer movement — with the SAME
+              // coordinates as the contact that just ended, still inside the canvas. A real
+              // "left the canvas" mouseout, by contrast, always carries coordinates outside
+              // the canvas bounds (that's what makes it a real exit). Checking the
+              // coordinates here, rather than trusting the event type alone, is what tells
+              // the two apart — the actual event (a pointer leaving) is unambiguous; it's
+              // only the synthetic touch-release one that needs filtering out.
+              var _dpr = me.currentDevicePixelRatio || 1;
+              var _reallyOutside = e.x === null || e.y === null ||
+                e.x < 0 || e.y < 0 || e.x > me.canvas.width / _dpr || e.y > me.canvas.height / _dpr;
+              if (_reallyOutside) {
+                me.active = [];
+                me._hecLastHitXY = undefined;
               }
-              if (me.active.length && e.x !== null && e.y !== null) {
+              // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
+              // active stays exactly what it was, same as a below-threshold mousemove.
+            } else if (e.type === 'mousedown') {
+              me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+              if (e.x !== null && e.y !== null) {
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
+            } else if (e.type === 'mousemove') {
+              var _searched = false;
+              if (hoverOptions.hoverEnabled) {
+                if (!me._hecLastHitXY || e.x === null || e.y === null) {
+                  _searched = true;
+                } else {
+                  var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
+                  if (_dx * _dx + _dy * _dy >= HOVER_MOVE_THRESHOLD_SQ) {
+                    _searched = true;
+                  }
+                }
+              }
+              if (_searched) {
+                me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+                if (e.x !== null && e.y !== null) {
+                  me._hecLastHitXY = { x: e.x, y: e.y };
+                }
+              }
+              // else: below threshold (or hover disabled) — leave me.active untouched
             }
 
             // Invoke onHover hook
             // Need to call with native event here to not break backwards compatibility
             helpers.callback(options.onHover || options.hover.onHover, [e.native, me.active], me);
 
-            if (e.type === 'mouseup' || e.type === 'click') {
+            if (e.type === 'mousedown') {
               if (options.onClick) {
                 // Use e.native here for backwards compatibility
                 options.onClick.call(me, e.native, me.active);
@@ -6029,11 +6074,20 @@
         responsive: true,
         responsiveAnimationDuration: 0,
         maintainAspectRatio: true,
-        events: ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove'],
+        // click is needed for Chart.js's own Legend.handleEvent — this card's legend.onClick
+        // (single click toggles visibility, double-click uncombines) relies on native
+        // Chart.js click handling, and the card's own legendDragEnd already synthesizes a
+        // 'click' MouseEvent on the canvas for a genuine click (see history-explorer-card.js)
+        // — restoring this is what that code has always expected, unchanged since before
+        // this session's Pointer Events work. Controller.handleEvent/Tooltip.handleEvent
+        // (hover + tooltip) only ever act on mousedown/mousemove/mouseout, so this doesn't
+        // touch their already-verified behavior.
+        events: ['pointerdown', 'click', 'pointermove', 'pointerout'],
         hover: {
           onHover: null,
           mode: 'nearest',
           intersect: true,
+          hoverEnabled: true,
           animationDuration: 400 },
 
         onClick: null,
@@ -8570,7 +8624,7 @@
             return lines;
           },
 
-          update: function (changed) {
+          update: function (changed, justMoved) {
             var me = this;
             var opts = me._options;
 
@@ -8579,9 +8633,11 @@
             // which breaks any animations.
             var existingModel = me._model;
             var model = me._model = getBaseModel(opts);
+            model.hecJustMoved = !!justMoved;
             var active = me._active;
 
             var data = me._data;
+
 
             // In the case where active.length === 0 we need to keep these at existing values for good animations
             var alignment = {
@@ -8604,7 +8660,7 @@
             var i, len;
 
             if (active.length) {
-              model.opacity = 1;
+              model.tooltipActive = true;
 
               var labelColors = [];
               var labelTextColors = [];
@@ -8659,7 +8715,7 @@
               // Final Size and Position
               backgroundPoint = getBackgroundPoint(model, tooltipSize, alignment);
             } else {
-              model.opacity = 0;
+              model.tooltipActive = false;
             }
 
             model.xAlign = alignment.xAlign;
@@ -8957,33 +9013,82 @@
             var me = this;
             var options = me._options;
             var changed = false;
+            var HOVER_MOVE_THRESHOLD_SQ = 16; // 4px radius — same rule as Controller.handleEvent
 
+            me._active = me._active || [];
             me._lastActive = me._lastActive || [];
 
-            // Find Active Elements for tooltips
+            // Find Active Elements for tooltips. Same trigger rule as Chart.Controller's
+            // own handleEvent above (this computation is independent of it — this one
+            // drives what shows IN the tooltip, the other drives hover styling — so it
+            // needs the same logic, not a shared state): the hit-test only runs on a real
+            // contact (mousedown) or on a pointer move that travelled at least 4px since
+            // the position that produced the current active element, and only when hover
+            // is enabled on the parent chart. A refresh of the chart's data between two
+            // pointer events never reaches this code at all.
+            //
+            // _justMoved is a LOCAL variable, scoped to this single call — it is never
+            // stored on me, so it cannot outlive this invocation and be read stale by some
+            // later, unrelated call. The state-to-event transformation is the detection
+            // itself: comparing the current position against the last one a gesture was
+            // confirmed at, deciding "moved" only past the threshold, and only THEN
+            // updating that reference — that decision already is the one-shot event.
+            // It is handed to update() directly, in this same call, right after being
+            // computed — never deferred to be picked up by a later, possibly-unrelated
+            // update() call (which is exactly what let a stale "moved" leak into an
+            // unrelated data-refresh render before this fix).
+            var _justMoved = false;
             if (e.type === 'mouseout') {
-              me._active = [];
-            } else {
-              me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
-              // Dead zone — same fix as Chart.Controller.handleEvent above, needed again
-              // here because the tooltip's active-element computation is independent of
-              // the chart's own (this one drives what shows IN the tooltip, the other
-              // drives hover styling) and was missing the same guard.
-              if (!me._active.length && me._lastActive.length && me._hecLastHitXY && e.x !== null && e.y !== null) {
-                var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
-                if (_dx * _dx + _dy * _dy < 16) {
-                  me._active = me._lastActive;
-                }
+              // Same fix as Controller.handleEvent above, for the same reason — see the
+              // comment there. A non-hover device fires a synthetic mouseout right after
+              // pointerup with the SAME in-canvas coordinates as the contact that just
+              // ended; only a real exit carries out-of-bounds coordinates.
+              var _dpr = me._chart.currentDevicePixelRatio || 1;
+              var _reallyOutside = e.x === null || e.y === null ||
+                e.x < 0 || e.y < 0 || e.x > me._chart.canvas.width / _dpr || e.y > me._chart.canvas.height / _dpr;
+              if (_reallyOutside) {
+                me._active = [];
+                me._hecLastHitXY = undefined;
               }
-              if (me._active.length && e.x !== null && e.y !== null) {
+              // else: synthetic mouseout from a non-hover device's pointerup — ignore it.
+            } else if (e.type === 'mousedown') {
+              me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
+              _justMoved = true;
+              if (e.x !== null && e.y !== null) {
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
+            } else if (e.type === 'mousemove') {
+              var _searched = false;
+              var _hoverEnabled = me._chart.options.hover && me._chart.options.hover.hoverEnabled;
+              if (_hoverEnabled) {
+                if (!me._hecLastHitXY || e.x === null || e.y === null) {
+                  _searched = true;
+                } else {
+                  var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
+                  if (_dx * _dx + _dy * _dy >= HOVER_MOVE_THRESHOLD_SQ) {
+                    _searched = true;
+                  }
+                }
+              }
+              if (_searched) {
+                me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
+                _justMoved = true;
+                if (e.x !== null && e.y !== null) {
+                  me._hecLastHitXY = { x: e.x, y: e.y };
+                }
+              }
+              // else: below threshold (or hover disabled) — leave me._active untouched
             }
 
             // Remember Last Actives
             changed = !helpers.arrayEquals(me._active, me._lastActive);
 
-            // If tooltip didn't change, do not handle the target event
+            // If tooltip didn't change, do not handle the target event. Note this can
+            // discard a true _justMoved (a real gesture whose hit-test still landed on the
+            // same point) — that is correct and intentional: per the card's tooltip spec, a
+            // gesture that doesn't change the active point has nothing new to show, so
+            // there is nothing here for update() to be called for. Nothing is lost by
+            // discarding it, precisely because _justMoved is local and never persisted.
             if (!changed) {
               return false;
             }
@@ -8997,7 +9102,7 @@
 
 
               var model = me._model;
-              me.update(true);
+              me.update(true, _justMoved);
               me.pivot();
 
               // See if our tooltip position changed
