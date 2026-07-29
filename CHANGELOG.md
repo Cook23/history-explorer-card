@@ -4,6 +4,22 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.39] - 2026-07-29
+
+### Fixed — tooltip and point highlight disappearing every time new data arrived
+- Both used to be re-evaluated on every chart redraw — including one triggered by fresh data coming in, with no pointer movement at all — because that redraw was never checked against whether the pointer had actually moved
+- Both now only ever change on a real gesture: a contact, or a move past a small threshold. A graph redrawing because new data just arrived leaves them untouched
+- Was previously making the tooltip and point highlight unreliable or effectively unusable on touch devices, and on any setup where data refreshes often
+
+### Fixed — tooltip and point highlight vanishing immediately on touch
+- Releasing a finger fires a background `pointerout` event even without any movement — a behaviour specific to devices that don't support hover — which the code was treating the same as actually leaving the graph. This closed the tooltip and cleared the point highlight the instant a finger lifted, even right after a plain tap
+- That signal is now only trusted when the reported position is actually outside the graph
+
+### Improved — the safety net that removes a tooltip left open after switching Home Assistant tabs
+- Home Assistant keeps a previously-shown view cached rather than tearing it down when switching tabs, which could leave a tooltip floating on top of every other tab afterwards
+- The mechanism that catches this case is now more reliable
+
+
 ## [v1.1.38] - 2026-07-28
 
 ### Added — shared style defaults at the graph level
