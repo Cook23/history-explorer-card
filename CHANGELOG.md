@@ -4,6 +4,25 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.40] - 2026-07-29
+
+### Fixed — tooltip sometimes not appearing on touch even though the point highlighted correctly
+- The point highlight and the tooltip content used to be decided by two separate calculations, each with its own criteria for "is a point close enough here" — on a touch device, a contact that was close enough to light up the point could still be judged too far off to open the tooltip
+- Both are now decided by a single calculation instead, so they always agree — this also removed a fair amount of duplicated code
+
+### Changed — closing the tooltip now also clears the point highlight, without a fade
+- The tooltip already fades out on its own after a delay; the point highlight left behind after that fade used to keep waiting on its own separate logic instead of turning off at the same time
+- The point highlight now turns off the moment the tooltip actually disappears, instantly rather than fading, matching how it already behaves everywhere else
+
+### Changed — tooltip now follows along while dragging or pinch-zooming a graph, instead of disappearing
+- Dragging a graph sideways to scroll through time used to hide the tooltip for the whole gesture; it now keeps showing whichever point it was already on, updating as you drag
+- Pinch-zooming vertically with two fingers already kept the tooltip visible — no change needed there, just confirmed working the same way
+
+### Fixed — tooltip and menus could pop up outside the card, over Home Assistant's own side menu or header
+- These floating elements were only ever kept inside the browser window as a whole, not the card itself
+- They now stay within the card's own boundaries instead, falling back to the full window only if the card's own position can't be determined
+
+
 ## [v1.1.39] - 2026-07-29
 
 ### Fixed — tooltip and point highlight disappearing every time new data arrived
