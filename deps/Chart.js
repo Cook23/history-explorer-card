@@ -4063,20 +4063,49 @@
 
             me.updateDatasets();
 
-            // updateDataset()'s own updateElement() rebuilds each element's _model from
-            // scratch on every call (base colors, base radius — see Point.updateElement),
-            // with no notion of hover: it always overwrites whatever setHoverStyle had set.
             // This is not a new event-detection point — me.active is only ever written by
             // Controller.handleEvent, in direct response to a genuine pointer gesture (a
             // real contact, or a move past the 4px threshold); nothing here re-derives or
             // re-decides it. This just re-applies that already-decided state so a refresh
-            // between two gestures doesn't visually erase it.
+            // between two gestures doesn't visually erase it — and, since the tooltip is
+            // driven by this same me.active (see handleEvent), lets its position and
+            // content follow along too: panning the graph reloads new data under the same
+            // still-active point/index (see updateHistory/updateAxes in the card).
+            //
+            // justMoved is always passed false here, deliberately — the fade timer is only
+            // ever armed inside handleEvent, in direct response to a genuine pointer event,
+            // and must NEVER be re-armed from here. This function runs on every data
+            // refresh, not just while panning — forcing justMoved true here (tried and
+            // reverted) kept re-arming the fade timer on every incoming measurement, so it
+            // would never expire at all. With it false, this only recomputes position and
+            // content (Tooltip.update()/pivot() do that unconditionally); the timer armed at
+            // the pan's initial gesture keeps counting down untouched, and if a pan runs
+            // longer than that duration, the tooltip closes mid-pan — correct, since nothing
+            // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
               var _stillValid = me.active.filter(function(el) {
                 return el && me.data.datasets[el._datasetIndex];
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
+                var _tt = me.tooltip;
+                if (_tt && (_tt._options.enabled || _tt._options.custom)) {
+                  _tt._active = _stillValid;
+                  _tt.update(true, false);
+                  _tt.pivot();
+                }
+              } else {
+                // The point the tooltip was showing no longer exists in the reloaded data
+                // (e.g. panned far enough that dataset shape changed) — same as a genuine
+                // contact landing on empty space (spec point 5): close it, don't leave it
+                // displaying stale content for a point that's gone.
+                me.active = [];
+                var _tt2 = me.tooltip;
+                if (_tt2 && (_tt2._options.enabled || _tt2._options.custom)) {
+                  _tt2._active = [];
+                  _tt2.update(true, false);
+                  _tt2.pivot();
+                }
               }
             }
 
@@ -4509,7 +4538,6 @@
               */
           eventHandler: function (e) {
             var me = this;
-            var tooltip = me.tooltip;
 
             if (plugins.notify(me, 'beforeEvent', [e]) === false) {
               return;
@@ -4520,7 +4548,6 @@
             me._bufferedRequest = null;
 
             var changed = me.handleEvent(e);
-            changed |= tooltip && tooltip.handleEvent(e);
 
             plugins.notify(me, 'afterEvent', [e]);
 
@@ -4572,30 +4599,33 @@
             // A move under that threshold, or any move at all when hover is disabled,
             // changes nothing: active stays exactly what it was.
             if (e.type === 'mouseout') {
-              // Per the W3C Pointer Events spec, a device that does not support hover
-              // (touch) fires pointerout (translated to mouseout here) automatically right
-              // after pointerup, EVEN WITHOUT any pointer movement — with the SAME
-              // coordinates as the contact that just ended, still inside the canvas. A real
-              // "left the canvas" mouseout, by contrast, always carries coordinates outside
-              // the canvas bounds (that's what makes it a real exit). Checking the
-              // coordinates here, rather than trusting the event type alone, is what tells
-              // the two apart — the actual event (a pointer leaving) is unambiguous; it's
-              // only the synthetic touch-release one that needs filtering out.
-              var _dpr = me.currentDevicePixelRatio || 1;
-              var _reallyOutside = e.x === null || e.y === null ||
-                e.x < 0 || e.y < 0 || e.x > me.canvas.width / _dpr || e.y > me.canvas.height / _dpr;
-              if (_reallyOutside) {
+              // A genuine mouseout (the pointer actually left the canvas) is always
+              // preceded by a mousemove — that's what carried it across the boundary. The
+              // synthetic one a non-hover device fires automatically right after mouseup
+              // (per the W3C Pointer Events spec) is, structurally, never preceded by a
+              // move at all — only by that mouseup. Tracking which of the two happened
+              // last is a reliable way to tell them apart; comparing the reported
+              // coordinates against the canvas bounds isn't (verified empirically: real
+              // mouseout events can report coordinates still well inside those bounds,
+              // the browser's own internal hit-testing boundary not being obtainable from
+              // script) — see the two mouseXXXX branches below for where this flag is set
+              // and cleared.
+              if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
               }
+              me._hecHasMoved = false;
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
               // active stays exactly what it was, same as a below-threshold mousemove.
+            } else if (e.type === 'mouseup') {
+              me._hecHasMoved = false;
             } else if (e.type === 'mousedown') {
               me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
               if (e.x !== null && e.y !== null) {
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
             } else if (e.type === 'mousemove') {
+              me._hecHasMoved = true;
               var _searched = false;
               if (hoverOptions.hoverEnabled) {
                 if (!me._hecLastHitXY || e.x === null || e.y === null) {
@@ -4608,7 +4638,16 @@
                 }
               }
               if (_searched) {
-                me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+                // Per the card's tooltip spec (7 points), NO closure is ever triggered by
+                // a plain move, on any device — only a genuine contact landing on empty
+                // space (point 5) or leaving the graph (point 6) may close an active
+                // tooltip. A move past the threshold that lands on empty space must leave
+                // active exactly as it was; only overwrite it when the search actually
+                // found something to jump to (point 3).
+                var _found = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+                if (_found.length) {
+                  me.active = _found;
+                }
                 if (e.x !== null && e.y !== null) {
                   me._hecLastHitXY = { x: e.x, y: e.y };
                 }
@@ -4641,6 +4680,21 @@
 
             // Remember Last Actives
             me.lastActive = me.active;
+
+            // The tooltip is driven by this SAME decision, in this SAME function, right
+            // here — not by a separate Tooltip.handleEvent computing its own verdict on
+            // whether something is active. Two independent decisions for the same gesture
+            // is exactly what let them disagree in practice (confirmed via traced logs:
+            // the point lit up while the tooltip stayed closed for the same contact,
+            // because each ran its own search with its own mode/intersect). There is now
+            // only one search (above) and only one place that acts on its result for both.
+            var tooltip = me.tooltip;
+            if (tooltip && changed && (tooltip._options.enabled || tooltip._options.custom)) {
+              tooltip._active = me.active;
+              var _justMoved = e.type === 'mousedown' || e.type === 'mousemove';
+              tooltip.update(true, _justMoved);
+              tooltip.pivot();
+            }
 
             return changed;
           } });
@@ -6082,7 +6136,7 @@
         // this session's Pointer Events work. Controller.handleEvent/Tooltip.handleEvent
         // (hover + tooltip) only ever act on mousedown/mousemove/mouseout, so this doesn't
         // touch their already-verified behavior.
-        events: ['pointerdown', 'click', 'pointermove', 'pointerout'],
+        events: ['pointerdown', 'click', 'pointermove', 'pointerout', 'pointerup'],
         hover: {
           onHover: null,
           mode: 'nearest',
@@ -8547,10 +8601,208 @@
 
         }
 
+        // Shared across every Chart.Tooltip instance on the page (one per graph/canvas) —
+        // exactly one floating tooltip element exists at a time, same as when this state
+        // lived on the card itself. A module-level closure variable is the equivalent here:
+        // each Tooltip instance's own `this` is per-graph, but the DOM element and which
+        // graph currently owns it must be shared, not duplicated per instance.
+        var _hecTooltipEl = null;
+        var _hecTooltipOwner = null;
+
         Chart.Tooltip = Element.extend({
           initialize: function () {
             this._model = getBaseModel(this._options);
             this._lastActive = [];
+          },
+
+          _hecCountWords: function (text) {
+            return text.split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
+          },
+
+          _hecWordBasedFadeDuration: function (wordCount) {
+            return 1000 + 500 * wordCount;
+          },
+
+          // Nudges an already-positioned, already-visible floating element back fully
+          // inside the viewport if any edge overflows. Duplicated from the card's own
+          // _clampToViewport (used there for its other floating popups too) so this file
+          // has no outside dependency for it.
+          _hecClampToViewport: function (el, anchorEl) {
+            // Clamped to the card itself (the <ha-card id="maincard"> the graphs live
+            // inside), not the whole browser window — the tooltip may overflow anywhere
+            // over the card, but never onto Home Assistant's own surrounding UI (side
+            // menu, header, etc). anchorEl.closest() stays within the same shadow root as
+            // #maincard (both are inside the card's own shadow DOM), so this doesn't run
+            // into the usual closest()-can't-cross-shadow-boundaries limitation. Falls back
+            // to the full window if #maincard can't be found for any reason, matching the
+            // previous behavior rather than failing silently.
+            var _bounds = (anchorEl && anchorEl.closest && anchorEl.closest('#maincard'))
+              ? anchorEl.closest('#maincard').getBoundingClientRect()
+              : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+            var _r = el.getBoundingClientRect();
+            var _dx = 0, _dy = 0;
+            if (_r.right > _bounds.right) _dx = _bounds.right - _r.right;
+            else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
+            if (_r.bottom > _bounds.bottom) _dy = _bounds.bottom - _r.bottom;
+            else if (_r.top < _bounds.top) _dy = _bounds.top - _r.top;
+            if (_dx) el.style.left = (el.offsetLeft + _dx) + 'px';
+            if (_dy) {
+              if (el.style.bottom !== '') el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
+              else el.style.top = (el.offsetTop + _dy) + 'px';
+            }
+          },
+
+          _hecArmTooltipAutoFade: function (_el, duration, justMoved) {
+            if (arguments.length >= 3 && justMoved !== true) return;
+            _el.style.opacity = '0';
+            requestAnimationFrame(function () { _el.style.opacity = '1'; });
+            this._hecStartTooltipFade(_el, duration);
+          },
+
+          _hecStartTooltipFade: function (_el, duration) {
+            var me = this;
+            var _chart = me._chart;
+            clearTimeout(_el._hecFadeTimer);
+            clearTimeout(_el._hecRemoveTimer);
+            _el._hecFadeTimer = setTimeout(function () { _el.style.opacity = '0'; }, duration);
+            _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _chart); }, duration + 1000);
+          },
+
+          // _chart is passed uniformly by both callers (the timer path above, and the
+          // ResizeObserver safety net below) — homogeneous, even though the safety net's
+          // own case never actually has a point to turn off in practice (it fires because
+          // the graph/view is gone or hidden, so _chart.active is already empty or the
+          // instance itself is torn down/cached away by then; the _chart.active.length
+          // guard below simply no-ops there). removeHoverStyle never turns a point fully
+          // invisible if it's independently kept visible by showPoints (a separate,
+          // permanent pointRadius on the dataset, not hover-driven) — it only resets the
+          // radius back to that dataset's own baseline, whatever that already is.
+          _hecKillFloatingTooltip: function (_el, _chart) {
+            clearTimeout(_el._hecFadeTimer);
+            clearTimeout(_el._hecRemoveTimer);
+            if (_el._hecObserver) _el._hecObserver.disconnect();
+            if (_el.parentNode) _el.remove();
+            if (_chart && _chart.active && _chart.active.length) {
+              _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
+              _chart.active = [];
+            }
+          },
+
+          _hecAttachFloatingTooltip: function (_el, anchorEl) {
+            var me = this;
+            var _offsetParent = anchorEl.offsetParent;
+            var _targetParent = _offsetParent || document.body;
+            if (_el.parentNode !== _targetParent) _targetParent.appendChild(_el);
+            var _wantPosition = _offsetParent ? 'absolute' : 'fixed';
+            if (_el.style.position !== _wantPosition) _el.style.position = _wantPosition;
+            if (_el._hecObserverTarget !== anchorEl) {
+              if (_el._hecObserver) _el._hecObserver.disconnect();
+              _el._hecObserverTarget = anchorEl;
+              _el._hecObserver = new ResizeObserver(function (entries) {
+                var _box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
+                var _w = _box ? _box.inlineSize : entries[0].contentRect.width;
+                var _h = _box ? _box.blockSize : entries[0].contentRect.height;
+                if (_w === 0 && _h === 0) me._hecKillFloatingTooltip(_el, me._chart);
+              });
+              _el._hecObserver.observe(anchorEl);
+            }
+          },
+
+          // Renders the tooltip as a floating DOM element instead of drawing on the canvas
+          // — the on-canvas draw is hard-clipped to its own graph's canvas, so a short
+          // graph or one near a viewport edge would truncate the tooltip with no way to fix
+          // that from within canvas drawing. Called from draw() below in place of the old
+          // on-canvas path.
+          _hecRenderFloatingTooltip: function () {
+            var me = this;
+            var _vm = this._view;
+            var _el = _hecTooltipEl;
+
+            var _justMoved = !!(_vm && _vm.hecJustMoved);
+            if (_vm) _vm.hecJustMoved = false;
+
+            if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
+              if (_el && _hecTooltipOwner === this._chart) this._hecStartTooltipFade(_el, 0);
+              return;
+            }
+            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+            if (!_hasContent) {
+              if (_el && _hecTooltipOwner === this._chart) this._hecStartTooltipFade(_el, 0);
+              return;
+            }
+
+            var _padY = 6, _padX = 8;
+
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.id = 'hec-chart-tooltip';
+              _el.style.cssText = 'z-index:9999;pointer-events:none;border-radius:4px;padding:' + _padY + 'px ' + _padX + 'px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
+              _hecTooltipEl = _el;
+            }
+            this._hecAttachFloatingTooltip(_el, this._chart.canvas);
+            _el.style.background = _vm.backgroundColor;
+            _el.style.border = _vm.borderWidth + 'px solid ' + _vm.borderColor;
+            _el.style.color = _vm.bodyFontColor;
+
+            var _wordCount = 0;
+            var _addLine = function (text, color, swatch) {
+              var _row = document.createElement('div');
+              if (color) _row.style.color = color;
+              if (swatch) {
+                var _sw = document.createElement('span');
+                _sw.style.cssText = 'display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle;border-radius:2px;border:1px solid ' + swatch.borderColor + ';background:' + swatch.backgroundColor + ';';
+                _row.appendChild(_sw);
+              }
+              _row.appendChild(document.createTextNode(text));
+              _el.appendChild(_row);
+              _wordCount += me._hecCountWords(text);
+            };
+
+            _el.innerHTML = '';
+            for (var _ti = 0; _ti < _vm.title.length; _ti++) {
+              var _t = _vm.title[_ti];
+              var _row = document.createElement('div');
+              _row.style.fontWeight = '600';
+              _row.style.marginBottom = '2px';
+              _row.style.color = _vm.titleFontColor;
+              _row.appendChild(document.createTextNode(_t));
+              _el.appendChild(_row);
+              _wordCount += this._hecCountWords(_t);
+            }
+            for (var _bi = 0; _bi < _vm.beforeBody.length; _bi++) _addLine(_vm.beforeBody[_bi]);
+            _vm.body.forEach(function (_item, _i) {
+              for (var _bj = 0; _bj < _item.before.length; _bj++) _addLine(_item.before[_bj]);
+              for (var _lj = 0; _lj < _item.lines.length; _lj++) _addLine(_item.lines[_lj], _vm.labelTextColors[_i], _vm.displayColors ? _vm.labelColors[_i] : null);
+              for (var _aj = 0; _aj < _item.after.length; _aj++) _addLine(_item.after[_aj]);
+            });
+            for (var _ai = 0; _ai < _vm.afterBody.length; _ai++) _addLine(_vm.afterBody[_ai]);
+
+            var _caret = document.createElement('div');
+            var _cs = _vm.caretSize, _cr = _vm.cornerRadius, _bw = _vm.borderWidth;
+            var _bg = _vm.backgroundColor;
+            _caret.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
+            if (_vm.yAlign === 'center') {
+              _caret.style.top = '50%';
+              _caret.style.marginTop = -_cs + 'px';
+              if (_vm.xAlign === 'left') { _caret.style.left = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderRightColor = _bg; }
+              else { _caret.style.right = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderLeftColor = _bg; }
+            } else {
+              if (_vm.xAlign === 'left') _caret.style.left = (_cr - _padX) + 'px';
+              else if (_vm.xAlign === 'right') _caret.style.right = (_cr - _padX) + 'px';
+              else { _caret.style.left = '50%'; _caret.style.marginLeft = -_cs + 'px'; }
+              if (_vm.yAlign === 'top') { _caret.style.top = -(_bw + _padY + _cs) + 'px'; _caret.style.borderBottomColor = _bg; }
+              else { _caret.style.bottom = -(_bw + _padY + _cs) + 'px'; _caret.style.borderTopColor = _bg; }
+            }
+            _el.appendChild(_caret);
+
+            _hecTooltipOwner = this._chart;
+            _el.style.display = 'block';
+            var _canvasRect = this._chart.canvas.getBoundingClientRect();
+            var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+            _el.style.left = (_canvasRect.left - _origin.left + _vm.x) + 'px';
+            _el.style.top = (_canvasRect.top - _origin.top + _vm.y) + 'px';
+            this._hecClampToViewport(_el, this._chart.canvas);
+            this._hecArmTooltipAutoFade(_el, this._hecWordBasedFadeDuration(_wordCount), _justMoved);
           },
 
           // Get the title
@@ -8953,14 +9205,12 @@
             var ctx = this._chart.ctx;
             var vm = this._view;
 
-            // Lets the caller take over rendering entirely (e.g. a DOM tooltip that isn't
-            // clipped by this chart's own canvas bounds) instead of the built-in on-canvas
-            // draw below. Must run before the opacity===0 early return so the callback is
-            // also invoked when the tooltip should hide.
-            if (this._options.custom) {
-              this._options.custom.call(this);
-              return;
-            }
+            // Floating DOM tooltip, drawn outside the canvas — see
+            // _hecRenderFloatingTooltip above. Replaces the on-canvas draw below entirely;
+            // must run before the opacity===0 early return so it's also invoked when the
+            // tooltip should hide.
+            this._hecRenderFloatingTooltip();
+            return;
 
             if (vm.opacity === 0) {
               return;
@@ -9001,115 +9251,6 @@
               // Footer
               this.drawFooter(pt, vm, ctx, opacity);
             }
-          },
-
-          /**
-              * Handle an event
-              * @private
-              * @param {IEvent} event - The event to handle
-              * @returns {Boolean} true if the tooltip changed
-              */
-          handleEvent: function (e) {
-            var me = this;
-            var options = me._options;
-            var changed = false;
-            var HOVER_MOVE_THRESHOLD_SQ = 16; // 4px radius — same rule as Controller.handleEvent
-
-            me._active = me._active || [];
-            me._lastActive = me._lastActive || [];
-
-            // Find Active Elements for tooltips. Same trigger rule as Chart.Controller's
-            // own handleEvent above (this computation is independent of it — this one
-            // drives what shows IN the tooltip, the other drives hover styling — so it
-            // needs the same logic, not a shared state): the hit-test only runs on a real
-            // contact (mousedown) or on a pointer move that travelled at least 4px since
-            // the position that produced the current active element, and only when hover
-            // is enabled on the parent chart. A refresh of the chart's data between two
-            // pointer events never reaches this code at all.
-            //
-            // _justMoved is a LOCAL variable, scoped to this single call — it is never
-            // stored on me, so it cannot outlive this invocation and be read stale by some
-            // later, unrelated call. The state-to-event transformation is the detection
-            // itself: comparing the current position against the last one a gesture was
-            // confirmed at, deciding "moved" only past the threshold, and only THEN
-            // updating that reference — that decision already is the one-shot event.
-            // It is handed to update() directly, in this same call, right after being
-            // computed — never deferred to be picked up by a later, possibly-unrelated
-            // update() call (which is exactly what let a stale "moved" leak into an
-            // unrelated data-refresh render before this fix).
-            var _justMoved = false;
-            if (e.type === 'mouseout') {
-              // Same fix as Controller.handleEvent above, for the same reason — see the
-              // comment there. A non-hover device fires a synthetic mouseout right after
-              // pointerup with the SAME in-canvas coordinates as the contact that just
-              // ended; only a real exit carries out-of-bounds coordinates.
-              var _dpr = me._chart.currentDevicePixelRatio || 1;
-              var _reallyOutside = e.x === null || e.y === null ||
-                e.x < 0 || e.y < 0 || e.x > me._chart.canvas.width / _dpr || e.y > me._chart.canvas.height / _dpr;
-              if (_reallyOutside) {
-                me._active = [];
-                me._hecLastHitXY = undefined;
-              }
-              // else: synthetic mouseout from a non-hover device's pointerup — ignore it.
-            } else if (e.type === 'mousedown') {
-              me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
-              _justMoved = true;
-              if (e.x !== null && e.y !== null) {
-                me._hecLastHitXY = { x: e.x, y: e.y };
-              }
-            } else if (e.type === 'mousemove') {
-              var _searched = false;
-              var _hoverEnabled = me._chart.options.hover && me._chart.options.hover.hoverEnabled;
-              if (_hoverEnabled) {
-                if (!me._hecLastHitXY || e.x === null || e.y === null) {
-                  _searched = true;
-                } else {
-                  var _dx = e.x - me._hecLastHitXY.x, _dy = e.y - me._hecLastHitXY.y;
-                  if (_dx * _dx + _dy * _dy >= HOVER_MOVE_THRESHOLD_SQ) {
-                    _searched = true;
-                  }
-                }
-              }
-              if (_searched) {
-                me._active = me._chart.getElementsAtEventForMode(e, options.mode, options);
-                _justMoved = true;
-                if (e.x !== null && e.y !== null) {
-                  me._hecLastHitXY = { x: e.x, y: e.y };
-                }
-              }
-              // else: below threshold (or hover disabled) — leave me._active untouched
-            }
-
-            // Remember Last Actives
-            changed = !helpers.arrayEquals(me._active, me._lastActive);
-
-            // If tooltip didn't change, do not handle the target event. Note this can
-            // discard a true _justMoved (a real gesture whose hit-test still landed on the
-            // same point) — that is correct and intentional: per the card's tooltip spec, a
-            // gesture that doesn't change the active point has nothing new to show, so
-            // there is nothing here for update() to be called for. Nothing is lost by
-            // discarding it, precisely because _justMoved is local and never persisted.
-            if (!changed) {
-              return false;
-            }
-
-            me._lastActive = me._active;
-
-            if (options.enabled || options.custom) {
-              me._eventPosition = {
-                x: e.x,
-                y: e.y };
-
-
-              var model = me._model;
-              me.update(true, _justMoved);
-              me.pivot();
-
-              // See if our tooltip position changed
-              changed |= model.x !== me._model.x || model.y !== me._model.y;
-            }
-
-            return changed;
           } });
 
 
