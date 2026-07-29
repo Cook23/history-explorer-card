@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.40] - 2026-07-29
+## [v1.1.41] - 2026-07-29
 
 ### Fixed — tooltip sometimes not appearing on touch even though the point highlighted correctly
 - The point highlight and the tooltip content used to be decided by two separate calculations, each with its own criteria for "is a point close enough here" — on a touch device, a contact that was close enough to light up the point could still be judged too far off to open the tooltip
@@ -26,6 +26,9 @@ Changelog for the HA History Explorer Card.
 - Clicking around on several graphs one after another could leave a point lit up on one graph while the tooltip showed on another — they shared the same underlying floating element and timer instead of each graph having its own
 - Each graph now has its own independent tooltip element and timer, so this can no longer happen
 
+
+## [v1.1.40] - 2026-07-29
+- Pulled release. Pulled.
 
 ## [v1.1.39] - 2026-07-29
 
