@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.41b5';
+const Version = '1.1.42b12';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -4519,19 +4519,40 @@ export class HistoryCardState {
     _clampToViewport(el)
     {
         // Nudges an already-positioned, already-visible floating element (menu, dropdown,
-        // tooltip) back fully inside the card itself, not the whole browser window — it may
-        // overflow anywhere over the card, but never onto Home Assistant's own surrounding
-        // UI (side menu, header, etc). Falls back to the full window if #maincard can't be
-        // found for any reason, matching the previous behavior rather than failing silently.
-        // Call once after display:block and left/top/bottom/transform are set. Reads back
-        // the actual rendered box via getBoundingClientRect() rather than assuming how the
+        // tooltip) back fully inside its allowed bounds if any edge overflows. Every edge is
+        // clamped to whichever of #maincard and the browser viewport is MORE restrictive —
+        // never to #maincard alone, never to the viewport alone. Two distinct reasons this
+        // needs both, applied the same way on all four sides for consistency:
+        //   - #maincard alone isn't enough: it may overflow anywhere over the card, but never
+        //     onto Home Assistant's own surrounding UI (side menu, header, etc) — so its own
+        //     edges must stay inside the viewport too, in particular when the card itself has
+        //     scrolled partly off-screen (its own top could then be above the visible area).
+        //   - The viewport alone isn't enough either: a freshly-mounted card (never seen
+        //     before — e.g. a brand new cardName) starts out empty, before its graphs have
+        //     loaded, so #maincard's real size at that exact moment can be far smaller than
+        //     the space genuinely available around it on the page — clamping purely to the
+        //     viewport in that case would let a menu spill past the card's own edge.
+        // The bottom is the one exception: only ever the viewport, never #maincard, since
+        // Home Assistant leaves no meaningful UI below the dashboard content, so there is
+        // nothing the viewport-only bound could wrongly let a menu spill onto down there —
+        // and using #maincard there would reintroduce exactly the empty-card problem above.
+        // Falls back to the full window on the other three sides if #maincard can't be found
+        // for any reason, matching the previous behavior rather than failing silently. Call
+        // once after display:block and left/top/bottom/transform are set. Reads back the
+        // actual rendered box via getBoundingClientRect() rather than assuming how the
         // position was computed, so this works uniformly for position:fixed and
         // position:absolute, for elements anchored via `top` or `bottom`, and for elements
         // using a CSS transform (e.g. translateX for center/right-aligned tooltips) — a
         // translation delta applied to `left`/`top` shifts the final rendered position by
         // the same delta regardless of any transform already in effect.
         const _cardEl = this._this?.querySelector('#maincard');
-        const _bounds = _cardEl ? _cardEl.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+        const _cardRect = _cardEl ? _cardEl.getBoundingClientRect() : null;
+        const _bounds = {
+            left:   Math.max(_cardRect ? _cardRect.left  : 0, 0),
+            top:    Math.max(_cardRect ? _cardRect.top   : 0, 0),
+            right:  Math.min(_cardRect ? _cardRect.right : window.innerWidth, window.innerWidth),
+            bottom: window.innerHeight,
+        };
         const _r = el.getBoundingClientRect();
         let _dx = 0, _dy = 0;
         if( _r.right > _bounds.right ) _dx = _bounds.right - _r.right;
