@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.42] - 2026-07-30
+
+### Fixed — menus could appear squeezed off-screen on a new card
+- A card that had never been shown before started out empty, with no graphs at all — so the card was much shorter than usual at that moment, and a menu clamped to fit within it could get pushed almost entirely off-screen
+- Menus are now also clamped to the browser window itself, so they always have enough room to show properly even on a card that's still empty
+
+
 ## [v1.1.41] - 2026-07-29
 
 ### Fixed — tooltip sometimes not appearing on touch even though the point highlighted correctly
@@ -28,7 +35,7 @@ Changelog for the HA History Explorer Card.
 
 
 ## [v1.1.40] - 2026-07-29
-- Pulled release. Pulled.
+- Wrong release. Pulled.
 
 ## [v1.1.39] - 2026-07-29
 
