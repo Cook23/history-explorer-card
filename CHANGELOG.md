@@ -40,6 +40,10 @@ Changelog for the HA History Explorer Card.
 - With no local history yet, every YAML value looked like a fresh YAML edit: YAML won over what the other devices had synced through Home Assistant, and was then written back, overwriting it for everyone
 - A device's first load now takes the synced values (where multi-device persistence is enabled), and YAML only where nothing was synced
 
+### Fixed — multi-device sync of dynamically added entities
+- With `enable_multidevice_persistence: none` (local memory only), entities added on another device still appeared on this one — they no longer do
+- An entity removed on one device came back on the others at their next reload — a removal is now synced too (an entity this device had seen in HA and that's gone from it was removed elsewhere)
+
 ### Fixed — `unit:` set in YAML is now used when deciding whether a new dynamic entity can join an existing graph
 
 

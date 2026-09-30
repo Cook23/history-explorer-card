@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43b5';
+const Version = '1.1.43b6';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -6880,6 +6880,13 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
+        // What this device writes to HA just below is, from now on, the last HA state it
+        // knows of — the HA mirrors are updated to it, so that on the next load only
+        // changes made by OTHER devices since then count as "HA changed" (e.g. an entity
+        // this device added and another one removed before this device reloaded).
+        this._lastHaEntities         = JSON.parse(JSON.stringify(this.pconfig.entities));
+        this._lastHaTimeRangeHours   = this.activeRange.timeRangeHours;
+        this._lastHaTimeRangeMinutes = this.activeRange.timeRangeMinutes;
         const data = {
             // Active values
             entities            : this.pconfig.entities,
@@ -6995,9 +7002,19 @@ export class HistoryCardState {
             _staticOrderEnabled, _staticOrderMultidevice
         );
 
+        // Dynamic entities another device added only reach this device if multi-device
+        // persistence covers entities — with enable_persistence alone, this device only
+        // ever knows the ones it added itself.
+        const _dynamicMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities');
+        // Removed on another device (last one to speak): an entity this device had already
+        // seen in HA (in its HA mirror) but that's gone from HA now was deleted elsewhere —
+        // dropped here too. One missing from both is a local addition not synced yet — kept.
+        const _haIdsNow    = new Set(_haEntities.map(e => e.entity));
+        const _haIdsMirror = new Set(_haMirror.map(e => e.entity));
+        const _removedElsewhere = id => _dynamicMultidevice && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
         const _dynamicCandidates = [...new Set([
-            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
-            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ..._lsEntities.filter(e => !e.isStatic && !_removedElsewhere(e.entity)).map(e => e.entity),
+            ...( _dynamicMultidevice ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : [] ),
         ])];
         const _dynamicOrder = this._resolveOrder(
             _dynamicCandidates, null, null,
