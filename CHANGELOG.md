@@ -4,7 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.44] - unreleased (beta)
+## [v1.1.44] - 2026-09-30
+
+### Fixed — the curves of a graph could come back in a shuffled order after syncing
+- v1.1.43 saved the position of each linked graph within its block per entity: after a change synced from another device, some entities took their position from there and others kept this device's own, and the curves of a graph came back shuffled
+- The order within a block of linked graphs is now carried by the entities' order, resolved as a whole like any other order
 
 ### Fixed — a change made on this device could randomly revert on reload (e.g. a display type picked from the menu)
 - v1.1.43 updated this device's image of the Home Assistant user data with what it had just written there. That write is asynchronous and may land late or not at all (connection lost, page reloaded first): Home Assistant then still returned the old value, which differed from the image and was taken as a change from another device — reverting this device's own change

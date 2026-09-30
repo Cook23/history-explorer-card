@@ -21,6 +21,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.1.44** — Multi-device sync fixes: a change could randomly revert on reload, showing a hidden curve again wasn't synced, curves could come back shuffled.
 - **v1.1.43** — New `smart` line mode (silences drawn as flat dashed plateaus); YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
 - **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
 - **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.

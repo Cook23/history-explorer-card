@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.44b1';
+const Version = '1.1.44';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2932,6 +2932,7 @@ export class HistoryCardState {
                                 this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG, undefined, false, null, _tgtOrigGroupId, _pe ?? en);
                             });
                     this.pconfig.combineSameUnits = _savedCombine2;
+                    if( _sameGroup ) this._syncGroupOrder(_tgtOrigGroupId);
                     // Persist now — after the reconstruction, not before — so the freshly
                     // computed graphIndex (and everything else addGraph resolved) is what
                     // actually gets saved.
@@ -3249,6 +3250,27 @@ export class HistoryCardState {
         return this._rebuildGraphIndex.get(a) === this._rebuildGraphIndex.get(b);
     }
 
+    // Puts the pconfig.entities entries of one group in the order they're displayed in
+    // (graph by graph down the block, then legend order), at the group's current place.
+    // That order is what carries the layout of a block of linked graphs across reloads
+    // and devices — graphIndex is only a live, per-device position (see readLocalState).
+    _syncGroupOrder(groupId)
+    {
+        if( groupId === null || groupId === undefined ) return;
+        const _shown = this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
+            .flatMap(g => g.entities.map(e => e.entity));
+        const _first = this.pconfig.entities.findIndex(e => typeof e === 'object' && e.groupId === groupId);
+        if( _first < 0 ) return;
+        const _entries = this.pconfig.entities.filter(e => typeof e === 'object' && e.groupId === groupId);
+        _entries.sort((a, b) => {
+            const ia = _shown.indexOf(a.entity), ib = _shown.indexOf(b.entity);
+            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib);
+        });
+        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && e.groupId === groupId));
+        _rest.splice(Math.min(_first, _rest.length), 0, ..._entries);
+        this.pconfig.entities = _rest;
+    }
+
     // Something to uncombine: a static graph splits one of its own curves off (needs at
     // least two on this graph); a dynamic entity leaves its group (needs a group of two+).
     _canUncombine(g)
@@ -3290,6 +3312,7 @@ export class HistoryCardState {
             const _nextG = this._nextGraph(g);
             this._detachAndRebuildRemaining(g, idx, _nextG);
             this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, true, null, g.groupId, _entity);
+            this._syncGroupOrder(g.groupId);
             this.writeLocalState();
             this.updateHistory();
             return;
@@ -3646,6 +3669,7 @@ export class HistoryCardState {
                             this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG0, undefined, false, null, _tgtGroupId, _pe ?? en);
                         });
             this.pconfig.combineSameUnits = _saved2;
+            if( _sameGroup ) this._syncGroupOrder(_tgtGroupId);
         } else {
             const _groupId = this._pcGroupIdOf(_allTgtEntities[0].entity);
             if( _groupId !== undefined ) {
@@ -3869,6 +3893,7 @@ export class HistoryCardState {
         _moved.forEach((g, k) => {
             for( let e of g.entities ) e.graphIndex = _newGraphIndex + k * _step;
         });
+        this._syncGroupOrder(_srcG.groupId);
         this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
@@ -5180,6 +5205,7 @@ export class HistoryCardState {
         _all.forEach((en, i) => {
             this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId, en);
         });
+        this._syncGroupOrder(_groupId);
         this.writeLocalState();
         this.updateHistory();
     }
@@ -7181,15 +7207,18 @@ export class HistoryCardState {
                 for( const _f of _multiFields )
                     _take(_haE, _f);
             // graphKey (which linked graph of its group the entity is shown in — see
-            // _uncombineEntity) and graphIndex (that graph's position inside the group's
-            // block) aren't fields of their own: they're part of the grouping, so they
-            // follow whichever source won groupId above.
+            // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
+            // follows whichever source won groupId above. graphIndex is NOT taken over per
+            // entity: it's a position relative to the other graphs of the block, so taking
+            // it from different sources for different entities would mix two coordinate
+            // systems and shuffle the block. The order inside a block is carried by the
+            // entities' order instead (resolved as a whole, see 'order' — and kept in step
+            // with the display by _syncGroupOrder).
             const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                             ( _enabledFields.has('groupId') ? _localE : null );
             if( _keySrc ) {
                 if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
                 else delete _result.graphKey;
-                if( _keySrc.graphIndex !== undefined ) _result.graphIndex = _keySrc.graphIndex;
             }
             return _result;
         });
