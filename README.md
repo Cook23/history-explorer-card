@@ -194,6 +194,16 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 
 An incompatible drop shows a brief tooltip explaining the mismatch.
 
+### Linked graphs
+
+A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Only entities of different display types (e.g. a line and a bar) end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+
+- **Double-click** a curve label of a YAML graph to show it in its own graph right below — it stays linked to its YAML graph
+- **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
+- **Double-click** the chain icon to merge the two linked graphs back into one
+
+Linked graphs can always be merged back as long as their display types match (a line can't share a graph with a bar, timeline or arrowline).
+
 ### Reordering graphs
 
 Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock.

@@ -355,13 +355,27 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Only entities of different display types (for example a `line` and a `bar`, when the graph has no `type:`) can't share one chart: they are shown as separate *linked* graphs, see below.
+
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
 #### Ungrouping a curve
 
 A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
+On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
+
 A long-press (700ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+
+#### Linked graphs
+
+Graphs sharing the same group are shown as a solid block with a chain icon 🔗 between them, on the left. A group gets split into several linked graphs either by a double-click on a YAML graph's label (see above) or by changing an entity's display type (a line and a bar can't share one chart).
+
+Within a group, curves can always be shown together again, whatever their units, as long as their display types match:
+- **Drag** a curve (or timeline entity) label onto another graph of the same group
+- **Double-click** the chain icon to merge the graph below it into the graph above it
+
+A curve of a YAML graph can't be dropped onto a graph of another group, and a curve from elsewhere can't be dropped onto a YAML graph.
 
 #### Moving curves between graphs
 

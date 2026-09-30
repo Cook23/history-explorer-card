@@ -35,7 +35,8 @@ const lang_en =
             "type_label"         : "Type",
             "type_default"       : "Default",
             "entity_delete"      : "Delete",
-            "linked_graphs"      : "Linked graphs"
+            "linked_graphs"      : "Linked graphs",
+            "linked_graphs_merge": "Double-click to merge"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -96,7 +97,8 @@ const lang_fr =
             "type_label"         : "Type",
             "type_default"       : "Par défaut",
             "entity_delete"      : "Supprimer",
-            "linked_graphs"      : "Graphiques liés"
+            "linked_graphs"      : "Graphiques liés",
+            "linked_graphs_merge": "Double-clic pour fusionner"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -157,7 +159,8 @@ const lang_de =
             "type_label"         : "Typ",
             "type_default"       : "Standard",
             "entity_delete"      : "Löschen",
-            "linked_graphs"      : "Verknüpfte Diagramme"
+            "linked_graphs"      : "Verknüpfte Diagramme",
+            "linked_graphs_merge": "Doppelklick zum Zusammenführen"
         },
         "ranges" : {
             "l_hour" : "< 1 Std",
@@ -218,7 +221,8 @@ const lang_es =
             "type_label"         : "Tipo",
             "type_default"       : "Predeterminado",
             "entity_delete"      : "Eliminar",
-            "linked_graphs"      : "Gráficos vinculados"
+            "linked_graphs"      : "Gráficos vinculados",
+            "linked_graphs_merge": "Doble clic para combinar"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -279,7 +283,8 @@ const lang_nl =
             "type_label"         : "Type",
             "type_default"       : "Standaard",
             "entity_delete"      : "Verwijderen",
-            "linked_graphs"      : "Gekoppelde grafieken"
+            "linked_graphs"      : "Gekoppelde grafieken",
+            "linked_graphs_merge": "Dubbelklik om samen te voegen"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -340,7 +345,8 @@ const lang_pl =
             "type_label"         : "Typ",
             "type_default"       : "Domyślny",
             "entity_delete"      : "Usuń",
-            "linked_graphs"      : "Połączone wykresy"
+            "linked_graphs"      : "Połączone wykresy",
+            "linked_graphs_merge": "Kliknij dwukrotnie, aby połączyć"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -401,7 +407,8 @@ const lang_sv =
             "type_label"         : "Typ",
             "type_default"       : "Standard",
             "entity_delete": "Ta bort",
-            "linked_graphs": "Länkade grafer"
+            "linked_graphs": "Länkade grafer",
+            "linked_graphs_merge": "Dubbelklicka för att slå ihop"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -462,7 +469,8 @@ const lang_da =
             "type_label"         : "Type",
             "type_default"       : "Standard",
             "entity_delete"      : "Slet",
-            "linked_graphs"      : "Sammenkædede grafer"
+            "linked_graphs"      : "Sammenkædede grafer",
+            "linked_graphs_merge": "Dobbeltklik for at flette"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -523,7 +531,8 @@ const lang_sk =
             "type_label"         : "Typ",
             "type_default"       : "Predvolené",
             "entity_delete"      : "Odstrániť",
-            "linked_graphs"      : "Prepojené grafy"
+            "linked_graphs"      : "Prepojené grafy",
+            "linked_graphs_merge": "Dvojitým kliknutím zlúčiť"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -584,7 +593,8 @@ const lang_ru =
             "type_label"         : "Тип",
             "type_default"       : "По умолчанию",
             "entity_delete"      : "Удалить",
-            "linked_graphs"      : "Связанные графики"
+            "linked_graphs"      : "Связанные графики",
+            "linked_graphs_merge": "Дважды щёлкните, чтобы объединить"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",
