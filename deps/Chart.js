@@ -4083,8 +4083,15 @@
             // longer than that duration, the tooltip closes mid-pan — correct, since nothing
             // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
-              var _stillValid = me.active.filter(function(el) {
-                return el && me.data.datasets[el._datasetIndex];
+              // Re-resolve each active element against the reloaded data: a new time range
+              // can shrink a dataset below the active index (element gone), and the tooltip
+              // callbacks (labelColor, positioners) read meta.data[index]._view directly —
+              // a stale index there throws mid-update and leaves a half-built tooltip model.
+              var _stillValid = [];
+              me.active.forEach(function(el) {
+                if (!el || !me.data.datasets[el._datasetIndex]) return;
+                var _cur = me.getDatasetMeta(el._datasetIndex).data[el._index];
+                if (_cur && _cur._view) _stillValid.push(_cur);
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
@@ -8282,7 +8289,8 @@
             labelColor: function (tooltipItem, chart) {
               var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
               var activeElement = meta.data[tooltipItem.index];
-              var view = activeElement._view;
+              var view = activeElement && activeElement._view;
+              if (!view) return { borderColor: 'rgba(0,0,0,0)', backgroundColor: 'rgba(0,0,0,0)' };
               return {
                 borderColor: view.borderColor,
                 backgroundColor: view.backgroundColor };
@@ -8717,7 +8725,10 @@
               if (_el) this._hecStartTooltipFade(_el, 0);
               return;
             }
-            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+            // A model left half-built by a throw inside Tooltip.update() can still read
+            // tooltipActive === true with its text arrays missing — treat it as empty.
+            var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
+            var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
             if (!_hasContent) {
               if (_el) this._hecStartTooltipFade(_el, 0);
               return;
