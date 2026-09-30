@@ -2918,21 +2918,31 @@
             point._datasetIndex = datasetIndex;
             point._index = index;
 
+            // Silence plateaus ('smart' line mode, see the card's _applySilencePlateaus):
+            // a data point flagged hecPlateauEnd ends a flat stretch drawn as a straight,
+            // dashed segment from the previous point; a hecVirtual point only exists to
+            // shape the curve (never drawn as a dot, never hovered).
+            var hecPlateauEnd = !!(value && value.hecPlateauEnd);
+            var hecVirtual = !!(value && value.hecVirtual);
+
             // Desired view properties
             point._model = {
               x: x,
               y: y,
               skip: custom.skip || isNaN(x) || isNaN(y),
+              hecPlateauEnd: hecPlateauEnd,
+              hecVirtual: hecVirtual,
               // Appearance
-              radius: custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
+              radius: hecVirtual ? 0 : custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
               pointStyle: custom.pointStyle || helpers.valueAtIndexOrDefault(dataset.pointStyle, index, pointOptions.pointStyle),
               backgroundColor: me.getPointBackgroundColor(point, index),
               borderColor: me.getPointBorderColor(point, index),
               borderWidth: me.getPointBorderWidth(point, index),
-              tension: meta.dataset._model ? meta.dataset._model.tension : 0,
-              steppedLine: meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              // (the segment ending at a plateau end is always a straight line)
+              tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
+              steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
               // Tooltip
-              hitRadius: custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
+              hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
           },
 
@@ -4083,8 +4093,15 @@
             // longer than that duration, the tooltip closes mid-pan — correct, since nothing
             // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
-              var _stillValid = me.active.filter(function(el) {
-                return el && me.data.datasets[el._datasetIndex];
+              // Re-resolve each active element against the reloaded data: a new time range
+              // can shrink a dataset below the active index (element gone), and the tooltip
+              // callbacks (labelColor, positioners) read meta.data[index]._view directly —
+              // a stale index there throws mid-update and leaves a half-built tooltip model.
+              var _stillValid = [];
+              me.active.forEach(function(el) {
+                if (!el || !me.data.datasets[el._datasetIndex]) return;
+                var _cur = me.getDatasetMeta(el._datasetIndex).data[el._index];
+                if (_cur && _cur._view) _stillValid.push(_cur);
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
@@ -5817,7 +5834,8 @@
           meta = chart.getDatasetMeta(i);
           for (j = 0, jlen = meta.data.length; j < jlen; ++j) {
             var element = meta.data[j];
-            if (!element._view.skip) {
+            // (hecVirtual: a curve-shaping point of the 'smart' line mode — not a value)
+            if (!element._view.skip && !element._view.hecVirtual) {
               handler(element);
             }
           }
@@ -8282,7 +8300,8 @@
             labelColor: function (tooltipItem, chart) {
               var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
               var activeElement = meta.data[tooltipItem.index];
-              var view = activeElement._view;
+              var view = activeElement && activeElement._view;
+              if (!view) return { borderColor: 'rgba(0,0,0,0)', backgroundColor: 'rgba(0,0,0,0)' };
               return {
                 borderColor: view.borderColor,
                 backgroundColor: view.backgroundColor };
@@ -8717,7 +8736,10 @@
               if (_el) this._hecStartTooltipFade(_el, 0);
               return;
             }
-            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+            // A model left half-built by a throw inside Tooltip.update() can still read
+            // tooltipActive === true with its text arrays missing — treat it as empty.
+            var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
+            var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
             if (!_hasContent) {
               if (_el) this._hecStartTooltipFade(_el, 0);
               return;
@@ -9490,6 +9512,9 @@
           // Stroke Line
           ctx.beginPath();
           lastDrawnIndex = -1;
+          // Silence plateaus ('smart' line mode): left out of this solid pass, collected
+          // and stroked dashed afterwards (a canvas path has a single dash pattern)
+          var plateaus = [];
 
           for (index = 0; index < points.length; ++index) {
             current = points[index];
@@ -9509,6 +9534,9 @@
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
                   ctx.moveTo(currentVM.x, currentVM.y);
+                } else if (currentVM.hecPlateauEnd) {
+                  plateaus.push([previous._view, currentVM]);
+                  ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
                   helpers.canvas.lineTo(ctx, previous._view, current._view);
@@ -9519,6 +9547,20 @@
           }
 
           ctx.stroke();
+
+          if (plateaus.length) {
+            if (ctx.setLineDash) {
+              ctx.setLineDash([4, 4]);
+            }
+            ctx.lineDashOffset = 0;
+            ctx.beginPath();
+            for (index = 0; index < plateaus.length; ++index) {
+              ctx.moveTo(plateaus[index][0].x, plateaus[index][0].y);
+              ctx.lineTo(plateaus[index][1].x, plateaus[index][1].y);
+            }
+            ctx.stroke();
+          }
+
           ctx.restore();
         } });
 

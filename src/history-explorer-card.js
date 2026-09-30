@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.42b12';
+const Version = '1.1.43';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -24,6 +24,9 @@ export const _TYPE_MENU_DEFS = [
     { type: 'bar',  lineMode: null      },
     { type: 'arrowline', lineMode: null },
     { type: 'timeline',  lineMode: null },
+    // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
+    // right after 'Line stepped' in the menus' markup
+    { type: 'line', lineMode: 'smart'   },
 ];
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
@@ -308,6 +311,8 @@ export class HistoryCardState {
     normalizeLineMode(m)
     {
         // Accept singular aliases: 'line' -> 'lines', 'curve' -> 'curves', 'step' -> 'stepped'
+        // ('smart': curves while the source reports, flat dashed plateaus over its
+        // silences — see _applySilencePlateaus)
         if( m === 'line'  ) return 'lines';
         if( m === 'curve' ) return 'curves';
         if( m === 'step'  ) return 'stepped';
@@ -795,7 +800,7 @@ export class HistoryCardState {
 
     updateScaleLockState(g, axisInteraction)
     {
-        const fixedScale = ( g.chart.options.scales.yAxes[0].ticks.forceMin && g.chart.options.scales.yAxes[0].ticks.forceMax );
+        const fixedScale = ( g.chart.options.scales.yAxes[0].ticks.forceMin != null && g.chart.options.scales.yAxes[0].ticks.forceMax != null );
 
         let e = this._this.querySelector(`#ca-${g.id}`);
         if( e ) {
@@ -1447,6 +1452,88 @@ export class HistoryCardState {
         return r;
     }
 
+    // 'smart' line mode: a curve while the source reports, and a flat plateau — the last
+    // known value held — over each of its silences, instead of a diagonal or a spline
+    // bridging the gap to the next value. Same rules as the lowpass_dt integration:
+    // - the source's usual interval between values is an EMA (alpha 0.1) of the intervals,
+    //   seeded with their median (and σ with their median absolute deviation) so that a
+    //   first long interval can't skew it;
+    // - an interval longer than mean + 3σ + 0.1 s (never under 1 s) is a silence, and only
+    //   counts as that limit in the EMA (lowpass_dt's first-sample-after-silence rule);
+    // - the curve resumes one usual interval before the value that ends the silence (a
+    //   virtual point at t0 − mean on the plateau), so the spline only ever joins values
+    //   the source actually reported at its usual rhythm.
+    // Plateaus are marked for Chart.js (hecPlateauEnd on the point ending one: straight,
+    // dashed segment; hecVirtual: curve-shaping only, never shown or hovered). An ongoing
+    // silence (last value to now / the end of the window) is a plateau too.
+    // Note: Home Assistant only records a value when it changes, so a "silence" here is
+    // "no new value recorded" — a steady source looks the same, and the plateau is
+    // equally right for it (the last value still holds).
+    _applySilencePlateaus(s, raw, extended)
+    {
+        if( raw.length < 3 || s.length < 2 ) return s;
+
+        const _dts = [];
+        for( let i = 1; i < raw.length; i++ ) {
+            const dt = raw[i].t - raw[i - 1].t;
+            if( dt > 0 ) _dts.push(dt);
+        }
+        if( _dts.length < 2 ) return s;
+        _dts.sort((a, b) => a - b);
+        let mean = _dts[Math.floor(_dts.length / 2)];
+        // σ seeded the same robust way: from the median absolute deviation (×1.4826, its
+        // ratio to σ for normally distributed values) — not 0, which would make the first
+        // limit mean + 0.1 s and turn the first bit of timing jitter into a "silence"
+        const _dev = _dts.map(d => Math.abs(d - mean)).sort((a, b) => a - b);
+        const sigma0 = 1.4826 * _dev[Math.floor(_dev.length / 2)];
+        let m2 = mean * mean + sigma0 * sigma0;
+        const _limit = () => Math.max(mean + 3 * Math.sqrt(Math.max(0, m2 - mean * mean)) + 100, 1000);
+
+        const gaps = [];
+        for( let i = 1; i < raw.length; i++ ) {
+            const dt = raw[i].t - raw[i - 1].t;
+            if( dt <= 0 ) continue;
+            const limit = _limit();
+            let dtStat = dt;
+            if( dt > limit ) {
+                gaps.push({ ta: raw[i - 1].t, y: raw[i - 1].y, tb: raw[i].t, lead: mean });
+                dtStat = limit;
+            }
+            mean = 0.9 * mean + 0.1 * dtStat;
+            m2   = 0.9 * m2   + 0.1 * dtStat * dtStat;
+        }
+
+        const tOf = p => moment(p.x).valueOf();
+        const out = s.slice();
+
+        // Inserts the plateau start point (the last value before the silence) right before
+        // index k, unless it's already there — decimation may have dropped it
+        const ensureStart = (k, ta, y) => {
+            if( k > 0 && tOf(out[k - 1]) >= ta ) return k;
+            out.splice(k, 0, { x: ta, y });
+            return k + 1;
+        };
+
+        let k = 0;
+        for( const gap of gaps ) {
+            while( k < out.length && tOf(out[k]) < gap.tb ) k++;
+            if( k === 0 || k >= out.length ) continue;
+            k = ensureStart(k, gap.ta, gap.y);
+            out.splice(k, 0, { x: gap.tb - gap.lead, y: gap.y, hecPlateauEnd: true, hecVirtual: true });
+            k++;
+        }
+
+        // Ongoing silence: from the last recorded value to the extension point at the end
+        const last = raw[raw.length - 1];
+        const end = out[out.length - 1];
+        if( extended && tOf(end) - last.t > _limit() ) {
+            const kEnd = ensureStart(out.length - 1, last.t, last.y);
+            out[kEnd].hecPlateauEnd = true;
+        }
+
+        return out;
+    }
+
     buildChartData(result)
     {
         let m_now = moment();
@@ -1540,6 +1627,7 @@ export class HistoryCardState {
                             }
                         }
 
+                        let _extended = false;
                         if( m_now > m_end && s.length > 0 && moment(s[s.length-1].x) < m_end ) {
                             const state = this.process(result[id][n-1].state, process);
                             if( isDataValid(state) ) {
@@ -1547,6 +1635,7 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
+                                _extended = true;
                             }
                         } else if( m_now <= m_end && s.length > 0 && moment(s[s.length-1].x) < m_now ) {
                             const state = this.process(result[id][n-1].state, process);
@@ -1555,7 +1644,20 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
+                                _extended = true;
                             }
+                        }
+
+                        if( (this.normalizeLineMode(g.entities[j].lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+                            // Silences are detected on every recorded value (before decimation)
+                            const _raw = [];
+                            for( let i = 0; i < n; i++ ) {
+                                const state = this.process(result[id][i].state, process);
+                                if( !isDataValid(state) ) continue;
+                                const y = state * scale;
+                                if( !isNaN(y) ) _raw.push({ t: moment(result[id][i].last_changed).valueOf(), y });
+                            }
+                            s = this._applySilencePlateaus(s, _raw, _extended);
                         }
 
                     } else if( g.type == 'bar' && n > 0 ) {
@@ -1791,6 +1893,11 @@ export class HistoryCardState {
                 if( d.siConversionFactor !== undefined && datasets._siRefUnit ) scaleUnit = datasets._siRefUnit;
             }
 
+            // Incompatible units sharing one graph (a YAML graph mixing e.g. days, mm and a
+            // unitless value): no single unit describes the Y axis, so don't label it with
+            // whichever came first — the legend and tooltip still show each entity's own unit.
+            if( datasets.some(d => !areSICompatible(d.unit, datasets[0].unit)) ) scaleUnit = '';
+
         } else if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
 
             datastructure = {
@@ -2000,16 +2107,11 @@ export class HistoryCardState {
                         if( !g ) return;
                         const idx = legendItem.datasetIndex;
                         if( !this._uncombineInProgress && g._lastLegendClick && g._lastLegendClickIdx === idx && now - g._lastLegendClick < 400 ) {
-                            // Double-click — uncombine (not allowed on static/fixed graphs)
-                            if( g.isStatic ) {
-                                g._lastLegendClick = null;
-                                return;
-                            }
+                            // Double-click — uncombine (see _uncombineEntity for static graphs)
                             g._lastLegendClick = null;
                             this._uncombineInProgress = true;
                             setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                            const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
-                            if( _groupSize > 1 ) this._uncombineEntity(g, idx);
+                            if( this._canUncombine(g) ) this._uncombineEntity(g, idx);
                         } else {
                             // Single-click — default toggle visibility
                             g._lastLegendClick = now;
@@ -2629,7 +2731,7 @@ export class HistoryCardState {
             // Inter-graph: check compatibility
             const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
             const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = !_overG.isStatic && _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
+            const _compatible = this._dropCompatibility(_src, _overG, _srcUnit, _tgtUnit) === null;
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
             this._highlightDropTarget(_overG.canvas, _compatible);
             // Freeze target chart when over its legend overlay
@@ -2749,7 +2851,9 @@ export class HistoryCardState {
                             // the first rebuilt entity can be anchored there (targetGraph
                             // means "insert right before this graph"); addGraph inserts
                             // directly at the right spot, no post-hoc DOM move needed.
-                            const _nextG = this._nextGroup(_src);
+                            // Graph-level neighbor: rebuilt right where it was, even inside a
+                            // block of several linked graphs
+                            const _nextG = this._nextGraph(_src);
                             this._detachGraph(_src);
                             const _saved = this.pconfig.combineSameUnits;
                             this.pconfig.combineSameUnits = true;
@@ -2766,28 +2870,16 @@ export class HistoryCardState {
                 return;
             }
 
-            if( _tgt && _tgt.isStatic ) {
-                this._showLabelTooltip(i18n('ui.menu.type_static'), event.clientX, event.clientY, 'left', event.target);
-                return;
-            }
-
-            if( _tgt && _tgt.type !== _src.type ) {
-                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY, 'left', event.target);
-                return;
-            }
-
-            if( _tgt && _tgt.type === _src.type ) {
-                // Check SI compatibility
+            if( _tgt ) {
                 const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
                 const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-                if( _srcUnit !== undefined && _tgtUnit !== undefined && !areSICompatible(_srcUnit, _tgtUnit) ) {
-                    // Show incompatibility tooltip
-                    const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
-                    const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
-                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY, 'left', event.target);
+                const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit);
+                if( _refusal !== null ) {
+                    this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
                     return;
                 }
-                if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
+                const _sameGroup = this._sameGroup(_src, _tgt);
+                {
                     // Check if drop is on legend label zone — find insertion position
                     let _tgtLabelInsertIdx = -1;
                     if( _tgt.chart.legend?.legendHitBoxes ) {
@@ -2809,6 +2901,8 @@ export class HistoryCardState {
                         // pconfig.entities entry now that there's no separate runtime copy.
                         const _pcE = this.pconfig.entities[_eIdx];
                         _pcE.groupId = _tgtGroupId;
+                        // Joins the target's own sub-graph of that group (see _uncombineEntity)
+                        this._setGraphKey(_pcE, _tgt.entities[0].graphKey);
                         _pcE.color = _entity.color;
                         _pcE.fill = _entity.fill;
                         // Same reason as _uncombineEntity: the entry's groupId just changed
@@ -2816,13 +2910,15 @@ export class HistoryCardState {
                         this._regroupPcEntities();
                     }
                     // Rebuild source graph without the moved entity (removes the source
-                    // graph entirely if it becomes empty)
+                    // graph entirely if it becomes empty). Within one group (several linked
+                    // graphs), each graph is rebuilt right where it was — graph-level
+                    // neighbor, not the next group, or the block's internal order would change.
                     const _tgtOrigGroupId = _tgt.groupId;
-                    this._detachAndRebuildRemaining(_src, _srcIdx);
+                    this._detachAndRebuildRemaining(_src, _srcIdx, _sameGroup ? this._nextGraph(_src) : undefined);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtNextG = this._nextGroup(_tgt);
+                    const _tgtNextG = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
                     this._detachGraph(_tgt);
                     const _allTgtEntities = [..._tgt.entities];
                     if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
@@ -2844,6 +2940,32 @@ export class HistoryCardState {
                 }
             }
             return;
+    }
+
+    // Same group of linked graphs (a static YAML graph split by double-click, or a group
+    // split by a type change)?
+    _sameGroup(a, b)
+    {
+        return a.groupId !== null && a.groupId !== undefined && a.groupId === b.groupId;
+    }
+
+    // Can one of src's entities be dropped onto another graph tgt? Returns null if so, or
+    // the short text explaining why not (shown as a tooltip at the drop point).
+    // - Within one group: always, as long as the chart type matches — units don't matter,
+    //   the group's entities are meant to be shown together (see addGraph).
+    // - Across groups: never to or from a static (YAML) graph — its composition is the
+    //   YAML's; otherwise same type and compatible units, as before.
+    _dropCompatibility(src, tgt, srcUnit, tgtUnit)
+    {
+        if( tgt.type !== src.type ) return `${src.type} ≠ ${tgt.type}`;
+        if( this._sameGroup(src, tgt) ) return null;
+        if( src.isStatic || tgt.isStatic ) return i18n('ui.menu.type_static');
+        if( srcUnit !== undefined && tgtUnit !== undefined && !areSICompatible(srcUnit, tgtUnit) ) {
+            const _srcBase = getSIFactor(srcUnit).base || srcUnit;
+            const _tgtBase = getSIFactor(tgtUnit).base || tgtUnit;
+            return `${_srcBase} ≠ ${_tgtBase}`;
+        }
+        return null;
     }
 
     _clearAllDragFeedback() {
@@ -3114,10 +3236,64 @@ export class HistoryCardState {
         }
     }
 
+    // During the initial rebuild only: were these two entities shown in the same graph when
+    // last saved (same saved graphIndex)? Keeps apart graphs of one group that were apart —
+    // e.g. dynamic entities that ended up sharing a group through an old migration bug
+    // (null groupId renumbered to 1000), each in its own graph. Outside the rebuild,
+    // always true: live operations only re-add entities that belong together.
+    _sameSavedGraph(a, b)
+    {
+        // (static entities: graphKey alone decides — their graphIndex may be persisted for
+        // some entities of a graph and not others, per-entity persistence options)
+        if( !this._rebuildGraphIndex || a.isStatic || b.isStatic ) return true;
+        return this._rebuildGraphIndex.get(a) === this._rebuildGraphIndex.get(b);
+    }
+
+    // Something to uncombine: a static graph splits one of its own curves off (needs at
+    // least two on this graph); a dynamic entity leaves its group (needs a group of two+).
+    _canUncombine(g)
+    {
+        if( g.isStatic ) return g.entities.length > 1;
+        return this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length > 1;
+    }
+
+    // A new sub-graph identifier within a group (see _uncombineEntity). Random rather than
+    // a counter: it's persisted, and must never collide with one restored from storage.
+    _newGraphKey()
+    {
+        return 'k' + Math.random().toString(36).slice(2, 10);
+    }
+
+    // Sets which sub-graph of its group an entity is shown in (undefined = the group's
+    // main graph) — the property itself is removed rather than set to undefined, so the
+    // persisted entry and the YAML-change detection mirror stay clean.
+    _setGraphKey(entry, key)
+    {
+        if( key === undefined ) delete entry.graphKey;
+        else entry.graphKey = key;
+    }
+
     _uncombineEntity(g, idx)
     {
         // Extract one entity from a combined graph into its own graph.
         // Type-agnostic: used for line/bar legend double-click and timeline/arrowline label double-click.
+        if( g.isStatic ) {
+            // Static (YAML) graph: the curve moves into its own graph right below, but stays
+            // in the same group (linked, chain icon) — only its sub-graph key changes. It can
+            // be put back later by dragging its label onto a graph of the group, or by
+            // double-clicking the chain icon (_mergeLinkedGraph).
+            const _entity = g.entities[idx];
+            _entity.siConversionFactor = undefined;
+            this._setGraphKey(_entity, this._newGraphKey());
+            // Forced visible — see the dynamic case below for why.
+            _entity.hidden = undefined;
+            const _nextG = this._nextGraph(g);
+            this._detachAndRebuildRemaining(g, idx, _nextG);
+            this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, true, null, g.groupId, _entity);
+            this.writeLocalState();
+            this.updateHistory();
+            return;
+        }
         const _entity = g.entities[idx];
         _entity.siConversionFactor = undefined;
         const _newGroupId = this._nextGroupId++;
@@ -3135,6 +3311,7 @@ export class HistoryCardState {
             // reassignment here would silently detach that reference.
             const _pcE = this.pconfig.entities[_eIdx];
             _pcE.groupId = _newGroupId;
+            this._setGraphKey(_pcE, undefined);
             _pcE.color = _entity.color;
             _pcE.fill = _entity.fill;
             _pcE.hidden = undefined;
@@ -3197,8 +3374,8 @@ export class HistoryCardState {
             if( _textW > _availW ) {
                 this._showLabelTooltip(_origName, event.clientX, event.clientY, 'left', g.canvas);
             }
-            // Double-click: uncombine (non-fixed graphs only)
-            if( !g.isStatic ) {
+            // Double-click: uncombine (see _uncombineEntity for static graphs)
+            {
                 const _now = Date.now();
                 if( !this._uncombineInProgress &&
                     g._lastTLClick && g._lastTLClickIdx === _closestIdx &&
@@ -3206,8 +3383,7 @@ export class HistoryCardState {
                     g._lastTLClick = null;
                     this._uncombineInProgress = true;
                     setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                    const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
-                    if( _groupSize > 1 ) this._uncombineEntity(g, _closestIdx);
+                    if( this._canUncombine(g) ) this._uncombineEntity(g, _closestIdx);
                     return;
                 }
                 g._lastTLClick = _now;
@@ -3263,7 +3439,7 @@ export class HistoryCardState {
                 }
             }
             if( _overGTL && _overGTL !== _srcTL ) {
-                const _compatible = _overGTL.type === _srcTL.type;
+                const _compatible = this._dropCompatibility(_srcTL, _overGTL) === null;
                 event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
                 this._highlightDropTarget(_overGTL.canvas, _compatible);
                 if( _compatible ) {
@@ -3327,7 +3503,7 @@ export class HistoryCardState {
     {
         const _g = this._graphByOverlay('tl', event.target);
         if( !_g ) return;
-        event.target.style.cursor = _g.isStatic ? 'default' : 'move';
+        event.target.style.cursor = 'move';
     }
 
     timelineDragEnd(event)
@@ -3393,9 +3569,16 @@ export class HistoryCardState {
             return;
         }
 
+        const _isSameGraph = _tgt === _src;
+        const _refusal = _isSameGraph ? null : this._dropCompatibility(_src, _tgt);
+        if( _refusal !== null ) {
+            this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
+            return;
+        }
+        const _sameGroup = !_isSameGraph && this._sameGroup(_src, _tgt);
+
         const _entity = _src.entities[_srcIdx];
         const _srcEmpty = _src.entities.length === 1;
-        const _isSameGraph = _tgt === _src;
         // Computed once here, used both for the pconfig.entities update below and for
         // the target-graph rebuild further down — must stay in scope for both
         const _tgtGroupId = _isSameGraph ? undefined : this._pcGroupIdOf(_tgt.entities[0].entity);
@@ -3411,6 +3594,8 @@ export class HistoryCardState {
                 // still moved to a new array position below, just never replaced.
                 const _updatedEntry = this.pconfig.entities[_eIdx];
                 _updatedEntry.groupId = _tgtGroupId;
+                // Joins the target's own sub-graph of that group (see _uncombineEntity)
+                this._setGraphKey(_updatedEntry, _tgt.entities[0].graphKey);
                 _updatedEntry.color = _entity.color;
                 _updatedEntry.fill = _entity.fill;
                 this.pconfig.entities.splice(_eIdx, 1);
@@ -3425,7 +3610,9 @@ export class HistoryCardState {
         }
 
         const _srcOrigGroupId = _src.groupId;
-        const _srcNextG0 = this._nextGroup(_src);
+        // Graph-level neighbor when staying within one group (same graph, or linked graphs
+        // of one group): each graph is rebuilt right where it was inside the block
+        const _srcNextG0 = ( _isSameGraph || _sameGroup ) ? this._nextGraph(_src) : this._nextGroup(_src);
         this._detachGraph(_src);
 
         const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
@@ -3448,7 +3635,7 @@ export class HistoryCardState {
                         });
                 this.pconfig.combineSameUnits = _saved;
             }
-            const _tgtNextG0 = this._nextGroup(_tgt);
+            const _tgtNextG0 = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
             this._detachGraph(_tgt);
             const _newTgtEntities = [..._tgt.entities];
             _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
@@ -3612,43 +3799,44 @@ export class HistoryCardState {
             return;
         }
 
+        // A graph belonging to a block of several linked graphs (same group) moved outside
+        // of its own group takes the whole block along — a group always stays one solid,
+        // contiguous block (moving it inside its own block is just an internal reorder).
+        const _moved = ( this._sameGroup(_srcG, _srcG) && _tgtG.groupId !== _srcG.groupId )
+            ? this._allGraphsInDisplayOrder().filter(g => g.groupId === _srcG.groupId)
+            : [_srcG];
+
         // Reorder in DOM — re-query by ID to get fresh refs after potential HA re-render
         const _gl = this._this.querySelector('#graphlist');
-        const _srcCanvas = this._this.querySelector(`#graph${_srcG.id}`);
         const _tgtCanvas = this._this.querySelector(`#graph${_tgtG.id}`);
-        if( !_srcCanvas || !_tgtCanvas || !_gl ) return;
+        if( !_tgtCanvas || !_gl ) return;
         // Canvas -> position:relative div -> wrapper div (direct child of #graphlist)
-        const _srcDiv = _srcCanvas.parentNode.parentNode;
+        const _srcDivs = _moved.map(g => this._this.querySelector(`#graph${g.id}`)?.parentNode.parentNode);
         const _tgtDiv = _tgtCanvas.parentNode.parentNode;
-        if( _srcDiv.parentNode !== _gl || _tgtDiv.parentNode !== _gl ) return;
+        if( _srcDivs.some(d => !d || d.parentNode !== _gl) || _tgtDiv.parentNode !== _gl ) return;
+        let _anchor;
         if( _insertBefore ) {
-            _gl.insertBefore(_srcDiv, _tgtDiv);
+            _anchor = _tgtDiv;
         } else {
-            const _next = _tgtDiv.nextSibling;
-            if( _next && _next.parentNode === _gl ) {
-                _gl.insertBefore(_srcDiv, _next);
-            } else {
-                const _footer = this._footerAnchor(_gl);
-                if( _footer ) _gl.insertBefore(_srcDiv, _footer); else _gl.appendChild(_srcDiv);
-            }
+            _anchor = _tgtDiv.nextSibling;
+            while( _anchor && _srcDivs.includes(_anchor) ) _anchor = _anchor.nextSibling;
+            if( !_anchor || _anchor.parentNode !== _gl ) _anchor = this._footerAnchor(_gl);
+        }
+        for( const _div of _srcDivs ) {
+            if( _anchor ) _gl.insertBefore(_div, _anchor); else _gl.appendChild(_div);
         }
 
         // Reorder in this.graphs
-        const _srcIdx = this.graphs.indexOf(_srcG);
-        this.graphs.splice(_srcIdx, 1);
+        this.graphs = this.graphs.filter(g => !_moved.includes(g));
         const _newTgtIdx = this.graphs.indexOf(_tgtG);
-        if( _insertBefore ) {
-            this.graphs.splice(_newTgtIdx, 0, _srcG);
-        } else {
-            this.graphs.splice(_newTgtIdx + 1, 0, _srcG);
-        }
+        this.graphs.splice(_insertBefore ? _newTgtIdx : _newTgtIdx + 1, 0, ..._moved);
 
         // Reorder pconfig.entities directly — never derive it from this.graphs, which is
         // only guaranteed correct for the _srcG/_tgtG pair just moved, not for the rest of
         // the page. Pull _srcG's entities out and reinsert them right before/after _tgtG's,
         // exactly like the DOM move above, leaving everything else untouched. Done before
         // the graphIndex calculation below, which reads pconfig.entities' order.
-        const _srcEntityIds = new Set(_srcG.entities.map(e => e.entity));
+        const _srcEntityIds = new Set(_moved.flatMap(g => g.entities.map(e => e.entity)));
         const _movedEntries = this.pconfig.entities.filter(e => typeof e === 'object' && _srcEntityIds.has(e.entity));
         const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && _srcEntityIds.has(e.entity)));
         const _tgtEntityIds = new Set(_tgtG.entities.map(e => e.entity));
@@ -3674,7 +3862,13 @@ export class HistoryCardState {
         const _prevIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
         const _nextIdx = _nextGraphForIdx?.entities?.[0]?.graphIndex;
         const _newGraphIndex = _nextIdx !== undefined ? (_prevIdx + _nextIdx) / 2 : _prevIdx + 1;
-        for( let e of _srcG.entities ) e.graphIndex = _newGraphIndex;
+        // A whole block moved: its graphs keep their own relative order (strictly increasing
+        // from there, staying within half the gap — graphIndex only decides the order
+        // inside a group, groups themselves follow pconfig.entities' order)
+        const _step = ( _nextIdx !== undefined ? Math.abs(_nextIdx - _prevIdx) || 1 : 1 ) / (2 * (_moved.length + 1));
+        _moved.forEach((g, k) => {
+            for( let e of g.entities ) e.graphIndex = _newGraphIndex + k * _step;
+        });
         this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
@@ -3785,7 +3979,7 @@ export class HistoryCardState {
                 const _cx = event.clientX - _rect.left;
                 const _cy = event.clientY - _rect.top;
                 let _onDraggable = false;
-                if( !_hoverG.isStatic && _hoverG.type !== 'timeline' && _hoverG.type !== 'arrowline' ) {
+                if( _hoverG.type !== 'timeline' && _hoverG.type !== 'arrowline' ) {
                     if( _chart.legend && _chart.legend.legendHitBoxes ) {
                         for( let _box of _chart.legend.legendHitBoxes ) {
                             if( _cx >= _box.left && _cx <= _box.left + _box.width &&
@@ -4881,13 +5075,19 @@ export class HistoryCardState {
     {
         // Creates one brand-new entity with an explicit type and persists it —
         // shared by the non-numeric direct-create path and the type-menu new-entity path
-        const _prevCount = this.graphs.length;
-        this.addGraph(eid, false, null, null, null, undefined, false, null, null, { type, lineMode });
-        const _wasCombined = this.graphs.length === _prevCount;
-        const _lastG = this.graphs[this.graphs.length - 1];
-        const _gid = _wasCombined ? _lastG?.groupId : this._nextGroupId++;
-        const _addedEntity = _lastG?.entities.find(e => e.entity === eid);
-        this.pconfig.entities.push({ entity: eid, groupId: _gid, color: _addedEntity?.color, fill: _addedEntity?.fill, type, lineMode });
+        // addGraph registers _entry itself as the entity's pconfig.entities entry (and adopts
+        // the groupId of the graph it combined into, if any) — it must not be pushed a second
+        // time here: a duplicate entry, never displayed, used to carry the groupId instead,
+        // leaving the displayed one with none (so a type change couldn't link its graphs).
+        const _entry = { type, lineMode };
+        this.addGraph(eid, false, null, null, null, undefined, false, null, null, _entry);
+        const _g = this.graphs.find(g => g.entities.includes(_entry));
+        if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
+            // A brand-new graph (or one left without a group by that old bug): a group of its own
+            const _gid = this._nextGroupId++;
+            _g.groupId = _gid;
+            _g.entities.forEach(e => { e.groupId = _gid; });
+        }
         return this._hass.states[eid]?.attributes?.friendly_name || eid;
     }
 
@@ -4926,9 +5126,13 @@ export class HistoryCardState {
                 if( !_el ) {
                     _el = document.createElement('div');
                     _el.id = `gc-${g.id}`;
-                    _el.title = i18n('ui.menu.linked_graphs');
-                    _el.style.cssText = 'height:0;text-align:center;pointer-events:none;';
-                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
+                    // Straddles the boundary between the two graphs, on the left under the
+                    // upper graph's Y axis labels — an empty spot. Not centered on the lower
+                    // graph's top any more: now that it's clickable (double-click merges), it
+                    // would sit over that graph's legend labels and steal their clicks/drags.
+                    _el.style.cssText = 'height:0;text-align:left;pointer-events:none;';
+                    _el.innerHTML = `<div title="${i18n('ui.menu.linked_graphs')} — ${i18n('ui.menu.linked_graphs_merge')}" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;left:${Math.max(0, Math.round(this.pconfig.labelAreaWidth / 2) - 11)}px;top:-15px;z-index:2;pointer-events:auto;cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
+                    _el.firstElementChild.addEventListener('click', (ev) => this._linkMarkerClicked(ev, _el));
                 }
                 // Always reposition (cheap no-op if already correct) — a caller earlier
                 // in the same operation may have created this marker before the graph's
@@ -4938,6 +5142,46 @@ export class HistoryCardState {
                 _el.remove();
             }
         }
+    }
+
+    // Double-click (two clicks within 400ms, same as legend labels — also works for
+    // double taps) on the chain icon between two linked graphs merges them back into one.
+    _linkMarkerClicked(event, el)
+    {
+        event.stopPropagation();
+        const _now = Date.now();
+        if( el._hecLastClick && _now - el._hecLastClick < 400 ) {
+            el._hecLastClick = null;
+            const _g = this.graphs.find(g => `gc-${g.id}` === el.id);
+            if( _g ) this._mergeLinkedGraph(_g, event);
+        } else {
+            el._hecLastClick = _now;
+        }
+    }
+
+    // Merges graph g into the graph right above it, when both belong to the same group
+    // (linked) — the reverse of a static uncombine or of a type change, whatever the units.
+    // Only the chart type can prevent it (a line and a bar/timeline can't share one chart).
+    _mergeLinkedGraph(g, event)
+    {
+        const _upper = this._previousGraph(g);
+        if( !_upper || !this._sameGroup(_upper, g) ) return;
+        if( _upper.type !== g.type ) {
+            this._showLabelTooltip(`${g.type} ≠ ${_upper.type}`, event.clientX, event.clientY, 'left', event.target);
+            return;
+        }
+        const _key = _upper.entities[0].graphKey;
+        const _all = [..._upper.entities, ...g.entities];
+        _all.forEach(en => { this._setGraphKey(en, _key); en.siConversionFactor = undefined; });
+        const _groupId = _upper.groupId;
+        const _nextG = this._nextGraph(g);
+        this._detachGraph(_upper);
+        this._detachGraph(g);
+        _all.forEach((en, i) => {
+            this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId, en);
+        });
+        this.writeLocalState();
+        this.updateHistory();
     }
 
     removeGraph(event)
@@ -4975,7 +5219,10 @@ export class HistoryCardState {
 
         // Merge graph-level properties before type detection so graph.type from YAML wins
         const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
-        entityOptions = { ...entityOptions, ..._graphProps, groupId };
+        // Only keys the graph actually sets: a plain spread would let every graph-level key
+        // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
+        const _definedGraphProps = Object.fromEntries(Object.entries(_graphProps).filter(([, v]) => v !== undefined));
+        entityOptions = { ...entityOptions, ..._definedGraphProps, groupId };
 
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
@@ -4998,6 +5245,14 @@ export class HistoryCardState {
             this.pconfig.entities.push(_pcEntry);
         }
         _pcEntry.entity = entity_id;
+        // A YAML entity's graph stays static whichever operation rebuilds it (uncombine,
+        // drag, type change...) — not only the initial rebuild, which passes isStatic.
+        if( _pcEntry.isStatic ) isStatic = true;
+
+        // The entity's own fill (e.g. `fill:` on a YAML graph entity), captured before the
+        // defaults below — an explicit per-entity fill always wins over entityOptions/graph
+        // defaults and over the auto-assigned default color's fill.
+        const _ownFill = _pcEntry.fill;
 
         let entities = [_pcEntry];
         entities[0].color = entities[0].color ?? "#000000";
@@ -5012,11 +5267,11 @@ export class HistoryCardState {
                 entities[0].fill = overrideFill ?? 'rgba(0,0,0,0)';
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
-                entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
+                entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
             } else if( entities[0].color === "#000000" ) {
                 const c = this.getNextDefaultColor();
                 entities[0].color = c.color;
-                entities[0].fill = entityOptions?.fill ?? c.fill;
+                entities[0].fill = _ownFill ?? entityOptions?.fill ?? c.fill;
             }
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
@@ -5041,23 +5296,21 @@ export class HistoryCardState {
         }
 
         // Find a graph to combine with:
-        // - Static multi-entity groups (isStatic + targetGraph): always the last graph
-        //   (YAML author responsible for contiguous grouping in the rebuild)
-        // - Dynamic with an explicit groupId: search for the LAST graph sharing that
-        //   groupId — not the first. A groupId's graphs are always built in sequence (the
-        //   rebuild walks each group in graphIndex order), so the last one built is always
-        //   the right compatibility candidate; the first one found could be an earlier,
-        //   type-incompatible graph of the same solid block (a group of several linked
-        //   graphs), which would wrongly fail every later entity's combine attempt.
+        // - With an explicit groupId (static YAML graph, or any graph being rebuilt): the
+        //   graph of that same group showing the same sub-graph (graphKey — see
+        //   _uncombineEntity) with the same type. Units are deliberately NOT checked here:
+        //   the entities of one group are shown together by definition (a YAML graph is the
+        //   author's explicit choice; a dynamic group was only ever formed from compatible
+        //   units), so mixed units share one graph and one Y axis. Only the type keeps them
+        //   apart (line/bar/timeline/arrowline can't share one chart) — those become linked
+        //   graphs of the same group instead, re-combinable later.
         // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
-        //   considered, and its groupId is adopted if compatible
-        const _isStaticForce = isStatic && targetGraph !== null;
+        //   considered, and its groupId is adopted if type and units are compatible
+        const _graphKey = _pcEntry.graphKey;
         let _combineIdx = -1;
-        if( _isStaticForce ) {
-            _combineIdx = this.graphs.length - 1;
-        } else if( !noAutoGroup ) {
+        if( !noAutoGroup ) {
             _combineIdx = (groupId !== null) ?
-                this.graphs.reduce((_last, g, i) => g.groupId === groupId ? i : _last, -1) :
+                this.graphs.reduce((_last, g, i) => g.groupId === groupId && g.type === type && g.entities[0]?.graphKey === _graphKey && this._sameSavedGraph(g.entities[0], _pcEntry) ? i : _last, -1) :
                 this.graphs.length - 1;
         }
 
@@ -5066,9 +5319,9 @@ export class HistoryCardState {
         let _adoptedGraphIndex = null;
         if( _combineIdx >= 0 ) {
             _cand = this.graphs[_combineIdx];
-            combine = _isStaticForce ? true :
+            combine = ( groupId !== null ) ? true :
                       _cand.type === type &&
-                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(_cand.entities[0].entity)) );
+                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id, _pcEntry.unit), this.getUnitOfMeasure(_cand.entities[0].entity, _cand.entities[0].unit)) );
         }
 
         // Captured so the merged graph can be reinserted at the removed graph's DOM position
@@ -5097,7 +5350,7 @@ export class HistoryCardState {
                     const _free = defaultColors.find(c => !_usedColors.includes(c.color));
                     if( _free ) {
                         entities[0].color = _free.color;
-                        entities[0].fill  = _free.fill;
+                        entities[0].fill  = _ownFill ?? _free.fill;
                     }
                 }
             }
@@ -5180,9 +5433,11 @@ export class HistoryCardState {
         if( type == 'line' || type == 'bar' )
             html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
             html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
-            if( (type == 'line' || type == 'bar') && !isStatic )
+            // Legend / timeline label overlays exist on static (YAML) graphs too: their curves
+            // can be split (double-click) and re-combined (drag) within their own group.
+            if( type == 'line' || type == 'bar' )
                 html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
-            if( (type == 'timeline' || type == 'arrowline') && !isStatic )
+            if( type == 'timeline' || type == 'arrowline' )
                 html += `<div id="tl-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:100%;touch-action:none;pointer-events:auto;cursor:default;"></div>`;
         html += `</div>`;
 
@@ -5395,6 +5650,7 @@ export class HistoryCardState {
                     <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
                     <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
+                    <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                     <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
@@ -5461,6 +5717,7 @@ export class HistoryCardState {
         const _et0 = this._this.querySelector(`#et_${i}_0`); if( _et0 ) _et0.innerHTML = i18n('ui.menu.type_line_straight');
         const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
         const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
+        const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
@@ -5786,6 +6043,11 @@ export class HistoryCardState {
                 // Rebuild: call addGraph one entity at a time
                 // For statics: force combineSameUnits (YAML author responsible for grouping)
                 // For dynamics: combine logic in addGraph handles groupId + compatibility
+                // The graphIndex each entity had when last saved, captured before addGraph
+                // recomputes it: within a group, only entities that were shown in the same
+                // graph are combined again (see addGraph). Statics never persist graphIndex,
+                // so for them this is always undefined === undefined — graphKey decides.
+                this._rebuildGraphIndex = new Map(this.pconfig.entities.map(e => [e, e.graphIndex]));
                 for( let _key of _groupOrder ) {
                     const _group = _groupMap.get(_key);
                     const _isStaticGroup = _group.entities.some(e => e.isStatic);
@@ -5803,6 +6065,7 @@ export class HistoryCardState {
                     });
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
                 }
+                this._rebuildGraphIndex = null;
                 // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
                 // from scratch — persist that result now rather than leaving storage stale
                 // until some unrelated later action happens to call writeLocalState.
@@ -6721,6 +6984,13 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
+        // What this device writes to HA just below is, from now on, the last HA state it
+        // knows of — the HA mirrors are updated to it, so that on the next load only
+        // changes made by OTHER devices since then count as "HA changed" (e.g. an entity
+        // this device added and another one removed before this device reloaded).
+        this._lastHaEntities         = JSON.parse(JSON.stringify(this.pconfig.entities));
+        this._lastHaTimeRangeHours   = this.activeRange.timeRangeHours;
+        this._lastHaTimeRangeMinutes = this.activeRange.timeRangeMinutes;
         const data = {
             // Active values
             entities            : this.pconfig.entities,
@@ -6790,7 +7060,14 @@ export class HistoryCardState {
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         this._pureYamlEntities = _yamlEntities;
-        const _yamlMirror   = _ls?.yaml_entities ?? [];
+        // First load of this card on this device (nothing in localStorage yet): there's no
+        // mirror of what YAML said last time, so the current YAML is taken as that mirror —
+        // i.e. YAML is NOT considered changed. Otherwise a device opening the card for the
+        // first time would see every YAML value as a fresh edit, override what the other
+        // devices synced through HA, and then write those YAML values back to HA, wiping
+        // everyone's customizations. On a first load, HA (where enabled) wins instead.
+        const _firstLoadOnDevice = !_ls;
+        const _yamlMirror   = _firstLoadOnDevice ? _yamlEntities : ( _ls.yaml_entities ?? [] );
         const _haMirror     = _ls?.ha_entities ?? [];
 
         const _findEntity = (arr, id) => arr.find(e => e.entity === id);
@@ -6829,9 +7106,19 @@ export class HistoryCardState {
             _staticOrderEnabled, _staticOrderMultidevice
         );
 
+        // Dynamic entities another device added only reach this device if multi-device
+        // persistence covers entities — with enable_persistence alone, this device only
+        // ever knows the ones it added itself.
+        const _dynamicMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities');
+        // Removed on another device (last one to speak): an entity this device had already
+        // seen in HA (in its HA mirror) but that's gone from HA now was deleted elsewhere —
+        // dropped here too. One missing from both is a local addition not synced yet — kept.
+        const _haIdsNow    = new Set(_haEntities.map(e => e.entity));
+        const _haIdsMirror = new Set(_haMirror.map(e => e.entity));
+        const _removedElsewhere = id => _dynamicMultidevice && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
         const _dynamicCandidates = [...new Set([
-            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
-            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ..._lsEntities.filter(e => !e.isStatic && !_removedElsewhere(e.entity)).map(e => e.entity),
+            ...( _dynamicMultidevice ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : [] ),
         ])];
         const _dynamicOrder = this._resolveOrder(
             _dynamicCandidates, null, null,
@@ -6850,8 +7137,10 @@ export class HistoryCardState {
             const _yamlE = _findEntity(_yamlEntities, id);
 
             // YAML front — per entity, always wins on change, unaffected by the enable flags
+            // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
+            // is also the pure YAML mirror saved by writeLocalState)
             if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_findEntity(_yamlMirror, id) ?? null) )
-                return _yamlE;
+                return { ..._yamlE };
 
             // Resolve which fields have persistence enabled at all — entity-level first,
             // falling back to the card-level 'entities' switch, itself defaulting to 'all'
@@ -6887,6 +7176,17 @@ export class HistoryCardState {
             if( _haChanged )
                 for( const _f of _multiFields )
                     if( _f in _haE ) _result[_f] = _haE[_f];
+            // graphKey (which linked graph of its group the entity is shown in — see
+            // _uncombineEntity) and graphIndex (that graph's position inside the group's
+            // block) aren't fields of their own: they're part of the grouping, so they
+            // follow whichever source won groupId above.
+            const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
+                            ( _enabledFields.has('groupId') ? _localE : null );
+            if( _keySrc ) {
+                if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
+                else delete _result.graphKey;
+                if( _keySrc.graphIndex !== undefined ) _result.graphIndex = _keySrc.graphIndex;
+            }
             return _result;
         });
 
@@ -6894,11 +7194,13 @@ export class HistoryCardState {
         // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
         // sequentially from g_id. Dynamic graphs now always use groupId >= 1000.
         const _yamlGroupIds = new Set(this.pconfig.entities.filter(e => e.isStatic).map(e => e.groupId));
-        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId < 1000);
+        // (null is "no group", not group 0 — null < 1000 is true in JS, so it must be
+        // excluded explicitly, or every ungrouped entity would land in one group 1000)
+        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000);
         if( _needsRenumber ) {
             const _remap = new Map();
             this.pconfig.entities = this.pconfig.entities.map(e => {
-                if( !e.isStatic && e.groupId !== undefined && e.groupId < 1000 ) {
+                if( !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000 ) {
                     if( !_remap.has(e.groupId) ) _remap.set(e.groupId, e.groupId + 1000);
                     return { ...e, groupId: _remap.get(e.groupId) };
                 }
@@ -6906,13 +7208,48 @@ export class HistoryCardState {
             });
         }
 
+        // Migration: dynamic entities without a group (left by a duplicate-entry bug in
+        // _createAndPersistEntity, fixed in 1.1.43 — the displayed entry never got its
+        // groupId). One new group per graph, graphs told apart by their saved graphIndex.
+        if( this.pconfig.entities.some(e => !e.isStatic && ( e.groupId === null || e.groupId === undefined )) ) {
+            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
+            const _byIndex = new Map();
+            this.pconfig.entities = this.pconfig.entities.map(e => {
+                if( e.isStatic || ( e.groupId !== null && e.groupId !== undefined ) ) return e;
+                const _k = e.graphIndex ?? Symbol();
+                if( !_byIndex.has(_k) ) _byIndex.set(_k, _next++);
+                return { ...e, groupId: _byIndex.get(_k) };
+            });
+        }
+
+        // Migration: the old renumbering above also caught null (fixed in 1.1.43), which put
+        // every ungrouped dynamic entity into one group 1000, each graph linked to the next.
+        // Its signature: one dynamic group with two graphs (told apart by saved graphIndex) of
+        // the same type — impossible otherwise, since same-type graphs of a dynamic group
+        // always combine. Such a group is split back into one group per graph.
+        {
+            const _dynGroups = new Map();
+            for( const e of this.pconfig.entities ) {
+                if( e.isStatic || e.groupId === null || e.groupId === undefined ) continue;
+                if( !_dynGroups.has(e.groupId) ) _dynGroups.set(e.groupId, new Map());
+                const _graphs = _dynGroups.get(e.groupId);
+                const _k = e.graphIndex ?? Symbol();
+                if( !_graphs.has(_k) ) _graphs.set(_k, e.type ?? this._detectDefaultType(e.entity).type);
+            }
+            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
+            for( const [_groupId, _graphs] of _dynGroups ) {
+                const _types = [..._graphs.values()];
+                if( new Set(_types).size === _types.length ) continue;
+                const _newIds = new Map([..._graphs.keys()].map(k => [k, _next++]));
+                this.pconfig.entities = this.pconfig.entities.map(e =>
+                    ( !e.isStatic && e.groupId === _groupId && _newIds.has(e.graphIndex) ) ? { ...e, groupId: _newIds.get(e.graphIndex) } : e);
+            }
+        }
+
         // --- Last one to speak wins — timeRange ---
         // infoPanelEnabled is handled separately below — see the warning comment there,
         // it deliberately does NOT follow this pattern.
 
-        // YAML front
-        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined &&
-                                 String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
         // HA user front (compare HA user value to its mirror in localStorage)
         // range defaults to 'all' when this card has no static (YAML) entities at all —
@@ -6928,6 +7265,12 @@ export class HistoryCardState {
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
 
+        // YAML front — on this device's first load (no mirror yet, see _firstLoadOnDevice),
+        // YAML only applies if HA has nothing to offer
+        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined && (
+            _firstLoadOnDevice ? !_haTimeChanged :
+            String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange) );
+
         // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
         // as everything else. This was broken as an unrelated side effect of the v1.1.27
         // storage-format simplification (which dropped `yaml_defaultInfoPanel` from the
@@ -6941,10 +7284,12 @@ export class HistoryCardState {
         // timestamp on every load regardless of this comparison, see below) — verified
         // against the last version with a properly tested info panel (v1.1.19), which used
         // this exact mirror comparison.
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
         const _haInfoChanged = _haInfoEnabled !== undefined &&
                                _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
+        // (first load on this device: YAML only applies if HA has nothing — see range above)
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined && (
+            _firstLoadOnDevice ? !_haInfoChanged :
+            this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel );
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;
@@ -7210,6 +7555,9 @@ export class HistoryCardState {
                 height         : graph.options?.height,
                 stacked        : graph.options?.stacked,
                 ylock          : graph.options?.ylock,
+                ymin           : graph.options?.ymin,
+                ymax           : graph.options?.ymax,
+                ystepSize      : graph.options?.ystepSize,
                 fill           : graph.options?.fill,
                 showMinMax     : graph.options?.showMinMax,
                 dashMode       : graph.options?.dashMode,

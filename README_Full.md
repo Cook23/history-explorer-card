@@ -69,6 +69,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
+- **v1.1.43** — New `smart` line mode: a curve while the sensor reports, flat dashed plateaus over its silences (same detection as lowpass_dt). Entities of a YAML graph always share one graph whatever their units (regression since v1.1.34); only different display types are split into *linked* graphs. Linked graphs (chain icon) can be split by double-clicking a YAML graph's label and merged back by dragging a label onto the group or double-clicking the chain icon, whatever the units; moving a linked graph moves its whole block. Fixes: graph-level `ymin`/`ymax`/`ystepSize`, per-entity `fill` on wildcard entities, tooltip errors on data reload, dynamic graphs that never got a group (type change couldn't link/unlink them), and a device's first load overwriting the other devices' synced customizations.
 - **v1.1.38** — `exclude:` (per-entity) and `filterEntities`/`excludeFilterEntities` now accept a plain string or a list of plain strings, in addition to the `{entity: ...}` object form — all mixable in the same list. Malformed YAML values across the card now log a console warning and are skipped individually instead of blanking the whole card. Entities added via a wildcard `entity:` pattern are now added in natural alphabetical order instead of Home Assistant's entity creation order. `fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can now be set under a graph's `options:` as a shared default for every entity in that graph (`options.exclude` combines with, rather than replacing, each wildcard entity's own `exclude:`). `width` remains accepted everywhere as an alias for `lineWidth`. `dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can now also be set once for the whole card, the same way `lineMode`, `lineWidth` and `decimation` already could.
 - **v1.1.32** — Persistence options renamed and inverted to opt-in: `enable_persistence`/`enable_multidevice_persistence` replace `disable_multidevice_persistence`/`disable_persistence`. Nothing persists by default except dynamically-added entities; `none` opts back out where that default applies.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge (`_clampToViewport()`); the graph hover tooltip is now a floating element instead of canvas-drawn, fixing size limits and touch/stylus flicker.
@@ -355,17 +356,33 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Only entities of different display types (for example a `line` and a `bar`, when the graph has no `type:`) can't share one chart: they are shown as separate *linked* graphs, see below.
+
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
 #### Ungrouping a curve
 
 A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
+On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
+
 A long-press (700ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+
+#### Linked graphs
+
+Graphs sharing the same group are shown as a solid block with a chain icon 🔗 between them, on the left. A group gets split into several linked graphs either by a double-click on a YAML graph's label (see above) or by changing an entity's display type (a line and a bar can't share one chart).
+
+Graphs added from the UI work the same way: changing a curve's display type to one its graph can't show (e.g. a line into a bar) moves it to a new graph linked to its original one, and changing its type back to a compatible one returns it to that original graph. A double-click on a label of a graph added from the UI, on the other hand, takes that curve out of its group entirely (no link).
+
+Within a group, curves can always be shown together again, whatever their units, as long as their display types match:
+- **Drag** a curve (or timeline entity) label onto another graph of the same group
+- **Double-click** the chain icon to merge the graph below it into the graph above it
+
+A curve of a YAML graph can't be dropped onto a graph of another group, and a curve from elsewhere can't be dropped onto a YAML graph.
 
 #### Moving curves between graphs
 
-A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`).
+A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets — except within a group of linked graphs, where any unit is accepted (see *Linked graphs* above). The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`).
 
 #### Reordering curves within a graph
 
@@ -374,6 +391,8 @@ Curve labels in the legend can be dragged left or right to change their display 
 #### Reordering graphs
 
 Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area still toggles the Y axis lock as before. The new order is synchronized with your HA user account.
+
+Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
 
 When dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are not currently visible.
 
@@ -649,13 +668,13 @@ See the customizing dynamic line graphs section and the advanced YAML example be
 
 ## Line interpolation modes
 
-Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase.
+Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
 All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`) or `stepped` (or `step`). The default if the option is not present is `curves`.
+You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. The default if the option is not present is `curves`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -678,6 +697,32 @@ type: custom:history-explorer-card
 axisAddMarginMin: false
 axisAddMarginMax: false
 ```
+
+### Smart mode: silences shown as flat dashed plateaus
+
+Many sensors report irregularly: every few seconds while something happens, then nothing for minutes or hours. `curves` and `lines` then bridge each silence with a long spline or diagonal from the last value before it to the first one after it — suggesting a slow, gradual change that never happened. `stepped` avoids that, but loses the smooth shape of the curve while the sensor reports.
+
+`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.heater_power
+        lineMode: smart
+```
+
+It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Line smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
+
+How a silence is detected — the same rules as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
+- the sensor's usual interval between values is a running average (EMA) of the intervals, started from their median;
+- an interval longer than that average plus 3 standard deviations (and at least 1 second) is a silence;
+- the curve resumes one average interval before the value that ends the silence.
+
+The threshold adapts along the curve, so a sensor that reports fast during the day and slowly at night gets plateaus only for what's unusual at each moment. The tooltip only ever shows recorded values.
+
+Limitation: Home Assistant only records a new value when it changes, so the card can't tell a silent sensor from one repeating the same value. Both appear as a plateau — which is right either way, since the last value still holds — but the dashes then mean "no new value recorded" rather than strictly "sensor silent".
 
 ### Line stroke style
 
@@ -874,6 +919,7 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```
 
 - **`enable_persistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
+- **"Last one to speak wins"** — each value comes from whichever source changed it last: a YAML edit (compared with what YAML said the previous time on this device), another device (compared with what this device last saw in your HA account), or this device's own UI. A YAML edit always wins for what it changed — for an entity, its YAML values replace every UI customization of that entity (other entities are untouched); reordering graphs in the YAML counts as a change for every entity of the moved graphs. A device opening the card for the very first time has no previous YAML to compare with, so it takes what your other devices synced (where `enable_multidevice_persistence` covers it) and YAML for everything else.
 - **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account (see [per-user server-side persistence](#per-user-server-side-persistence)), so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
@@ -1014,7 +1060,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
-| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped` |
+| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
 | `scale` | number | Multiply all values by this factor before display |
@@ -1445,7 +1491,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click) and their order within the block.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
