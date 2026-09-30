@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.42b12';
+const Version = '1.1.42b13';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -795,7 +795,7 @@ export class HistoryCardState {
 
     updateScaleLockState(g, axisInteraction)
     {
-        const fixedScale = ( g.chart.options.scales.yAxes[0].ticks.forceMin && g.chart.options.scales.yAxes[0].ticks.forceMax );
+        const fixedScale = ( g.chart.options.scales.yAxes[0].ticks.forceMin != null && g.chart.options.scales.yAxes[0].ticks.forceMax != null );
 
         let e = this._this.querySelector(`#ca-${g.id}`);
         if( e ) {
@@ -4975,7 +4975,10 @@ export class HistoryCardState {
 
         // Merge graph-level properties before type detection so graph.type from YAML wins
         const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
-        entityOptions = { ...entityOptions, ..._graphProps, groupId };
+        // Only keys the graph actually sets: a plain spread would let every graph-level key
+        // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
+        const _definedGraphProps = Object.fromEntries(Object.entries(_graphProps).filter(([, v]) => v !== undefined));
+        entityOptions = { ...entityOptions, ..._definedGraphProps, groupId };
 
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
@@ -4999,6 +5002,11 @@ export class HistoryCardState {
         }
         _pcEntry.entity = entity_id;
 
+        // The entity's own fill (e.g. `fill:` on a YAML graph entity), captured before the
+        // defaults below — an explicit per-entity fill always wins over entityOptions/graph
+        // defaults and over the auto-assigned default color's fill.
+        const _ownFill = _pcEntry.fill;
+
         let entities = [_pcEntry];
         entities[0].color = entities[0].color ?? "#000000";
         entities[0].fill = entities[0].fill ?? "#00000000";
@@ -5012,11 +5020,11 @@ export class HistoryCardState {
                 entities[0].fill = overrideFill ?? 'rgba(0,0,0,0)';
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
-                entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
+                entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
             } else if( entities[0].color === "#000000" ) {
                 const c = this.getNextDefaultColor();
                 entities[0].color = c.color;
-                entities[0].fill = entityOptions?.fill ?? c.fill;
+                entities[0].fill = _ownFill ?? entityOptions?.fill ?? c.fill;
             }
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
@@ -5097,7 +5105,7 @@ export class HistoryCardState {
                     const _free = defaultColors.find(c => !_usedColors.includes(c.color));
                     if( _free ) {
                         entities[0].color = _free.color;
-                        entities[0].fill  = _free.fill;
+                        entities[0].fill  = _ownFill ?? _free.fill;
                     }
                 }
             }
@@ -7210,6 +7218,9 @@ export class HistoryCardState {
                 height         : graph.options?.height,
                 stacked        : graph.options?.stacked,
                 ylock          : graph.options?.ylock,
+                ymin           : graph.options?.ymin,
+                ymax           : graph.options?.ymax,
+                ystepSize      : graph.options?.ystepSize,
                 fill           : graph.options?.fill,
                 showMinMax     : graph.options?.showMinMax,
                 dashMode       : graph.options?.dashMode,
