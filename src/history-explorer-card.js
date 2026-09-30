@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43b6';
+const Version = '1.1.43b7';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -24,6 +24,9 @@ export const _TYPE_MENU_DEFS = [
     { type: 'bar',  lineMode: null      },
     { type: 'arrowline', lineMode: null },
     { type: 'timeline',  lineMode: null },
+    // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
+    // right after 'Line stepped' in the menus' markup
+    { type: 'line', lineMode: 'smart'   },
 ];
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
@@ -308,6 +311,8 @@ export class HistoryCardState {
     normalizeLineMode(m)
     {
         // Accept singular aliases: 'line' -> 'lines', 'curve' -> 'curves', 'step' -> 'stepped'
+        // ('smart': curves while the source reports, flat dashed plateaus over its
+        // silences — see _applySilencePlateaus)
         if( m === 'line'  ) return 'lines';
         if( m === 'curve' ) return 'curves';
         if( m === 'step'  ) return 'stepped';
@@ -1447,6 +1452,82 @@ export class HistoryCardState {
         return r;
     }
 
+    // 'smart' line mode: a curve while the source reports, and a flat plateau — the last
+    // known value held — over each of its silences, instead of a diagonal or a spline
+    // bridging the gap to the next value. Same rules as the lowpass_dt integration:
+    // - the source's usual interval between values is an EMA (alpha 0.1) of the intervals,
+    //   seeded with their median so that a first long interval can't skew it;
+    // - an interval longer than mean + 3σ + 0.1 s (never under 1 s) is a silence, and only
+    //   counts as that limit in the EMA (lowpass_dt's first-sample-after-silence rule);
+    // - the curve resumes one usual interval before the value that ends the silence (a
+    //   virtual point at t0 − mean on the plateau), so the spline only ever joins values
+    //   the source actually reported at its usual rhythm.
+    // Plateaus are marked for Chart.js (hecPlateauEnd on the point ending one: straight,
+    // dashed segment; hecVirtual: curve-shaping only, never shown or hovered). An ongoing
+    // silence (last value to now / the end of the window) is a plateau too.
+    // Note: Home Assistant only records a value when it changes, so a "silence" here is
+    // "no new value recorded" — a steady source looks the same, and the plateau is
+    // equally right for it (the last value still holds).
+    _applySilencePlateaus(s, raw, extended)
+    {
+        if( raw.length < 3 || s.length < 2 ) return s;
+
+        const _dts = [];
+        for( let i = 1; i < raw.length; i++ ) {
+            const dt = raw[i].t - raw[i - 1].t;
+            if( dt > 0 ) _dts.push(dt);
+        }
+        if( _dts.length < 2 ) return s;
+        _dts.sort((a, b) => a - b);
+        let mean = _dts[Math.floor(_dts.length / 2)];
+        let m2 = mean * mean;
+        const _limit = () => Math.max(mean + 3 * Math.sqrt(Math.max(0, m2 - mean * mean)) + 100, 1000);
+
+        const gaps = [];
+        for( let i = 1; i < raw.length; i++ ) {
+            const dt = raw[i].t - raw[i - 1].t;
+            if( dt <= 0 ) continue;
+            const limit = _limit();
+            let dtStat = dt;
+            if( dt > limit ) {
+                gaps.push({ ta: raw[i - 1].t, y: raw[i - 1].y, tb: raw[i].t, lead: mean });
+                dtStat = limit;
+            }
+            mean = 0.9 * mean + 0.1 * dtStat;
+            m2   = 0.9 * m2   + 0.1 * dtStat * dtStat;
+        }
+
+        const tOf = p => moment(p.x).valueOf();
+        const out = s.slice();
+
+        // Inserts the plateau start point (the last value before the silence) right before
+        // index k, unless it's already there — decimation may have dropped it
+        const ensureStart = (k, ta, y) => {
+            if( k > 0 && tOf(out[k - 1]) >= ta ) return k;
+            out.splice(k, 0, { x: ta, y });
+            return k + 1;
+        };
+
+        let k = 0;
+        for( const gap of gaps ) {
+            while( k < out.length && tOf(out[k]) < gap.tb ) k++;
+            if( k === 0 || k >= out.length ) continue;
+            k = ensureStart(k, gap.ta, gap.y);
+            out.splice(k, 0, { x: gap.tb - gap.lead, y: gap.y, hecPlateauEnd: true, hecVirtual: true });
+            k++;
+        }
+
+        // Ongoing silence: from the last recorded value to the extension point at the end
+        const last = raw[raw.length - 1];
+        const end = out[out.length - 1];
+        if( extended && tOf(end) - last.t > _limit() ) {
+            const kEnd = ensureStart(out.length - 1, last.t, last.y);
+            out[kEnd].hecPlateauEnd = true;
+        }
+
+        return out;
+    }
+
     buildChartData(result)
     {
         let m_now = moment();
@@ -1540,6 +1621,7 @@ export class HistoryCardState {
                             }
                         }
 
+                        let _extended = false;
                         if( m_now > m_end && s.length > 0 && moment(s[s.length-1].x) < m_end ) {
                             const state = this.process(result[id][n-1].state, process);
                             if( isDataValid(state) ) {
@@ -1547,6 +1629,7 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
+                                _extended = true;
                             }
                         } else if( m_now <= m_end && s.length > 0 && moment(s[s.length-1].x) < m_now ) {
                             const state = this.process(result[id][n-1].state, process);
@@ -1555,7 +1638,20 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
+                                _extended = true;
                             }
+                        }
+
+                        if( (this.normalizeLineMode(g.entities[j].lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+                            // Silences are detected on every recorded value (before decimation)
+                            const _raw = [];
+                            for( let i = 0; i < n; i++ ) {
+                                const state = this.process(result[id][i].state, process);
+                                if( !isDataValid(state) ) continue;
+                                const y = state * scale;
+                                if( !isNaN(y) ) _raw.push({ t: moment(result[id][i].last_changed).valueOf(), y });
+                            }
+                            s = this._applySilencePlateaus(s, _raw, _extended);
                         }
 
                     } else if( g.type == 'bar' && n > 0 ) {
@@ -5548,6 +5644,7 @@ export class HistoryCardState {
                     <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
                     <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
+                    <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                     <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
@@ -5614,6 +5711,7 @@ export class HistoryCardState {
         const _et0 = this._this.querySelector(`#et_${i}_0`); if( _et0 ) _et0.innerHTML = i18n('ui.menu.type_line_straight');
         const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
         const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
+        const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');

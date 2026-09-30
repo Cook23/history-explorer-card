@@ -69,7 +69,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
-- **v1.1.43** — Entities of a YAML graph always share one graph whatever their units (regression since v1.1.34); only different display types are split into *linked* graphs. Linked graphs (chain icon) can be split by double-clicking a YAML graph's label and merged back by dragging a label onto the group or double-clicking the chain icon, whatever the units; moving a linked graph moves its whole block. Fixes: graph-level `ymin`/`ymax`/`ystepSize`, per-entity `fill` on wildcard entities, tooltip errors on data reload, dynamic graphs that never got a group (type change couldn't link/unlink them), and a device's first load overwriting the other devices' synced customizations.
+- **v1.1.43** — New `smart` line mode: a curve while the sensor reports, flat dashed plateaus over its silences (same detection as lowpass_dt). Entities of a YAML graph always share one graph whatever their units (regression since v1.1.34); only different display types are split into *linked* graphs. Linked graphs (chain icon) can be split by double-clicking a YAML graph's label and merged back by dragging a label onto the group or double-clicking the chain icon, whatever the units; moving a linked graph moves its whole block. Fixes: graph-level `ymin`/`ymax`/`ystepSize`, per-entity `fill` on wildcard entities, tooltip errors on data reload, dynamic graphs that never got a group (type change couldn't link/unlink them), and a device's first load overwriting the other devices' synced customizations.
 - **v1.1.38** — `exclude:` (per-entity) and `filterEntities`/`excludeFilterEntities` now accept a plain string or a list of plain strings, in addition to the `{entity: ...}` object form — all mixable in the same list. Malformed YAML values across the card now log a console warning and are skipped individually instead of blanking the whole card. Entities added via a wildcard `entity:` pattern are now added in natural alphabetical order instead of Home Assistant's entity creation order. `fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can now be set under a graph's `options:` as a shared default for every entity in that graph (`options.exclude` combines with, rather than replacing, each wildcard entity's own `exclude:`). `width` remains accepted everywhere as an alias for `lineWidth`. `dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can now also be set once for the whole card, the same way `lineMode`, `lineWidth` and `decimation` already could.
 - **v1.1.32** — Persistence options renamed and inverted to opt-in: `enable_persistence`/`enable_multidevice_persistence` replace `disable_multidevice_persistence`/`disable_persistence`. Nothing persists by default except dynamically-added entities; `none` opts back out where that default applies.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge (`_clampToViewport()`); the graph hover tooltip is now a floating element instead of canvas-drawn, fixing size limits and touch/stylus flicker.
@@ -668,13 +668,13 @@ See the customizing dynamic line graphs section and the advanced YAML example be
 
 ## Line interpolation modes
 
-Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase.
+Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
 All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`) or `stepped` (or `step`). The default if the option is not present is `curves`.
+You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. The default if the option is not present is `curves`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -697,6 +697,32 @@ type: custom:history-explorer-card
 axisAddMarginMin: false
 axisAddMarginMax: false
 ```
+
+### Smart mode: silences shown as flat dashed plateaus
+
+Many sensors report irregularly: every few seconds while something happens, then nothing for minutes or hours. `curves` and `lines` then bridge each silence with a long spline or diagonal from the last value before it to the first one after it — suggesting a slow, gradual change that never happened. `stepped` avoids that, but loses the smooth shape of the curve while the sensor reports.
+
+`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.heater_power
+        lineMode: smart
+```
+
+It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Line smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
+
+How a silence is detected — the same rules as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
+- the sensor's usual interval between values is a running average (EMA) of the intervals, started from their median;
+- an interval longer than that average plus 3 standard deviations (and at least 1 second) is a silence;
+- the curve resumes one average interval before the value that ends the silence.
+
+The threshold adapts along the curve, so a sensor that reports fast during the day and slowly at night gets plateaus only for what's unusual at each moment. The tooltip only ever shows recorded values.
+
+Limitation: Home Assistant only records a new value when it changes, so the card can't tell a silent sensor from one repeating the same value. Both appear as a plateau — which is right either way, since the last value still holds — but the dashes then mean "no new value recorded" rather than strictly "sensor silent".
 
 ### Line stroke style
 
@@ -1034,7 +1060,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
-| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped` |
+| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
 | `scale` | number | Multiply all values by this factor before display |

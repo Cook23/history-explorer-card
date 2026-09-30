@@ -21,7 +21,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
-- **v1.1.43** — YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
+- **v1.1.43** — New `smart` line mode (silences drawn as flat dashed plateaus); YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
 - **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
 - **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
@@ -157,7 +157,7 @@ excludeFilterEntities:
 
 ## Choosing an entity's display type
 
-Any numeric entity can be shown as a line (straight, curved or stepped), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
+Any numeric entity can be shown as a line (straight, curved, stepped or smart), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
 
 - Right after selecting a new numeric entity in the dropdown (see [Adding entities](#adding-entities))
 - On a 700ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
@@ -293,8 +293,10 @@ refresh:
 
 ```yaml
 type: custom:history-explorer-card
-lineMode: curves   # curves (default), lines, or stepped
+lineMode: curves   # curves (default), lines, stepped, or smart
 ```
+
+`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
@@ -473,7 +475,7 @@ graphs:
 | `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
 | `fill` | | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
-| `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, or `stepped` |
+| `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
 | `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) |
 | `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |

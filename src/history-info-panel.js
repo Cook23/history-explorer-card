@@ -386,6 +386,7 @@ function hecHookInfoPanel()
                             <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                             <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
                             <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
+                            <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                             <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                             <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                             <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>

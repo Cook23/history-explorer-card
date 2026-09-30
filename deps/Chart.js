@@ -2918,21 +2918,31 @@
             point._datasetIndex = datasetIndex;
             point._index = index;
 
+            // Silence plateaus ('smart' line mode, see the card's _applySilencePlateaus):
+            // a data point flagged hecPlateauEnd ends a flat stretch drawn as a straight,
+            // dashed segment from the previous point; a hecVirtual point only exists to
+            // shape the curve (never drawn as a dot, never hovered).
+            var hecPlateauEnd = !!(value && value.hecPlateauEnd);
+            var hecVirtual = !!(value && value.hecVirtual);
+
             // Desired view properties
             point._model = {
               x: x,
               y: y,
               skip: custom.skip || isNaN(x) || isNaN(y),
+              hecPlateauEnd: hecPlateauEnd,
+              hecVirtual: hecVirtual,
               // Appearance
-              radius: custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
+              radius: hecVirtual ? 0 : custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
               pointStyle: custom.pointStyle || helpers.valueAtIndexOrDefault(dataset.pointStyle, index, pointOptions.pointStyle),
               backgroundColor: me.getPointBackgroundColor(point, index),
               borderColor: me.getPointBorderColor(point, index),
               borderWidth: me.getPointBorderWidth(point, index),
-              tension: meta.dataset._model ? meta.dataset._model.tension : 0,
-              steppedLine: meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              // (the segment ending at a plateau end is always a straight line)
+              tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
+              steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
               // Tooltip
-              hitRadius: custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
+              hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
           },
 
@@ -5824,7 +5834,8 @@
           meta = chart.getDatasetMeta(i);
           for (j = 0, jlen = meta.data.length; j < jlen; ++j) {
             var element = meta.data[j];
-            if (!element._view.skip) {
+            // (hecVirtual: a curve-shaping point of the 'smart' line mode — not a value)
+            if (!element._view.skip && !element._view.hecVirtual) {
               handler(element);
             }
           }
@@ -9501,6 +9512,9 @@
           // Stroke Line
           ctx.beginPath();
           lastDrawnIndex = -1;
+          // Silence plateaus ('smart' line mode): left out of this solid pass, collected
+          // and stroked dashed afterwards (a canvas path has a single dash pattern)
+          var plateaus = [];
 
           for (index = 0; index < points.length; ++index) {
             current = points[index];
@@ -9520,6 +9534,9 @@
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
                   ctx.moveTo(currentVM.x, currentVM.y);
+                } else if (currentVM.hecPlateauEnd) {
+                  plateaus.push([previous._view, currentVM]);
+                  ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
                   helpers.canvas.lineTo(ctx, previous._view, current._view);
@@ -9530,6 +9547,20 @@
           }
 
           ctx.stroke();
+
+          if (plateaus.length) {
+            if (ctx.setLineDash) {
+              ctx.setLineDash([4, 4]);
+            }
+            ctx.lineDashOffset = 0;
+            ctx.beginPath();
+            for (index = 0; index < plateaus.length; ++index) {
+              ctx.moveTo(plateaus[index][0].x, plateaus[index][0].y);
+              ctx.lineTo(plateaus[index][1].x, plateaus[index][1].y);
+            }
+            ctx.stroke();
+          }
+
           ctx.restore();
         } });
 

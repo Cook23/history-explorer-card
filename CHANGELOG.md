@@ -40,6 +40,12 @@ Changelog for the HA History Explorer Card.
 - With no local history yet, every YAML value looked like a fresh YAML edit: YAML won over what the other devices had synced through Home Assistant, and was then written back, overwriting it for everyone
 - A device's first load now takes the synced values (where multi-device persistence is enabled), and YAML only where nothing was synced
 
+### New — `smart` line mode: silences shown as flat dashed plateaus
+- A curve while the sensor reports at its usual rhythm; during a silence, a flat dashed line at the last known value instead of a spline or diagonal bridging the gap, the curve resuming one usual interval before the next value
+- Silences detected like the lowpass_dt integration: running average of the intervals (started from their median), silence beyond average + 3σ (at least 1 s)
+- An ongoing silence (last value to now) is drawn the same way; the tooltip only shows recorded values
+- Set with `lineMode: smart` (card, graph entity, `entityOptions`), or *Line smart* in the display type menu
+
 ### Fixed — multi-device sync of dynamically added entities
 - With `enable_multidevice_persistence: none` (local memory only), entities added on another device still appeared on this one — they no longer do
 - An entity removed on one device came back on the others at their next reload — a removal is now synced too (an entity this device had seen in HA and that's gone from it was removed elsewhere)

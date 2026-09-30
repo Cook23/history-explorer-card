@@ -275,7 +275,7 @@ decimation: "fast"
 # How many decimal places to round values to, in tool tips and labels
 rounding: 2
 
-# Line interpolation mode. Can be: curves, lines, or stepped
+# Line interpolation mode. Can be: curves, lines, stepped, or smart (curves, with silences drawn as flat dashed plateaus)
 lineMode: "curves"
 
 # Line width for lines in line graphs. `width` is also accepted as an alias
