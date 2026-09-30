@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43';
+const Version = '1.1.44';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2932,6 +2932,7 @@ export class HistoryCardState {
                                 this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG, undefined, false, null, _tgtOrigGroupId, _pe ?? en);
                             });
                     this.pconfig.combineSameUnits = _savedCombine2;
+                    if( _sameGroup ) this._syncGroupOrder(_tgtOrigGroupId);
                     // Persist now — after the reconstruction, not before — so the freshly
                     // computed graphIndex (and everything else addGraph resolved) is what
                     // actually gets saved.
@@ -3249,6 +3250,27 @@ export class HistoryCardState {
         return this._rebuildGraphIndex.get(a) === this._rebuildGraphIndex.get(b);
     }
 
+    // Puts the pconfig.entities entries of one group in the order they're displayed in
+    // (graph by graph down the block, then legend order), at the group's current place.
+    // That order is what carries the layout of a block of linked graphs across reloads
+    // and devices — graphIndex is only a live, per-device position (see readLocalState).
+    _syncGroupOrder(groupId)
+    {
+        if( groupId === null || groupId === undefined ) return;
+        const _shown = this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
+            .flatMap(g => g.entities.map(e => e.entity));
+        const _first = this.pconfig.entities.findIndex(e => typeof e === 'object' && e.groupId === groupId);
+        if( _first < 0 ) return;
+        const _entries = this.pconfig.entities.filter(e => typeof e === 'object' && e.groupId === groupId);
+        _entries.sort((a, b) => {
+            const ia = _shown.indexOf(a.entity), ib = _shown.indexOf(b.entity);
+            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib);
+        });
+        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && e.groupId === groupId));
+        _rest.splice(Math.min(_first, _rest.length), 0, ..._entries);
+        this.pconfig.entities = _rest;
+    }
+
     // Something to uncombine: a static graph splits one of its own curves off (needs at
     // least two on this graph); a dynamic entity leaves its group (needs a group of two+).
     _canUncombine(g)
@@ -3290,6 +3312,7 @@ export class HistoryCardState {
             const _nextG = this._nextGraph(g);
             this._detachAndRebuildRemaining(g, idx, _nextG);
             this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, true, null, g.groupId, _entity);
+            this._syncGroupOrder(g.groupId);
             this.writeLocalState();
             this.updateHistory();
             return;
@@ -3646,6 +3669,7 @@ export class HistoryCardState {
                             this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG0, undefined, false, null, _tgtGroupId, _pe ?? en);
                         });
             this.pconfig.combineSameUnits = _saved2;
+            if( _sameGroup ) this._syncGroupOrder(_tgtGroupId);
         } else {
             const _groupId = this._pcGroupIdOf(_allTgtEntities[0].entity);
             if( _groupId !== undefined ) {
@@ -3869,6 +3893,7 @@ export class HistoryCardState {
         _moved.forEach((g, k) => {
             for( let e of g.entities ) e.graphIndex = _newGraphIndex + k * _step;
         });
+        this._syncGroupOrder(_srcG.groupId);
         this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
@@ -5180,6 +5205,7 @@ export class HistoryCardState {
         _all.forEach((en, i) => {
             this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId, en);
         });
+        this._syncGroupOrder(_groupId);
         this.writeLocalState();
         this.updateHistory();
     }
@@ -6984,20 +7010,20 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
-        // What this device writes to HA just below is, from now on, the last HA state it
-        // knows of — the HA mirrors are updated to it, so that on the next load only
-        // changes made by OTHER devices since then count as "HA changed" (e.g. an entity
-        // this device added and another one removed before this device reloaded).
-        this._lastHaEntities         = JSON.parse(JSON.stringify(this.pconfig.entities));
-        this._lastHaTimeRangeHours   = this.activeRange.timeRangeHours;
-        this._lastHaTimeRangeMinutes = this.activeRange.timeRangeMinutes;
+        // HA's image (ha_* below) is deliberately NOT updated with what this device writes:
+        // it's only ever updated from what HA itself returns (readLocalState). The write
+        // below is asynchronous and may land late or not at all (connection lost, page
+        // reloaded first) — had the image already taken the new value, HA still returning
+        // the old one would look like a front of HA, and revert this device's own change.
+        // This device's own write comes back later as an HA front carrying the value it
+        // already has: applying it changes nothing.
         const data = {
             // Active values
             entities            : this.pconfig.entities,
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
-            yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
+            yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_entities          : this._pureYamlEntities ?? this.pconfig.entities.filter(e => e.isStatic),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
@@ -7060,14 +7086,11 @@ export class HistoryCardState {
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         this._pureYamlEntities = _yamlEntities;
-        // First load of this card on this device (nothing in localStorage yet): there's no
-        // mirror of what YAML said last time, so the current YAML is taken as that mirror —
-        // i.e. YAML is NOT considered changed. Otherwise a device opening the card for the
-        // first time would see every YAML value as a fresh edit, override what the other
-        // devices synced through HA, and then write those YAML values back to HA, wiping
-        // everyone's customizations. On a first load, HA (where enabled) wins instead.
-        const _firstLoadOnDevice = !_ls;
-        const _yamlMirror   = _firstLoadOnDevice ? _yamlEntities : ( _ls.yaml_entities ?? [] );
+        // Each source is only ever compared with its own image (its mirror): YAML with what
+        // YAML said last time on this device, HA with what this device last knew of HA. On
+        // this device's first load the YAML image is empty, so YAML has spoken here — it
+        // wins, then reaches HA (and the other devices) like any other YAML change.
+        const _yamlMirror   = _ls?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
 
         const _findEntity = (arr, id) => arr.find(e => e.entity === id);
@@ -7171,21 +7194,31 @@ export class HistoryCardState {
             // local/HA snapshot instead — it only exists here at all because persistence was
             // enabled for it (see _entityIds above), so there's always something to base on.
             const _result = _yamlE ? { ..._yamlE } : { ..._localE };
+            // A field missing from a stored entry is a field that was cleared (e.g. hidden
+            // back to visible drops 'hidden' from the saved JSON) — taken over as cleared
+            // too, not skipped: skipping it would silently lose that source's change.
+            const _take = (_src, _f) => {
+                if( _src[_f] === undefined ) delete _result[_f];
+                else _result[_f] = _src[_f];
+            };
             for( const _f of _enabledFields )
-                if( _localE && _f in _localE ) _result[_f] = _localE[_f];
+                if( _localE ) _take(_localE, _f);
             if( _haChanged )
                 for( const _f of _multiFields )
-                    if( _f in _haE ) _result[_f] = _haE[_f];
+                    _take(_haE, _f);
             // graphKey (which linked graph of its group the entity is shown in — see
-            // _uncombineEntity) and graphIndex (that graph's position inside the group's
-            // block) aren't fields of their own: they're part of the grouping, so they
-            // follow whichever source won groupId above.
+            // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
+            // follows whichever source won groupId above. graphIndex is NOT taken over per
+            // entity: it's a position relative to the other graphs of the block, so taking
+            // it from different sources for different entities would mix two coordinate
+            // systems and shuffle the block. The order inside a block is carried by the
+            // entities' order instead (resolved as a whole, see 'order' — and kept in step
+            // with the display by _syncGroupOrder).
             const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                             ( _enabledFields.has('groupId') ? _localE : null );
             if( _keySrc ) {
                 if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
                 else delete _result.graphKey;
-                if( _keySrc.graphIndex !== undefined ) _result.graphIndex = _keySrc.graphIndex;
             }
             return _result;
         });
@@ -7265,11 +7298,9 @@ export class HistoryCardState {
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
 
-        // YAML front — on this device's first load (no mirror yet, see _firstLoadOnDevice),
-        // YAML only applies if HA has nothing to offer
-        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined && (
-            _firstLoadOnDevice ? !_haTimeChanged :
-            String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange) );
+        // YAML front — compared with the YAML image only
+        const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
+                                 String(this.pconfig.yamlDefaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
         // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
         // as everything else. This was broken as an unrelated side effect of the v1.1.27
@@ -7286,10 +7317,8 @@ export class HistoryCardState {
         // this exact mirror comparison.
         const _haInfoChanged = _haInfoEnabled !== undefined &&
                                _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
-        // (first load on this device: YAML only applies if HA has nothing — see range above)
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined && (
-            _firstLoadOnDevice ? !_haInfoChanged :
-            this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel );
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
+                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;
@@ -7718,6 +7747,9 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.excludeFilterEntities =   config.excludeFilterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
+        // What the YAML itself says (undefined if it says nothing) — the only value its
+        // front and its image are about; the '24' fallback above isn't the YAML speaking
+        this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
