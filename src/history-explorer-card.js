@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43b7';
+const Version = '1.1.43b8';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1456,7 +1456,8 @@ export class HistoryCardState {
     // known value held — over each of its silences, instead of a diagonal or a spline
     // bridging the gap to the next value. Same rules as the lowpass_dt integration:
     // - the source's usual interval between values is an EMA (alpha 0.1) of the intervals,
-    //   seeded with their median so that a first long interval can't skew it;
+    //   seeded with their median (and σ with their median absolute deviation) so that a
+    //   first long interval can't skew it;
     // - an interval longer than mean + 3σ + 0.1 s (never under 1 s) is a silence, and only
     //   counts as that limit in the EMA (lowpass_dt's first-sample-after-silence rule);
     // - the curve resumes one usual interval before the value that ends the silence (a
@@ -1480,7 +1481,12 @@ export class HistoryCardState {
         if( _dts.length < 2 ) return s;
         _dts.sort((a, b) => a - b);
         let mean = _dts[Math.floor(_dts.length / 2)];
-        let m2 = mean * mean;
+        // σ seeded the same robust way: from the median absolute deviation (×1.4826, its
+        // ratio to σ for normally distributed values) — not 0, which would make the first
+        // limit mean + 0.1 s and turn the first bit of timing jitter into a "silence"
+        const _dev = _dts.map(d => Math.abs(d - mean)).sort((a, b) => a - b);
+        const sigma0 = 1.4826 * _dev[Math.floor(_dev.length / 2)];
+        let m2 = mean * mean + sigma0 * sigma0;
         const _limit = () => Math.max(mean + 3 * Math.sqrt(Math.max(0, m2 - mean * mean)) + 100, 1000);
 
         const gaps = [];
