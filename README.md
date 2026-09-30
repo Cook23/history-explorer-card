@@ -268,8 +268,8 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```
 
 - `enable_persistence` — this device remembers on its own (local browser storage only).
-- `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account. A device opening the card for the first time starts from what your other devices synced.
-- Changing the YAML always wins over customizations made in the UI, for what was changed: an entity edited in YAML gets its YAML values back (on every device), the others keep theirs.
+- `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account.
+- Last one to speak wins: YAML, each device's UI, and your HA account (for multi-device) are each compared with what they said last time — whichever changed most recently wins. An entity edited in YAML gets its YAML values back (on every device), the others keep theirs. A device opening the card for the first time counts as YAML speaking on that device.
 - Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)

@@ -4,6 +4,21 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.44] - unreleased (beta)
+
+### Fixed — a change made on this device could randomly revert on reload (e.g. a display type picked from the menu)
+- v1.1.43 updated this device's image of the Home Assistant user data with what it had just written there. That write is asynchronous and may land late or not at all (connection lost, page reloaded first): Home Assistant then still returned the old value, which differed from the image and was taken as a change from another device — reverting this device's own change
+- The image of the Home Assistant user data is again only ever updated from what Home Assistant returns; this device's own write comes back later as an unchanged value
+
+### Fixed — "last one to speak wins": each source compared with its own image only
+- v1.1.43 made a device's first load compare YAML against what the other devices had synced through HA — mixing two sources' images. Reverted: YAML is compared with the YAML image only, so on a device's first load (no image yet) YAML has spoken there, applies, and reaches the other devices through HA like any YAML change
+- A card whose YAML doesn't set `defaultTimeRange` was still treated as YAML speaking about the time range (the built-in 24 h default was compared, not what the YAML says) — an option the YAML doesn't set now never speaks
+
+### Fixed — clearing a value (e.g. showing a hidden curve again) was never synced nor remembered
+- A cleared field disappears from the saved entry, and taking a source's change over only copied the fields present: showing a hidden curve again on one device never reached the others (and could even bring the curve back hidden), and showing again a curve hidden in YAML was lost on reload
+- A field missing from the saved entry is now taken over as cleared
+
+
 ## [v1.1.43] - 2026-09-30
 
 ### Fixed — graph-level `ymin` / `ymax` / `ystepSize` had no effect ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
