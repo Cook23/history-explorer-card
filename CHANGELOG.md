@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.43] - unreleased (beta)
+## [v1.1.43] - 2026-09-30
 
 ### Fixed — graph-level `ymin` / `ymax` / `ystepSize` had no effect ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
 - Set under a YAML graph's `options:`, they were never passed on to the graph — they now set its Y axis as documented
