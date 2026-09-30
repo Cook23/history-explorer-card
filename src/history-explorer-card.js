@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43b4';
+const Version = '1.1.43b5';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -3141,7 +3141,9 @@ export class HistoryCardState {
     // always true: live operations only re-add entities that belong together.
     _sameSavedGraph(a, b)
     {
-        if( !this._rebuildGraphIndex ) return true;
+        // (static entities: graphKey alone decides — their graphIndex may be persisted for
+        // some entities of a graph and not others, per-entity persistence options)
+        if( !this._rebuildGraphIndex || a.isStatic || b.isStatic ) return true;
         return this._rebuildGraphIndex.get(a) === this._rebuildGraphIndex.get(b);
     }
 
@@ -3695,43 +3697,44 @@ export class HistoryCardState {
             return;
         }
 
+        // A graph belonging to a block of several linked graphs (same group) moved outside
+        // of its own group takes the whole block along — a group always stays one solid,
+        // contiguous block (moving it inside its own block is just an internal reorder).
+        const _moved = ( this._sameGroup(_srcG, _srcG) && _tgtG.groupId !== _srcG.groupId )
+            ? this._allGraphsInDisplayOrder().filter(g => g.groupId === _srcG.groupId)
+            : [_srcG];
+
         // Reorder in DOM — re-query by ID to get fresh refs after potential HA re-render
         const _gl = this._this.querySelector('#graphlist');
-        const _srcCanvas = this._this.querySelector(`#graph${_srcG.id}`);
         const _tgtCanvas = this._this.querySelector(`#graph${_tgtG.id}`);
-        if( !_srcCanvas || !_tgtCanvas || !_gl ) return;
+        if( !_tgtCanvas || !_gl ) return;
         // Canvas -> position:relative div -> wrapper div (direct child of #graphlist)
-        const _srcDiv = _srcCanvas.parentNode.parentNode;
+        const _srcDivs = _moved.map(g => this._this.querySelector(`#graph${g.id}`)?.parentNode.parentNode);
         const _tgtDiv = _tgtCanvas.parentNode.parentNode;
-        if( _srcDiv.parentNode !== _gl || _tgtDiv.parentNode !== _gl ) return;
+        if( _srcDivs.some(d => !d || d.parentNode !== _gl) || _tgtDiv.parentNode !== _gl ) return;
+        let _anchor;
         if( _insertBefore ) {
-            _gl.insertBefore(_srcDiv, _tgtDiv);
+            _anchor = _tgtDiv;
         } else {
-            const _next = _tgtDiv.nextSibling;
-            if( _next && _next.parentNode === _gl ) {
-                _gl.insertBefore(_srcDiv, _next);
-            } else {
-                const _footer = this._footerAnchor(_gl);
-                if( _footer ) _gl.insertBefore(_srcDiv, _footer); else _gl.appendChild(_srcDiv);
-            }
+            _anchor = _tgtDiv.nextSibling;
+            while( _anchor && _srcDivs.includes(_anchor) ) _anchor = _anchor.nextSibling;
+            if( !_anchor || _anchor.parentNode !== _gl ) _anchor = this._footerAnchor(_gl);
+        }
+        for( const _div of _srcDivs ) {
+            if( _anchor ) _gl.insertBefore(_div, _anchor); else _gl.appendChild(_div);
         }
 
         // Reorder in this.graphs
-        const _srcIdx = this.graphs.indexOf(_srcG);
-        this.graphs.splice(_srcIdx, 1);
+        this.graphs = this.graphs.filter(g => !_moved.includes(g));
         const _newTgtIdx = this.graphs.indexOf(_tgtG);
-        if( _insertBefore ) {
-            this.graphs.splice(_newTgtIdx, 0, _srcG);
-        } else {
-            this.graphs.splice(_newTgtIdx + 1, 0, _srcG);
-        }
+        this.graphs.splice(_insertBefore ? _newTgtIdx : _newTgtIdx + 1, 0, ..._moved);
 
         // Reorder pconfig.entities directly — never derive it from this.graphs, which is
         // only guaranteed correct for the _srcG/_tgtG pair just moved, not for the rest of
         // the page. Pull _srcG's entities out and reinsert them right before/after _tgtG's,
         // exactly like the DOM move above, leaving everything else untouched. Done before
         // the graphIndex calculation below, which reads pconfig.entities' order.
-        const _srcEntityIds = new Set(_srcG.entities.map(e => e.entity));
+        const _srcEntityIds = new Set(_moved.flatMap(g => g.entities.map(e => e.entity)));
         const _movedEntries = this.pconfig.entities.filter(e => typeof e === 'object' && _srcEntityIds.has(e.entity));
         const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && _srcEntityIds.has(e.entity)));
         const _tgtEntityIds = new Set(_tgtG.entities.map(e => e.entity));
@@ -3757,7 +3760,13 @@ export class HistoryCardState {
         const _prevIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
         const _nextIdx = _nextGraphForIdx?.entities?.[0]?.graphIndex;
         const _newGraphIndex = _nextIdx !== undefined ? (_prevIdx + _nextIdx) / 2 : _prevIdx + 1;
-        for( let e of _srcG.entities ) e.graphIndex = _newGraphIndex;
+        // A whole block moved: its graphs keep their own relative order (strictly increasing
+        // from there, staying within half the gap — graphIndex only decides the order
+        // inside a group, groups themselves follow pconfig.entities' order)
+        const _step = ( _nextIdx !== undefined ? Math.abs(_nextIdx - _prevIdx) || 1 : 1 ) / (2 * (_moved.length + 1));
+        _moved.forEach((g, k) => {
+            for( let e of g.entities ) e.graphIndex = _newGraphIndex + k * _step;
+        });
         this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
@@ -6940,7 +6949,14 @@ export class HistoryCardState {
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         this._pureYamlEntities = _yamlEntities;
-        const _yamlMirror   = _ls?.yaml_entities ?? [];
+        // First load of this card on this device (nothing in localStorage yet): there's no
+        // mirror of what YAML said last time, so the current YAML is taken as that mirror —
+        // i.e. YAML is NOT considered changed. Otherwise a device opening the card for the
+        // first time would see every YAML value as a fresh edit, override what the other
+        // devices synced through HA, and then write those YAML values back to HA, wiping
+        // everyone's customizations. On a first load, HA (where enabled) wins instead.
+        const _firstLoadOnDevice = !_ls;
+        const _yamlMirror   = _firstLoadOnDevice ? _yamlEntities : ( _ls.yaml_entities ?? [] );
         const _haMirror     = _ls?.ha_entities ?? [];
 
         const _findEntity = (arr, id) => arr.find(e => e.entity === id);
@@ -7040,13 +7056,15 @@ export class HistoryCardState {
                 for( const _f of _multiFields )
                     if( _f in _haE ) _result[_f] = _haE[_f];
             // graphKey (which linked graph of its group the entity is shown in — see
-            // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
-            // follows whichever source won groupId above.
+            // _uncombineEntity) and graphIndex (that graph's position inside the group's
+            // block) aren't fields of their own: they're part of the grouping, so they
+            // follow whichever source won groupId above.
             const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                             ( _enabledFields.has('groupId') ? _localE : null );
             if( _keySrc ) {
                 if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
                 else delete _result.graphKey;
+                if( _keySrc.graphIndex !== undefined ) _result.graphIndex = _keySrc.graphIndex;
             }
             return _result;
         });
@@ -7111,9 +7129,6 @@ export class HistoryCardState {
         // infoPanelEnabled is handled separately below — see the warning comment there,
         // it deliberately does NOT follow this pattern.
 
-        // YAML front
-        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined &&
-                                 String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
         // HA user front (compare HA user value to its mirror in localStorage)
         // range defaults to 'all' when this card has no static (YAML) entities at all —
@@ -7129,6 +7144,12 @@ export class HistoryCardState {
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
 
+        // YAML front — on this device's first load (no mirror yet, see _firstLoadOnDevice),
+        // YAML only applies if HA has nothing to offer
+        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined && (
+            _firstLoadOnDevice ? !_haTimeChanged :
+            String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange) );
+
         // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
         // as everything else. This was broken as an unrelated side effect of the v1.1.27
         // storage-format simplification (which dropped `yaml_defaultInfoPanel` from the
@@ -7142,10 +7163,12 @@ export class HistoryCardState {
         // timestamp on every load regardless of this comparison, see below) — verified
         // against the last version with a properly tested info panel (v1.1.19), which used
         // this exact mirror comparison.
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
         const _haInfoChanged = _haInfoEnabled !== undefined &&
                                _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
+        // (first load on this device: YAML only applies if HA has nothing — see range above)
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined && (
+            _firstLoadOnDevice ? !_haInfoChanged :
+            this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel );
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;

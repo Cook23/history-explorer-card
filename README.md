@@ -21,6 +21,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.1.43** — YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
 - **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
 - **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
@@ -172,7 +173,7 @@ In the info panel, a "Type" link appears between the date and range selectors fo
 
 ## Interactive graph management
 
-All changes made interactively are synchronized with your HA user account and survive a page refresh across all devices.
+Changes made interactively on graphs added from the UI are synchronized with your HA user account and survive a page refresh across all your devices. For graphs defined in YAML, they only do if you enable it — see [Time range and display defaults](#time-range-and-display-defaults).
 
 ### Line graphs
 
@@ -190,7 +191,7 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph
-- **Drag** a curve label onto another graph to move it there (compatible units only)
+- **Drag** a curve label onto another graph to move it there (compatible units only — any unit within a group of [linked graphs](#linked-graphs))
 
 An incompatible drop shows a brief tooltip explaining the mismatch.
 
@@ -198,15 +199,17 @@ An incompatible drop shows a brief tooltip explaining the mismatch.
 
 A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Only entities of different display types (e.g. a line and a bar) end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
-- **Double-click** a curve label of a YAML graph to show it in its own graph right below — it stays linked to its YAML graph
+- **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
 - **Double-click** the chain icon to merge the two linked graphs back into one
 
-Linked graphs can always be merged back as long as their display types match (a line can't share a graph with a bar, timeline or arrowline).
+Linked graphs can always be merged back as long as their display types match (a line can't share a graph with a bar, timeline or arrowline). The same applies to entities added from the UI: changing a curve's display type to one its graph can't show moves it to a linked graph, and changing it back returns it to its graph. A double-click on a label of a graph added from the UI takes that curve out of its group instead.
 
 ### Reordering graphs
 
 Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock.
+
+Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
 ### Timeline and arrowline graphs
 
@@ -265,7 +268,8 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```
 
 - `enable_persistence` — this device remembers on its own (local browser storage only).
-- `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account.
+- `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account. A device opening the card for the first time starts from what your other devices synced.
+- Changing the YAML always wins over customizations made in the UI, for what was changed: an entity edited in YAML gets its YAML values back (on every device), the others keep theirs.
 - Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)

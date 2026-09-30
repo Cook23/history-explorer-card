@@ -4,6 +4,45 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.43] - unreleased (beta)
+
+### Fixed — graph-level `ymin` / `ymax` / `ystepSize` had no effect ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
+- Set under a YAML graph's `options:`, they were never passed on to the graph — they now set its Y axis as documented
+- `ymin: 0` / `ymax: 0` now also count as a fixed scale for the padlock icon
+
+### Fixed — `fill` set on a YAML graph entity was ignored ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
+- A `fill` given directly on a graph entity (typically a wildcard `entity: sensor.*...`) without its own `color` was replaced by the automatic color's fill — an entity's own `fill` now always wins
+- Graph-level options left unset no longer wipe the matching `entityOptions` value for entities of that graph
+
+### Fixed — errors logged when a data reload shrinks a graph under an open tooltip ([#30](https://github.com/Cook23/history-explorer-card/issues/30))
+- Typically when opening the card from a tile card's trend graph: `...data[t.index]._view` then `e.title.length` errors
+- The tooltip now re-checks its point against the reloaded data, and closes if that point no longer exists
+
+### Changed — a YAML graph shows all its entities together again, whatever their units ([#31](https://github.com/Cook23/history-explorer-card/issues/31))
+- Regression since v1.1.34: YAML graphs were split into one graph per unit family again, as before v1.1.28
+- Entities of a YAML graph now always share one graph; the Y axis title is left empty when units differ, the legend and tooltip keep each entity's own unit
+- Only different display types (line, bar, timeline, arrowline) can't share a graph — they are shown as linked graphs (chain icon)
+
+### New — linked graphs can be split and merged back
+- Double-click a curve (or timeline entity) label on a YAML graph: it moves to its own graph right below, still linked to its YAML graph (same group, chain icon) — whatever its unit
+- Drag a label onto another graph of the same group, or double-click the chain icon, to show them together again — whatever the units, as long as the display types match
+- Dynamic entities keep their behavior: a double-click takes the curve out of its group
+- The chain icon now sits on the left, straddling the two graphs, so it no longer covers the lower graph's legend
+- Moving a graph that belongs to a block of linked graphs elsewhere now moves the whole block, instead of breaking it apart until the next reload
+- A split YAML graph (and the order of its linked graphs) is remembered following the `groupId` persistence rules
+
+### Fixed — dynamic graphs never really got a group
+- Adding an entity from the UI stored a second, hidden copy of it carrying its group, while the displayed one had none — so changing a curve to an incompatible type didn't link the new graph (no chain), and changing it back didn't return it to its graph
+- It only seemed to work after a reload, because an old storage migration then put every dynamic entity into one single group, chaining unrelated graphs together
+- Existing saved layouts are repaired automatically on first load
+
+### Fixed — a device opening the card for the first time wiped the other devices' synced customizations
+- With no local history yet, every YAML value looked like a fresh YAML edit: YAML won over what the other devices had synced through Home Assistant, and was then written back, overwriting it for everyone
+- A device's first load now takes the synced values (where multi-device persistence is enabled), and YAML only where nothing was synced
+
+### Fixed — `unit:` set in YAML is now used when deciding whether a new dynamic entity can join an existing graph
+
+
 ## [v1.1.42] - 2026-07-30
 
 ### Fixed — menus could appear squeezed off-screen on a new card
