@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.43b3';
+const Version = '1.1.43b4';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -4964,13 +4964,19 @@ export class HistoryCardState {
     {
         // Creates one brand-new entity with an explicit type and persists it —
         // shared by the non-numeric direct-create path and the type-menu new-entity path
-        const _prevCount = this.graphs.length;
-        this.addGraph(eid, false, null, null, null, undefined, false, null, null, { type, lineMode });
-        const _wasCombined = this.graphs.length === _prevCount;
-        const _lastG = this.graphs[this.graphs.length - 1];
-        const _gid = _wasCombined ? _lastG?.groupId : this._nextGroupId++;
-        const _addedEntity = _lastG?.entities.find(e => e.entity === eid);
-        this.pconfig.entities.push({ entity: eid, groupId: _gid, color: _addedEntity?.color, fill: _addedEntity?.fill, type, lineMode });
+        // addGraph registers _entry itself as the entity's pconfig.entities entry (and adopts
+        // the groupId of the graph it combined into, if any) — it must not be pushed a second
+        // time here: a duplicate entry, never displayed, used to carry the groupId instead,
+        // leaving the displayed one with none (so a type change couldn't link its graphs).
+        const _entry = { type, lineMode };
+        this.addGraph(eid, false, null, null, null, undefined, false, null, null, _entry);
+        const _g = this.graphs.find(g => g.entities.includes(_entry));
+        if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
+            // A brand-new graph (or one left without a group by that old bug): a group of its own
+            const _gid = this._nextGroupId++;
+            _g.groupId = _gid;
+            _g.entities.forEach(e => { e.groupId = _gid; });
+        }
         return this._hass.states[eid]?.attributes?.friendly_name || eid;
     }
 
@@ -7061,6 +7067,44 @@ export class HistoryCardState {
                 }
                 return e;
             });
+        }
+
+        // Migration: dynamic entities without a group (left by a duplicate-entry bug in
+        // _createAndPersistEntity, fixed in 1.1.43 — the displayed entry never got its
+        // groupId). One new group per graph, graphs told apart by their saved graphIndex.
+        if( this.pconfig.entities.some(e => !e.isStatic && ( e.groupId === null || e.groupId === undefined )) ) {
+            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
+            const _byIndex = new Map();
+            this.pconfig.entities = this.pconfig.entities.map(e => {
+                if( e.isStatic || ( e.groupId !== null && e.groupId !== undefined ) ) return e;
+                const _k = e.graphIndex ?? Symbol();
+                if( !_byIndex.has(_k) ) _byIndex.set(_k, _next++);
+                return { ...e, groupId: _byIndex.get(_k) };
+            });
+        }
+
+        // Migration: the old renumbering above also caught null (fixed in 1.1.43), which put
+        // every ungrouped dynamic entity into one group 1000, each graph linked to the next.
+        // Its signature: one dynamic group with two graphs (told apart by saved graphIndex) of
+        // the same type — impossible otherwise, since same-type graphs of a dynamic group
+        // always combine. Such a group is split back into one group per graph.
+        {
+            const _dynGroups = new Map();
+            for( const e of this.pconfig.entities ) {
+                if( e.isStatic || e.groupId === null || e.groupId === undefined ) continue;
+                if( !_dynGroups.has(e.groupId) ) _dynGroups.set(e.groupId, new Map());
+                const _graphs = _dynGroups.get(e.groupId);
+                const _k = e.graphIndex ?? Symbol();
+                if( !_graphs.has(_k) ) _graphs.set(_k, e.type ?? this._detectDefaultType(e.entity).type);
+            }
+            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
+            for( const [_groupId, _graphs] of _dynGroups ) {
+                const _types = [..._graphs.values()];
+                if( new Set(_types).size === _types.length ) continue;
+                const _newIds = new Map([..._graphs.keys()].map(k => [k, _next++]));
+                this.pconfig.entities = this.pconfig.entities.map(e =>
+                    ( !e.isStatic && e.groupId === _groupId && _newIds.has(e.graphIndex) ) ? { ...e, groupId: _newIds.get(e.graphIndex) } : e);
+            }
         }
 
         // --- Last one to speak wins — timeRange ---
