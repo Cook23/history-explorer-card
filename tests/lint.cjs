@@ -1,5 +1,6 @@
-// Static check of the sources: every identifier read is declared somewhere in reach — a
-// variable left behind by a refactoring shows up here, before any test has to run it
+// Static check of the sources: every identifier read is declared somewhere in reach, and no
+// imported binding is assigned — what a refactoring that moves code between files can leave
+// behind shows up here, before any test has to run it
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -8,6 +9,12 @@ const acorn = require('acorn');
 const FILES = [
     ['src/history-explorer-card.js', 'module'],
     ['src/history-entity-store.js', 'module'],
+    ['src/history-units.js', 'module'],
+    ['src/card-history.js', 'module'],
+    ['src/card-datasets.js', 'module'],
+    ['src/card-gestures.js', 'module'],
+    ['src/card-menus.js', 'module'],
+    ['src/card-storage.js', 'module'],
     ['src/history-info-panel.js', 'module'],
     ['src/history-csv-exporter.js', 'module'],
     ['src/history-chart-vline.js', 'module'],
@@ -71,12 +78,19 @@ function scopeNames(fn)
     return names;
 }
 
-// Identifiers read but declared in no enclosing scope
-function undeclared(ast)
+// Identifiers read but declared in no enclosing scope; imports assigned to (an imported
+// binding is read-only: the assignment throws at run time)
+function problems(ast)
 {
-    const missing = new Set();
+    const missing = new Set(), assigned = new Set();
+    const imports = new Set();
+    ast.body.filter(n => n.type === 'ImportDeclaration').forEach(n => n.specifiers.forEach(s => imports.add(s.local.name)));
     const visit = (n, scopes, parent, key) => {
         if( /Function|Program/.test(n.type) ) scopes = scopes.concat([scopeNames(n)]);
+        const target = n.type === 'AssignmentExpression' ? n.left : n.type === 'UpdateExpression' ? n.argument : null;
+        // (an import not shadowed by a local declaration of the same name)
+        if( target?.type === 'Identifier' && imports.has(target.name) && !scopes.slice(1).some(s => s.has(target.name)) )
+            assigned.add(target.name);
         if( n.type === 'Identifier' ) {
             const notARead = (parent.type === 'MemberExpression' && key === 'property' && !parent.computed) ||
                 (/^(Property|MethodDefinition|PropertyDefinition)$/.test(parent.type) && key === 'key' && !parent.computed) ||
@@ -91,7 +105,7 @@ function undeclared(ast)
         }
     };
     visit(ast, [], null, null);
-    return missing;
+    return [...[...missing].map(m => 'undeclared: ' + m), ...[...assigned].map(a => 'import assigned: ' + a)];
 }
 
 module.exports = async function()
@@ -99,9 +113,9 @@ module.exports = async function()
     let passed = 0, failed = 0;
     for( const [file, sourceType] of FILES ) {
         const src = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
-        const missing = undeclared(acorn.parse(src, { ecmaVersion: 2022, sourceType }));
-        if( missing.size ) failed++; else passed++;
-        console.log((missing.size ? '  ✗ ' : '  ✓ ') + file + (missing.size ? '  -> undeclared: ' + [...missing].join(', ') : ''));
+        const found = problems(acorn.parse(src, { ecmaVersion: 2022, sourceType }));
+        if( found.length ) failed++; else passed++;
+        console.log((found.length ? '  ✗ ' : '  ✓ ') + file + (found.length ? '  -> ' + found.join(', ') : ''));
     }
     return { passed, failed };
 };
