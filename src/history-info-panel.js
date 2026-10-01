@@ -62,7 +62,7 @@ function hecHookInfoPanel()
 
         const uom = instance.getUnitOfMeasure(entity_id);
         const sc = instance.getStateClass(entity_id);
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
         // Make sure the panel always starts with the same default graph color
         instance.pconfig.nextDefaultColor = 0;
@@ -341,7 +341,7 @@ function hecHookInfoPanel()
 
         const uom = this.hass.states[entity_id]?.attributes?.unit_of_measurement;
         const sc = this.hass.states[entity_id]?.attributes?.state_class;
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
         const h = calcGraphHeight(type);
 
@@ -386,7 +386,6 @@ function hecHookInfoPanel()
                             <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                             <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
                             <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
-                            <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                             <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                             <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                             <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>

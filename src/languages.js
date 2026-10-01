@@ -28,7 +28,6 @@ const lang_en =
             "type_line_straight" : "Line straight",
             "type_line_curves"   : "Line curves",
             "type_line_stepped"  : "Line stepped",
-            "type_line_smart"  : "Line smart",
             "type_bar"           : "Bar",
             "type_arrowline"     : "Arrowline",
             "type_timeline"      : "Timeline",
@@ -36,8 +35,7 @@ const lang_en =
             "type_label"         : "Type",
             "type_default"       : "Default",
             "entity_delete"      : "Delete",
-            "linked_graphs"      : "Linked graphs",
-            "linked_graphs_merge": "Double-click to merge"
+            "linked_graphs"      : "Linked graphs"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -91,7 +89,6 @@ const lang_fr =
             "type_line_straight" : "Ligne droite",
             "type_line_curves"   : "Ligne courbe",
             "type_line_stepped"  : "Ligne en escalier",
-            "type_line_smart"  : "Courbe intelligente",
             "type_bar"           : "Barres",
             "type_arrowline"     : "Flèche directionnelle",
             "type_timeline"      : "Chronologie",
@@ -99,8 +96,7 @@ const lang_fr =
             "type_label"         : "Type",
             "type_default"       : "Par défaut",
             "entity_delete"      : "Supprimer",
-            "linked_graphs"      : "Graphiques liés",
-            "linked_graphs_merge": "Double-clic pour fusionner"
+            "linked_graphs"      : "Graphiques liés"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -154,7 +150,6 @@ const lang_de =
             "type_line_straight" : "Linie gerade",
             "type_line_curves"   : "Linie kurvig",
             "type_line_stepped"  : "Linie gestuft",
-            "type_line_smart"  : "Intelligente Kurve",
             "type_bar"           : "Balken",
             "type_arrowline"     : "Pfeillinie",
             "type_timeline"      : "Zeitachse",
@@ -162,8 +157,7 @@ const lang_de =
             "type_label"         : "Typ",
             "type_default"       : "Standard",
             "entity_delete"      : "Löschen",
-            "linked_graphs"      : "Verknüpfte Diagramme",
-            "linked_graphs_merge": "Doppelklick zum Zusammenführen"
+            "linked_graphs"      : "Verknüpfte Diagramme"
         },
         "ranges" : {
             "l_hour" : "< 1 Std",
@@ -217,7 +211,6 @@ const lang_es =
             "type_line_straight" : "Línea recta",
             "type_line_curves"   : "Línea curva",
             "type_line_stepped"  : "Línea escalonada",
-            "type_line_smart"  : "Curva inteligente",
             "type_bar"           : "Barras",
             "type_arrowline"     : "Línea de flecha",
             "type_timeline"      : "Cronología",
@@ -225,8 +218,7 @@ const lang_es =
             "type_label"         : "Tipo",
             "type_default"       : "Predeterminado",
             "entity_delete"      : "Eliminar",
-            "linked_graphs"      : "Gráficos vinculados",
-            "linked_graphs_merge": "Doble clic para combinar"
+            "linked_graphs"      : "Gráficos vinculados"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -280,7 +272,6 @@ const lang_nl =
             "type_line_straight" : "Lijn recht",
             "type_line_curves"   : "Lijn gebogen",
             "type_line_stepped"  : "Lijn getrapt",
-            "type_line_smart"  : "Slimme curve",
             "type_bar"           : "Staaf",
             "type_arrowline"     : "Pijllijn",
             "type_timeline"      : "Tijdlijn",
@@ -288,8 +279,7 @@ const lang_nl =
             "type_label"         : "Type",
             "type_default"       : "Standaard",
             "entity_delete"      : "Verwijderen",
-            "linked_graphs"      : "Gekoppelde grafieken",
-            "linked_graphs_merge": "Dubbelklik om samen te voegen"
+            "linked_graphs"      : "Gekoppelde grafieken"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -343,7 +333,6 @@ const lang_pl =
             "type_line_straight" : "Linia prosta",
             "type_line_curves"   : "Linia krzywa",
             "type_line_stepped"  : "Linia schodkowa",
-            "type_line_smart"  : "Inteligentna krzywa",
             "type_bar"           : "Słupek",
             "type_arrowline"     : "Linia strzałki",
             "type_timeline"      : "Oś czasu",
@@ -351,8 +340,7 @@ const lang_pl =
             "type_label"         : "Typ",
             "type_default"       : "Domyślny",
             "entity_delete"      : "Usuń",
-            "linked_graphs"      : "Połączone wykresy",
-            "linked_graphs_merge": "Kliknij dwukrotnie, aby połączyć"
+            "linked_graphs"      : "Połączone wykresy"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -406,7 +394,6 @@ const lang_sv =
             "type_line_straight" : "Rak linje",
             "type_line_curves"   : "Kurvig linje",
             "type_line_stepped"  : "Stegad linje",
-            "type_line_smart"  : "Smart kurva",
             "type_bar"           : "Stapel",
             "type_arrowline"     : "Pillinje",
             "type_timeline"      : "Tidslinje",
@@ -414,8 +401,7 @@ const lang_sv =
             "type_label"         : "Typ",
             "type_default"       : "Standard",
             "entity_delete": "Ta bort",
-            "linked_graphs": "Länkade grafer",
-            "linked_graphs_merge": "Dubbelklicka för att slå ihop"
+            "linked_graphs": "Länkade grafer"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -469,7 +455,6 @@ const lang_da =
             "type_line_straight" : "Ret linje",
             "type_line_curves"   : "Kurvet linje",
             "type_line_stepped"  : "Trappelinje",
-            "type_line_smart"  : "Smart kurve",
             "type_bar"           : "Søjle",
             "type_arrowline"     : "Pillinje",
             "type_timeline"      : "Tidslinje",
@@ -477,8 +462,7 @@ const lang_da =
             "type_label"         : "Type",
             "type_default"       : "Standard",
             "entity_delete"      : "Slet",
-            "linked_graphs"      : "Sammenkædede grafer",
-            "linked_graphs_merge": "Dobbeltklik for at flette"
+            "linked_graphs"      : "Sammenkædede grafer"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -532,7 +516,6 @@ const lang_sk =
             "type_line_straight" : "Priama čiara",
             "type_line_curves"   : "Krivka",
             "type_line_stepped"  : "Schodová čiara",
-            "type_line_smart"  : "Inteligentná krivka",
             "type_bar"           : "Stĺpec",
             "type_arrowline"     : "Šípová čiara",
             "type_timeline"      : "Časová os",
@@ -540,8 +523,7 @@ const lang_sk =
             "type_label"         : "Typ",
             "type_default"       : "Predvolené",
             "entity_delete"      : "Odstrániť",
-            "linked_graphs"      : "Prepojené grafy",
-            "linked_graphs_merge": "Dvojitým kliknutím zlúčiť"
+            "linked_graphs"      : "Prepojené grafy"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -595,7 +577,6 @@ const lang_ru =
             "type_line_straight" : "Прямая линия",
             "type_line_curves"   : "Кривая линия",
             "type_line_stepped"  : "Ступенчатая линия",
-            "type_line_smart"  : "Умная кривая",
             "type_bar"           : "Столбик",
             "type_arrowline"     : "Линия стрелки",
             "type_timeline"      : "Хронология",
@@ -603,8 +584,7 @@ const lang_ru =
             "type_label"         : "Тип",
             "type_default"       : "По умолчанию",
             "entity_delete"      : "Удалить",
-            "linked_graphs"      : "Связанные графики",
-            "linked_graphs_merge": "Дважды щёлкните, чтобы объединить"
+            "linked_graphs"      : "Связанные графики"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",

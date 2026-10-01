@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.46';
+const Version = '1.2.0b68';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -24,9 +24,6 @@ export const _TYPE_MENU_DEFS = [
     { type: 'bar',  lineMode: null      },
     { type: 'arrowline', lineMode: null },
     { type: 'timeline',  lineMode: null },
-    // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // right after 'Line stepped' in the menus' markup
-    { type: 'line', lineMode: 'smart'   },
 ];
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
@@ -133,11 +130,7 @@ var panstate = {};
     panstate.ly = 0;
     panstate.tc = 0;
     panstate.g 	= null;
-    panstate.overlay = null;
-    panstate.st0 = null;
-    panstate.st1 = null;
     panstate.yaxis = null;
-    panstate.pinch = null;  // { p1, p2, distY, y0, y1 } when two fingers active
     panstate.longpress = null; // { timer, pointerId, x0, y0 } — touch long-press gate
 
 
@@ -259,7 +252,6 @@ export class HistoryCardState {
         this.state.updateCanvas  = null;
         this.state.loading       = false;
         this.state.zoomMode      = false;
-        this.state.altGraph      = null;
         this.state.autoScroll    = false;
 
         this.activeRange = {};
@@ -311,8 +303,6 @@ export class HistoryCardState {
     normalizeLineMode(m)
     {
         // Accept singular aliases: 'line' -> 'lines', 'curve' -> 'curves', 'step' -> 'stepped'
-        // ('smart': curves while the source reports, flat dashed plateaus over its
-        // silences — see _applySilencePlateaus)
         if( m === 'line'  ) return 'lines';
         if( m === 'curve' ) return 'curves';
         if( m === 'step'  ) return 'stepped';
@@ -502,10 +492,8 @@ export class HistoryCardState {
         for( let i of this.ui.zoomButton )
             if( i ) i.style.backgroundColor = this.state.zoomMode ? this.ui.darkMode ? '#ffffff3a' : '#0000003a' : '#0000';
 
-        if( panstate.overlay ) {
-            panstate.overlay.remove();
-            panstate.overlay = null;
-        }
+        for( let g of this.graphs )
+            if( g.chart ) g.chart.options.zoomSelectMode = this.state.zoomMode;
     }
 
     decZoom()
@@ -610,35 +598,41 @@ export class HistoryCardState {
     selectBarInterval(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
-        const g = this.graphs.find(gr => gr.id == id);
-        if( !g ) return;
 
-        const _value = parseInt(event.target.value);
-        const _wasRaw = g.interval == 4;
-        const _isRaw = _value == 4;
-        g.interval = _value;
+        for( let i = 0; i < this.graphs.length; i++ ) {
+            if( this.graphs[i].id == id ) {
 
-        // Persist the interval on every entity of this graph (whichever is rebuilt first
-        // carries it — see addGraph's _graphInterval). The entities' own types are left
-        // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
-        // they are, so picking an interval again turns them back into bars.
-        for( let en of g.entities ) {
-            const _eIdx = this._pcEntryIndex(en.entity);
-            if( _eIdx < 0 ) continue;
-            if( typeof this.pconfig.entities[_eIdx] === 'string' )
-                this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
-            this.pconfig.entities[_eIdx].interval = _value;
-        }
+                this.graphs[i].interval = event.target.value;
+                const ntype = ( event.target.value == 4 ) ? 'line' : 'bar';
+                const _typeChanged = ntype !== this.graphs[i].type;
 
-        // Bars <-> raw curves: rebuilt in place, each bar entity's dataset changing kind
-        if( _wasRaw !== _isRaw ) {
-            const _nextG = this._nextGraph(g);
-            const _entities = [...g.entities];
-            const _groupId = g.groupId;
-            this._detachGraph(g);
-            _entities.forEach((en, i) => {
-                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, _value, _groupId, en);
-            });
+                // Persist interval (and type, if it changed) in pconfig.entities for
+                // every entity of this graph — one lookup per entity, not two
+                for( let en of this.graphs[i].entities ) {
+                    const _eIdx = this._pcEntryIndex(en.entity);
+                    if( _eIdx < 0 ) continue;
+                    if( typeof this.pconfig.entities[_eIdx] === 'string' )
+                        this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
+                    this.pconfig.entities[_eIdx].interval = parseInt(event.target.value);
+                    if( _typeChanged ) this.pconfig.entities[_eIdx].type = ntype;
+                }
+
+                if( _typeChanged ) {
+                    if( ntype == 'line' ) {
+                        for( let d of this.graphs[i].chart.data.datasets ) {
+                            d.backgroundColor = 'rgba(0,0,0,0)';
+                            if( d.borderColor && Array.isArray(d.borderColor) ) d.borderColor = d.borderColor[0];
+                        }
+                    } else {
+                        for( let d of this.graphs[i].chart.data.datasets ) d.backgroundColor = d.borderColor;
+                    }
+
+                    this.graphs[i].chart.type = this.graphs[i].chart.config.type = this.graphs[i].type = ntype;
+                    this.graphs[i].chart.update();
+                }
+
+                break;
+            }
         }
 
         this.updateHistory();
@@ -648,11 +642,11 @@ export class HistoryCardState {
     createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
         return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
-                    <option value="0" ${optionStyle} ${selected == 0 ? 'selected' : ''}>${i18n('ui.interval._10m')}</option>
-                    <option value="1" ${optionStyle} ${selected == 1 ? 'selected' : ''}>${i18n('ui.interval.hourly')}</option>
-                    <option value="2" ${optionStyle} ${selected == 2 ? 'selected' : ''}>${i18n('ui.interval.daily')}</option>
-                    <option value="3" ${optionStyle} ${selected == 3 ? 'selected' : ''}>${i18n('ui.interval.monthly')}</option>
-                    <option value="4" ${optionStyle} ${selected == 4 ? 'selected' : ''}>${i18n('ui.interval.rawline')}</option>
+                    <option value="0" ${optionStyle}>${i18n('ui.interval._10m')}</option>
+                    <option value="1" ${optionStyle}>${i18n('ui.interval.hourly')}</option>
+                    <option value="2" ${optionStyle}>${i18n('ui.interval.daily')}</option>
+                    <option value="3" ${optionStyle}>${i18n('ui.interval.monthly')}</option>
+                    <option value="4" ${optionStyle}>${i18n('ui.interval.rawline')}</option>
                 </select>`;
     }
 
@@ -736,7 +730,7 @@ export class HistoryCardState {
     {
         return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
                 'dashMode', 'lineMode', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
-                'netBars', 'decimation', 'circular', 'groupId'];
+                'netBars', 'decimation', 'groupId'];
     }
 
     // Entity-scope persistence option: a list of specific field names, or 'entities'/'all' as
@@ -752,55 +746,9 @@ export class HistoryCardState {
 
 
     // --------------------------------------------------------------------------------------
-    // Y axis scale lock / unlock
+    // Y axis scale lock / unlock — entirely Chart.js's own responsibility now
+    // (_hecUpdateYAxisLockIcon), nothing left for the card here.
     // --------------------------------------------------------------------------------------
-
-    scaleLockClicked(event)
-    {
-        const id = event.currentTarget.id.substr(event.currentTarget.id.indexOf("-") + 1);
-
-        for( let i = 0; i < this.graphs.length; i++ ) {
-            if( this.graphs[i].id == id ) {
-                let c = this.graphs[i].chart;
-
-                if( this.graphs[i].yaxisLock ) {
-                    c.options.scales.yAxes[0].ticks.min = c.options.scales.yAxes[0].ticks.forceMin;
-                    c.options.scales.yAxes[0].ticks.removeEdgeTicks = false;
-                    c.options.scales.yAxes[0].ticks.max = c.options.scales.yAxes[0].ticks.forceMax;
-                    c.options.scales.yAxes[0].ticks.removeEdgeTicks = false;
-                    this.graphs[i].yaxisLock = 0;
-                    const _ya = this._this.querySelector(`#ya-${this.graphs[i].id}`);
-                    if( _ya ) _ya.style.touchAction = '';
-                } else
-                    this.graphs[i].yaxisLock = 1;
-
-                this.updateScaleLockState(this.graphs[i], false);
-
-                break;
-            }
-        }
-
-        this.updateHistory();
-    }
-
-    createScaleLockIconHtml(gid, h)
-    {
-        return `<button id='ca-${gid}' style="position:absolute;left:${(this.pconfig.labelAreaWidth-18) * 0 + 10}px;margin-top:${-h+5}px;background:none;opacity:1.0;border:0px solid black;">
-            <svg style='display:none' width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" /></svg>
-            </button>`;
-    }
-
-    updateScaleLockState(g, axisInteraction)
-    {
-        const fixedScale = ( g.chart.options.scales.yAxes[0].ticks.forceMin != null && g.chart.options.scales.yAxes[0].ticks.forceMax != null );
-
-        let e = this._this.querySelector(`#ca-${g.id}`);
-        if( e ) {
-            e.children[0].style.display = ( fixedScale && !axisInteraction ) ? 'none' : 'inherit';
-            e.style.opacity = ( axisInteraction || g.yaxisLock ) ? 1.0 : 0.3;
-        }
-    }
-
 
     // --------------------------------------------------------------------------------------
     // Time ticks and step size
@@ -1444,88 +1392,6 @@ export class HistoryCardState {
         return r;
     }
 
-    // 'smart' line mode: a curve while the source reports, and a flat plateau — the last
-    // known value held — over each of its silences, instead of a diagonal or a spline
-    // bridging the gap to the next value. Same rules as the lowpass_dt integration:
-    // - the source's usual interval between values is an EMA (alpha 0.1) of the intervals,
-    //   seeded with their median (and σ with their median absolute deviation) so that a
-    //   first long interval can't skew it;
-    // - an interval longer than mean + 3σ + 0.1 s (never under 1 s) is a silence, and only
-    //   counts as that limit in the EMA (lowpass_dt's first-sample-after-silence rule);
-    // - the curve resumes one usual interval before the value that ends the silence (a
-    //   virtual point at t0 − mean on the plateau), so the spline only ever joins values
-    //   the source actually reported at its usual rhythm.
-    // Plateaus are marked for Chart.js (hecPlateauEnd on the point ending one: straight,
-    // dashed segment; hecVirtual: curve-shaping only, never shown or hovered). An ongoing
-    // silence (last value to now / the end of the window) is a plateau too.
-    // Note: Home Assistant only records a value when it changes, so a "silence" here is
-    // "no new value recorded" — a steady source looks the same, and the plateau is
-    // equally right for it (the last value still holds).
-    _applySilencePlateaus(s, raw, extended)
-    {
-        if( raw.length < 3 || s.length < 2 ) return s;
-
-        const _dts = [];
-        for( let i = 1; i < raw.length; i++ ) {
-            const dt = raw[i].t - raw[i - 1].t;
-            if( dt > 0 ) _dts.push(dt);
-        }
-        if( _dts.length < 2 ) return s;
-        _dts.sort((a, b) => a - b);
-        let mean = _dts[Math.floor(_dts.length / 2)];
-        // σ seeded the same robust way: from the median absolute deviation (×1.4826, its
-        // ratio to σ for normally distributed values) — not 0, which would make the first
-        // limit mean + 0.1 s and turn the first bit of timing jitter into a "silence"
-        const _dev = _dts.map(d => Math.abs(d - mean)).sort((a, b) => a - b);
-        const sigma0 = 1.4826 * _dev[Math.floor(_dev.length / 2)];
-        let m2 = mean * mean + sigma0 * sigma0;
-        const _limit = () => Math.max(mean + 3 * Math.sqrt(Math.max(0, m2 - mean * mean)) + 100, 1000);
-
-        const gaps = [];
-        for( let i = 1; i < raw.length; i++ ) {
-            const dt = raw[i].t - raw[i - 1].t;
-            if( dt <= 0 ) continue;
-            const limit = _limit();
-            let dtStat = dt;
-            if( dt > limit ) {
-                gaps.push({ ta: raw[i - 1].t, y: raw[i - 1].y, tb: raw[i].t, lead: mean });
-                dtStat = limit;
-            }
-            mean = 0.9 * mean + 0.1 * dtStat;
-            m2   = 0.9 * m2   + 0.1 * dtStat * dtStat;
-        }
-
-        const tOf = p => moment(p.x).valueOf();
-        const out = s.slice();
-
-        // Inserts the plateau start point (the last value before the silence) right before
-        // index k, unless it's already there — decimation may have dropped it
-        const ensureStart = (k, ta, y) => {
-            if( k > 0 && tOf(out[k - 1]) >= ta ) return k;
-            out.splice(k, 0, { x: ta, y });
-            return k + 1;
-        };
-
-        let k = 0;
-        for( const gap of gaps ) {
-            while( k < out.length && tOf(out[k]) < gap.tb ) k++;
-            if( k === 0 || k >= out.length ) continue;
-            k = ensureStart(k, gap.ta, gap.y);
-            out.splice(k, 0, { x: gap.tb - gap.lead, y: gap.y, hecPlateauEnd: true, hecVirtual: true });
-            k++;
-        }
-
-        // Ongoing silence: from the last recorded value to the extension point at the end
-        const last = raw[raw.length - 1];
-        const end = out[out.length - 1];
-        if( extended && tOf(end) - last.t > _limit() ) {
-            const kEnd = ensureStart(out.length - 1, last.t, last.y);
-            out[kEnd].hecPlateauEnd = true;
-        }
-
-        return out;
-    }
-
     buildChartData(result)
     {
         let m_now = moment();
@@ -1553,15 +1419,7 @@ export class HistoryCardState {
 
                     const process = this.buildProcessFunction(g.entities[j].process);
 
-                    // Per entity: a bar graph can hold curves too (see _entityKind)
-                    const _kind = this._entityKind(g, g.entities[j]);
-
-                    // Circular values (angles): a continuous curve, see _unwrapCircular
-                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this._circularPeriod(g.entities[j]) : null;
-                    let _circBand = false;
-                    if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
-
-                    if( _kind == 'line' ) {
+                    if( g.type == 'line' ) {
 
                         // Fill line chart buffer
 
@@ -1627,7 +1485,6 @@ export class HistoryCardState {
                             }
                         }
 
-                        let _extended = false;
                         if( m_now > m_end && s.length > 0 && moment(s[s.length-1].x) < m_end ) {
                             const state = this.process(result[id][n-1].state, process);
                             if( isDataValid(state) ) {
@@ -1635,7 +1492,6 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
-                                _extended = true;
                             }
                         } else if( m_now <= m_end && s.length > 0 && moment(s[s.length-1].x) < m_now ) {
                             const state = this.process(result[id][n-1].state, process);
@@ -1644,25 +1500,10 @@ export class HistoryCardState {
                                 const showMM = g.entities[j].showMinMax;
                                 if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
                                 s.push(pt);
-                                _extended = true;
                             }
                         }
 
-                        if( (this.normalizeLineMode(g.entities[j].lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
-                            // Silences are detected on every recorded value (before decimation)
-                            const _raw = [];
-                            for( let i = 0; i < n; i++ ) {
-                                const state = this.process(result[id][i].state, process);
-                                if( !isDataValid(state) ) continue;
-                                const y = state * scale;
-                                if( !isNaN(y) ) _raw.push({ t: moment(result[id][i].last_changed).valueOf(), y });
-                            }
-                            s = this._applySilencePlateaus(s, _raw, _extended);
-                        }
-
-                        if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
-
-                    } else if( _kind == 'bar' && n > 0 ) {
+                    } else if( g.type == 'bar' && n > 0 ) {
 
                         const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
                         const netBars = g.entities[j].netBars ?? false;
@@ -1838,7 +1679,7 @@ export class HistoryCardState {
             return [label, moment(d[0]).format(this.i18n.styleDateTimeTooltip), moment(d[1]).format(this.i18n.styleDateTimeTooltip)];
     }
 
-    newGraph(canvas, graphtype, datasets, config)
+    newGraph(canvas, graphtype, datasets, config, isStatic = false)
     {
         const ctx = canvas.getContext('2d');
 
@@ -1854,10 +1695,6 @@ export class HistoryCardState {
 
             for( let d of datasets ) {
                 datastructure.datasets.push({
-                    // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
-                    type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
-                    hecNoStack: graphtype == 'bar' && d.kind === 'line',
-                    hecCircular: d.circular,
                     borderColor: d.bColor,
                     backgroundColor: d.fillColor,
                     borderWidth: d.width,
@@ -1899,11 +1736,6 @@ export class HistoryCardState {
                 if( d.siConversionFactor !== undefined && datasets._siRefUnit ) scaleUnit = datasets._siRefUnit;
             }
 
-            // Incompatible units sharing one graph (a YAML graph mixing e.g. days, mm and a
-            // unitless value): no single unit describes the Y axis, so don't label it with
-            // whichever came first — the legend and tooltip still show each entity's own unit.
-            if( datasets.some(d => !areSICompatible(d.unit, datasets[0].unit)) ) scaleUnit = '';
-
         } else if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
 
             datastructure = {
@@ -1911,40 +1743,8 @@ export class HistoryCardState {
                 datasets: [ ]
             };
 
-            // Helper: wrap label to 2 lines if too long for labelAreaWidth
-            const _wrapLabel = (name) => {
-                if( !name || !this.pconfig.labelsVisible ) return '';
-                const _availW = this.pconfig.labelAreaWidth - 8;
-                // Use an offscreen canvas to measure text accurately
-                const _mc = document.createElement('canvas').getContext('2d');
-                _mc.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
-                if( _mc.measureText(name).width <= _availW ) return name;
-                // Try to split at a word boundary
-                const _words = name.split(' ');
-                if( _words.length > 1 ) {
-                    let _line1 = '', _line2 = '';
-                    for( let _wi = 0; _wi < _words.length; _wi++ ) {
-                        const _try = _line1 ? _line1 + ' ' + _words[_wi] : _words[_wi];
-                        if( _mc.measureText(_try).width <= _availW ) {
-                            _line1 = _try;
-                        } else {
-                            _line2 = _words.slice(_wi).join(' ');
-                            break;
-                        }
-                    }
-                    if( _line1 && _line2 ) return [_line1, _line2];
-                }
-                // No word boundary — split at character level
-                let _split = 0;
-                for( let _ci = 1; _ci <= name.length; _ci++ ) {
-                    if( _mc.measureText(name.substring(0, _ci)).width <= _availW ) _split = _ci;
-                    else break;
-                }
-                return [name.substring(0, _split), name.substring(_split)];
-            };
-
             for( let d of datasets ) {
-                datastructure.labels.push(this.pconfig.labelsVisible ? _wrapLabel(d.name) : '');
+                datastructure.labels.push(this.pconfig.labelsVisible ? d.name : '');
                 datastructure.datasets.push({
                     domain: d.domain,
                     device_class: d.device_class,
@@ -1959,10 +1759,6 @@ export class HistoryCardState {
 
         }
 
-        // Any dataset drawn as a curve / as bars (a bar graph can hold both)
-        const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
-        const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
-
         const tooltipSize = this.pconfig.tooltipSize;
         const _self = this; // captured for tooltips.custom below — `this` there is the Chart.js Tooltip instance
 
@@ -1973,11 +1769,223 @@ export class HistoryCardState {
             data: datastructure,
 
             options: {
+                // Static graphs never have a draggable legend/timeline label —
+                // disable Chart.js's own cursorEnabled default behavior entirely for
+                // them, rather than teaching Chart.js the isStatic concept itself.
+                cursorEnabled: !isStatic,
+                zoomSelectMode: this.state.zoomMode,
+                // Phase 2.1 — legend overlay removed; drag&drop and long-press menu on
+                // legend labels, previously intercepted by that overlay, are recabled here
+                // onto Chart.js's generic gesture detection. Simple/double click on legend
+                // (hide/show, uncombine) needs no wiring here — legend.onClick (Chart.js
+                // native) already handles both, now itself driven by the same detector.
+                customEvent: function(info) {
+                    console.log('[HEC customEvent]', Version, info.gestureType, {
+                        pointerCount: info.pointerCount,
+                        element: info.element,
+                        legendIndex: info.legendIndex,
+                        chartType: info.chart?.config?.type,
+                        graphIndex: this.graphs?.findIndex(g => g.chart === info.chart),
+                        deltaX: info.deltaX, deltaY: info.deltaY,
+                        ctrlKey: info.ctrlKey, shiftKey: info.shiftKey, altKey: info.altKey,
+                        nativeType: info.event?.type
+                    });
+
+                    const g = this.graphs?.find(g => g.chart === info.chart);
+                    if( !g ) return;
+
+                    if( info.gestureType === 'longpress' ) {
+                        // Same condition as the removed overlay's long-press timer: only
+                        // on a legend label, line/bar graph, numeric-convertible entity.
+                        if( info.legendIndex >= 0 && (g.type === 'line' || g.type === 'bar') ) {
+                            const _entity = g.entities[info.legendIndex];
+                            if( _entity && this._isNumericEntity(_entity.entity) ) {
+                                const _box     = g.chart.legend?.legendHitBoxes[info.legendIndex];
+                                const _canvasR = g.canvas.getBoundingClientRect();
+                                const _cx      = _box ? _canvasR.left + _box.left + 30 : info.event?.clientX;
+                                const _cy      = _box ? _canvasR.top  + _box.top  + _box.height : info.event?.clientY;
+                                this.showEntityTypeMenu(0, _entity.entity, g, _cx, _cy);
+                            }
+                        } else if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') ) {
+                            const _entity = g.entities[info.yAxisIndex];
+                            if( _entity ) {
+                                const _canvasR = g.canvas.getBoundingClientRect();
+                                this.showEntityTypeMenu(0, _entity.entity, g, _canvasR.left + 30, info.event?.clientY);
+                            }
+                        }
+                        return;
+                    }
+
+                    if( info.gestureType === 'dragstart' ) {
+                        if( info.legendIndex >= 0 ) {
+                            const _color = g.chart.data.datasets[info.legendIndex]?.borderColor || null;
+                            panstate.dragDataset = { g, datasetIdx: info.legendIndex, color: _color };
+                            this._startAutoScroll(info.event);
+                        } else if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') ) {
+                            panstate.dragTLEntity = { g, entityIdx: info.yAxisIndex };
+                            this._startAutoScroll(info.event);
+                        } else if( info.lockAndHandleZone ) {
+                            panstate.moveGraph = { g };
+                            this._startAutoScroll(info.event);
+                        } else if( this.state.zoomMode ) {
+                            // Zoom-rectangle selection — Chart.js draws its own
+                            // overlay now (zoomSelectMode option, written in
+                            // toggleZoom below), the card only disables tooltips
+                            // while selecting.
+                            g.chart.options.tooltips.enabled = false;
+                        } else if( !this.state.zoomMode ) {
+                            // Horizontal (time) pan — the default fallback once every
+                            // other drag target above is ruled out. Now gated behind
+                            // Chart.js's own 10px threshold (custDragStart), unlike the
+                            // original pointerDown which started this immediately on
+                            // first contact — an intentional behavior change, per
+                            // Thierry.
+                            panstate.g = g;
+                            panstate.mx = info.event.clientX;
+                            panstate.lx = info.event.clientX;
+                            panstate.tc = this.startTime;
+                            this.state.drag = true;
+                            this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : info.event.target;
+                        }
+                        return;
+                    }
+
+                    if( info.gestureType === 'dragmove' ) {
+                        if( panstate.dragDataset ) {
+                            this._updateDragFeedback(info.event);
+                        } else if( panstate.dragTLEntity ) {
+                            this._updateTLDragFeedback(info.event);
+                        } else if( panstate.moveGraph ) {
+                            this._autoScrollY = info.event.clientY;
+                            for( let _g of this.graphs ) {
+                                if( _g === panstate.moveGraph.g || !_g.chart ) continue;
+                                const _r = _g.canvas.getBoundingClientRect();
+                                const _insertBefore = info.event.clientY < _r.top + _r.height / 2;
+                                _g.chart.options.insertionForbidden = this._wouldSplitGroup(panstate.moveGraph.g, _g, _insertBefore);
+                            }
+                        } else if( this.state.drag ) {
+                            // Horizontal (time) pan — same formula the original
+                            // pointerMove used, fed by Chart.js's cumulative x
+                            // (info.x = e.x, the canvas-relative position at this
+                            // exact moment) converted back to clientX via the
+                            // canvas's own bounding rect, since the original formula
+                            // is expressed in clientX terms (panstate.mx/lx).
+                            const _rect = g.canvas.getBoundingClientRect();
+                            const _clientX = _rect.left + info.x;
+                            if( Math.abs(_clientX - panstate.lx) > 0 ) {
+                                panstate.lx = _clientX;
+                                const w = g.chart.chartArea.right - g.chart.chartArea.left;
+                                const x = Math.floor((_clientX - panstate.mx) * ((3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes) / w));
+                                if( x < 0 ) {
+                                    let t0 = moment(panstate.tc).add(-x, "second");
+                                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
+                                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
+                                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+                                } else if( x > 0 ) {
+                                    let t0 = moment(panstate.tc).subtract(x, "second");
+                                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
+                                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
+                                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+                                }
+                                if( !this.state.loading )
+                                    this.updateHistory();
+                                else
+                                    this.updateAxes();
+                            }
+                        }
+                        return;
+                    }
+
+                    if( info.gestureType === 'dragovergraph' ) {
+                        if( panstate.dragDataset ) {
+                            if( g === panstate.dragDataset.g ) return;
+                            const _src    = panstate.dragDataset.g;
+                            const _srcIdx = panstate.dragDataset.datasetIdx;
+                            const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
+                            const _tgtUnit = g.entities[0] ? this.getUnitOfMeasure(g.entities[0].entity, g.entities[0].unit) : undefined;
+                            const _compatible = !g.isStatic && g.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
+                            g.chart.options.dropAllowed = _compatible;
+                            const _legend = info.chart.legend;
+                            const _inLegendZone = _legend && info.y >= _legend.top && info.y <= _legend.bottom;
+                            if( !_inLegendZone ) { this._unfreezeChart(); return; }
+                            this._freezeChart(g);
+                        } else if( panstate.dragTLEntity ) {
+                            if( g === panstate.dragTLEntity.g ) return;
+                            const _src = panstate.dragTLEntity.g;
+                            const _compatible = g.type === _src.type;
+                            g.chart.options.dropAllowed = _compatible;
+                            if( !_compatible || info.yAxisIndex < 0 || !info.chart.chartArea || info.x >= info.chart.chartArea.left ) {
+                                this._unfreezeChart();
+                                return;
+                            }
+                            this._freezeChart(g);
+                        }
+                        return;
+                    }
+
+                    if( info.gestureType === 'dragend' ) {
+                        if( panstate.dragDataset ) {
+                            const _src    = panstate.dragDataset.g;
+                            const _srcIdx = panstate.dragDataset.datasetIdx;
+                            panstate.dragDataset = null;
+                            this._stopAutoScroll();
+                            this._clearAllDragFeedback();
+                            this._finalizeLegendDrop(info.event, _src, _srcIdx);
+                        } else if( panstate.dragTLEntity ) {
+                            const _src    = panstate.dragTLEntity.g;
+                            const _srcIdx = panstate.dragTLEntity.entityIdx;
+                            panstate.dragTLEntity = null;
+                            this._stopAutoScroll();
+                            this._clearAllDragFeedback();
+                            this._finalizeTimelineDrop(info.event, _src, _srcIdx);
+                        } else if( panstate.moveGraph ) {
+                            const _srcG = panstate.moveGraph.g;
+                            panstate.moveGraph = null;
+                            this._stopAutoScroll();
+                            this._clearAllDragFeedback();
+                            this._finalizeGraphMove(info.event, _srcG);
+                        } else if( info.zoomSelectX0 !== undefined ) {
+                            this._finalizeZoomSelection(g, info.zoomSelectX0, info.zoomSelectX1);
+                        } else if( this.state.drag ) {
+                            this.state.drag = false;
+                            this.state.updateCanvas = null;
+                            this.updateHistory();
+                            this.state.autoScroll = moment() <= moment(this.endTime);
+                        }
+                        return;
+                    }
+
+                    if( info.gestureType === 'pinchend' ) {
+                        // A pinch just ended (one finger lifted, the other remains) —
+                        // prepare to resume the pan with the remaining finger.
+                        // Chart.js has already re-armed its own gesture state for
+                        // this pointer (its 10px drag threshold), so no card-side
+                        // tracking flag is needed anymore — the next dragstart for
+                        // this same graph will fire naturally once the threshold is
+                        // crossed from this new starting point.
+                        panstate.g = g;
+                        panstate.mx = info.clientX;
+                        panstate.lx = info.clientX;
+                        panstate.my = info.clientY;
+                        panstate.ly = info.clientY;
+                        panstate.tc = this.startTime;
+                        return;
+                    }
+
+                    if( info.gestureType === 'dblclick' ) {
+                        // Timeline/arrowline double-click uncombine — no native Chart.js
+                        // legend equivalent exists for this axis, unlike the legend's own
+                        // dblclick (handled via legend.onClick's gestureType parameter).
+                        if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') && !g.isStatic ) {
+                            const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
+                            if( _groupSize > 1 ) this._uncombineEntity(g, info.yAxisIndex);
+                        }
+                        return;
+                    }
+                }.bind(this),
                 scales: {
                     xAxes: [{
                         type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
-                        // (half a bar of margin at both ends only when there are bars to show)
-                        offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
                         time: {
                             unit: this.activeRange.tickStepUnit,
                             stepSize: this.activeRange.tickStepSize,
@@ -2004,26 +2012,10 @@ export class HistoryCardState {
                         afterFit: (scaleInstance) => {
                             scaleInstance.width = this.pconfig.labelAreaWidth;
                         },
-                        // Graph of circular curves only, all of the same period: the labels show
-                        // the real values, in [0, period)
-                        afterTickToLabelConversion: (me) => {
-                            const _ds = me.chart.data.datasets;
-                            const Q = _ds[0]?.hecCircular;
-                            if( !Q || !me.ticksAsNumbers || !_ds.every(d => d.hecCircular === Q && ( d.siConversionFactor ?? 1 ) === 1) ) return;
-                            // (in place: Chart.js holds on to this very array)
-                            for( let i = 0; i < me.ticks.length; i++ ) {
-                                const _dec = ( String(me.ticks[i]).split('.')[1] || '' ).length;
-                                const w = parseFloat(this._wrapCircular(me.ticksAsNumbers[i], Q).toFixed(_dec));
-                                // (the top label — ticks[0] — at a whole turn reads better as 360 than as
-                                // 0: 0...360, 300...350, 0, 10...360; anywhere else it's 0)
-                                const _turn = ( w === 0 || w >= Q );
-                                me.ticks[i] = !_turn ? w.toFixed(_dec) : ( i === 0 && me.ticks.length > 1 ) ? parseFloat(Q.toFixed(_dec)).toFixed(_dec) : '0';
-                            }
-                        },
                         afterDataLimits: (me) => {
                             const epsilon = 0.0001;
-                            if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
-                            if( config?.ymax == null && this.pconfig.axisAddMarginMax && _hasCurves && !_hasBars ) me.max += epsilon;
+                            if( config?.ymin == null && this.pconfig.axisAddMarginMin && graphtype == 'line' ) me.min -= epsilon;
+                            if( config?.ymax == null && this.pconfig.axisAddMarginMax && graphtype == 'line' ) me.max += epsilon;
                         },
                         ticks: {
                             fontColor: this.pconfig.graphLabelColor,
@@ -2045,8 +2037,8 @@ export class HistoryCardState {
                         stacked: config?.stacked
                     }],
                 },
-                topClipMargin : ( config?.ymax == null ) ? 4 : 1,
-                bottomClipMargin: ( config?.ymin == null ) ? 4 : 1,
+                topClipMargin : 4,
+                bottomClipMargin: 4,
                 layout: {
                     padding: {
                         top: ( graphtype === 'timeline' || graphtype === 'arrowline' ) ? 24 : 0
@@ -2064,11 +2056,7 @@ export class HistoryCardState {
                                 if( label ) label += ': ';
                                 const p = 10 ** this.pconfig.roundingPrecision;
                                 const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
-                                const _circQ = data.datasets[item.datasetIndex].hecCircular;
-                                let _v = Math.round(item.yLabel / _siFactor * p) / p;
-                                // (a circular curve shows its real value, in [0, period))
-                                if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ) * p) / p;
-                                label += _v;
+                                label += Math.round(item.yLabel / _siFactor * p) / p;
                                 label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                                 return label;
                             } else if( graphtype == 'timeline' ) {
@@ -2100,12 +2088,11 @@ export class HistoryCardState {
                     },
                     yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
                     caretPadding: 8,
-                    displayColors: _hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
+                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
                 },
                 hover: {
-                    // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
-                    mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
-                    intersect: !_hasCurves,
+                    mode: 'nearest',
+                    intersect: graphtype != 'line',
                     // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
                     // trigger on a pure hover move (no button/contact needed) since
                     // hoverEnabled is true — matching this card's desktop behaviour. See
@@ -2128,10 +2115,10 @@ export class HistoryCardState {
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
                         boxWidth: 0
                     },
-                    onClick: (e, legendItem) => {
-                        // Double-click: uncombine the dataset into its own graph
-                        // Single-click: toggle visibility (default Chart.js behavior)
-                        const now = Date.now();
+                    onClick: (e, legendItem, gestureType) => {
+                        // gestureType ('click' or 'dblclick') is already resolved by
+                        // Chart.js's single gesture detector — no timestamp comparison
+                        // here anymore, per the homogenization Thierry asked for.
                         const canvas = e.target?.closest('canvas');
                         if( !canvas ) return;
                         const g = this.graphs.find(g => g.canvas === canvas);
@@ -2139,16 +2126,13 @@ export class HistoryCardState {
                         if( !chart ) return;
                         if( !g ) return;
                         const idx = legendItem.datasetIndex;
-                        if( !this._uncombineInProgress && g._lastLegendClick && g._lastLegendClickIdx === idx && now - g._lastLegendClick < 400 ) {
-                            // Double-click — uncombine (see _uncombineEntity for static graphs)
-                            g._lastLegendClick = null;
-                            this._uncombineInProgress = true;
-                            setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                            if( this._canUncombine(g) ) this._uncombineEntity(g, idx);
+                        if( gestureType === 'dblclick' ) {
+                            // Double-click — uncombine (not allowed on static/fixed graphs)
+                            if( g.isStatic ) return;
+                            const _groupSize = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length;
+                            if( _groupSize > 1 ) this._uncombineEntity(g, idx);
                         } else {
                             // Single-click — default toggle visibility
-                            g._lastLegendClick = now;
-                            g._lastLegendClickIdx = idx;
                             const meta = chart.getDatasetMeta(idx);
                             meta.hidden = meta.hidden === null ? !chart.data.datasets[idx].hidden : null;
                             chart.update();
@@ -2188,25 +2172,7 @@ export class HistoryCardState {
                 }
             },
 
-            plugins: [vertline_plugin, minmaxfill_plugin, {
-                afterUpdate: (chartInstance) => {
-                    const _gid = chartInstance.canvas?.id?.replace('graph', '');
-                    if( _gid === undefined ) return;
-                    const _lgEl = this._this.querySelector(`#lg-${_gid}`);
-                    if( _lgEl && chartInstance.legend ) {
-                        _lgEl.style.height = (chartInstance.legend.height || 0) + 'px';
-                        _lgEl.style.left   = this.pconfig.labelAreaWidth + 'px';
-                        _lgEl.style.right  = (chartInstance._legendRightMargin ?? 25) + 'px';
-                        _lgEl.style.width  = '';
-                    }
-                    // tl-N: label column overlay for timeline/arrowline graphs — width matches
-                    // the actual computed left chart area (same boundary the hit-test logic uses)
-                    const _tlEl = this._this.querySelector(`#tl-${_gid}`);
-                    if( _tlEl && chartInstance.chartArea ) {
-                        _tlEl.style.width = chartInstance.chartArea.left + 'px';
-                    }
-                }
-            }]
+            plugins: [vertline_plugin, minmaxfill_plugin]
 
         });
 
@@ -2377,95 +2343,12 @@ export class HistoryCardState {
     // --------------------------------------------------------------------------------------
 
 
-    pixelPositionToTimecode(x)
-    {
-        const f = (x - panstate.g.chart.chartArea.left) / (panstate.g.chart.chartArea.right - panstate.g.chart.chartArea.left);
-
-        return this.factorToTimecode(f);
-    }
-
     factorToTimecode(f)
     {
         return moment(this.startTime) + moment(this.endTime).diff(this.startTime) * f;
     }
 
-    yAxisPointerDown(event)
-    {
-        const _el = event.target;
-        const _pid = event.pointerId;
-        let _pending = null;
-        for( let g of this.graphs ) {
-            if( this._this.querySelector(`#ya-${g.id}`) === _el ) {
-                _pending = {
-                    g,
-                    startY: event.clientY,
-                    y0: g.chart.scales['y-axis-0'].min,
-                    y1: g.chart.scales['y-axis-0'].max
-                };
-                break;
-            }
-        }
-        if( !_pending ) return;
-        if( _pending.g.ylock ) return;
-        if( event.pointerType !== 'touch' || _pending.g.yaxisLock === 2 ) {
-            event.preventDefault();
-            event.stopPropagation();
-            try { _el.setPointerCapture(_pid); } catch(e) {}
-            _el.style.touchAction = 'none';
-            panstate.yaxis = _pending;
-        } else {
-            panstate.longpress = {
-                pointerId : _pid,
-                x0        : event.clientX,
-                y0        : event.clientY,
-                timer     : setTimeout(() => {
-                    panstate.longpress = null;
-                    try { _el.setPointerCapture(_pid); } catch(e) {}
-                    _el.style.touchAction = 'none';
-                    panstate.yaxis = _pending;
-                    _pending.g.yaxisLock = 2;
-                    this.updateScaleLockState(_pending.g, true);
-                }, 500)
-            };
-        }
-    }
 
-    yAxisPointerMove(event)
-    {
-        if( event.buttons === 0 ) return;
-        if( panstate.longpress && event.pointerId === panstate.longpress.pointerId ) {
-            if( Math.abs(event.clientX - panstate.longpress.x0) + Math.abs(event.clientY - panstate.longpress.y0) > TOUCH_SLOP ) {
-                clearTimeout(panstate.longpress.timer);
-                panstate.longpress = null;
-            }
-            return;
-        }
-        if( !panstate.yaxis ) return;
-        event.preventDefault();
-        const p     = panstate.yaxis;
-        const g     = p.g;
-        const h     = g.chart.chartArea.bottom - g.chart.chartArea.top;
-        const dy    = event.clientY - p.startY;
-        const shift = dy * (p.y1 - p.y0) / h;
-        g.chart.options.scales.yAxes[0].ticks.min = p.y0 + shift;
-        g.chart.options.scales.yAxes[0].ticks.max = p.y1 + shift;
-        g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-        if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
-        g.yaxisLock = 2;
-        g.chart.update();
-    }
-
-    yAxisPointerUp(event)
-    {
-        if( panstate.longpress ) {
-            clearTimeout(panstate.longpress.timer);
-            panstate.longpress = null;
-        }
-        if( panstate.yaxis && panstate.yaxis.g.yaxisLock !== 2 ) {
-            event.target.style.touchAction = '';
-        }
-        panstate.yaxis = null;
-    }
 
     // ── Shared floating-tooltip lifecycle ──────────────────────────────────────
     // Both tooltip kinds (chart hover tooltip, label tooltip) share one lifecycle:
@@ -2625,69 +2508,6 @@ export class HistoryCardState {
 
     // ── Drag visual feedback helpers ──────────────────────────────────────────
 
-    _createGhost(text, width, height, clientX, clientY, anchor='center', color=null) {
-        this._destroyGhost();
-        const el = document.createElement('div');
-        el.id = '_hec_ghost';
-        el.dataset.anchor = anchor;
-        const _transform = anchor === 'topleft' ? 'translate(-9px,-18px)' : 'translate(-50%,-50%)';
-        const _borderColor = color || 'var(--primary-color,#03a9f4)';
-        el.style.cssText = `position:fixed;pointer-events:none;z-index:9999;opacity:0.65;` +
-            `background:var(--card-background-color,#fff);border:2px solid ${_borderColor};` +
-            `border-radius:4px;padding:2px 8px;font-size:12px;white-space:nowrap;` +
-            `box-shadow:0 2px 8px rgba(0,0,0,0.25);transform:${_transform};` +
-            `width:${width}px;height:${height}px;display:flex;align-items:center;justify-content:center;` +
-            `overflow:hidden;text-overflow:ellipsis;`;
-        el.textContent = text || '';
-        document.body.appendChild(el);
-        this._moveGhost(clientX, clientY);
-        return el;
-    }
-
-    _moveGhost(clientX, clientY) {
-        const el = document.getElementById('_hec_ghost');
-        if( el ) { el.style.left = clientX + 'px'; el.style.top = clientY + 'px'; }
-    }
-
-    _destroyGhost() {
-        const el = document.getElementById('_hec_ghost');
-        if( el ) el.remove();
-    }
-
-    _showInsertionMarker(x, y, width, height, horizontal, color) {
-        let el = document.getElementById('_hec_insert');
-        if( !el ) {
-            el = document.createElement('div');
-            el.id = '_hec_insert';
-            document.body.appendChild(el);
-        }
-        const _c = color || 'var(--primary-color,#03a9f4)';
-        if( horizontal ) {
-            // Horizontal line for timeline/arrowline and graph drag (top/bottom insertion)
-            el.style.cssText = `position:fixed;pointer-events:none;z-index:9999;` +
-                `left:${x}px;top:${y - 1}px;width:${width}px;height:3px;` +
-                `background:${_c};border-radius:2px;`;
-            el.innerHTML = `<div style="position:absolute;left:-8px;top:-4px;width:0;height:0;` +
-                `border-top:5px solid transparent;border-bottom:5px solid transparent;` +
-                `border-left:8px solid ${_c};"></div>`;
-        } else {
-            // Vertical line for legend (left/right insertion) — 1.5x height, offset left to avoid color dot
-            const _h15 = Math.round(height * 1.5);
-            const _yOff = Math.round((height - _h15) / 2);
-            el.style.cssText = `position:fixed;pointer-events:none;z-index:9999;` +
-                `left:${x - 6}px;top:${y + _yOff}px;width:3px;height:${_h15}px;` +
-                `background:${_c};border-radius:2px;`;
-            el.innerHTML = `<div style="position:absolute;top:-2px;left:-4px;width:0;height:0;` +
-                `border-left:5px solid transparent;border-right:5px solid transparent;` +
-                `border-top:5px solid ${_c};"></div>`;
-        }
-    }
-
-    _hideInsertionMarker() {
-        const el = document.getElementById('_hec_insert');
-        if( el ) el.remove();
-    }
-
     _highlightDropTarget(canvasEl, valid) {
         this._clearDropHighlight();
         if( !canvasEl ) return;
@@ -2748,7 +2568,6 @@ export class HistoryCardState {
     _updateDragFeedback(event)
     {
         this._autoScrollY = event.clientY;
-        this._moveGhost(event.clientX, event.clientY);
         const _src = panstate.dragDataset.g;
         const _srcIdx = panstate.dragDataset.datasetIdx;
         // Find graph under pointer
@@ -2761,70 +2580,56 @@ export class HistoryCardState {
             }
         }
         if( _overG && _overG !== _src ) {
-            // Inter-graph: check compatibility
+            // Inter-graph: cursor here on the source (this canvas holds pointer
+            // capture, the destination gets no native events). Compatibility,
+            // highlight, and insertion marker for the destination are all handled
+            // by Chart.js's own dragovergraph consumer/customEvent — not duplicated
+            // here.
             const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
             const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = this._dropCompatibility(_src, _overG, _srcUnit, _tgtUnit, _src.entities[_srcIdx]) === null;
+            const _compatible = !_overG.isStatic && _overG.type === _src.type && (_srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit));
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
-            this._highlightDropTarget(_overG.canvas, _compatible);
-            // Freeze target chart when over its legend overlay
-            const _lgEl = this._this.querySelector(`#lg-${_overG.id}`);
-            if( _lgEl ) {
-                const _lgR = _lgEl.getBoundingClientRect();
-                if( event.clientY >= _lgR.top && event.clientY <= _lgR.bottom ) {
-                    this._freezeChart(_overG);
-                    // Show insertion marker in legend zone (inter-graph)
-                    if( _compatible && _overG.chart.legend?.legendHitBoxes ) {
-                        const _r = _overG.canvas.getBoundingClientRect();
-                        const _cx = event.clientX - _r.left;
-                        const _cy = event.clientY - _r.top;
-                        const _found = this._findLegendLabel(_overG.chart.legend.legendHitBoxes, _cx, _cy, -2, true);
-                        if( _found ) {
-                            this._showInsertionMarker(
-                                _r.left + _found.markerX + 2, _r.top + _found.markerY,
-                                3, _found.markerH, false, panstate.dragDataset?.color);
-                        } else {
-                            this._hideInsertionMarker();
-                        }
-                    }
-                } else {
-                    this._unfreezeChart();
-                    this._hideInsertionMarker();
-                }
-            } else {
-                this._hideInsertionMarker();
-            }
         } else if( _overG === _src ) {
-            // Intra-graph: show vertical insertion marker between legend labels
+            // Intra-graph: show vertical insertion marker between legend labels.
+            // Source graph handles its own legend directly — no cross-graph event
+            // needed here, it already receives its own pointermove natively.
             event.target.style.cursor = 'grabbing';
-            this._clearDropHighlight();
-            // Freeze when over legend overlay
-            const _lgElSrc = this._this.querySelector(`#lg-${_src.id}`);
-            if( _lgElSrc ) {
-                const _lgRSrc = _lgElSrc.getBoundingClientRect();
-                if( event.clientY >= _lgRSrc.top && event.clientY <= _lgRSrc.bottom )
-                    this._freezeChart(_src);
-                else
-                    this._unfreezeChart();
-            }
-            const _hitBoxes = _src.chart.legend?.legendHitBoxes;
-            if( _hitBoxes && _hitBoxes.length > 1 ) {
-                const _r = _src.canvas.getBoundingClientRect();
-                const _cx = event.clientX - _r.left;
-                const _cy = event.clientY - _r.top;
-                const _found = this._findLegendLabel(_hitBoxes, _cx, _cy, _srcIdx, true);
-                if( _found ) {
-                    this._showInsertionMarker(
-                        _r.left + _found.markerX + 2, _r.top + _found.markerY,
-                        3, _found.markerH, false, panstate.dragDataset?.color);
-                } else {
-                    this._hideInsertionMarker();
-                }
-            }
+            const _legend = _src.chart.legend;
+            if( _legend && event.clientY >= (_src.canvas.getBoundingClientRect().top + _legend.top) &&
+                           event.clientY <= (_src.canvas.getBoundingClientRect().top + _legend.bottom) )
+                this._freezeChart(_src);
+            else
+                this._unfreezeChart();
         } else {
             event.target.style.cursor = 'grabbing';
-            this._clearDropHighlight();
-            this._hideInsertionMarker();
+            this._unfreezeChart();
+        }
+        return;
+    }
+
+    _updateTLDragFeedback(event)
+    {
+        this._autoScrollY = event.clientY;
+        const _src = panstate.dragTLEntity.g;
+        const _srcIdx = panstate.dragTLEntity.entityIdx;
+        let _overG = null;
+        for( let g of this.graphs ) {
+            const _r = g.canvas.getBoundingClientRect();
+            if( event.clientX >= _r.left && event.clientX <= _r.right &&
+                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
+                _overG = g; break;
+            }
+        }
+        if( _overG && _overG !== _src ) {
+            // Inter-graph: cursor here on the source. Compatibility, highlight, and
+            // insertion marker for the destination are all handled by Chart.js's
+            // own dragovergraph consumer/customEvent — not duplicated here.
+            const _compatible = _overG.type === _src.type;
+            event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
+        } else if( _overG === _src ) {
+            event.target.style.cursor = 'grabbing';
+        } else {
+            event.target.style.cursor = 'grabbing';
             this._unfreezeChart();
         }
         return;
@@ -2884,9 +2689,7 @@ export class HistoryCardState {
                             // the first rebuilt entity can be anchored there (targetGraph
                             // means "insert right before this graph"); addGraph inserts
                             // directly at the right spot, no post-hoc DOM move needed.
-                            // Graph-level neighbor: rebuilt right where it was, even inside a
-                            // block of several linked graphs
-                            const _nextG = this._nextGraph(_src);
+                            const _nextG = this._nextGroup(_src);
                             this._detachGraph(_src);
                             const _saved = this.pconfig.combineSameUnits;
                             this.pconfig.combineSameUnits = true;
@@ -2903,16 +2706,28 @@ export class HistoryCardState {
                 return;
             }
 
-            if( _tgt ) {
+            if( _tgt && _tgt.isStatic ) {
+                this._showLabelTooltip(i18n('ui.menu.type_static'), event.clientX, event.clientY, 'left', event.target);
+                return;
+            }
+
+            if( _tgt && _tgt.type !== _src.type ) {
+                this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY, 'left', event.target);
+                return;
+            }
+
+            if( _tgt && _tgt.type === _src.type ) {
+                // Check SI compatibility
                 const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
                 const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-                const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _src.entities[_srcIdx]);
-                if( _refusal !== null ) {
-                    this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
+                if( _srcUnit !== undefined && _tgtUnit !== undefined && !areSICompatible(_srcUnit, _tgtUnit) ) {
+                    // Show incompatibility tooltip
+                    const _srcBase = getSIFactor(_srcUnit).base || _srcUnit;
+                    const _tgtBase = getSIFactor(_tgtUnit).base || _tgtUnit;
+                    this._showLabelTooltip(`${_srcBase} ≠ ${_tgtBase}`, event.clientX, event.clientY, 'left', event.target);
                     return;
                 }
-                const _sameGroup = this._sameGroup(_src, _tgt);
-                {
+                if( _srcUnit === undefined || _tgtUnit === undefined || areSICompatible(_srcUnit, _tgtUnit) ) {
                     // Check if drop is on legend label zone — find insertion position
                     let _tgtLabelInsertIdx = -1;
                     if( _tgt.chart.legend?.legendHitBoxes ) {
@@ -2934,8 +2749,6 @@ export class HistoryCardState {
                         // pconfig.entities entry now that there's no separate runtime copy.
                         const _pcE = this.pconfig.entities[_eIdx];
                         _pcE.groupId = _tgtGroupId;
-                        // Joins the target's own sub-graph of that group (see _uncombineEntity)
-                        this._setGraphKey(_pcE, _tgt.entities[0].graphKey);
                         _pcE.color = _entity.color;
                         _pcE.fill = _entity.fill;
                         // Same reason as _uncombineEntity: the entry's groupId just changed
@@ -2943,15 +2756,13 @@ export class HistoryCardState {
                         this._regroupPcEntities();
                     }
                     // Rebuild source graph without the moved entity (removes the source
-                    // graph entirely if it becomes empty). Within one group (several linked
-                    // graphs), each graph is rebuilt right where it was — graph-level
-                    // neighbor, not the next group, or the block's internal order would change.
+                    // graph entirely if it becomes empty)
                     const _tgtOrigGroupId = _tgt.groupId;
-                    this._detachAndRebuildRemaining(_src, _srcIdx, _sameGroup ? this._nextGraph(_src) : undefined);
+                    this._detachAndRebuildRemaining(_src, _srcIdx);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtNextG = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+                    const _tgtNextG = this._nextGroup(_tgt);
                     this._detachGraph(_tgt);
                     const _allTgtEntities = [..._tgt.entities];
                     if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
@@ -2965,7 +2776,6 @@ export class HistoryCardState {
                                 this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG, undefined, false, null, _tgtOrigGroupId, _pe ?? en);
                             });
                     this.pconfig.combineSameUnits = _savedCombine2;
-                    if( _sameGroup ) this._syncGroupOrder(_tgtOrigGroupId);
                     // Persist now — after the reconstruction, not before — so the freshly
                     // computed graphIndex (and everything else addGraph resolved) is what
                     // actually gets saved.
@@ -2976,153 +2786,7 @@ export class HistoryCardState {
             return;
     }
 
-    // Line and bar entities can share one graph (curves drawn over the bars); timeline and
-    // arrowline graphs only ever hold their own type.
-    _typesCompatible(a, b)
-    {
-        const _xy = t => t === 'line' || t === 'bar';
-        return a === b || ( _xy(a) && _xy(b) );
-    }
-
-    // How one entity of graph g is drawn: its bars, unless the graph's interval is 'raw
-    // line' (4) — which only ever turns its bar entities into raw curves. A graph holding
-    // at least one bar entity is a 'bar' graph (interval selector), its line entities
-    // being drawn as curves over the bars.
-    _entityKind(g, e)
-    {
-        if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
-        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
-    }
-
-    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
-    // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
-    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360), false
-    // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
-    // period <= 0, disables it with a warning.
-    _circularPeriod(e)
-    {
-        const c = e?.circular;
-        if( c === false ) return null;
-        if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
-            if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
-            return ( this.getUnitOfMeasure(e.entity, e.unit) === '°' ) ? 360 : null;
-        }
-        let P = NaN;
-        if( typeof c === 'number' ) P = c;
-        else if( typeof c === 'string' ) {
-            const t = c.replace(/\s+/g, '').toLowerCase();
-            P = ( t === '2pi' ) ? 2 * Math.PI : ( t === '' ? NaN : Number(t) );
-        }
-        if( !isFinite(P) || P <= 0 ) {
-            this._circularWarned = this._circularWarned ?? new Set();
-            if( !this._circularWarned.has(e.entity) ) {
-                this._circularWarned.add(e.entity);
-                console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(c)} for ${e.entity} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
-            }
-            return null;
-        }
-        return P;
-    }
-
-    // Circular values (period P) made into a continuous curve, on a copy of the samples (they
-    // are shared with the cache). Each value is first brought into [0, P), then a step of more
-    // than P/2 from the previous valid value is taken as a crossing of 0 (3, 1, 359 → 3, 1, -1).
-    // The whole curve is then moved by a multiple of P to sit around its circular mean c in
-    // [0, P). Should it span more than a turn (it went round several times), every value is put
-    // in the one-turn band [c - P/2, c + P/2) instead: band is then true, and its jumps get
-    // dashed (_markCircularJumps).
-    _unwrapCircular(data, P)
-    {
-        const mod = v => ( ( v % P ) + P ) % P;
-        const idx = [], raw = [], un = [];
-        let prev = null, offset = 0, sumS = 0, sumC = 0;
-        for( let i = 0; i < data.length; i++ ) {
-            const st = data[i].state;
-            if( st === null || st === undefined || st === '' ) continue;
-            const v = Number(st);
-            if( !isFinite(v) ) continue;
-            const r = mod(v);
-            if( prev !== null ) {
-                if( r - prev > P / 2 ) offset -= P; else
-                if( r - prev < -P / 2 ) offset += P;
-            }
-            prev = r;
-            idx.push(i); raw.push(r); un.push(r + offset);
-            sumS += Math.sin(r / P * 2 * Math.PI);
-            sumC += Math.cos(r / P * 2 * Math.PI);
-        }
-        if( !idx.length ) return { data, band: false };
-
-        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[0];
-        const mean = un.reduce((a, v) => a + v, 0) / un.length;
-        const k = Math.round(( c - mean ) / P) * P;
-        let lo = Infinity, hi = -Infinity;
-        for( let m = 0; m < un.length; m++ ) { un[m] += k; lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
-        const band = ( hi - lo > P );
-        if( band ) for( let m = 0; m < un.length; m++ ) un[m] = ( c - P / 2 ) + mod(raw[m] - ( c - P / 2 ));
-
-        const out = data.slice();
-        for( let m = 0; m < idx.length; m++ ) {
-            const p = data[idx[m]];
-            const q = { ...p, state: un[m] };
-            // (a min/max carried by the sample moves with it)
-            const shift = un[m] - Number(p.state);
-            if( p.yMin != null ) q.yMin = p.yMin + shift;
-            if( p.yMax != null ) q.yMax = p.yMax + shift;
-            out[idx[m]] = q;
-        }
-        return { data: out, band };
-    }
-
-    // A circular curve put in a one-turn band jumps where it crosses the band's edge: the
-    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode.
-    // Q: the period in chart units.
-    _markCircularJumps(s, Q)
-    {
-        for( let k = 1; k < s.length; k++ )
-            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) s[k].hecPlateauEnd = true;
-    }
-
-    // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)
-    _wrapCircular(v, Q)
-    {
-        return ( ( v % Q ) + Q ) % Q;
-    }
-
-    // Same group of linked graphs (a static YAML graph split by double-click, or a group
-    // split by a type change)?
-    _sameGroup(a, b)
-    {
-        return a.groupId !== null && a.groupId !== undefined && a.groupId === b.groupId;
-    }
-
-    // Can one of src's entities be dropped onto another graph tgt? Returns null if so, or
-    // the short text explaining why not (shown as a tooltip at the drop point).
-    // - Within one group: always, as long as the chart type matches — units don't matter,
-    //   the group's entities are meant to be shown together (see addGraph).
-    // - Across groups: never to or from a static (YAML) graph — its composition is the
-    //   YAML's; otherwise same type and compatible units, as before.
-    _dropCompatibility(src, tgt, srcUnit, tgtUnit, srcEntity = null)
-    {
-        // The dragged entity's own type (a bar graph can also hold line entities)
-        const _srcType = srcEntity?.type ?? src.type;
-        if( this._sameGroup(src, tgt) )
-            return this._typesCompatible(_srcType, tgt.type) ? null : `${_srcType} ≠ ${tgt.type}`;
-        // Across groups, only the same type — curves and bars only mix within one group
-        if( _srcType !== tgt.type ) return `${_srcType} ≠ ${tgt.type}`;
-        if( src.isStatic || tgt.isStatic ) return i18n('ui.menu.type_static');
-        if( srcUnit !== undefined && tgtUnit !== undefined && !areSICompatible(srcUnit, tgtUnit) ) {
-            const _srcBase = getSIFactor(srcUnit).base || srcUnit;
-            const _tgtBase = getSIFactor(tgtUnit).base || tgtUnit;
-            return `${_srcBase} ≠ ${_tgtBase}`;
-        }
-        return null;
-    }
-
     _clearAllDragFeedback() {
-        this._destroyGhost();
-        this._hideInsertionMarker();
-        this._clearDropHighlight();
         this._unfreezeChart();
     }
 
@@ -3164,10 +2828,22 @@ export class HistoryCardState {
         if( !closestLine ) return null;
         if( cy < closestLine.top || cy > closestLine.top + closestLine.height ) return null;
 
-        // Limit X to the bounds of the line (leftmost label left, rightmost label right)
-        const lineLeft  = Math.min(...closestLine.items.map(x => x.b.left));
-        const lineRight = Math.max(...closestLine.items.map(x => x.b.left + x.b.width));
-        if( cx < lineLeft || cx > lineRight ) return null;
+        // X bounds: accept being over the line's labels, but also just before the
+        // first one or just after the last one — within a tolerance capped at
+        // min(that label's own half-width, 50px), so a very long label doesn't
+        // create an unreasonably large dead zone. Same rule for intra-graph and
+        // inter-graph drag, since both funnel through this one function.
+        const firstItem = closestLine.items.reduce((a, b) => a.b.left < b.b.left ? a : b);
+        const lastItem  = closestLine.items.reduce((a, b) => (a.b.left + a.b.width) > (b.b.left + b.b.width) ? a : b);
+        const lineLeft  = firstItem.b.left;
+        const lineRight = lastItem.b.left + lastItem.b.width;
+        if( cx < lineLeft ) {
+            const tolerance = Math.min(firstItem.b.width / 2, 50);
+            if( lineLeft - cx > tolerance ) return null;
+        } else if( cx > lineRight ) {
+            const tolerance = Math.min(lastItem.b.width / 2, 50);
+            if( cx - lineRight > tolerance ) return null;
+        }
 
         // Find closest label by X on this line
         let closest = null, closestDistX = Infinity;
@@ -3242,231 +2918,11 @@ export class HistoryCardState {
         if( this._autoScrollRaf ) { cancelAnimationFrame(this._autoScrollRaf); this._autoScrollRaf = null; }
     }
 
-    legendDragStart(event)
-    {
-        event.preventDefault();
-        event.stopPropagation();
-        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
-        const g = this._graphByOverlay('lg', event.target);
-        if( !g ) return;
-        const _chart = g.chart;
-        // Store pending state — drag or click decided on pointerup
-        const _lgPending = { g, startX: event.clientX, startY: event.clientY, datasetIdx: -1 };
-        if( _chart.legend && _chart.legend.legendHitBoxes ) {
-            // legendHitBoxes coords are relative to the canvas — use canvas rect, not lg-N rect
-            const _canvasRect = g.canvas.getBoundingClientRect();
-            const _cx      = event.clientX - _canvasRect.left;
-            const _cy      = event.clientY - _canvasRect.top;
-            const _grabbed = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
-            if( _grabbed && _chart.data.datasets[_grabbed.idx] ) {
-                const _i  = _grabbed.idx;
-                const _box = _chart.legend.legendHitBoxes[_i];
-                _lgPending.datasetIdx = _i;
-                _lgPending.color = _chart.data.datasets[_i]?.borderColor || null;
-                _lgPending.text  = _chart.legend.legendItems[_i]?.text || '';
-                _lgPending.boxW  = _box.width;
-                _lgPending.boxH  = _box.height;
-            }
-        }
-        panstate.lgPending = _lgPending;
-
-        // Long-press timer — 700ms to show entity type menu
-        panstate.lgLongPressTimer = setTimeout(() => {
-            if( !panstate.lgPending ) return; // drag already started or cancelled
-            const _pp = panstate.lgPending;
-            panstate.lgPending = null;
-            panstate.lgLongPressTimer = null;
-            // Show type menu if over a legend label on a line/bar graph
-            // with a numeric-convertible current state (menu is all-or-nothing)
-            if( _pp.datasetIdx >= 0 && (_pp.g.type === 'line' || _pp.g.type === 'bar') ) {
-                const _entity = _pp.g.entities[_pp.datasetIdx];
-                if( _entity && this._isNumericEntity(_entity.entity) ) {
-                    const _box      = _pp.g.chart.legend?.legendHitBoxes[_pp.datasetIdx];
-                    const _canvasR  = _pp.g.canvas.getBoundingClientRect();
-                    const _cx       = _box ? _canvasR.left + _box.left + 30 : _pp.startX;
-                    const _cy       = _box ? _canvasR.top  + _box.top  + _box.height : _pp.startY;
-                    this.showEntityTypeMenu(0, _entity.entity, _pp.g, _cx, _cy);
-                }
-            }
-        }, 700);
-    }
-
-    legendDragMove(event)
-    {
-        if( panstate.lgPending ) {
-            const _p = panstate.lgPending;
-            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > TOUCH_SLOP && _p.datasetIdx >= 0 ) {
-                // Movement detected — cancel long-press timer
-                if( panstate.lgLongPressTimer ) { clearTimeout(panstate.lgLongPressTimer); panstate.lgLongPressTimer = null; }
-                panstate.dragDataset = { g: _p.g, datasetIdx: _p.datasetIdx, color: _p.color };
-                panstate.lgPending = null;
-                this._createGhost(_p.text, _p.boxW, _p.boxH, event.clientX, event.clientY, 'center', _p.color);
-                this._startAutoScroll(event);
-            } else {
-                return;
-            }
-        }
-        if( panstate.dragDataset ) {
-            event.preventDefault();
-            event.stopPropagation();
-            this._updateDragFeedback(event);
-            return;
-        }
-        // Update cursor based on pointer position within lg-N
-        this._updateLegendCursor(event);
-    }
-
-    _updateLegendCursor(event)
-    {
-        // Find which graph owns this lg overlay
-        const _g = this._graphByOverlay('lg', event.target);
-        if( !_g ) return;
-        const _lgEl = event.target;
-        // ca-N and bc-N always get default cursor — check them first
-        const _caEl = this._this.querySelector(`#ca-${_g.id}`);
-        const _bcEl = this._this.querySelector(`#bc-${_g.id}`);
-        for( const _el of [_caEl, _bcEl] ) {
-            if( !_el ) continue;
-            const _r = _el.getBoundingClientRect();
-            if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                _lgEl.style.cursor = 'default';
-                return;
-            }
-        }
-        // Check if pointer is over a legend label — move cursor
-        const _chart = _g.chart;
-        if( _chart.legend && _chart.legend.legendHitBoxes ) {
-            const _canvasRect2 = _g.canvas.getBoundingClientRect();
-            const _cx   = event.clientX - _canvasRect2.left;
-            const _cy   = event.clientY - _canvasRect2.top;
-            const _hit  = this._findLegendLabel(_chart.legend.legendHitBoxes, _cx, _cy, -1, false);
-            if( _hit && _chart.data.datasets[_hit.idx] ) {
-                _lgEl.style.cursor = 'move';
-                return;
-            }
-        }
-        _lgEl.style.cursor = 'default';
-    }
-
-    legendDragEnd(event)
-    {
-        event.preventDefault();
-        event.stopPropagation();
-        // Cancel long-press timer on pointer up
-        if( panstate.lgLongPressTimer ) { clearTimeout(panstate.lgLongPressTimer); panstate.lgLongPressTimer = null; }
-        // Click (movement < 5px or no label hit) — forward to bc-N or canvas
-        if( panstate.lgPending ) {
-            const _p = panstate.lgPending;
-            panstate.lgPending = null;
-            // Check if pointer is over the close button (#bc-N) — forward click to it
-            const _bcEl = this._this.querySelector(`#bc-${_p.g.id}`);
-            if( _bcEl ) {
-                const _bcR = _bcEl.getBoundingClientRect();
-                if( event.clientX >= _bcR.left && event.clientX <= _bcR.right &&
-                    event.clientY >= _bcR.top  && event.clientY <= _bcR.bottom ) {
-                    _bcEl.click();
-                    return;
-                }
-            }
-            // Otherwise forward to canvas (Chart.js legend click: hide/show, double-click uncombine)
-            _p.g.canvas.dispatchEvent(new MouseEvent('click', {
-                bubbles: true, cancelable: true,
-                clientX: event.clientX, clientY: event.clientY
-            }));
-            return;
-        }
-        if( panstate.dragDataset ) {
-            const _src    = panstate.dragDataset.g;
-            const _srcIdx = panstate.dragDataset.datasetIdx;
-            panstate.dragDataset = null;
-            event.target.style.cursor = '';
-            this._stopAutoScroll();
-            this._clearAllDragFeedback();
-            this._finalizeLegendDrop(event, _src, _srcIdx);
-        }
-    }
-
-    // During the initial rebuild only: were these two entities shown in the same graph when
-    // last saved (same saved graphIndex)? Keeps apart graphs of one group that were apart —
-    // e.g. dynamic entities that ended up sharing a group through an old migration bug
-    // (null groupId renumbered to 1000), each in its own graph. Outside the rebuild,
-    // always true: live operations only re-add entities that belong together.
-    _sameSavedGraph(a, b)
-    {
-        // (static entities: graphKey alone decides — their graphIndex may be persisted for
-        // some entities of a graph and not others, per-entity persistence options)
-        if( !this._rebuildGraphIndex || a.isStatic || b.isStatic ) return true;
-        return this._rebuildGraphIndex.get(a) === this._rebuildGraphIndex.get(b);
-    }
-
-    // Puts the pconfig.entities entries of one group in the order they're displayed in
-    // (graph by graph down the block, then legend order), at the group's current place.
-    // That order is what carries the layout of a block of linked graphs across reloads
-    // and devices — graphIndex is only a live, per-device position (see readLocalState).
-    _syncGroupOrder(groupId)
-    {
-        if( groupId === null || groupId === undefined ) return;
-        const _shown = this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
-            .flatMap(g => g.entities.map(e => e.entity));
-        const _first = this.pconfig.entities.findIndex(e => typeof e === 'object' && e.groupId === groupId);
-        if( _first < 0 ) return;
-        const _entries = this.pconfig.entities.filter(e => typeof e === 'object' && e.groupId === groupId);
-        _entries.sort((a, b) => {
-            const ia = _shown.indexOf(a.entity), ib = _shown.indexOf(b.entity);
-            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib);
-        });
-        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && e.groupId === groupId));
-        _rest.splice(Math.min(_first, _rest.length), 0, ..._entries);
-        this.pconfig.entities = _rest;
-    }
-
-    // Something to uncombine: a static graph splits one of its own curves off (needs at
-    // least two on this graph); a dynamic entity leaves its group (needs a group of two+).
-    _canUncombine(g)
-    {
-        if( g.isStatic ) return g.entities.length > 1;
-        return this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length > 1;
-    }
-
-    // A new sub-graph identifier within a group (see _uncombineEntity). Random rather than
-    // a counter: it's persisted, and must never collide with one restored from storage.
-    _newGraphKey()
-    {
-        return 'k' + Math.random().toString(36).slice(2, 10);
-    }
-
-    // Sets which sub-graph of its group an entity is shown in (undefined = the group's
-    // main graph) — the property itself is removed rather than set to undefined, so the
-    // persisted entry and the YAML-change detection mirror stay clean.
-    _setGraphKey(entry, key)
-    {
-        if( key === undefined ) delete entry.graphKey;
-        else entry.graphKey = key;
-    }
 
     _uncombineEntity(g, idx)
     {
         // Extract one entity from a combined graph into its own graph.
         // Type-agnostic: used for line/bar legend double-click and timeline/arrowline label double-click.
-        if( g.isStatic ) {
-            // Static (YAML) graph: the curve moves into its own graph right below, but stays
-            // in the same group (linked, chain icon) — only its sub-graph key changes. It can
-            // be put back later by dragging its label onto a graph of the group, or by
-            // double-clicking the chain icon (_mergeLinkedGraph).
-            const _entity = g.entities[idx];
-            _entity.siConversionFactor = undefined;
-            this._setGraphKey(_entity, this._newGraphKey());
-            // Forced visible — see the dynamic case below for why.
-            _entity.hidden = undefined;
-            const _nextG = this._nextGraph(g);
-            this._detachAndRebuildRemaining(g, idx, _nextG);
-            this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, true, null, g.groupId, _entity);
-            this._syncGroupOrder(g.groupId);
-            this.writeLocalState();
-            this.updateHistory();
-            return;
-        }
         const _entity = g.entities[idx];
         _entity.siConversionFactor = undefined;
         const _newGroupId = this._nextGroupId++;
@@ -3484,7 +2940,6 @@ export class HistoryCardState {
             // reassignment here would silently detach that reference.
             const _pcE = this.pconfig.entities[_eIdx];
             _pcE.groupId = _newGroupId;
-            this._setGraphKey(_pcE, undefined);
             _pcE.color = _entity.color;
             _pcE.fill = _entity.fill;
             _pcE.hidden = undefined;
@@ -3504,199 +2959,6 @@ export class HistoryCardState {
         // graphIndex (and everything else addGraph resolved) is what actually gets saved.
         this.writeLocalState();
         this.updateHistory();
-    }
-
-    timelineDragStart(event)
-    {
-        event.preventDefault();
-        event.stopPropagation();
-        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
-        const g = this._graphByOverlay('tl', event.target);
-        if( !g ) return;
-        const _chart = g.chart;
-        const _canvasRect = g.canvas.getBoundingClientRect();
-        const _cy = event.clientY - _canvasRect.top;
-        const _yScale = _chart.scales['y-axis-0'];
-        let _closestIdx = -1;
-        if( _yScale && _chart.data.labels ) {
-            let _closestDist = Infinity;
-            for( let _li = 0; _li < _chart.data.labels.length; _li++ ) {
-                const _py = _yScale.getPixelForValue(null, _li, _li);
-                const _dist = Math.abs(_cy - _py);
-                if( _dist < _closestDist ) { _closestDist = _dist; _closestIdx = _li; }
-            }
-        }
-        const _tlPending = { g, startX: event.clientX, startY: event.clientY, entityIdx: _closestIdx };
-        if( _closestIdx >= 0 ) {
-            const _lbl = _chart.data.labels[_closestIdx];
-            const _labelStr = Array.isArray(_lbl) ? _lbl.join(' ') : _lbl;
-            _tlPending.labelStr = _labelStr;
-            _tlPending.tlLabelW = _chart.chartArea ? _chart.chartArea.left : this.pconfig.labelAreaWidth;
-            // Original, unwrapped name — source of truth for anything meant to be read in full
-            // (tooltip below). _labelStr above is the wrapped/hyphenated display form, kept
-            // separate because it's still needed as-is for the drag ghost (_createGhost),
-            // which must reflect what actually fits in the label column.
-            const _origName = _chart.data.datasets[_closestIdx]?.name ?? _labelStr;
-            // Show tooltip if label is truncated
-            const _ctx2 = g.canvas.getContext('2d');
-            _ctx2.save();
-            _ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
-            const _textW = _ctx2.measureText(_origName).width;
-            _ctx2.restore();
-            const _availW = (_chart.chartArea ? _chart.chartArea.left : this.pconfig.labelAreaWidth) - 8;
-            if( _textW > _availW ) {
-                this._showLabelTooltip(_origName, event.clientX, event.clientY, 'left', g.canvas);
-            }
-            // Double-click: uncombine (see _uncombineEntity for static graphs)
-            {
-                const _now = Date.now();
-                if( !this._uncombineInProgress &&
-                    g._lastTLClick && g._lastTLClickIdx === _closestIdx &&
-                    _now - g._lastTLClick < 400 ) {
-                    g._lastTLClick = null;
-                    this._uncombineInProgress = true;
-                    setTimeout(() => { this._uncombineInProgress = false; }, 500);
-                    if( this._canUncombine(g) ) this._uncombineEntity(g, _closestIdx);
-                    return;
-                }
-                g._lastTLClick = _now;
-                g._lastTLClickIdx = _closestIdx;
-            }
-        }
-        panstate.tlPending = _tlPending;
-
-        // Long-press timer — 700ms to show entity type menu (same as legend)
-        panstate.tlLongPressTimer = setTimeout(() => {
-            if( !panstate.tlPending ) return; // drag already started or cancelled
-            const _pp = panstate.tlPending;
-            panstate.tlPending = null;
-            panstate.tlLongPressTimer = null;
-            if( _pp.entityIdx >= 0 ) {
-                const _entity = _pp.g.entities[_pp.entityIdx];
-                if( _entity ) {
-                    const _canvasR = _pp.g.canvas.getBoundingClientRect();
-                    this.showEntityTypeMenu(0, _entity.entity, _pp.g, _canvasR.left + 30, event.clientY);
-                }
-            }
-        }, 700);
-    }
-
-    timelineDragMove(event)
-    {
-        if( panstate.tlPending ) {
-            const _pt = panstate.tlPending;
-            if( Math.abs(event.clientX - _pt.startX) + Math.abs(event.clientY - _pt.startY) > TOUCH_SLOP && _pt.entityIdx >= 0 ) {
-                if( panstate.tlLongPressTimer ) { clearTimeout(panstate.tlLongPressTimer); panstate.tlLongPressTimer = null; }
-                panstate.dragEntity = { g: _pt.g, entityIdx: _pt.entityIdx };
-                panstate.tlPending = null;
-                event.target.style.cursor = 'grabbing';
-                this._createGhost(_pt.labelStr, _pt.tlLabelW, 20, event.clientX, event.clientY);
-                this._startAutoScroll(event);
-            } else {
-                return;
-            }
-        }
-        if( panstate.dragEntity ) {
-            event.preventDefault();
-            event.stopPropagation();
-            this._autoScrollY = event.clientY;
-            this._moveGhost(event.clientX, event.clientY);
-            const _srcTL = panstate.dragEntity.g;
-            const _srcIdxTL = panstate.dragEntity.entityIdx;
-            let _overGTL = null;
-            for( let g of this.graphs ) {
-                const _r = g.canvas.getBoundingClientRect();
-                if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                    event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                    _overGTL = g; break;
-                }
-            }
-            if( _overGTL && _overGTL !== _srcTL ) {
-                const _compatible = this._dropCompatibility(_srcTL, _overGTL) === null;
-                event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
-                this._highlightDropTarget(_overGTL.canvas, _compatible);
-                if( _compatible ) {
-                    const _r = _overGTL.canvas.getBoundingClientRect();
-                    const _cx = event.clientX - _r.left;
-                    const _cy = event.clientY - _r.top;
-                    const _yScale = _overGTL.chart.scales['y-axis-0'];
-                    if( _yScale && _overGTL.chart.chartArea && _cx < _overGTL.chart.chartArea.left ) {
-                        let _markerShown = false;
-                        for( let _ei = 0; _ei < _overGTL.entities.length; _ei++ ) {
-                            const _py = _yScale.getPixelForValue(null, _ei, _ei);
-                            const _halfH = (_yScale.height / _overGTL.entities.length) / 2;
-                            if( Math.abs(_cy - _py) < _halfH ) {
-                                const _insertBefore = _cy < _py;
-                                const _my = _r.top + _py + (_insertBefore ? -_halfH : _halfH);
-                                this._showInsertionMarker(_r.left, _my, _r.width, 3, true);
-                                _markerShown = true;
-                                break;
-                            }
-                        }
-                        if( !_markerShown ) this._hideInsertionMarker();
-                    } else {
-                        this._hideInsertionMarker();
-                    }
-                } else {
-                    this._hideInsertionMarker();
-                }
-            } else if( _overGTL === _srcTL ) {
-                event.target.style.cursor = 'grabbing';
-                this._clearDropHighlight();
-                const _yScale = _srcTL.chart.scales['y-axis-0'];
-                if( _yScale ) {
-                    const _r = _srcTL.canvas.getBoundingClientRect();
-                    const _cy = event.clientY - _r.top;
-                    let _markerShown = false;
-                    for( let _ei = 0; _ei < _srcTL.entities.length; _ei++ ) {
-                        if( _ei === _srcIdxTL ) continue;
-                        const _py = _yScale.getPixelForValue(null, _ei, _ei);
-                        const _halfH = (_yScale.height / _srcTL.entities.length) / 2;
-                        if( Math.abs(_cy - _py) < _halfH ) {
-                            const _insertBefore = _cy < _py;
-                            const _my = _r.top + _py + (_insertBefore ? -_halfH : _halfH);
-                            this._showInsertionMarker(_r.left, _my, _r.width, 3, true);
-                            _markerShown = true;
-                            break;
-                        }
-                    }
-                    if( !_markerShown ) this._hideInsertionMarker();
-                }
-            } else {
-                event.target.style.cursor = 'grabbing';
-                this._clearDropHighlight();
-                this._hideInsertionMarker();
-            }
-            return;
-        }
-        this._updateTimelineCursor(event);
-    }
-
-    _updateTimelineCursor(event)
-    {
-        const _g = this._graphByOverlay('tl', event.target);
-        if( !_g ) return;
-        event.target.style.cursor = 'move';
-    }
-
-    timelineDragEnd(event)
-    {
-        event.preventDefault();
-        event.stopPropagation();
-        if( panstate.tlLongPressTimer ) { clearTimeout(panstate.tlLongPressTimer); panstate.tlLongPressTimer = null; }
-        if( panstate.tlPending ) {
-            panstate.tlPending = null;
-            return;
-        }
-        if( panstate.dragEntity ) {
-            const _src = panstate.dragEntity.g;
-            const _srcIdx = panstate.dragEntity.entityIdx;
-            panstate.dragEntity = null;
-            event.target.style.cursor = '';
-            this._stopAutoScroll();
-            this._clearAllDragFeedback();
-            this._finalizeTimelineDrop(event, _src, _srcIdx);
-        }
     }
 
     _finalizeTimelineDrop(event, _src, _srcIdx)
@@ -3742,16 +3004,9 @@ export class HistoryCardState {
             return;
         }
 
-        const _isSameGraph = _tgt === _src;
-        const _refusal = _isSameGraph ? null : this._dropCompatibility(_src, _tgt);
-        if( _refusal !== null ) {
-            this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
-            return;
-        }
-        const _sameGroup = !_isSameGraph && this._sameGroup(_src, _tgt);
-
         const _entity = _src.entities[_srcIdx];
         const _srcEmpty = _src.entities.length === 1;
+        const _isSameGraph = _tgt === _src;
         // Computed once here, used both for the pconfig.entities update below and for
         // the target-graph rebuild further down — must stay in scope for both
         const _tgtGroupId = _isSameGraph ? undefined : this._pcGroupIdOf(_tgt.entities[0].entity);
@@ -3767,8 +3022,6 @@ export class HistoryCardState {
                 // still moved to a new array position below, just never replaced.
                 const _updatedEntry = this.pconfig.entities[_eIdx];
                 _updatedEntry.groupId = _tgtGroupId;
-                // Joins the target's own sub-graph of that group (see _uncombineEntity)
-                this._setGraphKey(_updatedEntry, _tgt.entities[0].graphKey);
                 _updatedEntry.color = _entity.color;
                 _updatedEntry.fill = _entity.fill;
                 this.pconfig.entities.splice(_eIdx, 1);
@@ -3783,9 +3036,7 @@ export class HistoryCardState {
         }
 
         const _srcOrigGroupId = _src.groupId;
-        // Graph-level neighbor when staying within one group (same graph, or linked graphs
-        // of one group): each graph is rebuilt right where it was inside the block
-        const _srcNextG0 = ( _isSameGraph || _sameGroup ) ? this._nextGraph(_src) : this._nextGroup(_src);
+        const _srcNextG0 = this._nextGroup(_src);
         this._detachGraph(_src);
 
         const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
@@ -3808,7 +3059,7 @@ export class HistoryCardState {
                         });
                 this.pconfig.combineSameUnits = _saved;
             }
-            const _tgtNextG0 = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+            const _tgtNextG0 = this._nextGroup(_tgt);
             this._detachGraph(_tgt);
             const _newTgtEntities = [..._tgt.entities];
             _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
@@ -3819,7 +3070,6 @@ export class HistoryCardState {
                             this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG0, undefined, false, null, _tgtGroupId, _pe ?? en);
                         });
             this.pconfig.combineSameUnits = _saved2;
-            if( _sameGroup ) this._syncGroupOrder(_tgtGroupId);
         } else {
             const _groupId = this._pcGroupIdOf(_allTgtEntities[0].entity);
             if( _groupId !== undefined ) {
@@ -3844,25 +3094,9 @@ export class HistoryCardState {
         this.updateHistory();
     }
 
-    _updateMoCursor(event)
-    {
-        const g = this._graphByOverlay('mo', event.target);
-        if( !g ) return;
-        const _caEl = this._this.querySelector(`#ca-${g.id}`);
-        if( _caEl ) {
-            const _r = _caEl.getBoundingClientRect();
-            if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                event.target.style.cursor = 'default';
-                return;
-            }
-        }
-        event.target.style.cursor = 'grab';
-    }
-
     // Would inserting srcG right before/after tgtG (per _insertBefore) split a group of
     // linked graphs (same non-null groupId)? Groups are always consecutive by graphIndex
-    // (the stable display-order field — see addGraph/graphMoveEnd), so this only has to
+    // (the stable display-order field — see addGraph/_finalizeGraphMove), so this only has to
     // check the one neighbor on the insertion side, found via graphIndex order rather than
     // this.graphs' own (not guaranteed to already match it) array order.
     // Reordering srcG within its OWN group is allowed — only an outsider (a different
@@ -3878,80 +3112,57 @@ export class HistoryCardState {
         return _neighbor.groupId === tgtG.groupId;
     }
 
-    graphMoveStart(event)
+    _finalizeZoomSelection(g, x0, x1)
     {
-        event.preventDefault();
-        event.stopPropagation();
-        try { event.target.setPointerCapture(event.pointerId); } catch(e) {}
-        // Find which graph this mo overlay belongs to — store pending, activate after 5px
-        const g = this._graphByOverlay('mo', event.target);
-        if( g ) panstate.pendingMoveGraph = { g, startX: event.clientX, startY: event.clientY };
+        g.chart.options.tooltips.enabled = true;
+
+        const _factor0 = (x0 - g.chart.chartArea.left) / (g.chart.chartArea.right - g.chart.chartArea.left);
+        const _factor1 = (x1 - g.chart.chartArea.left) / (g.chart.chartArea.right - g.chart.chartArea.left);
+        let st0 = this.factorToTimecode(_factor0);
+        let st1 = this.factorToTimecode(_factor1);
+        if( st1 < st0 ) [st1, st0] = [st0, st1];
+
+        const tm = (moment(st1) + moment(st0)) / 2;
+
+        // Time delta in minutes
+        const dt = moment.duration(st1 - st0).asMinutes();
+
+        // Time delta in hours, ceiled
+        let d = ( dt >= 60.0 ) ? Math.ceil(dt / 60.0) : 0;
+
+        if( d < 12 ) {
+
+            if( d < 1 )
+                this.setTimeRangeMinutes(Math.ceil(dt), true, tm);
+            else
+                this.setTimeRange(d, true, tm);
+
+        } else {
+
+            d = Math.ceil(d / 24.0);
+
+            if( d < 1 ) this.setTimeRange(12, true, tm); else       // 12 hours
+            if( d < 2 ) this.setTimeRange(24, true, tm); else       // 1 day
+            if( d < 3 ) this.setTimeRange(48, true, tm); else       // 2 days
+            if( d < 4 ) this.setTimeRange(72, true, tm); else       // 3 days
+            if( d < 5 ) this.setTimeRange(96, true, tm); else       // 4 days
+            if( d < 6 ) this.setTimeRange(120, true, tm); else      // 5 days
+            if( d < 7 ) this.setTimeRange(144, true, tm); else      // 6 days
+            if( d < 13 ) this.setTimeRange(168, true, tm); else     // 1 week
+            if( d < 20 ) this.setTimeRange(336, true, tm); else     // 2 weeks
+            if( d < 28 ) this.setTimeRange(504, true, tm); else     // 3 weeks
+            if( d < 45 ) this.setTimeRange(720, true, tm); else     // 1 month
+            if( d < 105 ) this.setTimeRange(2184, true, tm); else   // 3 months
+                          this.setTimeRange(4368, true, tm);        // 6 months
+
+        }
+
+        this.toggleZoom();
+        this.writeLocalState();
     }
 
-    graphMoveMove(event)
+    _finalizeGraphMove(event, _srcG)
     {
-        if( panstate.pendingMoveGraph ) {
-            const _p = panstate.pendingMoveGraph;
-            if( Math.abs(event.clientX - _p.startX) + Math.abs(event.clientY - _p.startY) > TOUCH_SLOP ) {
-                panstate.moveGraph = { g: _p.g, startX: _p.startX, startY: _p.startY };
-                panstate.pendingMoveGraph = null;
-                event.target.style.cursor = 'grabbing';
-                const _gRect = _p.g.canvas.getBoundingClientRect();
-                this._createGhost('', _gRect.width, _gRect.height, event.clientX, event.clientY, 'topleft');
-                this._startAutoScroll(event);
-            } else {
-                this._updateMoCursor(event);
-                return;
-            }
-        }
-        if( !panstate.moveGraph ) {
-            // No drag active — update cursor: default over ca-N, grab elsewhere
-            this._updateMoCursor(event);
-            return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        event.target.style.cursor = 'grabbing';
-        this._autoScrollY = event.clientY;
-        this._moveGhost(event.clientX, event.clientY);
-        // Find graph under pointer for insertion marker
-        let _found = false;
-        for( let g of this.graphs ) {
-            if( g === panstate.moveGraph.g ) continue;
-            const _r = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                const _insertBefore = event.clientY < _r.top + _r.height / 2;
-                const _y = _insertBefore ? _r.top : _r.bottom;
-                const _forbidden = this._wouldSplitGroup(panstate.moveGraph.g, g, _insertBefore);
-                event.target.style.cursor = _forbidden ? 'not-allowed' : 'grabbing';
-                this._showInsertionMarker(_r.left, _y, _r.width, 3, true, _forbidden ? 'var(--error-color,#f44336)' : undefined);
-                _found = true;
-                break;
-            }
-        }
-        if( !_found ) { this._hideInsertionMarker(); this._clearDropHighlight(); }
-    }
-
-    graphMoveEnd(event)
-    {
-        // Released before threshold — treat as click, forward to ca-N
-        if( panstate.pendingMoveGraph ) {
-            const _g = panstate.pendingMoveGraph.g;
-            panstate.pendingMoveGraph = null;
-            event.target.style.cursor = 'grab';
-            this._this.querySelector(`#ca-${_g.id}`)?.click();
-            return;
-        }
-        if( !panstate.moveGraph ) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const _srcG = panstate.moveGraph.g;
-        panstate.moveGraph = null;
-        event.target.style.cursor = 'grab';
-        this._stopAutoScroll();
-        this._clearAllDragFeedback();
-
         // Find target graph under pointer
         let _tgtG = null;
         let _insertBefore = true; // above or below midpoint
@@ -3969,48 +3180,47 @@ export class HistoryCardState {
         if( !_tgtG || _tgtG === _srcG ) return;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
-            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', event.target);
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', _srcG.canvas);
             return;
         }
 
-        // A graph belonging to a block of several linked graphs (same group) moved outside
-        // of its own group takes the whole block along — a group always stays one solid,
-        // contiguous block (moving it inside its own block is just an internal reorder).
-        const _moved = ( this._sameGroup(_srcG, _srcG) && _tgtG.groupId !== _srcG.groupId )
-            ? this._allGraphsInDisplayOrder().filter(g => g.groupId === _srcG.groupId)
-            : [_srcG];
-
         // Reorder in DOM — re-query by ID to get fresh refs after potential HA re-render
         const _gl = this._this.querySelector('#graphlist');
+        const _srcCanvas = this._this.querySelector(`#graph${_srcG.id}`);
         const _tgtCanvas = this._this.querySelector(`#graph${_tgtG.id}`);
-        if( !_tgtCanvas || !_gl ) return;
+        if( !_srcCanvas || !_tgtCanvas || !_gl ) return;
         // Canvas -> position:relative div -> wrapper div (direct child of #graphlist)
-        const _srcDivs = _moved.map(g => this._this.querySelector(`#graph${g.id}`)?.parentNode.parentNode);
+        const _srcDiv = _srcCanvas.parentNode.parentNode;
         const _tgtDiv = _tgtCanvas.parentNode.parentNode;
-        if( _srcDivs.some(d => !d || d.parentNode !== _gl) || _tgtDiv.parentNode !== _gl ) return;
-        let _anchor;
+        if( _srcDiv.parentNode !== _gl || _tgtDiv.parentNode !== _gl ) return;
         if( _insertBefore ) {
-            _anchor = _tgtDiv;
+            _gl.insertBefore(_srcDiv, _tgtDiv);
         } else {
-            _anchor = _tgtDiv.nextSibling;
-            while( _anchor && _srcDivs.includes(_anchor) ) _anchor = _anchor.nextSibling;
-            if( !_anchor || _anchor.parentNode !== _gl ) _anchor = this._footerAnchor(_gl);
-        }
-        for( const _div of _srcDivs ) {
-            if( _anchor ) _gl.insertBefore(_div, _anchor); else _gl.appendChild(_div);
+            const _next = _tgtDiv.nextSibling;
+            if( _next && _next.parentNode === _gl ) {
+                _gl.insertBefore(_srcDiv, _next);
+            } else {
+                const _footer = this._footerAnchor(_gl);
+                if( _footer ) _gl.insertBefore(_srcDiv, _footer); else _gl.appendChild(_srcDiv);
+            }
         }
 
         // Reorder in this.graphs
-        this.graphs = this.graphs.filter(g => !_moved.includes(g));
+        const _srcIdx = this.graphs.indexOf(_srcG);
+        this.graphs.splice(_srcIdx, 1);
         const _newTgtIdx = this.graphs.indexOf(_tgtG);
-        this.graphs.splice(_insertBefore ? _newTgtIdx : _newTgtIdx + 1, 0, ..._moved);
+        if( _insertBefore ) {
+            this.graphs.splice(_newTgtIdx, 0, _srcG);
+        } else {
+            this.graphs.splice(_newTgtIdx + 1, 0, _srcG);
+        }
 
         // Reorder pconfig.entities directly — never derive it from this.graphs, which is
         // only guaranteed correct for the _srcG/_tgtG pair just moved, not for the rest of
         // the page. Pull _srcG's entities out and reinsert them right before/after _tgtG's,
         // exactly like the DOM move above, leaving everything else untouched. Done before
         // the graphIndex calculation below, which reads pconfig.entities' order.
-        const _srcEntityIds = new Set(_moved.flatMap(g => g.entities.map(e => e.entity)));
+        const _srcEntityIds = new Set(_srcG.entities.map(e => e.entity));
         const _movedEntries = this.pconfig.entities.filter(e => typeof e === 'object' && _srcEntityIds.has(e.entity));
         const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && _srcEntityIds.has(e.entity)));
         const _tgtEntityIds = new Set(_tgtG.entities.map(e => e.entity));
@@ -4036,426 +3246,11 @@ export class HistoryCardState {
         const _prevIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
         const _nextIdx = _nextGraphForIdx?.entities?.[0]?.graphIndex;
         const _newGraphIndex = _nextIdx !== undefined ? (_prevIdx + _nextIdx) / 2 : _prevIdx + 1;
-        // A whole block moved: its graphs keep their own relative order (strictly increasing
-        // from there, staying within half the gap — graphIndex only decides the order
-        // inside a group, groups themselves follow pconfig.entities' order)
-        const _step = ( _nextIdx !== undefined ? Math.abs(_nextIdx - _prevIdx) || 1 : 1 ) / (2 * (_moved.length + 1));
-        _moved.forEach((g, k) => {
-            for( let e of g.entities ) e.graphIndex = _newGraphIndex + k * _step;
-        });
-        this._syncGroupOrder(_srcG.groupId);
+        for( let e of _srcG.entities ) e.graphIndex = _newGraphIndex;
         this._updateGroupLinkMarkers();
         this.writeLocalState();
     }
 
-    pointerDown(event)
-    {
-        panstate.g = null;
-
-        for( let g of this.graphs ) {
-            if( g.canvas === event.target ) {
-                panstate.g = g;
-                if( g.type !== 'timeline' && g.type !== 'arrowline' ) {
-                    g.chart.options.scales.yAxes[0].ticks.min = panstate.y0 = g.chart.scales["y-axis-0"].min;
-                    g.chart.options.scales.yAxes[0].ticks.max = panstate.y1 = g.chart.scales["y-axis-0"].max;
-                }
-                g.chart.options.topClipMargin = 0;
-                g.chart.options.bottomClipMargin = 0;
-                break;
-            }
-        }
-
-        if( panstate.g ) {
-
-            this.state.autoScroll = false;
-
-            panstate.mx = event.clientX;
-            panstate.lx = event.clientX;
-            panstate.my = event.clientY;
-            panstate.ly = event.clientY;
-
-            event.target?.setPointerCapture(event.pointerId);
-
-            // Check if click is on a legend item — start drag if so
-            panstate.dragDataset = null;
-
-            if( !this.state.zoomMode ) {
-
-                if( this.state.drag && !panstate.pinch ) {
-                    // Second finger while panning — start vertical pinch zoom (line/bar only)
-                    const p1 = { x: panstate.mx, y: panstate.my };
-                    const p2 = { x: event.clientX, y: event.clientY };
-                    const g  = panstate.g;
-                    if( g.type !== 'timeline' && g.type !== 'arrowline' && !g.ylock ) {
-                        panstate.pinch = {
-                            p1, p2,
-                            distY: Math.abs(p2.y - p1.y),
-                            y0: g.chart.scales['y-axis-0'].min,
-                            y1: g.chart.scales['y-axis-0'].max
-                        };
-                    }
-                } else if( !panstate.pinch ) {
-                    // First finger — start pan
-                    this.state.drag = true;
-                    panstate.tc = this.startTime;
-                    this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : event.target;
-                }
-
-            } else if( this.state.zoomMode ) {
-
-                const x0 = panstate.mx - panstate.g.canvas.getBoundingClientRect().left;
-
-                if( x0 > panstate.g.chart.chartArea.left && x0 < panstate.g.chart.chartArea.right ) {
-
-                    if( !panstate.overlay ) {
-
-                        let e = document.createElement('canvas');
-                        e.style = 'position:absolute;pointer-events:none;';
-                        e.width = panstate.g.canvas.width;
-                        e.height = panstate.g.canvas.height;
-
-                        panstate.g.canvas.parentNode.insertBefore(e, panstate.g.canvas);
-
-                        panstate.overlay = e;
-
-                    }
-
-                    panstate.st0 = this.pixelPositionToTimecode(x0);
-
-                    this.state.selecting = true;
-                    panstate.g.chart.options.tooltips.enabled = false;
-
-                }
-
-            }
-
-        }
-    }
-
-    pointerMove(event)
-    {
-        // Activate pending legend drag once pointer has moved enough
-
-
-        if( panstate.dragDataset ) {
-            this._updateDragFeedback(event);
-            return;
-        }
-
-        // Hover cursor: move over draggable legend or timeline label areas
-        if( !this.state.drag && !panstate.pinch ) {
-            let _hoverG = null;
-            for( let g of this.graphs ) {
-                if( g.canvas === event.target ) { _hoverG = g; break; }
-            }
-            if( _hoverG ) {
-                const _chart = _hoverG.chart;
-                const _rect = event.target.getBoundingClientRect();
-                const _cx = event.clientX - _rect.left;
-                const _cy = event.clientY - _rect.top;
-                let _onDraggable = false;
-                if( _hoverG.type !== 'timeline' && _hoverG.type !== 'arrowline' ) {
-                    if( _chart.legend && _chart.legend.legendHitBoxes ) {
-                        for( let _box of _chart.legend.legendHitBoxes ) {
-                            if( _cx >= _box.left && _cx <= _box.left + _box.width &&
-                                _cy >= _box.top  && _cy <= _box.top  + _box.height ) {
-                                _onDraggable = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                event.target.style.cursor = _onDraggable ? 'move' : '';
-            }
-        }
-
-
-        if( this.state.drag ) {
-
-            if( Math.abs(event.clientX - panstate.lx) > 0 ) {
-
-                panstate.lx = event.clientX;
-
-                const w = panstate.g.chart.chartArea.right - panstate.g.chart.chartArea.left;
-
-                const x = Math.floor((event.clientX - panstate.mx) * ((3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes) / w));
-
-                if( x < 0 ) {
-                    let t0 = moment(panstate.tc).add(-x, "second");
-                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
-                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-                } else if( x > 0 ) {
-                    let t0 = moment(panstate.tc).subtract(x, "second");
-                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");;
-                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-                }
-
-                if( !this.state.loading )
-                    this.updateHistory();
-                else
-                    this.updateAxes();
-
-            }
-
-            // Two-finger gestures: pinch zoom Y + pan Y
-            if( panstate.pinch ) {
-                const p = panstate.pinch;
-
-                // Track center of the two fingers before update
-                const prevCenterY = (p.p1.y + p.p2.y) / 2;
-
-                // Update whichever finger moved
-                const d1 = Math.abs(event.clientY - p.p1.y);
-                const d2 = Math.abs(event.clientY - p.p2.y);
-                if( d1 < d2 ) p.p1 = { x: event.clientX, y: event.clientY };
-                else           p.p2 = { x: event.clientX, y: event.clientY };
-
-                const newDistY   = Math.abs(p.p2.y - p.p1.y);
-                const newCenterY = (p.p1.y + p.p2.y) / 2;
-                const g          = panstate.g;
-                const h          = g.chart.chartArea.bottom - g.chart.chartArea.top;
-
-                // Pan Y: translate axis by center movement
-                const panDY = newCenterY - prevCenterY;
-                if( Math.abs(panDY) > 0 ) {
-                    const shift = panDY * (p.y1 - p.y0) / h;
-                    p.y0 -= shift;
-                    p.y1 -= shift;
-                    g.chart.options.scales.yAxes[0].ticks.min = p.y0;
-                    g.chart.options.scales.yAxes[0].ticks.max = p.y1;
-                    g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-                    if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
-                    g.yaxisLock = 2;
-                    g.chart.update();
-                }
-
-                // Zoom Y: scale axis by finger spread change
-                if( p.distY > 5 && newDistY > 5 ) {
-                    const scale = p.distY / newDistY;
-                    const mid   = (p.y0 + p.y1) / 2;
-                    const half  = (p.y1 - p.y0) / 2 * scale;
-                    p.y0 = mid - half;
-                    p.y1 = mid + half;
-                    g.chart.options.scales.yAxes[0].ticks.min = p.y0;
-                    g.chart.options.scales.yAxes[0].ticks.max = p.y1;
-                    g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-                    if( g.yaxisLock !== 2 ) this.updateScaleLockState(g, true);
-                    g.yaxisLock = 2;
-                    g.chart.update();
-                }
-
-                p.distY = newDistY;
-                return;
-            }
-
-            // Y drag — pan vertical axis (Shift+drag on desktop only, touch devices use #ya-N overlay)
-            if( event.shiftKey && panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline'
-                && Math.abs(event.clientY - panstate.ly) > 0 ) {
-
-                panstate.ly = event.clientY;
-
-                const h = panstate.g.chart.chartArea.bottom - panstate.g.chart.chartArea.top;
-                const y = (event.clientY - panstate.my) * (panstate.y1 - panstate.y0) / h;
-
-                panstate.g.chart.options.scales.yAxes[0].ticks.min = panstate.y0 + y;
-                panstate.g.chart.options.scales.yAxes[0].ticks.max = panstate.y1 + y;
-                panstate.g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-                panstate.g.chart.update();
-
-                if( panstate.g.yaxisLock !== 2 ) this.updateScaleLockState(panstate.g, true);
-                panstate.g.yaxisLock = 2;
-
-            }
-
-        } else if( this.state.selecting && panstate.overlay ) {
-
-            // Selection rectangle dragging
-
-            let ctx = panstate.overlay.getContext('2d');
-            ctx.clearRect(0, 0, panstate.overlay.width, panstate.overlay.height);
-
-            const rect = panstate.overlay.getBoundingClientRect();
-            const x0 = panstate.mx - rect.left;
-            const x1 = Math.max(Math.min(event.clientX - rect.left, panstate.g.chart.chartArea.right), panstate.g.chart.chartArea.left);
-
-            ctx.fillStyle = this.ui.darkMode ? '#ffffff20' : '#00000020';
-            ctx.fillRect(x0, panstate.g.chart.chartArea.top, x1-x0, panstate.g.chart.chartArea.bottom - panstate.g.chart.chartArea.top);
-
-            panstate.st1 = this.pixelPositionToTimecode(x1);
-
-        } else if( !this.state.altGraph && event.altKey ) {
-
-            // Alt key pressed, show individual samples
-
-            for( let g of this.graphs ) {
-                if( g.canvas === event.target ) {
-                    this.state.altGraph = g;
-                    g.chart.options.hover.mode = 'dataset';
-                    break;
-                }
-            }
-
-        } else if( this.state.altGraph && !event.altKey ) {
-
-            // Alt not pressed, hide samples
-
-            this.state.altGraph.chart.options.hover.mode = 'nearest';
-            this.state.altGraph = null;
-
-        }
-    }
-
-    pointerUp(event)
-    {
-        // Handle timeline/arrowline entity drag & drop
-
-        // Handle legend drag & drop
-        // Clear pending drag if pointer released before threshold (normal click)
-
-        if( panstate.dragDataset ) {
-            const _src = panstate.dragDataset.g;
-            const _srcIdx = panstate.dragDataset.datasetIdx;
-            panstate.dragDataset = null;
-            event.target.style.cursor = '';
-            this._stopAutoScroll();
-            this._clearAllDragFeedback();
-            this._finalizeLegendDrop(event, _src, _srcIdx);
-        }
-
-        if( panstate.pinch ) {
-            panstate.pinch = null;
-            // Resume pan with remaining finger
-            panstate.mx = event.clientX;
-            panstate.lx = event.clientX;
-            panstate.my = event.clientY;
-            panstate.ly = event.clientY;
-            panstate.tc = this.startTime;
-            return;
-        }
-
-        if( this.state.drag ) {
-
-            this.state.drag = false;
-            this.state.updateCanvas = null;
-
-            if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
-                if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMin === undefined && !panstate.g.yaxisLock ) {
-                    panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
-                    panstate.g.chart.options.bottomClipMargin = 4;
-                } else
-                    panstate.g.chart.options.bottomClipMargin = 1;
-
-                if( panstate.g.chart.options.scales.yAxes[0].ticks.forceMax === undefined && !panstate.g.yaxisLock ) {
-                    panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
-                    panstate.g.chart.options.topClipMargin = 4;
-                } else
-                    panstate.g.chart.options.topClipMargin = 1;
-            }
-
-            this.updateHistory();
-
-        }
-
-        if( this.state.selecting ) {
-
-            this.state.selecting = false;
-
-            panstate.g.chart.options.tooltips.enabled = true;
-
-            panstate.overlay.remove();
-            panstate.overlay = null;
-
-            if( panstate.st1 < panstate.st0 ) [panstate.st1, panstate.st0] = [panstate.st0, panstate.st1];
-
-            const tm = (moment(panstate.st1) + moment(panstate.st0)) / 2;
-
-            // Time delta in minutes
-            const dt = moment.duration(panstate.st1 - panstate.st0).asMinutes();
-
-            // Time delta in hours, ceiled
-            let d = ( dt >= 60.0 ) ? Math.ceil(dt / 60.0) : 0;
-
-            if( d < 12 ) {
-
-                if( d < 1 )
-                    this.setTimeRangeMinutes(Math.ceil(dt), true, tm);
-                else
-                    this.setTimeRange(d, true, tm);
-
-            } else {
-
-                d = Math.ceil(d / 24.0);
-
-                if( d < 1 ) this.setTimeRange(12, true, tm); else       // 12 hours
-                if( d < 2 ) this.setTimeRange(24, true, tm); else       // 1 day
-                if( d < 3 ) this.setTimeRange(48, true, tm); else       // 2 days
-                if( d < 4 ) this.setTimeRange(72, true, tm); else       // 3 days
-                if( d < 5 ) this.setTimeRange(96, true, tm); else       // 4 days
-                if( d < 6 ) this.setTimeRange(120, true, tm); else      // 5 days
-                if( d < 7 ) this.setTimeRange(144, true, tm); else      // 6 days
-                if( d < 13 ) this.setTimeRange(168, true, tm); else     // 1 week
-                if( d < 20 ) this.setTimeRange(336, true, tm); else     // 2 weeks
-                if( d < 28 ) this.setTimeRange(504, true, tm); else     // 3 weeks
-                if( d < 45 ) this.setTimeRange(720, true, tm); else     // 1 month
-                if( d < 105 ) this.setTimeRange(2184, true, tm); else   // 3 months
-                              this.setTimeRange(4368, true, tm);        // 6 months
-
-            }
-
-            this.toggleZoom();
-            this.writeLocalState();
-
-        }
-
-        panstate.g = null;
-
-        // Allow auto scroll on refresh if the user dragged at or past the current time
-        this.state.autoScroll = moment() <= moment(this.endTime);
-    }
-
-    pointerCancel(event)
-    {
-        if( panstate.pinch ) {
-            panstate.pinch = null;
-            if( this.state.drag && panstate.g ) {
-                this.state.drag = false;
-                this.state.updateCanvas = null;
-            }
-            return;
-        }
-
-        if( this.state.drag ) {
-
-            this.state.drag = false;
-            this.state.updateCanvas = null;
-
-            if( panstate.g.type !== 'timeline' && panstate.g.type !== 'arrowline' ) {
-                panstate.g.chart.options.scales.yAxes[0].ticks.min = undefined;
-                panstate.g.chart.options.scales.yAxes[0].ticks.max = undefined;
-            }
-            panstate.g.chart.options.topClipMargin = 4;
-            panstate.g.chart.options.bottomClipMargin = 4;
-
-        }
-
-        if( this.state.selecting ) {
-
-            this.state.selecting = false;
-
-            panstate.g.chart.options.tooltips.enabled = true;
-
-            panstate.overlay.remove();
-            panstate.overlay = null;
-
-        }
-
-        panstate.g = null;
-
-        // Allow auto scroll on refresh if the user dragged at or past the current time
-        this.state.autoScroll = moment() <= moment(this.endTime);
-    }
 
     wheelScrolled(event)
     {
@@ -4474,41 +3269,6 @@ export class HistoryCardState {
             const tc = this.factorToTimecode(f);
             if( event.deltaY < 0 ) this.incZoomStep(tc, f); else
             if( event.deltaY > 0 ) this.decZoomStep(tc, f);
-        }
-
-        // Zoom Y axis
-        if( event.shiftKey ) {
-            let wd = ( Math.abs(event.deltaX) > Math.abs(event.deltaY) ) ? event.deltaX : event.deltaY;
-            if( wd === 0 ) return;
-            for( let g of this.graphs ) {
-                if( g.type === 'timeline' || g.type === 'arrowline' ) continue;
-                const rect = g.canvas.getBoundingClientRect();
-                if( event.clientY >= rect.top && event.clientY <= rect.bottom ) {
-
-                    let f = ( wd < 0 ) ? 0.9 : 1.0/0.9;
-
-                    let t = g.chart.options.scales.yAxes[0].ticks;
-                    if( t.min === undefined )
-                        t.min = g.chart.scales["y-axis-0"].min;
-                    if( t.max === undefined )
-                        t.max = g.chart.scales["y-axis-0"].max;
-
-                    let d = t.max - t.min;
-                    d = d - (d * f);
-                    t.max -= d * 0.5;
-                    t.min += d * 0.5;
-
-                    if( !g.yaxisLock ) {
-                        g.yaxisLock = 2;
-                        this.updateScaleLockState(g, true);
-                    }
-
-                    g.chart.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-
-                    g.chart.update();
-                    break;
-                }
-            }
         }
     }
 
@@ -4888,40 +3648,32 @@ export class HistoryCardState {
     _clampToViewport(el)
     {
         // Nudges an already-positioned, already-visible floating element (menu, dropdown,
-        // tooltip) back fully inside its allowed bounds if any edge overflows. Every edge is
-        // clamped to whichever of #maincard and the browser viewport is MORE restrictive —
-        // never to #maincard alone, never to the viewport alone. Two distinct reasons this
-        // needs both, applied the same way on all four sides for consistency:
-        //   - #maincard alone isn't enough: it may overflow anywhere over the card, but never
-        //     onto Home Assistant's own surrounding UI (side menu, header, etc) — so its own
-        //     edges must stay inside the viewport too, in particular when the card itself has
-        //     scrolled partly off-screen (its own top could then be above the visible area).
-        //   - The viewport alone isn't enough either: a freshly-mounted card (never seen
-        //     before — e.g. a brand new cardName) starts out empty, before its graphs have
-        //     loaded, so #maincard's real size at that exact moment can be far smaller than
-        //     the space genuinely available around it on the page — clamping purely to the
-        //     viewport in that case would let a menu spill past the card's own edge.
-        // The bottom is the one exception: only ever the viewport, never #maincard, since
-        // Home Assistant leaves no meaningful UI below the dashboard content, so there is
-        // nothing the viewport-only bound could wrongly let a menu spill onto down there —
-        // and using #maincard there would reintroduce exactly the empty-card problem above.
-        // Falls back to the full window on the other three sides if #maincard can't be found
-        // for any reason, matching the previous behavior rather than failing silently. Call
-        // once after display:block and left/top/bottom/transform are set. Reads back the
-        // actual rendered box via getBoundingClientRect() rather than assuming how the
-        // position was computed, so this works uniformly for position:fixed and
-        // position:absolute, for elements anchored via `top` or `bottom`, and for elements
-        // using a CSS transform (e.g. translateX for center/right-aligned tooltips) — a
-        // translation delta applied to `left`/`top` shifts the final rendered position by
-        // the same delta regardless of any transform already in effect.
+        // tooltip) back inside bounds. Call once after display:block and left/top/bottom/
+        // transform are set. Reads back the actual rendered box via
+        // getBoundingClientRect() rather than assuming how the position was computed, so
+        // this works uniformly for position:fixed and position:absolute, for elements
+        // anchored via `top` or `bottom`, and for elements using a CSS transform (e.g.
+        // translateX for center/right-aligned tooltips) — a translation delta applied to
+        // `left`/`top` shifts the final rendered position by the same delta regardless of
+        // any transform already in effect.
+        //
+        // Left/right/top: the MOST RESTRICTIVE of #maincard and the viewport — never
+        // #maincard alone, since a never-before-mounted card (new cardName) starts with an
+        // empty/transiently tiny #maincard (graphs not yet loaded/sized), which would
+        // wrongly clamp a menu/tooltip into that tiny box and send it off-screen. Never the
+        // viewport alone either, or an element could bleed onto Home Assistant's own
+        // surrounding UI (side menu, header, etc).
+        //
+        // Bottom is the sole exception: viewport ONLY, never #maincard — reintroducing
+        // #maincard there is exactly what caused the original bug (empty-card height
+        // ~130px vs 1300+px once loaded). HA never leaves meaningful UI below the
+        // dashboard content, so the viewport alone is safe in this one direction.
         const _cardEl = this._this?.querySelector('#maincard');
-        const _cardRect = _cardEl ? _cardEl.getBoundingClientRect() : null;
-        const _bounds = {
-            left:   Math.max(_cardRect ? _cardRect.left  : 0, 0),
-            top:    Math.max(_cardRect ? _cardRect.top   : 0, 0),
-            right:  Math.min(_cardRect ? _cardRect.right : window.innerWidth, window.innerWidth),
-            bottom: window.innerHeight,
-        };
+        const _cardR = _cardEl ? _cardEl.getBoundingClientRect() : null;
+        const _bounds = _cardR
+            ? { left: Math.max(_cardR.left, 0), right: Math.min(_cardR.right, window.innerWidth),
+                top: Math.max(_cardR.top, 0), bottom: window.innerHeight }
+            : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
         const _r = el.getBoundingClientRect();
         let _dx = 0, _dy = 0;
         if( _r.right > _bounds.right ) _dx = _bounds.right - _r.right;
@@ -4952,15 +3704,6 @@ export class HistoryCardState {
         let _node = _anchorEl;
         while( _node && _node.parentNode !== gl ) _node = _node.parentNode;
         return _node;
-    }
-
-    _graphByOverlay(prefix, target)
-    {
-        // Find which graph owns a given overlay element (lg-N, tl-N, mo-N, ...)
-        for( let g of this.graphs ) {
-            if( this._this.querySelector(`#${prefix}-${g.id}`) === target ) return g;
-        }
-        return null;
     }
 
     // Generic menu-opening action, shared by all 3 menus (entity selector dropdown, entity
@@ -5241,7 +3984,7 @@ export class HistoryCardState {
         const sc = this.getStateClass(entity_id);
         const type = entityOptions?.type ? entityOptions.type :
                      ( sc === 'total_increasing' ) ? 'bar' :
-                     ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+                     ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
         const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'curves';
         return { type, lineMode };
     }
@@ -5250,19 +3993,13 @@ export class HistoryCardState {
     {
         // Creates one brand-new entity with an explicit type and persists it —
         // shared by the non-numeric direct-create path and the type-menu new-entity path
-        // addGraph registers _entry itself as the entity's pconfig.entities entry (and adopts
-        // the groupId of the graph it combined into, if any) — it must not be pushed a second
-        // time here: a duplicate entry, never displayed, used to carry the groupId instead,
-        // leaving the displayed one with none (so a type change couldn't link its graphs).
-        const _entry = { type, lineMode };
-        this.addGraph(eid, false, null, null, null, undefined, false, null, null, _entry);
-        const _g = this.graphs.find(g => g.entities.includes(_entry));
-        if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
-            // A brand-new graph (or one left without a group by that old bug): a group of its own
-            const _gid = this._nextGroupId++;
-            _g.groupId = _gid;
-            _g.entities.forEach(e => { e.groupId = _gid; });
-        }
+        const _prevCount = this.graphs.length;
+        this.addGraph(eid, false, null, null, null, undefined, false, null, null, { type, lineMode });
+        const _wasCombined = this.graphs.length === _prevCount;
+        const _lastG = this.graphs[this.graphs.length - 1];
+        const _gid = _wasCombined ? _lastG?.groupId : this._nextGroupId++;
+        const _addedEntity = _lastG?.entities.find(e => e.entity === eid);
+        this.pconfig.entities.push({ entity: eid, groupId: _gid, color: _addedEntity?.color, fill: _addedEntity?.fill, type, lineMode });
         return this._hass.states[eid]?.attributes?.friendly_name || eid;
     }
 
@@ -5270,10 +4007,10 @@ export class HistoryCardState {
     {
         const _single = this.graphs.length <= 1;
         for( let g of this.graphs ) {
-            const _mo = this._this.querySelector(`#mo-${g.id}`);
-            const _ca = this._this.querySelector(`#ca-${g.id}`);
-            if( _mo ) _mo.style.display = _single ? 'none' : 'flex';
-            if( _ca ) _ca.style.left = _single ? '0px' : '10px';
+            if( g.chart ) {
+                g.chart.options.moveHandleVisible = !_single;
+                g.chart.update();
+            }
         }
     }
 
@@ -5301,13 +4038,9 @@ export class HistoryCardState {
                 if( !_el ) {
                     _el = document.createElement('div');
                     _el.id = `gc-${g.id}`;
-                    // Straddles the boundary between the two graphs, on the left under the
-                    // upper graph's Y axis labels — an empty spot. Not centered on the lower
-                    // graph's top any more: now that it's clickable (double-click merges), it
-                    // would sit over that graph's legend labels and steal their clicks/drags.
-                    _el.style.cssText = 'height:0;text-align:left;pointer-events:none;';
-                    _el.innerHTML = `<div title="${i18n('ui.menu.linked_graphs')} — ${i18n('ui.menu.linked_graphs_merge')}" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;left:${Math.max(0, Math.round(this.pconfig.labelAreaWidth / 2) - 11)}px;top:-15px;z-index:2;pointer-events:auto;cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
-                    _el.firstElementChild.addEventListener('click', (ev) => this._linkMarkerClicked(ev, _el));
+                    _el.title = i18n('ui.menu.linked_graphs');
+                    _el.style.cssText = 'height:0;text-align:center;pointer-events:none;';
+                    _el.innerHTML = `<div style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;top:4px;z-index:1;pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
                 }
                 // Always reposition (cheap no-op if already correct) — a caller earlier
                 // in the same operation may have created this marker before the graph's
@@ -5317,47 +4050,6 @@ export class HistoryCardState {
                 _el.remove();
             }
         }
-    }
-
-    // Double-click (two clicks within 400ms, same as legend labels — also works for
-    // double taps) on the chain icon between two linked graphs merges them back into one.
-    _linkMarkerClicked(event, el)
-    {
-        event.stopPropagation();
-        const _now = Date.now();
-        if( el._hecLastClick && _now - el._hecLastClick < 400 ) {
-            el._hecLastClick = null;
-            const _g = this.graphs.find(g => `gc-${g.id}` === el.id);
-            if( _g ) this._mergeLinkedGraph(_g, event);
-        } else {
-            el._hecLastClick = _now;
-        }
-    }
-
-    // Merges graph g into the graph right above it, when both belong to the same group
-    // (linked) — the reverse of a static uncombine or of a type change, whatever the units.
-    // Only the chart type can prevent it (a line and a bar/timeline can't share one chart).
-    _mergeLinkedGraph(g, event)
-    {
-        const _upper = this._previousGraph(g);
-        if( !_upper || !this._sameGroup(_upper, g) ) return;
-        if( !this._typesCompatible(_upper.type, g.type) ) {
-            this._showLabelTooltip(`${g.type} ≠ ${_upper.type}`, event.clientX, event.clientY, 'left', event.target);
-            return;
-        }
-        const _key = _upper.entities[0].graphKey;
-        const _all = [..._upper.entities, ...g.entities];
-        _all.forEach(en => { this._setGraphKey(en, _key); en.siConversionFactor = undefined; });
-        const _groupId = _upper.groupId;
-        const _nextG = this._nextGraph(g);
-        this._detachGraph(_upper);
-        this._detachGraph(g);
-        _all.forEach((en, i) => {
-            this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId, en);
-        });
-        this._syncGroupOrder(_groupId);
-        this.writeLocalState();
-        this.updateHistory();
     }
 
     removeGraph(event)
@@ -5395,16 +4087,12 @@ export class HistoryCardState {
 
         // Merge graph-level properties before type detection so graph.type from YAML wins
         const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
-        // Only keys the graph actually sets: a plain spread would let every graph-level key
-        // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
-        const _definedGraphProps = Object.fromEntries(Object.entries(_graphProps).filter(([, v]) => v !== undefined));
-        entityOptions = { ...entityOptions, ..._definedGraphProps, groupId };
+        entityOptions = { ...entityOptions, ..._graphProps, groupId };
 
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
         const _overrideType = overrideEntityProps?.type ?? entityOptions?.type;
-        // (let: becomes the graph's type below, once combined — see _graphType)
-        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        const type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
         // The entity's single source of truth: overrideEntityProps is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
@@ -5422,17 +4110,6 @@ export class HistoryCardState {
             this.pconfig.entities.push(_pcEntry);
         }
         _pcEntry.entity = entity_id;
-        // The entity's own display type — kept per entity, since a graph can now hold both
-        // line and bar entities (see _entityKind)
-        _pcEntry.type = type;
-        // A YAML entity's graph stays static whichever operation rebuilds it (uncombine,
-        // drag, type change...) — not only the initial rebuild, which passes isStatic.
-        if( _pcEntry.isStatic ) isStatic = true;
-
-        // The entity's own fill (e.g. `fill:` on a YAML graph entity), captured before the
-        // defaults below — an explicit per-entity fill always wins over entityOptions/graph
-        // defaults and over the auto-assigned default color's fill.
-        const _ownFill = _pcEntry.fill;
 
         let entities = [_pcEntry];
         entities[0].color = entities[0].color ?? "#000000";
@@ -5447,11 +4124,11 @@ export class HistoryCardState {
                 entities[0].fill = overrideFill ?? 'rgba(0,0,0,0)';
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
-                entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
+                entities[0].fill = entityOptions?.fill ?? 'rgba(0,0,0,0)';
             } else if( entities[0].color === "#000000" ) {
                 const c = this.getNextDefaultColor();
                 entities[0].color = c.color;
-                entities[0].fill = _ownFill ?? entityOptions?.fill ?? c.fill;
+                entities[0].fill = entityOptions?.fill ?? c.fill;
             }
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
@@ -5467,7 +4144,6 @@ export class HistoryCardState {
             entities[0].siConversionFactor = entities[0].siConversionFactor ?? entityOptions?.siConversionFactor;
             entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
             entities[0].process   = entities[0].process     ?? entityOptions?.process;
-            entities[0].circular  = entities[0].circular    ?? entityOptions?.circular;
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
@@ -5477,21 +4153,23 @@ export class HistoryCardState {
         }
 
         // Find a graph to combine with:
-        // - With an explicit groupId (static YAML graph, or any graph being rebuilt): the
-        //   graph of that same group showing the same sub-graph (graphKey — see
-        //   _uncombineEntity) with the same type. Units are deliberately NOT checked here:
-        //   the entities of one group are shown together by definition (a YAML graph is the
-        //   author's explicit choice; a dynamic group was only ever formed from compatible
-        //   units), so mixed units share one graph and one Y axis. Only the type keeps them
-        //   apart (line/bar/timeline/arrowline can't share one chart) — those become linked
-        //   graphs of the same group instead, re-combinable later.
+        // - Static multi-entity groups (isStatic + targetGraph): always the last graph
+        //   (YAML author responsible for contiguous grouping in the rebuild)
+        // - Dynamic with an explicit groupId: search for the LAST graph sharing that
+        //   groupId — not the first. A groupId's graphs are always built in sequence (the
+        //   rebuild walks each group in graphIndex order), so the last one built is always
+        //   the right compatibility candidate; the first one found could be an earlier,
+        //   type-incompatible graph of the same solid block (a group of several linked
+        //   graphs), which would wrongly fail every later entity's combine attempt.
         // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
-        //   considered, and its groupId is adopted if type and units are compatible
-        const _graphKey = _pcEntry.graphKey;
+        //   considered, and its groupId is adopted if compatible
+        const _isStaticForce = isStatic && targetGraph !== null;
         let _combineIdx = -1;
-        if( !noAutoGroup ) {
+        if( _isStaticForce ) {
+            _combineIdx = this.graphs.length - 1;
+        } else if( !noAutoGroup ) {
             _combineIdx = (groupId !== null) ?
-                this.graphs.reduce((_last, g, i) => g.groupId === groupId && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === _graphKey && this._sameSavedGraph(g.entities[0], _pcEntry) ? i : _last, -1) :
+                this.graphs.reduce((_last, g, i) => g.groupId === groupId ? i : _last, -1) :
                 this.graphs.length - 1;
         }
 
@@ -5500,9 +4178,9 @@ export class HistoryCardState {
         let _adoptedGraphIndex = null;
         if( _combineIdx >= 0 ) {
             _cand = this.graphs[_combineIdx];
-            combine = ( groupId !== null ) ? true :
+            combine = _isStaticForce ? true :
                       _cand.type === type &&
-                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id, _pcEntry.unit), this.getUnitOfMeasure(_cand.entities[0].entity, _cand.entities[0].unit)) );
+                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id), this.getUnitOfMeasure(_cand.entities[0].entity)) );
         }
 
         // Captured so the merged graph can be reinserted at the removed graph's DOM position
@@ -5531,7 +4209,7 @@ export class HistoryCardState {
                     const _free = defaultColors.find(c => !_usedColors.includes(c.color));
                     if( _free ) {
                         entities[0].color = _free.color;
-                        entities[0].fill  = _ownFill ?? _free.fill;
+                        entities[0].fill  = _free.fill;
                     }
                 }
             }
@@ -5560,29 +4238,6 @@ export class HistoryCardState {
         entityOptions.groupId = groupId;
         _pcEntry.groupId = groupId;
 
-        // Y axis bounds: the graph's own options first, else the first entity of the graph
-        // that sets them (on its YAML entry), else entityOptions — taken from every entity
-        // of the graph, not only the one being added (which used to decide alone).
-        for( const _k of ['ymin', 'ymax', 'ystepSize'] ) {
-            if( _graphProps[_k] !== undefined ) continue;
-            const _fromEntity = entities.map(e => e[_k]).find(v => v !== undefined && v !== null);
-            if( _fromEntity !== undefined ) entityOptions[_k] = _fromEntity;
-        }
-
-        // The graph's own type: 'bar' as soon as it holds a bar entity (its line entities
-        // then drawn as curves over the bars), otherwise the entities' type
-        if( type === 'line' || type === 'bar' )
-            type = entities.some(e => e.type === 'bar') ? 'bar' : 'line';
-        const _mixed = type === 'bar' && entities.some(e => e.type !== 'bar');
-        entityOptions._mixed = _mixed;
-        // The bar interval of the graph: the one asked for, else the one saved with its
-        // entities (any of them — a line entity rebuilt last must not reset it), else the
-        // configured one. Needed before the graph is built: it decides how bar entities
-        // are drawn (bars, or raw curves for interval 4).
-        const _graphInterval = overrideInterval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
-            ?? this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval) ?? 1;
-        entityOptions._graphInterval = _graphInterval;
-
         // graphIndex: a real number giving each graph's display order (1 = topmost page-
         // wide), tracked per entity (all entities of one displayed graph share the same
         // value) since there's no separate per-graph persisted structure. Combine already
@@ -5607,8 +4262,7 @@ export class HistoryCardState {
         for( let e of entities ) e.graphIndex = _graphIndex;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
-        // (a mixed bar/line graph is sized like a line graph, plus the interval selector)
-        const h = _mixed ? this.calcGraphHeight('line', entities.length, _graphHeight) + 24 : this.calcGraphHeight(type, entities.length, _graphHeight);
+        const h = this.calcGraphHeight(type, entities.length, _graphHeight);
 
         let html = '';
         // Spacing between graphs: a margin-top on this graph's own container unless it's
@@ -5632,18 +4286,7 @@ export class HistoryCardState {
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, _graphInterval, this.ui.optionStyle, 40);
-        if( type == 'line' || type == 'bar' )
-            html += this.createScaleLockIconHtml(this.g_id, h);
-        if( type == 'line' || type == 'bar' )
-            html += `<div id="ya-${this.g_id}" style="position:absolute;left:0;top:28px;width:${this.pconfig.labelAreaWidth}px;height:${h-28}px;touch-action:pan-y;cursor:ns-resize;"></div>`;
-            html += `<div id="mo-${this.g_id}" style="position:absolute;left:0;top:0;width:30px;height:28px;touch-action:none;cursor:grab;z-index:1;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;">&#x283F;</div>`;
-            // Legend / timeline label overlays exist on static (YAML) graphs too: their curves
-            // can be split (double-click) and re-combined (drag) within their own group.
-            if( type == 'line' || type == 'bar' )
-                html += `<div id="lg-${this.g_id}" style="position:absolute;left:0;top:0;width:100%;height:0px;touch-action:none;pointer-events:auto;cursor:move;"></div>`;
-            if( type == 'timeline' || type == 'arrowline' )
-                html += `<div id="tl-${this.g_id}" style="position:absolute;left:0;top:0;width:${this.pconfig.labelAreaWidth}px;height:100%;touch-action:none;pointer-events:auto;cursor:default;"></div>`;
+            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval), this.ui.optionStyle, 40);
         html += `</div>`;
 
         let e = document.createElement('div');
@@ -5666,43 +4309,6 @@ export class HistoryCardState {
         // For bar graphs, connect the interval selector dropdown listener
         if( type == 'bar' && !this.ui.hideInterval )
             this._this.querySelector(`#bd-${this.g_id}`).addEventListener('change', this.selectBarInterval.bind(this));
-
-
-        // For line and bar graphs connect the scale lock button listener
-        if( type == 'line' || type == 'bar' ) {
-            this._this.querySelector(`#ca-${this.g_id}`)?.addEventListener('click', this.scaleLockClicked.bind(this));
-            const yaEl2 = this._this.querySelector(`#ya-${this.g_id}`);
-            if( yaEl2 ) {
-                yaEl2.addEventListener('pointerdown', this.yAxisPointerDown.bind(this));
-                yaEl2.addEventListener('pointermove', this.yAxisPointerMove.bind(this));
-                yaEl2.addEventListener('pointerup',   this.yAxisPointerUp.bind(this));
-            }
-        }
-        // Connect graph move listeners for all graph types
-        const moEl2 = this._this.querySelector(`#mo-${this.g_id}`);
-        if( moEl2 ) {
-            moEl2.addEventListener('pointerenter', this._updateMoCursor.bind(this));
-            moEl2.addEventListener('pointerdown', this.graphMoveStart.bind(this));
-            moEl2.addEventListener('pointermove', this.graphMoveMove.bind(this));
-            moEl2.addEventListener('pointerup',   this.graphMoveEnd.bind(this));
-            moEl2.addEventListener('pointercancel', this.graphMoveEnd.bind(this));
-        }
-        const lgEl2 = this._this.querySelector(`#lg-${this.g_id}`);
-        if( lgEl2 ) {
-            lgEl2.addEventListener('pointerenter',  this._updateLegendCursor.bind(this));
-            lgEl2.addEventListener('pointerdown',   this.legendDragStart.bind(this));
-            lgEl2.addEventListener('pointermove',   this.legendDragMove.bind(this));
-            lgEl2.addEventListener('pointerup',     this.legendDragEnd.bind(this));
-            lgEl2.addEventListener('pointercancel', this.legendDragEnd.bind(this));
-        }
-        const tlEl2 = this._this.querySelector(`#tl-${this.g_id}`);
-        if( tlEl2 ) {
-            tlEl2.addEventListener('pointerenter',  this._updateTimelineCursor.bind(this));
-            tlEl2.addEventListener('pointerdown',   this.timelineDragStart.bind(this));
-            tlEl2.addEventListener('pointermove',   this.timelineDragMove.bind(this));
-            tlEl2.addEventListener('pointerup',     this.timelineDragEnd.bind(this));
-            tlEl2.addEventListener('pointercancel', this.timelineDragEnd.bind(this));
-        }
 
         // Create the graph
         const _dynGid = this.g_id;
@@ -5744,25 +4350,17 @@ export class HistoryCardState {
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
 
-        // Needed before building the datasets: it decides how each bar entity is drawn
-        const interval = config?._graphInterval ?? this.parseIntervalConfig(config?.interval) ?? 1;
-
         let datasets = [];
         for( let d of entities ) {
-            const _kind = this._entityKind({ type, interval }, d);
             datasets.push({
-                "kind": _kind,
                 "name": ( d.name === undefined ) ? this._hass.states[d.entity]?.attributes?.friendly_name : d.name,
                 "bColor": parseColor(d.color),
-                // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : parseColor(d.fill),
+                "fillColor": parseColor(d.fill),
                 "dashMode": d.dashMode,
                 "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
-                // (period of a circular entity in the units shown, before SI conversion)
-                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this._circularPeriod(d) ?? 0 ) * Math.abs(d.scale ?? 1) || null : null,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
@@ -5790,29 +4388,15 @@ export class HistoryCardState {
             }
         }
 
-        const chart = this.newGraph(canvas, type, datasets, config);
+        const chart = this.newGraph(canvas, type, datasets, config, isStatic);
 
-        // Update legend overlay height now that chart has been rendered
-        if( type === 'line' || type === 'bar' ) {
-            const lgEl = this._this.querySelector(`#lg-${gid}`);
-            if( lgEl && chart.legend ) {
-                lgEl.style.height = (chart.legend.height || 0) + 'px';
-            }
-        }
+        const h = this.calcGraphHeight(type, entities.length, config?.height);
 
-        const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
+        const interval = this.parseIntervalConfig(config?.interval) ?? 1;
 
         const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
-
-        canvas.addEventListener('pointerdown', this.pointerDown.bind(this));
-        canvas.addEventListener('pointermove', this.pointerMove.bind(this));
-        canvas.addEventListener('pointerup', this.pointerUp.bind(this));
-        canvas.addEventListener('pointercancel', this.pointerCancel.bind(this));
-
-        if( type == 'line' || type == 'bar' )
-            this.updateScaleLockState(g, false);
     }
 
 
@@ -5861,7 +4445,6 @@ export class HistoryCardState {
                     <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
                     <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
-                    <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                     <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
@@ -5928,7 +4511,6 @@ export class HistoryCardState {
         const _et0 = this._this.querySelector(`#et_${i}_0`); if( _et0 ) _et0.innerHTML = i18n('ui.menu.type_line_straight');
         const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
         const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
-        const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
@@ -6254,11 +4836,6 @@ export class HistoryCardState {
                 // Rebuild: call addGraph one entity at a time
                 // For statics: force combineSameUnits (YAML author responsible for grouping)
                 // For dynamics: combine logic in addGraph handles groupId + compatibility
-                // The graphIndex each entity had when last saved, captured before addGraph
-                // recomputes it: within a group, only entities that were shown in the same
-                // graph are combined again (see addGraph). Statics never persist graphIndex,
-                // so for them this is always undefined === undefined — graphKey decides.
-                this._rebuildGraphIndex = new Map(this.pconfig.entities.map(e => [e, e.graphIndex]));
                 for( let _key of _groupOrder ) {
                     const _group = _groupMap.get(_key);
                     const _isStaticGroup = _group.entities.some(e => e.isStatic);
@@ -6276,7 +4853,6 @@ export class HistoryCardState {
                     });
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
                 }
-                this._rebuildGraphIndex = null;
                 // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
                 // from scratch — persist that result now rather than leaving storage stale
                 // until some unrelated later action happens to call writeLocalState.
@@ -6381,9 +4957,8 @@ export class HistoryCardState {
             // Existing entity — change type. "Default" option not applicable. Non-numeric
             // entity (only ever timeline): the only choice is timeline itself, reduced menu.
             if( _defaultEl ) _defaultEl.style.display = 'none';
+            const _curType     = graph.type;
             const _entity      = graph.entities.find(e => e.entity === entity_id);
-            // The entity's own type — a bar graph can also hold line entities
-            const _curType     = _entity?.type ?? graph.type;
             const _curLineMode = this.normalizeLineMode(_entity?.lineMode) || this.pconfig.defaultLineMode || 'curves';
             const _numeric = this._isNumericEntity(entity_id);
             _TYPE_MENU_DEFS.forEach((_def, _idx) => {
@@ -6539,9 +5114,6 @@ export class HistoryCardState {
 
         // Update pconfig.entities — persist lineMode and type
         const _pcEntry = this.pconfig.entities.find(e => typeof e === 'object' && e.entity === _entity_id);
-        // The entity's own type before this change (a bar graph can also hold line entities)
-        const _gOld = this.graphs.find(g => g.id === _graph_id);
-        const _oldType = _gOld?.entities.find(e => e.entity === _entity_id)?.type ?? _gOld?.type;
         if( _pcEntry ) {
             _pcEntry.lineMode = lineMode;
             _pcEntry.type     = type;
@@ -6549,7 +5121,7 @@ export class HistoryCardState {
 
         const _g = this.graphs.find(g => g.id === _graph_id);
         if( _g ) {
-            if( _oldType === type ) {
+            if( _g.type === type ) {
                 // Same type — update lineMode on the specific entity's dataset only
                 const _mode = this.normalizeLineMode(lineMode);
                 const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
@@ -7199,20 +5771,13 @@ export class HistoryCardState {
 
     async writeLocalState()
     {
-        // HA's image (ha_* below) is deliberately NOT updated with what this device writes:
-        // it's only ever updated from what HA itself returns (readLocalState). The write
-        // below is asynchronous and may land late or not at all (connection lost, page
-        // reloaded first) — had the image already taken the new value, HA still returning
-        // the old one would look like a front of HA, and revert this device's own change.
-        // This device's own write comes back later as an HA front carrying the value it
-        // already has: applying it changes nothing.
         const data = {
             // Active values
             entities            : this.pconfig.entities,
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
-            yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
+            yaml_defaultTimeRange  : this.pconfig.defaultTimeRange,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_entities          : this._pureYamlEntities ?? this.pconfig.entities.filter(e => e.isStatic),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
@@ -7275,10 +5840,6 @@ export class HistoryCardState {
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         this._pureYamlEntities = _yamlEntities;
-        // Each source is only ever compared with its own image (its mirror): YAML with what
-        // YAML said last time on this device, HA with what this device last knew of HA. On
-        // this device's first load the YAML image is empty, so YAML has spoken here — it
-        // wins, then reaches HA (and the other devices) like any other YAML change.
         const _yamlMirror   = _ls?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
 
@@ -7318,19 +5879,9 @@ export class HistoryCardState {
             _staticOrderEnabled, _staticOrderMultidevice
         );
 
-        // Dynamic entities another device added only reach this device if multi-device
-        // persistence covers entities — with enable_persistence alone, this device only
-        // ever knows the ones it added itself.
-        const _dynamicMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities');
-        // Removed on another device (last one to speak): an entity this device had already
-        // seen in HA (in its HA mirror) but that's gone from HA now was deleted elsewhere —
-        // dropped here too. One missing from both is a local addition not synced yet — kept.
-        const _haIdsNow    = new Set(_haEntities.map(e => e.entity));
-        const _haIdsMirror = new Set(_haMirror.map(e => e.entity));
-        const _removedElsewhere = id => _dynamicMultidevice && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
         const _dynamicCandidates = [...new Set([
-            ..._lsEntities.filter(e => !e.isStatic && !_removedElsewhere(e.entity)).map(e => e.entity),
-            ...( _dynamicMultidevice ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : [] ),
+            ..._lsEntities.filter(e => !e.isStatic).map(e => e.entity),
+            ..._haEntities.filter(e => !e.isStatic).map(e => e.entity),
         ])];
         const _dynamicOrder = this._resolveOrder(
             _dynamicCandidates, null, null,
@@ -7349,10 +5900,8 @@ export class HistoryCardState {
             const _yamlE = _findEntity(_yamlEntities, id);
 
             // YAML front — per entity, always wins on change, unaffected by the enable flags
-            // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
-            // is also the pure YAML mirror saved by writeLocalState)
             if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_findEntity(_yamlMirror, id) ?? null) )
-                return { ..._yamlE };
+                return _yamlE;
 
             // Resolve which fields have persistence enabled at all — entity-level first,
             // falling back to the card-level 'entities' switch, itself defaulting to 'all'
@@ -7383,32 +5932,11 @@ export class HistoryCardState {
             // local/HA snapshot instead — it only exists here at all because persistence was
             // enabled for it (see _entityIds above), so there's always something to base on.
             const _result = _yamlE ? { ..._yamlE } : { ..._localE };
-            // A field missing from a stored entry is a field that was cleared (e.g. hidden
-            // back to visible drops 'hidden' from the saved JSON) — taken over as cleared
-            // too, not skipped: skipping it would silently lose that source's change.
-            const _take = (_src, _f) => {
-                if( _src[_f] === undefined ) delete _result[_f];
-                else _result[_f] = _src[_f];
-            };
             for( const _f of _enabledFields )
-                if( _localE ) _take(_localE, _f);
+                if( _localE && _f in _localE ) _result[_f] = _localE[_f];
             if( _haChanged )
                 for( const _f of _multiFields )
-                    _take(_haE, _f);
-            // graphKey (which linked graph of its group the entity is shown in — see
-            // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
-            // follows whichever source won groupId above. graphIndex is NOT taken over per
-            // entity: it's a position relative to the other graphs of the block, so taking
-            // it from different sources for different entities would mix two coordinate
-            // systems and shuffle the block. The order inside a block is carried by the
-            // entities' order instead (resolved as a whole, see 'order' — and kept in step
-            // with the display by _syncGroupOrder).
-            const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
-                            ( _enabledFields.has('groupId') ? _localE : null );
-            if( _keySrc ) {
-                if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
-                else delete _result.graphKey;
-            }
+                    if( _f in _haE ) _result[_f] = _haE[_f];
             return _result;
         });
 
@@ -7416,13 +5944,11 @@ export class HistoryCardState {
         // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
         // sequentially from g_id. Dynamic graphs now always use groupId >= 1000.
         const _yamlGroupIds = new Set(this.pconfig.entities.filter(e => e.isStatic).map(e => e.groupId));
-        // (null is "no group", not group 0 — null < 1000 is true in JS, so it must be
-        // excluded explicitly, or every ungrouped entity would land in one group 1000)
-        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000);
+        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId < 1000);
         if( _needsRenumber ) {
             const _remap = new Map();
             this.pconfig.entities = this.pconfig.entities.map(e => {
-                if( !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000 ) {
+                if( !e.isStatic && e.groupId !== undefined && e.groupId < 1000 ) {
                     if( !_remap.has(e.groupId) ) _remap.set(e.groupId, e.groupId + 1000);
                     return { ...e, groupId: _remap.get(e.groupId) };
                 }
@@ -7430,48 +5956,13 @@ export class HistoryCardState {
             });
         }
 
-        // Migration: dynamic entities without a group (left by a duplicate-entry bug in
-        // _createAndPersistEntity, fixed in 1.1.43 — the displayed entry never got its
-        // groupId). One new group per graph, graphs told apart by their saved graphIndex.
-        if( this.pconfig.entities.some(e => !e.isStatic && ( e.groupId === null || e.groupId === undefined )) ) {
-            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
-            const _byIndex = new Map();
-            this.pconfig.entities = this.pconfig.entities.map(e => {
-                if( e.isStatic || ( e.groupId !== null && e.groupId !== undefined ) ) return e;
-                const _k = e.graphIndex ?? Symbol();
-                if( !_byIndex.has(_k) ) _byIndex.set(_k, _next++);
-                return { ...e, groupId: _byIndex.get(_k) };
-            });
-        }
-
-        // Migration: the old renumbering above also caught null (fixed in 1.1.43), which put
-        // every ungrouped dynamic entity into one group 1000, each graph linked to the next.
-        // Its signature: one dynamic group with two graphs (told apart by saved graphIndex) of
-        // the same type — impossible otherwise, since same-type graphs of a dynamic group
-        // always combine. Such a group is split back into one group per graph.
-        {
-            const _dynGroups = new Map();
-            for( const e of this.pconfig.entities ) {
-                if( e.isStatic || e.groupId === null || e.groupId === undefined ) continue;
-                if( !_dynGroups.has(e.groupId) ) _dynGroups.set(e.groupId, new Map());
-                const _graphs = _dynGroups.get(e.groupId);
-                const _k = e.graphIndex ?? Symbol();
-                if( !_graphs.has(_k) ) _graphs.set(_k, e.type ?? this._detectDefaultType(e.entity).type);
-            }
-            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
-            for( const [_groupId, _graphs] of _dynGroups ) {
-                const _types = [..._graphs.values()];
-                if( new Set(_types).size === _types.length ) continue;
-                const _newIds = new Map([..._graphs.keys()].map(k => [k, _next++]));
-                this.pconfig.entities = this.pconfig.entities.map(e =>
-                    ( !e.isStatic && e.groupId === _groupId && _newIds.has(e.graphIndex) ) ? { ...e, groupId: _newIds.get(e.graphIndex) } : e);
-            }
-        }
-
         // --- Last one to speak wins — timeRange ---
         // infoPanelEnabled is handled separately below — see the warning comment there,
         // it deliberately does NOT follow this pattern.
 
+        // YAML front
+        const _yamlTimeChanged = this.pconfig.defaultTimeRange !== undefined &&
+                                 String(this.pconfig.defaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
 
         // HA user front (compare HA user value to its mirror in localStorage)
         // range defaults to 'all' when this card has no static (YAML) entities at all —
@@ -7487,10 +5978,6 @@ export class HistoryCardState {
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
 
-        // YAML front — compared with the YAML image only
-        const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
-                                 String(this.pconfig.yamlDefaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
-
         // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
         // as everything else. This was broken as an unrelated side effect of the v1.1.27
         // storage-format simplification (which dropped `yaml_defaultInfoPanel` from the
@@ -7504,10 +5991,10 @@ export class HistoryCardState {
         // timestamp on every load regardless of this comparison, see below) — verified
         // against the last version with a properly tested info panel (v1.1.19), which used
         // this exact mirror comparison.
-        const _haInfoChanged = _haInfoEnabled !== undefined &&
-                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
         const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
                                  this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
+        const _haInfoChanged = _haInfoEnabled !== undefined &&
+                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;
@@ -7679,27 +6166,20 @@ export class HistoryCardState {
             color             : ent.color,
             fill              : ent.fill,
             hidden            : ent.hidden,
-            interval          : this.parseIntervalConfig(ent.interval) ?? interval,
+            interval          : interval,
             isStatic          : true,
             name              : ent.name,
             scale             : ent.scale,
             siConversionFactor: ent.siConversionFactor,
             dashMode          : ent.dashMode,
             lineMode          : ent.lineMode,
-            width             : ent.width ?? ent.lineWidth,
-            type              : ent.type,
-            // Y axis bounds set on an entity: the axis is the graph's, so they apply to the
-            // graph the entity is shown in (see addGraph)
-            ymin              : ent.ymin,
-            ymax              : ent.ymax,
-            ystepSize         : ent.ystepSize ?? ent.ystepsize,
+            width             : ent.width,
             showPoints        : ent.showPoints,
             showMinMax        : ent.showMinMax,
             unit              : ent.unit,
             process           : ent.process,
             netBars           : ent.netBars,
             decimation        : ent.decimation,
-            circular          : ent.circular,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
@@ -7780,10 +6260,6 @@ export class HistoryCardState {
                 height         : graph.options?.height,
                 stacked        : graph.options?.stacked,
                 ylock          : graph.options?.ylock,
-                ymin           : graph.options?.ymin,
-                ymax           : graph.options?.ymax,
-                // (ystepsize: spelling of the reference config up to 1.1.44, still accepted)
-                ystepSize      : graph.options?.ystepSize ?? graph.options?.ystepsize,
                 fill           : graph.options?.fill,
                 showMinMax     : graph.options?.showMinMax,
                 dashMode       : graph.options?.dashMode,
@@ -7944,9 +6420,6 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.excludeFilterEntities =   config.excludeFilterEntities;
         this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
         this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-        // What the YAML itself says (undefined if it says nothing) — the only value its
-        // front and its image are about; the '24' fallback above isn't the YAML speaking
-        this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
