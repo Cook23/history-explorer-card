@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b78';
+const Version = '1.2.0b79';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1793,6 +1793,10 @@ export class HistoryCardState {
 
         let scaleUnit;
 
+        // (see ticks.period below)
+        const _period0 = datasets[0]?.circular;
+        const _tickPeriod = ( _period0 && datasets.every(d => d.circular === _period0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _period0 : undefined;
+
         if( graphtype == 'line' || graphtype == 'bar' ) {
 
             datastructure = {
@@ -2141,22 +2145,6 @@ export class HistoryCardState {
                         afterFit: (scaleInstance) => {
                             scaleInstance.width = this.pconfig.labelAreaWidth;
                         },
-                        // Graph of circular curves only, all of the same period: the labels show
-                        // the real values, in [0, period)
-                        afterTickToLabelConversion: (me) => {
-                            const _ds = me.chart.data.datasets;
-                            const Q = _ds[0]?.hecCircular;
-                            if( !Q || !me.ticksAsNumbers || !_ds.every(d => d.hecCircular === Q && ( d.siConversionFactor ?? 1 ) === 1) ) return;
-                            // (in place: Chart.js holds on to this very array)
-                            for( let i = 0; i < me.ticks.length; i++ ) {
-                                const _dec = ( String(me.ticks[i]).split('.')[1] || '' ).length;
-                                const w = parseFloat(this._wrapCircular(me.ticksAsNumbers[i], Q).toFixed(_dec));
-                                // (the top label — ticks[0] — at a whole turn reads better as 360 than as
-                                // 0: 0...360, 300...350, 0, 10...360; anywhere else it's 0)
-                                const _turn = ( w === 0 || w >= Q );
-                                me.ticks[i] = !_turn ? w.toFixed(_dec) : ( i === 0 && me.ticks.length > 1 ) ? parseFloat(Q.toFixed(_dec)).toFixed(_dec) : '0';
-                            }
-                        },
                         afterDataLimits: (me) => {
                             const epsilon = 0.0001;
                             if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
@@ -2168,7 +2156,10 @@ export class HistoryCardState {
                             max: config?.ymax ?? undefined,
                             forceMin: config?.ymin ?? undefined,
                             forceMax: config?.ymax ?? undefined,
-                            stepSize: config?.ystepSize ?? undefined
+                            stepSize: config?.ystepSize ?? undefined,
+                            // Graph of circular curves only, all of the same period: the labels
+                            // show the real values, in [0, period) (Chart.js ticks.period)
+                            period: _tickPeriod
                         },
                         gridLines: {
                             color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'

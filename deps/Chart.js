@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b78
+ * HEC fork — synced with history-explorer-card version: 1.2.0b79
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b78';
+        var HEC_CHART_VERSION = '1.2.0b79';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -14576,6 +14576,22 @@
             me.zeroLineIndex = me.ticks.indexOf(0);
 
             Chart.Scale.prototype.convertTicksToLabels.call(me);
+
+            // options.ticks.period (fork addition): an axis of values that wrap around
+            // (angles) — each label shows its value brought into [0, period); the top one,
+            // at a whole turn, shows the period itself rather than 0 (0 … 360, or 300 …
+            // 350, 0, 10 … 360). Same number of decimals as the label it replaces.
+            var _P = me.options.ticks.period;
+            if (_P > 0) {
+              var _top = Math.max.apply(null, me.ticksAsNumbers);
+              me.ticks = me.ticks.map(function (label, i) {
+                var _v = me.ticksAsNumbers[i];
+                var _dec = (String(label).split('.')[1] || '').length;
+                var _w = parseFloat((((_v % _P) + _P) % _P).toFixed(_dec));
+                if (_w !== 0 && _w < _P) return _w.toFixed(_dec);
+                return (_v === _top && me.ticks.length > 1) ? parseFloat(_P.toFixed(_dec)).toFixed(_dec) : '0';
+              });
+            }
           } });
 
       };
