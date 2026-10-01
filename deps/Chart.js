@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b79
+ * HEC fork — synced with history-explorer-card version: 1.2.0b80
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b79';
+        var HEC_CHART_VERSION = '1.2.0b80';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -3909,6 +3909,30 @@
               var idx = _hecFindClosest(x, y, rects);
               if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
               return idx;
+            };
+
+            // Where a timeline/arrowline row dropped at canvas-relative y lands: the row it's
+            // over — { idx, insertBefore (y above the row's middle), markerY (that row's edge
+            // on that side, for the insertion marker) } — skipping excludeIdx (the row being
+            // dragged), or null when over none; with nearest, the nearest row whatever the
+            // distance. Shared by the insertion markers (in this chart and in another one) and
+            // by the card, which places the dropped entity from it.
+            me._hecYAxisInsertAt = function (y, excludeIdx, nearest) {
+              var yScale = this.scales && this.scales['y-axis-0'];
+              var labels = this.data && this.data.labels;
+              if (!yScale || !labels || !labels.length) return null;
+              var _halfH = (yScale.height / labels.length) / 2;
+              var _best = null, _bestDist = Infinity;
+              for (var _i = 0; _i < labels.length; _i++) {
+                if (_i === excludeIdx) continue;
+                var _py = yScale.getPixelForValue(null, _i, _i);
+                var _dist = Math.abs(y - _py);
+                if (_dist < _bestDist && (nearest || _dist < _halfH)) {
+                  _bestDist = _dist;
+                  _best = { idx: _i, insertBefore: y < _py, markerY: _py + (y < _py ? -_halfH : _halfH) };
+                }
+              }
+              return _best;
             };
 
             // Cross-graph scan — finds whichever OTHER Chart instance's canvas
@@ -5541,22 +5565,10 @@
                 },
                 onMove: function (p, e) {
                   _hecDragMoveTick(p, e);
-                  var _yScale = me.scales['y-axis-0'];
                   var _mr2 = me.canvas.getBoundingClientRect();
-                  var _markerShown = false;
-                  for (var _ei = 0; _ei < me.data.labels.length; _ei++) {
-                    if (_ei === p.dragYIdx) continue;
-                    var _py = _yScale.getPixelForValue(null, _ei, _ei);
-                    var _halfH = (_yScale.height / me.data.labels.length) / 2;
-                    if (Math.abs(e.y - _py) < _halfH) {
-                      var _insertBeforeTL = e.y < _py;
-                      var _my = _mr2.top + _py + (_insertBeforeTL ? -_halfH : _halfH);
-                      me._hecShowInsertionMarker(_mr2.left, _my, _mr2.width, 3, true);
-                      _markerShown = true;
-                      break;
-                    }
-                  }
-                  if (!_markerShown) me._hecHideInsertionMarker();
+                  var _at = me._hecYAxisInsertAt(e.y, p.dragYIdx, false);
+                  if (_at) me._hecShowInsertionMarker(_mr2.left, _mr2.top + _at.markerY, _mr2.width, 3, true);
+                  else me._hecHideInsertionMarker();
                   _hecCrossGraphDragFeedback(p, e);
                   if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
                     me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
@@ -5669,15 +5681,10 @@
                   }
                 } else if (_other.options.dropAllowed !== false && p.dragYIdx >= 0 && (_other.config.type === 'timeline' || _other.config.type === 'arrowline') &&
                            _oy >= 0 && _other.chartArea && _ox < _other.chartArea.left) {
-                  var _oYIdx = _other._hecYAxisIndexAt(_ox, _oy);
-                  if (_oYIdx >= 0) {
-                    var _oYScale = _other.scales['y-axis-0'];
+                  var _oAt = _other._hecYAxisInsertAt(_oy, -1, false);
+                  if (_oAt) {
                     var _oMr2 = _other.canvas.getBoundingClientRect();
-                    var _oPy = _oYScale.getPixelForValue(null, _oYIdx, _oYIdx);
-                    var _oHalfH = (_oYScale.height / _other.data.labels.length) / 2;
-                    var _oInsertBefore = _oy < _oPy;
-                    var _oMy = _oMr2.top + _oPy + (_oInsertBefore ? -_oHalfH : _oHalfH);
-                    _other._hecShowInsertionMarker(_oMr2.left, _oMy, _oMr2.width, 3, true);
+                    _other._hecShowInsertionMarker(_oMr2.left, _oMr2.top + _oAt.markerY, _oMr2.width, 3, true);
                   } else {
                     _other._hecHideInsertionMarker();
                   }
@@ -6075,9 +6082,12 @@
 
             } else if (e.type === 'wheel') {
               if (!e.native) return;
-              // Debounce identical to the card's wheelScrolled: rapid-fire wheel ticks
-              // within 150ms of each other are coalesced to one, avoiding runaway zoom
-              // steps on trackpads/high-resolution wheels.
+              // Ctrl+wheel zooms the time range, never the page — every tick, including those
+              // the debounce below coalesces away
+              var _ctrlZoom = e.native.ctrlKey && me.options.wheelZoomEnabled !== false && typeof me.options.zoomX === 'function';
+              if (_ctrlZoom) e.native.preventDefault();
+              // Debounce: rapid-fire wheel ticks within 150ms of each other are coalesced to
+              // one, avoiding runaway zoom steps on trackpads/high-resolution wheels.
               var _now2 = Date.now();
               if (me._hecWheelLast && _now2 - me._hecWheelLast < cfg.wheelDebounceMs) return;
               me._hecWheelLast = _now2;
@@ -6096,8 +6106,7 @@
               // used. Configurable, on by default (see options.wheelZoomEnabled /
               // options.zoomYEnabled below).
               if (me.options.wheelZoomEnabled !== false) {
-                if (_native.ctrlKey && typeof me.options.zoomX === 'function') {
-                  _native.preventDefault();
+                if (_ctrlZoom) {
                   me.options.zoomX.call(me, { chart: me, deltaY: _native.deltaY, centerPixels: e.x, event: _native });
                 }
                 if (_native.shiftKey && me.options.zoomYEnabled !== false) {
@@ -12543,8 +12552,12 @@
       // https://github.com/chartjs/Chart.js/issues/4287
       var eventListenerOptions = supportsEventListenerOptions ? { passive: true } : false;
 
+      // (fork) Passive only for the touch events stock Chart.js listens to: the pointer and
+      // wheel listeners must be able to preventDefault() — Ctrl+wheel zooms the time range
+      // instead of the page, a press keeps its default actions (see _hecGestureHandler).
+      // Pointer and wheel listeners never delay scrolling anyway (touch-action decides).
       function addEventListener(node, type, listener) {
-        node.addEventListener(type, listener, eventListenerOptions);
+        node.addEventListener(type, listener, /^touch/.test(type) ? eventListenerOptions : false);
       }
 
       function removeEventListener(node, type, listener) {

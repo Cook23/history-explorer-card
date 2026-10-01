@@ -124,7 +124,6 @@ function hecHookInfoPanel()
 
             }
 
-            instance._this.querySelector('#maincard').addEventListener('wheel', instance.wheelScrolled.bind(instance), { passive: false });
 
             const config = hec_panel.config ?? {};
 

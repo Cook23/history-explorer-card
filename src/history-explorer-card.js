@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b79';
+const Version = '1.2.0b80';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1898,6 +1898,16 @@ export class HistoryCardState {
                 cursorEnabled: true,
                 // Chart.js's floating tooltips stay within the card (see Chart.hecUi.clampToViewport)
                 floatingBoundsSelector: '#maincard',
+                // Ctrl+wheel over a graph: zoom the time range — shared by every graph, so the
+                // card's — around the time under the pointer (Chart.js zoomX callback)
+                zoomX: (info) => {
+                    if( info.deltaY === undefined || this.state.loading ) return;
+                    const _a = info.chart.chartArea;
+                    const f = (info.centerPixels - _a.left) / (_a.right - _a.left);
+                    const tc = this.factorToTimecode(f);
+                    if( info.deltaY < 0 ) this.incZoomStep(tc, f); else
+                    if( info.deltaY > 0 ) this.decZoomStep(tc, f);
+                },
                 zoomSelectMode: this.state.zoomMode,
                 // Phase 2.1 — legend overlay removed; drag&drop and long-press menu on
                 // legend labels, previously intercepted by that overlay, are recabled here
@@ -2618,7 +2628,7 @@ export class HistoryCardState {
                         const _rect = _src.canvas.getBoundingClientRect();
                         const _cx = event.clientX - _rect.left;
                         const _cy2 = event.clientY - _rect.top;
-                        const _dropTarget = this._findLegendLabel(_hitBoxes, _cx, _cy2, _srcIdx, true);
+                        const _dropTarget = _src.chart._hecFindLegendLabel(_cx, _cy2, _srcIdx, true);
                         let _tgtLabelIdx = _dropTarget ? _dropTarget.idx : -1;
                         let _insertBefore = _dropTarget ? _dropTarget.insertBefore : true;
                         if( _tgtLabelIdx >= 0 ) {
@@ -2682,7 +2692,7 @@ export class HistoryCardState {
                         const _r = _tgt.canvas.getBoundingClientRect();
                         const _cx = event.clientX - _r.left;
                         const _cy = event.clientY - _r.top;
-                        const _found = this._findLegendLabel(_tgt.chart.legend.legendHitBoxes, _cx, _cy, -2, true);
+                        const _found = _tgt.chart._hecFindLegendLabel(_cx, _cy, -2, true);
                         if( _found ) _tgtLabelInsertIdx = _found.insertBefore ? _found.idx : _found.idx + 1;
                     }
                     // Move entity from source to target
@@ -2895,98 +2905,6 @@ export class HistoryCardState {
         this._frozenChart = null;
     }
 
-    // Find legend label index using closest-Y then closest-X logic
-    // Returns { idx, insertBefore, markerX, markerY, markerH } or null
-    // Find legend label by closest-Y then closest-X
-    // target=false: finding the source to grab (no no-op check, strict X bounds)
-    // target=true:  finding the insertion target (no-op check, excludeIdx = source)
-    _findLegendLabel(hitBoxes, cx, cy, excludeIdx, target) {
-        if( !hitBoxes || hitBoxes.length === 0 ) return null;
-
-        // Group labels by line (same top ± 4px tolerance), excluding source when finding target
-        const lines = [];
-        for( let i = 0; i < hitBoxes.length; i++ ) {
-            if( target && i === excludeIdx ) continue;
-            const b = hitBoxes[i];
-            let line = lines.find(l => Math.abs(l.top - b.top) <= 4);
-            if( !line ) { line = { top: b.top, height: b.height, items: [] }; lines.push(line); }
-            line.items.push({ b, i });
-        }
-        if( lines.length === 0 ) return null;
-
-        // Find closest line by Y — must be within the Y band of that line
-        let closestLine = null, closestDistY = Infinity;
-        for( let line of lines ) {
-            const midY = line.top + line.height / 2;
-            const dist = Math.abs(cy - midY);
-            if( dist < closestDistY ) { closestDistY = dist; closestLine = line; }
-        }
-        if( !closestLine ) return null;
-        if( cy < closestLine.top || cy > closestLine.top + closestLine.height ) return null;
-
-        // X bounds: accept being over the line's labels, but also just before the
-        // first one or just after the last one — within a tolerance capped at
-        // min(that label's own half-width, 50px), so a very long label doesn't
-        // create an unreasonably large dead zone. Same rule for intra-graph and
-        // inter-graph drag, since both funnel through this one function.
-        const firstItem = closestLine.items.reduce((a, b) => a.b.left < b.b.left ? a : b);
-        const lastItem  = closestLine.items.reduce((a, b) => (a.b.left + a.b.width) > (b.b.left + b.b.width) ? a : b);
-        const lineLeft  = firstItem.b.left;
-        const lineRight = lastItem.b.left + lastItem.b.width;
-        if( cx < lineLeft ) {
-            const tolerance = Math.min(firstItem.b.width / 2, 50);
-            if( lineLeft - cx > tolerance ) return null;
-        } else if( cx > lineRight ) {
-            const tolerance = Math.min(lastItem.b.width / 2, 50);
-            if( cx - lineRight > tolerance ) return null;
-        }
-
-        // Find closest label by X on this line
-        let closest = null, closestDistX = Infinity;
-        for( let item of closestLine.items ) {
-            const midX = item.b.left + item.b.width / 2;
-            const dist = Math.abs(cx - midX);
-            if( dist < closestDistX ) { closestDistX = dist; closest = item; }
-        }
-        if( !closest ) return null;
-
-        const insertBefore = cx < closest.b.left + closest.b.width / 2;
-
-        if( !target ) {
-            // Source grab — just return the found label, no marker, no no-op check
-            return { idx: closest.i };
-        }
-
-        // Marker X: midpoint between neighbors on the same line, or margin for first/last
-        const MARGIN = 6;
-        let markerX;
-        if( insertBefore ) {
-            const leftNeighbor = closestLine.items
-                .filter(x => x.i !== closest.i && x.b.left + x.b.width <= closest.b.left)
-                .sort((a, b) => b.b.left - a.b.left)[0];
-            markerX = leftNeighbor
-                ? (leftNeighbor.b.left + leftNeighbor.b.width + closest.b.left) / 2
-                : closest.b.left - MARGIN;
-        } else {
-            const rightNeighbor = closestLine.items
-                .filter(x => x.i !== closest.i && x.b.left >= closest.b.left + closest.b.width)
-                .sort((a, b) => a.b.left - b.b.left)[0];
-            markerX = rightNeighbor
-                ? (closest.b.left + closest.b.width + rightNeighbor.b.left) / 2
-                : closest.b.left + closest.b.width + MARGIN;
-        }
-
-        // No-op detection: same logic as pointerUp _insertAt calculation
-        const tgt = closest.i;
-        const src = excludeIdx;
-        let insertAt;
-        if( tgt > src ) insertAt = insertBefore ? tgt - 1 : tgt;
-        else            insertAt = insertBefore ? tgt : tgt + 1;
-        if( insertAt === src ) return null;
-
-        return { idx: closest.i, insertBefore, markerX, markerY: closestLine.top, markerH: closestLine.height };
-    }
-
     _startAutoScroll(event) {
         this._stopAutoScroll();
         const _scroll = () => {
@@ -3151,23 +3069,9 @@ export class HistoryCardState {
             if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
                 event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
                 _tgt = g;
-                const _yScale = g.chart.scales['y-axis-0'];
-                if( _yScale ) {
-                    let _closestDist = Infinity;
-                    let _closestI = 0;
-                    let _insertBefore = true;
-                    const _cy = event.clientY - _rect.top;
-                    for( let _ei = 0; _ei < g.entities.length; _ei++ ) {
-                        const _py = _yScale.getPixelForValue(null, _ei, _ei);
-                        const _dist = Math.abs(_cy - _py);
-                        if( _dist < _closestDist ) {
-                            _closestDist = _dist;
-                            _closestI = _ei;
-                            _insertBefore = _cy < _py;
-                        }
-                    }
-                    _tgtInsertIdx = _insertBefore ? _closestI : _closestI + 1;
-                }
+                // (the nearest row of the target, before or after it)
+                const _at = g.chart._hecYAxisInsertAt(event.clientY - _rect.top, -1, true);
+                if( _at ) _tgtInsertIdx = _at.insertBefore ? _at.idx : _at.idx + 1;
                 break;
             }
         }
@@ -3442,27 +3346,6 @@ export class HistoryCardState {
         this._syncGroupOrder(_srcG.groupId);
         this._updateGroupLinkMarkers();
         this.writeLocalState();
-    }
-
-
-    wheelScrolled(event)
-    {
-        const now = Date.now();
-        if( this._wheelLast && now - this._wheelLast < 150 ) return;
-        this._wheelLast = now;
-
-        // Zoom x time scale
-        if( event.ctrlKey ) {
-            event.preventDefault();
-            if( !this.graphs.length || this.state.loading ) return;
-            const rect = this.graphs[0].canvas.getBoundingClientRect();
-            const chartArea = this.graphs[0].chart.chartArea;
-            const x0 = event.clientX - rect.left - chartArea.left;
-            const f = x0 / (chartArea.right - chartArea.left);
-            const tc = this.factorToTimecode(f);
-            if( event.deltaY < 0 ) this.incZoomStep(tc, f); else
-            if( event.deltaY > 0 ) this.decZoomStep(tc, f);
-        }
     }
 
 
@@ -3946,11 +3829,6 @@ export class HistoryCardState {
         return this._firstGraph() === g;
     }
 
-    _isLastGraph(g)
-    {
-        return this._lastGraph() === g;
-    }
-
     // The graph immediately before/after g on screen — needed to number a new graph's
     // graphIndex correctly in every situation, including inside a solid block of several
     // linked graphs.
@@ -3982,23 +3860,6 @@ export class HistoryCardState {
         const _startIdx = this._pcEntryIndex(_lastEntity.entity);
         if( _startIdx < 0 ) return null;
         for( let i = _startIdx + 1; i < this.pconfig.entities.length; i++ ) {
-            const _e = this.pconfig.entities[i];
-            if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
-            const _eid = entityIdOf(_e);
-            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
-            if( _candidateG ) return _candidateG;
-        }
-        return null;
-    }
-
-    // Symmetric to _nextGroup — scans backward from g's first entity for the previous
-    // entry whose groupId differs from g's.
-    _previousGroup(g)
-    {
-        const _firstEntity = g.entities[0];
-        const _startIdx = this._pcEntryIndex(_firstEntity.entity);
-        if( _startIdx < 0 ) return null;
-        for( let i = _startIdx - 1; i >= 0; i-- ) {
             const _e = this.pconfig.entities[i];
             if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
             const _eid = entityIdOf(_e);
@@ -4956,7 +4817,6 @@ export class HistoryCardState {
 
             }
 
-            this._this.querySelector('#maincard').addEventListener('wheel', this.wheelScrolled.bind(this), { passive: false });
 
             const _needsIntervalRedraw = await this.readLocalState();
 
