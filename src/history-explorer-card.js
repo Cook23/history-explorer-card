@@ -2013,6 +2013,9 @@ export class HistoryCardState {
                             // (in place: Chart.js holds on to this very array)
                             for( let i = 0; i < me.ticks.length; i++ ) {
                                 const _dec = ( String(me.ticks[i]).split('.')[1] || '' ).length;
+                                // (a tick at exactly one period, e.g. the top of a 0..360 axis, reads
+                                // better as 360 than as 0)
+                                if( Math.abs(me.ticksAsNumbers[i] - Q) < 1e-9 ) { me.ticks[i] = parseFloat(Q.toFixed(_dec)).toFixed(_dec); continue; }
                                 const w = parseFloat(this._wrapCircular(me.ticksAsNumbers[i], Q).toFixed(_dec));
                                 me.ticks[i] = ( w === 0 || w >= Q ) ? '0' : w.toFixed(_dec);
                             }

@@ -772,7 +772,7 @@ How it's drawn:
 - the whole curve is then placed around its average direction, so a wind around the north is drawn around 0 whatever the start of the time range;
 - should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus);
 - the Y axis labels show the real values only when every curve of the graph is circular with the same period;
-- `ymin` / `ymax` apply as set: with `ymin: 0` and `ymax: 360`, what goes below 0 is cut off at the edge of the graph.
+- `ymin` / `ymax` apply as set: with `ymin: 0` and `ymax: 360`, what goes below 0 is cut off at the edge of the graph. A Y axis label at exactly one period shows it as such (360 at the top of a 0–360 axis, not 0).
 
 Line and bar graphs only: an arrowline already shows an angle. An entity with state class `measurement_angle` and no unit is shown as a line, like a `measurement`.
 
