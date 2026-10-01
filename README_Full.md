@@ -744,6 +744,40 @@ The threshold adapts along the curve, so a sensor that reports fast during the d
 
 Limitation: Home Assistant only records a new value when it changes, so the card can't tell a silent sensor from one repeating the same value. Both appear as a plateau — which is right either way, since the last value still holds — but the dashes then mean "no new value recorded" rather than strictly "sensor silent".
 
+### Circular values (angles)
+
+A wind direction oscillating around the north goes 3, 2, 1, 0, 359, 358…: drawn as is, the curve jumps across the whole graph at each crossing of 0/360. For angles, the card draws a continuous curve instead — 3, 2, 1, 0, -1, -2 — while the tooltip and the Y axis labels keep showing the real values, in [0, 360) (a point at -1 shows 359).
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.wind_direction      # unit °: detected automatically
+      - entity: sensor.heading_rad
+        circular: 2pi                      # angle in radians
+      - entity: sensor.some_angle
+        circular: false                    # drawn as is
+```
+
+`circular` is set per entity (in `graphs:` or `entityOptions`):
+- absent, `null` or `none`: automatic — an entity whose unit is exactly `°` (not `°C`/`°F`) or whose state class is `measurement_angle` is circular with a period of 360;
+- `false`: never circular;
+- a number or numeric string (`360`, `"360"`, `6.28`): circular with this period; `2pi` (any case, spaces ignored): 2π. Any other value, or a period ≤ 0, turns it off with a warning in the browser console.
+
+The same values as the `circular` option of the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration.
+
+How it's drawn:
+- each value is first brought into [0, period); a step of more than half a period from the previous value is a crossing of 0, and the curve goes on below 0 (or above the period) instead of jumping;
+- the whole curve is then placed around its average direction, so a wind around the north is drawn around 0 whatever the start of the time range;
+- should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus);
+- the Y axis labels show the real values only when every curve of the graph is circular with the same period;
+- `ymin` / `ymax` apply as set: with `ymin: 0` and `ymax: 360`, what goes below 0 is cut off at the edge of the graph.
+
+Line and bar graphs only: an arrowline already shows an angle. An entity with state class `measurement_angle` and no unit is shown as a line, like a `measurement`.
+
+Limitations: Home Assistant's long-term statistics average angles as plain numbers (the mean of 359 and 1 is 180), which the card can't correct; the hourly min/max band of `showMinMax: history` isn't unwrapped.
+
 ### Line stroke style
 
 The stroke style of a line can be customized per entity using the `dashMode` option. It is available in `entityOptions` and in the per-entity YAML under `graphs`.
@@ -1511,7 +1545,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 

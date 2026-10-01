@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.46] - unreleased (beta)
+
+### New — angles drawn without jumps at 0/360 (`circular`)
+- A wind direction oscillating around the north (3, 2, 1, 0, 359, 358…) jumped across the whole graph at each crossing of 0/360. Angles are now drawn as a continuous curve (3, 2, 1, 0, -1, -2), placed around their circular mean; the tooltip and the Y axis labels show the real values in [0, period)
+- New per-entity option `circular` (in `graphs:` and `entityOptions`, persisted like the other entity fields), same values as lowpass_dt's: absent / `null` / `none` auto-detects (unit exactly `°`, or state class `measurement_angle`: period 360), `false` never, a number or numeric string sets the period, `2pi` sets 2π; anything else, or a period ≤ 0, turns it off with a console warning
+- A curve going round more than a whole turn over the time range is drawn within a one-turn band centered on its circular mean, its jumps at the band's edge drawn dashed like the smart mode's plateaus
+- Line and bar graphs only (not arrowline). The Y axis labels are only wrapped when every curve of the graph is circular with the same period. `ymin` / `ymax` apply as set (what goes beyond is cut off)
+- Bars of an angle no longer take a crossing of 0/360 for a counter reset
+- State class `measurement_angle` is treated as `measurement` when choosing the graph type (a line, not a timeline, even without a unit)
+- Limitations: long-term statistics average angles as plain numbers; the hourly min/max band of `showMinMax: history` isn't unwrapped
+
+
 ## [v1.1.45] - 2026-10-01
 
 ### New — bars and curves on the same graph

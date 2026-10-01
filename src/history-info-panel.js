@@ -62,7 +62,7 @@ function hecHookInfoPanel()
 
         const uom = instance.getUnitOfMeasure(entity_id);
         const sc = instance.getStateClass(entity_id);
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 
         // Make sure the panel always starts with the same default graph color
         instance.pconfig.nextDefaultColor = 0;
@@ -341,7 +341,7 @@ function hecHookInfoPanel()
 
         const uom = this.hass.states[entity_id]?.attributes?.unit_of_measurement;
         const sc = this.hass.states[entity_id]?.attributes?.state_class;
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 
         const h = calcGraphHeight(type);
 

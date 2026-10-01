@@ -299,6 +299,8 @@ lineMode: curves   # curves (default), lines, stepped, or smart
 
 `smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
+Angles (a wind direction, for example) no longer jump across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
+
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
 ### Stroke style
@@ -488,6 +490,7 @@ graphs:
 | `scale` | | | ✓ | Multiply values by this factor before display |
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |
+| `circular` | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
 | `ymin` / `ymax` | | | ✓ | Set initial Y axis bounds (can still be modified interactively) |
 | `ystepSize` | | | ✓ | Fix Y axis tick step |
 | `ylock` | | ✓ | | Disable all interactive Y axis pan and zoom |
@@ -506,6 +509,8 @@ graphs:
 *3 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
 
 *4 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
+
+*5 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. Line and bar graphs only — an arrowline already shows an angle.
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 
