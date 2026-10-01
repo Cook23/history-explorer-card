@@ -357,7 +357,7 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Only entities of different display types (for example a `line` and a `bar`, when the graph has no `type:`) can't share one chart: they are shown as separate *linked* graphs, see below.
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -371,7 +371,7 @@ A long-press (700ms) on a legend label instead opens the [display type menu](#ch
 
 #### Linked graphs
 
-Graphs sharing the same group are shown as a solid block with a chain icon 🔗 between them, on the left. A group gets split into several linked graphs either by a double-click on a YAML graph's label (see above) or by changing an entity's display type (a line and a bar can't share one chart).
+Graphs sharing the same group are shown as a solid block with a chain icon 🔗 between them, on the left. A group gets split into several linked graphs either by a double-click on a YAML graph's label (see above) or by changing an entity's display type to one its graph can't show (a timeline or arrowline can't share a chart with lines or bars; lines and bars can).
 
 Graphs added from the UI work the same way: changing a curve's display type to one its graph can't show (e.g. a line into a bar) moves it to a new graph linked to its original one, and changing its type back to a compatible one returns it to that original graph. A double-click on a label of a graph added from the UI, on the other hand, takes that curve out of its group entirely (no link).
 
@@ -476,7 +476,7 @@ Entities that represent a total (monotonically increasing or net metering) can b
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When dynamically adding an entity with a state class of `total_increasing`, then the bar chart type is automatically used. If the entity does not have this state class, then its type must be explicitly set to `bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting `as line` will show the raw data of the entity as a line graph. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting `as line` will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`. The latter is not needed if the entity has a `total_increasing` state class.
 
@@ -504,6 +504,23 @@ graphs:
         scale: 0.5
       - entity: sensor.rain_amount
 ```
+
+#### Bars and curves on the same graph
+
+A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and `as line` only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when dragging a label within a group of linked graphs. An entity added from the UI never joins a graph of the other type on its own.
+
+```yaml
+graphs:
+  - options:
+      interval: hourly
+    entities:
+      - entity: sensor.energy_consumed      # total_increasing (kWh) → bars
+      - entity: sensor.power                # measurement (W) → curve
+        lineMode: smart
+        scale: 0.001                        # W → kW, comparable with the kWh bars
+```
+
+Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values.
 
 Set the `stacked` option to `true` to display the bars on top of each other rather than side by side:
 

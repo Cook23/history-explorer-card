@@ -198,13 +198,13 @@ An incompatible drop shows a brief tooltip explaining the mismatch.
 
 ### Linked graphs
 
-A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Only entities of different display types (e.g. a line and a bar) end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
 - **Double-click** the chain icon to merge the two linked graphs back into one
 
-Linked graphs can always be merged back as long as their display types match (a line can't share a graph with a bar, timeline or arrowline). The same applies to entities added from the UI: changing a curve's display type to one its graph can't show moves it to a linked graph, and changing it back returns it to its graph. A double-click on a label of a graph added from the UI takes that curve out of its group instead.
+Linked graphs can always be merged back as long as their display types can share a graph (lines and bars can; a timeline or arrowline can't share a graph with anything else). The same applies to entities added from the UI: changing a curve's display type to one its graph can't show (e.g. a line to a timeline) moves it to a linked graph, and changing it back returns it to its graph; changing a line to bars keeps it in its graph. An entity added from the UI never joins a graph of another display type on its own. A double-click on a label of a graph added from the UI takes that curve out of its group instead.
 
 ### Reordering graphs
 
@@ -348,6 +348,8 @@ showUnavailable: true
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
 Entities with a `total_increasing` state class are automatically shown as bar charts. Use the interval selector on the graph to switch between 10m, hourly, daily and monthly views.
+
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves share one Y axis — for incompatible units (e.g. kWh bars and a W curve) use `scale:` to bring them to comparable values.
 
 ```yaml
 entityOptions:

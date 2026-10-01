@@ -2955,11 +2955,13 @@
             var sumNeg = 0;
             var i, ds, dsMeta;
 
-            if (yScale.options.stacked) {
+            // (hecNoStack: a curve drawn over the bars of a mixed bar/line graph — the
+            // graph's stacked option is about its bars, the curves never stack)
+            if (yScale.options.stacked && !me.getDataset().hecNoStack) {
               for (i = 0; i < datasetIndex; i++) {
                 ds = chart.data.datasets[i];
                 dsMeta = chart.getDatasetMeta(i);
-                if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
+                if (dsMeta.type === 'line' && !ds.hecNoStack && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
                   var stackedRightValue = Number(yScale.getRightValue(ds.data[index]));
                   if (stackedRightValue < 0) {
                     sumNeg += stackedRightValue || 0;
@@ -4315,10 +4317,14 @@
               return;
             }
 
-            // Draw datasets reversed to support proper line stacking
-            for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
-              if (me.isDatasetVisible(i)) {
-                me.drawDataset(i, easingValue);
+            // Draw datasets reversed to support proper line stacking. The curves of a mixed
+            // bar/line graph (hecNoStack) are drawn in a second pass, over the bars.
+            var datasets = me.data.datasets || [];
+            for (var pass = 0; pass < 2; ++pass) {
+              for (var i = datasets.length - 1; i >= 0; --i) {
+                if (!!datasets[i].hecNoStack === (pass === 1) && me.isDatasetVisible(i)) {
+                  me.drawDataset(i, easingValue);
+                }
               }
             }
 
