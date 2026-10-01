@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.45';
+const Version = '1.1.46';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -736,7 +736,7 @@ export class HistoryCardState {
     {
         return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
                 'dashMode', 'lineMode', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
-                'netBars', 'decimation', 'groupId'];
+                'netBars', 'decimation', 'circular', 'groupId'];
     }
 
     // Entity-scope persistence option: a list of specific field names, or 'entities'/'all' as
@@ -1556,6 +1556,11 @@ export class HistoryCardState {
                     // Per entity: a bar graph can hold curves too (see _entityKind)
                     const _kind = this._entityKind(g, g.entities[j]);
 
+                    // Circular values (angles): a continuous curve, see _unwrapCircular
+                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this._circularPeriod(g.entities[j]) : null;
+                    let _circBand = false;
+                    if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
+
                     if( _kind == 'line' ) {
 
                         // Fill line chart buffer
@@ -1654,6 +1659,8 @@ export class HistoryCardState {
                             }
                             s = this._applySilencePlateaus(s, _raw, _extended);
                         }
+
+                        if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
 
                     } else if( _kind == 'bar' && n > 0 ) {
 
@@ -1850,6 +1857,7 @@ export class HistoryCardState {
                     // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
                     type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
                     hecNoStack: graphtype == 'bar' && d.kind === 'line',
+                    hecCircular: d.circular,
                     borderColor: d.bColor,
                     backgroundColor: d.fillColor,
                     borderWidth: d.width,
@@ -1996,6 +2004,22 @@ export class HistoryCardState {
                         afterFit: (scaleInstance) => {
                             scaleInstance.width = this.pconfig.labelAreaWidth;
                         },
+                        // Graph of circular curves only, all of the same period: the labels show
+                        // the real values, in [0, period)
+                        afterTickToLabelConversion: (me) => {
+                            const _ds = me.chart.data.datasets;
+                            const Q = _ds[0]?.hecCircular;
+                            if( !Q || !me.ticksAsNumbers || !_ds.every(d => d.hecCircular === Q && ( d.siConversionFactor ?? 1 ) === 1) ) return;
+                            // (in place: Chart.js holds on to this very array)
+                            for( let i = 0; i < me.ticks.length; i++ ) {
+                                const _dec = ( String(me.ticks[i]).split('.')[1] || '' ).length;
+                                const w = parseFloat(this._wrapCircular(me.ticksAsNumbers[i], Q).toFixed(_dec));
+                                // (the top label — ticks[0] — at a whole turn reads better as 360 than as
+                                // 0: 0...360, 300...350, 0, 10...360; anywhere else it's 0)
+                                const _turn = ( w === 0 || w >= Q );
+                                me.ticks[i] = !_turn ? w.toFixed(_dec) : ( i === 0 && me.ticks.length > 1 ) ? parseFloat(Q.toFixed(_dec)).toFixed(_dec) : '0';
+                            }
+                        },
                         afterDataLimits: (me) => {
                             const epsilon = 0.0001;
                             if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
@@ -2040,7 +2064,11 @@ export class HistoryCardState {
                                 if( label ) label += ': ';
                                 const p = 10 ** this.pconfig.roundingPrecision;
                                 const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
-                                label += Math.round(item.yLabel / _siFactor * p) / p;
+                                const _circQ = data.datasets[item.datasetIndex].hecCircular;
+                                let _v = Math.round(item.yLabel / _siFactor * p) / p;
+                                // (a circular curve shows its real value, in [0, period))
+                                if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ) * p) / p;
+                                label += _v;
                                 label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                                 return label;
                             } else if( graphtype == 'timeline' ) {
@@ -2964,6 +2992,101 @@ export class HistoryCardState {
     {
         if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
         return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
+    }
+
+    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
+    // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
+    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360), false
+    // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
+    // period <= 0, disables it with a warning.
+    _circularPeriod(e)
+    {
+        const c = e?.circular;
+        if( c === false ) return null;
+        if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
+            if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
+            return ( this.getUnitOfMeasure(e.entity, e.unit) === '°' ) ? 360 : null;
+        }
+        let P = NaN;
+        if( typeof c === 'number' ) P = c;
+        else if( typeof c === 'string' ) {
+            const t = c.replace(/\s+/g, '').toLowerCase();
+            P = ( t === '2pi' ) ? 2 * Math.PI : ( t === '' ? NaN : Number(t) );
+        }
+        if( !isFinite(P) || P <= 0 ) {
+            this._circularWarned = this._circularWarned ?? new Set();
+            if( !this._circularWarned.has(e.entity) ) {
+                this._circularWarned.add(e.entity);
+                console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(c)} for ${e.entity} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
+            }
+            return null;
+        }
+        return P;
+    }
+
+    // Circular values (period P) made into a continuous curve, on a copy of the samples (they
+    // are shared with the cache). Each value is first brought into [0, P), then a step of more
+    // than P/2 from the previous valid value is taken as a crossing of 0 (3, 1, 359 → 3, 1, -1).
+    // The whole curve is then moved by a multiple of P to sit around its circular mean c in
+    // [0, P). Should it span more than a turn (it went round several times), every value is put
+    // in the one-turn band [c - P/2, c + P/2) instead: band is then true, and its jumps get
+    // dashed (_markCircularJumps).
+    _unwrapCircular(data, P)
+    {
+        const mod = v => ( ( v % P ) + P ) % P;
+        const idx = [], raw = [], un = [];
+        let prev = null, offset = 0, sumS = 0, sumC = 0;
+        for( let i = 0; i < data.length; i++ ) {
+            const st = data[i].state;
+            if( st === null || st === undefined || st === '' ) continue;
+            const v = Number(st);
+            if( !isFinite(v) ) continue;
+            const r = mod(v);
+            if( prev !== null ) {
+                if( r - prev > P / 2 ) offset -= P; else
+                if( r - prev < -P / 2 ) offset += P;
+            }
+            prev = r;
+            idx.push(i); raw.push(r); un.push(r + offset);
+            sumS += Math.sin(r / P * 2 * Math.PI);
+            sumC += Math.cos(r / P * 2 * Math.PI);
+        }
+        if( !idx.length ) return { data, band: false };
+
+        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[0];
+        const mean = un.reduce((a, v) => a + v, 0) / un.length;
+        const k = Math.round(( c - mean ) / P) * P;
+        let lo = Infinity, hi = -Infinity;
+        for( let m = 0; m < un.length; m++ ) { un[m] += k; lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
+        const band = ( hi - lo > P );
+        if( band ) for( let m = 0; m < un.length; m++ ) un[m] = ( c - P / 2 ) + mod(raw[m] - ( c - P / 2 ));
+
+        const out = data.slice();
+        for( let m = 0; m < idx.length; m++ ) {
+            const p = data[idx[m]];
+            const q = { ...p, state: un[m] };
+            // (a min/max carried by the sample moves with it)
+            const shift = un[m] - Number(p.state);
+            if( p.yMin != null ) q.yMin = p.yMin + shift;
+            if( p.yMax != null ) q.yMax = p.yMax + shift;
+            out[idx[m]] = q;
+        }
+        return { data: out, band };
+    }
+
+    // A circular curve put in a one-turn band jumps where it crosses the band's edge: the
+    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode.
+    // Q: the period in chart units.
+    _markCircularJumps(s, Q)
+    {
+        for( let k = 1; k < s.length; k++ )
+            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) s[k].hecPlateauEnd = true;
+    }
+
+    // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)
+    _wrapCircular(v, Q)
+    {
+        return ( ( v % Q ) + Q ) % Q;
     }
 
     // Same group of linked graphs (a static YAML graph split by double-click, or a group
@@ -5118,7 +5241,7 @@ export class HistoryCardState {
         const sc = this.getStateClass(entity_id);
         const type = entityOptions?.type ? entityOptions.type :
                      ( sc === 'total_increasing' ) ? 'bar' :
-                     ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
+                     ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
         const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'curves';
         return { type, lineMode };
     }
@@ -5281,7 +5404,7 @@ export class HistoryCardState {
         const sc = this.getStateClass(entity_id);
         const _overrideType = overrideEntityProps?.type ?? entityOptions?.type;
         // (let: becomes the graph's type below, once combined — see _graphType)
-        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
+        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 
         // The entity's single source of truth: overrideEntityProps is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
@@ -5344,6 +5467,7 @@ export class HistoryCardState {
             entities[0].siConversionFactor = entities[0].siConversionFactor ?? entityOptions?.siConversionFactor;
             entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
             entities[0].process   = entities[0].process     ?? entityOptions?.process;
+            entities[0].circular  = entities[0].circular    ?? entityOptions?.circular;
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
@@ -5637,6 +5761,8 @@ export class HistoryCardState {
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
+                // (period of a circular entity in the units shown, before SI conversion)
+                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this._circularPeriod(d) ?? 0 ) * Math.abs(d.scale ?? 1) || null : null,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
@@ -7573,6 +7699,7 @@ export class HistoryCardState {
             process           : ent.process,
             netBars           : ent.netBars,
             decimation        : ent.decimation,
+            circular          : ent.circular,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };

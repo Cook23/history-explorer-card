@@ -69,6 +69,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
+- **v1.1.46** — New per-entity `circular` option (automatic for a unit of exactly `°` or state class `measurement_angle`; `false`, a period, or `2pi`): angles are drawn as a continuous curve across 0/360, placed around their circular mean, with the real values in [0, period) in the tooltip and on the Y axis labels (only the top label shows a whole turn as 360). A curve going round more than a turn is drawn within a one-turn band, its jumps dashed. `measurement_angle` is treated as `measurement` when choosing the graph type.
 - **v1.1.45** — A bar graph can hold curves too (YAML graph mixing both, a curve changed to bars, a drag or chain merge within linked graphs): curves are drawn over the bars, keep their line mode, aren't affected by the interval and never stack; *Raw line* only turns the bars into raw curves. Fixes: the interval selector always showed *10 min*, hover on a mixed graph, and `type` / `lineWidth` / `interval` / `ymin` / `ymax` / `ystepSize` set on an entity inside `graphs:` were ignored (`ystepsize` accepted too).
 - **v1.1.44** — "Last one to speak wins" fixed to compare each source with its own image only: a change made on a device (e.g. a display type from the menu) could randomly revert on reload, a device's first load no longer mixes YAML and HA, a YAML option that isn't set never speaks, clearing a value (showing a curve again) is synced and remembered, and the curves of a block of linked graphs no longer come back shuffled after syncing.
 - **v1.1.43** — New `smart` line mode: a curve while the sensor reports, flat dashed plateaus over its silences (same detection as lowpass_dt). Entities of a YAML graph always share one graph whatever their units (regression since v1.1.34); only different display types are split into *linked* graphs. Linked graphs (chain icon) can be split by double-clicking a YAML graph's label and merged back by dragging a label onto the group or double-clicking the chain icon, whatever the units; moving a linked graph moves its whole block. Fixes: graph-level `ymin`/`ymax`/`ystepSize`, per-entity `fill` on wildcard entities, tooltip errors on data reload, dynamic graphs that never got a group (type change couldn't link/unlink them), and removals / `none` in multi-device sync.
@@ -743,6 +744,40 @@ How a silence is detected — the same rules as the [lowpass_dt](https://github.
 The threshold adapts along the curve, so a sensor that reports fast during the day and slowly at night gets plateaus only for what's unusual at each moment. The tooltip only ever shows recorded values.
 
 Limitation: Home Assistant only records a new value when it changes, so the card can't tell a silent sensor from one repeating the same value. Both appear as a plateau — which is right either way, since the last value still holds — but the dashes then mean "no new value recorded" rather than strictly "sensor silent".
+
+### Circular values (angles)
+
+A wind direction oscillating around the north goes 3, 2, 1, 0, 359, 358…: drawn as is, the curve jumps across the whole graph at each crossing of 0/360. For angles, the card draws a continuous curve instead — 3, 2, 1, 0, -1, -2 — while the tooltip and the Y axis labels keep showing the real values, in [0, 360) (a point at -1 shows 359).
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.wind_direction      # unit °: detected automatically
+      - entity: sensor.heading_rad
+        circular: 2pi                      # angle in radians
+      - entity: sensor.some_angle
+        circular: false                    # drawn as is
+```
+
+`circular` is set per entity (in `graphs:` or `entityOptions`):
+- absent, `null` or `none`: automatic — an entity whose unit is exactly `°` (not `°C`/`°F`) or whose state class is `measurement_angle` is circular with a period of 360;
+- `false`: never circular;
+- a number or numeric string (`360`, `"360"`, `6.28`): circular with this period; `2pi` (any case, spaces ignored): 2π. Any other value, or a period ≤ 0, turns it off with a warning in the browser console.
+
+The same values as the `circular` option of the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration.
+
+How it's drawn:
+- each value is first brought into [0, period); a step of more than half a period from the previous value is a crossing of 0, and the curve goes on below 0 (or above the period) instead of jumping;
+- the whole curve is then placed around its average direction, so a wind around the north is drawn around 0 whatever the start of the time range;
+- should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus);
+- the Y axis labels show the real values only when every curve of the graph is circular with the same period;
+- `ymin` / `ymax` apply as set: with `ymin: 0` and `ymax: 360`, what goes below 0 is cut off at the edge of the graph. The top label of the Y axis shows a whole turn as 360 rather than 0 (0 … 360, or 300 … 350, 0, 10 … 360); anywhere else it's 0.
+
+Line and bar graphs only: an arrowline already shows an angle. An entity with state class `measurement_angle` and no unit is shown as a line, like a `measurement`.
+
+Limitations: Home Assistant's long-term statistics average angles as plain numbers (the mean of 359 and 1 is 180), which the card can't correct; the hourly min/max band of `showMinMax: history` isn't unwrapped.
 
 ### Line stroke style
 
@@ -1511,7 +1546,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
