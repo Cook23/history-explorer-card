@@ -19,6 +19,7 @@ const STATES={
  'binary_sensor.b':ent('binary_sensor.b','door b',null,'off'),
  'sensor.power_kw':ent('sensor.power_kw','power kw','kW','1.2','measurement'),
  'sensor.energy':ent('sensor.energy','energy','kWh','12','total_increasing'),
+ 'sensor.power2':ent('sensor.power2','power two','W','300','measurement'),
  'sensor.energy2':ent('sensor.energy2','energy2','kWh','5','total_increasing'),
 };
 window.userData={};
@@ -55,6 +56,17 @@ window.yaPt=(gi,frac)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClient
 window.yRange=(gi)=>{ const s=graphAt(gi).chart.scales['y-axis-0']; return [+s.min.toFixed(2),+s.max.toFixed(2)]; };
 window.timeRange=()=>[el.instance.startTime,el.instance.endTime];
 window.chainShown=()=>el.instance._allGraphsInDisplayOrder().map(g=>g.chart.options.linkMarkerVisible?1:0).join('');
+// The persisted list agrees with the screen: each group's entries contiguous, groups in
+// the order their graphs are shown, every shown entity persisted once — '' when so, else
+// what's wrong
+window.storeProblems=()=>{ const I=el.instance; const list=I.store.list.filter(e=>typeof e==='object');
+  const seq=[]; for(const e of list){ if(seq[seq.length-1]!==e.groupId) seq.push(e.groupId); }
+  if(new Set(seq).size!==seq.length) return 'group split in the list: '+seq.join(',');
+  const shown=[]; for(const g of I._allGraphsInDisplayOrder()){ if(shown[shown.length-1]!==g.groupId) shown.push(g.groupId); }
+  const listShown=seq.filter(id=>shown.includes(id));
+  if(listShown.join()!==shown.join()) return 'list order '+listShown.join(',')+' vs shown '+shown.join(',');
+  const ids=I.graphs.flatMap(g=>g.entities.map(e=>e.entity)); const dup=ids.find(id=>list.filter(e=>e.entity===id).length!==1);
+  return dup?'not persisted once: '+dup:''; };
 window.tip=()=>{ const t=el.querySelector('#hec-label-tooltip')||document.getElementById('hec-label-tooltip'); return t?t.textContent:null; };
 window.menuOpen=()=>{ const m=el.querySelector('#et_0'); return m? getComputedStyle(m).display!=='none' && m.style.display!=='none' : null; };
 </script></body></html>
