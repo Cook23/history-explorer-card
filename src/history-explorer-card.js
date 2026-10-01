@@ -1,6 +1,7 @@
 
 import "../deps/moment.js";
 import "../deps/Chart.js";
+import "../deps/chart-hec.js";
 import "../deps/timeline.js";
 import "../deps/md5.js"
 import "../deps/FileSaver.js"
@@ -15,7 +16,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b87';
+const Version = '1.2.0b89';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [

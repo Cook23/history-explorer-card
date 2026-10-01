@@ -16,6 +16,7 @@
     "postversion": "sed -i \"s/^const Version = '[^']*';/const Version = '$npm_package_version';/\" src/history-explorer-card.js && yarn build && git add history-explorer-card.js src/history-explorer-card.js"
   },
   "devDependencies": {
+    "acorn": "^8",
     "playwright": "^1.63.0",
     "webpack": "^5.91.0",
     "webpack-cli": "^5.1.4"
