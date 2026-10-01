@@ -4,6 +4,26 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.45] - 2026-10-01
+
+### New — bars and curves on the same graph
+- A bar graph can now hold line entities too: their curves are drawn over the bars, keep their own line mode (`smart`...), aren't affected by the interval and never stack
+- Happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it now stays in its graph instead of moving to a linked graph), with a drag or a chain double-click within a group of linked graphs. An entity added from the UI never joins a graph of the other type on its own
+- *Raw line* in the interval selector only turns the bars into raw curves, which turn back into bars when picking an interval again (it no longer changes the entities' type)
+- A mixed graph is sized like a line graph
+
+### Fixed — hovering a bar of a mixed graph showed a curve's value
+- The nearest curve point always won, even with the pointer right on a bar. Now a curve point close to the pointer wins (curves are drawn over the bars), else the bar under the pointer
+
+### Fixed — options set on an entity inside `graphs:` were ignored
+- `type`, `lineWidth` (only its `width` alias was read), `interval`, `ymin` / `ymax` and `ystepSize` set directly on an entity of a YAML graph had no effect — they worked only through `entityOptions` or the graph's `options:`
+- The Y axis bounds of a graph are now taken from any of its entities (its own `options:` first), not only from the last one added — this also applied to `entityOptions`
+- `full-reference-config.yaml` spelled `ystepsize`, which the card doesn't read: fixed to `ystepSize`, and `ystepsize` is accepted too
+
+### Fixed — the interval selector could show the wrong interval
+- It always showed *10 min* unless the interval came from a saved state, even when the graph was hourly (YAML `interval:` or the default)
+
+
 ## [v1.1.44] - 2026-09-30
 
 ### Fixed — the curves of a graph could come back in a shuffled order after syncing

@@ -148,7 +148,7 @@ graphs:
     ymax: null
 
     # Step size to display on the Y-axis (automatically calculated by default)
-    ystepsize: null
+    ystepSize: null
 
     # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
     # platform. `ymin`/`ymax` above still work as initial bounds alongside this

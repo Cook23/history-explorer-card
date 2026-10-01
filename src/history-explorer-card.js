@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.44';
+const Version = '1.1.45';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -610,43 +610,35 @@ export class HistoryCardState {
     selectBarInterval(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
+        const g = this.graphs.find(gr => gr.id == id);
+        if( !g ) return;
 
-        for( let i = 0; i < this.graphs.length; i++ ) {
-            if( this.graphs[i].id == id ) {
+        const _value = parseInt(event.target.value);
+        const _wasRaw = g.interval == 4;
+        const _isRaw = _value == 4;
+        g.interval = _value;
 
-                this.graphs[i].interval = event.target.value;
-                const ntype = ( event.target.value == 4 ) ? 'line' : 'bar';
-                const _typeChanged = ntype !== this.graphs[i].type;
+        // Persist the interval on every entity of this graph (whichever is rebuilt first
+        // carries it — see addGraph's _graphInterval). The entities' own types are left
+        // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
+        // they are, so picking an interval again turns them back into bars.
+        for( let en of g.entities ) {
+            const _eIdx = this._pcEntryIndex(en.entity);
+            if( _eIdx < 0 ) continue;
+            if( typeof this.pconfig.entities[_eIdx] === 'string' )
+                this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
+            this.pconfig.entities[_eIdx].interval = _value;
+        }
 
-                // Persist interval (and type, if it changed) in pconfig.entities for
-                // every entity of this graph — one lookup per entity, not two
-                for( let en of this.graphs[i].entities ) {
-                    const _eIdx = this._pcEntryIndex(en.entity);
-                    if( _eIdx < 0 ) continue;
-                    if( typeof this.pconfig.entities[_eIdx] === 'string' )
-                        this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
-                    this.pconfig.entities[_eIdx].interval = parseInt(event.target.value);
-                    if( _typeChanged ) this.pconfig.entities[_eIdx].type = ntype;
-                }
-
-                if( _typeChanged ) {
-                    if( ntype == 'line' ) {
-                        for( let d of this.graphs[i].chart.data.datasets ) {
-                            d.backgroundColor = 'rgba(0,0,0,0)';
-                            if( d.borderColor && Array.isArray(d.borderColor) ) d.borderColor = d.borderColor[0];
-                        }
-                    } else {
-                        for( let d of this.graphs[i].chart.data.datasets ) d.backgroundColor = d.borderColor;
-                    }
-
-                    this.graphs[i].chart.type = this.graphs[i].chart.config.type = this.graphs[i].type = ntype;
-                    this.graphs[i].chart.update();
-
-                    if( this.graphs[i].yaxisLock ) this.scaleLockClicked({currentTarget:{id:`-${i}`}});
-                }
-
-                break;
-            }
+        // Bars <-> raw curves: rebuilt in place, each bar entity's dataset changing kind
+        if( _wasRaw !== _isRaw ) {
+            const _nextG = this._nextGraph(g);
+            const _entities = [...g.entities];
+            const _groupId = g.groupId;
+            this._detachGraph(g);
+            _entities.forEach((en, i) => {
+                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, _value, _groupId, en);
+            });
         }
 
         this.updateHistory();
@@ -656,11 +648,11 @@ export class HistoryCardState {
     createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
         return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
-                    <option value="0" ${optionStyle}>${i18n('ui.interval._10m')}</option>
-                    <option value="1" ${optionStyle}>${i18n('ui.interval.hourly')}</option>
-                    <option value="2" ${optionStyle}>${i18n('ui.interval.daily')}</option>
-                    <option value="3" ${optionStyle}>${i18n('ui.interval.monthly')}</option>
-                    <option value="4" ${optionStyle}>${i18n('ui.interval.rawline')}</option>
+                    <option value="0" ${optionStyle} ${selected == 0 ? 'selected' : ''}>${i18n('ui.interval._10m')}</option>
+                    <option value="1" ${optionStyle} ${selected == 1 ? 'selected' : ''}>${i18n('ui.interval.hourly')}</option>
+                    <option value="2" ${optionStyle} ${selected == 2 ? 'selected' : ''}>${i18n('ui.interval.daily')}</option>
+                    <option value="3" ${optionStyle} ${selected == 3 ? 'selected' : ''}>${i18n('ui.interval.monthly')}</option>
+                    <option value="4" ${optionStyle} ${selected == 4 ? 'selected' : ''}>${i18n('ui.interval.rawline')}</option>
                 </select>`;
     }
 
@@ -1561,7 +1553,10 @@ export class HistoryCardState {
 
                     const process = this.buildProcessFunction(g.entities[j].process);
 
-                    if( g.type == 'line' ) {
+                    // Per entity: a bar graph can hold curves too (see _entityKind)
+                    const _kind = this._entityKind(g, g.entities[j]);
+
+                    if( _kind == 'line' ) {
 
                         // Fill line chart buffer
 
@@ -1660,7 +1655,7 @@ export class HistoryCardState {
                             s = this._applySilencePlateaus(s, _raw, _extended);
                         }
 
-                    } else if( g.type == 'bar' && n > 0 ) {
+                    } else if( _kind == 'bar' && n > 0 ) {
 
                         const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
                         const netBars = g.entities[j].netBars ?? false;
@@ -1852,6 +1847,9 @@ export class HistoryCardState {
 
             for( let d of datasets ) {
                 datastructure.datasets.push({
+                    // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
+                    type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
+                    hecNoStack: graphtype == 'bar' && d.kind === 'line',
                     borderColor: d.bColor,
                     backgroundColor: d.fillColor,
                     borderWidth: d.width,
@@ -1953,6 +1951,10 @@ export class HistoryCardState {
 
         }
 
+        // Any dataset drawn as a curve / as bars (a bar graph can hold both)
+        const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
+        const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
+
         const tooltipSize = this.pconfig.tooltipSize;
         const _self = this; // captured for tooltips.custom below — `this` there is the Chart.js Tooltip instance
 
@@ -1966,6 +1968,8 @@ export class HistoryCardState {
                 scales: {
                     xAxes: [{
                         type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
+                        // (half a bar of margin at both ends only when there are bars to show)
+                        offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
                         time: {
                             unit: this.activeRange.tickStepUnit,
                             stepSize: this.activeRange.tickStepSize,
@@ -1994,8 +1998,8 @@ export class HistoryCardState {
                         },
                         afterDataLimits: (me) => {
                             const epsilon = 0.0001;
-                            if( config?.ymin == null && this.pconfig.axisAddMarginMin && graphtype == 'line' ) me.min -= epsilon;
-                            if( config?.ymax == null && this.pconfig.axisAddMarginMax && graphtype == 'line' ) me.max += epsilon;
+                            if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
+                            if( config?.ymax == null && this.pconfig.axisAddMarginMax && _hasCurves && !_hasBars ) me.max += epsilon;
                         },
                         ticks: {
                             fontColor: this.pconfig.graphLabelColor,
@@ -2068,11 +2072,12 @@ export class HistoryCardState {
                     },
                     yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
                     caretPadding: 8,
-                    displayColors: ( graphtype == 'line' ) ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
+                    displayColors: _hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
                 },
                 hover: {
-                    mode: 'nearest',
-                    intersect: graphtype != 'line',
+                    // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
+                    mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
+                    intersect: !_hasCurves,
                     // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
                     // trigger on a pure hover move (no button/contact needed) since
                     // hoverEnabled is true — matching this card's desktop behaviour. See
@@ -2731,7 +2736,7 @@ export class HistoryCardState {
             // Inter-graph: check compatibility
             const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
             const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = this._dropCompatibility(_src, _overG, _srcUnit, _tgtUnit) === null;
+            const _compatible = this._dropCompatibility(_src, _overG, _srcUnit, _tgtUnit, _src.entities[_srcIdx]) === null;
             event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
             this._highlightDropTarget(_overG.canvas, _compatible);
             // Freeze target chart when over its legend overlay
@@ -2873,7 +2878,7 @@ export class HistoryCardState {
             if( _tgt ) {
                 const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
                 const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-                const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit);
+                const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _src.entities[_srcIdx]);
                 if( _refusal !== null ) {
                     this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
                     return;
@@ -2943,6 +2948,24 @@ export class HistoryCardState {
             return;
     }
 
+    // Line and bar entities can share one graph (curves drawn over the bars); timeline and
+    // arrowline graphs only ever hold their own type.
+    _typesCompatible(a, b)
+    {
+        const _xy = t => t === 'line' || t === 'bar';
+        return a === b || ( _xy(a) && _xy(b) );
+    }
+
+    // How one entity of graph g is drawn: its bars, unless the graph's interval is 'raw
+    // line' (4) — which only ever turns its bar entities into raw curves. A graph holding
+    // at least one bar entity is a 'bar' graph (interval selector), its line entities
+    // being drawn as curves over the bars.
+    _entityKind(g, e)
+    {
+        if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
+        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
+    }
+
     // Same group of linked graphs (a static YAML graph split by double-click, or a group
     // split by a type change)?
     _sameGroup(a, b)
@@ -2956,10 +2979,14 @@ export class HistoryCardState {
     //   the group's entities are meant to be shown together (see addGraph).
     // - Across groups: never to or from a static (YAML) graph — its composition is the
     //   YAML's; otherwise same type and compatible units, as before.
-    _dropCompatibility(src, tgt, srcUnit, tgtUnit)
+    _dropCompatibility(src, tgt, srcUnit, tgtUnit, srcEntity = null)
     {
-        if( tgt.type !== src.type ) return `${src.type} ≠ ${tgt.type}`;
-        if( this._sameGroup(src, tgt) ) return null;
+        // The dragged entity's own type (a bar graph can also hold line entities)
+        const _srcType = srcEntity?.type ?? src.type;
+        if( this._sameGroup(src, tgt) )
+            return this._typesCompatible(_srcType, tgt.type) ? null : `${_srcType} ≠ ${tgt.type}`;
+        // Across groups, only the same type — curves and bars only mix within one group
+        if( _srcType !== tgt.type ) return `${_srcType} ≠ ${tgt.type}`;
         if( src.isStatic || tgt.isStatic ) return i18n('ui.menu.type_static');
         if( srcUnit !== undefined && tgtUnit !== undefined && !areSICompatible(srcUnit, tgtUnit) ) {
             const _srcBase = getSIFactor(srcUnit).base || srcUnit;
@@ -5191,7 +5218,7 @@ export class HistoryCardState {
     {
         const _upper = this._previousGraph(g);
         if( !_upper || !this._sameGroup(_upper, g) ) return;
-        if( _upper.type !== g.type ) {
+        if( !this._typesCompatible(_upper.type, g.type) ) {
             this._showLabelTooltip(`${g.type} ≠ ${_upper.type}`, event.clientX, event.clientY, 'left', event.target);
             return;
         }
@@ -5253,7 +5280,8 @@ export class HistoryCardState {
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
         const _overrideType = overrideEntityProps?.type ?? entityOptions?.type;
-        const type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
+        // (let: becomes the graph's type below, once combined — see _graphType)
+        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' ) ? 'timeline' : 'line';
 
         // The entity's single source of truth: overrideEntityProps is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
@@ -5271,6 +5299,9 @@ export class HistoryCardState {
             this.pconfig.entities.push(_pcEntry);
         }
         _pcEntry.entity = entity_id;
+        // The entity's own display type — kept per entity, since a graph can now hold both
+        // line and bar entities (see _entityKind)
+        _pcEntry.type = type;
         // A YAML entity's graph stays static whichever operation rebuilds it (uncombine,
         // drag, type change...) — not only the initial rebuild, which passes isStatic.
         if( _pcEntry.isStatic ) isStatic = true;
@@ -5336,7 +5367,7 @@ export class HistoryCardState {
         let _combineIdx = -1;
         if( !noAutoGroup ) {
             _combineIdx = (groupId !== null) ?
-                this.graphs.reduce((_last, g, i) => g.groupId === groupId && g.type === type && g.entities[0]?.graphKey === _graphKey && this._sameSavedGraph(g.entities[0], _pcEntry) ? i : _last, -1) :
+                this.graphs.reduce((_last, g, i) => g.groupId === groupId && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === _graphKey && this._sameSavedGraph(g.entities[0], _pcEntry) ? i : _last, -1) :
                 this.graphs.length - 1;
         }
 
@@ -5405,6 +5436,29 @@ export class HistoryCardState {
         entityOptions.groupId = groupId;
         _pcEntry.groupId = groupId;
 
+        // Y axis bounds: the graph's own options first, else the first entity of the graph
+        // that sets them (on its YAML entry), else entityOptions — taken from every entity
+        // of the graph, not only the one being added (which used to decide alone).
+        for( const _k of ['ymin', 'ymax', 'ystepSize'] ) {
+            if( _graphProps[_k] !== undefined ) continue;
+            const _fromEntity = entities.map(e => e[_k]).find(v => v !== undefined && v !== null);
+            if( _fromEntity !== undefined ) entityOptions[_k] = _fromEntity;
+        }
+
+        // The graph's own type: 'bar' as soon as it holds a bar entity (its line entities
+        // then drawn as curves over the bars), otherwise the entities' type
+        if( type === 'line' || type === 'bar' )
+            type = entities.some(e => e.type === 'bar') ? 'bar' : 'line';
+        const _mixed = type === 'bar' && entities.some(e => e.type !== 'bar');
+        entityOptions._mixed = _mixed;
+        // The bar interval of the graph: the one asked for, else the one saved with its
+        // entities (any of them — a line entity rebuilt last must not reset it), else the
+        // configured one. Needed before the graph is built: it decides how bar entities
+        // are drawn (bars, or raw curves for interval 4).
+        const _graphInterval = overrideInterval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
+            ?? this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval) ?? 1;
+        entityOptions._graphInterval = _graphInterval;
+
         // graphIndex: a real number giving each graph's display order (1 = topmost page-
         // wide), tracked per entity (all entities of one displayed graph share the same
         // value) since there's no separate per-graph persisted structure. Combine already
@@ -5429,7 +5483,8 @@ export class HistoryCardState {
         for( let e of entities ) e.graphIndex = _graphIndex;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
-        const h = this.calcGraphHeight(type, entities.length, _graphHeight);
+        // (a mixed bar/line graph is sized like a line graph, plus the interval selector)
+        const h = _mixed ? this.calcGraphHeight('line', entities.length, _graphHeight) + 24 : this.calcGraphHeight(type, entities.length, _graphHeight);
 
         let html = '';
         // Spacing between graphs: a margin-top on this graph's own container unless it's
@@ -5453,7 +5508,7 @@ export class HistoryCardState {
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval), this.ui.optionStyle, 40);
+            html += this.createIntervalSelectorHtml(this.g_id, h, _graphInterval, this.ui.optionStyle, 40);
         if( type == 'line' || type == 'bar' )
             html += this.createScaleLockIconHtml(this.g_id, h);
         if( type == 'line' || type == 'bar' )
@@ -5565,12 +5620,18 @@ export class HistoryCardState {
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
 
+        // Needed before building the datasets: it decides how each bar entity is drawn
+        const interval = config?._graphInterval ?? this.parseIntervalConfig(config?.interval) ?? 1;
+
         let datasets = [];
         for( let d of entities ) {
+            const _kind = this._entityKind({ type, interval }, d);
             datasets.push({
+                "kind": _kind,
                 "name": ( d.name === undefined ) ? this._hass.states[d.entity]?.attributes?.friendly_name : d.name,
                 "bColor": parseColor(d.color),
-                "fillColor": parseColor(d.fill),
+                // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar)
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : parseColor(d.fill),
                 "dashMode": d.dashMode,
                 "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
                 "width": d.width || this.pconfig.defaultLineWidth,
@@ -5613,9 +5674,7 @@ export class HistoryCardState {
             }
         }
 
-        const h = this.calcGraphHeight(type, entities.length, config?.height);
-
-        const interval = this.parseIntervalConfig(config?.interval) ?? 1;
+        const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 
         const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
@@ -6196,8 +6255,9 @@ export class HistoryCardState {
             // Existing entity — change type. "Default" option not applicable. Non-numeric
             // entity (only ever timeline): the only choice is timeline itself, reduced menu.
             if( _defaultEl ) _defaultEl.style.display = 'none';
-            const _curType     = graph.type;
             const _entity      = graph.entities.find(e => e.entity === entity_id);
+            // The entity's own type — a bar graph can also hold line entities
+            const _curType     = _entity?.type ?? graph.type;
             const _curLineMode = this.normalizeLineMode(_entity?.lineMode) || this.pconfig.defaultLineMode || 'curves';
             const _numeric = this._isNumericEntity(entity_id);
             _TYPE_MENU_DEFS.forEach((_def, _idx) => {
@@ -6353,6 +6413,9 @@ export class HistoryCardState {
 
         // Update pconfig.entities — persist lineMode and type
         const _pcEntry = this.pconfig.entities.find(e => typeof e === 'object' && e.entity === _entity_id);
+        // The entity's own type before this change (a bar graph can also hold line entities)
+        const _gOld = this.graphs.find(g => g.id === _graph_id);
+        const _oldType = _gOld?.entities.find(e => e.entity === _entity_id)?.type ?? _gOld?.type;
         if( _pcEntry ) {
             _pcEntry.lineMode = lineMode;
             _pcEntry.type     = type;
@@ -6360,7 +6423,7 @@ export class HistoryCardState {
 
         const _g = this.graphs.find(g => g.id === _graph_id);
         if( _g ) {
-            if( _g.type === type ) {
+            if( _oldType === type ) {
                 // Same type — update lineMode on the specific entity's dataset only
                 const _mode = this.normalizeLineMode(lineMode);
                 const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
@@ -7490,14 +7553,20 @@ export class HistoryCardState {
             color             : ent.color,
             fill              : ent.fill,
             hidden            : ent.hidden,
-            interval          : interval,
+            interval          : this.parseIntervalConfig(ent.interval) ?? interval,
             isStatic          : true,
             name              : ent.name,
             scale             : ent.scale,
             siConversionFactor: ent.siConversionFactor,
             dashMode          : ent.dashMode,
             lineMode          : ent.lineMode,
-            width             : ent.width,
+            width             : ent.width ?? ent.lineWidth,
+            type              : ent.type,
+            // Y axis bounds set on an entity: the axis is the graph's, so they apply to the
+            // graph the entity is shown in (see addGraph)
+            ymin              : ent.ymin,
+            ymax              : ent.ymax,
+            ystepSize         : ent.ystepSize ?? ent.ystepsize,
             showPoints        : ent.showPoints,
             showMinMax        : ent.showMinMax,
             unit              : ent.unit,
@@ -7586,7 +7655,8 @@ export class HistoryCardState {
                 ylock          : graph.options?.ylock,
                 ymin           : graph.options?.ymin,
                 ymax           : graph.options?.ymax,
-                ystepSize      : graph.options?.ystepSize,
+                // (ystepsize: spelling of the reference config up to 1.1.44, still accepted)
+                ystepSize      : graph.options?.ystepSize ?? graph.options?.ystepsize,
                 fill           : graph.options?.fill,
                 showMinMax     : graph.options?.showMinMax,
                 dashMode       : graph.options?.dashMode,

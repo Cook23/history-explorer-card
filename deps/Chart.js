@@ -2955,11 +2955,13 @@
             var sumNeg = 0;
             var i, ds, dsMeta;
 
-            if (yScale.options.stacked) {
+            // (hecNoStack: a curve drawn over the bars of a mixed bar/line graph — the
+            // graph's stacked option is about its bars, the curves never stack)
+            if (yScale.options.stacked && !me.getDataset().hecNoStack) {
               for (i = 0; i < datasetIndex; i++) {
                 ds = chart.data.datasets[i];
                 dsMeta = chart.getDatasetMeta(i);
-                if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
+                if (dsMeta.type === 'line' && !ds.hecNoStack && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
                   var stackedRightValue = Number(yScale.getRightValue(ds.data[index]));
                   if (stackedRightValue < 0) {
                     sumNeg += stackedRightValue || 0;
@@ -4315,10 +4317,14 @@
               return;
             }
 
-            // Draw datasets reversed to support proper line stacking
-            for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
-              if (me.isDatasetVisible(i)) {
-                me.drawDataset(i, easingValue);
+            // Draw datasets reversed to support proper line stacking. The curves of a mixed
+            // bar/line graph (hecNoStack) are drawn in a second pass, over the bars.
+            var datasets = me.data.datasets || [];
+            for (var pass = 0; pass < 2; ++pass) {
+              for (var i = datasets.length - 1; i >= 0; --i) {
+                if (!!datasets[i].hecNoStack === (pass === 1) && me.isDatasetVisible(i)) {
+                  me.drawDataset(i, easingValue);
+                }
               }
             }
 
@@ -6038,6 +6044,27 @@
               * @param options {IInteractionOptions} options to use
               * @return {Chart.Element[]} Array of elements that are under the point. If none are found, an empty array is returned
               */
+          // Mixed bar/line graph: a curve point close to the pointer wins (the curves are
+          // drawn over the bars), else the bar under the pointer, else the plain 'nearest'.
+          // Plain 'nearest' alone would always prefer the dense curve points, even with the
+          // pointer right on a bar.
+          hecMixed: function (chart, e, options) {
+            var position = getRelativePosition(e, chart);
+            var best = null, bestDist = 8;
+            parseVisibleItems(chart, function (element) {
+              if (chart.getDatasetMeta(element._datasetIndex).bar) return;
+              var cp = element.getCenterPoint();
+              var d = Math.sqrt(Math.pow(position.x - cp.x, 2) + Math.pow(position.y - cp.y, 2));
+              if (d < bestDist) { bestDist = d; best = element; }
+            });
+            if (best) return [best];
+            var onBar = getIntersectItems(chart, position).filter(function (element) {
+              return chart.getDatasetMeta(element._datasetIndex).bar;
+            });
+            if (onBar.length) return onBar.slice(0, 1);
+            return module.exports.modes.nearest(chart, e, { intersect: false, axis: options.axis });
+          },
+
           nearest: function (chart, e, options) {
             var position = getRelativePosition(e, chart);
             options.axis = options.axis || 'xy';
