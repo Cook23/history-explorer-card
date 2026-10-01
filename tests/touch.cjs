@@ -116,6 +116,17 @@ module.exports = async function()
         const r1 = await E(`yRange(${li})`);
         return r1[0] > r0[0] && r1[1] > r0[1] && (await t.scrollY()) === 0 ? true : `y ${r0} -> ${r1} scrollY=${await t.scrollY()}`;
     });
+    await step('entity selector: tapping an entry of the list opens the type menu for it', async () => {
+        const inp = await E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+20,y:r.top+r.height/2}; })()`);
+        await t.tap(inp); await t.wait(400);
+        await t.page.keyboard.type('energy'); await t.wait(500);
+        const pt = await E(`(()=>{ const a=el.querySelector('#es_0 a[data-entity="sensor.energy"]'); if(!a||a.style.display==='none') return null; const r=a.getBoundingClientRect(); return {x:r.left+10,y:r.top+r.height/2}; })()`);
+        if( !pt ) return 'entry not listed';
+        await t.tap(pt); await t.wait(600);
+        const open = await E('menuOpen()');
+        await t.page.keyboard.press('Escape'); await t.tap({ x: 5, y: 5 }); await t.wait(300);
+        return open ? true : 'type menu not open';
+    });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     return t.close();
 };
