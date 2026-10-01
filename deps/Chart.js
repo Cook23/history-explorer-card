@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b68
+ * HEC fork — synced with history-explorer-card version: 1.2.0b69
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -2919,21 +2919,31 @@
             point._datasetIndex = datasetIndex;
             point._index = index;
 
+            // Silence plateaus ('smart' line mode, see the card's _applySilencePlateaus):
+            // a data point flagged hecPlateauEnd ends a flat stretch drawn as a straight,
+            // dashed segment from the previous point; a hecVirtual point only exists to
+            // shape the curve (never drawn as a dot, never hovered).
+            var hecPlateauEnd = !!(value && value.hecPlateauEnd);
+            var hecVirtual = !!(value && value.hecVirtual);
+
             // Desired view properties
             point._model = {
               x: x,
               y: y,
               skip: custom.skip || isNaN(x) || isNaN(y),
+              hecPlateauEnd: hecPlateauEnd,
+              hecVirtual: hecVirtual,
               // Appearance
-              radius: custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
+              radius: hecVirtual ? 0 : custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
               pointStyle: custom.pointStyle || helpers.valueAtIndexOrDefault(dataset.pointStyle, index, pointOptions.pointStyle),
               backgroundColor: me.getPointBackgroundColor(point, index),
               borderColor: me.getPointBorderColor(point, index),
               borderWidth: me.getPointBorderWidth(point, index),
-              tension: meta.dataset._model ? meta.dataset._model.tension : 0,
-              steppedLine: meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              // (the segment ending at a plateau end is always a straight line)
+              tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
+              steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
               // Tooltip
-              hitRadius: custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
+              hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
           },
 
@@ -2946,11 +2956,13 @@
             var sumNeg = 0;
             var i, ds, dsMeta;
 
-            if (yScale.options.stacked) {
+            // (hecNoStack: a curve drawn over the bars of a mixed bar/line graph — the
+            // graph's stacked option is about its bars, the curves never stack)
+            if (yScale.options.stacked && !me.getDataset().hecNoStack) {
               for (i = 0; i < datasetIndex; i++) {
                 ds = chart.data.datasets[i];
                 dsMeta = chart.getDatasetMeta(i);
-                if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
+                if (dsMeta.type === 'line' && !ds.hecNoStack && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
                   var stackedRightValue = Number(yScale.getRightValue(ds.data[index]));
                   if (stackedRightValue < 0) {
                     sumNeg += stackedRightValue || 0;
@@ -3702,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b68';
+        var HEC_CHART_VERSION = '1.2.0b69';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -4274,8 +4286,15 @@
             // longer than that duration, the tooltip closes mid-pan — correct, since nothing
             // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
-              var _stillValid = me.active.filter(function(el) {
-                return el && me.data.datasets[el._datasetIndex];
+              // Re-resolve each active element against the reloaded data: a new time range
+              // can shrink a dataset below the active index (element gone), and the tooltip
+              // callbacks (labelColor, positioners) read meta.data[index]._view directly —
+              // a stale index there throws mid-update and leaves a half-built tooltip model.
+              var _stillValid = [];
+              me.active.forEach(function(el) {
+                if (!el || !me.data.datasets[el._datasetIndex]) return;
+                var _cur = me.getDatasetMeta(el._datasetIndex).data[el._index];
+                if (_cur && _cur._view) _stillValid.push(_cur);
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
@@ -4873,10 +4892,14 @@
               return;
             }
 
-            // Draw datasets reversed to support proper line stacking
-            for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
-              if (me.isDatasetVisible(i)) {
-                me.drawDataset(i, easingValue);
+            // Draw datasets reversed to support proper line stacking. The curves of a mixed
+            // bar/line graph (hecNoStack) are drawn in a second pass, over the bars.
+            var datasets = me.data.datasets || [];
+            for (var pass = 0; pass < 2; ++pass) {
+              for (var i = datasets.length - 1; i >= 0; --i) {
+                if (!!datasets[i].hecNoStack === (pass === 1) && me.isDatasetVisible(i)) {
+                  me.drawDataset(i, easingValue);
+                }
               }
             }
 
@@ -7190,7 +7213,8 @@
           meta = chart.getDatasetMeta(i);
           for (j = 0, jlen = meta.data.length; j < jlen; ++j) {
             var element = meta.data[j];
-            if (!element._view.skip) {
+            // (hecVirtual: a curve-shaping point of the 'smart' line mode — not a value)
+            if (!element._view.skip && !element._view.hecVirtual) {
               handler(element);
             }
           }
@@ -7393,6 +7417,27 @@
               * @param options {IInteractionOptions} options to use
               * @return {Chart.Element[]} Array of elements that are under the point. If none are found, an empty array is returned
               */
+          // Mixed bar/line graph: a curve point close to the pointer wins (the curves are
+          // drawn over the bars), else the bar under the pointer, else the plain 'nearest'.
+          // Plain 'nearest' alone would always prefer the dense curve points, even with the
+          // pointer right on a bar.
+          hecMixed: function (chart, e, options) {
+            var position = getRelativePosition(e, chart);
+            var best = null, bestDist = 8;
+            parseVisibleItems(chart, function (element) {
+              if (chart.getDatasetMeta(element._datasetIndex).bar) return;
+              var cp = element.getCenterPoint();
+              var d = Math.sqrt(Math.pow(position.x - cp.x, 2) + Math.pow(position.y - cp.y, 2));
+              if (d < bestDist) { bestDist = d; best = element; }
+            });
+            if (best) return [best];
+            var onBar = getIntersectItems(chart, position).filter(function (element) {
+              return chart.getDatasetMeta(element._datasetIndex).bar;
+            });
+            if (onBar.length) return onBar.slice(0, 1);
+            return module.exports.modes.nearest(chart, e, { intersect: false, axis: options.axis });
+          },
+
           nearest: function (chart, e, options) {
             var position = getRelativePosition(e, chart);
             options.axis = options.axis || 'xy';
@@ -9703,7 +9748,8 @@
             labelColor: function (tooltipItem, chart) {
               var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
               var activeElement = meta.data[tooltipItem.index];
-              var view = activeElement._view;
+              var view = activeElement && activeElement._view;
+              if (!view) return { borderColor: 'rgba(0,0,0,0)', backgroundColor: 'rgba(0,0,0,0)' };
               return {
                 borderColor: view.borderColor,
                 backgroundColor: view.backgroundColor };
@@ -10218,7 +10264,10 @@
               this._hecCloseTooltip('hover');
               return;
             }
-            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+            // A model left half-built by a throw inside Tooltip.update() can still read
+            // tooltipActive === true with its text arrays missing — treat it as empty.
+            var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
+            var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
             if (!_hasContent) {
               this._hecCloseTooltip('hover');
               return;
@@ -10968,6 +11017,9 @@
           // Stroke Line
           ctx.beginPath();
           lastDrawnIndex = -1;
+          // Silence plateaus ('smart' line mode): left out of this solid pass, collected
+          // and stroked dashed afterwards (a canvas path has a single dash pattern)
+          var plateaus = [];
 
           for (index = 0; index < points.length; ++index) {
             current = points[index];
@@ -10987,6 +11039,9 @@
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
                   ctx.moveTo(currentVM.x, currentVM.y);
+                } else if (currentVM.hecPlateauEnd) {
+                  plateaus.push([previous._view, currentVM]);
+                  ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
                   helpers.canvas.lineTo(ctx, previous._view, current._view);
@@ -10997,6 +11052,20 @@
           }
 
           ctx.stroke();
+
+          if (plateaus.length) {
+            if (ctx.setLineDash) {
+              ctx.setLineDash([4, 4]);
+            }
+            ctx.lineDashOffset = 0;
+            ctx.beginPath();
+            for (index = 0; index < plateaus.length; ++index) {
+              ctx.moveTo(plateaus[index][0].x, plateaus[index][0].y);
+              ctx.lineTo(plateaus[index][1].x, plateaus[index][1].y);
+            }
+            ctx.stroke();
+          }
+
           ctx.restore();
         } });
 

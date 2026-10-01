@@ -21,6 +21,9 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.1.46** — Angles (wind direction…) drawn without jumps at 0/360: a continuous curve, real values in the tooltip and on the Y axis — automatic for `°` and `measurement_angle`, or set with `circular`.
+- **v1.1.45** — Bars and curves on the same graph: curves drawn over the bars, never stacked; *Raw line* only turns the bars into raw curves.
+- **v1.1.43** — New `smart` line mode (silences drawn as flat dashed plateaus); YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
 - **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
 - **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
@@ -157,7 +160,7 @@ excludeFilterEntities:
 
 ## Choosing an entity's display type
 
-Any numeric entity can be shown as a line (straight, curved or stepped), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
+Any numeric entity can be shown as a line (straight, curved, stepped or smart), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
 
 - Right after selecting a new numeric entity in the dropdown (see [Adding entities](#adding-entities))
 - On a 600ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
@@ -173,7 +176,7 @@ In the info panel, a "Type" link appears between the date and range selectors fo
 
 ## Interactive graph management
 
-All changes made interactively are synchronized with your HA user account and survive a page refresh across all devices.
+Changes made interactively on graphs added from the UI are synchronized with your HA user account and survive a page refresh across all your devices. For graphs defined in YAML, they only do if you enable it — see [Time range and display defaults](#time-range-and-display-defaults).
 
 ### Line graphs
 
@@ -191,14 +194,26 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph
-- **Drag** a curve label onto another graph to move it there (compatible units only)
+- **Drag** a curve label onto another graph to move it there (compatible units only — any unit within a group of [linked graphs](#linked-graphs))
 - On mobile, double-tap a curve label then drag to start moving it
 
 An incompatible drop shows a brief tooltip explaining the mismatch.
 
+### Linked graphs
+
+A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+
+- **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
+- **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
+- **Double-click** the chain icon to merge the two linked graphs back into one
+
+Linked graphs can always be merged back as long as their display types can share a graph (lines and bars can; a timeline or arrowline can't share a graph with anything else). The same applies to entities added from the UI: changing a curve's display type to one its graph can't show (e.g. a line to a timeline) moves it to a linked graph, and changing it back returns it to its graph; changing a line to bars keeps it in its graph. An entity added from the UI never joins a graph of another display type on its own. A double-click on a label of a graph added from the UI takes that curve out of its group instead.
+
 ### Reordering graphs
 
 Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On mobile, double-tap the ⠿ symbol then drag to start reordering.
+
+Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
 ### Timeline and arrowline graphs
 
@@ -259,6 +274,7 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 
 - `enable_persistence` — this device remembers on its own (local browser storage only).
 - `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account.
+- Last one to speak wins: YAML, each device's UI, and your HA account (for multi-device) are each compared with what they said last time — whichever changed most recently wins. An entity edited in YAML gets its YAML values back (on every device), the others keep theirs. A device opening the card for the first time counts as YAML speaking on that device.
 - Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
@@ -282,8 +298,12 @@ refresh:
 
 ```yaml
 type: custom:history-explorer-card
-lineMode: curves   # curves (default), lines, or stepped
+lineMode: curves   # curves (default), lines, stepped, or smart
 ```
+
+`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+
+Angles (a wind direction, for example) no longer jump across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
@@ -334,6 +354,8 @@ showUnavailable: true
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
 Entities with a `total_increasing` state class are automatically shown as bar charts. Use the interval selector on the graph to switch between 10m, hourly, daily and monthly views.
+
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves share one Y axis — for incompatible units (e.g. kWh bars and a W curve) use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
 ```yaml
 entityOptions:
@@ -462,7 +484,7 @@ graphs:
 | `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
 | `fill` | | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
-| `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, or `stepped` |
+| `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
 | `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) |
 | `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
@@ -472,6 +494,7 @@ graphs:
 | `scale` | | | ✓ | Multiply values by this factor before display |
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |
+| `circular` | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
 | `ymin` / `ymax` | | | ✓ | Set initial Y axis bounds (can still be modified interactively) |
 | `ystepSize` | | | ✓ | Fix Y axis tick step |
 | `ylock` | | ✓ | | Disable all interactive Y axis pan and zoom |
@@ -490,6 +513,8 @@ graphs:
 *3 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
 
 *4 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
+
+*5 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. Line and bar graphs only — an arrowline already shows an angle.
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 
