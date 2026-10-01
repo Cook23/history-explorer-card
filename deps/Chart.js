@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b69
+ * HEC fork — synced with history-explorer-card version: 1.2.0b74
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b69';
+        var HEC_CHART_VERSION = '1.2.0b74';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -4549,11 +4549,7 @@
               _el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
               me._hecLockIconEl = _el;
             }
-            var _parent = me.canvas.parentNode;
-            if (_parent && _el.parentNode !== _parent) {
-              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-              _parent.appendChild(_el);
-            }
+            me._hecAttachToCanvasParent(_el);
             _el.style.left = '15px';
             _el.style.top = '5px';
             var _svg = _el.children[0];
@@ -4570,26 +4566,56 @@
             // else. Forwards every event it receives straight to the canvas so
             // Chart.js's own gesture handling still does 100% of the actual work.
             if (me.chartArea) {
-              var _yo = me._hecYAxisTouchEl;
-              if (!_yo) {
-                _yo = document.createElement('div');
-                _yo.style.cssText = 'position:absolute;z-index:0;cursor:ns-resize;';
-                var _forward = function (ev) {
-                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
-                };
-                _yo.addEventListener('pointerdown', _forward);
-                _yo.addEventListener('pointermove', _forward);
-                _yo.addEventListener('pointerup', _forward);
-                _yo.addEventListener('pointercancel', _forward);
-                me._hecYAxisTouchEl = _yo;
-              }
-              if (_parent && _yo.parentNode !== _parent) _parent.appendChild(_yo);
+              var _yo = me._hecTouchOverlay('_hecYAxisTouchEl', 'ns-resize');
               _yo.style.left = me.canvas.offsetLeft + 'px';
               _yo.style.top = (me.canvas.offsetTop + me.chartArea.top) + 'px';
               _yo.style.width = me.chartArea.left + 'px';
               _yo.style.height = (me.chartArea.bottom - me.chartArea.top) + 'px';
               _yo.style.touchAction = (me._hecYAxisLock || me._hecYAxisClickArmed) ? 'none' : '';
             }
+          },
+
+          // Places el next to this chart's canvas, in the canvas's own parent (made a
+          // positioned container if it isn't one yet) — shared by every element below
+          // that's laid over the chart: lock icon, move handle, touch zones.
+          _hecAttachToCanvasParent: function (el) {
+            var _parent = this.canvas && this.canvas.parentNode;
+            if (!_parent) return null;
+            if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+            if (el.parentNode !== _parent) _parent.appendChild(el);
+            return _parent;
+          },
+
+          // A touch zone laid over part of the chart (see "The touch-action workaround" in
+          // Chart Custom.js.md): created once and kept under this[key], it relays every
+          // pointer event it gets to the canvas, so the gesture detector still does 100% of
+          // the work — only its touch-action differs from the canvas's. Single place for the
+          // Y axis zone, the legend / label column zones and the lock+handle zone.
+          _hecTouchOverlay: function (key, cursor) {
+            var me = this;
+            var _el = me[key];
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.style.cssText = 'position:absolute;z-index:0;cursor:' + cursor + ';';
+              var _forward = function (ev) {
+                // A press here keeps the browser's default actions to itself, as the card's
+                // own zones did before v1.2: with a mouse or pen, no text selection (dragging
+                // out of the zone would leave one behind on the page, and the next press on
+                // it would start the browser's own drag-and-drop instead — a pointercancel
+                // that lost the drag); on touch, no focus change by the emulated mouse
+                // events (the click that follows a long-press would otherwise take the focus
+                // away from the type menu it just opened, closing it). Scrolling isn't one of
+                // these: on touch it's only ever governed by touch-action.
+                if (ev.type === 'pointerdown') ev.preventDefault();
+                me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
+              };
+              ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(function (t) {
+                _el.addEventListener(t, _forward);
+              });
+              me[key] = _el;
+            }
+            me._hecAttachToCanvasParent(_el);
+            return _el;
           },
 
           // Graph reorder handle symbol (⠿) — purely visual, pointer-events:none.
@@ -4607,11 +4633,7 @@
               _el.textContent = '\u283F';
               me._hecMoveHandleIconEl = _el;
             }
-            var _parent = me.canvas.parentNode;
-            if (_parent) {
-              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-              if (_el.parentNode !== _parent) _parent.appendChild(_el);
-            }
+            me._hecAttachToCanvasParent(_el);
             _el.style.left = me.canvas.offsetLeft + 'px';
             _el.style.top = me.canvas.offsetTop + 'px';
             _el.style.display = me.options.moveHandleVisible === false ? 'none' : 'flex';
@@ -4786,24 +4808,7 @@
             if (!me.canvas || !me.chartArea) return;
 
             function ensureOverlay(key) {
-              var _el = me[key];
-              if (!_el) {
-                _el = document.createElement('div');
-                _el.style.cssText = 'position:absolute;z-index:0;cursor:move;';
-                var _forward = function (ev) {
-                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
-                };
-                _el.addEventListener('pointerdown', _forward);
-                _el.addEventListener('pointermove', _forward);
-                _el.addEventListener('pointerup', _forward);
-                _el.addEventListener('pointercancel', _forward);
-                me[key] = _el;
-              }
-              var _parent = me.canvas.parentNode;
-              if (_parent) {
-                if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-                if (_el.parentNode !== _parent) _parent.appendChild(_el);
-              }
+              var _el = me._hecTouchOverlay(key, 'move');
               _el.style.touchAction = (me._hecLabelDragAllowed || me._hecLabelClickArmed) ? 'none' : '';
               return _el;
             }
@@ -5137,10 +5142,8 @@
           eventHandler: function (e) {
             var me = this;
 
-            console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler ENTRY e.type=', e.type, 'chart.id=', me.id);
 
             if (plugins.notify(me, 'beforeEvent', [e]) === false) {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler SWALLOWED by beforeEvent plugin hook, e.type=', e.type);
               return;
             }
 
@@ -5332,6 +5335,39 @@
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
 
+            // Always run: click detection here is no longer an add-on for customEvent/
+            // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
+            // options.onClick now have (see fire() above), so this must run
+            // unconditionally, the same way wheel's default zoom behavior already does.
+            {
+              me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
+              me._hecGestureHandler(e, {
+                longPressMs: _HEC_LONGPRESS_MS,
+                dblClickMs: _HEC_DBLCLICK_MS,
+                dragSlop: _HEC_DRAG_SLOP,
+                pinchMinDist: _HEC_PINCH_MIN_DIST,
+                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
+            }
+
+            return changed;
+          },
+
+          /**
+              * @private
+              * Generic pointer/wheel gesture state machine feeding options.customEvent and
+              * options.panX/panY/zoomX/zoomY. See the comment block in handleEvent above
+              * for provenance of the timing constants and structure.
+              */
+          _hecGestureHandler: function (e, cfg) {
+            var me = this;
+            var gs = me._hecGesture;
+            var pid = e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0;
+            var pointerType = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
+
+            // (This table and its two helpers live here, not in handleEvent: they use
+            // this function's own gs / cfg / pid / fire. Declared in handleEvent they were
+            // out of scope here, and every drag or pinch threw "HEC_DRAG_HANDLERS is not
+            // defined" — v1.2.0b69.)
             // Drag/gesture handlers — per Thierry's explicit instruction, ALL
             // 2-finger and 1-finger drag gestures are handled uniformly through
             // this single table, replacing what used to be a scattered if/else-if
@@ -5629,34 +5665,6 @@
               p.dragOverTarget = _dragOverFound;
             }
 
-            // Always run: click detection here is no longer an add-on for customEvent/
-            // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
-            // options.onClick now have (see fire() above), so this must run
-            // unconditionally, the same way wheel's default zoom behavior already does.
-            {
-              me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
-              me._hecGestureHandler(e, {
-                longPressMs: _HEC_LONGPRESS_MS,
-                dblClickMs: _HEC_DBLCLICK_MS,
-                dragSlop: _HEC_DRAG_SLOP,
-                pinchMinDist: _HEC_PINCH_MIN_DIST,
-                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
-            }
-
-            return changed;
-          },
-
-          /**
-              * @private
-              * Generic pointer/wheel gesture state machine feeding options.customEvent and
-              * options.panX/panY/zoomX/zoomY. See the comment block in handleEvent above
-              * for provenance of the timing constants and structure.
-              */
-          _hecGestureHandler: function (e, cfg) {
-            var me = this;
-            var gs = me._hecGesture;
-            var pid = e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0;
-            var pointerType = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
 
             function customEventTarget() {
               return typeof me.options.customEvent === 'function';
@@ -5732,7 +5740,6 @@
               var _yIdx = yAxisIndexAt(_hx, _hy);
               var _truncated = truncatedYAxisLabelAt(_yIdx);
               if (gestureType === 'click') {
-                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' click yAxisIndex=', _yIdx, 'truncated=', _truncated, 'labelTooltipEnabled=', me.options.labelTooltipEnabled, 'hasTooltip=', !!me.tooltip, 'chartArea=', me.chartArea, 'labels=', me.data && me.data.labels);
                 if (typeof me.options.onClick === 'function') {
                   me.options.onClick.call(me, e.native, me.active);
                 }
@@ -5828,10 +5835,17 @@
             }
 
             if (e.type === 'mousedown') {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mousedown pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId);
               gs.pointers[pid] = { x: e.x, y: e.y };
               gs.count = Object.keys(gs.pointers).length;
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' after mousedown gs.pointers=', JSON.stringify(gs.pointers), 'count=', gs.count);
+              // Keep receiving this pointer's moves/release once it leaves the canvas —
+              // a drag onto ANOTHER graph (curve/label/graph move) is followed from here
+              // (see _hecCrossGraphDragFeedback). Touch gets this implicitly from the
+              // browser; a mouse or pen doesn't, so without it a drag toward another
+              // graph never got past this canvas's edge. Released automatically at the
+              // pointer's release.
+              if (e.native && e.native.pointerId !== undefined && me.canvas && me.canvas.setPointerCapture) {
+                try { me.canvas.setPointerCapture(e.native.pointerId); } catch (_err) { /* pointer already gone */ }
+              }
 
               if (gs.count === 1) {
                 // Four independent events, defined purely by time and distance —
@@ -5960,7 +5974,6 @@
               }
 
             } else if (e.type === 'mouseup') {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId, 'gs.pointers=', JSON.stringify(gs.pointers), 'gs.pending=', JSON.stringify(gs.pending));
               // Legend/timeline label drag workaround: armed by custDblClick, always
               // disarmed here on the raw mouseup itself — not custDragEnd — so it
               // never stays stuck armed when no drag actually followed the dblclick.
@@ -5997,32 +6010,26 @@
                 clearTimeout(gs.longPressTimer); gs.longPressTimer = null;
               }
               var pu = gs.pending;
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup decision pu=', JSON.stringify(pu), 'pid=', pid);
               if (pu && pu.pid === pid) {
                 gs.pending = null;
                 if (pu.dragging) {
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> dragend');
                   _hecEndDrag(pu);
                 } else if (pu.longPressFired) {
                   // Click and long-press are mutually exclusive — a long-press already
                   // fired for this contact, so releasing without ever moving does NOT
                   // become a click, even though gs.pending stayed alive to allow a drag
                   // to follow (which didn't happen here).
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (long-press already fired)');
                 } else if (pu.dblClickFired) {
                   // Click and dblclick are mutually exclusive too — this same press
                   // was the second one of a double-click, already fired at its own
                   // mousedown; releasing it must not ALSO produce a plain click.
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (dblclick already fired)');
                 } else {
                   // click: released without moving, before the long-press timer
                   // fired (< 600ms), and this press wasn't itself a dblclick's
                   // second press — per Thierry's spec.
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> click');
                   fire('click', undefined, undefined);
                 }
               } else {
-                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> NO MATCH, pu was null or wrong pid');
               }
               delete gs.pointers[pid];
               gs.count = Object.keys(gs.pointers).length;
