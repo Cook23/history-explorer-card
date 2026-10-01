@@ -14,20 +14,24 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b81';
+const Version = '1.2.0b82';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
-    { type: 'line', lineMode: 'lines'   },
-    { type: 'line', lineMode: 'curves'  },
-    { type: 'line', lineMode: 'stepped' },
-    { type: 'bar',  lineMode: null      },
-    { type: 'arrowline', lineMode: null },
-    { type: 'timeline',  lineMode: null },
+    { type: 'line', lineMode: 'lines',   label: 'ui.menu.type_line_straight' },
+    { type: 'line', lineMode: 'curves',  label: 'ui.menu.type_line_curves' },
+    { type: 'line', lineMode: 'stepped', label: 'ui.menu.type_line_stepped' },
+    { type: 'bar',  lineMode: null,      label: 'ui.menu.type_bar' },
+    { type: 'arrowline', lineMode: null, label: 'ui.menu.type_arrowline' },
+    { type: 'timeline',  lineMode: null, label: 'ui.menu.type_timeline' },
     // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // right after 'Line stepped' in the menus' markup
-    { type: 'line', lineMode: 'smart'   },
+    // right after 'Line stepped' (_TYPE_MENU_ORDER)
+    { type: 'line', lineMode: 'smart',   label: 'ui.menu.type_line_smart' },
 ];
+// Display order of the type menu's entries (indices in _TYPE_MENU_DEFS), and their style —
+// shared by the card's menu and the info panel's
+export const _TYPE_MENU_ORDER = [0, 1, 2, 6, 3, 4, 5];
+export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit';
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
@@ -883,17 +887,28 @@ export class HistoryCardState {
 
             }
 
-            for( let g of this.graphs ) {
-                g.chart.options.scales.xAxes[0].time.unit = this.activeRange.tickStepUnit;
-                g.chart.options.scales.xAxes[0].time.stepSize = this.activeRange.tickStepSize;
-                g.chart.options.scales.xAxes[0].time.min = this.startTime;
-                g.chart.options.scales.xAxes[0].time.max = this.endTime;
-                g.chart.update();
-            }
+            this._applyTimeAxes();
 
             this.updateHistory();
 
         }
+    }
+
+    // Applies the current time window and tick step to a graph's time axis — or to every
+    // graph's
+    _applyTimeAxis(g)
+    {
+        const _time = g.chart.options.scales.xAxes[0].time;
+        _time.unit = this.activeRange.tickStepUnit;
+        _time.stepSize = this.activeRange.tickStepSize;
+        _time.min = this.startTime;
+        _time.max = this.endTime;
+        g.chart.update();
+    }
+
+    _applyTimeAxes()
+    {
+        for( let g of this.graphs ) this._applyTimeAxis(g);
     }
 
     setTimeRangeMinutes(range, update, t_center, t_position = 0.5)
@@ -923,13 +938,7 @@ export class HistoryCardState {
             this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
             this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
 
-            for( let g of this.graphs ) {
-                g.chart.options.scales.xAxes[0].time.unit = this.activeRange.tickStepUnit;
-                g.chart.options.scales.xAxes[0].time.stepSize = this.activeRange.tickStepSize;
-                g.chart.options.scales.xAxes[0].time.min = this.startTime;
-                g.chart.options.scales.xAxes[0].time.max = this.endTime;
-                g.chart.update();
-            }
+            this._applyTimeAxes();
 
             this.updateHistory();
 
@@ -1748,14 +1757,7 @@ export class HistoryCardState {
 
             }
 
-            if( updated ) {
-
-                g.chart.options.scales.xAxes[0].time.unit = this.activeRange.tickStepUnit;
-                g.chart.options.scales.xAxes[0].time.stepSize = this.activeRange.tickStepSize;
-                g.chart.options.scales.xAxes[0].time.min = this.startTime;
-                g.chart.options.scales.xAxes[0].time.max = this.endTime;
-                g.chart.update();
-            }
+            if( updated ) this._applyTimeAxis(g);
 
         }
     }
@@ -4379,13 +4381,7 @@ export class HistoryCardState {
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
-                    <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
-                    <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
-                    <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
-                    <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
-                    <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
-                    <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
-                    <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
+                    ${_TYPE_MENU_ORDER.map(k => `<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`).join('')}
                     <a id="et_${i}_delete" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-top:1px solid #444;">${i18n('ui.menu.entity_delete')}</a>
                 </div>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
@@ -4848,6 +4844,22 @@ export class HistoryCardState {
     // Entity type menu (line straight / line curves / line stepped / bar)
     // --------------------------------------------------------------------------------------
 
+    // Shows the type menu's entries for an entity — only Timeline when it isn't numeric —
+    // and marks (bold, hecSelected) the one isActive(def) says is current
+    _markTypeMenu(input_idx, numeric, isActive)
+    {
+        _TYPE_MENU_DEFS.forEach((_def, _idx) => {
+            const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
+            if( !_el ) return;
+            if( !numeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
+            _el.style.display = 'block';
+            _el.style.background = '';
+            const _active = isActive(_def);
+            _el.style.fontWeight = _active ? 'bold' : '';
+            if( _active ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
+        });
+    }
+
     showEntityTypeMenu(input_idx, entity_id, graph, anchorClientX = null, anchorClientY = null, align = 'left')
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
@@ -4906,20 +4918,7 @@ export class HistoryCardState {
             const _curType     = _entity?.type ?? graph.type;
             const _curLineMode = this.normalizeLineMode(_entity?.lineMode) || this.pconfig.defaultLineMode || 'curves';
             const _numeric = this._isNumericEntity(entity_id);
-            _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
-                if( !_el ) return;
-                if( !_numeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
-                _el.style.display = 'block';
-                const _active = _def.type === _curType && (_def.lineMode === null || _def.lineMode === _curLineMode);
-                _el.style.background = '';
-                _el.style.fontWeight = '';
-                delete _el.dataset.hecSelected;
-                if( _active ) {
-                    _el.style.fontWeight = 'bold';
-                    _el.dataset.hecSelected = '1';
-                }
-            });
+            this._markTypeMenu(input_idx, _numeric, d => d.type === _curType && (d.lineMode === null || d.lineMode === _curLineMode));
         } else if( _isWildcard ) {
             // Brand-new entities from a wildcard match — nothing created yet.
             // "Default" (apply each entity's own auto-detected type) is offered and
@@ -4935,19 +4934,7 @@ export class HistoryCardState {
                     _defaultEl.dataset.hecSelected = '1';
                 }
             }
-            _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
-                if( !_el ) return;
-                if( !_anyNumeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
-                _el.style.display = 'block';
-                _el.style.background = '';
-                _el.style.fontWeight = '';
-                delete _el.dataset.hecSelected;
-                if( !_anyNumeric && _def.type === 'timeline' ) {
-                    _el.style.fontWeight = 'bold';
-                    _el.dataset.hecSelected = '1';
-                }
-            });
+            this._markTypeMenu(input_idx, _anyNumeric, d => !_anyNumeric && d.type === 'timeline');
         } else {
             // Brand-new single entity — nothing created yet. Pre-select its own
             // auto-detected type (YAML/state/unit), same as what addGraph would pick —
@@ -4955,20 +4942,7 @@ export class HistoryCardState {
             if( _defaultEl ) _defaultEl.style.display = 'none';
             const _numeric = this._isNumericEntity(entity_id);
             const _detected = _numeric ? this._detectDefaultType(entity_id) : { type: 'timeline', lineMode: null };
-            _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                const _el = this._this.querySelector(`#et_${input_idx}_${_idx}`);
-                if( !_el ) return;
-                if( !_numeric && _def.type !== 'timeline' ) { _el.style.display = 'none'; return; }
-                _el.style.display = 'block';
-                const _active = _def.type === _detected.type && (_def.lineMode === null || _def.lineMode === _detected.lineMode);
-                _el.style.background = '';
-                _el.style.fontWeight = '';
-                delete _el.dataset.hecSelected;
-                if( _active ) {
-                    _el.style.fontWeight = 'bold';
-                    _el.dataset.hecSelected = '1';
-                }
-            });
+            this._markTypeMenu(input_idx, _numeric, d => d.type === _detected.type && (d.lineMode === null || d.lineMode === _detected.lineMode));
         }
 
         // Position — #tb_N directly, not _menu.offsetParent — offsetParent of a display:none
@@ -5454,67 +5428,7 @@ export class HistoryCardState {
 
     entityCollectorCallback(result)
     {
-        for( let i = 0; i < 2; ++i ) {
-
-            const datalist = this._this.querySelector(`#es_${i}`);
-            if( !datalist ) continue;
-
-            while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
-
-            const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
-            const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
-
-            let entities = [];
-            for( let entity in result ) {
-                if( this.matchRegexList(regex, entity) && !this.matchExcludeRegexList(excludeRegex, entity) ) entities.push(entity);
-            }
-
-            // Sort by domain / friendly name / entity_id
-            entities.sort((a, b) => {
-                const da = a.split('.')[0], db = b.split('.')[0];
-                if( da !== db ) return da.localeCompare(db);
-                const fa = this._hass.states[a]?.attributes?.friendly_name || a;
-                const fb = this._hass.states[b]?.attributes?.friendly_name || b;
-                if( fa !== fb ) return fa.localeCompare(fb);
-                return a.localeCompare(b);
-            });
-
-            for( let entity of entities ) {
-                const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
-                const _state = this._hass.states[entity];
-                const _stateVal = _state?.state;
-                const _unit = _state?.attributes?.unit_of_measurement;
-                // Format value like legend labels: rounded to roundingPrecision
-                let _valStr = '';
-                try {
-                    if( _stateVal !== undefined && _stateVal !== 'unavailable' && _stateVal !== 'unknown' ) {
-                        const _p = 10 ** this.pconfig.roundingPrecision;
-                        const _numVal = Number(_stateVal);
-                        const _v = Math.round(_numVal * _p) / _p;
-                        if( isNaN(_numVal) ) {
-                            // Try to parse as date and show HH:MM
-                            const _d = new Date(_stateVal);
-                            _valStr = isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
-                        } else {
-                            _valStr = _v + (_unit ? ' ' + _unit : '');
-                        }
-                    }
-                } catch(e) { _valStr = ''; }
-                const _label = _valStr ? `${friendly} (${_valStr})` : friendly;
-                const o = document.createElement('a');
-                o.href = `#s_${i}`;
-                o.id = entity;
-                o.dataset.entity = entity;
-                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden";
-                o.innerHTML = _label;
-                o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
-                datalist.appendChild(o);
-            }
-
-        }
-
-        for( let i of this.ui.inputField )
-            if( i ) i.placeholder = i18n("ui.label.type_to_search");
+        this._fillEntitySelectors(Object.keys(result));
     }
 
     entityCollectorFailed(error)
@@ -5529,34 +5443,35 @@ export class HistoryCardState {
 
     entityCollectAll()
     {
+        const _hidden = ['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'];
+        this._fillEntitySelectors(Object.keys(this._hass.states).filter(e => !_hidden.includes(this.getDomainForEntity(e))));
+    }
+
+    // Fills the entity selectors' dropdowns with the candidate entities the card's
+    // filterEntities / excludeFilterEntities keep, sorted by domain, friendly name and
+    // entity id, each shown with its current value.
+    _fillEntitySelectors(candidates)
+    {
+        const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
+        const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
+        const entities = candidates.filter(e => this.matchRegexList(regex, e) && !this.matchExcludeRegexList(excludeRegex, e));
+
+        // Sort by domain / friendly name / entity_id
+        entities.sort((a, b) => {
+            const da = a.split('.')[0], db = b.split('.')[0];
+            if( da !== db ) return da.localeCompare(db);
+            const fa = this._hass.states[a]?.attributes?.friendly_name || a;
+            const fb = this._hass.states[b]?.attributes?.friendly_name || b;
+            if( fa !== fb ) return fa.localeCompare(fb);
+            return a.localeCompare(b);
+        });
+
         for( let i = 0; i < 2; ++i ) {
 
             const datalist = this._this.querySelector(`#es_${i}`);
             if( !datalist ) continue;
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
-
-            const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
-            const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
-
-            let entities = [];
-            for( let e in this._hass.states ) {
-                if( !this.matchRegexList(regex, e) || this.matchExcludeRegexList(excludeRegex, e) ) continue;
-                const d = this.getDomainForEntity(e);
-                if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) {
-                    entities.push(e);
-                }
-            }
-
-            // Sort by domain / friendly name / entity_id
-            entities.sort((a, b) => {
-                const da = a.split('.')[0], db = b.split('.')[0];
-                if( da !== db ) return da.localeCompare(db);
-                const fa = this._hass.states[a]?.attributes?.friendly_name || a;
-                const fb = this._hass.states[b]?.attributes?.friendly_name || b;
-                if( fa !== fb ) return fa.localeCompare(fb);
-                return a.localeCompare(b);
-            });
 
             for( let entity of entities ) {
                 const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;

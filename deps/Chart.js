@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b81
+ * HEC fork — synced with history-explorer-card version: 1.2.0b82
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b81';
+        var HEC_CHART_VERSION = '1.2.0b82';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -3957,10 +3957,9 @@
               return null;
             };
 
-            // Find the best legend-item insertion point near (cx, cy) — migrated
-            // verbatim from the card's own _findLegendLabel, which had reimplemented
-            // this from legendHitBoxes (already this chart's own native data) rather
-            // than anything Chart.js couldn't already provide. With target=false,
+            // Find the best legend-item insertion point near (cx, cy), from legendHitBoxes
+            // (this chart's own data) — the one implementation, also used by the card to
+            // place a dropped curve (see Chart Custom.js.md §4). With target=false,
             // just identifies which label is being grabbed (source lookup). With
             // target=true, additionally computes the insertion marker's position
             // (midpoint between neighboring labels, or a fixed margin at either
@@ -5977,9 +5976,8 @@
                   // options.cursorEnabled) — Chart.js sets its own canvas's cursor
                   // style directly, same as wheelZoomEnabled actually zooming: 'move'
                   // over a draggable legend label (line/bar) or a draggable
-                  // timeline/arrowline Y-axis label, '' otherwise. Static graphs get
-                  // this disabled entirely by the card passing cursorEnabled:false at
-                  // construction time — no separate isStatic concept needed here.
+                  // timeline/arrowline Y-axis label, '' otherwise (cursorEnabled: false
+                  // turns it all off).
                   if (me.options.cursorEnabled !== false && me.canvas) {
                     var _draggable = (_hLegendIdx >= 0 && (me.config.type === 'line' || me.config.type === 'bar')) ||
                                       (_hYIdx >= 0 && (me.config.type === 'timeline' || me.config.type === 'arrowline'));
@@ -6106,14 +6104,12 @@
                 deltaX: _native.deltaX, deltaY: _native.deltaY,
                 ctrlKey: _native.ctrlKey, shiftKey: _native.shiftKey, altKey: _native.altKey });
 
-              // High-level default behavior, same mapping as the card's wheelScrolled:
-              // Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel calls a card-supplied zoomX
-              // callback (the shared date range across all graphs is a card
-              // responsibility, per Thierry). Shift+wheel zoom Y, by contrast, is a
-              // per-graph responsibility Chart.js handles directly on its own Y scale
-              // — no callback needed, same formula the card's original wheelScrolled
-              // used. Configurable, on by default (see options.wheelZoomEnabled /
-              // options.zoomYEnabled below).
+              // High-level default behavior: Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel
+              // calls a card-supplied zoomX callback (the shared date range across all
+              // graphs is a card responsibility, per Thierry). Shift+wheel zoom Y, by
+              // contrast, is a per-graph responsibility Chart.js handles directly on its
+              // own Y scale — no callback needed. Configurable, on by default (see
+              // options.wheelZoomEnabled / options.zoomYEnabled below).
               if (me.options.wheelZoomEnabled !== false) {
                 if (_ctrlZoom) {
                   me.options.zoomX.call(me, { chart: me, deltaY: _native.deltaY, centerPixels: e.x, event: _native });
