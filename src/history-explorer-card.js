@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b80';
+const Version = '1.2.0b81';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1898,6 +1898,9 @@ export class HistoryCardState {
                 cursorEnabled: true,
                 // Chart.js's floating tooltips stay within the card (see Chart.hecUi.clampToViewport)
                 floatingBoundsSelector: '#maincard',
+                // A drag only reaches this card's own graphs (Chart.js dragScope), not those
+                // of another card on the same page
+                dragScope: this._dragScope ??= 'hec-' + Math.random().toString(36).slice(2),
                 // Ctrl+wheel over a graph: zoom the time range — shared by every graph, so the
                 // card's — around the time under the pointer (Chart.js zoomX callback)
                 zoomX: (info) => {
@@ -1986,10 +1989,8 @@ export class HistoryCardState {
                     }
 
                     if( info.gestureType === 'dragmove' ) {
-                        if( panstate.dragDataset ) {
-                            this._updateDragFeedback(info.event);
-                        } else if( panstate.dragTLEntity ) {
-                            this._updateTLDragFeedback(info.event);
+                        if( panstate.dragDataset || panstate.dragTLEntity ) {
+                            this._onLabelDragMove(info, g);
                         } else if( panstate.moveGraph ) {
                             this._autoScrollY = info.event.clientY;
                             for( let _g of this.graphs ) {
@@ -2533,95 +2534,41 @@ export class HistoryCardState {
         }
     }
 
-    _updateDragFeedback(event)
+    // This card's graph whose canvas is under the pointer (client coordinates), except
+    // `except`, or undefined.
+    _graphAt(clientX, clientY, except = null)
     {
-        this._autoScrollY = event.clientY;
-        const _src = panstate.dragDataset.g;
-        const _srcIdx = panstate.dragDataset.datasetIdx;
-        // Find graph under pointer
-        let _overG = null;
-        for( let g of this.graphs ) {
+        return this.graphs.find(g => {
+            if( g === except ) return false;
             const _r = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                _overG = g; break;
-            }
-        }
-        if( _overG && _overG !== _src ) {
-            // Inter-graph: cursor here on the source (this canvas holds pointer
-            // capture, the destination gets no native events). Compatibility,
-            // highlight, and insertion marker for the destination are all handled
-            // by Chart.js's own dragovergraph consumer/customEvent — not duplicated
-            // here.
-            const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
-            const _tgtUnit = _overG.entities[0] ? this.getUnitOfMeasure(_overG.entities[0].entity, _overG.entities[0].unit) : undefined;
-            const _compatible = this._dropCompatibility(_src, _overG, _srcUnit, _tgtUnit, _src.entities[_srcIdx]) === null;
-            event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
-        } else if( _overG === _src ) {
-            // Intra-graph: show vertical insertion marker between legend labels.
-            // Source graph handles its own legend directly — no cross-graph event
-            // needed here, it already receives its own pointermove natively.
-            event.target.style.cursor = 'grabbing';
-            const _legend = _src.chart.legend;
-            if( _legend && event.clientY >= (_src.canvas.getBoundingClientRect().top + _legend.top) &&
-                           event.clientY <= (_src.canvas.getBoundingClientRect().top + _legend.bottom) )
-                this._freezeChart(_src);
-            else
-                this._unfreezeChart();
-        } else {
-            event.target.style.cursor = 'grabbing';
-            this._unfreezeChart();
-        }
-        return;
+            return clientX >= _r.left && clientX <= _r.right && clientY >= _r.top && clientY <= _r.bottom;
+        });
     }
 
-    _updateTLDragFeedback(event)
+    // A label being dragged (dragmove, on its source graph g): the auto-scroll follows the
+    // pointer, and the source graph's legend stays frozen (_freezeChart) while the pointer
+    // is over it — over another graph, dragovergraph takes care of that graph's. (The
+    // drag's cursor is Chart.js's, from the dropAllowed set in dragovergraph.)
+    _onLabelDragMove(info, g)
     {
-        this._autoScrollY = event.clientY;
-        const _src = panstate.dragTLEntity.g;
-        const _srcIdx = panstate.dragTLEntity.entityIdx;
-        let _overG = null;
-        for( let g of this.graphs ) {
-            const _r = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _r.left && event.clientX <= _r.right &&
-                event.clientY >= _r.top  && event.clientY <= _r.bottom ) {
-                _overG = g; break;
-            }
-        }
-        if( _overG && _overG !== _src ) {
-            // Inter-graph: cursor here on the source. Compatibility, highlight, and
-            // insertion marker for the destination are all handled by Chart.js's
-            // own dragovergraph consumer/customEvent — not duplicated here.
-            const _compatible = this._dropCompatibility(_src, _overG) === null;
-            event.target.style.cursor = _compatible ? 'grabbing' : 'not-allowed';
-        } else if( _overG === _src ) {
-            event.target.style.cursor = 'grabbing';
-        } else {
-            event.target.style.cursor = 'grabbing';
+        this._autoScrollY = info.event.clientY;
+        const _over = this._graphAt(info.event.clientX, info.event.clientY);
+        if( _over && _over !== g ) return;
+        const _legend = g.chart.legend;
+        if( _over === g && panstate.dragDataset && _legend && info.y >= _legend.top && info.y <= _legend.bottom )
+            this._freezeChart(g);
+        else
             this._unfreezeChart();
-        }
-        return;
     }
 
     _finalizeLegendDrop(event, _src, _srcIdx)
     {
-            // Find target graph under pointer
-            let _tgt = null;
-            for( let g of this.graphs ) {
-                if( g === _src ) continue;
-                const _rect = g.canvas.getBoundingClientRect();
-                if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
-                    event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
-                    _tgt = g;
-                    break;
-                }
-            }
+            // Target graph under the pointer
+            const _tgt = this._graphAt(event.clientX, event.clientY, _src);
             // Intra-graph reorder: drop on same graph canvas
             if( !_tgt ) {
                 // Check if drop is on the source graph itself (same canvas)
-                const _srcRect = _src.canvas.getBoundingClientRect();
-                if( event.clientX >= _srcRect.left && event.clientX <= _srcRect.right &&
-                    event.clientY >= _srcRect.top  && event.clientY <= _srcRect.bottom ) {
+                if( this._graphAt(event.clientX, event.clientY) === _src ) {
                     // Find target label by X position in legend
                     const _hitBoxes = _src.chart.legend?.legendHitBoxes;
                     if( _hitBoxes && _hitBoxes.length > 1 ) {
@@ -3054,32 +3001,16 @@ export class HistoryCardState {
 
     _finalizeTimelineDrop(event, _src, _srcIdx)
     {
-        // Find target graph under pointer — same type only
-        let _tgt = null;
-        let _tgtWrongType = null;
-        let _tgtInsertIdx = -1;
-        for( let g of this.graphs ) {
-            const _rect0 = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _rect0.left && event.clientX <= _rect0.right &&
-                event.clientY >= _rect0.top  && event.clientY <= _rect0.bottom ) {
-                if( g.type !== _src.type ) { _tgtWrongType = g; break; }
-            }
-            if( g.type !== _src.type ) continue;
-            const _rect = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
-                event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
-                _tgt = g;
-                // (the nearest row of the target, before or after it)
-                const _at = g.chart._hecYAxisInsertAt(event.clientY - _rect.top, -1, true);
-                if( _at ) _tgtInsertIdx = _at.insertBefore ? _at.idx : _at.idx + 1;
-                break;
-            }
-        }
-
-        if( !_tgt ) {
-            if( _tgtWrongType ) this._showLabelTooltip(`${_src.type} ≠ ${_tgtWrongType.type}`, event.clientX, event.clientY, 'left', event.target);
+        // Target graph under the pointer (the source itself included) — same type only
+        const _tgt = this._graphAt(event.clientX, event.clientY);
+        if( !_tgt ) return;
+        if( _tgt.type !== _src.type ) {
+            this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY, 'left', event.target);
             return;
         }
+        // (the nearest row of the target, before or after it)
+        const _at = _tgt.chart._hecYAxisInsertAt(event.clientY - _tgt.canvas.getBoundingClientRect().top, -1, true);
+        const _tgtInsertIdx = _at ? ( _at.insertBefore ? _at.idx : _at.idx + 1 ) : -1;
 
         const _isSameGraph = _tgt === _src;
         const _refusal = _isSameGraph ? null : this._dropCompatibility(_src, _tgt);
@@ -3252,21 +3183,11 @@ export class HistoryCardState {
 
     _finalizeGraphMove(event, _srcG)
     {
-        // Find target graph under pointer
-        let _tgtG = null;
-        let _insertBefore = true; // above or below midpoint
-        for( let g of this.graphs ) {
-            if( g === _srcG ) continue;
-            const _rect = g.canvas.getBoundingClientRect();
-            if( event.clientX >= _rect.left && event.clientX <= _rect.right &&
-                event.clientY >= _rect.top  && event.clientY <= _rect.bottom ) {
-                _tgtG = g;
-                _insertBefore = event.clientY < _rect.top + _rect.height / 2;
-                break;
-            }
-        }
-
-        if( !_tgtG || _tgtG === _srcG ) return;
+        // Target graph under the pointer; above or below its midpoint
+        const _tgtG = this._graphAt(event.clientX, event.clientY, _srcG);
+        if( !_tgtG ) return;
+        const _tgtR = _tgtG.canvas.getBoundingClientRect();
+        const _insertBefore = event.clientY < _tgtR.top + _tgtR.height / 2;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
             this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', _srcG.canvas);

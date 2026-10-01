@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b80
+ * HEC fork — synced with history-explorer-card version: 1.2.0b81
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b80';
+        var HEC_CHART_VERSION = '1.2.0b81';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -3946,7 +3946,9 @@
               if (!Chart.instances) return null;
               for (var _cid in Chart.instances) {
                 var _other = Chart.instances[_cid];
-                if (_other === me || !_other.canvas) continue;
+                // (options.dragScope: a drag only reaches the charts that share it — those
+                // of the same card, not another one on the same page)
+                if (_other === me || !_other.canvas || _other.options.dragScope !== me.options.dragScope) continue;
                 var _r = _other.canvas.getBoundingClientRect();
                 if (clientX >= _r.left && clientX <= _r.right && clientY >= _r.top && clientY <= _r.bottom) {
                   return _other;
@@ -5695,6 +5697,12 @@
                 p.dragOverTarget._hecHideInsertionMarker();
               }
               p.dragOverTarget = _dragOverFound;
+              // The drag's cursor (this canvas holds the pointer): not-allowed over a graph
+              // that refuses the drop (dropAllowed, decided by the customEvent above),
+              // grabbing anywhere else
+              if (me.options.cursorEnabled !== false) {
+                me.canvas.style.cursor = (_dragOverFound && _dragOverFound.options.dropAllowed === false) ? 'not-allowed' : 'grabbing';
+              }
             }
 
 
@@ -5850,6 +5858,7 @@
             // Thierry's explicit request to harmonize the drag-handling code.
             function _hecEndDrag(p) {
               me._hecDestroyDragGhost();
+              if (me.canvas) me.canvas.style.cursor = '';
               me._hecHideInsertionMarker();
               if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
               if (p.handler && p.handler.name === 'zoomSelect') {
