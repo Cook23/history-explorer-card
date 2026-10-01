@@ -1,0 +1,75 @@
+// A mock of the few Home Assistant APIs the card uses: states, history, long-term
+// statistics, user data (stored by the test, see lib.cjs). The card under test is the
+// built history-explorer-card.js; the config comes from the test (window.CFG), the
+// mock's own settings too (window.MOCK, all optional):
+//   series      history as real series (a sine for numbers, on/off every 2 h for the
+//               others) — else one value per entity, its current state
+//   historyDays history kept that many days back (older: statistics only)
+//   fail        WS message types that fail
+//   language    Home Assistant's language ('en')
+//   dark        dark theme
+// Every WS request is logged in window.__ws ({type, start, end, ids}).
+// setState(id, value) pushes the change to every element in window.hassTargets.
+window.logs=[]; window.onerror=(m)=>{logs.push('ERR '+m)};
+const _ce=console.error; console.error=(...a)=>{logs.push('CE '+a.join(' '));_ce(...a)};
+const MOCK=window.MOCK||{};
+const lc=new Date(Date.now()-3600e3).toISOString();
+const ent=(id,name,unit,val,sc)=>({entity_id:id,state:val,last_changed:lc,last_updated:lc,attributes:Object.assign({friendly_name:name},unit?{unit_of_measurement:unit}:{},sc?{state_class:sc}:{})});
+const STATES={
+ 'sensor.watering_cycle':ent('sensor.watering_cycle','cycle','d','3','measurement'),
+ 'sensor.days_to_watering':ent('sensor.days_to_watering','days to','d','2','measurement'),
+ 'input_number.watering_in_progress':ent('input_number.watering_in_progress','in progress',null,'1'),
+ 'sensor.rain':ent('sensor.rain','rain','mm','4','measurement'),
+ 'sensor.power':ent('sensor.power','power','W','400','measurement'),
+ 'binary_sensor.a':ent('binary_sensor.a','door a',null,'on'),
+ 'binary_sensor.b':ent('binary_sensor.b','door b',null,'off'),
+ 'sensor.power_kw':ent('sensor.power_kw','power kw','kW','1.2','measurement'),
+ 'sensor.energy':ent('sensor.energy','energy','kWh','12','total_increasing'),
+ 'sensor.power2':ent('sensor.power2','power two','W','300','measurement'),
+ 'sensor.wind':ent('sensor.wind','wind direction','°','350','measurement'),
+ 'sensor.energy2':ent('sensor.energy2','energy2','kWh','5','total_increasing'),
+};
+window.userData={};
+window.__ws=[];
+// A state change, as Home Assistant pushes it: new value, new last_changed, new hass object
+window.setState=(id,v)=>{ const t=new Date().toISOString(); STATES[id]={...STATES[id],state:String(v),last_changed:t,last_updated:t}; (window.hassTargets||[]).forEach(x=>{ x.hass=mkHass(); }); };
+// Value of entity id at time t (s) in the mocked history
+const isNum=id=>!isNaN(Number(STATES[id].state));
+const base=id=>Number(STATES[id].state)||1;
+function valueAt(id,t){
+  if(!isNum(id)) return Math.floor(t/7200)%2 ? 'on' : 'off';
+  if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
+  return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
+}
+function history(d){
+  const t0=Date.parse(d.start_time)/1000, t1=Date.parse(d.end_time)/1000, r={};
+  const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
+  for(const e of d.entity_ids){
+    if(!STATES[e]) continue;
+    if(!MOCK.series){ r[e]=[{s:STATES[e].state,lu:Math.max(t0,kept)}]; continue; }
+    const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/600)*600; t<t1; t+=600) pts.push({s:valueAt(e,t),lu:t});
+    if(pts.length) r[e]=pts;
+  }
+  return r;
+}
+function statistics(d){
+  const t0=Date.parse(d.start_time), t1=Date.parse(d.end_time), r={};
+  for(const e of d.statistic_ids){
+    if(!STATES[e]||!isNum(e)) continue;
+    const pts=[]; for(let t=Math.ceil(t0/3600e3)*3600e3; t<t1; t+=3600e3){ const v=Number(valueAt(e,t/1000)); pts.push({start:t,end:t+3600e3,mean:v,min:v*0.9,max:v*1.1,state:v,sum:v}); }
+    if(pts.length) r[e]=pts;
+  }
+  return r;
+}
+function mkHass(){ return {
+  states:{...STATES}, config:{version:'2026.7.4'}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
+  user:{id:'u1',name:'u'}, localize:(k)=>k,
+  callWS:(d)=>{
+    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids});
+    if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
+    if(d.type==='history/history_during_period') return Promise.resolve(history(d));
+    if(d.type==='recorder/statistics_during_period') return Promise.resolve(statistics(d));
+    if(d.type==='frontend/get_user_data') return window.__getUD(d.key).then(v=>({value:v}));
+    if(d.type==='frontend/set_user_data'){ return window.__setUD(d.key, d.value===null?null:JSON.parse(JSON.stringify(d.value))).then(()=>({})); }
+    return Promise.resolve({}); } }; }

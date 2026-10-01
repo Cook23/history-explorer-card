@@ -5,10 +5,12 @@
 const path = require('path');
 const { chromium } = require('playwright');
 
-const PAGE = 'file://' + path.join(__dirname, 'page.html');
+const pageUrl = name => 'file://' + path.join(__dirname, name);
 
 // A page showing one card with config cfg. opts: { touch, height, scrollRoom (px of page
-// below the card, so the page can scroll) }
+// below the card, so the page can scroll), mock (the mocked Home Assistant's settings, see
+// page.html), page ('panel.html': the info panel instead
+// of a card), panel (the info panel's config) }
 async function openCard(cfg, opts = {})
 {
     const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -21,9 +23,11 @@ async function openCard(cfg, opts = {})
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     let init = 'window.CFG=' + JSON.stringify({ ...cfg, cardName: (cfg.cardName || 'test') + Date.now() }) + ';';
+    if( opts.mock ) init += 'window.MOCK=' + JSON.stringify(opts.mock) + ';';
+    if( opts.panel ) init += 'window.PANEL_CFG=' + JSON.stringify(opts.panel) + ';';
     if( opts.scrollRoom ) init += `document.addEventListener("DOMContentLoaded",()=>{ const s=document.createElement("div"); s.style.height="${opts.scrollRoom}px"; document.body.appendChild(s); });`;
     await page.addInitScript(init);
-    await page.goto(PAGE);
+    await page.goto(pageUrl(opts.page || 'page.html'));
     await page.waitForTimeout(2500);
     const cdp = opts.touch ? await ctx.newCDPSession(page) : null;
     return new Tester(browser, page, cdp, errors);

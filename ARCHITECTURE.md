@@ -74,7 +74,8 @@ keep them apart. For the details of the boundary with Chart.js, see
 - **lint** — every identifier is declared, no import is assigned (catches what moving
   code between files leaves behind);
 - **store** — the entity store on its own, no browser;
-- **mouse**, **touch**, **cards** — the built card in Chromium against a mocked Home
+- **mouse**, **touch**, **cards**, **features**, **panel** — the built card in Chromium against a mocked Home
   Assistant: every gesture with a mouse and with fingers (real touch: `touch-action` and
-  page scrolling apply), linked graphs, menus, two cards on one page; after each scenario,
+  page scrolling apply), linked graphs, menus, two cards on one page, history and
+  statistics, CSV export, refresh, the entity selector, the info panel; after each scenario,
   the persisted entities must match what is shown.

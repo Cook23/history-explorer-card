@@ -1,0 +1,28 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>history-explorer-card info panel tests</title></head>
+<body style="width:900px;margin:0"><style>ha-card{display:block}</style><div id=host></div>
+<!-- The card's info panel: the history section of Home Assistant's entity dialog
+     (ha-more-info-history, faked here: it renders what the card puts in its place),
+     against the mocked Home Assistant (mock-ha.js). The panel's config comes from the test
+     (window.PANEL_CFG). -->
+<script src="mock-ha.js"></script>
+<script>
+localStorage.setItem('history-explorer-info-panel', JSON.stringify({ config: window.PANEL_CFG || {} }));
+// lit's template result, rendered to HTML text
+const ser=(t)=>{ if(t==null||t===false) return ''; if(typeof t!=='object') return String(t); if(Array.isArray(t)) return t.map(ser).join(''); let o=''; t.strings.forEach((x,k)=>{ o+=x; if(k<t.values.length) o+=ser(t.values[k]); }); return o; };
+class FakeMoreInfoHistory extends HTMLElement {
+  constructor(){ super(); this.attachShadow({mode:'open'}); }
+  render(){ return {_$litType$:1,strings:['<div>native</div>'],values:[]}; }
+  updated(){}
+  requestUpdate(){ this.shadowRoot.innerHTML=ser(this.render()); this.updated(new Map()); }
+}
+customElements.define('ha-more-info-history', FakeMoreInfoHistory);
+</script>
+<script src="../history-explorer-card.js"></script>
+<script>
+// Opens the entity dialog's history of entity eid
+window.openPanel=(eid)=>{ const p=document.createElement('ha-more-info-history'); p.entityId=eid; p.hass=mkHass(); document.getElementById('host').appendChild(p); p.requestUpdate(); window.P=p; window.hassTargets=[p]; return true; };
+window.inst=()=>window.P.hec_instance;
+window.datasets=(gi)=>inst().graphs[gi].chart.data.datasets.map(d=>({ label:d.label, n:d.data.length, circular:d.hecCircular, type:d.type }));
+window.timeRange=()=>[inst().startTime,inst().endTime];
+</script></body></html>
