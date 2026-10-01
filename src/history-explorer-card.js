@@ -9,12 +9,13 @@ import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
 import { stateColors, stateColorsDark, defaultColors, parseColor, parseColorRange } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
+import { EntityStore, entityIdOf } from "./history-entity-store.js";
 import "./history-info-panel.js"
 
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b86';
+const Version = '1.2.0b87';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -85,11 +86,6 @@ function areSICompatible(unitA, unitB) {
     if( unitA === unitB ) return true;
     if( !unitA || !unitB ) return false;
     return getSIFactor(unitA).base === getSIFactor(unitB).base;
-}
-
-// pconfig.entities entries can be a plain string (legacy) or an object with an .entity field
-function entityIdOf(e) {
-    return typeof e === 'string' ? e : e.entity;
 }
 
 function chooseSIUnit(unitsWithMax) {
@@ -225,7 +221,8 @@ export class HistoryCardState {
         this.pconfig.exportTimeFormat     = undefined;
         this.pconfig.exportStatsPeriod    = undefined;
         this.pconfig.entities             = [];
-        this._nextGroupId                  = 1;
+        // Every change to pconfig.entities goes through the store (history-entity-store.js)
+        this.store                        = new EntityStore(this.pconfig);
         this.pconfig.infoPanelConfig      = null;
         this.pconfig.defaultInfoPanel     = undefined;
 
@@ -605,11 +602,8 @@ export class HistoryCardState {
         // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
         // they are, so picking an interval again turns them back into bars.
         for( let en of g.entities ) {
-            const _eIdx = this._pcEntryIndex(en.entity);
-            if( _eIdx < 0 ) continue;
-            if( typeof this.pconfig.entities[_eIdx] === 'string' )
-                this.pconfig.entities[_eIdx] = { entity: this.pconfig.entities[_eIdx] };
-            this.pconfig.entities[_eIdx].interval = _value;
+            const _e = this.store.entry(en.entity);
+            if( _e ) _e.interval = _value;
         }
 
         // Bars <-> raw curves: rebuilt in place, each bar entity's dataset changing kind
@@ -2271,8 +2265,8 @@ export class HistoryCardState {
         meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
         g.chart.update();
         const _hiddenState = meta.hidden !== null ? meta.hidden : g.chart.data.datasets[idx].hidden;
-        const _eIdx = this._pcEntryIndex(g.entities[idx].entity);
-        if( _eIdx >= 0 ) this.pconfig.entities[_eIdx].hidden = _hiddenState || undefined;
+        const _e = this.store.entry(g.entities[idx].entity);
+        if( _e ) _e.hidden = _hiddenState || undefined;
         this.writeLocalState();
     }
 
@@ -2480,120 +2474,109 @@ export class HistoryCardState {
     }
 
     // A curve (legend label _srcIdx of graph _src) dropped on graph _tgt (undefined: none),
-    // next to its legend label drop.index (-1: none) — reordered within its own graph, or
-    // moved into another one
+    // next to its legend label drop.index — reordered within its own graph (on another of
+    // its labels), or moved into another graph if their units and groups allow it
     _finalizeLegendDrop(info, _src, _srcIdx, _tgt, drop)
     {
-            // Intra-graph reorder: dropped on its own graph, next to another of its labels
-            if( _tgt === _src ) {
-                const _tgtLabelIdx = drop.index;
-                const _insertBefore = drop.insertBefore;
-                if( _tgtLabelIdx < 0 ) return;
-                // Reorder entities
-                const _newEntities = [..._src.entities];
-                const [_moved] = _newEntities.splice(_srcIdx, 1);
-                const _insertAt = _tgtLabelIdx > _srcIdx
-                    ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
-                    : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
-                _newEntities.splice(_insertAt, 0, _moved);
-                // Persist in pconfig.entities
-                const _groupId = this._pcGroupIdOf(_newEntities[0].entity);
-                if( _groupId !== undefined ) {
-                    // groupId alone doesn't uniquely identify one graph — it can be
-                    // shared across incompatible-type graphs since a type change
-                    // keeps the original groupId to allow re-combining later.
-                    // Only touch entities that actually belong to THIS graph (_newEntities).
-                    const _srcEntityIds = new Set(_newEntities.map(en => en.entity));
-                    const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                    const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                    this.pconfig.entities = this.pconfig.entities.filter(en => !(typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity)));
-                    const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
-                    this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
-                }
-                // Rebuild graph — capture the graph right after _src (if any) so
-                // the first rebuilt entity can be anchored there (targetGraph
-                // means "insert right before this graph"); addGraph inserts
-                // directly at the right spot, no post-hoc DOM move needed.
-                // Graph-level neighbor: rebuilt right where it was, even inside a
-                // block of several linked graphs
-                const _nextG = this._nextGraph(_src);
-                this._detachGraph(_src);
-                const _saved = this.pconfig.combineSameUnits;
-                this.pconfig.combineSameUnits = true;
-                _newEntities.forEach((en, i) => {
-                    const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
-                    this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId ?? null, _pe ?? en);
-                });
-                this.pconfig.combineSameUnits = _saved;
-                this.writeLocalState();
-                this.updateHistory();
+        if( !_tgt ) return;
+        if( _tgt === _src ) {
+            if( drop.index < 0 ) return;
+        } else {
+            const _e = _src.entities[_srcIdx];
+            const _srcUnit = _e ? this.getUnitOfMeasure(_e.entity, _e.unit) : undefined;
+            const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
+            const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _e);
+            if( _refusal !== null ) {
+                this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
                 return;
             }
+        }
+        this._moveEntity(_src, _srcIdx, _tgt, this._dropInsertIndex(drop));
+    }
 
-            if( _tgt ) {
-                const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
-                const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-                const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _src.entities[_srcIdx]);
-                if( _refusal !== null ) {
-                    this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
-                    return;
-                }
-                const _sameGroup = this._sameGroup(_src, _tgt);
-                {
-                    // Check if drop is on legend label zone — find insertion position
-                    const _tgtLabelInsertIdx = drop.index >= 0 ? ( drop.insertBefore ? drop.index : drop.index + 1 ) : -1;
-                    // Move entity from source to target
-                    const _entity = _src.entities[_srcIdx];
-                    // Update groupId in pconfig.entities
-                    const _tgtGroupId = this._pcGroupIdOf(_tgt.entities[0].entity);
-                    const _eIdx = this._pcEntryIndex(_entity.entity);
-                    if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
-                        // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
-                        // only groupId/color/fill change on a cross-graph move.
-                        // Mutate in place (not a replacement object) — _entity IS this same
-                        // pconfig.entities entry now that there's no separate runtime copy.
-                        const _pcE = this.pconfig.entities[_eIdx];
-                        _pcE.groupId = _tgtGroupId;
-                        // Joins the target's own sub-graph of that group (see _uncombineEntity)
-                        this._setGraphKey(_pcE, _tgt.entities[0].graphKey);
-                        _pcE.color = _entity.color;
-                        _pcE.fill = _entity.fill;
-                        // Same reason as _uncombineEntity: the entry's groupId just changed
-                        // but it's still at its old array position — regroup now.
-                        this._regroupPcEntities();
-                    }
-                    // Rebuild source graph without the moved entity (removes the source
-                    // graph entirely if it becomes empty). Within one group (several linked
-                    // graphs), each graph is rebuilt right where it was — graph-level
-                    // neighbor, not the next group, or the block's internal order would change.
-                    const _tgtOrigGroupId = _tgt.groupId;
-                    this._detachAndRebuildRemaining(_src, _srcIdx, _sameGroup ? this._nextGraph(_src) : undefined);
-                    // Rebuild target graph with added entity
-                    _entity.siConversionFactor = undefined;
-                    _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtNextG = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
-                    this._detachGraph(_tgt);
-                    const _allTgtEntities = [..._tgt.entities];
-                    if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
-                        _allTgtEntities.splice(_tgtLabelInsertIdx, 0, _entity);
-                    else
-                        _allTgtEntities.push(_entity);
-                    const _savedCombine2 = this.pconfig.combineSameUnits;
-                    this.pconfig.combineSameUnits = true;
-                    _allTgtEntities.forEach((en, i) => {
-                                const _pe = this._pcEntryInGroup(en.entity, _tgtOrigGroupId);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG, undefined, false, null, _tgtOrigGroupId, _pe ?? en);
-                            });
-                    this.pconfig.combineSameUnits = _savedCombine2;
-                    if( _sameGroup ) this._syncGroupOrder(_tgtOrigGroupId);
-                    // Persist now — after the reconstruction, not before — so the freshly
-                    // computed graphIndex (and everything else addGraph resolved) is what
-                    // actually gets saved.
-                    this.writeLocalState();
-                    this.updateHistory();
-                }
-            }
+    // A timeline row (_srcIdx of graph _src) dropped on graph _tgt (the source itself
+    // included; undefined: none) — same type only — next to its nearest row drop.index
+    _finalizeTimelineDrop(info, _src, _srcIdx, _tgt, drop)
+    {
+        if( !_tgt ) return;
+        const _refusal = ( _tgt.type !== _src.type ) ? `${_src.type} ≠ ${_tgt.type}`
+                       : ( _tgt !== _src ) ? this._dropCompatibility(_src, _tgt) : null;
+        if( _refusal !== null ) {
+            this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
             return;
+        }
+        this._moveEntity(_src, _srcIdx, _tgt, this._dropInsertIndex(drop));
+    }
+
+    // Index in the target graph's entities where a dropped one goes (drop: dragend's, see
+    // _onDragEnd), -1 for the end
+    _dropInsertIndex(drop)
+    {
+        return drop.index >= 0 ? ( drop.insertBefore ? drop.index : drop.index + 1 ) : -1;
+    }
+
+    // Moves entity srcIdx of graph src to index insertIdx (-1: the end) of graph tgt's
+    // entities — of every type, curve or row. Within one graph, only the order changes;
+    // into another one, the entity joins that graph's group (and sub-graph), the source
+    // is rebuilt without it (removed if it was its last) and the target with it.
+    _moveEntity(src, srcIdx, tgt, insertIdx)
+    {
+        const _entity = src.entities[srcIdx];
+        if( tgt === src ) {
+            const _list = src.entities.filter((_, i) => i !== srcIdx);
+            // (insertIdx counts the moved entity itself)
+            const _at = insertIdx > srcIdx ? insertIdx - 1 : insertIdx;
+            _list.splice(_at < 0 ? _list.length : _at, 0, _entity);
+            const _groupId = this.store.groupIdOf(_list[0].entity);
+            if( _groupId !== undefined ) this.store.setGraphOrder(_groupId, _list);
+            // Rebuilt right where it was, even inside a block of several linked graphs
+            const _nextG = this._nextGraph(src);
+            this._detachGraph(src);
+            this._rebuildGraph(_list, _groupId ?? null, _nextG);
+        } else {
+            const _sameGroup = this._sameGroup(src, tgt);
+            // Within one group (several linked graphs), each graph is rebuilt right where it
+            // was — the graph-level neighbor, not the next group, or the block's internal
+            // order would change. (Before the entity changes group: the next group is found
+            // from the list's order.)
+            const _srcNext = _sameGroup ? this._nextGraph(src) : this._nextGroup(src);
+            const _entry = this.store.find(_entity.entity);
+            const _tgtGroupId = this.store.groupIdOf(tgt.entities[0].entity);
+            if( typeof _entry === 'object' && _tgtGroupId !== undefined ) {
+                // Every other persisted field (type, lineMode, hidden...) stays
+                this.store.moveToGroup(_entry, _tgtGroupId);
+                // Joins the target's own sub-graph of that group (see _uncombineEntity)
+                this._setGraphKey(_entry, tgt.entities[0].graphKey);
+                _entry.color = _entity.color;
+                _entry.fill = _entity.fill;
+            }
+            this._detachAndRebuildRemaining(src, srcIdx, _srcNext);
+            _entity.siConversionFactor = undefined;
+            tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
+            const _tgtNext = _sameGroup ? this._nextGraph(tgt) : this._nextGroup(tgt);
+            this._detachGraph(tgt);
+            const _list = [...tgt.entities];
+            _list.splice(insertIdx < 0 || insertIdx > _list.length ? _list.length : insertIdx, 0, _entity);
+            this._rebuildGraph(_list, tgt.groupId, _tgtNext);
+            if( _sameGroup ) this._syncGroupOrder(tgt.groupId);
+        }
+        // Persisted after the rebuild: the graphIndex addGraph computed is saved
+        this.writeLocalState();
+        this.updateHistory();
+    }
+
+    // Builds one graph of group groupId from entities (in that order), right before graph
+    // nextG (null: at the end) — combined into one graph whatever their units, each with its
+    // persisted entry of that group
+    _rebuildGraph(entities, groupId, nextG)
+    {
+        const _saved = this.pconfig.combineSameUnits;
+        this.pconfig.combineSameUnits = true;
+        entities.forEach((en, i) => {
+            const _pe = this.store.inGroup(en.entity, groupId);
+            this.addGraph(en.entity, i === 0, en.color, en.fill, nextG, undefined, false, null, groupId, _pe ?? en);
+        });
+        this.pconfig.combineSameUnits = _saved;
     }
 
     // Line and bar entities can share one graph (curves drawn over the bars); timeline and
@@ -2802,18 +2785,8 @@ export class HistoryCardState {
     _syncGroupOrder(groupId)
     {
         if( groupId === null || groupId === undefined ) return;
-        const _shown = this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
-            .flatMap(g => g.entities.map(e => e.entity));
-        const _first = this.pconfig.entities.findIndex(e => typeof e === 'object' && e.groupId === groupId);
-        if( _first < 0 ) return;
-        const _entries = this.pconfig.entities.filter(e => typeof e === 'object' && e.groupId === groupId);
-        _entries.sort((a, b) => {
-            const ia = _shown.indexOf(a.entity), ib = _shown.indexOf(b.entity);
-            return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib);
-        });
-        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && e.groupId === groupId));
-        _rest.splice(Math.min(_first, _rest.length), 0, ..._entries);
-        this.pconfig.entities = _rest;
+        this.store.syncGroupOrder(groupId, this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
+            .flatMap(g => g.entities.map(e => e.entity)));
     }
 
     // Something to uncombine: a static graph splits one of its own curves off (needs at
@@ -2821,7 +2794,7 @@ export class HistoryCardState {
     _canUncombine(g)
     {
         if( g.isStatic ) return g.entities.length > 1;
-        return this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === g.groupId).length > 1;
+        return this.store.groupSize(g.groupId) > 1;
     }
 
     // A new sub-graph identifier within a group (see _uncombineEntity). Random rather than
@@ -2864,30 +2837,27 @@ export class HistoryCardState {
         }
         const _entity = g.entities[idx];
         _entity.siConversionFactor = undefined;
-        const _newGroupId = this._nextGroupId++;
+        const _newGroupId = this.store.newGroupId();
         // Preserve all existing persisted fields (type, lineMode, interval, ...) —
         // only groupId/color/fill change on uncombine, EXCEPT hidden: the first click of
         // the double-click already toggled visibility before the second click reached us,
         // so the persisted hidden state is stale. What the user always wants after an
         // uncombine is to SEE the extracted curve — force it visible rather than reversing
         // the stale toggle (which could land on hidden again depending on prior state).
-        const _eIdx = this._pcEntryIndex(_entity.entity);
+        const _pcE = this.store.entry(_entity.entity);
         let _pcExtracted = null;
-        if( _eIdx >= 0 ) {
-            // Mutate in place (not a replacement object) — _entity/g.entities[idx] IS this
-            // same pconfig.entities entry now that there's no separate runtime copy; a
-            // reassignment here would silently detach that reference.
-            const _pcE = this.pconfig.entities[_eIdx];
+        if( _pcE ) {
+            // Mutated in place: _entity/g.entities[idx] IS this same persisted entry
             _pcE.groupId = _newGroupId;
             this._setGraphKey(_pcE, undefined);
             _pcE.color = _entity.color;
             _pcE.fill = _entity.fill;
             _pcE.hidden = undefined;
             _pcExtracted = _pcE;
-            // The entity's groupId just changed but it's still sitting at its old array
-            // position — regroup now, before anything else relies on pconfig.entities'
-            // array order (e.g. finding the next graph below).
-            this._regroupPcEntities();
+            // The entity's groupId just changed but it's still sitting at its old place in
+            // the list — regroup now, before anything relies on the list's order (e.g.
+            // finding the next graph below).
+            this.store.regroup();
         }
         const _nextG = this._nextGroup(g);
         this._detachAndRebuildRemaining(g, idx, _nextG);
@@ -2897,119 +2867,6 @@ export class HistoryCardState {
         this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, false, null, _newGroupId, _pcExtracted ?? _entity);
         // Persist now — after the reconstruction, not before — so the freshly computed
         // graphIndex (and everything else addGraph resolved) is what actually gets saved.
-        this.writeLocalState();
-        this.updateHistory();
-    }
-
-    // A timeline row (_srcIdx of graph _src) dropped on graph _tgt (the source itself
-    // included; undefined: none) — same type only — next to its nearest row drop.index
-    _finalizeTimelineDrop(info, _src, _srcIdx, _tgt, drop)
-    {
-        if( !_tgt ) return;
-        if( _tgt.type !== _src.type ) {
-            this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, info.clientX, info.clientY, 'left', _src.canvas);
-            return;
-        }
-        const _tgtInsertIdx = drop.index >= 0 ? ( drop.insertBefore ? drop.index : drop.index + 1 ) : -1;
-
-        const _isSameGraph = _tgt === _src;
-        const _refusal = _isSameGraph ? null : this._dropCompatibility(_src, _tgt);
-        if( _refusal !== null ) {
-            this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
-            return;
-        }
-        const _sameGroup = !_isSameGraph && this._sameGroup(_src, _tgt);
-
-        const _entity = _src.entities[_srcIdx];
-        const _srcEmpty = _src.entities.length === 1;
-        // Computed once here, used both for the pconfig.entities update below and for
-        // the target-graph rebuild further down — must stay in scope for both
-        const _tgtGroupId = _isSameGraph ? undefined : this._pcGroupIdOf(_tgt.entities[0].entity);
-
-        if( !_isSameGraph ) {
-            const _eIdx = this._pcEntryIndex(_entity.entity);
-            if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
-                // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
-                // only groupId/color/fill change on a cross-graph move.
-                // Mutate in place (not a replacement object) — _entity/this.pconfig.entities[_eIdx]
-                // IS the same object as g.entities[...] now that there's no separate runtime
-                // copy; reassigning here would silently detach that reference. The entry is
-                // still moved to a new array position below, just never replaced.
-                const _updatedEntry = this.pconfig.entities[_eIdx];
-                _updatedEntry.groupId = _tgtGroupId;
-                // Joins the target's own sub-graph of that group (see _uncombineEntity)
-                this._setGraphKey(_updatedEntry, _tgt.entities[0].graphKey);
-                _updatedEntry.color = _entity.color;
-                _updatedEntry.fill = _entity.fill;
-                this.pconfig.entities.splice(_eIdx, 1);
-                const _tgtLastIdx = this.pconfig.entities.reduce((acc, en, i) =>
-                    (typeof en === 'object' && en.groupId === _tgtGroupId) ? i : acc, -1);
-                if( _tgtLastIdx >= 0 ) {
-                    this.pconfig.entities.splice(_tgtLastIdx + 1, 0, _updatedEntry);
-                } else {
-                    this.pconfig.entities.push(_updatedEntry);
-                }
-            }
-        }
-
-        const _srcOrigGroupId = _src.groupId;
-        // Graph-level neighbor when staying within one group (same graph, or linked graphs
-        // of one group): each graph is rebuilt right where it was inside the block
-        const _srcNextG0 = ( _isSameGraph || _sameGroup ) ? this._nextGraph(_src) : this._nextGroup(_src);
-        this._detachGraph(_src);
-
-        const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
-        const _allTgtEntities = _isSameGraph
-            ? (() => {
-                const _arr = _src.entities.filter((_, i) => i !== _srcIdx);
-                const _insertAt = _tgtInsertIdx > _srcIdx ? _tgtInsertIdx - 1 : _tgtInsertIdx;
-                _arr.splice(_insertAt < 0 ? _arr.length : _insertAt, 0, _entity);
-                return _arr;
-            })()
-            : null;
-
-        if( !_isSameGraph ) {
-            if( !_srcEmpty ) {
-                const _saved = this.pconfig.combineSameUnits;
-                this.pconfig.combineSameUnits = true;
-                _srcRemaining.forEach((en, i) => {
-                            const _pe = this._pcEntryInGroup(en.entity, _srcOrigGroupId);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG0, undefined, false, null, _srcOrigGroupId, _pe ?? en);
-                        });
-                this.pconfig.combineSameUnits = _saved;
-            }
-            const _tgtNextG0 = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
-            this._detachGraph(_tgt);
-            const _newTgtEntities = [..._tgt.entities];
-            _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
-            const _saved2 = this.pconfig.combineSameUnits;
-            this.pconfig.combineSameUnits = true;
-            _newTgtEntities.forEach((en, i) => {
-                            const _pe = this._pcEntryInGroup(en.entity, _tgtGroupId);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, _tgtNextG0, undefined, false, null, _tgtGroupId, _pe ?? en);
-                        });
-            this.pconfig.combineSameUnits = _saved2;
-            if( _sameGroup ) this._syncGroupOrder(_tgtGroupId);
-        } else {
-            const _groupId = this._pcGroupIdOf(_allTgtEntities[0].entity);
-            if( _groupId !== undefined ) {
-                // Same fix as legend reorder: groupId alone doesn't uniquely identify one graph
-                const _srcEntityIds = new Set(_allTgtEntities.map(en => en.entity));
-                const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                this.pconfig.entities = this.pconfig.entities.filter(en => !(typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity)));
-                const _reordered = _allTgtEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
-                this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
-            }
-            const _saved = this.pconfig.combineSameUnits;
-            this.pconfig.combineSameUnits = true;
-            _allTgtEntities.forEach((en, i) => {
-                            const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
-                            this.addGraph(en.entity, i === 0, en.color, en.fill, _srcNextG0, undefined, false, null, _groupId ?? null, _pe ?? en);
-                        });
-            this.pconfig.combineSameUnits = _saved;
-        }
-
         this.writeLocalState();
         this.updateHistory();
     }
@@ -3123,25 +2980,11 @@ export class HistoryCardState {
         const _newTgtIdx = this.graphs.indexOf(_tgtG);
         this.graphs.splice(_insertBefore ? _newTgtIdx : _newTgtIdx + 1, 0, ..._moved);
 
-        // Reorder pconfig.entities directly — never derive it from this.graphs, which is
-        // only guaranteed correct for the _srcG/_tgtG pair just moved, not for the rest of
-        // the page. Pull _srcG's entities out and reinsert them right before/after _tgtG's,
-        // exactly like the DOM move above, leaving everything else untouched. Done before
-        // the graphIndex calculation below, which reads pconfig.entities' order.
-        const _srcEntityIds = new Set(_moved.flatMap(g => g.entities.map(e => e.entity)));
-        const _movedEntries = this.pconfig.entities.filter(e => typeof e === 'object' && _srcEntityIds.has(e.entity));
-        const _rest = this.pconfig.entities.filter(e => !(typeof e === 'object' && _srcEntityIds.has(e.entity)));
-        const _tgtEntityIds = new Set(_tgtG.entities.map(e => e.entity));
-        const _tgtRestIdx = _insertBefore
-            ? _rest.findIndex(e => typeof e === 'object' && _tgtEntityIds.has(e.entity))
-            : (() => {
-                let _last = -1;
-                _rest.forEach((e, i) => { if( typeof e === 'object' && _tgtEntityIds.has(e.entity) ) _last = i; });
-                return _last;
-            })();
-        const _insertAt = _insertBefore ? _tgtRestIdx : (_tgtRestIdx < 0 ? _rest.length : _tgtRestIdx + 1);
-        _rest.splice(_insertAt < 0 ? _rest.length : _insertAt, 0, ..._movedEntries);
-        this.pconfig.entities = _rest;
+        // The same move in the persisted list — never derived from this.graphs, only right
+        // for the pair just moved. Before the graphIndex calculation below, which reads the
+        // list's order.
+        this.store.moveBefore(new Set(_moved.flatMap(g => g.entities.map(e => e.entity))),
+            new Set(_tgtG.entities.map(e => e.entity)), _insertBefore);
 
         // graphIndex: same real-number ordering scheme as addGraph — look at the insertion
         // point (_tgtG, _insertBefore), not at _srcG (looking at _srcG's own neighbors
@@ -3193,7 +3036,7 @@ export class HistoryCardState {
     {
         if( this._hass.states[entity_id] === undefined ) return;
         const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-        const _exists = this.pconfig.entities.some(en => entityIdOf(en) === entity_id);
+        const _exists = this.store.has(entity_id);
         const _existingG = _exists ? this.graphs.find(g => g.entities.some(e => e.entity === entity_id)) : null;
         const _r = _existingG?.canvas.getBoundingClientRect();
         const _tx = _ir ? _ir.left + _ir.width / 2 : (_r ? _r.left + _r.width / 2 : window.innerWidth / 2);
@@ -3233,7 +3076,7 @@ export class HistoryCardState {
             const _newIds = [];
             for( let eid of ids ) {
                 if( this._hass.states[eid] === undefined ) continue;
-                if( this.pconfig.entities.some(en => entityIdOf(en) === eid) ) {
+                if( this.store.has(eid) ) {
                     _duplicates.push(eid);
                     const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === eid));
                     if( _existingG ) _duplicateGraphs.add(_existingG);
@@ -3296,7 +3139,7 @@ export class HistoryCardState {
                 const _eid = e.dataset.entity;
                 if( !regex.test(_eid) ) continue;
                 if( this._hass.states[_eid] == undefined ) continue;
-                if( this.pconfig.entities.some(en => entityIdOf(en) === _eid) ) continue;
+                if( this.store.has(_eid) ) continue;
                 _matchedIds.push(_eid);
             }
 
@@ -3310,7 +3153,7 @@ export class HistoryCardState {
         } else {
 
             if( this._hass.states[entity_id] == undefined ) return;
-            if( this.pconfig.entities.some(en => entityIdOf(en) === entity_id) ) {
+            if( this.store.has(entity_id) ) {
                 // Entity already exists — show tooltip and highlight containing graph
                 const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === entity_id));
                 if( _existingG ) {
@@ -3371,7 +3214,7 @@ export class HistoryCardState {
             }
         }
 
-        this.pconfig.entities = this.pconfig.entities.filter(e => e.isStatic);
+        this.store.removeAllDynamic();
 
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
@@ -3388,8 +3231,7 @@ export class HistoryCardState {
     _deleteEntity(g, idx)
     {
         const _entity = this._detachAndRebuildRemaining(g, idx);
-        const _eIdx = this._pcEntryIndex(_entity.entity);
-        if( _eIdx >= 0 ) this.pconfig.entities.splice(_eIdx, 1);
+        this.store.remove(_entity.entity);
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
         this.writeLocalState();
@@ -3568,39 +3410,6 @@ export class HistoryCardState {
         fi.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    _pcEntryIndex(entityId)
-    {
-        // Index of an entity's entry in pconfig.entities, or -1 if not found
-        return this.pconfig.entities.findIndex(en => entityIdOf(en) === entityId);
-    }
-
-    _pcGroupIdOf(entityId)
-    {
-        // groupId of an entity's entry in pconfig.entities, or undefined if not found
-        return this.pconfig.entities.find(en => entityIdOf(en) === entityId)?.groupId;
-    }
-
-    // Physically groups pconfig.entities by groupId (first-occurrence order) — the same
-    // grouping the rebuild and display already apply implicitly. Called by anything that
-    // can leave entries interleaved (e.g. mutating one entity's groupId in place without
-    // moving it, as _uncombineEntity does), so pconfig.entities' own array order stays the
-    // single source of truth for display order — trivial to read (just walk the array),
-    // no need to re-derive a "true" order via a search/lookup rule anywhere else.
-    _regroupPcEntities()
-    {
-        const _groupMap = new Map();
-        const _groupOrder = [];
-        for( let e of this.pconfig.entities ) {
-            const _groupId = typeof e === 'object' ? e.groupId : undefined;
-            const _key = _groupId ?? Symbol();
-            if( !_groupMap.has(_key) ) { _groupMap.set(_key, []); _groupOrder.push(_key); }
-            _groupMap.get(_key).push(e);
-        }
-        const _reordered = [];
-        for( let _key of _groupOrder ) _reordered.push(..._groupMap.get(_key));
-        this.pconfig.entities = _reordered;
-    }
-
     // All graphs on the page, in true display order: pconfig.entities' own order decides
     // between different groupId blocks; within one groupId block (usually a single graph,
     // exceptionally several linked ones), graphIndex decides — position in pconfig.entities
@@ -3619,7 +3428,7 @@ export class HistoryCardState {
             _result.push(..._blockGraphs);
             _blockGraphs = [];
         };
-        for( let en of this.pconfig.entities ) {
+        for( let en of this.store.list ) {
             if( typeof en !== 'object' ) continue;
             const _g = this.graphs.find(gr => gr.entities.some(e => e.entity === en.entity));
             if( !_g || _seen.has(_g) ) continue;
@@ -3675,24 +3484,17 @@ export class HistoryCardState {
     _nextGroup(g)
     {
         const _lastEntity = g.entities[g.entities.length - 1];
-        const _startIdx = this._pcEntryIndex(_lastEntity.entity);
+        const _list = this.store.list;
+        const _startIdx = this.store.indexOf(_lastEntity.entity);
         if( _startIdx < 0 ) return null;
-        for( let i = _startIdx + 1; i < this.pconfig.entities.length; i++ ) {
-            const _e = this.pconfig.entities[i];
+        for( let i = _startIdx + 1; i < _list.length; i++ ) {
+            const _e = _list[i];
             if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
             const _eid = entityIdOf(_e);
             const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
             if( _candidateG ) return _candidateG;
         }
         return null;
-    }
-
-    _pcEntryInGroup(entityId, groupId)
-    {
-        // Find an entity's persisted entry, scoped to a specific groupId — groupId alone
-        // doesn't uniquely identify one graph (an entity id could in principle appear in
-        // more than one group across renames/edits), so this disambiguates.
-        return this.pconfig.entities.find(e => typeof e === 'object' && e.entity === entityId && e.groupId === groupId);
     }
 
     _detachGraph(g)
@@ -3722,16 +3524,8 @@ export class HistoryCardState {
         const _origGroupId = g.groupId;
         const _nextG = nextG !== undefined ? nextG : this._nextGroup(g);
         this._detachGraph(g);
-        if( _remaining.length ) {
-            _remaining.forEach(en => { en.siConversionFactor = undefined; });
-            const _savedCombine = this.pconfig.combineSameUnits;
-            this.pconfig.combineSameUnits = true;
-            _remaining.forEach((en, i) => {
-                const _pe = this._pcEntryInGroup(en.entity, _origGroupId);
-                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _origGroupId, _pe ?? en);
-            });
-            this.pconfig.combineSameUnits = _savedCombine;
-        }
+        _remaining.forEach(en => { en.siConversionFactor = undefined; });
+        this._rebuildGraph(_remaining, _origGroupId, _nextG);
         return _entity;
     }
 
@@ -3772,7 +3566,7 @@ export class HistoryCardState {
         const _g = this.graphs.find(g => g.entities.includes(_entry));
         if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
             // A brand-new graph (or one left without a group by that old bug): a group of its own
-            const _gid = this._nextGroupId++;
+            const _gid = this.store.newGroupId();
             _g.groupId = _gid;
             _g.entities.forEach(e => { e.groupId = _gid; });
         }
@@ -3851,10 +3645,7 @@ export class HistoryCardState {
         for( let i = 0; i < this.graphs.length; i++ ) {
             if( this.graphs[i].id == id ) {
                 this._graphDiv(this.graphs[i]).remove();
-                for( let e of this.graphs[i].entities ) {
-                    const j = this.pconfig.entities.findIndex(en => entityIdOf(en) === e.entity && !en.isStatic);
-                    if( j >= 0 ) this.pconfig.entities.splice(j, 1);
-                }
+                for( let e of this.graphs[i].entities ) this.store.remove(e.entity, true);
                 this.graphs.splice(i, 1);
                 break;
             }
@@ -3894,16 +3685,9 @@ export class HistoryCardState {
         // throughout this file). If not (a genuinely new entity), create one now and use
         // it — g.entities[0] below is this SAME object, never a copy, so there is nothing
         // left to keep in sync between "session" and "persisted" entity data.
-        let _pcEntry = overrideEntityProps;
-        if( !_pcEntry ) {
-            _pcEntry = { entity: entity_id };
-            this.pconfig.entities.push(_pcEntry);
-        } else if( !this.pconfig.entities.includes(_pcEntry) ) {
-            // Defensive: overrideEntityProps was provided but isn't actually a live
-            // pconfig.entities entry (e.g. a plain runtime object) — register it so it
-            // becomes one, rather than silently creating a second, disconnected copy.
-            this.pconfig.entities.push(_pcEntry);
-        }
+        // (an overrideEntityProps that isn't a persisted entry yet — a plain runtime object —
+        // is registered as one, rather than leaving a second, disconnected copy)
+        const _pcEntry = this.store.add(overrideEntityProps ?? { entity: entity_id });
         _pcEntry.entity = entity_id;
         // The entity's own display type — kept per entity, since a graph can now hold both
         // line and bar entities (see _entityKind)
@@ -4640,11 +4424,11 @@ export class HistoryCardState {
             this.pconfig.nextDefaultColor = 0;
 
             // Rebuild all graphs (static and dynamic) from pconfig.entities
-            if( this.pconfig.entities ) {
+            if( this.store.list ) {
                 // Group by groupId, preserving first-occurrence order
                 const _groupMap = new Map();
                 const _groupOrder = [];
-                for( let e of this.pconfig.entities ) {
+                for( let e of this.store.list ) {
                     const _groupId = typeof e === 'object' ? e.groupId : undefined;
                     const _key = _groupId ?? Symbol();
                     if( !_groupMap.has(_key) ) {
@@ -4662,10 +4446,10 @@ export class HistoryCardState {
                 // graphIndex (one graph) keep their relative order.
                 for( let _group of _groupMap.values() )
                     _group.entities.sort((a, b) => (a.graphIndex ?? 0) - (b.graphIndex ?? 0));
-                // Physically reorder pconfig.entities to match this grouping — never
-                // interleaved again, so its array order stays the single source of truth
-                // for display order everywhere else (neighbor lookups, graphIndex averaging).
-                this._regroupPcEntities();
+                // Physically regroup the persisted list the same way — never interleaved
+                // again, so its order stays the single source of truth for display order
+                // everywhere else (neighbor lookups, graphIndex averaging).
+                this.store.regroup();
 
                 // Rebuild: call addGraph one entity at a time
                 // For statics: force combineSameUnits (YAML author responsible for grouping)
@@ -4674,7 +4458,7 @@ export class HistoryCardState {
                 // recomputes it: within a group, only entities that were shown in the same
                 // graph are combined again (see addGraph). Statics never persist graphIndex,
                 // so for them this is always undefined === undefined — graphKey decides.
-                this._rebuildGraphIndex = new Map(this.pconfig.entities.map(e => [e, e.graphIndex]));
+                this._rebuildGraphIndex = new Map(this.store.list.map(e => [e, e.graphIndex]));
                 for( let _key of _groupOrder ) {
                     const _group = _groupMap.get(_key);
                     const _isStaticGroup = _group.entities.some(e => e.isStatic);
@@ -4698,7 +4482,7 @@ export class HistoryCardState {
                 // until some unrelated later action happens to call writeLocalState.
                 this.writeLocalState();
             } else
-                this.pconfig.entities = [];
+                this.store.list = [];
 
             this.today(false);
 
@@ -4932,7 +4716,7 @@ export class HistoryCardState {
         }
 
         // Update pconfig.entities — persist lineMode and type
-        const _pcEntry = this.pconfig.entities.find(e => typeof e === 'object' && e.entity === _entity_id);
+        const _pcEntry = this.store.entry(_entity_id);
         // The entity's own type before this change (a bar graph can also hold line entities)
         const _gOld = this.graphs.find(g => g.id === _graph_id);
         const _oldType = _gOld?.entities.find(e => e.entity === _entity_id)?.type ?? _gOld?.type;
@@ -4975,7 +4759,7 @@ export class HistoryCardState {
                 const _savedCombine = this.pconfig.combineSameUnits;
                 this.pconfig.combineSameUnits = true;
                 _newEntities.forEach((en, i) => {
-                    const _pe = this._pcEntryInGroup(en.entity, _origGroupId);
+                    const _pe = this.store.inGroup(en.entity, _origGroupId);
                     // fill is not persisted across a type change: it's derived from color+type,
                     // not a type-independent value. Pass null so addGraph recomputes it correctly
                     // for the target type (transparent for line/arrowline/timeline, solid for bar).
@@ -5549,7 +5333,7 @@ export class HistoryCardState {
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
             yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
-            yaml_entities          : this._pureYamlEntities ?? this.pconfig.entities.filter(e => e.isStatic),
+            yaml_entities          : this._pureYamlEntities ?? this.store.statics(),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
@@ -5599,7 +5383,7 @@ export class HistoryCardState {
         // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
         const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
-        const _yamlEntities = this.pconfig.entities.filter(e => e.isStatic);
+        const _yamlEntities = this.store.statics();
         // Shared by range and order below: a card with no static entities at all has nothing
         // fixed to anchor to, so both default to 'all' (persist by default) instead of the
         // usual 'none' — same reasoning as dynamic entities defaulting to 'all'.
@@ -5680,7 +5464,7 @@ export class HistoryCardState {
             ...(_dynamicEntitiesAllowed ? _dynamicOrder : []),
         ]);
 
-        this.pconfig.entities = [..._entityIds].map(id => {
+        this.store.list = [..._entityIds].map(id => {
             const _yamlE = _findEntity(_yamlEntities, id);
 
             // YAML front — per entity, always wins on change, unaffected by the enable flags
@@ -5747,61 +5531,8 @@ export class HistoryCardState {
             return _result;
         });
 
-        // Migration: renumber dynamic entities with groupId < 1000 to groupId + 1000
-        // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
-        // sequentially from g_id. Dynamic graphs now always use groupId >= 1000.
-        const _yamlGroupIds = new Set(this.pconfig.entities.filter(e => e.isStatic).map(e => e.groupId));
-        // (null is "no group", not group 0 — null < 1000 is true in JS, so it must be
-        // excluded explicitly, or every ungrouped entity would land in one group 1000)
-        const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000);
-        if( _needsRenumber ) {
-            const _remap = new Map();
-            this.pconfig.entities = this.pconfig.entities.map(e => {
-                if( !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000 ) {
-                    if( !_remap.has(e.groupId) ) _remap.set(e.groupId, e.groupId + 1000);
-                    return { ...e, groupId: _remap.get(e.groupId) };
-                }
-                return e;
-            });
-        }
-
-        // Migration: dynamic entities without a group (left by a duplicate-entry bug in
-        // _createAndPersistEntity, fixed in 1.1.43 — the displayed entry never got its
-        // groupId). One new group per graph, graphs told apart by their saved graphIndex.
-        if( this.pconfig.entities.some(e => !e.isStatic && ( e.groupId === null || e.groupId === undefined )) ) {
-            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
-            const _byIndex = new Map();
-            this.pconfig.entities = this.pconfig.entities.map(e => {
-                if( e.isStatic || ( e.groupId !== null && e.groupId !== undefined ) ) return e;
-                const _k = e.graphIndex ?? Symbol();
-                if( !_byIndex.has(_k) ) _byIndex.set(_k, _next++);
-                return { ...e, groupId: _byIndex.get(_k) };
-            });
-        }
-
-        // Migration: the old renumbering above also caught null (fixed in 1.1.43), which put
-        // every ungrouped dynamic entity into one group 1000, each graph linked to the next.
-        // Its signature: one dynamic group with two graphs (told apart by saved graphIndex) of
-        // the same type — impossible otherwise, since same-type graphs of a dynamic group
-        // always combine. Such a group is split back into one group per graph.
-        {
-            const _dynGroups = new Map();
-            for( const e of this.pconfig.entities ) {
-                if( e.isStatic || e.groupId === null || e.groupId === undefined ) continue;
-                if( !_dynGroups.has(e.groupId) ) _dynGroups.set(e.groupId, new Map());
-                const _graphs = _dynGroups.get(e.groupId);
-                const _k = e.graphIndex ?? Symbol();
-                if( !_graphs.has(_k) ) _graphs.set(_k, e.type ?? this._detectDefaultType(e.entity).type);
-            }
-            let _next = Math.max(1000, ...this.pconfig.entities.map(e => e.groupId ?? 0)) + 1;
-            for( const [_groupId, _graphs] of _dynGroups ) {
-                const _types = [..._graphs.values()];
-                if( new Set(_types).size === _types.length ) continue;
-                const _newIds = new Map([..._graphs.keys()].map(k => [k, _next++]));
-                this.pconfig.entities = this.pconfig.entities.map(e =>
-                    ( !e.isStatic && e.groupId === _groupId && _newIds.has(e.graphIndex) ) ? { ...e, groupId: _newIds.get(e.graphIndex) } : e);
-            }
-        }
+        // Group ids left wrong by older versions repaired; next free dynamic group id set
+        this.store.normalizeGroupIds(e => e.type ?? this._detectDefaultType(e.entity).type);
 
         // --- Last one to speak wins — timeRange ---
         // infoPanelEnabled is handled separately below — see the warning comment there,
@@ -5894,9 +5625,6 @@ export class HistoryCardState {
         this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
         this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
 
-        // Set _nextGroupId to max(1000, maxGroupId + 1) — dynamic groupIds always >= 1000
-        const _maxGroupId = Math.max(0, ...this.pconfig.entities.map(e => e.groupId ?? 0));
-        this._nextGroupId = Math.max(1000, _maxGroupId + 1);
 
         // Register defaultInfoPanel with HA user key and detect conflicts across cards.
         // This re-registers with a fresh timestamp on every load, unconditionally — that's
@@ -6094,10 +5822,10 @@ export class HistoryCardState {
                     _matched.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
                     for( let s of _matched ) {
                         const _ent = {...e, 'entity': s};
-                        this.pconfig.entities.push(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
+                        this.store.add(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
                     }
                 } else {
-                    this.pconfig.entities.push(this._makeStaticEntityEntry(e.entity, _groupId, e, _interval));
+                    this.store.add(this._makeStaticEntityEntry(e.entity, _groupId, e, _interval));
                 }
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.

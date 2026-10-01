@@ -1,6 +1,6 @@
 // Runs every interaction test suite against the built history-explorer-card.js (run
-// `yarn build` first). usage: yarn test [mouse|touch|cards ...]
-const SUITES = ['mouse', 'touch', 'cards'];
+// `yarn build` first). usage: yarn test [store|mouse|touch|cards ...]
+const SUITES = ['store', 'mouse', 'touch', 'cards'];
 
 (async () => {
     const only = process.argv.slice(2);

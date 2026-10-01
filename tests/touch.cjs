@@ -116,5 +116,6 @@ module.exports = async function()
         const r1 = await E(`yRange(${li})`);
         return r1[0] > r0[0] && r1[1] > r0[1] && (await t.scrollY()) === 0 ? true : `y ${r0} -> ${r1} scrollY=${await t.scrollY()}`;
     });
+    await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     return t.close();
 };

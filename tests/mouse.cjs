@@ -124,5 +124,6 @@ module.exports = async function()
         const tooltips = await E(`el.instance._allGraphsInDisplayOrder()[${li}].chart.options.tooltips.enabled`);
         return r1[0] < r0[0] && mode === false && tooltips === true ? true : JSON.stringify({ r0, r1, mode, tooltips });
     });
+    await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     return t.close();
 };
