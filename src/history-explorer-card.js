@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b75';
+const Version = '1.2.0b78';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2093,6 +2093,12 @@ export class HistoryCardState {
                         return;
                     }
 
+                    if( info.gestureType === 'dblclick' && info.linkMarkerZone ) {
+                        // Chain icon between two linked graphs: merge them back into one
+                        this._mergeLinkedGraph(g, info.event);
+                        return;
+                    }
+
                     if( info.gestureType === 'dblclick' ) {
                         // Timeline/arrowline double-click uncombine — no native Chart.js
                         // legend equivalent exists for this axis, unlike the legend's own
@@ -3669,7 +3675,6 @@ export class HistoryCardState {
         for( let i = this.graphs.length - 1; i >= 0; i-- ) {
             if( !this.graphs[i].isStatic ) {
                 this._graphDiv(this.graphs[i]).remove();
-                this._this.querySelector(`#gc-${this.graphs[i].id}`)?.remove();
                 this.graphs.splice(i, 1);
             }
         }
@@ -4026,7 +4031,6 @@ export class HistoryCardState {
         // the graph right after g in this.graphs BEFORE calling this, to use as addGraph's
         // targetGraph (insertBefore semantics) for whatever gets rebuilt in its place.
         this._graphDiv(g).remove();
-        this._this.querySelector(`#gc-${g.id}`)?.remove();
         this.graphs.splice(this.graphs.indexOf(g), 1);
     }
 
@@ -4122,6 +4126,9 @@ export class HistoryCardState {
     // Takes no vertical space (height:0 wrapper, icon floated up over it) and is always
     // re-inserted at its correct DOM position even if it already existed, as a cheap safety
     // net — addGraph now inserts each graph div directly at its final spot via targetGraph.
+    // Chain icon between two linked graphs (same group, one right below the other): shown
+    // by Chart.js on the lower one (linkMarkerVisible); a double-click on it reaches
+    // customEvent with linkMarkerZone (see newGraph) and merges them (_mergeLinkedGraph).
     _updateGroupLinkMarkers()
     {
         // Sort by graphIndex — the stable, persisted display-order field — rather than
@@ -4133,43 +4140,11 @@ export class HistoryCardState {
             const _linked = i > 0 && _sorted[i - 1].groupId !== null &&
                             _sorted[i - 1].groupId !== undefined &&
                             _sorted[i - 1].groupId === g.groupId;
-            let _el = this._this.querySelector(`#gc-${g.id}`);
-            if( _linked ) {
-                const _div = this._graphDiv(g);
-                if( !_div ) continue;
-                if( !_el ) {
-                    _el = document.createElement('div');
-                    _el.id = `gc-${g.id}`;
-                    // Straddles the boundary between the two graphs, on the left under the
-                    // upper graph's Y axis labels — an empty spot. Not centered on the lower
-                    // graph's top any more: now that it's clickable (double-click merges), it
-                    // would sit over that graph's legend labels and steal their clicks/drags.
-                    _el.style.cssText = 'height:0;text-align:left;pointer-events:none;';
-                    _el.innerHTML = `<div title="${i18n('ui.menu.linked_graphs')} — ${i18n('ui.menu.linked_graphs_merge')}" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb, var(--primary-background-color) 50%, transparent);position:relative;left:${Math.max(0, Math.round(this.pconfig.labelAreaWidth / 2) - 11)}px;top:-15px;z-index:2;pointer-events:auto;cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z" /></svg></div>`;
-                    _el.firstElementChild.addEventListener('click', (ev) => this._linkMarkerClicked(ev, _el));
-                }
-                // Always reposition (cheap no-op if already correct) — a caller earlier
-                // in the same operation may have created this marker before the graph's
-                // own div reached its final DOM position.
-                _div.parentNode.insertBefore(_el, _div);
-            } else if( _el ) {
-                _el.remove();
-            }
-        }
-    }
-
-    // Double-click (two clicks within 400ms, same as legend labels — also works for
-    // double taps) on the chain icon between two linked graphs merges them back into one.
-    _linkMarkerClicked(event, el)
-    {
-        event.stopPropagation();
-        const _now = Date.now();
-        if( el._hecLastClick && _now - el._hecLastClick < 400 ) {
-            el._hecLastClick = null;
-            const _g = this.graphs.find(g => `gc-${g.id}` === el.id);
-            if( _g ) this._mergeLinkedGraph(_g, event);
-        } else {
-            el._hecLastClick = _now;
+            const _opt = g.chart.options;
+            if( !!_opt.linkMarkerVisible === _linked ) continue;
+            _opt.linkMarkerVisible = _linked;
+            _opt.linkMarkerTitle = `${i18n('ui.menu.linked_graphs')} — ${i18n('ui.menu.linked_graphs_merge')}`;
+            g.chart.update();
         }
     }
 
@@ -4206,7 +4181,6 @@ export class HistoryCardState {
         for( let i = 0; i < this.graphs.length; i++ ) {
             if( this.graphs[i].id == id ) {
                 this._graphDiv(this.graphs[i]).remove();
-                this._this.querySelector(`#gc-${this.graphs[i].id}`)?.remove();
                 for( let e of this.graphs[i].entities ) {
                     const j = this.pconfig.entities.findIndex(en => entityIdOf(en) === e.entity && !en.isStatic);
                     if( j >= 0 ) this.pconfig.entities.splice(j, 1);
@@ -4382,11 +4356,10 @@ export class HistoryCardState {
             const _candDiv = this._graphDiv(_cand);
             _combineGl = _candDiv.parentNode;
             let _sib = _candDiv.nextSibling;
-            while( _sib && (!_combineGl.contains(_sib) || _sib.id?.startsWith('gc-')) ) _sib = _sib.nextSibling;
+            while( _sib && !_combineGl.contains(_sib) ) _sib = _sib.nextSibling;
             _combineInsertBefore = _sib;
 
             // Delete the old graph, will be regenerated below including the new entity
-            this._this.querySelector(`#gc-${_cand.id}`)?.remove();
             _candDiv.remove();
             this.graphs.splice(_combineIdx, 1);
 

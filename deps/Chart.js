@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b75
+ * HEC fork — synced with history-explorer-card version: 1.2.0b78
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b75';
+        var HEC_CHART_VERSION = '1.2.0b78';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -4498,6 +4498,7 @@
             me._hecUpdateYAxisState();
             me._hecUpdateDragTouchOverlays();
             me._hecUpdateMoveHandleIcon();
+            me._hecUpdateLinkMarker();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
           },
@@ -4616,6 +4617,57 @@
             }
             me._hecAttachToCanvasParent(_el);
             return _el;
+          },
+
+          // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
+          // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays.
+          // Minus where the chain icon (drawn over it) overlaps its top edge.
+          _hecInLockAndHandleZone: function (x, y) {
+            return x >= 0 && x <= 33 && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+          },
+
+          // Linked-graphs marker (chain icon), shown while options.linkMarkerVisible is
+          // true: straddling this chart's top edge, under the Y axis labels of the graph
+          // above (an empty spot — centered on the top it would cover this chart's legend).
+          // Canvas-relative rectangle, or null when hidden.
+          _hecLinkMarkerRect: function () {
+            if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
+            return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+          },
+
+          _hecInLinkMarkerZone: function (x, y) {
+            var _r = this._hecLinkMarkerRect();
+            return !!_r && x >= _r.left && x <= _r.left + _r.width && y >= _r.top && y <= _r.top + _r.height;
+          },
+
+          // The chain icon itself: a relay zone like the others (_hecTouchOverlay) — its
+          // gestures reach customEvent like any other on this chart, with linkMarkerZone
+          // true (the card merges the two graphs on a double-click). options.linkMarkerTitle:
+          // its hover text, given by the card.
+          _hecUpdateLinkMarker: function () {
+            var me = this;
+            var _r = me._hecLinkMarkerRect();
+            var _el = me._hecLinkMarkerEl;
+            if (!_r) {
+              if (_el) _el.style.display = 'none';
+              return;
+            }
+            if (!_el) {
+              _el = me._hecTouchOverlay('_hecLinkMarkerEl', 'pointer');
+              _el.style.zIndex = '2';
+              _el.style.alignItems = 'center';
+              _el.style.justifyContent = 'center';
+              _el.style.borderRadius = '50%';
+              _el.style.background = 'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
+              _el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
+            }
+            me._hecAttachToCanvasParent(_el);
+            _el.style.display = 'flex';
+            _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
+            _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
+            _el.style.width = _r.width + 'px';
+            _el.style.height = _r.height + 'px';
+            _el.title = me.options.linkMarkerTitle || '';
           },
 
           // Graph reorder handle symbol (⠿) — purely visual, pointer-events:none.
@@ -5527,7 +5579,7 @@
               {
                 name: 'lockAndHandle',
                 test: function (p) {
-                  var _inZone = p.x0 >= 0 && p.x0 <= 33 && p.y0 >= 0 && p.y0 <= 28;
+                  var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0);
                   if (!_inZone) return false;
                   var _gRect = me.canvas.getBoundingClientRect();
                   me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
@@ -5694,7 +5746,7 @@
                 // Grouped lock+handle zone: dblclick toggles the lock exactly the
                 // same way click does (see the click branch below) — same zone
                 // check, same action, no pointerType distinction.
-                var _dblInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
                 if (_dblInLockAndHandleZone) {
                   me._hecToggleYAxisLock();
                 }
@@ -5726,7 +5778,7 @@
                   var _bSel = me.options.floatingBoundsSelector;
                   Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
                 }
-                var _clickInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
                 if (_clickInLockAndHandleZone) {
                   // Grouped lock+handle zone: a click here always toggles the lock.
                   // On mouse/pen, that's the whole story — simple, no two-step: click
@@ -5773,7 +5825,8 @@
                 legendIndex: legendIndexAt(_hx, _hy),
                 yAxisIndex: _yIdx,
                 truncatedYAxisLabel: _truncated,
-                lockAndHandleZone: _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28,
+                lockAndHandleZone: me._hecInLockAndHandleZone(_hx, _hy),
+                linkMarkerZone: me._hecInLinkMarkerZone(_hx, _hy),
                 zoomSelectMode: me.options.zoomSelectMode === true,
                 gestureType: gestureType,
                 pointerCount: gs.count,
