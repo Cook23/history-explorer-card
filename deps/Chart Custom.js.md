@@ -5,22 +5,41 @@ This documents everything added or changed in this fork relative to
 repeat anything already covered by the official 2.7.1 docs — only what's
 different here.
 
-The guiding principle behind all of it: **Chart.js owns every mouse/touch
-interaction on its own canvas** (clicks, drags, zoom, pan, hover, tooltips,
-cursors). `history-explorer-card.js` owns all domain/business logic
-(entities, groups, Home Assistant state, persistence) and never listens to
-a raw pointer/mouse event on a graph canvas directly — it receives
-everything through the `customEvent` option described below, and calls
-back into Chart.js only through the public options/methods listed here,
-never through private state.
+## 0. The contract between Chart.js and the card (frozen in 1.2.0)
 
-The one documented exception: cross-graph drag (moving a curve, a
-timeline/arrowline entity, or reordering graphs onto a *different*
-graph's canvas) has the source chart instance look up the destination
-instance via `Chart.instances` and re-dispatch through that instance's own
-`customEvent` — there's no clean way for one canvas's gesture to reach
-another chart's data/hit-testing otherwise. Every other interaction stays
-within a single chart instance.
+**Chart.js owns every mouse/touch interaction on its own canvas** (gesture
+detection, hit-testing, zones, cursors, `touch-action`, drag ghost, insertion
+markers, Y axis pan/zoom/lock, tooltips). **`history-explorer-card.js` owns
+everything that has a meaning** (entities, groups, the shared time window,
+Home Assistant state, persistence, menus). They talk through four channels
+only:
+
+| Direction | Channel | What goes through it |
+|---|---|---|
+| Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
+| Card → Chart.js | stock 2.7.1 methods | `update()`, `resize()`, `getDatasetMeta()` — nothing else |
+| Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
+| Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
+| Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
+
+Rules that keep it that way:
+
+- The card never listens to a pointer, mouse, touch or wheel event on a graph
+  canvas, never reads a chart's layout (`chartArea`, `legend`, hit boxes, scale
+  pixels) and never calls or reads anything `_hec`-prefixed. Whatever position it
+  needs comes in the payload: a `zone`, an index, a fraction of the time axis
+  (`xFactor`, `centerFactor`, `deltaFactor`), or client coordinates.
+- Chart.js never knows what an entity, a group or a time window is. When a
+  gesture's outcome depends on that (may this curve be dropped there?), it asks
+  through `customEvent` and reads the answer the card writes in an option.
+- A new interaction is added by extending this contract (an option, a payload
+  field, a `gestureType`), documented here — never by reaching across it.
+
+The one place a chart deals with another one: a drag onto another graph (a
+curve, a timeline/arrowline row, a whole graph) is followed by the source chart,
+which finds the chart under the pointer among `Chart.instances` of the same
+`dragScope` and sends it a `dragovergraph` through that chart's own
+`customEvent`.
 
 ---
 
@@ -34,26 +53,26 @@ or `maintainAspectRatio`.
 |---|---|---|---|
 | `customEvent` | `function(payload)` | none (opt-in) | If not a function, no custom gesture events are ever fired at all — the whole mechanism described in §2 is inert. |
 | `cursorEnabled` | `boolean` | `true` | Canvas cursor never changes to `move`/`ns-resize`/etc. on hover; stays whatever the page's default is. |
-| `wheelZoomEnabled` | `boolean` | `true` | Mouse wheel does nothing at all on this chart (no Ctrl+wheel zoomX callback, no Shift+wheel zoomY). |
-| `panEnabled` | `boolean` | `true` | Dragging a graph (1-finger or 2-finger pinch center-move) never calls the `panX`/`panY` callbacks (§3), though the drag is still detected and still fires `customEvent`. |
-| `zoomEnabled` | `boolean` | `true` | Pinch (2-finger) zoom X and Y are both inert — no scale change, no `zoomX` callback call. |
+| `wheelZoomEnabled` | `boolean` | `true` | Mouse wheel does nothing at all on this chart (no Ctrl+wheel `zoomX`, no Shift+wheel Y zoom). |
+| `panEnabled` | `boolean` | `true` | Dragging a graph (1-finger or 2-finger pinch center-move) never calls `panX` and never pans the Y axis during a pinch, though the drag is still detected and still fires `customEvent`. |
+| `zoomEnabled` | `boolean` | `true` | Zoom X and Y are both inert — no Y scale change, no `zoomX` call. |
 | `zoomYEnabled` | `boolean` | `true` | Y-axis zoom specifically (wheel Shift+wheel, or the Y-spread of a pinch) is inert, even if `zoomEnabled` is on. |
 | `yAxisPanEnabled` | `boolean` | `true` | Dragging directly on the Y-axis label zone (or Shift+drag anywhere on a `line`/`bar` graph) never pans the Y scale. Never applies to `timeline`/`arrowline` graphs regardless. |
 | `yAxisLockEnabled` | `boolean` | `true` | The Y-axis lock icon (padlock) is never drawn, never engages automatically, and the grouped lock+handle click/dblclick toggle (§5) does nothing. |
-| `legendClickEnabled` | `boolean` | `true` | Clicking/double-clicking a legend label never toggles/isolates its dataset (the native `legend.onClick` you'd configure yourself in 2.7.1 is unaffected — this only gates whether our gesture layer forwards clicks to it at all). |
+| `legendClickEnabled` | `boolean` | `true` | A click/double-click on a legend label is not forwarded to the stock `legend.onClick`. The card sets it to `false`: it handles legend clicks like every other gesture, from `customEvent` (`click`/`dblclick` with `legendIndex`). |
 | `labelTooltipEnabled` | `boolean` | `true` | Clicking a truncated Y-axis category label (timeline/arrowline) never shows its full text in a tooltip. |
 | `altSampleModeEnabled` | `boolean` | `true` | Holding Alt while hovering never switches `hover.mode` to `'dataset'` (showing every sample instead of just the nearest point). |
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
-| `panX` | `function({chart, deltaPixels, event})` | none | Card-supplied callback for horizontal (time) panning, called by the one-finger plot drag and by the fingers' common movement in a pinch. **Not implemented by Chart.js itself** — the shared date range across multiple graphs is a card responsibility. The card doesn't use it: it pans the time from the `dragmove` and `pinch` events (§2). Label drags and graph moves never call it. |
-| `panY` | `function({chart, deltaPixels, event})` | none | Never called any more: Y-axis panning, including the vertical movement of a pinch, is applied by Chart.js directly (§3). Kept only for backward compatibility. |
-| `zoomX` | `function({chart, scale or deltaY, centerPixels, event})` | none | Card-supplied callback for horizontal (time) zoom, around `centerPixels`: Ctrl+wheel (`deltaY`) and the horizontal spread of a pinch (`scale`, old spread / new spread, < 1 when the fingers move apart). The card zooms by its fixed range steps, like its zoom buttons: one step per wheel tick, and one per ×1.5 of accumulated pinch spread. Every Ctrl+wheel tick is kept from zooming the page, the debounced ones included. |
+| `panX` | `function({chart, phase, deltaFactor, event})` | none | The time axis (the card's — the time window is shared by every graph) is moved by a drag: the one-finger drag on the plot area, and the fingers' common horizontal movement in a pinch. `phase`: `'start'`, `'move'` (`deltaFactor`: the movement since the last call, in widths of the plot area, > 0 rightward) or `'end'`. Label drags, graph moves and drags in zoom select mode never call it. |
+| `zoomX` | `function({chart, step, centerFactor, event})` | none | The time axis is zoomed by one step: `step` +1 zooms in, -1 out, around `centerFactor` (0 at the plot area's left edge, 1 at its right edge). From Ctrl+wheel (one step per tick, after the 150 ms debounce — every tick is kept from zooming the page) and from the horizontal spread of a pinch (one step each time the spread, accumulated since the last step, changes by ×1.5). |
 | `dragGhostEnabled` | `boolean` | `true` | No drag ghost (the floating label following the pointer) and no insertion marker during a drag. |
-| `zoomSelectMode` | `boolean` | `false` | When `true`, a drag over the plot area selects a time span (Chart.js draws the selection; the span comes back in `dragend`'s `zoomSelectX0`/`zoomSelectX1`) instead of panning. Set by the card while its zoom button is on. |
+| `zoomSelectMode` | `boolean` | `false` | When `true`, a drag over the plot area selects a time span (Chart.js draws the selection; the span comes back in `dragend`'s `zoomSelectFactor0`/`zoomSelectFactor1`) instead of panning, and a drag elsewhere doesn't pan. Set by the card while its zoom button is on. |
 | `dropAllowed` | `boolean` | `true` | Written by the card on the chart a drag is over, from its `dragovergraph` event (§2): `false` shows that graph's drop highlight as refused (dashed, error color), no insertion marker, and the dragging pointer's cursor as `not-allowed` (otherwise `grabbing`). |
-| `insertionForbidden` | `boolean` | `false` | Written by the card during a graph move: `true` draws the graph-move insertion marker in the error color (dropping there would split a block of linked graphs). |
-| `linkMarkerVisible` | `boolean` | `false` | When `true`, the linked-graphs chain icon is drawn straddling this chart's top edge, under the labels of the graph above (§5). The card sets it on the lower graph of two linked ones. A double-click/double-tap on it fires `customEvent` with `linkMarkerZone: true`. |
+| `insertionForbidden` | `boolean` | `false` | Written by the card during a graph move, from the `dragovergraph` it receives (with `insertBefore`): `true` draws the graph-move insertion marker in the error color (dropping there would split a block of linked graphs). |
+| `linkMarkerVisible` | `boolean` | `false` | When `true`, the linked-graphs chain icon is drawn straddling this chart's top edge, under the labels of the graph above (§5). The card sets it on the lower graph of two linked ones. A double-click/double-tap on it fires `customEvent` with `zone: 'linkMarker'`. |
 | `linkMarkerTitle` | `string` | `''` | Hover text of the chain icon (the card's translated text). |
 | `floatingBoundsSelector` | CSS selector | none | The area Chart.js's floating elements (hover tooltip, truncated-label message) stay in: the closest ancestor of the canvas matching it, else the viewport only (see `Chart.hecUi.clampToViewport`, §7). The card passes `'#maincard'` — Chart.js knows nothing about the card's markup. |
+| `legend.leftMargin` / `legend.rightMargin` | `number` (px) | `50` / `25` | Room kept free at both ends of the legend's lines (`options.legend`, next to the stock legend options). The card sets `rightMargin` so the legend keeps clear of the buttons it draws over the graph's top right corner. |
 | `dragScope` | any value | none | A cross-graph drag (curve, label, graph move) only reaches the charts with the same `dragScope` — the card gives each of its instances its own, so two cards on the same dashboard never see each other's drags. |
 
 None of these existed in stock 2.7.1 — `options.hover.mode`,
@@ -79,22 +98,32 @@ that fires a single callback: **`options.customEvent(payload)`**.
 
 ### Payload shape (every gesture)
 
+Built in one place (`_hecPayload`), for this chart's gestures and for the
+`dragovergraph` another chart sends it. Positions are given in every form the
+card may need, so it never has to compute one from the chart's layout.
+
 ```js
 {
-  chart,              // the Chart instance
-  element,             // native getElementAtEvent() result, or null
-  legendIndex,          // legend item index at the gesture's position, or -1
-  yAxisIndex,           // timeline/arrowline label row index at the position, or -1
-  truncatedYAxisLabel,   // full text if that label is visually truncated, else null
-  lockAndHandleZone,     // true if the gesture is within the lock+handle zone (§5)
-  linkMarkerZone,        // true if the gesture is on the chain icon (linkMarkerVisible, §5)
-  gestureType,          // one of the 11 strings below
-  pointerCount,          // how many pointers are currently down
-  pointerType,          // 'mouse' | 'touch' | 'pen' — from the native PointerEvent
-  button,               // native event.button, or undefined
-  event,                // the native PointerEvent (or synthetic PointerEvent for
-                         // events forwarded from a touch overlay, see §5)
-  // ...plus gestureType-specific fields, see below
+  chart,               // the Chart instance
+  gestureType,         // one of the strings below
+  x, y,                // the gesture's point, canvas-relative
+  clientX, clientY,    // the same point, client (viewport) coordinates
+  zone,                // where that point is: 'linkMarker' (chain icon, §5),
+                       // 'lockAndHandle' (§5), 'legend' (its band, whole width),
+                       // 'yAxis' (left of the plot area), 'plot', or 'other'
+  xFactor,             // where x is along the time axis: 0 at the plot area's left
+                       // edge, 1 at its right edge (undefined before the first layout)
+  legendIndex,         // legend label under the point, or -1
+  yAxisIndex,          // timeline/arrowline row under the point, or -1
+  labelRect,           // client rectangle {left, top, right, bottom} of that legend
+                       // label, else of that row (the whole label column), else null
+  element,             // stock getElementAtEvent() result, or null
+  truncatedYAxisLabel, // full text if that row's label is visually truncated, else null
+  pointerCount,        // how many pointers are down
+  pointerType,         // 'mouse' | 'touch' | 'pen'
+  button,              // native event.button, or undefined
+  event,               // the native PointerEvent (or the one a touch overlay forwards, §5)
+  // ...plus the gestureType's own fields, below
 }
 ```
 
@@ -105,19 +134,34 @@ reconstructed from raw `pointerdown`/`pointermove`/`pointerup`/
 `pointercancel`/`wheel`, since the browser only gives you native `click`
 and `dblclick`, and nothing at all for long-press or drag.
 
-| `gestureType` | Fires when | Extra payload fields |
+| `gestureType` | Fires when | Its own payload fields |
 |---|---|---|
 | `click` | Pointer released, stayed within 10px, before the 600ms long-press timer fired, and this same press wasn't the second half of a double-click | — |
 | `dblclick` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`), not at release | — |
 | `longpress` | Pointer held stationary (within 10px) for 600ms without releasing | — |
-| `dragstart` | Pointer moves past 10px total (either axis combined) while still down | — |
-| `dragmove` | Pointer continues moving while a drag is active | `x`, `y` (canvas-relative position), `panDeltaX` (incremental horizontal movement since the last `dragmove`) |
-| `dragend` | Pointer released or gesture cancelled while a drag was active | — |
-| `dragovergraph` | During a drag, the pointer passes over a *different* chart instance's canvas — re-dispatched through that instance's own `customEvent` (the one documented cross-instance exception, see intro) | `x`, `y` (relative to the other chart) |
-| `pinch` | Two fingers down, either one moves | `panDeltaX`, `panDeltaY` (center-point movement), `zoomScaleX`, `centerPixelsX`, `centerPixelsY` — no `zoomScaleY`, since Y-axis zoom during a pinch is applied directly by Chart.js (§3), never left for a consumer to compute |
-| `pinchend` | One finger of a pinch lifts, the other remains down | position of the *remaining* finger (canvas-relative, via the standard `hitX`/`hitY` mechanism) plus explicit `clientX`/`clientY` (screen coordinates), since the native `event` on this payload still refers to the finger that's lifting, not the one continuing |
-| `hover` | Pointer moves without any button/finger down | `legendIndex`, `yAxisIndex` (redundant with the top-level fields, kept for consumers that only care about hover) |
+| `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
+| `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
+| `dragovergraph` | During a drag, the pointer is over a *different* chart of the same `dragScope` — sent through that chart's own `customEvent`, its payload relative to that chart | for a graph move: `insertBefore` (the pointer is above that graph's middle) |
+| `dragend` | Pointer released or gesture cancelled while a drag was active | zoom selection: `zoomSelectFactor0`, `zoomSelectFactor1` (its two ends along the time axis, see `xFactor`). Label or graph drag: `drop` (below). Any other drag: neither |
+| `pinch` | Two fingers down, either one moves | `panDeltaX`, `panDeltaY` (centre movement, px), `zoomScaleX`, `centerPixelsX`, `centerPixelsY` — informative only: the time axis gets the pinch through `panX`/`zoomX`, the Y axis is Chart.js's own (§3) |
+| `pinchend` | One finger of a pinch lifts, the other remains down | the payload's point is the *remaining* finger's |
+| `hover` | Pointer moves without any button/finger down | — |
 | `wheel` | Mouse wheel used over the canvas | `deltaX`, `deltaY`, `ctrlKey`, `shiftKey`, `altKey` |
+
+`drop` — where a label or a graph was dropped, resolved by the same lookups as
+the insertion marker shown during the drag, so the drop always lands where the
+marker said:
+
+```js
+{
+  chart,         // the chart under the pointer (curve or row drag: this one included;
+                 // graph move: another one only), or null
+  index,         // curve drag: the legend label to insert next to; row drag: the
+                 // nearest row; -1 for none (and always for a graph move)
+  insertBefore   // before that label/row, else after it; graph move: above the
+                 // target graph's middle
+}
+```
 
 ### Mutual exclusion rules (all intentional, not incidental)
 
@@ -153,13 +197,17 @@ value needs to come back from the card:
   `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. The
   card never reads or writes this value directly (see §6 for why that
   matters) — it can only see it change by receiving the resulting
-  `customEvent`s (e.g. a `click` or `dblclick` inside `lockAndHandleZone`).
+  `customEvent`s (e.g. a `click` or `dblclick` with `zone: 'lockAndHandle'`).
 - **Alt-key sample mode** — `options.hover.mode` (already a native 2.7.1
   option) is switched between its normal value and `'dataset'` while Alt
   is held, purely by Chart.js watching `hover` gestures.
 - **Cursor** — `canvas.style.cursor` changes to `move`/`ns-resize`/etc. on
   hover over a draggable zone, entirely computed from `_hecLegendIndexAt`/
   `_hecYAxisIndexAt` (see §4), no card involvement.
+
+- **Canvas `touch-action`** — `pan-y`, set by Chart.js on its canvas: on touch, a
+  vertical swipe scrolls the page, every other gesture is the chart's (§5 for the
+  zones where a vertical drag is the chart's too).
 
 Contrast with `panX`/`zoomX` (§1), which stay card callbacks — the shared
 date range spanning multiple graphs is data the card owns, not Chart.js.
@@ -180,11 +228,12 @@ finds *data points*, never legend items or axis labels):
 | `_hecFindNearest(px, py, rects)` | → index or `-1` | Closest candidate, but only returned if it also passes `_hecIsNear` — otherwise `-1`. |
 | `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item (if any) is under this point — exact containment (`_hecIsOn`) against each item's real `legendHitBoxes` rectangle. |
 | `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — exact containment, closest-row candidate spans the whole label column width. |
-| `_hecFindLegendLabel(x, y, excludeIdx, target)` | → `{ idx, insertBefore, markerX, markerY, markerH }` or `null` | Where a legend label dropped at this point lands (closest line, then closest label; `target` = finding an insertion point, skipping `excludeIdx`, the label being dragged; `null` for a no-op). Used by the insertion marker and by the card to place a dropped curve. |
-| `_hecYAxisInsertAt(y, excludeIdx, nearest)` | → `{ idx, insertBefore, markerY }` or `null` | Where a timeline/arrowline row dropped at this height lands: the row it's over (skipping `excludeIdx`), before or after its middle; with `nearest`, the nearest row whatever the distance. Used by the insertion markers and by the card to place a dropped entity. |
+| `_hecFindLegendLabel(x, y, excludeIdx, target)` | → `{ idx, insertBefore, markerX, markerY, markerH }` or `null` | Where a legend label dropped at this point lands (closest line, then closest label; `target` = finding an insertion point, skipping `excludeIdx`, the label being dragged; `null` for a no-op). Used by the insertion marker and by `dragend`'s `drop`. |
+| `_hecYAxisInsertAt(y, excludeIdx, nearest)` | → `{ idx, insertBefore, markerY }` or `null` | Where a timeline/arrowline row dropped at this height lands: the row it's over (skipping `excludeIdx`), before or after its middle; with `nearest`, the nearest row whatever the distance. Used by the insertion markers and by `dragend`'s `drop`. |
+| `_hecZoneAt(x, y)`, `_hecPlotFactor(x)`, `_hecLabelRect(legendIdx, yIdx)`, `_hecChartAt(clientX, clientY)` | | The payload's `zone`, `xFactor`, `labelRect`, and the chart under a client point (`overChart`, `drop.chart`). |
 
-These are the only `_hec` methods the card calls (to place what was dropped, §2
-`dragend`): one implementation for the marker shown during the drag and the drop itself.
+All internal: they are how Chart.js fills the payload (§2). The card calls none
+of them.
 
 ---
 
@@ -206,13 +255,13 @@ nowhere at all.
 
 | Element (property name) | Zone | Purpose |
 |---|---|---|
-| `_hecLockIconEl` | 18×18px @ `(15, 5)` | The Y-axis lock padlock SVG. `pointer-events: none` — purely visual, the actual click is handled by the gesture detector via `lockAndHandleZone`. |
+| `_hecLockIconEl` | 18×18px @ `(15, 5)` | The Y-axis lock padlock SVG. `pointer-events: none` — purely visual, the actual click is handled by the gesture detector (`zone: 'lockAndHandle'`). |
 | `_hecMoveHandleIconEl` | 15×28px @ `(0, 0)` | The `⠿` graph-reorder handle glyph. Also `pointer-events: none`, same reasoning. |
 | `_hecMoveHandleTouchEl` | 33×28px @ `(0, 0)` (0×0 if `moveHandleVisible` is `false`) | The single real touch target covering **both** the lock icon and the move handle as one zone (see below) — `touch-action` toggled dynamically. |
 | `_hecYAxisTouchEl` | Matches the Y-axis label column | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
 | `_hecLegendTouchEl` | Tight bounding box of the legend's actual `legendHitBoxes`, +4px margin | Same dynamic `touch-action`, for dragging a curve label. Only exists for `line`/`bar` charts. |
 | `_hecLabelTouchEl` | Full label column height | Same dynamic `touch-action`, for dragging a timeline/arrowline entity label. Only exists for `timeline`/`arrowline` charts. |
-| `_hecLinkMarkerEl` | 22×22px, 23px above the canvas, centered under the Y axis labels | The linked-graphs chain icon (`linkMarkerVisible`), a relay zone like the others: its gestures come back as `customEvent`s with `linkMarkerZone: true`. Where it overlaps the lock+handle zone, it wins. |
+| `_hecLinkMarkerEl` | 22×22px, 23px above the canvas, centered under the Y axis labels | The linked-graphs chain icon (`linkMarkerVisible`), a relay zone like the others: its gestures come back as `customEvent`s with `zone: 'linkMarker'`. Where it overlaps the lock+handle zone, it wins. |
 
 All the relay zones come from one factory, `_hecTouchOverlay(key, cursor)`. Their press
 calls `preventDefault()`, for every pointer type: with a mouse or pen it starts no text
@@ -265,14 +314,12 @@ you don't know yet whether it's a scroll or a chart interaction.
 
 ## 6. What stays deliberately private
 
-Every `_hec`-prefixed property or method not listed in §1–§5 above is
-genuinely internal. `history-explorer-card.js` never reads or calls any of them directly; it only ever reacts to the
-`customEvent` payloads described in §2, or reads/writes the public
-`options.*` fields in §1. The one narrow exception, `chart.update()`
-(itself a stock 2.7.1 public method, not an addition), is what the card
-calls whenever it needs to force an immediate redraw (e.g. after changing
-`moveHandleVisible`) rather than reaching into `_hecUpdateDragTouchOverlays`
-or similar directly.
+Every `_hec`-prefixed property or method is internal, those listed in §4 and §5
+included. `history-explorer-card.js` never reads or calls any of them: it reacts
+to `customEvent`, `panX` and `zoomX` (§1, §2), and writes the `options.*` fields
+of §1. To make a change visible right away (after changing `moveHandleVisible`,
+say), it calls the stock `chart.update()`, never `_hecUpdateDragTouchOverlays`
+or the like.
 
 ---
 
