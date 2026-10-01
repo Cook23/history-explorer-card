@@ -8,6 +8,35 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
+### Merged — everything from v1.1.42 to v1.1.46
+- Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), and the multi-device sync fixes — see their own entries below. Adapted to the new split of roles: the interaction parts go through Chart.js's gesture system, like everything else
+
+### Fixed — dragging the plot (pan) and pinching threw an error and did nothing
+- The table of drag handlers was declared in one function and used in another, where it didn't exist: every drag of the plot and every pinch failed
+
+### Fixed — with a mouse, a curve, a label or a graph could not be dragged onto another graph
+- The drag was lost as soon as the pointer left its graph (touch was not affected)
+
+### Fixed — after a refused drop, the next drag on the same graph did nothing
+- The first drag left an (invisible) text selection on the page; the next press on it started the browser's own drag-and-drop instead
+
+### Fixed — a drop onto another graph never happened
+- A debug trace, logged at every release, failed on the drag's state while a drag onto another graph was under way, so the release was lost. All the debug traces are removed
+
+### Fixed — on touch, the type menu opened by a long-press closed as soon as the finger was lifted
+
+### Fixed — Ctrl+wheel could zoom the page as well as the time range
+- Only the first tick of a fast wheel movement was kept from zooming the page
+
+### Fixed — dragging a curve over another history-explorer card on the same dashboard highlighted it as a drop target
+- A drag now only reaches the graphs of its own card
+
+### Changed — the rest of the interaction code moved to Chart.js, without any duplicate
+- The chain icon of linked graphs, the drag cursor, the Ctrl+wheel zoom and the circular Y axis labels are now Chart.js's (options `linkMarkerVisible`, `dropAllowed`, `zoomX`, `ticks.period`); the card no longer listens to any pointer or wheel event of a graph, nor sets any cursor
+- One shared implementation of the floating elements (tooltips, messages, menus kept on screen, drop-target outline): `Chart.hecUi`, used by Chart.js and by the card, which had its own copies. Drop positions (curve or timeline label) come from the same Chart.js functions as the insertion markers
+- The other duplicated code of the card is factored too (entity selector lists, time axes, type menu entries — also shared with the info panel)
+- All documented in `deps/Chart Custom.js.md`
+
 ### Changed — internal architecture rework for how the card handles clicks, drags, and gestures
 - Legend clicks/double-clicks, curve and timeline/arrowline label drag & drop, the entity type menu's long-press, mouse wheel zoom, hover cursors, and the truncated-label tooltip are now all detected and handled through a single, unified mechanism instead of several separate, overlapping ones
 - No user-visible change is intended from this alone — it's a foundation for the touch-related fixes below, and for future work
