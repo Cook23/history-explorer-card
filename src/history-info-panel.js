@@ -106,23 +106,7 @@ function hecHookInfoPanel()
 
             instance.insertUIHtmlText(0);
 
-            for( let i = 0; i < 1; i++ ) {
-
-                instance._this.querySelector(`#b1_${i}`)?.addEventListener('click', instance.subDay.bind(instance), false);
-                instance._this.querySelector(`#b2_${i}`)?.addEventListener('click', instance.addDay.bind(instance), false);
-                instance._this.querySelector(`#b4_${i}`)?.addEventListener('click', instance.decZoom.bind(instance), false);
-                instance._this.querySelector(`#b5_${i}`)?.addEventListener('click', instance.incZoom.bind(instance), false);
-                instance._this.querySelector(`#bx_${i}`)?.addEventListener('click', instance.todayNoReset.bind(instance), false);
-                instance._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', instance.todayReset.bind(instance), false);
-                instance._this.querySelector(`#by_${i}`)?.addEventListener('change', instance.timeRangeSelected.bind(instance));
-                instance._this.querySelector(`#bz_${i}`)?.addEventListener('click', instance.toggleZoom.bind(instance), false);
-                instance._this.querySelector(`#bo_${i}`)?.addEventListener('click', instance.menuClicked.bind(instance), false);
-
-                instance.ui.dateSelector[i] = instance._this.querySelector(`#bx_${i}`);
-                instance.ui.rangeSelector[i] = instance._this.querySelector(`#by_${i}`);
-                instance.ui.zoomButton[i] = instance._this.querySelector(`#bz_${i}`);
-
-            }
+            instance._wireToolbar(0);
 
 
             const config = hec_panel.config ?? {};

@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b83';
+const Version = '1.2.0b86';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -32,8 +32,6 @@ export const _TYPE_MENU_DEFS = [
 // shared by the card's menu and the info panel's
 export const _TYPE_MENU_ORDER = [0, 1, 2, 6, 3, 4, 5];
 export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit';
-
-const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -124,21 +122,6 @@ function chooseSIUnit(unitsWithMax) {
 // --------------------------------------------------------------------------------------
 
 const ranges = [1, 2, 6, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368, 8760];
-
-
-// --------------------------------------------------------------------------------------
-// Shared panning state
-// --------------------------------------------------------------------------------------
-
-var panstate = {};
-    panstate.mx = 0;
-    panstate.lx = 0;
-    panstate.my = 0;
-    panstate.ly = 0;
-    panstate.tc = 0;
-    panstate.g 	= null;
-    panstate.yaxis = null;
-    panstate.longpress = null; // { timer, pointerId, x0, y0 } — touch long-press gate
 
 
 // --------------------------------------------------------------------------------------
@@ -260,6 +243,8 @@ export class HistoryCardState {
         this.state.loading       = false;
         this.state.zoomMode      = false;
         this.state.autoScroll    = false;
+
+        this._drag = null;   // label or graph being dragged (_onDragStart)
 
         this.activeRange = {};
         this.activeRange.timeRangeHours  = 24;
@@ -1903,237 +1888,15 @@ export class HistoryCardState {
                 // A drag only reaches this card's own graphs (Chart.js dragScope), not those
                 // of another card on the same page
                 dragScope: this._dragScope ??= 'hec-' + Math.random().toString(36).slice(2),
-                // Ctrl+wheel or a pinch over a graph: zoom the time range — shared by every
-                // graph, so the card's — around the time under the pointer / between the
-                // fingers, by the same steps as the zoom buttons (Chart.js zoomX callback)
-                zoomX: (info) => {
-                    if( this.state.loading ) return;
-                    let _dir = 0;
-                    if( info.deltaY !== undefined ) {
-                        _dir = -Math.sign(info.deltaY);
-                    } else {
-                        // Pinch: the spread change accumulates (scale < 1: fingers apart),
-                        // one step each time it reaches ×1.5 — restarted for a new pinch
-                        const _now = Date.now();
-                        if( !this._pinchZoomAt || _now - this._pinchZoomAt > 400 ) this._pinchZoom = 1;
-                        this._pinchZoomAt = _now;
-                        this._pinchZoom *= info.scale;
-                        if( this._pinchZoom < 2 / 3 ) _dir = 1; else if( this._pinchZoom > 1.5 ) _dir = -1;
-                        if( _dir ) this._pinchZoom = 1;
-                    }
-                    if( !_dir ) return;
-                    const _a = info.chart.chartArea;
-                    const f = (info.centerPixels - _a.left) / (_a.right - _a.left);
-                    const tc = this.factorToTimecode(f);
-                    if( _dir > 0 ) this.incZoomStep(tc, f); else this.decZoomStep(tc, f);
-                },
+                // Gestures (deps/Chart Custom.js.md): Chart.js detects them all and says
+                // where they happen; the card decides what they mean. The time axis, shared
+                // by every graph, is moved through panX/zoomX; everything else — labels,
+                // graphs, menus — arrives as customEvent gestures (_onGesture).
+                panX: (info) => this._onTimePan(info),
+                zoomX: (info) => this._onTimeZoom(info),
                 zoomSelectMode: this.state.zoomMode,
-                // Phase 2.1 — legend overlay removed; drag&drop and long-press menu on
-                // legend labels, previously intercepted by that overlay, are recabled here
-                // onto Chart.js's generic gesture detection. Simple/double click on legend
-                // (hide/show, uncombine) needs no wiring here — legend.onClick (Chart.js
-                // native) already handles both, now itself driven by the same detector.
-                customEvent: function(info) {
-                    console.log('[HEC customEvent]', Version, info.gestureType, {
-                        pointerCount: info.pointerCount,
-                        element: info.element,
-                        legendIndex: info.legendIndex,
-                        chartType: info.chart?.config?.type,
-                        graphIndex: this.graphs?.findIndex(g => g.chart === info.chart),
-                        deltaX: info.deltaX, deltaY: info.deltaY,
-                        ctrlKey: info.ctrlKey, shiftKey: info.shiftKey, altKey: info.altKey,
-                        nativeType: info.event?.type
-                    });
-
-                    const g = this.graphs?.find(g => g.chart === info.chart);
-                    if( !g ) return;
-
-                    if( info.gestureType === 'longpress' ) {
-                        // Same condition as the removed overlay's long-press timer: only
-                        // on a legend label, line/bar graph, numeric-convertible entity.
-                        if( info.legendIndex >= 0 && (g.type === 'line' || g.type === 'bar') ) {
-                            const _entity = g.entities[info.legendIndex];
-                            if( _entity && this._isNumericEntity(_entity.entity) ) {
-                                const _box     = g.chart.legend?.legendHitBoxes[info.legendIndex];
-                                const _canvasR = g.canvas.getBoundingClientRect();
-                                const _cx      = _box ? _canvasR.left + _box.left + 30 : info.event?.clientX;
-                                const _cy      = _box ? _canvasR.top  + _box.top  + _box.height : info.event?.clientY;
-                                this.showEntityTypeMenu(0, _entity.entity, g, _cx, _cy);
-                            }
-                        } else if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') ) {
-                            const _entity = g.entities[info.yAxisIndex];
-                            if( _entity ) {
-                                const _canvasR = g.canvas.getBoundingClientRect();
-                                this.showEntityTypeMenu(0, _entity.entity, g, _canvasR.left + 30, info.event?.clientY);
-                            }
-                        }
-                        return;
-                    }
-
-                    if( info.gestureType === 'dragstart' ) {
-                        if( info.legendIndex >= 0 ) {
-                            const _color = g.chart.data.datasets[info.legendIndex]?.borderColor || null;
-                            panstate.dragDataset = { g, datasetIdx: info.legendIndex, color: _color };
-                            this._startAutoScroll(info.event);
-                        } else if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') ) {
-                            panstate.dragTLEntity = { g, entityIdx: info.yAxisIndex };
-                            this._startAutoScroll(info.event);
-                        } else if( info.lockAndHandleZone ) {
-                            panstate.moveGraph = { g };
-                            this._startAutoScroll(info.event);
-                        } else if( this.state.zoomMode ) {
-                            // Zoom-rectangle selection — Chart.js draws its own
-                            // overlay now (zoomSelectMode option, written in
-                            // toggleZoom below), the card only disables tooltips
-                            // while selecting.
-                            g.chart.options.tooltips.enabled = false;
-                        } else if( !this.state.zoomMode ) {
-                            // Horizontal (time) pan — the default fallback once every
-                            // other drag target above is ruled out. Now gated behind
-                            // Chart.js's own 10px threshold (custDragStart), unlike the
-                            // original pointerDown which started this immediately on
-                            // first contact — an intentional behavior change, per
-                            // Thierry.
-                            panstate.g = g;
-                            panstate.mx = info.event.clientX;
-                            panstate.lx = info.event.clientX;
-                            panstate.tc = this.startTime;
-                            this.state.drag = true;
-                            this.state.updateCanvas = this.pconfig.lockAllGraphs ? null : info.event.target;
-                        }
-                        return;
-                    }
-
-                    if( info.gestureType === 'dragmove' ) {
-                        if( panstate.dragDataset || panstate.dragTLEntity ) {
-                            this._onLabelDragMove(info, g);
-                        } else if( panstate.moveGraph ) {
-                            this._autoScrollY = info.event.clientY;
-                            for( let _g of this.graphs ) {
-                                if( _g === panstate.moveGraph.g || !_g.chart ) continue;
-                                const _r = _g.canvas.getBoundingClientRect();
-                                const _insertBefore = info.event.clientY < _r.top + _r.height / 2;
-                                _g.chart.options.insertionForbidden = this._wouldSplitGroup(panstate.moveGraph.g, _g, _insertBefore);
-                            }
-                        } else if( this.state.drag ) {
-                            // Horizontal (time) pan — same formula the original
-                            // pointerMove used, fed by Chart.js's cumulative x
-                            // (info.x = e.x, the canvas-relative position at this
-                            // exact moment) converted back to clientX via the
-                            // canvas's own bounding rect, since the original formula
-                            // is expressed in clientX terms (panstate.mx/lx).
-                            const _rect = g.canvas.getBoundingClientRect();
-                            const _clientX = _rect.left + info.x;
-                            if( Math.abs(_clientX - panstate.lx) > 0 ) {
-                                panstate.lx = _clientX;
-                                const x = Math.floor((_clientX - panstate.mx) * this._secondsPerPixel(g));
-                                this._moveTimeWindow(moment(panstate.tc).subtract(x, "second"));
-                            }
-                        }
-                        return;
-                    }
-
-                    if( info.gestureType === 'dragovergraph' ) {
-                        if( panstate.dragDataset ) {
-                            if( g === panstate.dragDataset.g ) return;
-                            const _src    = panstate.dragDataset.g;
-                            const _srcIdx = panstate.dragDataset.datasetIdx;
-                            const _srcUnit = _src.entities[_srcIdx] ? this.getUnitOfMeasure(_src.entities[_srcIdx].entity, _src.entities[_srcIdx].unit) : undefined;
-                            const _tgtUnit = g.entities[0] ? this.getUnitOfMeasure(g.entities[0].entity, g.entities[0].unit) : undefined;
-                            const _compatible = this._dropCompatibility(_src, g, _srcUnit, _tgtUnit, _src.entities[_srcIdx]) === null;
-                            g.chart.options.dropAllowed = _compatible;
-                            const _legend = info.chart.legend;
-                            const _inLegendZone = _legend && info.y >= _legend.top && info.y <= _legend.bottom;
-                            if( !_inLegendZone ) { this._unfreezeChart(); return; }
-                            this._freezeChart(g);
-                        } else if( panstate.dragTLEntity ) {
-                            if( g === panstate.dragTLEntity.g ) return;
-                            const _src = panstate.dragTLEntity.g;
-                            const _compatible = this._dropCompatibility(_src, g) === null;
-                            g.chart.options.dropAllowed = _compatible;
-                            if( !_compatible || info.yAxisIndex < 0 || !info.chart.chartArea || info.x >= info.chart.chartArea.left ) {
-                                this._unfreezeChart();
-                                return;
-                            }
-                            this._freezeChart(g);
-                        }
-                        return;
-                    }
-
-                    if( info.gestureType === 'dragend' ) {
-                        if( panstate.dragDataset ) {
-                            const _src    = panstate.dragDataset.g;
-                            const _srcIdx = panstate.dragDataset.datasetIdx;
-                            panstate.dragDataset = null;
-                            this._stopAutoScroll();
-                            this._clearAllDragFeedback();
-                            this._finalizeLegendDrop(info.event, _src, _srcIdx);
-                        } else if( panstate.dragTLEntity ) {
-                            const _src    = panstate.dragTLEntity.g;
-                            const _srcIdx = panstate.dragTLEntity.entityIdx;
-                            panstate.dragTLEntity = null;
-                            this._stopAutoScroll();
-                            this._clearAllDragFeedback();
-                            this._finalizeTimelineDrop(info.event, _src, _srcIdx);
-                        } else if( panstate.moveGraph ) {
-                            const _srcG = panstate.moveGraph.g;
-                            panstate.moveGraph = null;
-                            this._stopAutoScroll();
-                            this._clearAllDragFeedback();
-                            this._finalizeGraphMove(info.event, _srcG);
-                        } else if( info.zoomSelectX0 !== undefined ) {
-                            this._finalizeZoomSelection(g, info.zoomSelectX0, info.zoomSelectX1);
-                        } else if( this.state.drag ) {
-                            this.state.drag = false;
-                            this.state.updateCanvas = null;
-                            this.updateHistory();
-                            this.state.autoScroll = moment() <= moment(this.endTime);
-                        }
-                        return;
-                    }
-
-                    if( info.gestureType === 'pinch' ) {
-                        // Two fingers: their common horizontal movement pans the time (their
-                        // spread zooms it — zoomX; the Y axis is Chart.js's own)
-                        const x = Math.round(info.panDeltaX * this._secondsPerPixel(g));
-                        if( x ) this._moveTimeWindow(moment(this.startTime).subtract(x, "second"));
-                        return;
-                    }
-
-                    if( info.gestureType === 'pinchend' ) {
-                        // A pinch just ended (one finger lifted, the other remains) —
-                        // prepare to resume the pan with the remaining finger.
-                        // Chart.js has already re-armed its own gesture state for
-                        // this pointer (its 10px drag threshold), so no card-side
-                        // tracking flag is needed anymore — the next dragstart for
-                        // this same graph will fire naturally once the threshold is
-                        // crossed from this new starting point.
-                        panstate.g = g;
-                        panstate.mx = info.clientX;
-                        panstate.lx = info.clientX;
-                        panstate.my = info.clientY;
-                        panstate.ly = info.clientY;
-                        panstate.tc = this.startTime;
-                        return;
-                    }
-
-                    if( info.gestureType === 'dblclick' && info.linkMarkerZone ) {
-                        // Chain icon between two linked graphs: merge them back into one
-                        this._mergeLinkedGraph(g, info.event);
-                        return;
-                    }
-
-                    if( info.gestureType === 'dblclick' ) {
-                        // Timeline/arrowline double-click uncombine — no native Chart.js
-                        // legend equivalent exists for this axis, unlike the legend's own
-                        // dblclick (handled via legend.onClick's gestureType parameter).
-                        // (static graphs too — see _uncombineEntity)
-                        if( info.yAxisIndex >= 0 && (g.type === 'timeline' || g.type === 'arrowline') ) {
-                            if( this._canUncombine(g) ) this._uncombineEntity(g, info.yAxisIndex);
-                        }
-                        return;
-                    }
-                }.bind(this),
+                legendClickEnabled: false,
+                customEvent: (info) => this._onGesture(info),
                 scales: {
                     xAxes: [{
                         type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
@@ -2276,32 +2039,6 @@ export class HistoryCardState {
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
                         boxWidth: 0
                     },
-                    onClick: (e, legendItem, gestureType) => {
-                        // gestureType ('click' or 'dblclick') is already resolved by
-                        // Chart.js's single gesture detector — no timestamp comparison
-                        // here anymore, per the homogenization Thierry asked for.
-                        const canvas = e.target?.closest('canvas');
-                        if( !canvas ) return;
-                        const g = this.graphs.find(g => g.canvas === canvas);
-                        const chart = g?.chart;
-                        if( !chart ) return;
-                        if( !g ) return;
-                        const idx = legendItem.datasetIndex;
-                        if( gestureType === 'dblclick' ) {
-                            // Double-click — uncombine (see _uncombineEntity for static graphs)
-                            if( this._canUncombine(g) ) this._uncombineEntity(g, idx);
-                        } else {
-                            // Single-click — default toggle visibility
-                            const meta = chart.getDatasetMeta(idx);
-                            meta.hidden = meta.hidden === null ? !chart.data.datasets[idx].hidden : null;
-                            chart.update();
-                            // Persist hidden state
-                            const _hiddenState = meta.hidden !== null ? meta.hidden : chart.data.datasets[idx].hidden;
-                            const _eIdx = this._pcEntryIndex(g.entities[idx].entity);
-                            if( _eIdx >= 0 ) this.pconfig.entities[_eIdx].hidden = _hiddenState || undefined;
-                            this.writeLocalState();
-                        }
-                    }
                 },
                 elements: {
                     textFunction: (text, datasets, index) => {
@@ -2498,15 +2235,194 @@ export class HistoryCardState {
 
 
     // --------------------------------------------------------------------------------------
-    // Panning
+    // Gestures on the graphs (deps/Chart Custom.js.md) — Chart.js detects every gesture and
+    // resolves where it happens (zone, label, drop target, position along the time axis); the
+    // card only decides what it means. It never reads a chart's layout.
     // --------------------------------------------------------------------------------------
 
-
-    // Seconds of the time window per pixel of graph g's plot area
-    _secondsPerPixel(g)
+    // customEvent: one method per gesture
+    _onGesture(info)
     {
-        const _a = g.chart.chartArea;
-        return (3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes) / (_a.right - _a.left);
+        const g = this.graphs?.find(g => g.chart === info.chart);
+        if( !g ) return;
+        switch( info.gestureType ) {
+            case 'click':         return this._onGraphClick(info, g);
+            case 'dblclick':      return this._onGraphDblClick(info, g);
+            case 'longpress':     return this._onGraphLongPress(info, g);
+            case 'dragstart':     return this._onDragStart(info, g);
+            case 'dragmove':      return this._onDragMove(info, g);
+            case 'dragovergraph': return this._onDragOver(info, g);
+            case 'dragend':       return this._onDragEnd(info, g);
+        }
+    }
+
+    // A graph whose Y axis lists entities (one row each), not values
+    _isRowGraph(g)
+    {
+        return g.type === 'timeline' || g.type === 'arrowline';
+    }
+
+    // Click on a legend label: shows/hides its curve, persisted
+    _onGraphClick(info, g)
+    {
+        const idx = info.legendIndex;
+        if( idx < 0 ) return;
+        const meta = g.chart.getDatasetMeta(idx);
+        meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
+        g.chart.update();
+        const _hiddenState = meta.hidden !== null ? meta.hidden : g.chart.data.datasets[idx].hidden;
+        const _eIdx = this._pcEntryIndex(g.entities[idx].entity);
+        if( _eIdx >= 0 ) this.pconfig.entities[_eIdx].hidden = _hiddenState || undefined;
+        this.writeLocalState();
+    }
+
+    // Double-click: on the chain icon, merges two linked graphs back into one; on a legend
+    // label or a timeline row, takes that entity out into its own graph (see _uncombineEntity,
+    // static graphs too)
+    _onGraphDblClick(info, g)
+    {
+        if( info.zone === 'linkMarker' ) {
+            this._mergeLinkedGraph(g, info);
+            return;
+        }
+        const idx = info.legendIndex >= 0 ? info.legendIndex : this._isRowGraph(g) ? info.yAxisIndex : -1;
+        if( idx >= 0 && this._canUncombine(g) ) this._uncombineEntity(g, idx);
+    }
+
+    // Long press on a label: the entity's type menu, under the label (line/bar: numeric
+    // entities only) or level with the finger (timeline/arrowline row)
+    _onGraphLongPress(info, g)
+    {
+        const _r = info.labelRect;
+        if( !_r ) return;
+        if( info.legendIndex >= 0 && !this._isRowGraph(g) ) {
+            const _entity = g.entities[info.legendIndex];
+            if( _entity && this._isNumericEntity(_entity.entity) )
+                this.showEntityTypeMenu(0, _entity.entity, g, _r.left + 30, _r.bottom);
+        } else if( info.yAxisIndex >= 0 && this._isRowGraph(g) ) {
+            const _entity = g.entities[info.yAxisIndex];
+            if( _entity ) this.showEntityTypeMenu(0, _entity.entity, g, _r.left + 30, info.clientY);
+        }
+    }
+
+    // A drag starts: a curve (legend label), a timeline row, a whole graph (lock+handle), or a
+    // zoom selection (zoom mode, drawn by Chart.js) — the time pan is _onTimePan's.
+    // this._drag: what is being dragged, until dragend.
+    _onDragStart(info, g)
+    {
+        if( info.legendIndex >= 0 ) {
+            this._drag = { kind: 'curve', g, idx: info.legendIndex };
+        } else if( info.yAxisIndex >= 0 && this._isRowGraph(g) ) {
+            this._drag = { kind: 'row', g, idx: info.yAxisIndex };
+        } else if( info.zone === 'lockAndHandle' ) {
+            this._drag = { kind: 'graph', g };
+        } else {
+            if( this.state.zoomMode ) g.chart.options.tooltips.enabled = false;
+            return;
+        }
+        this._startAutoScroll(info.clientY);
+    }
+
+    // The drag moves (on its source graph g): the auto-scroll follows the pointer, and a
+    // curve's source legend stays frozen (_freezeChart) while the pointer is over it — over
+    // another graph, _onDragOver takes care of that graph's. (The drag's cursor and
+    // insertion marker are Chart.js's, from the dropAllowed/insertionForbidden set there.)
+    _onDragMove(info, g)
+    {
+        const d = this._drag;
+        if( !d ) return;
+        this._autoScrollY = info.clientY;
+        if( d.kind === 'graph' || (info.overChart && info.overChart !== g.chart) ) return;
+        if( info.overChart === g.chart && d.kind === 'curve' && info.zone === 'legend' )
+            this._freezeChart(g);
+        else
+            this._unfreezeChart();
+    }
+
+    // The drag is over another graph g of this card: is a drop allowed there?
+    _onDragOver(info, g)
+    {
+        const d = this._drag;
+        if( !d || g === d.g ) return;
+        if( d.kind === 'graph' ) {
+            g.chart.options.insertionForbidden = this._wouldSplitGroup(d.g, g, info.insertBefore);
+            return;
+        }
+        let _compatible;
+        if( d.kind === 'curve' ) {
+            const _e = d.g.entities[d.idx];
+            const _srcUnit = _e ? this.getUnitOfMeasure(_e.entity, _e.unit) : undefined;
+            const _tgtUnit = g.entities[0] ? this.getUnitOfMeasure(g.entities[0].entity, g.entities[0].unit) : undefined;
+            _compatible = this._dropCompatibility(d.g, g, _srcUnit, _tgtUnit, _e) === null;
+            g.chart.options.dropAllowed = _compatible;
+            if( info.zone !== 'legend' ) { this._unfreezeChart(); return; }
+        } else {
+            _compatible = this._dropCompatibility(d.g, g) === null;
+            g.chart.options.dropAllowed = _compatible;
+            if( !_compatible || info.yAxisIndex < 0 || info.zone !== 'yAxis' ) { this._unfreezeChart(); return; }
+        }
+        this._freezeChart(g);
+    }
+
+    // The drag ends: the drop (info.drop, resolved by Chart.js) or the zoom selection
+    _onDragEnd(info, g)
+    {
+        const d = this._drag;
+        if( !d ) {
+            g.chart.options.tooltips.enabled = true;
+            if( info.zoomSelectFactor0 !== undefined && info.zoomSelectFactor1 !== undefined )
+                this._finalizeZoomSelection(info.zoomSelectFactor0, info.zoomSelectFactor1);
+            return;
+        }
+        this._drag = null;
+        this._stopAutoScroll();
+        this._clearAllDragFeedback();
+        const _drop = info.drop ?? { chart: null, index: -1, insertBefore: true };
+        const _tgt = _drop.chart ? this.graphs.find(t => t.chart === _drop.chart) : undefined;
+        if( d.kind === 'curve' ) this._finalizeLegendDrop(info, d.g, d.idx, _tgt, _drop);
+        else if( d.kind === 'row' ) this._finalizeTimelineDrop(info, d.g, d.idx, _tgt, _drop);
+        else this._finalizeGraphMove(info, d.g, _tgt, _drop);
+    }
+
+    // panX: a drag (or the fingers of a pinch) moves the time window — phase 'start', 'move'
+    // (deltaFactor: in widths of the time axis, > 0 rightward, so towards the past) or 'end'.
+    // While it moves, only the graph being dragged is redrawn, unless lockAllGraphs.
+    _onTimePan(info)
+    {
+        if( info.phase === 'start' ) {
+            const g = this.graphs.find(g => g.chart === info.chart);
+            this.state.drag = true;
+            this.state.updateCanvas = ( this.pconfig.lockAllGraphs || !g ) ? null : g.canvas;
+            this._panRestMs = 0;
+        } else if( !this.state.drag ) {
+            return;
+        } else if( info.phase === 'move' ) {
+            // (the window starts on a whole second: the remainder carries over to the next move)
+            const _ms = this._panRestMs - info.deltaFactor * this._timeRangeSeconds() * 1000;
+            const _s = Math.trunc(_ms / 1000);
+            this._panRestMs = _ms - _s * 1000;
+            if( _s ) this._moveTimeWindow(moment(this.startTime).add(_s, "second"));
+        } else {
+            this.state.drag = false;
+            this.state.updateCanvas = null;
+            this.updateHistory();
+            this.state.autoScroll = moment() <= moment(this.endTime);
+        }
+    }
+
+    // zoomX: Ctrl+wheel or the spread of a pinch — one zoom step (+1 in, -1 out), like the
+    // zoom buttons, around the time at centerFactor along the time axis
+    _onTimeZoom(info)
+    {
+        if( this.state.loading || info.centerFactor === undefined ) return;
+        const tc = this.factorToTimecode(info.centerFactor);
+        if( info.step > 0 ) this.incZoomStep(tc, info.centerFactor); else this.decZoomStep(tc, info.centerFactor);
+    }
+
+    // Length of the time window, in seconds
+    _timeRangeSeconds()
+    {
+        return 3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes;
     }
 
     // Moves the time window (same length) to start at t0, then redraws — fetching the newly
@@ -2563,92 +2479,54 @@ export class HistoryCardState {
         }
     }
 
-    // This card's graph whose canvas is under the pointer (client coordinates), except
-    // `except`, or undefined.
-    _graphAt(clientX, clientY, except = null)
+    // A curve (legend label _srcIdx of graph _src) dropped on graph _tgt (undefined: none),
+    // next to its legend label drop.index (-1: none) — reordered within its own graph, or
+    // moved into another one
+    _finalizeLegendDrop(info, _src, _srcIdx, _tgt, drop)
     {
-        return this.graphs.find(g => {
-            if( g === except ) return false;
-            const _r = g.canvas.getBoundingClientRect();
-            return clientX >= _r.left && clientX <= _r.right && clientY >= _r.top && clientY <= _r.bottom;
-        });
-    }
-
-    // A label being dragged (dragmove, on its source graph g): the auto-scroll follows the
-    // pointer, and the source graph's legend stays frozen (_freezeChart) while the pointer
-    // is over it — over another graph, dragovergraph takes care of that graph's. (The
-    // drag's cursor is Chart.js's, from the dropAllowed set in dragovergraph.)
-    _onLabelDragMove(info, g)
-    {
-        this._autoScrollY = info.event.clientY;
-        const _over = this._graphAt(info.event.clientX, info.event.clientY);
-        if( _over && _over !== g ) return;
-        const _legend = g.chart.legend;
-        if( _over === g && panstate.dragDataset && _legend && info.y >= _legend.top && info.y <= _legend.bottom )
-            this._freezeChart(g);
-        else
-            this._unfreezeChart();
-    }
-
-    _finalizeLegendDrop(event, _src, _srcIdx)
-    {
-            // Target graph under the pointer
-            const _tgt = this._graphAt(event.clientX, event.clientY, _src);
-            // Intra-graph reorder: drop on same graph canvas
-            if( !_tgt ) {
-                // Check if drop is on the source graph itself (same canvas)
-                if( this._graphAt(event.clientX, event.clientY) === _src ) {
-                    // Find target label by X position in legend
-                    const _hitBoxes = _src.chart.legend?.legendHitBoxes;
-                    if( _hitBoxes && _hitBoxes.length > 1 ) {
-                        const _rect = _src.canvas.getBoundingClientRect();
-                        const _cx = event.clientX - _rect.left;
-                        const _cy2 = event.clientY - _rect.top;
-                        const _dropTarget = _src.chart._hecFindLegendLabel(_cx, _cy2, _srcIdx, true);
-                        let _tgtLabelIdx = _dropTarget ? _dropTarget.idx : -1;
-                        let _insertBefore = _dropTarget ? _dropTarget.insertBefore : true;
-                        if( _tgtLabelIdx >= 0 ) {
-                            // Reorder entities
-                            const _newEntities = [..._src.entities];
-                            const [_moved] = _newEntities.splice(_srcIdx, 1);
-                            const _insertAt = _tgtLabelIdx > _srcIdx
-                                ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
-                                : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
-                            _newEntities.splice(_insertAt, 0, _moved);
-                            // Persist in pconfig.entities
-                            const _groupId = this._pcGroupIdOf(_newEntities[0].entity);
-                            if( _groupId !== undefined ) {
-                                // groupId alone doesn't uniquely identify one graph — it can be
-                                // shared across incompatible-type graphs since a type change
-                                // keeps the original groupId to allow re-combining later.
-                                // Only touch entities that actually belong to THIS graph (_newEntities).
-                                const _srcEntityIds = new Set(_newEntities.map(en => en.entity));
-                                const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                                const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
-                                this.pconfig.entities = this.pconfig.entities.filter(en => !(typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity)));
-                                const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
-                                this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
-                            }
-                            // Rebuild graph — capture the graph right after _src (if any) so
-                            // the first rebuilt entity can be anchored there (targetGraph
-                            // means "insert right before this graph"); addGraph inserts
-                            // directly at the right spot, no post-hoc DOM move needed.
-                            // Graph-level neighbor: rebuilt right where it was, even inside a
-                            // block of several linked graphs
-                            const _nextG = this._nextGraph(_src);
-                            this._detachGraph(_src);
-                            const _saved = this.pconfig.combineSameUnits;
-                            this.pconfig.combineSameUnits = true;
-                            _newEntities.forEach((en, i) => {
-                                const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
-                                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId ?? null, _pe ?? en);
-                            });
-                            this.pconfig.combineSameUnits = _saved;
-                            this.writeLocalState();
-                            this.updateHistory();
-                        }
-                    }
+            // Intra-graph reorder: dropped on its own graph, next to another of its labels
+            if( _tgt === _src ) {
+                const _tgtLabelIdx = drop.index;
+                const _insertBefore = drop.insertBefore;
+                if( _tgtLabelIdx < 0 ) return;
+                // Reorder entities
+                const _newEntities = [..._src.entities];
+                const [_moved] = _newEntities.splice(_srcIdx, 1);
+                const _insertAt = _tgtLabelIdx > _srcIdx
+                    ? (_insertBefore ? _tgtLabelIdx - 1 : _tgtLabelIdx)
+                    : (_insertBefore ? _tgtLabelIdx : _tgtLabelIdx + 1);
+                _newEntities.splice(_insertAt, 0, _moved);
+                // Persist in pconfig.entities
+                const _groupId = this._pcGroupIdOf(_newEntities[0].entity);
+                if( _groupId !== undefined ) {
+                    // groupId alone doesn't uniquely identify one graph — it can be
+                    // shared across incompatible-type graphs since a type change
+                    // keeps the original groupId to allow re-combining later.
+                    // Only touch entities that actually belong to THIS graph (_newEntities).
+                    const _srcEntityIds = new Set(_newEntities.map(en => en.entity));
+                    const _groupEntries = this.pconfig.entities.filter(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
+                    const _firstIdx = this.pconfig.entities.findIndex(en => typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity));
+                    this.pconfig.entities = this.pconfig.entities.filter(en => !(typeof en === 'object' && en.groupId === _groupId && _srcEntityIds.has(en.entity)));
+                    const _reordered = _newEntities.map(en => _groupEntries.find(e => e.entity === en.entity) || { entity: en.entity, groupId: _groupId, color: en.color, fill: en.fill });
+                    this.pconfig.entities.splice(_firstIdx, 0, ..._reordered);
                 }
+                // Rebuild graph — capture the graph right after _src (if any) so
+                // the first rebuilt entity can be anchored there (targetGraph
+                // means "insert right before this graph"); addGraph inserts
+                // directly at the right spot, no post-hoc DOM move needed.
+                // Graph-level neighbor: rebuilt right where it was, even inside a
+                // block of several linked graphs
+                const _nextG = this._nextGraph(_src);
+                this._detachGraph(_src);
+                const _saved = this.pconfig.combineSameUnits;
+                this.pconfig.combineSameUnits = true;
+                _newEntities.forEach((en, i) => {
+                    const _pe = this._pcEntryInGroup(en.entity, _groupId ?? null);
+                    this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId ?? null, _pe ?? en);
+                });
+                this.pconfig.combineSameUnits = _saved;
+                this.writeLocalState();
+                this.updateHistory();
                 return;
             }
 
@@ -2657,20 +2535,13 @@ export class HistoryCardState {
                 const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
                 const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _src.entities[_srcIdx]);
                 if( _refusal !== null ) {
-                    this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
+                    this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
                     return;
                 }
                 const _sameGroup = this._sameGroup(_src, _tgt);
                 {
                     // Check if drop is on legend label zone — find insertion position
-                    let _tgtLabelInsertIdx = -1;
-                    if( _tgt.chart.legend?.legendHitBoxes ) {
-                        const _r = _tgt.canvas.getBoundingClientRect();
-                        const _cx = event.clientX - _r.left;
-                        const _cy = event.clientY - _r.top;
-                        const _found = _tgt.chart._hecFindLegendLabel(_cx, _cy, -2, true);
-                        if( _found ) _tgtLabelInsertIdx = _found.insertBefore ? _found.idx : _found.idx + 1;
-                    }
+                    const _tgtLabelInsertIdx = drop.index >= 0 ? ( drop.insertBefore ? drop.index : drop.index + 1 ) : -1;
                     // Move entity from source to target
                     const _entity = _src.entities[_srcIdx];
                     // Update groupId in pconfig.entities
@@ -2881,7 +2752,9 @@ export class HistoryCardState {
         this._frozenChart = null;
     }
 
-    _startAutoScroll(event) {
+    // Scrolls the page while a drag is near its top or bottom edge (_autoScrollY: the
+    // pointer's clientY, kept up to date by the drag)
+    _startAutoScroll(clientY) {
         this._stopAutoScroll();
         const _scroll = () => {
             if( !this._autoScrollActive ) return;
@@ -2899,7 +2772,7 @@ export class HistoryCardState {
             this._autoScrollRaf = requestAnimationFrame(_scroll);
         };
         this._autoScrollActive = true;
-        this._autoScrollY = event.clientY;
+        this._autoScrollY = clientY;
         this._autoScrollRaf = requestAnimationFrame(_scroll);
     }
 
@@ -3028,23 +2901,21 @@ export class HistoryCardState {
         this.updateHistory();
     }
 
-    _finalizeTimelineDrop(event, _src, _srcIdx)
+    // A timeline row (_srcIdx of graph _src) dropped on graph _tgt (the source itself
+    // included; undefined: none) — same type only — next to its nearest row drop.index
+    _finalizeTimelineDrop(info, _src, _srcIdx, _tgt, drop)
     {
-        // Target graph under the pointer (the source itself included) — same type only
-        const _tgt = this._graphAt(event.clientX, event.clientY);
         if( !_tgt ) return;
         if( _tgt.type !== _src.type ) {
-            this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, event.clientX, event.clientY, 'left', event.target);
+            this._showLabelTooltip(`${_src.type} ≠ ${_tgt.type}`, info.clientX, info.clientY, 'left', _src.canvas);
             return;
         }
-        // (the nearest row of the target, before or after it)
-        const _at = _tgt.chart._hecYAxisInsertAt(event.clientY - _tgt.canvas.getBoundingClientRect().top, -1, true);
-        const _tgtInsertIdx = _at ? ( _at.insertBefore ? _at.idx : _at.idx + 1 ) : -1;
+        const _tgtInsertIdx = drop.index >= 0 ? ( drop.insertBefore ? drop.index : drop.index + 1 ) : -1;
 
         const _isSameGraph = _tgt === _src;
         const _refusal = _isSameGraph ? null : this._dropCompatibility(_src, _tgt);
         if( _refusal !== null ) {
-            this._showLabelTooltip(_refusal, event.clientX, event.clientY, 'left', event.target);
+            this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
             return;
         }
         const _sameGroup = !_isSameGraph && this._sameGroup(_src, _tgt);
@@ -3161,12 +3032,10 @@ export class HistoryCardState {
         return _neighbor.groupId === tgtG.groupId;
     }
 
-    _finalizeZoomSelection(g, x0, x1)
+    // A zoom selection, between factor0 and factor1 along the time axis: the time range
+    // becomes the nearest preset covering it, centred on it
+    _finalizeZoomSelection(_factor0, _factor1)
     {
-        g.chart.options.tooltips.enabled = true;
-
-        const _factor0 = (x0 - g.chart.chartArea.left) / (g.chart.chartArea.right - g.chart.chartArea.left);
-        const _factor1 = (x1 - g.chart.chartArea.left) / (g.chart.chartArea.right - g.chart.chartArea.left);
         let st0 = this.factorToTimecode(_factor0);
         let st1 = this.factorToTimecode(_factor1);
         if( st1 < st0 ) [st1, st0] = [st0, st1];
@@ -3210,16 +3079,15 @@ export class HistoryCardState {
         this.writeLocalState();
     }
 
-    _finalizeGraphMove(event, _srcG)
+    // A graph (_srcG) dropped on graph _tgtG (undefined: none), above it (drop.insertBefore)
+    // or below
+    _finalizeGraphMove(info, _srcG, _tgtG, drop)
     {
-        // Target graph under the pointer; above or below its midpoint
-        const _tgtG = this._graphAt(event.clientX, event.clientY, _srcG);
         if( !_tgtG ) return;
-        const _tgtR = _tgtG.canvas.getBoundingClientRect();
-        const _insertBefore = event.clientY < _tgtR.top + _tgtR.height / 2;
+        const _insertBefore = drop.insertBefore;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
-            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', _srcG.canvas);
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), info.clientX, info.clientY, 'left', _srcG.canvas);
             return;
         }
 
@@ -3953,12 +3821,12 @@ export class HistoryCardState {
     // Merges graph g into the graph right above it, when both belong to the same group
     // (linked) — the reverse of a static uncombine or of a type change, whatever the units.
     // Only the chart type can prevent it (a line and a bar/timeline can't share one chart).
-    _mergeLinkedGraph(g, event)
+    _mergeLinkedGraph(g, info)
     {
         const _upper = this._previousGraph(g);
         if( !_upper || !this._sameGroup(_upper, g) ) return;
         if( !this._typesCompatible(_upper.type, g.type) ) {
-            this._showLabelTooltip(`${g.type} ≠ ${_upper.type}`, event.clientX, event.clientY, 'left', event.target);
+            this._showLabelTooltip(`${g.type} ≠ ${_upper.type}`, info.clientX, info.clientY, 'left', g.canvas);
             return;
         }
         const _key = _upper.entities[0].graphKey;
@@ -4242,7 +4110,7 @@ export class HistoryCardState {
         // Optional title
         if( _graphProps.title !== undefined ) html += `<div style='text-align:center;'>${_graphProps.title}</div>`;
         html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
-        html += `<canvas id="graph${this.g_id}" height="${h}px" style='touch-action:pan-y'></canvas>`;
+        html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
@@ -4294,16 +4162,18 @@ export class HistoryCardState {
         this._updateGroupLinkMarkers();
     }
 
+    // The legend keeps clear of the buttons drawn over the graph's top right corner (bar
+    // interval selector, close button) — Chart.js legend.rightMargin
     _updateLegendMargins(g)
     {
         const _isStatic = g.isStatic;
+        const _legend = g.chart.options.legend;
         if( g.type === 'bar' ) {
             const bd = this._this.querySelector(`#bd-${g.id}`);
-            if( bd ) g.chart._legendRightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
+            if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
         } else {
-            g.chart._legendRightMargin = _isStatic ? 25 : 45;
+            _legend.rightMargin = _isStatic ? 25 : 45;
         }
-        g.chart._legendLeftMargin = undefined;
     }
 
     addGraphToCanvas(gid, type, entities, config, isStatic = false)
@@ -4462,6 +4332,74 @@ export class HistoryCardState {
         if( tools || selector ) html += `</div>`;
 
         return html;
+    }
+
+    // Wires toolbar i's controls (the card has two toolbars, top and bottom; the info panel
+    // one, with fewer controls — those it lacks are skipped)
+    _wireToolbar(i)
+    {
+        this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
+        this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
+        this._this.querySelector(`#b4_${i}`)?.addEventListener('click', this.decZoom.bind(this), false);
+        this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
+        this._this.querySelector(`#bx_${i}`)?.addEventListener('click', this.todayNoReset.bind(this), false);
+        this._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', this.todayReset.bind(this), false);
+        this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
+        this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
+        this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
+        this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
+        this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
+        this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
+        this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
+        // Close on focusout — same as es_N/et_N. eo_N needs a tabIndex to be
+        // focusable at all (unlike et_N, it isn't focusable by default in the HTML
+        // template), and menuSetVisibility() must call .focus() when opening it, or
+        // this listener would never fire in the first place.
+        const _eoMenu = this._this.querySelector(`#eo_${i}`);
+        if( _eoMenu ) {
+            _eoMenu.tabIndex = 0;
+            _eoMenu.addEventListener('focusout', () => {
+                setTimeout(() => {
+                    if( !_eoMenu.contains(document.activeElement) ) this.menuSetVisibility(i, false);
+                }, 150);
+            });
+            // Keyboard navigation — same as es_N/et_N. menuSetVisibility(i,false) as
+            // onClose (rather than duplicating display:none here) also resets the
+            // toggle button's caret icon back to its closed-state arrow.
+            _eoMenu.addEventListener('keydown', (e) => {
+                this._menuKeyDown(e, _eoMenu, { onClose: () => this.menuSetVisibility(i, false) });
+            });
+        }
+
+        this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
+        this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
+        this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
+        this._this.querySelector(`#b7_${i}`)?.addEventListener('input', this.entitySelectorEntered.bind(this), true);
+        this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
+        // Pointer hover preview — mouse/pen only (touch has no hover event; it
+        // stays on pointerdown/pointerup, see the dropdown entry's own handling).
+        // Delegated on the dropdown container so it survives entries being
+        // recreated on every re-filter, instead of re-attaching per entry.
+        this._this.querySelector(`#es_${i}`)?.addEventListener('pointerover', (e) => {
+            if( e.pointerType === 'touch' ) return;
+            const _a = e.target.closest('a[data-entity]');
+            if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+        });
+        // Touch has no hover event at all — preview on pointerdown/pointermove
+        // instead, while the finger can still be dragged to a different entry
+        // before lifting. Actual selection still only happens on the entry's own
+        // click handler (pointerup), unchanged.
+        const _touchPreview = (e) => {
+            if( e.pointerType !== 'touch' ) return;
+            const _a = e.target.closest('a[data-entity]');
+            if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+        };
+        this._this.querySelector(`#es_${i}`)?.addEventListener('pointerdown', _touchPreview);
+        this._this.querySelector(`#es_${i}`)?.addEventListener('pointermove', _touchPreview);
+
+        this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
+        this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);
+        this.ui.zoomButton[i] = this._this.querySelector(`#bz_${i}`);
     }
 
     insertUIHtmlText(i)
@@ -4694,72 +4632,7 @@ export class HistoryCardState {
 
             this.resizeSelector();
 
-            for( let i = 0; i < 2; i++ ) {
-
-                this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
-                this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
-                this._this.querySelector(`#b4_${i}`)?.addEventListener('click', this.decZoom.bind(this), false);
-                this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
-                this._this.querySelector(`#bx_${i}`)?.addEventListener('click', this.todayNoReset.bind(this), false);
-                this._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', this.todayReset.bind(this), false);
-                this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
-                this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
-                this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
-                this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
-                this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
-                this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
-                this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
-                // Close on focusout — same as es_N/et_N. eo_N needs a tabIndex to be
-                // focusable at all (unlike et_N, it isn't focusable by default in the HTML
-                // template), and menuSetVisibility() must call .focus() when opening it, or
-                // this listener would never fire in the first place.
-                const _eoMenu = this._this.querySelector(`#eo_${i}`);
-                if( _eoMenu ) {
-                    _eoMenu.tabIndex = 0;
-                    _eoMenu.addEventListener('focusout', () => {
-                        setTimeout(() => {
-                            if( !_eoMenu.contains(document.activeElement) ) this.menuSetVisibility(i, false);
-                        }, 150);
-                    });
-                    // Keyboard navigation — same as es_N/et_N. menuSetVisibility(i,false) as
-                    // onClose (rather than duplicating display:none here) also resets the
-                    // toggle button's caret icon back to its closed-state arrow.
-                    _eoMenu.addEventListener('keydown', (e) => {
-                        this._menuKeyDown(e, _eoMenu, { onClose: () => this.menuSetVisibility(i, false) });
-                    });
-                }
-
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('input', this.entitySelectorEntered.bind(this), true);
-                this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
-                // Pointer hover preview — mouse/pen only (touch has no hover event; it
-                // stays on pointerdown/pointerup, see the dropdown entry's own handling).
-                // Delegated on the dropdown container so it survives entries being
-                // recreated on every re-filter, instead of re-attaching per entry.
-                this._this.querySelector(`#es_${i}`)?.addEventListener('pointerover', (e) => {
-                    if( e.pointerType === 'touch' ) return;
-                    const _a = e.target.closest('a[data-entity]');
-                    if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
-                });
-                // Touch has no hover event at all — preview on pointerdown/pointermove
-                // instead, while the finger can still be dragged to a different entry
-                // before lifting. Actual selection still only happens on the entry's own
-                // click handler (pointerup), unchanged.
-                const _touchPreview = (e) => {
-                    if( e.pointerType !== 'touch' ) return;
-                    const _a = e.target.closest('a[data-entity]');
-                    if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
-                };
-                this._this.querySelector(`#es_${i}`)?.addEventListener('pointerdown', _touchPreview);
-                this._this.querySelector(`#es_${i}`)?.addEventListener('pointermove', _touchPreview);
-
-                this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
-                this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);
-                this.ui.zoomButton[i] = this._this.querySelector(`#bz_${i}`);
-
-            }
+            for( let i = 0; i < 2; i++ ) this._wireToolbar(i);
 
 
             const _needsIntervalRedraw = await this.readLocalState();

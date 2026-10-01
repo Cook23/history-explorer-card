@@ -41,6 +41,12 @@ Changelog for the HA History Explorer Card.
 - The other duplicated code of the card is factored too (entity selector lists, time axes, type menu entries — also shared with the info panel)
 - All documented in `deps/Chart Custom.js.md`
 
+### Changed — the boundary between Chart.js and the card is fixed, documented and tested
+- Chart.js now tells where each gesture happens: the zone, the label, the position along the time axis, and for a drop, the graph and the place among its labels or rows. The card no longer reads any graph's layout or calls any internal Chart.js function. The contract is described in `deps/Chart Custom.js.md` §0
+- The time axis is moved through two calls only, with a mouse or with fingers: `panX` (a drag, and the fingers of a pinch) and `zoomX` (Ctrl+wheel, and the spread of a pinch, one zoom step at a time)
+- The card handles each gesture in its own method (click, double-click, long press, start, move and end of a drag). Its drag state belongs to each card, instead of being shared by every card on the page
+- Automated interaction tests (mouse, touch, two cards): `yarn test`, see `tests/README.md`
+
 ### Changed — internal architecture rework for how the card handles clicks, drags, and gestures
 - Legend clicks/double-clicks, curve and timeline/arrowline label drag & drop, the entity type menu's long-press, mouse wheel zoom, hover cursors, and the truncated-label tooltip are now all detected and handled through a single, unified mechanism instead of several separate, overlapping ones
 - No user-visible change is intended from this alone — it's a foundation for the touch-related fixes below, and for future work
