@@ -26,7 +26,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
 - **v1.1.30** — Added persistence-control options for time range and entities — renamed in v1.1.32, see above.
 - **v1.1.29** — Change any entity's display type on the fly (line, bar, arrowline, timeline) from a simple menu.
-- **v1.1.26** — Touch-friendly Y axis panning, and a new `ylock` option to lock a graph's Y axis range.
+- **v1.1.26** — Touch-friendly Y axis panning (long-press to activate) and a new `ylock` option to lock a graph's Y axis range.
 - **v1.1.25** — Bar graph interval (10 min / hourly / daily / monthly) is now remembered across reloads.
 - **v1.1.23** — New unified entity picker (desktop and mobile) showing friendly names, with wildcard bulk-add.
 - **v1.1.19** — Default info panel state and default time range can be set in YAML, and are remembered per user across devices.
@@ -85,7 +85,6 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
 - **Tooltip**: hover over any graph to see values or state details
-- **Move**: on touch devices, moving an item (curve by its legend, graph, or Y-axis) uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
 
 ---
 
@@ -160,7 +159,7 @@ excludeFilterEntities:
 Any numeric entity can be shown as a line (straight, curved or stepped), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
 
 - Right after selecting a new numeric entity in the dropdown (see [Adding entities](#adding-entities))
-- On a 600ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
+- On a 700ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
 - When re-selecting an entity that's already added, to change its type
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
@@ -192,13 +191,12 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 - **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph
 - **Drag** a curve label onto another graph to move it there (compatible units only)
-- On mobile, double-tap a curve label then drag to start moving it
 
 An incompatible drop shows a brief tooltip explaining the mismatch.
 
 ### Reordering graphs
 
-Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On mobile, double-tap the ⠿ symbol then drag to start reordering.
+Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock.
 
 ### Timeline and arrowline graphs
 
@@ -208,7 +206,6 @@ Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the m
 - **Double-click** an entity label to extract it into its own graph
 - **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Click a truncated label to see the full name in a tooltip
-- On mobile, double-tap an entity label then drag to start moving it
 
 The page scrolls automatically when dragging near the top or bottom of the screen.
 
@@ -220,7 +217,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, double-tap the label area then drag to pan the Y axis, or use a two-finger vertical pinch to zoom it.
+The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, use a two-finger vertical pinch to zoom the Y axis.
 
 To set initial Y axis bounds in YAML:
 ```yaml

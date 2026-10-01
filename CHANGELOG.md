@@ -4,111 +4,33 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.46] - 2026-10-01
+## [v1.2.0] - in progress
 
-### New — angles drawn without jumps at 0/360 (`circular`)
-- A wind direction oscillating around the north (3, 2, 1, 0, 359, 358…) jumped across the whole graph at each crossing of 0/360. Angles are now drawn as a continuous curve (3, 2, 1, 0, -1, -2), placed around their circular mean; the tooltip and the Y axis labels show the real values in [0, period)
-- New per-entity option `circular` (in `graphs:` and `entityOptions`, persisted like the other entity fields), same values as lowpass_dt's: absent / `null` / `none` auto-detects (unit exactly `°`, or state class `measurement_angle`: period 360), `false` never, a number or numeric string sets the period, `2pi` sets 2π; anything else, or a period ≤ 0, turns it off with a console warning
-- A curve going round more than a whole turn over the time range is drawn within a one-turn band centered on its circular mean, its jumps at the band's edge drawn dashed like the smart mode's plateaus
-- Line and bar graphs only (not arrowline). The Y axis labels are only wrapped when every curve of the graph is circular with the same period. `ymin` / `ymax` apply as set (what goes beyond is cut off)
-- Bars of an angle no longer take a crossing of 0/360 for a counter reset
-- State class `measurement_angle` is treated as `measurement` when choosing the graph type (a line, not a timeline, even without a unit)
-- Limitations: long-term statistics average angles as plain numbers; the hourly min/max band of `showMinMax: history` isn't unwrapped
+> This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
+### Changed — internal architecture rework for how the card handles clicks, drags, and gestures
+- Legend clicks/double-clicks, curve and timeline/arrowline label drag & drop, the entity type menu's long-press, mouse wheel zoom, hover cursors, and the truncated-label tooltip are now all detected and handled through a single, unified mechanism instead of several separate, overlapping ones
+- No user-visible change is intended from this alone — it's a foundation for the touch-related fixes below, and for future work
 
-## [v1.1.45] - 2026-10-01
+### Fixed — double-click no longer requires a first click to also complete as a plain click first
+- Previously, a double-click's first tap was resolved as its own click before the second tap could combine into a double-click, occasionally causing both a single-click action (e.g. hiding a curve) and a double-click action (e.g. ungrouping it) to fire from the same gesture
+- A double-click is now recognized starting from the second press itself, without ever waiting on the first tap's own release
 
-### New — bars and curves on the same graph
-- A bar graph can now hold line entities too: their curves are drawn over the bars, keep their own line mode (`smart`...), aren't affected by the interval and never stack
-- Happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it now stays in its graph instead of moving to a linked graph), with a drag or a chain double-click within a group of linked graphs. An entity added from the UI never joins a graph of the other type on its own
-- *Raw line* in the interval selector only turns the bars into raw curves, which turn back into bars when picking an interval again (it no longer changes the entities' type)
-- A mixed graph is sized like a line graph
+### Fixed — a long-press followed immediately by dragging, without lifting your finger, now works as a single continuous gesture
+- Previously, once a long-press fired (e.g. opening the entity type menu), continuing to hold and drag the same finger no longer did anything — you had to lift and start a new, separate drag
+- A long-press and a drag can now both happen within the same continuous touch, one after the other, without lifting your finger in between
 
-### Fixed — hovering a bar of a mixed graph showed a curve's value
-- The nearest curve point always won, even with the pointer right on a bar. Now a curve point close to the pointer wins (curves are drawn over the bars), else the bar under the pointer
+### Changed — Y axis pan on touch now uses double-tap-then-drag, to avoid interfering with scrolling
+- The standard way to pan the Y axis on touch devices is now: double-tap the label area, then drag without lifting your finger — a workaround that reliably avoids any interference with the browser's native scroll
+- The Y axis lock icon still engages automatically the same way it always has
 
-### Fixed — options set on an entity inside `graphs:` were ignored
-- `type`, `lineWidth` (only its `width` alias was read), `interval`, `ymin` / `ymax` and `ystepSize` set directly on an entity of a YAML graph had no effect — they worked only through `entityOptions` or the graph's `options:`
-- The Y axis bounds of a graph are now taken from any of its entities (its own `options:` first), not only from the last one added — this also applied to `entityOptions`
-- `full-reference-config.yaml` spelled `ystepsize`, which the card doesn't read: fixed to `ystepSize`, and `ystepsize` is accepted too
+### Fixed — the touch-safe zone for dragging a curve label or a timeline/arrowline label was much wider than the label itself
+- On line/bar graphs with few curves, or a short legend, the area you could tap-and-hold on to start a drag stretched across the entire width of the graph, not just the legend's actual labels
+- That zone is now sized to the labels' own actual footprint, plus a small margin, on every graph type
 
-### Fixed — the interval selector could show the wrong interval
-- It always showed *10 min* unless the interval came from a saved state, even when the graph was hourly (YAML `interval:` or the default)
-
-
-## [v1.1.44] - 2026-09-30
-
-### Fixed — the curves of a graph could come back in a shuffled order after syncing
-- v1.1.43 saved the position of each linked graph within its block per entity: after a change synced from another device, some entities took their position from there and others kept this device's own, and the curves of a graph came back shuffled
-- The order within a block of linked graphs is now carried by the entities' order, resolved as a whole like any other order
-
-### Fixed — a change made on this device could randomly revert on reload (e.g. a display type picked from the menu)
-- v1.1.43 updated this device's image of the Home Assistant user data with what it had just written there. That write is asynchronous and may land late or not at all (connection lost, page reloaded first): Home Assistant then still returned the old value, which differed from the image and was taken as a change from another device — reverting this device's own change
-- The image of the Home Assistant user data is again only ever updated from what Home Assistant returns; this device's own write comes back later as an unchanged value
-
-### Fixed — "last one to speak wins": each source compared with its own image only
-- v1.1.43 made a device's first load compare YAML against what the other devices had synced through HA — mixing two sources' images. Reverted: YAML is compared with the YAML image only, so on a device's first load (no image yet) YAML has spoken there, applies, and reaches the other devices through HA like any YAML change
-- A card whose YAML doesn't set `defaultTimeRange` was still treated as YAML speaking about the time range (the built-in 24 h default was compared, not what the YAML says) — an option the YAML doesn't set now never speaks
-
-### Fixed — clearing a value (e.g. showing a hidden curve again) was never synced nor remembered
-- A cleared field disappears from the saved entry, and taking a source's change over only copied the fields present: showing a hidden curve again on one device never reached the others (and could even bring the curve back hidden), and showing again a curve hidden in YAML was lost on reload
-- A field missing from the saved entry is now taken over as cleared
-
-
-## [v1.1.43] - 2026-09-30
-
-### Fixed — graph-level `ymin` / `ymax` / `ystepSize` had no effect ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
-- Set under a YAML graph's `options:`, they were never passed on to the graph — they now set its Y axis as documented
-- `ymin: 0` / `ymax: 0` now also count as a fixed scale for the padlock icon
-
-### Fixed — `fill` set on a YAML graph entity was ignored ([#34](https://github.com/Cook23/history-explorer-card/issues/34))
-- A `fill` given directly on a graph entity (typically a wildcard `entity: sensor.*...`) without its own `color` was replaced by the automatic color's fill — an entity's own `fill` now always wins
-- Graph-level options left unset no longer wipe the matching `entityOptions` value for entities of that graph
-
-### Fixed — errors logged when a data reload shrinks a graph under an open tooltip ([#30](https://github.com/Cook23/history-explorer-card/issues/30))
-- Typically when opening the card from a tile card's trend graph: `...data[t.index]._view` then `e.title.length` errors
-- The tooltip now re-checks its point against the reloaded data, and closes if that point no longer exists
-
-### Changed — a YAML graph shows all its entities together again, whatever their units ([#31](https://github.com/Cook23/history-explorer-card/issues/31))
-- Regression since v1.1.34: YAML graphs were split into one graph per unit family again, as before v1.1.28
-- Entities of a YAML graph now always share one graph; the Y axis title is left empty when units differ, the legend and tooltip keep each entity's own unit
-- Only different display types (line, bar, timeline, arrowline) can't share a graph — they are shown as linked graphs (chain icon)
-
-### New — linked graphs can be split and merged back
-- Double-click a curve (or timeline entity) label on a YAML graph: it moves to its own graph right below, still linked to its YAML graph (same group, chain icon) — whatever its unit
-- Drag a label onto another graph of the same group, or double-click the chain icon, to show them together again — whatever the units, as long as the display types match
-- Dynamic entities keep their behavior: a double-click takes the curve out of its group
-- The chain icon now sits on the left, straddling the two graphs, so it no longer covers the lower graph's legend
-- Moving a graph that belongs to a block of linked graphs elsewhere now moves the whole block, instead of breaking it apart until the next reload
-- A split YAML graph (and the order of its linked graphs) is remembered following the `groupId` persistence rules
-
-### Fixed — dynamic graphs never really got a group
-- Adding an entity from the UI stored a second, hidden copy of it carrying its group, while the displayed one had none — so changing a curve to an incompatible type didn't link the new graph (no chain), and changing it back didn't return it to its graph
-- It only seemed to work after a reload, because an old storage migration then put every dynamic entity into one single group, chaining unrelated graphs together
-- Existing saved layouts are repaired automatically on first load
-
-### Fixed — a device opening the card for the first time wiped the other devices' synced customizations
-- With no local history yet, every YAML value looked like a fresh YAML edit: YAML won over what the other devices had synced through Home Assistant, and was then written back, overwriting it for everyone
-- A device's first load now takes the synced values (where multi-device persistence is enabled), and YAML only where nothing was synced
-
-### New — `smart` line mode: silences shown as flat dashed plateaus
-- A curve while the sensor reports at its usual rhythm; during a silence, a flat dashed line at the last known value instead of a spline or diagonal bridging the gap, the curve resuming one usual interval before the next value
-- Silences detected like the lowpass_dt integration: running average of the intervals (started from their median), silence beyond average + 3σ (at least 1 s)
-- An ongoing silence (last value to now) is drawn the same way; the tooltip only shows recorded values
-- Set with `lineMode: smart` (card, graph entity, `entityOptions`), or *Line smart* in the display type menu
-
-### Fixed — multi-device sync of dynamically added entities
-- With `enable_multidevice_persistence: none` (local memory only), entities added on another device still appeared on this one — they no longer do
-- An entity removed on one device came back on the others at their next reload — a removal is now synced too (an entity this device had seen in HA and that's gone from it was removed elsewhere)
-
-### Fixed — `unit:` set in YAML is now used when deciding whether a new dynamic entity can join an existing graph
-
-
-## [v1.1.42] - 2026-07-30
-
-### Fixed — menus could appear squeezed off-screen on a new card
-- A card that had never been shown before started out empty, with no graphs at all — so the card was much shorter than usual at that moment, and a menu clamped to fit within it could get pushed almost entirely off-screen
-- Menus are now also clamped to the browser window itself, so they always have enough room to show properly even on a card that's still empty
+### Fixed — hover cursors on the Y axis and curve/entity labels briefly went missing
+- A change made to fix an unrelated touch-scrolling issue had accidentally cleared the `↕` (Y axis) and 4-way move cursors shown when hovering those zones with a mouse or stylus
+- Restored, no other behavior affected
 
 
 ## [v1.1.41] - 2026-07-29
@@ -135,7 +57,7 @@ Changelog for the HA History Explorer Card.
 
 
 ## [v1.1.40] - 2026-07-29
-- Wrong release. Pulled.
+- Pulled release. Pulled.
 
 ## [v1.1.39] - 2026-07-29
 

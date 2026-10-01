@@ -78,11 +78,6 @@ graphs:
       # series at a given point
       process: null
 
-      # Angles: drawn as a continuous curve across 0/360 (tooltip and Y axis labels show the real values).
-      # null/none = automatic (unit '°' or state_class measurement_angle: period 360), false = never,
-      # a number or numeric string = the period, '2pi' = 2π
-      circular: null
-
       # Turns on persistence for this entity's fields — a specific list (e.g. [color, groupId]), or 'entities'/'all'
       # for every field, or 'none'. Local browser storage only, no cross-device sync. Falls back to the card-level
       # setting when unset here. See $.enable_persistence for what this means and what it defaults to.
@@ -153,7 +148,7 @@ graphs:
     ymax: null
 
     # Step size to display on the Y-axis (automatically calculated by default)
-    ystepSize: null
+    ystepsize: null
 
     # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
     # platform. `ymin`/`ymax` above still work as initial bounds alongside this
@@ -190,9 +185,6 @@ entityOptions:
 
     # Can be used to define a custom JS expression to post-process the state data before it goes into the graph. Should be defined as a JS expression taking one argument called `state` containing the value of the data series at a given point.
     process: null
-
-    # Angles: see $.graphs.entities.circular
-    circular: null
 
     # Colour of the line in the graph, defaults to automatically assigning a colour
     color: null
@@ -283,7 +275,7 @@ decimation: "fast"
 # How many decimal places to round values to, in tool tips and labels
 rounding: 2
 
-# Line interpolation mode. Can be: curves, lines, stepped, or smart (curves, with silences drawn as flat dashed plateaus)
+# Line interpolation mode. Can be: curves, lines, or stepped
 lineMode: "curves"
 
 # Line width for lines in line graphs. `width` is also accepted as an alias

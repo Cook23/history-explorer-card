@@ -69,10 +69,6 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
-- **v1.1.46** — New per-entity `circular` option (automatic for a unit of exactly `°` or state class `measurement_angle`; `false`, a period, or `2pi`): angles are drawn as a continuous curve across 0/360, placed around their circular mean, with the real values in [0, period) in the tooltip and on the Y axis labels (only the top label shows a whole turn as 360). A curve going round more than a turn is drawn within a one-turn band, its jumps dashed. `measurement_angle` is treated as `measurement` when choosing the graph type.
-- **v1.1.45** — A bar graph can hold curves too (YAML graph mixing both, a curve changed to bars, a drag or chain merge within linked graphs): curves are drawn over the bars, keep their line mode, aren't affected by the interval and never stack; *Raw line* only turns the bars into raw curves. Fixes: the interval selector always showed *10 min*, hover on a mixed graph, and `type` / `lineWidth` / `interval` / `ymin` / `ymax` / `ystepSize` set on an entity inside `graphs:` were ignored (`ystepsize` accepted too).
-- **v1.1.44** — "Last one to speak wins" fixed to compare each source with its own image only: a change made on a device (e.g. a display type from the menu) could randomly revert on reload, a device's first load no longer mixes YAML and HA, a YAML option that isn't set never speaks, clearing a value (showing a curve again) is synced and remembered, and the curves of a block of linked graphs no longer come back shuffled after syncing.
-- **v1.1.43** — New `smart` line mode: a curve while the sensor reports, flat dashed plateaus over its silences (same detection as lowpass_dt). Entities of a YAML graph always share one graph whatever their units (regression since v1.1.34); only different display types are split into *linked* graphs. Linked graphs (chain icon) can be split by double-clicking a YAML graph's label and merged back by dragging a label onto the group or double-clicking the chain icon, whatever the units; moving a linked graph moves its whole block. Fixes: graph-level `ymin`/`ymax`/`ystepSize`, per-entity `fill` on wildcard entities, tooltip errors on data reload, dynamic graphs that never got a group (type change couldn't link/unlink them), and removals / `none` in multi-device sync.
 - **v1.1.38** — `exclude:` (per-entity) and `filterEntities`/`excludeFilterEntities` now accept a plain string or a list of plain strings, in addition to the `{entity: ...}` object form — all mixable in the same list. Malformed YAML values across the card now log a console warning and are skipped individually instead of blanking the whole card. Entities added via a wildcard `entity:` pattern are now added in natural alphabetical order instead of Home Assistant's entity creation order. `fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can now be set under a graph's `options:` as a shared default for every entity in that graph (`options.exclude` combines with, rather than replacing, each wildcard entity's own `exclude:`). `width` remains accepted everywhere as an alias for `lineWidth`. `dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can now also be set once for the whole card, the same way `lineMode`, `lineWidth` and `decimation` already could.
 - **v1.1.32** — Persistence options renamed and inverted to opt-in: `enable_persistence`/`enable_multidevice_persistence` replace `disable_multidevice_persistence`/`disable_persistence`. Nothing persists by default except dynamically-added entities; `none` opts back out where that default applies.
 - **v1.1.31** — Popups and menus no longer get clipped near a viewport edge (`_clampToViewport()`); the graph hover tooltip is now a floating element instead of canvas-drawn, fixing size limits and touch/stylus flicker.
@@ -80,7 +76,7 @@ A chronological summary of every release that changed how the card behaves or is
 - **v1.1.29** — New entity type menu: change a numeric entity between line (straight/curved/stepped), bar, arrowline or timeline directly from the legend, a timeline label, or the entity selector — no need to remove and re-add it; a "Default" option re-applies each entity's auto-detected type for wildcard batches.
 - **v1.1.28** — Static YAML graphs fixed to combine correctly regardless of entity type/unit mix, honor the `graph.type` option, and correctly forward legend clicks and drag-and-drop rejection like dynamic graphs.
 - **v1.1.27** — Internal architecture unification: static (YAML) and dynamic (user-added) graphs now share a single code path (`pconfig.entities` + `pconfig.graphs`), simplifying maintenance and enabling later features such as the entity type menu.
-- **v1.1.26** — Touch ergonomics: Y axis pan on touch screens now requires a 500ms long-press before activating, avoiding accidental triggers while scrolling through graphs; new `ylock` YAML option locks a graph's Y axis against all interactive changes.
+- **v1.1.26** — Touch ergonomics: Y axis pan on touch screens now avoids accidental triggers while scrolling through graphs; new `ylock` YAML option locks a graph's Y axis against all interactive changes.
 - **v1.1.25** — Bar graph interval selection (10 min / hourly / daily / monthly) is now persisted across reloads with the same "last one to speak wins" logic used for the time range; entity selector dropdown shows each entity's current state value.
 - **v1.1.24** — Toolbar switches between three adaptive layouts depending on available width, replacing the previous fixed-width breakpoint logic; fixes wrapping issues on Safari.
 - **v1.1.23** — Entity selector unified across desktop and mobile into a single custom dropdown showing friendly names, with keyboard navigation and wildcard bulk-add.
@@ -151,9 +147,9 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 - **`lineMode` accepts singular aliases.** `line`, `curve` and `step` are now accepted in addition to `lines`, `curves` and `stepped`. The value is normalized at all entry points (global config, `entityOptions`, and static YAML graphs).
 
-### New — mobile touch gestures
+### New — mobile oriented touch gestures
 
-- **Y axis drag** — dragging on the Y axis label area pans the Y scale vertically. Works on both desktop (cursor changes to `↕`) and mobile (dedicated touch handler with `preventDefault` to avoid page scroll interference).
+- **Y axis drag** — dragging on the Y axis label area pans the Y scale vertically, on touch devices, uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
 - **Two-finger pinch vertical** — zooms the Y axis in or out, centered on the current midpoint. Works on mobile via touch events.
 
 ### New — SI unit grouping, ungrouping and drag & drop
@@ -162,13 +158,13 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 - **Ungroup by double-click** — double-clicking a curve label in the legend extracts that entity into its own separate graph, placed immediately below the original graph. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh.
 
-- **Drag and drop curves between graphs** — a curve can be dragged from its legend label and dropped onto another graph. Only drops onto graphs with compatible SI units are accepted. The curve's color is preserved; if the target graph already uses that color, a free color is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch. The new grouping is synchronized with your HA user account.
+- **Drag and drop curves between graphs** — a curve can be dragged from its legend label and dropped onto another graph. Only drops onto graphs with compatible SI units are accepted. The curve's color is preserved; if the target graph already uses that color, a free color is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch. The new grouping is synchronized with your HA user account. on touch devices, uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
 
-- **Reorder curves within a graph** — curve labels in the legend can be dragged left or right to reorder curves within the same graph. The new order is persisted.
+- **Reorder curves within a graph** — curve labels in the legend can be dragged left or right to reorder curves within the same graph. The new order is persisted. On touch devices, uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
 
-- **Drag and drop graphs to reorder** — graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (30 px wide zone). A simple click on that area still toggles the Y axis lock. The new order is synchronized with your HA user account.
+- **Drag and drop graphs to reorder** — graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (30 px wide zone). A simple click on that area still toggles the Y axis lock. The new order is synchronized with your HA user account. On touch devices, uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
 
-- **Drag and drop timeline/arrowline entities** — timeline and arrowline entities can be dragged from their label area to another graph of the same type, or reordered within the same graph by dragging their label up or down. Long labels that don't fit are truncated and can be revealed in full by clicking them.
+- **Drag and drop timeline/arrowline entities** — timeline and arrowline entities can be dragged from their label area to another graph of the same type, or reordered within the same graph by dragging their label up or down. On touch devices, uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag. Long labels that don't fit are truncated and can be revealed in full by clicking them.
 
 - **Auto-scroll during drag** — when dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are off screen.
 
@@ -201,7 +197,7 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 - A menu lets you choose how any numeric entity is displayed: line (straight, curved or stepped), bar, arrowline or timeline.
 - Opens right after selecting a new numeric entity in the dropdown — nothing is added until a type is chosen (click or keyboard); the choice both sets the type and performs the add in one step.
-- Also opens on a 700ms long-press of a legend label (line/bar) or a timeline/arrowline label, and when re-selecting an already-added entity, to change its type.
+- Also opens on a 600ms long-press of a legend label (line/bar) or a timeline/arrowline label, and when re-selecting an already-added entity, to change its type.
 - All-or-nothing: shown in full only for entities whose current state is numeric-convertible; not shown at all otherwise, since a non-numeric entity (on/off, text) can only ever be a timeline — it's added as one directly, no menu.
 - For a wildcard match, an extra **"Default"** option (pre-selected) applies each matched entity's own auto-detected type individually; picking any other option applies that one type to the whole batch.
 - The currently active type is pre-selected in bold; ArrowUp/ArrowDown and Enter navigate and confirm with the keyboard.
@@ -327,7 +323,7 @@ Dynamically added entities can be individually removed by clicking the `x` close
 Any numeric entity — one whose current state can be read as a number — can be shown as a line (straight, curved or stepped), a bar, an arrowline (bearing) or a timeline. A menu for making this choice opens automatically wherever it's relevant:
 
 - **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The currently auto-detected type (based on the entity's `state_class`/`unit_of_measurement`, or an explicit `entityOptions` override) is pre-selected in bold.
-- **On a 700ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
+- **On a 600ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
 The menu is all-or-nothing: it is shown in full only when the entity's current state is numeric-convertible. It is not shown at all otherwise — a non-numeric entity (an `on`/`off` state, free text, etc.) can only ever be represented as a timeline, so it is added directly as one, with no menu and no partial/greyed-out state to choose from.
@@ -359,33 +355,17 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
-
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
 #### Ungrouping a curve
 
 A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
-On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
-
-A long-press (700ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
-
-#### Linked graphs
-
-Graphs sharing the same group are shown as a solid block with a chain icon 🔗 between them, on the left. A group gets split into several linked graphs either by a double-click on a YAML graph's label (see above) or by changing an entity's display type to one its graph can't show (a timeline or arrowline can't share a chart with lines or bars; lines and bars can).
-
-Graphs added from the UI work the same way: changing a curve's display type to one its graph can't show (e.g. a line into a bar) moves it to a new graph linked to its original one, and changing its type back to a compatible one returns it to that original graph. A double-click on a label of a graph added from the UI, on the other hand, takes that curve out of its group entirely (no link).
-
-Within a group, curves can always be shown together again, whatever their units, as long as their display types match:
-- **Drag** a curve (or timeline entity) label onto another graph of the same group
-- **Double-click** the chain icon to merge the graph below it into the graph above it
-
-A curve of a YAML graph can't be dropped onto a graph of another group, and a curve from elsewhere can't be dropped onto a YAML graph.
+A long-press (600ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
 
 #### Moving curves between graphs
 
-A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets — except within a group of linked graphs, where any unit is accepted (see *Linked graphs* above). The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`).
+A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`). On mobile, double-tap a legend label then drag to start moving it.
 
 #### Reordering curves within a graph
 
@@ -393,9 +373,7 @@ Curve labels in the legend can be dragged left or right to change their display 
 
 #### Reordering graphs
 
-Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area still toggles the Y axis lock as before. The new order is synchronized with your HA user account.
-
-Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
+Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area still toggles the Y axis lock as before. The new order is synchronized with your HA user account. On mobile, double-tap the ⠿ symbol then drag to start reordering.
 
 When dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are not currently visible.
 
@@ -403,9 +381,10 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
-- **Long-press** (700ms) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** (600ms) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph
+- On mobile, double-tap an entity label then drag to start moving it
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
 
 All drag operations show a ghost element and horizontal insertion marker for precise positioning. All changes are synchronized with your HA user account.
@@ -478,7 +457,7 @@ Entities that represent a total (monotonically increasing or net metering) can b
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When dynamically adding an entity with a state class of `total_increasing`, then the bar chart type is automatically used. If the entity does not have this state class, then its type must be explicitly set to `bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting `as line` will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting `as line` will show the raw data of the entity as a line graph. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`. The latter is not needed if the entity has a `total_increasing` state class.
 
@@ -506,24 +485,6 @@ graphs:
         scale: 0.5
       - entity: sensor.rain_amount
 ```
-
-#### Bars and curves on the same graph
-
-A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and `as line` only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when dragging a label within a group of linked graphs. An entity added from the UI never joins a graph of the other type on its own.
-
-```yaml
-graphs:
-  - options:
-      interval: hourly
-    entities:
-      - entity: sensor.energy_consumed      # total_increasing (kWh) → bars
-      - entity: sensor.power                # measurement (W) → curve
-        lineMode: smart
-        scale: 0.001                        # W → kW, comparable with the kWh bars
-        unit: kW                            # the unit shown in the legend and tooltip
-```
-
-Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values.
 
 Set the `stacked` option to `true` to display the bars on top of each other rather than side by side:
 
@@ -665,7 +626,7 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
 
-**On mobile**, the same Y axis drag zone is available as a touch target. You can also use a two-finger vertical pinch on the graph to zoom the Y axis in or out.
+**On mobile**, double-tap the Y axis label area then drag, without lifting your finger, to pan the Y scale — this avoids interfering with the page's native scroll. You can also use a two-finger vertical pinch on the graph to zoom the Y axis in or out.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
 
@@ -689,13 +650,13 @@ See the customizing dynamic line graphs section and the advanced YAML example be
 
 ## Line interpolation modes
 
-Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
+Three modes are available for line charts: cubic splines, line segments and stepped. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase.
 
 All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. The default if the option is not present is `curves`.
+You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`) or `stepped` (or `step`). The default if the option is not present is `curves`.
 
 ```yaml
 type: custom:history-explorer-card
@@ -718,66 +679,6 @@ type: custom:history-explorer-card
 axisAddMarginMin: false
 axisAddMarginMax: false
 ```
-
-### Smart mode: silences shown as flat dashed plateaus
-
-Many sensors report irregularly: every few seconds while something happens, then nothing for minutes or hours. `curves` and `lines` then bridge each silence with a long spline or diagonal from the last value before it to the first one after it — suggesting a slow, gradual change that never happened. `stepped` avoids that, but loses the smooth shape of the curve while the sensor reports.
-
-`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way.
-
-```yaml
-type: custom:history-explorer-card
-graphs:
-  - type: line
-    entities:
-      - entity: sensor.heater_power
-        lineMode: smart
-```
-
-It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Line smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
-
-How a silence is detected — the same rules as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
-- the sensor's usual interval between values is a running average (EMA) of the intervals, started from their median;
-- an interval longer than that average plus 3 standard deviations (and at least 1 second) is a silence;
-- the curve resumes one average interval before the value that ends the silence.
-
-The threshold adapts along the curve, so a sensor that reports fast during the day and slowly at night gets plateaus only for what's unusual at each moment. The tooltip only ever shows recorded values.
-
-Limitation: Home Assistant only records a new value when it changes, so the card can't tell a silent sensor from one repeating the same value. Both appear as a plateau — which is right either way, since the last value still holds — but the dashes then mean "no new value recorded" rather than strictly "sensor silent".
-
-### Circular values (angles)
-
-A wind direction oscillating around the north goes 3, 2, 1, 0, 359, 358…: drawn as is, the curve jumps across the whole graph at each crossing of 0/360. For angles, the card draws a continuous curve instead — 3, 2, 1, 0, -1, -2 — while the tooltip and the Y axis labels keep showing the real values, in [0, 360) (a point at -1 shows 359).
-
-```yaml
-type: custom:history-explorer-card
-graphs:
-  - type: line
-    entities:
-      - entity: sensor.wind_direction      # unit °: detected automatically
-      - entity: sensor.heading_rad
-        circular: 2pi                      # angle in radians
-      - entity: sensor.some_angle
-        circular: false                    # drawn as is
-```
-
-`circular` is set per entity (in `graphs:` or `entityOptions`):
-- absent, `null` or `none`: automatic — an entity whose unit is exactly `°` (not `°C`/`°F`) or whose state class is `measurement_angle` is circular with a period of 360;
-- `false`: never circular;
-- a number or numeric string (`360`, `"360"`, `6.28`): circular with this period; `2pi` (any case, spaces ignored): 2π. Any other value, or a period ≤ 0, turns it off with a warning in the browser console.
-
-The same values as the `circular` option of the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration.
-
-How it's drawn:
-- each value is first brought into [0, period); a step of more than half a period from the previous value is a crossing of 0, and the curve goes on below 0 (or above the period) instead of jumping;
-- the whole curve is then placed around its average direction, so a wind around the north is drawn around 0 whatever the start of the time range;
-- should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus);
-- the Y axis labels show the real values only when every curve of the graph is circular with the same period;
-- `ymin` / `ymax` apply as set: with `ymin: 0` and `ymax: 360`, what goes below 0 is cut off at the edge of the graph. The top label of the Y axis shows a whole turn as 360 rather than 0 (0 … 360, or 300 … 350, 0, 10 … 360); anywhere else it's 0.
-
-Line and bar graphs only: an arrowline already shows an angle. An entity with state class `measurement_angle` and no unit is shown as a line, like a `measurement`.
-
-Limitations: Home Assistant's long-term statistics average angles as plain numbers (the mean of 359 and 1 is 180), which the card can't correct; the hourly min/max band of `showMinMax: history` isn't unwrapped.
 
 ### Line stroke style
 
@@ -974,7 +875,6 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```
 
 - **`enable_persistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
-- **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. If YAML and another source both spoke, YAML wins. For an entity, a YAML edit replaces every UI customization of that entity (other entities are untouched); reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML doesn't set at all (e.g. no `defaultTimeRange`) never speaks. A device opening the card for the very first time has no YAML image yet: YAML has spoken there, it applies on that device, and reaches your other devices through HA like any YAML change.
 - **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account (see [per-user server-side persistence](#per-user-server-side-persistence)), so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
@@ -1115,7 +1015,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
-| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
+| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped` |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
 | `scale` | number | Multiply all values by this factor before display |
@@ -1546,7 +1446,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `width`, `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `groupId`.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
