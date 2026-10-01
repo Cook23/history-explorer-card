@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b82';
+const Version = '1.2.0b83';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1903,15 +1903,29 @@ export class HistoryCardState {
                 // A drag only reaches this card's own graphs (Chart.js dragScope), not those
                 // of another card on the same page
                 dragScope: this._dragScope ??= 'hec-' + Math.random().toString(36).slice(2),
-                // Ctrl+wheel over a graph: zoom the time range — shared by every graph, so the
-                // card's — around the time under the pointer (Chart.js zoomX callback)
+                // Ctrl+wheel or a pinch over a graph: zoom the time range — shared by every
+                // graph, so the card's — around the time under the pointer / between the
+                // fingers, by the same steps as the zoom buttons (Chart.js zoomX callback)
                 zoomX: (info) => {
-                    if( info.deltaY === undefined || this.state.loading ) return;
+                    if( this.state.loading ) return;
+                    let _dir = 0;
+                    if( info.deltaY !== undefined ) {
+                        _dir = -Math.sign(info.deltaY);
+                    } else {
+                        // Pinch: the spread change accumulates (scale < 1: fingers apart),
+                        // one step each time it reaches ×1.5 — restarted for a new pinch
+                        const _now = Date.now();
+                        if( !this._pinchZoomAt || _now - this._pinchZoomAt > 400 ) this._pinchZoom = 1;
+                        this._pinchZoomAt = _now;
+                        this._pinchZoom *= info.scale;
+                        if( this._pinchZoom < 2 / 3 ) _dir = 1; else if( this._pinchZoom > 1.5 ) _dir = -1;
+                        if( _dir ) this._pinchZoom = 1;
+                    }
+                    if( !_dir ) return;
                     const _a = info.chart.chartArea;
                     const f = (info.centerPixels - _a.left) / (_a.right - _a.left);
                     const tc = this.factorToTimecode(f);
-                    if( info.deltaY < 0 ) this.incZoomStep(tc, f); else
-                    if( info.deltaY > 0 ) this.decZoomStep(tc, f);
+                    if( _dir > 0 ) this.incZoomStep(tc, f); else this.decZoomStep(tc, f);
                 },
                 zoomSelectMode: this.state.zoomMode,
                 // Phase 2.1 — legend overlay removed; drag&drop and long-press menu on
@@ -2012,23 +2026,8 @@ export class HistoryCardState {
                             const _clientX = _rect.left + info.x;
                             if( Math.abs(_clientX - panstate.lx) > 0 ) {
                                 panstate.lx = _clientX;
-                                const w = g.chart.chartArea.right - g.chart.chartArea.left;
-                                const x = Math.floor((_clientX - panstate.mx) * ((3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes) / w));
-                                if( x < 0 ) {
-                                    let t0 = moment(panstate.tc).add(-x, "second");
-                                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
-                                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-                                } else if( x > 0 ) {
-                                    let t0 = moment(panstate.tc).subtract(x, "second");
-                                    let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
-                                    this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                                    this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-                                }
-                                if( !this.state.loading )
-                                    this.updateHistory();
-                                else
-                                    this.updateAxes();
+                                const x = Math.floor((_clientX - panstate.mx) * this._secondsPerPixel(g));
+                                this._moveTimeWindow(moment(panstate.tc).subtract(x, "second"));
                             }
                         }
                         return;
@@ -2090,6 +2089,14 @@ export class HistoryCardState {
                             this.updateHistory();
                             this.state.autoScroll = moment() <= moment(this.endTime);
                         }
+                        return;
+                    }
+
+                    if( info.gestureType === 'pinch' ) {
+                        // Two fingers: their common horizontal movement pans the time (their
+                        // spread zooms it — zoomX; the Y axis is Chart.js's own)
+                        const x = Math.round(info.panDeltaX * this._secondsPerPixel(g));
+                        if( x ) this._moveTimeWindow(moment(this.startTime).subtract(x, "second"));
                         return;
                     }
 
@@ -2494,6 +2501,26 @@ export class HistoryCardState {
     // Panning
     // --------------------------------------------------------------------------------------
 
+
+    // Seconds of the time window per pixel of graph g's plot area
+    _secondsPerPixel(g)
+    {
+        const _a = g.chart.chartArea;
+        return (3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes) / (_a.right - _a.left);
+    }
+
+    // Moves the time window (same length) to start at t0, then redraws — fetching the newly
+    // visible data, or only the axes while a fetch is already under way
+    _moveTimeWindow(t0)
+    {
+        const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
+        this.startTime = moment(t0).format("YYYY-MM-DDTHH:mm:ss");
+        this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+        if( !this.state.loading )
+            this.updateHistory();
+        else
+            this.updateAxes();
+    }
 
     factorToTimecode(f)
     {

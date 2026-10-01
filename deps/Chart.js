@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b82
+ * HEC fork — synced with history-explorer-card version: 1.2.0b83
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b82';
+        var HEC_CHART_VERSION = '1.2.0b83';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -5470,12 +5470,23 @@
                     if (panDX !== 0 && typeof me.options.panX === 'function') {
                       me.options.panX.call(me, { chart: me, deltaPixels: panDX, event: e.native });
                     }
-                    if (panDY !== 0 && typeof me.options.panY === 'function') {
-                      me.options.panY.call(me, { chart: me, deltaPixels: panDY, event: e.native });
-                    }
                   }
                   if (_zoomXActive && me.options.zoomEnabled !== false && typeof me.options.zoomX === 'function') {
                     me.options.zoomX.call(me, { chart: me, scale: _zoomScaleX, centerPixels: newCenterX, event: e.native });
+                  }
+                  // Y pan by the vertical movement of the fingers' centre — the content follows
+                  // the fingers, as with the one-finger Y axis pan (yAxisPan) — applied here
+                  // like the Y zoom below: the Y scale is this chart's own (panY stays unused)
+                  var _yRange = me.chartArea ? me.chartArea.bottom - me.chartArea.top : 0;
+                  if (panDY !== 0 && _yRange > 0 && pinch.y0 !== undefined && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
+                    var _pShift = panDY * (pinch.y1 - pinch.y0) / _yRange;
+                    pinch.y0 += _pShift;
+                    pinch.y1 += _pShift;
+                    me.options.scales.yAxes[0].ticks.min = pinch.y0;
+                    me.options.scales.yAxes[0].ticks.max = pinch.y1;
+                    me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                    if (!me._hecYAxisLock) me._hecYAxisLock = 2;
+                    me.update();
                   }
                   if (me.options.zoomEnabled !== false) {
                     if (me.options.zoomYEnabled !== false && pinch.y0 !== undefined && pinch.distY > cfg.pinchMinDist && newDistY > cfg.pinchMinDist) {
@@ -5546,9 +5557,6 @@
                     me._hecHideInsertionMarker();
                   }
                   _hecCrossGraphDragFeedback(p, e);
-                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
-                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
-                  }
                 }
               },
               {
@@ -5571,9 +5579,6 @@
                   if (_at) me._hecShowInsertionMarker(_mr2.left, _mr2.top + _at.markerY, _mr2.width, 3, true);
                   else me._hecHideInsertionMarker();
                   _hecCrossGraphDragFeedback(p, e);
-                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
-                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
-                  }
                 }
               },
               {
@@ -5611,9 +5616,6 @@
                     } else {
                       me._hecHideInsertionMarker();
                     }
-                  }
-                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
-                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
                   }
                 }
               },

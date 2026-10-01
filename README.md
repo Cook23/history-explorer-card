@@ -235,7 +235,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, double-tap the label area then drag to pan the Y axis, or use a two-finger vertical pinch to zoom it.
+The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, double-tap the label area then drag to pan the Y axis. With two fingers on a graph: spread or pinch them horizontally to zoom the time in or out, vertically to zoom the Y axis; move them together to pan the time and the Y axis.
 
 To set initial Y axis bounds in YAML:
 ```yaml
