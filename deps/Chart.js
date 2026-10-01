@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b68
+ * HEC fork — synced with history-explorer-card version: 1.2.0b82
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -2919,21 +2919,31 @@
             point._datasetIndex = datasetIndex;
             point._index = index;
 
+            // Silence plateaus ('smart' line mode, see the card's _applySilencePlateaus):
+            // a data point flagged hecPlateauEnd ends a flat stretch drawn as a straight,
+            // dashed segment from the previous point; a hecVirtual point only exists to
+            // shape the curve (never drawn as a dot, never hovered).
+            var hecPlateauEnd = !!(value && value.hecPlateauEnd);
+            var hecVirtual = !!(value && value.hecVirtual);
+
             // Desired view properties
             point._model = {
               x: x,
               y: y,
               skip: custom.skip || isNaN(x) || isNaN(y),
+              hecPlateauEnd: hecPlateauEnd,
+              hecVirtual: hecVirtual,
               // Appearance
-              radius: custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
+              radius: hecVirtual ? 0 : custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
               pointStyle: custom.pointStyle || helpers.valueAtIndexOrDefault(dataset.pointStyle, index, pointOptions.pointStyle),
               backgroundColor: me.getPointBackgroundColor(point, index),
               borderColor: me.getPointBorderColor(point, index),
               borderWidth: me.getPointBorderWidth(point, index),
-              tension: meta.dataset._model ? meta.dataset._model.tension : 0,
-              steppedLine: meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              // (the segment ending at a plateau end is always a straight line)
+              tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
+              steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
               // Tooltip
-              hitRadius: custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
+              hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
           },
 
@@ -2946,11 +2956,13 @@
             var sumNeg = 0;
             var i, ds, dsMeta;
 
-            if (yScale.options.stacked) {
+            // (hecNoStack: a curve drawn over the bars of a mixed bar/line graph — the
+            // graph's stacked option is about its bars, the curves never stack)
+            if (yScale.options.stacked && !me.getDataset().hecNoStack) {
               for (i = 0; i < datasetIndex; i++) {
                 ds = chart.data.datasets[i];
                 dsMeta = chart.getDatasetMeta(i);
-                if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
+                if (dsMeta.type === 'line' && !ds.hecNoStack && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
                   var stackedRightValue = Number(yScale.getRightValue(ds.data[index]));
                   if (stackedRightValue < 0) {
                     sumNeg += stackedRightValue || 0;
@@ -3702,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b68';
+        var HEC_CHART_VERSION = '1.2.0b82';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -3899,6 +3911,30 @@
               return idx;
             };
 
+            // Where a timeline/arrowline row dropped at canvas-relative y lands: the row it's
+            // over — { idx, insertBefore (y above the row's middle), markerY (that row's edge
+            // on that side, for the insertion marker) } — skipping excludeIdx (the row being
+            // dragged), or null when over none; with nearest, the nearest row whatever the
+            // distance. Shared by the insertion markers (in this chart and in another one) and
+            // by the card, which places the dropped entity from it.
+            me._hecYAxisInsertAt = function (y, excludeIdx, nearest) {
+              var yScale = this.scales && this.scales['y-axis-0'];
+              var labels = this.data && this.data.labels;
+              if (!yScale || !labels || !labels.length) return null;
+              var _halfH = (yScale.height / labels.length) / 2;
+              var _best = null, _bestDist = Infinity;
+              for (var _i = 0; _i < labels.length; _i++) {
+                if (_i === excludeIdx) continue;
+                var _py = yScale.getPixelForValue(null, _i, _i);
+                var _dist = Math.abs(y - _py);
+                if (_dist < _bestDist && (nearest || _dist < _halfH)) {
+                  _bestDist = _dist;
+                  _best = { idx: _i, insertBefore: y < _py, markerY: _py + (y < _py ? -_halfH : _halfH) };
+                }
+              }
+              return _best;
+            };
+
             // Cross-graph scan — finds whichever OTHER Chart instance's canvas
             // contains this client position, or null. Factored out (per Thierry)
             // from what used to be two separately-written scans: the move-handle's
@@ -3910,7 +3946,9 @@
               if (!Chart.instances) return null;
               for (var _cid in Chart.instances) {
                 var _other = Chart.instances[_cid];
-                if (_other === me || !_other.canvas) continue;
+                // (options.dragScope: a drag only reaches the charts that share it — those
+                // of the same card, not another one on the same page)
+                if (_other === me || !_other.canvas || _other.options.dragScope !== me.options.dragScope) continue;
                 var _r = _other.canvas.getBoundingClientRect();
                 if (clientX >= _r.left && clientX <= _r.right && clientY >= _r.top && clientY <= _r.bottom) {
                   return _other;
@@ -3919,10 +3957,9 @@
               return null;
             };
 
-            // Find the best legend-item insertion point near (cx, cy) — migrated
-            // verbatim from the card's own _findLegendLabel, which had reimplemented
-            // this from legendHitBoxes (already this chart's own native data) rather
-            // than anything Chart.js couldn't already provide. With target=false,
+            // Find the best legend-item insertion point near (cx, cy), from legendHitBoxes
+            // (this chart's own data) — the one implementation, also used by the card to
+            // place a dropped curve (see Chart Custom.js.md §4). With target=false,
             // just identifies which label is being grabbed (source lookup). With
             // target=true, additionally computes the insertion marker's position
             // (midpoint between neighboring labels, or a fixed margin at either
@@ -4274,8 +4311,15 @@
             // longer than that duration, the tooltip closes mid-pan — correct, since nothing
             // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
-              var _stillValid = me.active.filter(function(el) {
-                return el && me.data.datasets[el._datasetIndex];
+              // Re-resolve each active element against the reloaded data: a new time range
+              // can shrink a dataset below the active index (element gone), and the tooltip
+              // callbacks (labelColor, positioners) read meta.data[index]._view directly —
+              // a stale index there throws mid-update and leaves a half-built tooltip model.
+              var _stillValid = [];
+              me.active.forEach(function(el) {
+                if (!el || !me.data.datasets[el._datasetIndex]) return;
+                var _cur = me.getDatasetMeta(el._datasetIndex).data[el._index];
+                if (_cur && _cur._view) _stillValid.push(_cur);
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
@@ -4479,6 +4523,7 @@
             me._hecUpdateYAxisState();
             me._hecUpdateDragTouchOverlays();
             me._hecUpdateMoveHandleIcon();
+            me._hecUpdateLinkMarker();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
           },
@@ -4530,11 +4575,7 @@
               _el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
               me._hecLockIconEl = _el;
             }
-            var _parent = me.canvas.parentNode;
-            if (_parent && _el.parentNode !== _parent) {
-              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-              _parent.appendChild(_el);
-            }
+            me._hecAttachToCanvasParent(_el);
             _el.style.left = '15px';
             _el.style.top = '5px';
             var _svg = _el.children[0];
@@ -4551,26 +4592,107 @@
             // else. Forwards every event it receives straight to the canvas so
             // Chart.js's own gesture handling still does 100% of the actual work.
             if (me.chartArea) {
-              var _yo = me._hecYAxisTouchEl;
-              if (!_yo) {
-                _yo = document.createElement('div');
-                _yo.style.cssText = 'position:absolute;z-index:0;cursor:ns-resize;';
-                var _forward = function (ev) {
-                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
-                };
-                _yo.addEventListener('pointerdown', _forward);
-                _yo.addEventListener('pointermove', _forward);
-                _yo.addEventListener('pointerup', _forward);
-                _yo.addEventListener('pointercancel', _forward);
-                me._hecYAxisTouchEl = _yo;
-              }
-              if (_parent && _yo.parentNode !== _parent) _parent.appendChild(_yo);
+              var _yo = me._hecTouchOverlay('_hecYAxisTouchEl', 'ns-resize');
               _yo.style.left = me.canvas.offsetLeft + 'px';
               _yo.style.top = (me.canvas.offsetTop + me.chartArea.top) + 'px';
               _yo.style.width = me.chartArea.left + 'px';
               _yo.style.height = (me.chartArea.bottom - me.chartArea.top) + 'px';
               _yo.style.touchAction = (me._hecYAxisLock || me._hecYAxisClickArmed) ? 'none' : '';
             }
+          },
+
+          // Places el next to this chart's canvas, in the canvas's own parent (made a
+          // positioned container if it isn't one yet) — shared by every element below
+          // that's laid over the chart: lock icon, move handle, touch zones.
+          _hecAttachToCanvasParent: function (el) {
+            var _parent = this.canvas && this.canvas.parentNode;
+            if (!_parent) return null;
+            if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+            if (el.parentNode !== _parent) _parent.appendChild(el);
+            return _parent;
+          },
+
+          // A touch zone laid over part of the chart (see "The touch-action workaround" in
+          // Chart Custom.js.md): created once and kept under this[key], it relays every
+          // pointer event it gets to the canvas, so the gesture detector still does 100% of
+          // the work — only its touch-action differs from the canvas's. Single place for the
+          // Y axis zone, the legend / label column zones and the lock+handle zone.
+          _hecTouchOverlay: function (key, cursor) {
+            var me = this;
+            var _el = me[key];
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.style.cssText = 'position:absolute;z-index:0;cursor:' + cursor + ';';
+              var _forward = function (ev) {
+                // A press here keeps the browser's default actions to itself, as the card's
+                // own zones did before v1.2: with a mouse or pen, no text selection (dragging
+                // out of the zone would leave one behind on the page, and the next press on
+                // it would start the browser's own drag-and-drop instead — a pointercancel
+                // that lost the drag); on touch, no focus change by the emulated mouse
+                // events (the click that follows a long-press would otherwise take the focus
+                // away from the type menu it just opened, closing it). Scrolling isn't one of
+                // these: on touch it's only ever governed by touch-action.
+                if (ev.type === 'pointerdown') ev.preventDefault();
+                me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
+              };
+              ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(function (t) {
+                _el.addEventListener(t, _forward);
+              });
+              me[key] = _el;
+            }
+            me._hecAttachToCanvasParent(_el);
+            return _el;
+          },
+
+          // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
+          // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays.
+          // Minus where the chain icon (drawn over it) overlaps its top edge.
+          _hecInLockAndHandleZone: function (x, y) {
+            return x >= 0 && x <= 33 && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+          },
+
+          // Linked-graphs marker (chain icon), shown while options.linkMarkerVisible is
+          // true: straddling this chart's top edge, under the Y axis labels of the graph
+          // above (an empty spot — centered on the top it would cover this chart's legend).
+          // Canvas-relative rectangle, or null when hidden.
+          _hecLinkMarkerRect: function () {
+            if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
+            return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+          },
+
+          _hecInLinkMarkerZone: function (x, y) {
+            var _r = this._hecLinkMarkerRect();
+            return !!_r && x >= _r.left && x <= _r.left + _r.width && y >= _r.top && y <= _r.top + _r.height;
+          },
+
+          // The chain icon itself: a relay zone like the others (_hecTouchOverlay) — its
+          // gestures reach customEvent like any other on this chart, with linkMarkerZone
+          // true (the card merges the two graphs on a double-click). options.linkMarkerTitle:
+          // its hover text, given by the card.
+          _hecUpdateLinkMarker: function () {
+            var me = this;
+            var _r = me._hecLinkMarkerRect();
+            var _el = me._hecLinkMarkerEl;
+            if (!_r) {
+              if (_el) _el.style.display = 'none';
+              return;
+            }
+            if (!_el) {
+              _el = me._hecTouchOverlay('_hecLinkMarkerEl', 'pointer');
+              _el.style.zIndex = '2';
+              _el.style.alignItems = 'center';
+              _el.style.justifyContent = 'center';
+              _el.style.borderRadius = '50%';
+              _el.style.background = 'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
+              _el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
+            }
+            me._hecAttachToCanvasParent(_el);
+            _el.style.display = 'flex';
+            _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
+            _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
+            _el.style.width = _r.width + 'px';
+            _el.style.height = _r.height + 'px';
+            _el.title = me.options.linkMarkerTitle || '';
           },
 
           // Graph reorder handle symbol (⠿) — purely visual, pointer-events:none.
@@ -4588,11 +4710,7 @@
               _el.textContent = '\u283F';
               me._hecMoveHandleIconEl = _el;
             }
-            var _parent = me.canvas.parentNode;
-            if (_parent) {
-              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-              if (_el.parentNode !== _parent) _parent.appendChild(_el);
-            }
+            me._hecAttachToCanvasParent(_el);
             _el.style.left = me.canvas.offsetLeft + 'px';
             _el.style.top = me.canvas.offsetTop + 'px';
             _el.style.display = me.options.moveHandleVisible === false ? 'none' : 'flex';
@@ -4674,47 +4792,19 @@
             if (_el) _el.remove();
           },
 
-          // Drop-target highlight — an outline drawn around a graph's own canvas
-          // wrapper while a compatible/incompatible drag hovers over it. Migrated
-          // verbatim from the card's own _highlightDropTarget/_clearDropHighlight,
-          // applied to THIS chart's own canvas.parentNode.
+          // Drop-target highlight — an outline around this chart's own canvas wrapper while
+          // a compatible/incompatible drag hovers over it (Chart.hecUi.outline).
           _hecHighlightDropTarget: function (valid) {
             this._hecClearDropHighlight();
             var _wrapper = this.canvas && this.canvas.parentNode;
             if (!_wrapper) return;
-            _wrapper._hecPrevOutline = _wrapper.style.outline;
-            _wrapper._hecPrevOutlineOffset = _wrapper.style.outlineOffset;
-            _wrapper._hecPrevTransition = _wrapper.style.transition;
-            var _color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
-            _wrapper.style.transition = '';
-            _wrapper.style.outline = '2px ' + (valid ? 'solid' : 'dashed') + ' ' + _color;
-            _wrapper.style.outlineOffset = '-2px';
-            if (!valid) {
-              (function (_w) {
-                requestAnimationFrame(function () { _w.style.transition = 'outline-color 1.5s ease'; });
-              })(_wrapper);
-            }
+            Chart.hecUi.outline(_wrapper, valid);
             this._hecHighlightEl = _wrapper;
           },
 
           _hecClearDropHighlight: function () {
-            var _el = this._hecHighlightEl;
-            if (!_el) return;
+            Chart.hecUi.clearOutline(this._hecHighlightEl);
             this._hecHighlightEl = null;
-            if (_el.style.transition && _el.style.transition.indexOf('outline-color') >= 0) {
-              _el.style.outlineColor = 'transparent';
-              (function (_e) {
-                setTimeout(function () {
-                  _e.style.outline = _e._hecPrevOutline || '';
-                  _e.style.outlineOffset = _e._hecPrevOutlineOffset || '';
-                  _e.style.transition = _e._hecPrevTransition || '';
-                }, 1500);
-              })(_el);
-            } else {
-              _el.style.outline = _el._hecPrevOutline || '';
-              _el.style.outlineOffset = _el._hecPrevOutlineOffset || '';
-              _el.style.transition = _el._hecPrevTransition || '';
-            }
           },
 
           // Zoom-rectangle selection overlay — pure geometry, no knowledge of
@@ -4767,24 +4857,7 @@
             if (!me.canvas || !me.chartArea) return;
 
             function ensureOverlay(key) {
-              var _el = me[key];
-              if (!_el) {
-                _el = document.createElement('div');
-                _el.style.cssText = 'position:absolute;z-index:0;cursor:move;';
-                var _forward = function (ev) {
-                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
-                };
-                _el.addEventListener('pointerdown', _forward);
-                _el.addEventListener('pointermove', _forward);
-                _el.addEventListener('pointerup', _forward);
-                _el.addEventListener('pointercancel', _forward);
-                me[key] = _el;
-              }
-              var _parent = me.canvas.parentNode;
-              if (_parent) {
-                if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
-                if (_el.parentNode !== _parent) _parent.appendChild(_el);
-              }
+              var _el = me._hecTouchOverlay(key, 'move');
               _el.style.touchAction = (me._hecLabelDragAllowed || me._hecLabelClickArmed) ? 'none' : '';
               return _el;
             }
@@ -4873,10 +4946,14 @@
               return;
             }
 
-            // Draw datasets reversed to support proper line stacking
-            for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
-              if (me.isDatasetVisible(i)) {
-                me.drawDataset(i, easingValue);
+            // Draw datasets reversed to support proper line stacking. The curves of a mixed
+            // bar/line graph (hecNoStack) are drawn in a second pass, over the bars.
+            var datasets = me.data.datasets || [];
+            for (var pass = 0; pass < 2; ++pass) {
+              for (var i = datasets.length - 1; i >= 0; --i) {
+                if (!!datasets[i].hecNoStack === (pass === 1) && me.isDatasetVisible(i)) {
+                  me.drawDataset(i, easingValue);
+                }
               }
             }
 
@@ -5114,10 +5191,8 @@
           eventHandler: function (e) {
             var me = this;
 
-            console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler ENTRY e.type=', e.type, 'chart.id=', me.id);
 
             if (plugins.notify(me, 'beforeEvent', [e]) === false) {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler SWALLOWED by beforeEvent plugin hook, e.type=', e.type);
               return;
             }
 
@@ -5201,9 +5276,10 @@
               if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
-                // A genuine mouseout leaves the canvas entirely — close both
-                // independent tooltip elements (hover and other), not just one.
-                if (me.tooltip) { me.tooltip._hecCloseTooltip('hover'); me.tooltip._hecCloseTooltip('other'); }
+                // A genuine mouseout leaves the canvas entirely — close both the hover
+                // tooltip and a label message shown from this chart.
+                if (me.tooltip) me.tooltip._hecCloseTooltip();
+                Chart.hecUi.closeMessage(me.canvas);
               }
               me._hecHasMoved = false;
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
@@ -5309,6 +5385,39 @@
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
 
+            // Always run: click detection here is no longer an add-on for customEvent/
+            // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
+            // options.onClick now have (see fire() above), so this must run
+            // unconditionally, the same way wheel's default zoom behavior already does.
+            {
+              me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
+              me._hecGestureHandler(e, {
+                longPressMs: _HEC_LONGPRESS_MS,
+                dblClickMs: _HEC_DBLCLICK_MS,
+                dragSlop: _HEC_DRAG_SLOP,
+                pinchMinDist: _HEC_PINCH_MIN_DIST,
+                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
+            }
+
+            return changed;
+          },
+
+          /**
+              * @private
+              * Generic pointer/wheel gesture state machine feeding options.customEvent and
+              * options.panX/panY/zoomX/zoomY. See the comment block in handleEvent above
+              * for provenance of the timing constants and structure.
+              */
+          _hecGestureHandler: function (e, cfg) {
+            var me = this;
+            var gs = me._hecGesture;
+            var pid = e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0;
+            var pointerType = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
+
+            // (This table and its two helpers live here, not in handleEvent: they use
+            // this function's own gs / cfg / pid / fire. Declared in handleEvent they were
+            // out of scope here, and every drag or pinch threw "HEC_DRAG_HANDLERS is not
+            // defined" — v1.2.0b69.)
             // Drag/gesture handlers — per Thierry's explicit instruction, ALL
             // 2-finger and 1-finger drag gestures are handled uniformly through
             // this single table, replacing what used to be a scattered if/else-if
@@ -5457,22 +5566,10 @@
                 },
                 onMove: function (p, e) {
                   _hecDragMoveTick(p, e);
-                  var _yScale = me.scales['y-axis-0'];
                   var _mr2 = me.canvas.getBoundingClientRect();
-                  var _markerShown = false;
-                  for (var _ei = 0; _ei < me.data.labels.length; _ei++) {
-                    if (_ei === p.dragYIdx) continue;
-                    var _py = _yScale.getPixelForValue(null, _ei, _ei);
-                    var _halfH = (_yScale.height / me.data.labels.length) / 2;
-                    if (Math.abs(e.y - _py) < _halfH) {
-                      var _insertBeforeTL = e.y < _py;
-                      var _my = _mr2.top + _py + (_insertBeforeTL ? -_halfH : _halfH);
-                      me._hecShowInsertionMarker(_mr2.left, _my, _mr2.width, 3, true);
-                      _markerShown = true;
-                      break;
-                    }
-                  }
-                  if (!_markerShown) me._hecHideInsertionMarker();
+                  var _at = me._hecYAxisInsertAt(e.y, p.dragYIdx, false);
+                  if (_at) me._hecShowInsertionMarker(_mr2.left, _mr2.top + _at.markerY, _mr2.width, 3, true);
+                  else me._hecHideInsertionMarker();
                   _hecCrossGraphDragFeedback(p, e);
                   if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
                     me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
@@ -5495,7 +5592,7 @@
               {
                 name: 'lockAndHandle',
                 test: function (p) {
-                  var _inZone = p.x0 >= 0 && p.x0 <= 33 && p.y0 >= 0 && p.y0 <= 28;
+                  var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0);
                   if (!_inZone) return false;
                   var _gRect = me.canvas.getBoundingClientRect();
                   me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
@@ -5585,15 +5682,10 @@
                   }
                 } else if (_other.options.dropAllowed !== false && p.dragYIdx >= 0 && (_other.config.type === 'timeline' || _other.config.type === 'arrowline') &&
                            _oy >= 0 && _other.chartArea && _ox < _other.chartArea.left) {
-                  var _oYIdx = _other._hecYAxisIndexAt(_ox, _oy);
-                  if (_oYIdx >= 0) {
-                    var _oYScale = _other.scales['y-axis-0'];
+                  var _oAt = _other._hecYAxisInsertAt(_oy, -1, false);
+                  if (_oAt) {
                     var _oMr2 = _other.canvas.getBoundingClientRect();
-                    var _oPy = _oYScale.getPixelForValue(null, _oYIdx, _oYIdx);
-                    var _oHalfH = (_oYScale.height / _other.data.labels.length) / 2;
-                    var _oInsertBefore = _oy < _oPy;
-                    var _oMy = _oMr2.top + _oPy + (_oInsertBefore ? -_oHalfH : _oHalfH);
-                    _other._hecShowInsertionMarker(_oMr2.left, _oMy, _oMr2.width, 3, true);
+                    _other._hecShowInsertionMarker(_oMr2.left, _oMr2.top + _oAt.markerY, _oMr2.width, 3, true);
                   } else {
                     _other._hecHideInsertionMarker();
                   }
@@ -5604,36 +5696,14 @@
                 p.dragOverTarget._hecHideInsertionMarker();
               }
               p.dragOverTarget = _dragOverFound;
+              // The drag's cursor (this canvas holds the pointer): not-allowed over a graph
+              // that refuses the drop (dropAllowed, decided by the customEvent above),
+              // grabbing anywhere else
+              if (me.options.cursorEnabled !== false) {
+                me.canvas.style.cursor = (_dragOverFound && _dragOverFound.options.dropAllowed === false) ? 'not-allowed' : 'grabbing';
+              }
             }
 
-            // Always run: click detection here is no longer an add-on for customEvent/
-            // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
-            // options.onClick now have (see fire() above), so this must run
-            // unconditionally, the same way wheel's default zoom behavior already does.
-            {
-              me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
-              me._hecGestureHandler(e, {
-                longPressMs: _HEC_LONGPRESS_MS,
-                dblClickMs: _HEC_DBLCLICK_MS,
-                dragSlop: _HEC_DRAG_SLOP,
-                pinchMinDist: _HEC_PINCH_MIN_DIST,
-                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
-            }
-
-            return changed;
-          },
-
-          /**
-              * @private
-              * Generic pointer/wheel gesture state machine feeding options.customEvent and
-              * options.panX/panY/zoomX/zoomY. See the comment block in handleEvent above
-              * for provenance of the timing constants and structure.
-              */
-          _hecGestureHandler: function (e, cfg) {
-            var me = this;
-            var gs = me._hecGesture;
-            var pid = e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0;
-            var pointerType = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
 
             function customEventTarget() {
               return typeof me.options.customEvent === 'function';
@@ -5690,7 +5760,7 @@
                 // Grouped lock+handle zone: dblclick toggles the lock exactly the
                 // same way click does (see the click branch below) — same zone
                 // check, same action, no pointerType distinction.
-                var _dblInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
                 if (_dblInLockAndHandleZone) {
                   me._hecToggleYAxisLock();
                 }
@@ -5709,7 +5779,6 @@
               var _yIdx = yAxisIndexAt(_hx, _hy);
               var _truncated = truncatedYAxisLabelAt(_yIdx);
               if (gestureType === 'click') {
-                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' click yAxisIndex=', _yIdx, 'truncated=', _truncated, 'labelTooltipEnabled=', me.options.labelTooltipEnabled, 'hasTooltip=', !!me.tooltip, 'chartArea=', me.chartArea, 'labels=', me.data && me.data.labels);
                 if (typeof me.options.onClick === 'function') {
                   me.options.onClick.call(me, e.native, me.active);
                 }
@@ -5720,17 +5789,10 @@
                 if (_truncated && me.options.labelTooltipEnabled !== false && me.tooltip) {
                   var _cx2 = e.native ? e.native.clientX : _hx;
                   var _cy2 = e.native ? e.native.clientY : _hy;
-                  me.tooltip._hecShowTooltip(
-                    'other',
-                    _truncated,
-                    _cx2 + 10, _cy2 - 16,
-                    me.canvas,
-                    'var(--card-background-color,#fff)', 'var(--divider-color,#ccc)', 'var(--primary-text-color,#333)',
-                    null,
-                    true
-                  );
+                  var _bSel = me.options.floatingBoundsSelector;
+                  Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
                 }
-                var _clickInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
                 if (_clickInLockAndHandleZone) {
                   // Grouped lock+handle zone: a click here always toggles the lock.
                   // On mouse/pen, that's the whole story — simple, no two-step: click
@@ -5777,7 +5839,8 @@
                 legendIndex: legendIndexAt(_hx, _hy),
                 yAxisIndex: _yIdx,
                 truncatedYAxisLabel: _truncated,
-                lockAndHandleZone: _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28,
+                lockAndHandleZone: me._hecInLockAndHandleZone(_hx, _hy),
+                linkMarkerZone: me._hecInLinkMarkerZone(_hx, _hy),
                 zoomSelectMode: me.options.zoomSelectMode === true,
                 gestureType: gestureType,
                 pointerCount: gs.count,
@@ -5794,6 +5857,7 @@
             // Thierry's explicit request to harmonize the drag-handling code.
             function _hecEndDrag(p) {
               me._hecDestroyDragGhost();
+              if (me.canvas) me.canvas.style.cursor = '';
               me._hecHideInsertionMarker();
               if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
               if (p.handler && p.handler.name === 'zoomSelect') {
@@ -5805,10 +5869,17 @@
             }
 
             if (e.type === 'mousedown') {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mousedown pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId);
               gs.pointers[pid] = { x: e.x, y: e.y };
               gs.count = Object.keys(gs.pointers).length;
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' after mousedown gs.pointers=', JSON.stringify(gs.pointers), 'count=', gs.count);
+              // Keep receiving this pointer's moves/release once it leaves the canvas —
+              // a drag onto ANOTHER graph (curve/label/graph move) is followed from here
+              // (see _hecCrossGraphDragFeedback). Touch gets this implicitly from the
+              // browser; a mouse or pen doesn't, so without it a drag toward another
+              // graph never got past this canvas's edge. Released automatically at the
+              // pointer's release.
+              if (e.native && e.native.pointerId !== undefined && me.canvas && me.canvas.setPointerCapture) {
+                try { me.canvas.setPointerCapture(e.native.pointerId); } catch (_err) { /* pointer already gone */ }
+              }
 
               if (gs.count === 1) {
                 // Four independent events, defined purely by time and distance —
@@ -5905,9 +5976,8 @@
                   // options.cursorEnabled) — Chart.js sets its own canvas's cursor
                   // style directly, same as wheelZoomEnabled actually zooming: 'move'
                   // over a draggable legend label (line/bar) or a draggable
-                  // timeline/arrowline Y-axis label, '' otherwise. Static graphs get
-                  // this disabled entirely by the card passing cursorEnabled:false at
-                  // construction time — no separate isStatic concept needed here.
+                  // timeline/arrowline Y-axis label, '' otherwise (cursorEnabled: false
+                  // turns it all off).
                   if (me.options.cursorEnabled !== false && me.canvas) {
                     var _draggable = (_hLegendIdx >= 0 && (me.config.type === 'line' || me.config.type === 'bar')) ||
                                       (_hYIdx >= 0 && (me.config.type === 'timeline' || me.config.type === 'arrowline'));
@@ -5937,7 +6007,6 @@
               }
 
             } else if (e.type === 'mouseup') {
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId, 'gs.pointers=', JSON.stringify(gs.pointers), 'gs.pending=', JSON.stringify(gs.pending));
               // Legend/timeline label drag workaround: armed by custDblClick, always
               // disarmed here on the raw mouseup itself — not custDragEnd — so it
               // never stays stuck armed when no drag actually followed the dblclick.
@@ -5974,32 +6043,26 @@
                 clearTimeout(gs.longPressTimer); gs.longPressTimer = null;
               }
               var pu = gs.pending;
-              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup decision pu=', JSON.stringify(pu), 'pid=', pid);
               if (pu && pu.pid === pid) {
                 gs.pending = null;
                 if (pu.dragging) {
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> dragend');
                   _hecEndDrag(pu);
                 } else if (pu.longPressFired) {
                   // Click and long-press are mutually exclusive — a long-press already
                   // fired for this contact, so releasing without ever moving does NOT
                   // become a click, even though gs.pending stayed alive to allow a drag
                   // to follow (which didn't happen here).
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (long-press already fired)');
                 } else if (pu.dblClickFired) {
                   // Click and dblclick are mutually exclusive too — this same press
                   // was the second one of a double-click, already fired at its own
                   // mousedown; releasing it must not ALSO produce a plain click.
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (dblclick already fired)');
                 } else {
                   // click: released without moving, before the long-press timer
                   // fired (< 600ms), and this press wasn't itself a dblclick's
                   // second press — per Thierry's spec.
-                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> click');
                   fire('click', undefined, undefined);
                 }
               } else {
-                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> NO MATCH, pu was null or wrong pid');
               }
               delete gs.pointers[pid];
               gs.count = Object.keys(gs.pointers).length;
@@ -6026,9 +6089,12 @@
 
             } else if (e.type === 'wheel') {
               if (!e.native) return;
-              // Debounce identical to the card's wheelScrolled: rapid-fire wheel ticks
-              // within 150ms of each other are coalesced to one, avoiding runaway zoom
-              // steps on trackpads/high-resolution wheels.
+              // Ctrl+wheel zooms the time range, never the page — every tick, including those
+              // the debounce below coalesces away
+              var _ctrlZoom = e.native.ctrlKey && me.options.wheelZoomEnabled !== false && typeof me.options.zoomX === 'function';
+              if (_ctrlZoom) e.native.preventDefault();
+              // Debounce: rapid-fire wheel ticks within 150ms of each other are coalesced to
+              // one, avoiding runaway zoom steps on trackpads/high-resolution wheels.
               var _now2 = Date.now();
               if (me._hecWheelLast && _now2 - me._hecWheelLast < cfg.wheelDebounceMs) return;
               me._hecWheelLast = _now2;
@@ -6038,17 +6104,14 @@
                 deltaX: _native.deltaX, deltaY: _native.deltaY,
                 ctrlKey: _native.ctrlKey, shiftKey: _native.shiftKey, altKey: _native.altKey });
 
-              // High-level default behavior, same mapping as the card's wheelScrolled:
-              // Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel calls a card-supplied zoomX
-              // callback (the shared date range across all graphs is a card
-              // responsibility, per Thierry). Shift+wheel zoom Y, by contrast, is a
-              // per-graph responsibility Chart.js handles directly on its own Y scale
-              // — no callback needed, same formula the card's original wheelScrolled
-              // used. Configurable, on by default (see options.wheelZoomEnabled /
-              // options.zoomYEnabled below).
+              // High-level default behavior: Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel
+              // calls a card-supplied zoomX callback (the shared date range across all
+              // graphs is a card responsibility, per Thierry). Shift+wheel zoom Y, by
+              // contrast, is a per-graph responsibility Chart.js handles directly on its
+              // own Y scale — no callback needed. Configurable, on by default (see
+              // options.wheelZoomEnabled / options.zoomYEnabled below).
               if (me.options.wheelZoomEnabled !== false) {
-                if (_native.ctrlKey && typeof me.options.zoomX === 'function') {
-                  _native.preventDefault();
+                if (_ctrlZoom) {
                   me.options.zoomX.call(me, { chart: me, deltaY: _native.deltaY, centerPixels: e.x, event: _native });
                 }
                 if (_native.shiftKey && me.options.zoomYEnabled !== false) {
@@ -7190,7 +7253,8 @@
           meta = chart.getDatasetMeta(i);
           for (j = 0, jlen = meta.data.length; j < jlen; ++j) {
             var element = meta.data[j];
-            if (!element._view.skip) {
+            // (hecVirtual: a curve-shaping point of the 'smart' line mode — not a value)
+            if (!element._view.skip && !element._view.hecVirtual) {
               handler(element);
             }
           }
@@ -7393,6 +7457,27 @@
               * @param options {IInteractionOptions} options to use
               * @return {Chart.Element[]} Array of elements that are under the point. If none are found, an empty array is returned
               */
+          // Mixed bar/line graph: a curve point close to the pointer wins (the curves are
+          // drawn over the bars), else the bar under the pointer, else the plain 'nearest'.
+          // Plain 'nearest' alone would always prefer the dense curve points, even with the
+          // pointer right on a bar.
+          hecMixed: function (chart, e, options) {
+            var position = getRelativePosition(e, chart);
+            var best = null, bestDist = 8;
+            parseVisibleItems(chart, function (element) {
+              if (chart.getDatasetMeta(element._datasetIndex).bar) return;
+              var cp = element.getCenterPoint();
+              var d = Math.sqrt(Math.pow(position.x - cp.x, 2) + Math.pow(position.y - cp.y, 2));
+              if (d < bestDist) { bestDist = d; best = element; }
+            });
+            if (best) return [best];
+            var onBar = getIntersectItems(chart, position).filter(function (element) {
+              return chart.getDatasetMeta(element._datasetIndex).bar;
+            });
+            if (onBar.length) return onBar.slice(0, 1);
+            return module.exports.modes.nearest(chart, e, { intersect: false, axis: options.axis });
+          },
+
           nearest: function (chart, e, options) {
             var position = getRelativePosition(e, chart);
             options.axis = options.axis || 'xy';
@@ -9703,7 +9788,8 @@
             labelColor: function (tooltipItem, chart) {
               var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
               var activeElement = meta.data[tooltipItem.index];
-              var view = activeElement._view;
+              var view = activeElement && activeElement._view;
+              if (!view) return { borderColor: 'rgba(0,0,0,0)', backgroundColor: 'rgba(0,0,0,0)' };
               return {
                 borderColor: view.borderColor,
                 backgroundColor: view.backgroundColor };
@@ -10022,47 +10108,37 @@
 
         }
 
-        Chart.Tooltip = Element.extend({
-          initialize: function () {
-            this._model = getBaseModel(this._options);
-            this._lastActive = [];
+        // ---------------------------------------------------------------------------
+        // Chart.hecUi — generic floating-element and highlight utilities. Public (see
+        // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
+        // feedback use them, and so does the card for its own menus and messages — one
+        // implementation, where there used to be a copy on each side. Stateless: whatever
+        // they keep is stored on the element they're given. They know nothing about the
+        // card; the area a floating element must stay in is passed in by the caller.
+        // ---------------------------------------------------------------------------
+        var hecUi = Chart.hecUi = {
+
+          // How long a message stays up: 1 s, plus 0.5 s per word (a word: 2+ letters or
+          // digits, words split on spaces and underscores — entity ids read as words).
+          readingTime: function (text) {
+            var _words = String(text || '').split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
+            return 1000 + 500 * _words;
           },
 
-          _hecCountWords: function (text) {
-            return text.split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
-          },
-
-          _hecWordBasedFadeDuration: function (wordCount) {
-            return 1000 + 500 * wordCount;
-          },
-
-          // Nudges an already-positioned, already-visible floating element back fully
-          // inside the viewport if any edge overflows. Duplicated from the card's own
-          // _clampToViewport (used there for its other floating popups too) so this file
-          // has no outside dependency for it.
-          _hecClampToViewport: function (el, anchorEl) {
-            // Same fix as history-explorer-card's own v1.1.42b12 _clampToViewport,
-            // ported here since on THIS branch the tooltip is genuinely driven by
-            // Chart.js (unlike v1.1.x, where the card never wires a custom: tooltip
-            // config at all, making that branch's Chart.js clamp code dead).
-            //
-            // Left/right/top: the MOST RESTRICTIVE of #maincard and the viewport —
-            // never #maincard alone, since a never-before-mounted card (new
-            // cardName) starts with an empty/transiently tiny #maincard (graphs not
-            // yet loaded/sized), which would wrongly clamp a menu/tooltip into that
-            // tiny box and send it off-screen. Never the viewport alone either, or a
-            // tooltip could bleed onto Home Assistant's own surrounding UI.
-            //
-            // Bottom is the sole exception: viewport ONLY, never #maincard —
-            // reintroducing #maincard there is exactly what caused the original bug
-            // (empty-card height ~130px vs 1300+px once loaded). HA never leaves
-            // meaningful UI below the dashboard content, so the viewport alone is
-            // safe in this one direction.
-            var _card = anchorEl && anchorEl.closest ? anchorEl.closest('#maincard') : null;
-            var _cardR = _card ? _card.getBoundingClientRect() : null;
-            var _bounds = _cardR
-              ? { left: Math.max(_cardR.left, 0), right: Math.min(_cardR.right, window.innerWidth),
-                  top: Math.max(_cardR.top, 0), bottom: window.innerHeight }
+          // Nudges an already-positioned, already-visible floating element (menu, tooltip)
+          // back inside bounds. Call once after display/left/top/bottom/transform are set:
+          // it reads back the rendered box, so it works for position fixed or absolute,
+          // anchored by top or bottom, with or without a CSS transform. Left/right/top: the
+          // most restrictive of boundsEl and the viewport — never boundsEl alone (a card
+          // that just mounted is still nearly empty, which would clamp into a tiny box),
+          // never the viewport alone (the element would bleed onto the surrounding page).
+          // Bottom: viewport only (boundsEl there is what caused the empty-card bug).
+          // boundsEl null: viewport only.
+          clampToViewport: function (el, boundsEl) {
+            var _bR = boundsEl ? boundsEl.getBoundingClientRect() : null;
+            var _bounds = _bR
+              ? { left: Math.max(_bR.left, 0), right: Math.min(_bR.right, window.innerWidth),
+                  top: Math.max(_bR.top, 0), bottom: window.innerHeight }
               : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
             var _r = el.getBoundingClientRect();
             var _dx = 0, _dy = 0;
@@ -10070,6 +10146,7 @@
             else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
             if (_r.bottom > _bounds.bottom) _dy = _bounds.bottom - _r.bottom;
             else if (_r.top < _bounds.top) _dy = _bounds.top - _r.top;
+            // (offsetLeft/offsetTop: the current rendered offset, explicit or from the flow)
             if (_dx) el.style.left = (el.offsetLeft + _dx) + 'px';
             if (_dy) {
               if (el.style.bottom !== '') el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
@@ -10077,80 +10154,142 @@
             }
           },
 
-          _hecArmTooltipAutoFade: function (_el, duration, justMoved) {
-            if (arguments.length >= 3 && justMoved !== true) return;
-            _el.style.opacity = '0';
-            requestAnimationFrame(function () { _el.style.opacity = '1'; });
-            this._hecStartTooltipFade(_el, duration);
-          },
-
-          _hecStartTooltipFade: function (_el, duration) {
-            var me = this;
-            clearTimeout(_el._hecFadeTimer);
-            clearTimeout(_el._hecRemoveTimer);
-            _el._hecFadeTimer = setTimeout(function () { _el.style.opacity = '0'; }, duration);
-            _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _el._hecOnClose); }, duration + 1000);
-          },
-
-          // Generic: removes the element and its ResizeObserver. onClose is an
-          // optional callback the caller supplied when arming the fade (or closing
-          // immediately) — this function has no idea what it means, it just calls it.
-          // The hover tooltip is the only current caller that passes one, to clear its
-          // own active/hover-highlight state; the label tooltip passes none.
-          _hecKillFloatingTooltip: function (_el, onClose) {
-            clearTimeout(_el._hecFadeTimer);
-            clearTimeout(_el._hecRemoveTimer);
-            if (_el._hecObserver) _el._hecObserver.disconnect();
-            if (_el.parentNode) _el.remove();
-            if (typeof onClose === 'function') onClose();
-          },
-
-          _hecAttachFloatingTooltip: function (_el, anchorEl) {
-            var me = this;
+          // Places a floating element against anchorEl's offsetParent (the positioned
+          // ancestor the browser already resolved — never forcing position onto someone
+          // else's container), so it scrolls with its anchor; document.body + fixed when
+          // there's none. It closes by itself (closeFloating) when anchorEl disappears or is
+          // hidden: a ResizeObserver reports a zero size then, with no help from anyone.
+          attachFloating: function (el, anchorEl) {
             var _offsetParent = anchorEl.offsetParent;
             var _targetParent = _offsetParent || document.body;
-            if (_el.parentNode !== _targetParent) _targetParent.appendChild(_el);
+            if (el.parentNode !== _targetParent) _targetParent.appendChild(el);
             var _wantPosition = _offsetParent ? 'absolute' : 'fixed';
-            if (_el.style.position !== _wantPosition) _el.style.position = _wantPosition;
-            if (_el._hecObserverTarget !== anchorEl) {
-              if (_el._hecObserver) _el._hecObserver.disconnect();
-              _el._hecObserverTarget = anchorEl;
-              _el._hecObserver = new ResizeObserver(function (entries) {
+            if (el.style.position !== _wantPosition) el.style.position = _wantPosition;
+            if (el._hecObserverTarget !== anchorEl) {
+              if (el._hecObserver) el._hecObserver.disconnect();
+              el._hecObserverTarget = anchorEl;
+              el._hecObserver = new ResizeObserver(function (entries) {
                 var _box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
                 var _w = _box ? _box.inlineSize : entries[0].contentRect.width;
                 var _h = _box ? _box.blockSize : entries[0].contentRect.height;
-                if (_w === 0 && _h === 0) me._hecKillFloatingTooltip(_el, _el._hecOnClose);
+                if (_w === 0 && _h === 0) hecUi.closeFloating(el);
               });
-              _el._hecObserver.observe(anchorEl);
+              el._hecObserver.observe(anchorEl);
             }
           },
 
-          // content: string, or a DOM Node to be inserted as the tooltip's only child.
-          // caret: null for no caret, or { size, xAlign ('left'/'right'/'center'),
-          //   yAlign ('top'/'bottom'/'center'), cornerRadius, borderWidth } — same
-          //   positioning math the hover tooltip's caret already used, just parameterized.
-          // Padding is fixed at 4px/8px for every tooltip — not a parameter, per
-          // Thierry: all tooltips share the exact same padding, no exceptions.
-          // elKey: which of the two independent tooltip element slots this call
-          // targets — 'hover' or 'other'. The hover tooltip re-renders/closes on
-          // every single event (driven by tooltip.update in Controller.handleEvent,
-          // which runs before any click-driven tooltip like the label one), so
-          // sharing one element meant it would silently close whatever the OTHER
-          // tooltip had just shown. Two independent elements, same generic
-          // display/lifecycle code, fixes that without needing either consumer to
-          // know about the other.
-          _hecShowTooltip: function (elKey, content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
-            var me = this;
-            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
-            var _el = this[_slot];
+          // (Re)shows el and arms its fade-out: fades in (the two opacity writes must land
+          // in separate frames, or no transition), then startFade. With a third argument,
+          // only a render that directly follows a real pointer gesture (justMoved === true)
+          // may do so — a data refresh under a still pointer must not reopen a tooltip.
+          armAutoFade: function (el, duration, justMoved) {
+            if (arguments.length >= 3 && justMoved !== true) return;
+            el.style.opacity = '0';
+            requestAnimationFrame(function () { el.style.opacity = '1'; });
+            hecUi.startFade(el, duration);
+          },
+
+          // Fades el out after duration, then closes it.
+          startFade: function (el, duration) {
+            clearTimeout(el._hecFadeTimer);
+            clearTimeout(el._hecRemoveTimer);
+            el._hecFadeTimer = setTimeout(function () { el.style.opacity = '0'; }, duration);
+            el._hecRemoveTimer = setTimeout(function () { hecUi.closeFloating(el); }, duration + 1000);
+          },
+
+          // Removes el and its observer, then calls el._hecOnClose if its owner set one.
+          closeFloating: function (el) {
+            clearTimeout(el._hecFadeTimer);
+            clearTimeout(el._hecRemoveTimer);
+            if (el._hecObserver) el._hecObserver.disconnect();
+            if (el.parentNode) el.remove();
+            if (typeof el._hecOnClose === 'function') el._hecOnClose();
+          },
+
+          // A short text message near a point — a refused drop, an entity already added, a
+          // truncated label's full text: one element per document or shadow root (the
+          // anchor's), reused, faded out after its readingTime. align: 'left' (default —
+          // just right of and above the point), 'center' or 'right' (centered on / ending
+          // at the point, above it). boundsEl: see clampToViewport.
+          showMessage: function (text, clientX, clientY, align, anchorEl, boundsEl) {
+            anchorEl = anchorEl || document.body;
+            var _root = anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+            var _el = _root._hecMessageEl;
             if (!_el) {
               _el = document.createElement('div');
-              _el.id = 'hec-tooltip-' + elKey;
+              _el.id = 'hec-label-tooltip';
+              _el.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;line-height:normal;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
+              _root._hecMessageEl = _el;
+            }
+            hecUi.attachFloating(_el, anchorEl);
+            _el.textContent = text;
+            // fixed: against the viewport (client coordinates as they are); absolute:
+            // against the parent it was actually attached to (see attachFloating)
+            var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+            _el.style.left = (clientX - _origin.left + (align === 'center' || align === 'right' ? 0 : 10)) + 'px';
+            _el.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
+            _el.style.top = (clientY - _origin.top - 16) + 'px';
+            hecUi.clampToViewport(_el, boundsEl);
+            hecUi.armAutoFade(_el, hecUi.readingTime(text));
+          },
+
+          // Closes the message shown by showMessage in anchorEl's document or shadow root.
+          closeMessage: function (anchorEl) {
+            var _root = anchorEl && anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+            if (_root._hecMessageEl) hecUi.startFade(_root._hecMessageEl, 0);
+          },
+
+          // Outlines el (a graph's wrapper): solid primary color when valid, dashed error
+          // color otherwise — that one fades out (over 1.5 s) once clearOutline is called.
+          outline: function (el, valid) {
+            if (!el) return;
+            if (el._hecOutlined) hecUi.clearOutline(el, true);
+            el._hecPrevOutline = el.style.outline;
+            el._hecPrevOutlineOffset = el.style.outlineOffset;
+            el._hecPrevTransition = el.style.transition;
+            el._hecOutlined = true;
+            var _color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
+            el.style.transition = '';
+            el.style.outline = '2px ' + (valid ? 'solid' : 'dashed') + ' ' + _color;
+            el.style.outlineOffset = '-2px';
+            if (!valid) requestAnimationFrame(function () { el.style.transition = 'outline-color 1.5s ease'; });
+          },
+
+          // Removes outline(el), fading it out if it was an invalid one (unless immediate).
+          clearOutline: function (el, immediate) {
+            if (!el || !el._hecOutlined) return;
+            el._hecOutlined = false;
+            var _restore = function () {
+              el.style.outline = el._hecPrevOutline || '';
+              el.style.outlineOffset = el._hecPrevOutlineOffset || '';
+              el.style.transition = el._hecPrevTransition || '';
+            };
+            if (!immediate && el.style.transition && el.style.transition.indexOf('outline-color') >= 0) {
+              el.style.outlineColor = 'transparent';
+              setTimeout(function () { if (!el._hecOutlined) _restore(); }, 1500);
+            } else {
+              _restore();
+            }
+          }
+        };
+
+        Chart.Tooltip = Element.extend({
+          initialize: function () {
+            this._model = getBaseModel(this._options);
+            this._lastActive = [];
+          },
+
+          _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
+            var me = this;
+            var _el = this._hecHoverTooltipEl;
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.id = 'hec-tooltip-hover';
               _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
-              this[_slot] = _el;
+              this._hecHoverTooltipEl = _el;
             }
             _el._hecOnClose = onClose;
-            this._hecAttachFloatingTooltip(_el, anchorEl);
+            hecUi.attachFloating(_el, anchorEl);
             _el.style.background = backgroundColor;
             _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
             _el.style.color = textColor;
@@ -10162,7 +10301,7 @@
             } else if (content) {
               _el.appendChild(content);
             }
-            var _wordCount = this._hecCountWords(typeof content === 'string' ? content : (content ? content.textContent : ''));
+            var _readingTime = hecUi.readingTime(typeof content === 'string' ? content : (content ? content.textContent : ''));
 
             if (caret) {
               var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
@@ -10187,17 +10326,18 @@
             var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
             _el.style.left = (x - _origin.left) + 'px';
             _el.style.top = (y - _origin.top) + 'px';
-            this._hecClampToViewport(_el, anchorEl);
-            this._hecArmTooltipAutoFade(_el, this._hecWordBasedFadeDuration(_wordCount), justMoved);
+            // (the area to stay in: the card's, if it says which — floatingBoundsSelector)
+            var _boundsSel = me._chart && me._chart.options.floatingBoundsSelector;
+            hecUi.clampToViewport(_el, _boundsSel && anchorEl && anchorEl.closest ? anchorEl.closest(_boundsSel) : null);
+            hecUi.armAutoFade(_el, _readingTime, justMoved);
 
             function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
           },
 
           // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
           // elKey) tooltip out immediately (duration 0) — never touches the other one.
-          _hecCloseTooltip: function (elKey) {
-            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
-            if (this[_slot]) this._hecStartTooltipFade(this[_slot], 0);
+          _hecCloseTooltip: function () {
+            if (this._hecHoverTooltipEl) hecUi.startFade(this._hecHoverTooltipEl, 0);
           },
 
           // Renders the tooltip as a floating DOM element instead of drawing on the canvas
@@ -10215,12 +10355,15 @@
             if (_vm) _vm.hecJustMoved = false;
 
             if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
-              this._hecCloseTooltip('hover');
+              this._hecCloseTooltip();
               return;
             }
-            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
+            // A model left half-built by a throw inside Tooltip.update() can still read
+            // tooltipActive === true with its text arrays missing — treat it as empty.
+            var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
+            var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
             if (!_hasContent) {
-              this._hecCloseTooltip('hover');
+              this._hecCloseTooltip();
               return;
             }
 
@@ -10256,7 +10399,6 @@
             var _canvasRect = this._chart.canvas.getBoundingClientRect();
             var _chart = this._chart;
             this._hecShowTooltip(
-              'hover',
               _content,
               _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
               this._chart.canvas,
@@ -10968,6 +11110,9 @@
           // Stroke Line
           ctx.beginPath();
           lastDrawnIndex = -1;
+          // Silence plateaus ('smart' line mode): left out of this solid pass, collected
+          // and stroked dashed afterwards (a canvas path has a single dash pattern)
+          var plateaus = [];
 
           for (index = 0; index < points.length; ++index) {
             current = points[index];
@@ -10987,6 +11132,9 @@
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
                   ctx.moveTo(currentVM.x, currentVM.y);
+                } else if (currentVM.hecPlateauEnd) {
+                  plateaus.push([previous._view, currentVM]);
+                  ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
                   helpers.canvas.lineTo(ctx, previous._view, current._view);
@@ -10997,6 +11145,20 @@
           }
 
           ctx.stroke();
+
+          if (plateaus.length) {
+            if (ctx.setLineDash) {
+              ctx.setLineDash([4, 4]);
+            }
+            ctx.lineDashOffset = 0;
+            ctx.beginPath();
+            for (index = 0; index < plateaus.length; ++index) {
+              ctx.moveTo(plateaus[index][0].x, plateaus[index][0].y);
+              ctx.lineTo(plateaus[index][1].x, plateaus[index][1].y);
+            }
+            ctx.stroke();
+          }
+
           ctx.restore();
         } });
 
@@ -12395,8 +12557,12 @@
       // https://github.com/chartjs/Chart.js/issues/4287
       var eventListenerOptions = supportsEventListenerOptions ? { passive: true } : false;
 
+      // (fork) Passive only for the touch events stock Chart.js listens to: the pointer and
+      // wheel listeners must be able to preventDefault() — Ctrl+wheel zooms the time range
+      // instead of the page, a press keeps its default actions (see _hecGestureHandler).
+      // Pointer and wheel listeners never delay scrolling anyway (touch-action decides).
       function addEventListener(node, type, listener) {
-        node.addEventListener(type, listener, eventListenerOptions);
+        node.addEventListener(type, listener, /^touch/.test(type) ? eventListenerOptions : false);
       }
 
       function removeEventListener(node, type, listener) {
@@ -14428,6 +14594,22 @@
             me.zeroLineIndex = me.ticks.indexOf(0);
 
             Chart.Scale.prototype.convertTicksToLabels.call(me);
+
+            // options.ticks.period (fork addition): an axis of values that wrap around
+            // (angles) — each label shows its value brought into [0, period); the top one,
+            // at a whole turn, shows the period itself rather than 0 (0 … 360, or 300 …
+            // 350, 0, 10 … 360). Same number of decimals as the label it replaces.
+            var _P = me.options.ticks.period;
+            if (_P > 0) {
+              var _top = Math.max.apply(null, me.ticksAsNumbers);
+              me.ticks = me.ticks.map(function (label, i) {
+                var _v = me.ticksAsNumbers[i];
+                var _dec = (String(label).split('.')[1] || '').length;
+                var _w = parseFloat((((_v % _P) + _P) % _P).toFixed(_dec));
+                if (_w !== 0 && _w < _P) return _w.toFixed(_dec);
+                return (_v === _top && me.ticks.length > 1) ? parseFloat(_P.toFixed(_dec)).toFixed(_dec) : '0';
+              });
+            }
           } });
 
       };

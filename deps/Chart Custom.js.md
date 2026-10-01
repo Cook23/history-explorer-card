@@ -46,11 +46,25 @@ or `maintainAspectRatio`.
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
 | `panX` | `function({chart, deltaPixels or scale, centerPixels, event})` | none | Card-supplied callback for horizontal (time) panning and zooming. **Not implemented by Chart.js itself** — the shared date range across multiple graphs is considered a card responsibility, not a per-graph one, unlike `zoomY` which Chart.js applies directly (see §3). |
 | `panY` | `function({chart, deltaPixels, event})` | none | Same idea as `panX`, but this one is effectively dead — Y-axis panning is fully handled by Chart.js directly (§3), so nothing calls this anymore. Kept only for backward compatibility if a card ever needs to intercept it. |
-| `zoomX` | `function({chart, scale or deltaY, centerPixels, event})` | none | Card-supplied callback for horizontal zoom (Ctrl+wheel, pinch spread). Same "shared range, card responsibility" reasoning as `panX`. |
+| `zoomX` | `function({chart, scale or deltaY, centerPixels, event})` | none | Card-supplied callback for horizontal zoom (Ctrl+wheel, pinch spread). Same "shared range, card responsibility" reasoning as `panX`. The card implements the Ctrl+wheel case (`deltaY`); a pinch only zooms the Y axis, as before v1.2. Every Ctrl+wheel tick is kept from zooming the page, the debounced ones included. |
+| `dragGhostEnabled` | `boolean` | `true` | No drag ghost (the floating label following the pointer) and no insertion marker during a drag. |
+| `zoomSelectMode` | `boolean` | `false` | When `true`, a drag over the plot area selects a time span (Chart.js draws the selection; the span comes back in `dragend`'s `zoomSelectX0`/`zoomSelectX1`) instead of panning. Set by the card while its zoom button is on. |
+| `dropAllowed` | `boolean` | `true` | Written by the card on the chart a drag is over, from its `dragovergraph` event (§2): `false` shows that graph's drop highlight as refused (dashed, error color), no insertion marker, and the dragging pointer's cursor as `not-allowed` (otherwise `grabbing`). |
+| `insertionForbidden` | `boolean` | `false` | Written by the card during a graph move: `true` draws the graph-move insertion marker in the error color (dropping there would split a block of linked graphs). |
+| `linkMarkerVisible` | `boolean` | `false` | When `true`, the linked-graphs chain icon is drawn straddling this chart's top edge, under the labels of the graph above (§5). The card sets it on the lower graph of two linked ones. A double-click/double-tap on it fires `customEvent` with `linkMarkerZone: true`. |
+| `linkMarkerTitle` | `string` | `''` | Hover text of the chain icon (the card's translated text). |
+| `floatingBoundsSelector` | CSS selector | none | The area Chart.js's floating elements (hover tooltip, truncated-label message) stay in: the closest ancestor of the canvas matching it, else the viewport only (see `Chart.hecUi.clampToViewport`, §7). The card passes `'#maincard'` — Chart.js knows nothing about the card's markup. |
+| `dragScope` | any value | none | A cross-graph drag (curve, label, graph move) only reaches the charts with the same `dragScope` — the card gives each of its instances its own, so two cards on the same dashboard never see each other's drags. |
 
 None of these existed in stock 2.7.1 — `options.hover.mode`,
 `options.scales.yAxes[0].ticks.min/max`, `options.legend`, etc. are all
 standard 2.7.1 options this fork reads/writes but didn't introduce.
+
+### Linear scale option
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
 ---
 
@@ -73,6 +87,7 @@ that fires a single callback: **`options.customEvent(payload)`**.
   yAxisIndex,           // timeline/arrowline label row index at the position, or -1
   truncatedYAxisLabel,   // full text if that label is visually truncated, else null
   lockAndHandleZone,     // true if the gesture is within the lock+handle zone (§5)
+  linkMarkerZone,        // true if the gesture is on the chain icon (linkMarkerVisible, §5)
   gestureType,          // one of the 11 strings below
   pointerCount,          // how many pointers are currently down
   pointerType,          // 'mouse' | 'touch' | 'pen' — from the native PointerEvent
@@ -163,6 +178,11 @@ finds *data points*, never legend items or axis labels):
 | `_hecFindNearest(px, py, rects)` | → index or `-1` | Closest candidate, but only returned if it also passes `_hecIsNear` — otherwise `-1`. |
 | `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item (if any) is under this point — exact containment (`_hecIsOn`) against each item's real `legendHitBoxes` rectangle. |
 | `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — exact containment, closest-row candidate spans the whole label column width. |
+| `_hecFindLegendLabel(x, y, excludeIdx, target)` | → `{ idx, insertBefore, markerX, markerY, markerH }` or `null` | Where a legend label dropped at this point lands (closest line, then closest label; `target` = finding an insertion point, skipping `excludeIdx`, the label being dragged; `null` for a no-op). Used by the insertion marker and by the card to place a dropped curve. |
+| `_hecYAxisInsertAt(y, excludeIdx, nearest)` | → `{ idx, insertBefore, markerY }` or `null` | Where a timeline/arrowline row dropped at this height lands: the row it's over (skipping `excludeIdx`), before or after its middle; with `nearest`, the nearest row whatever the distance. Used by the insertion markers and by the card to place a dropped entity. |
+
+These are the only `_hec` methods the card calls (to place what was dropped, §2
+`dragend`): one implementation for the marker shown during the drag and the drop itself.
 
 ---
 
@@ -190,6 +210,20 @@ nowhere at all.
 | `_hecYAxisTouchEl` | Matches the Y-axis label column | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
 | `_hecLegendTouchEl` | Tight bounding box of the legend's actual `legendHitBoxes`, +4px margin | Same dynamic `touch-action`, for dragging a curve label. Only exists for `line`/`bar` charts. |
 | `_hecLabelTouchEl` | Full label column height | Same dynamic `touch-action`, for dragging a timeline/arrowline entity label. Only exists for `timeline`/`arrowline` charts. |
+| `_hecLinkMarkerEl` | 22×22px, 23px above the canvas, centered under the Y axis labels | The linked-graphs chain icon (`linkMarkerVisible`), a relay zone like the others: its gestures come back as `customEvent`s with `linkMarkerZone: true`. Where it overlaps the lock+handle zone, it wins. |
+
+All the relay zones come from one factory, `_hecTouchOverlay(key, cursor)`. Their press
+calls `preventDefault()`, for every pointer type: with a mouse or pen it starts no text
+selection (dragging out of the zone would leave one on the page, and the next press on it
+would start the browser's own drag-and-drop — a `pointercancel` that loses the drag); on
+touch, no focus change by the emulated mouse events (the click after a long-press would
+otherwise close the type menu it just opened). Scrolling is never affected: on touch it
+only depends on `touch-action`.
+
+The canvas takes the pointer capture at the press, so a drag toward another graph keeps
+being followed from the source chart once the pointer leaves it (touch gets this from the
+browser; a mouse or pen doesn't). Chart.js's pointer and wheel listeners are not passive
+(only the stock `touch*` ones are), so its `preventDefault()` calls take effect.
 
 ### Why the lock icon and the move handle share one touch zone
 
@@ -237,3 +271,26 @@ genuinely internal. `history-explorer-card.js` never reads or calls any of them 
 calls whenever it needs to force an immediate redraw (e.g. after changing
 `moveHandleVisible`) rather than reaching into `_hecUpdateDragTouchOverlays`
 or similar directly.
+
+---
+
+## 7. Shared UI utilities — `Chart.hecUi`
+
+Generic, stateless helpers for floating elements and highlights, public: Chart.js's own
+tooltips and drag feedback use them, and so does the card for its own menus and messages —
+one implementation, where there used to be a copy on each side. Whatever they keep is
+stored on the element they're given; they know nothing about the card (the area to stay in
+is passed in).
+
+| Function | Behavior |
+|---|---|
+| `readingTime(text)` | How long a message stays up: 1 s + 0.5 s per word (2+ letters or digits; words split on spaces and underscores). |
+| `clampToViewport(el, boundsEl)` | Nudges an already-positioned element back inside: left/right/top within the most restrictive of `boundsEl` and the viewport, bottom within the viewport only; `boundsEl` null = viewport only. |
+| `attachFloating(el, anchorEl)` | Places `el` against `anchorEl`'s `offsetParent` (absolute), or `document.body` (fixed) when there's none, so it scrolls with its anchor; closes it by itself (`closeFloating`) when the anchor disappears or is hidden. |
+| `armAutoFade(el, duration[, justMoved])` | (Re)shows `el`, fading in, then fades it out after `duration` and closes it. With a third argument, only does so when `justMoved === true` (a render that follows a real pointer gesture, not a data refresh under a still pointer). |
+| `startFade(el, duration)` | Fades `el` out after `duration`, then closes it. |
+| `closeFloating(el)` | Removes `el` and its observer, then calls `el._hecOnClose` if its owner set one. |
+| `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added, truncated label's full text): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`. |
+| `closeMessage(anchorEl)` | Closes the message of `anchorEl`'s document or shadow root. |
+| `outline(el, valid)` / `clearOutline(el[, immediate])` | Outlines a graph's wrapper — solid primary color when valid, dashed error color otherwise (that one fades out when cleared). |
+
