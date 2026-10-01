@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b74';
+const Version = '1.2.0b75';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1892,6 +1892,8 @@ export class HistoryCardState {
                 // v1.1.43): their curves can be split (double-click) and re-combined (drag)
                 // within their own group of linked graphs — see _dropCompatibility.
                 cursorEnabled: true,
+                // Chart.js's floating tooltips stay within the card (see Chart.hecUi.clampToViewport)
+                floatingBoundsSelector: '#maincard',
                 zoomSelectMode: this.state.zoomMode,
                 // Phase 2.1 — legend overlay removed; drag&drop and long-press menu on
                 // legend labels, previously intercepted by that overlay, are recabled here
@@ -2490,156 +2492,9 @@ export class HistoryCardState {
 
 
 
-    // ── Shared floating-tooltip lifecycle ──────────────────────────────────────
-    // Both tooltip kinds (chart hover tooltip, label tooltip) share one lifecycle:
-    // anchor to the nearest positioned ancestor of a given element (so the tooltip
-    // scrolls with its content instead of staying pinned to the viewport), fade out
-    // after a duration proportional to how much text is shown, and get force-killed
-    // by an IntersectionObserver the moment their anchor stops intersecting the
-    // viewport — which fires both for an ordinary scroll-out AND for the anchor
-    // being removed from the DOM entirely (e.g. HA tearing the card down on a view
-    // change), since a detached element can never intersect. That single observer
-    // covers every "card no longer on screen" case without needing a separate
-    // disconnectedCallback.
-    _countWords(text) {
-        return text.split(/[\s_]+/).filter(w => (w.match(/[a-zA-Z0-9]/g) || []).length >= 2).length;
-    }
-
-    _wordBasedFadeDuration(wordCount) {
-        return 1000 + 500 * wordCount;
-    }
-
-    // Resets visibility to fully shown (needed on every re-render, e.g. content refreshed
-    // mid-fade) but only (re)starts the fade countdown when `changeKey` differs from the
-    // last call — passing the same key on every call (e.g. because the hovered point
-    // hasn't changed, just the data underneath it) no longer keeps re-arming the timer
-    // indefinitely. Symmetric with the fade-out: if the element isn't already fully shown
-    // (freshly created, or mid fade-out from a previous hide), it fades in the same way
-    // instead of snapping straight to opacity:1 — the two style writes must land in
-    // separate frames or the browser coalesces them and skips the transition entirely.
-    // Arms (or re-confirms) the tooltip's lifecycle. justMoved is true only on the exact
-    // render that immediately follows a real pointer gesture (contact, or a move past the
-    // 4px threshold — see Chart.js's Tooltip.handleEvent, where it's minted fresh on that
-    // exact edge as a call-local variable) and false on every other render, including one
-    // triggered by the chart's data refreshing while the pointer sits still on the very
-    // same point. Per the card's tooltip spec, only that gesture may open or restart a
-    // tooltip — a point drifting under an unmoving pointer/contact must not. So a render
-    // with justMoved false is always a plain no-op here, even once an earlier cycle for
-    // the same point has already finished fading: the tooltip stays gone until the
-    // pointer actually does something new. Deliberately never inferred from the DOM's
-    // current opacity, which is a pure visual side effect of the cycle, not a signal to
-    // decide from. Consumed inside Chart.js itself (Tooltip._hecRenderFloatingTooltip) —
-    // see the comment there for why clearing it happens there, not here.
-    //
-    // The curve-hover tooltip is now rendered entirely inside Chart.js (see
-    // Tooltip._hecRenderFloatingTooltip there), driven by Chart.js's own hover cycle and
-    // re-invocable by an unrelated data refresh — that's what this justMoved guard exists
-    // for. The entity-preview tooltip (_previewEntityTooltip) below has no such refresh
-    // to guard against — every call it makes already corresponds to a real highlight
-    // change — so it calls this without a third argument at all; leaving justMoved
-    // undefined there always arms, exactly as before this guard existed.
-    _armTooltipAutoFade(_el, duration, justMoved) {
-        if( arguments.length >= 3 && justMoved !== true ) return;
-        _el.style.opacity = '0';
-        requestAnimationFrame(() => { _el.style.opacity = '1'; });
-        this._startTooltipFade(_el, duration);
-    }
-
-    // Starts the fade-then-remove countdown without first forcing opacity back to 1 — used
-    // when hover has just genuinely ended (as opposed to a re-render of still-active
-    // content, which goes through _armTooltipAutoFade above instead).
-    _startTooltipFade(_el, duration) {
-        clearTimeout(_el._hecFadeTimer);
-        clearTimeout(_el._hecRemoveTimer);
-        _el._hecFadeTimer = setTimeout(() => { _el.style.opacity = '0'; }, duration);
-        _el._hecRemoveTimer = setTimeout(() => { this._killFloatingTooltip(_el); }, duration + 1000);
-    }
-
-    _killFloatingTooltip(_el) {
-        clearTimeout(_el._hecFadeTimer);
-        clearTimeout(_el._hecRemoveTimer);
-        _el._hecObserver?.disconnect();
-        if( _el.parentNode ) _el.remove();
-    }
-
-    // Anchors _el against anchorEl.offsetParent — the real positioned ancestor the browser
-    // has already resolved, exactly the same mechanism already used (and already reliable)
-    // elsewhere in this file for other floating menus (see setDropdownVisibility,
-    // showEntityTypeMenu): read what's already there, never force one. A previous version
-    // instead forced position:relative directly onto anchorEl.parentNode whenever it wasn't
-    // already positioned — but that parent can be a shared, structural UI container (e.g.
-    // the entity selector's own wrapper, which also holds its input, its dropdown-open
-    // caret, its dropdown, and its type menu): forcing position:relative onto it changed
-    // what THEIR OWN offsetParent resolved to, permanently (the style was never removed) —
-    // they'd been positioning themselves correctly against a distant ancestor all along, and
-    // suddenly started resolving against this one instead, breaking their layout and
-    // stacking at the same time. Reading offsetParent instead finds that same distant
-    // ancestor without ever touching it, so _el scrolls together with anchorEl there too —
-    // same behavior as the canvas case, no longer a special case for UI elements.
-    // document.body + position:fixed remains the fallback for the rare case offsetParent is
-    // null (anchorEl hidden, or detached) — never touching anyone else's style either way.
-    _attachFloatingTooltip(_el, anchorEl) {
-        const _offsetParent = anchorEl.offsetParent;
-        const _targetParent = _offsetParent || document.body;
-        if( _el.parentNode !== _targetParent ) _targetParent.appendChild(_el);
-        const _wantPosition = _offsetParent ? 'absolute' : 'fixed';
-        if( _el.style.position !== _wantPosition ) _el.style.position = _wantPosition;
-        // (Re)watch anchorEl with a ResizeObserver — deliberately not an
-        // IntersectionObserver: per the Resize Observer spec, a ResizeObserver fires ON
-        // ITS OWN whenever the watched element's rendered size changes, INCLUDING when it
-        // (or any ancestor) goes display:none, and INCLUDING when it's removed from the
-        // DOM entirely — both real-world cases this tooltip needs to react to (Home
-        // Assistant caching a previously-shown Lovelace view instead of unmounting it on
-        // tab switch; a graph/entity being deleted while its tooltip is showing). Unlike
-        // IntersectionObserver, this needs no other system (a data refresh, a render loop)
-        // to ever call back into this function again for the death to be noticed — the
-        // browser notifies the observer itself, the moment the size actually changes.
-        if( _el._hecObserverTarget !== anchorEl ) {
-            _el._hecObserver?.disconnect();
-            _el._hecObserverTarget = anchorEl;
-            _el._hecObserver = new ResizeObserver((entries) => {
-                const _box = entries[0].borderBoxSize?.[0];
-                const _w = _box ? _box.inlineSize : entries[0].contentRect.width;
-                const _h = _box ? _box.blockSize : entries[0].contentRect.height;
-                if( _w === 0 && _h === 0 ) this._killFloatingTooltip(_el);
-            });
-            _el._hecObserver.observe(anchorEl);
-        }
-    }
-
+    // A short message near a point (Chart.hecUi.showMessage), kept within the card
     _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
-        // Looked up via this._this (the component's shadow root) first, since that's
-        // where _attachFloatingTooltip normally places it — document.getElementById/
-        // querySelectorAll never cross a Shadow DOM boundary, so searching document alone
-        // always came back empty even though the tooltip was very much alive inside the
-        // shadow root; every call believed none existed yet and created a brand new one,
-        // stacking them up instead of reusing the same element. Also checked in document
-        // as a fallback, for the rarer case _attachFloatingTooltip's own fallback placed it
-        // in document.body instead (anchorEl.offsetParent was null).
-        let _tip = this._this.querySelector('#hec-label-tooltip') || document.getElementById('hec-label-tooltip');
-        if( !_tip ) {
-            _tip = document.createElement('div');
-            _tip.id = 'hec-label-tooltip';
-            _tip.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;line-height:normal;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
-        }
-        this._attachFloatingTooltip(_tip, anchorEl);
-        _tip.textContent = label;
-        // fixed positions directly against the viewport (clientX/Y as-is); absolute positions
-        // against the parent it was actually attached to (see _attachFloatingTooltip).
-        const _origin = ( _tip.style.position === 'fixed' ) ? { left: 0, top: 0 } : _tip.parentNode.getBoundingClientRect();
-        if( align === 'center' ) {
-            _tip.style.left      = (clientX - _origin.left) + 'px';
-            _tip.style.transform = 'translateX(-50%)';
-        } else if( align === 'right' ) {
-            _tip.style.left      = (clientX - _origin.left) + 'px';
-            _tip.style.transform = 'translateX(-100%)';
-        } else {
-            _tip.style.left = (clientX - _origin.left + 10) + 'px';
-            _tip.style.transform = '';
-        }
-        _tip.style.top = (clientY - _origin.top - 16) + 'px';
-        this._clampToViewport(_tip);
-        this._armTooltipAutoFade(_tip, this._wordBasedFadeDuration(this._countWords(label)));
+        Chart.hecUi.showMessage(label, clientX, clientY, align, anchorEl, this._this?.querySelector('#maincard'));
     }
 
     _getScrollContainer() {
@@ -2648,60 +2503,26 @@ export class HistoryCardState {
 
     // ── Drag visual feedback helpers ──────────────────────────────────────────
 
-    _highlightDropTarget(canvasEl, valid) {
-        this._clearDropHighlight();
-        if( !canvasEl ) return;
-        const wrapper = canvasEl.parentNode;
-        if( !wrapper ) return;
-        wrapper._hec_prev_outline = wrapper.style.outline;
-        wrapper._hec_prev_outline_offset = wrapper.style.outlineOffset;
-        wrapper._hec_prev_transition = wrapper.style.transition;
-        const color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
-        wrapper.style.transition = '';
-        wrapper.style.outline = `2px ${valid ? 'solid' : 'dashed'} ${color}`;
-        wrapper.style.outlineOffset = '-2px';
-        if( !valid ) requestAnimationFrame(() => { wrapper.style.transition = 'outline-color 1.5s ease'; });
-        this._hec_highlight_el = wrapper;
-    }
-
-    _highlightMultipleTargets(canvasEls) {
-        this._clearDropHighlight();
-        if( !canvasEls?.length ) return;
-        this._hec_highlight_els = [];
-        for( let canvasEl of canvasEls ) {
-            if( !canvasEl ) continue;
-            const wrapper = canvasEl.parentNode;
-            if( !wrapper ) continue;
-            wrapper._hec_prev_outline = wrapper.style.outline;
-            wrapper._hec_prev_outline_offset = wrapper.style.outlineOffset;
-            wrapper._hec_prev_transition = wrapper.style.transition;
-            wrapper.style.transition = '';
-            wrapper.style.outline = '2px dashed var(--error-color,#f44336)';
-            wrapper.style.outlineOffset = '-2px';
-            requestAnimationFrame(() => { wrapper.style.transition = 'outline-color 1.5s ease'; });
-            this._hec_highlight_els.push(wrapper);
-        }
-    }
-
-    _clearDropHighlight() {
-        if( this._hec_highlight_el ) {
-            const el = this._hec_highlight_el;
-            this._hec_highlight_el = null;
-            if( el.style.transition?.includes('outline-color') ) {
-                el.style.outlineColor = 'transparent';
-                setTimeout(() => { el.style.outline = el._hec_prev_outline || ''; el.style.outlineOffset = el._hec_prev_outline_offset || ''; el.style.transition = el._hec_prev_transition || ''; }, 1500);
-            } else {
-                el.style.outline = el._hec_prev_outline || '';
-                el.style.outlineOffset = el._hec_prev_outline_offset || '';
-                el.style.transition = el._hec_prev_transition || '';
-            }
-        }
-        if( this._hec_highlight_els?.length ) {
-            for( let el of this._hec_highlight_els ) {
-                el.style.outlineColor = 'transparent';
-                setTimeout(() => { el.style.outline = el._hec_prev_outline || ''; el.style.outlineOffset = el._hec_prev_outline_offset || ''; el.style.transition = el._hec_prev_transition || ''; }, 1500);
-            }
-            this._hec_highlight_els = [];
+    // Flags graphs — those already showing an entity being added again: a dashed red
+    // outline (Chart.hecUi.outline), cleared 1.5 s after it's been seen — right away if
+    // the graph is on screen, else once it scrolls into view, at the latest after 15 s.
+    _flagGraphs(graphs)
+    {
+        for( const g of graphs ) {
+            const _w = g?.canvas?.parentNode;
+            if( !_w ) continue;
+            Chart.hecUi.outline(_w, false);
+            const _clearSoon = () => setTimeout(() => Chart.hecUi.clearOutline(_w), 1500);
+            const _r = _w.getBoundingClientRect();
+            if( _r.top >= 0 && _r.bottom <= window.innerHeight ) { _clearSoon(); continue; }
+            const _obs = new IntersectionObserver((entries) => {
+                if( !entries[0].isIntersecting ) return;
+                _obs.disconnect();
+                clearTimeout(_late);
+                _clearSoon();
+            }, { threshold: 0.1 });
+            const _late = setTimeout(() => { _obs.disconnect(); Chart.hecUi.clearOutline(_w); }, 15000);
+            _obs.observe(_w);
         }
     }
 
@@ -3747,41 +3568,7 @@ export class HistoryCardState {
                 if( !_newIds.length && _dupEntityId ) {
                     this.showEntityTypeMenu(ii, _dupEntityId, _dupG);
                 }
-                const _dupCanvases = Array.from(_duplicateGraphs).map(g => g.canvas);
-                this._highlightMultipleTargets(_dupCanvases);
-                for( let _canvas of _dupCanvases ) {
-                    const _hlWrapper = _canvas.parentNode;
-                    if( !_hlWrapper ) continue;
-                    const _wr = _hlWrapper.getBoundingClientRect();
-                    const _inViewport = _wr.top >= 0 && _wr.bottom <= window.innerHeight;
-                    const _clearOne = () => {
-                        _hlWrapper.style.outlineColor = 'transparent';
-                        setTimeout(() => {
-                            _hlWrapper.style.outline = _hlWrapper._hec_prev_outline || '';
-                            _hlWrapper.style.outlineOffset = _hlWrapper._hec_prev_outline_offset || '';
-                            _hlWrapper.style.transition = _hlWrapper._hec_prev_transition || '';
-                            if( this._hec_highlight_els ) {
-                                this._hec_highlight_els = this._hec_highlight_els.filter(e => e !== _hlWrapper);
-                            }
-                        }, 1500);
-                    };
-                    if( _inViewport ) {
-                        setTimeout(_clearOne, 1500);
-                    } else {
-                        const _hlTimeout = setTimeout(() => {
-                            _hlObserver?.disconnect();
-                            _clearOne();
-                        }, 15000);
-                        const _hlObserver = new IntersectionObserver((entries) => {
-                            if( entries[0].isIntersecting ) {
-                                _hlObserver.disconnect();
-                                clearTimeout(_hlTimeout);
-                                setTimeout(_clearOne, 1500);
-                            }
-                        }, { threshold: 0.1 });
-                        _hlObserver.observe(_hlWrapper);
-                    }
-                }
+                this._flagGraphs(Array.from(_duplicateGraphs));
             }
 
             if( _addedNames.length ) {
@@ -3835,28 +3622,7 @@ export class HistoryCardState {
                     const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
                     this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG.canvas);
                     this.showEntityTypeMenu(ii, entity_id, _existingG);
-                    this._highlightDropTarget(_existingG.canvas, false);
-                    // Keep highlight 1.5s if visible, 15s if out of viewport
-                    // If it enters viewport while highlighted, fade after 1.5s
-                    const _hlWrapper = _existingG.canvas.parentNode;
-                    const _wr = _hlWrapper?.getBoundingClientRect();
-                    const _inViewport = _wr && _wr.top >= 0 && _wr.bottom <= window.innerHeight;
-                    if( _inViewport ) {
-                        setTimeout(() => { this._clearDropHighlight(); }, 1500);
-                    } else {
-                        const _hlTimeout = setTimeout(() => {
-                            _hlObserver?.disconnect();
-                            this._clearDropHighlight();
-                        }, 15000);
-                        const _hlObserver = new IntersectionObserver((entries) => {
-                            if( entries[0].isIntersecting ) {
-                                _hlObserver.disconnect();
-                                clearTimeout(_hlTimeout);
-                                setTimeout(() => { this._clearDropHighlight(); }, 1500);
-                            }
-                        }, { threshold: 0.1 });
-                        if( _hlWrapper ) _hlObserver.observe(_hlWrapper);
-                    }
+                    this._flagGraphs([_existingG]);
                 }
                 return;
             }
@@ -4020,51 +3786,6 @@ export class HistoryCardState {
         return g.canvas.parentNode.parentNode;
     }
 
-    _clampToViewport(el)
-    {
-        // Nudges an already-positioned, already-visible floating element (menu, dropdown,
-        // tooltip) back inside bounds. Call once after display:block and left/top/bottom/
-        // transform are set. Reads back the actual rendered box via
-        // getBoundingClientRect() rather than assuming how the position was computed, so
-        // this works uniformly for position:fixed and position:absolute, for elements
-        // anchored via `top` or `bottom`, and for elements using a CSS transform (e.g.
-        // translateX for center/right-aligned tooltips) — a translation delta applied to
-        // `left`/`top` shifts the final rendered position by the same delta regardless of
-        // any transform already in effect.
-        //
-        // Left/right/top: the MOST RESTRICTIVE of #maincard and the viewport — never
-        // #maincard alone, since a never-before-mounted card (new cardName) starts with an
-        // empty/transiently tiny #maincard (graphs not yet loaded/sized), which would
-        // wrongly clamp a menu/tooltip into that tiny box and send it off-screen. Never the
-        // viewport alone either, or an element could bleed onto Home Assistant's own
-        // surrounding UI (side menu, header, etc).
-        //
-        // Bottom is the sole exception: viewport ONLY, never #maincard — reintroducing
-        // #maincard there is exactly what caused the original bug (empty-card height
-        // ~130px vs 1300+px once loaded). HA never leaves meaningful UI below the
-        // dashboard content, so the viewport alone is safe in this one direction.
-        const _cardEl = this._this?.querySelector('#maincard');
-        const _cardR = _cardEl ? _cardEl.getBoundingClientRect() : null;
-        const _bounds = _cardR
-            ? { left: Math.max(_cardR.left, 0), right: Math.min(_cardR.right, window.innerWidth),
-                top: Math.max(_cardR.top, 0), bottom: window.innerHeight }
-            : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-        const _r = el.getBoundingClientRect();
-        let _dx = 0, _dy = 0;
-        if( _r.right > _bounds.right ) _dx = _bounds.right - _r.right;
-        else if( _r.left < _bounds.left ) _dx = _bounds.left - _r.left;
-        if( _r.bottom > _bounds.bottom ) _dy = _bounds.bottom - _r.bottom;
-        else if( _r.top < _bounds.top ) _dy = _bounds.top - _r.top;
-        // offsetLeft/offsetTop reflect the actual current rendered offset whether it came
-        // from an explicit style.left/top or from the element's normal/auto flow position —
-        // safer baseline than parsing style strings, which can be empty.
-        if( _dx ) el.style.left = (el.offsetLeft + _dx) + 'px';
-        if( _dy ) {
-            if( el.style.bottom !== '' ) el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
-            else el.style.top = (el.offsetTop + _dy) + 'px';
-        }
-    }
-
     _footerAnchor(gl)
     {
         // Returns the top-level child of #graphlist where the bottom toolbar block starts:
@@ -4101,7 +3822,7 @@ export class HistoryCardState {
         if( left !== undefined ) menuEl.style.left = left;
         menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
         for( let _a of menuEl.getElementsByTagName('a') ) _a.style.background = '';
-        this._clampToViewport(menuEl);
+        Chart.hecUi.clampToViewport(menuEl, this._this?.querySelector('#maincard'));
     }
 
     _navigateMenuArrowKey(visible, key)

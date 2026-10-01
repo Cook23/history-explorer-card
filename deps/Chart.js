@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b74
+ * HEC fork — synced with history-explorer-card version: 1.2.0b75
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b74';
+        var HEC_CHART_VERSION = '1.2.0b75';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // Two of the generic hit-test primitives (see the other two,
@@ -4715,47 +4715,19 @@
             if (_el) _el.remove();
           },
 
-          // Drop-target highlight — an outline drawn around a graph's own canvas
-          // wrapper while a compatible/incompatible drag hovers over it. Migrated
-          // verbatim from the card's own _highlightDropTarget/_clearDropHighlight,
-          // applied to THIS chart's own canvas.parentNode.
+          // Drop-target highlight — an outline around this chart's own canvas wrapper while
+          // a compatible/incompatible drag hovers over it (Chart.hecUi.outline).
           _hecHighlightDropTarget: function (valid) {
             this._hecClearDropHighlight();
             var _wrapper = this.canvas && this.canvas.parentNode;
             if (!_wrapper) return;
-            _wrapper._hecPrevOutline = _wrapper.style.outline;
-            _wrapper._hecPrevOutlineOffset = _wrapper.style.outlineOffset;
-            _wrapper._hecPrevTransition = _wrapper.style.transition;
-            var _color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
-            _wrapper.style.transition = '';
-            _wrapper.style.outline = '2px ' + (valid ? 'solid' : 'dashed') + ' ' + _color;
-            _wrapper.style.outlineOffset = '-2px';
-            if (!valid) {
-              (function (_w) {
-                requestAnimationFrame(function () { _w.style.transition = 'outline-color 1.5s ease'; });
-              })(_wrapper);
-            }
+            Chart.hecUi.outline(_wrapper, valid);
             this._hecHighlightEl = _wrapper;
           },
 
           _hecClearDropHighlight: function () {
-            var _el = this._hecHighlightEl;
-            if (!_el) return;
+            Chart.hecUi.clearOutline(this._hecHighlightEl);
             this._hecHighlightEl = null;
-            if (_el.style.transition && _el.style.transition.indexOf('outline-color') >= 0) {
-              _el.style.outlineColor = 'transparent';
-              (function (_e) {
-                setTimeout(function () {
-                  _e.style.outline = _e._hecPrevOutline || '';
-                  _e.style.outlineOffset = _e._hecPrevOutlineOffset || '';
-                  _e.style.transition = _e._hecPrevTransition || '';
-                }, 1500);
-              })(_el);
-            } else {
-              _el.style.outline = _el._hecPrevOutline || '';
-              _el.style.outlineOffset = _el._hecPrevOutlineOffset || '';
-              _el.style.transition = _el._hecPrevTransition || '';
-            }
           },
 
           // Zoom-rectangle selection overlay — pure geometry, no knowledge of
@@ -5227,9 +5199,10 @@
               if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
-                // A genuine mouseout leaves the canvas entirely — close both
-                // independent tooltip elements (hover and other), not just one.
-                if (me.tooltip) { me.tooltip._hecCloseTooltip('hover'); me.tooltip._hecCloseTooltip('other'); }
+                // A genuine mouseout leaves the canvas entirely — close both the hover
+                // tooltip and a label message shown from this chart.
+                if (me.tooltip) me.tooltip._hecCloseTooltip();
+                Chart.hecUi.closeMessage(me.canvas);
               }
               me._hecHasMoved = false;
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
@@ -5750,15 +5723,8 @@
                 if (_truncated && me.options.labelTooltipEnabled !== false && me.tooltip) {
                   var _cx2 = e.native ? e.native.clientX : _hx;
                   var _cy2 = e.native ? e.native.clientY : _hy;
-                  me.tooltip._hecShowTooltip(
-                    'other',
-                    _truncated,
-                    _cx2 + 10, _cy2 - 16,
-                    me.canvas,
-                    'var(--card-background-color,#fff)', 'var(--divider-color,#ccc)', 'var(--primary-text-color,#333)',
-                    null,
-                    true
-                  );
+                  var _bSel = me.options.floatingBoundsSelector;
+                  Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
                 }
                 var _clickInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
                 if (_clickInLockAndHandleZone) {
@@ -10075,47 +10041,37 @@
 
         }
 
-        Chart.Tooltip = Element.extend({
-          initialize: function () {
-            this._model = getBaseModel(this._options);
-            this._lastActive = [];
+        // ---------------------------------------------------------------------------
+        // Chart.hecUi — generic floating-element and highlight utilities. Public (see
+        // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
+        // feedback use them, and so does the card for its own menus and messages — one
+        // implementation, where there used to be a copy on each side. Stateless: whatever
+        // they keep is stored on the element they're given. They know nothing about the
+        // card; the area a floating element must stay in is passed in by the caller.
+        // ---------------------------------------------------------------------------
+        var hecUi = Chart.hecUi = {
+
+          // How long a message stays up: 1 s, plus 0.5 s per word (a word: 2+ letters or
+          // digits, words split on spaces and underscores — entity ids read as words).
+          readingTime: function (text) {
+            var _words = String(text || '').split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
+            return 1000 + 500 * _words;
           },
 
-          _hecCountWords: function (text) {
-            return text.split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
-          },
-
-          _hecWordBasedFadeDuration: function (wordCount) {
-            return 1000 + 500 * wordCount;
-          },
-
-          // Nudges an already-positioned, already-visible floating element back fully
-          // inside the viewport if any edge overflows. Duplicated from the card's own
-          // _clampToViewport (used there for its other floating popups too) so this file
-          // has no outside dependency for it.
-          _hecClampToViewport: function (el, anchorEl) {
-            // Same fix as history-explorer-card's own v1.1.42b12 _clampToViewport,
-            // ported here since on THIS branch the tooltip is genuinely driven by
-            // Chart.js (unlike v1.1.x, where the card never wires a custom: tooltip
-            // config at all, making that branch's Chart.js clamp code dead).
-            //
-            // Left/right/top: the MOST RESTRICTIVE of #maincard and the viewport —
-            // never #maincard alone, since a never-before-mounted card (new
-            // cardName) starts with an empty/transiently tiny #maincard (graphs not
-            // yet loaded/sized), which would wrongly clamp a menu/tooltip into that
-            // tiny box and send it off-screen. Never the viewport alone either, or a
-            // tooltip could bleed onto Home Assistant's own surrounding UI.
-            //
-            // Bottom is the sole exception: viewport ONLY, never #maincard —
-            // reintroducing #maincard there is exactly what caused the original bug
-            // (empty-card height ~130px vs 1300+px once loaded). HA never leaves
-            // meaningful UI below the dashboard content, so the viewport alone is
-            // safe in this one direction.
-            var _card = anchorEl && anchorEl.closest ? anchorEl.closest('#maincard') : null;
-            var _cardR = _card ? _card.getBoundingClientRect() : null;
-            var _bounds = _cardR
-              ? { left: Math.max(_cardR.left, 0), right: Math.min(_cardR.right, window.innerWidth),
-                  top: Math.max(_cardR.top, 0), bottom: window.innerHeight }
+          // Nudges an already-positioned, already-visible floating element (menu, tooltip)
+          // back inside bounds. Call once after display/left/top/bottom/transform are set:
+          // it reads back the rendered box, so it works for position fixed or absolute,
+          // anchored by top or bottom, with or without a CSS transform. Left/right/top: the
+          // most restrictive of boundsEl and the viewport — never boundsEl alone (a card
+          // that just mounted is still nearly empty, which would clamp into a tiny box),
+          // never the viewport alone (the element would bleed onto the surrounding page).
+          // Bottom: viewport only (boundsEl there is what caused the empty-card bug).
+          // boundsEl null: viewport only.
+          clampToViewport: function (el, boundsEl) {
+            var _bR = boundsEl ? boundsEl.getBoundingClientRect() : null;
+            var _bounds = _bR
+              ? { left: Math.max(_bR.left, 0), right: Math.min(_bR.right, window.innerWidth),
+                  top: Math.max(_bR.top, 0), bottom: window.innerHeight }
               : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
             var _r = el.getBoundingClientRect();
             var _dx = 0, _dy = 0;
@@ -10123,6 +10079,7 @@
             else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
             if (_r.bottom > _bounds.bottom) _dy = _bounds.bottom - _r.bottom;
             else if (_r.top < _bounds.top) _dy = _bounds.top - _r.top;
+            // (offsetLeft/offsetTop: the current rendered offset, explicit or from the flow)
             if (_dx) el.style.left = (el.offsetLeft + _dx) + 'px';
             if (_dy) {
               if (el.style.bottom !== '') el.style.bottom = (parseFloat(el.style.bottom) || 0) - _dy + 'px';
@@ -10130,80 +10087,142 @@
             }
           },
 
-          _hecArmTooltipAutoFade: function (_el, duration, justMoved) {
-            if (arguments.length >= 3 && justMoved !== true) return;
-            _el.style.opacity = '0';
-            requestAnimationFrame(function () { _el.style.opacity = '1'; });
-            this._hecStartTooltipFade(_el, duration);
-          },
-
-          _hecStartTooltipFade: function (_el, duration) {
-            var me = this;
-            clearTimeout(_el._hecFadeTimer);
-            clearTimeout(_el._hecRemoveTimer);
-            _el._hecFadeTimer = setTimeout(function () { _el.style.opacity = '0'; }, duration);
-            _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _el._hecOnClose); }, duration + 1000);
-          },
-
-          // Generic: removes the element and its ResizeObserver. onClose is an
-          // optional callback the caller supplied when arming the fade (or closing
-          // immediately) — this function has no idea what it means, it just calls it.
-          // The hover tooltip is the only current caller that passes one, to clear its
-          // own active/hover-highlight state; the label tooltip passes none.
-          _hecKillFloatingTooltip: function (_el, onClose) {
-            clearTimeout(_el._hecFadeTimer);
-            clearTimeout(_el._hecRemoveTimer);
-            if (_el._hecObserver) _el._hecObserver.disconnect();
-            if (_el.parentNode) _el.remove();
-            if (typeof onClose === 'function') onClose();
-          },
-
-          _hecAttachFloatingTooltip: function (_el, anchorEl) {
-            var me = this;
+          // Places a floating element against anchorEl's offsetParent (the positioned
+          // ancestor the browser already resolved — never forcing position onto someone
+          // else's container), so it scrolls with its anchor; document.body + fixed when
+          // there's none. It closes by itself (closeFloating) when anchorEl disappears or is
+          // hidden: a ResizeObserver reports a zero size then, with no help from anyone.
+          attachFloating: function (el, anchorEl) {
             var _offsetParent = anchorEl.offsetParent;
             var _targetParent = _offsetParent || document.body;
-            if (_el.parentNode !== _targetParent) _targetParent.appendChild(_el);
+            if (el.parentNode !== _targetParent) _targetParent.appendChild(el);
             var _wantPosition = _offsetParent ? 'absolute' : 'fixed';
-            if (_el.style.position !== _wantPosition) _el.style.position = _wantPosition;
-            if (_el._hecObserverTarget !== anchorEl) {
-              if (_el._hecObserver) _el._hecObserver.disconnect();
-              _el._hecObserverTarget = anchorEl;
-              _el._hecObserver = new ResizeObserver(function (entries) {
+            if (el.style.position !== _wantPosition) el.style.position = _wantPosition;
+            if (el._hecObserverTarget !== anchorEl) {
+              if (el._hecObserver) el._hecObserver.disconnect();
+              el._hecObserverTarget = anchorEl;
+              el._hecObserver = new ResizeObserver(function (entries) {
                 var _box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
                 var _w = _box ? _box.inlineSize : entries[0].contentRect.width;
                 var _h = _box ? _box.blockSize : entries[0].contentRect.height;
-                if (_w === 0 && _h === 0) me._hecKillFloatingTooltip(_el, _el._hecOnClose);
+                if (_w === 0 && _h === 0) hecUi.closeFloating(el);
               });
-              _el._hecObserver.observe(anchorEl);
+              el._hecObserver.observe(anchorEl);
             }
           },
 
-          // content: string, or a DOM Node to be inserted as the tooltip's only child.
-          // caret: null for no caret, or { size, xAlign ('left'/'right'/'center'),
-          //   yAlign ('top'/'bottom'/'center'), cornerRadius, borderWidth } — same
-          //   positioning math the hover tooltip's caret already used, just parameterized.
-          // Padding is fixed at 4px/8px for every tooltip — not a parameter, per
-          // Thierry: all tooltips share the exact same padding, no exceptions.
-          // elKey: which of the two independent tooltip element slots this call
-          // targets — 'hover' or 'other'. The hover tooltip re-renders/closes on
-          // every single event (driven by tooltip.update in Controller.handleEvent,
-          // which runs before any click-driven tooltip like the label one), so
-          // sharing one element meant it would silently close whatever the OTHER
-          // tooltip had just shown. Two independent elements, same generic
-          // display/lifecycle code, fixes that without needing either consumer to
-          // know about the other.
-          _hecShowTooltip: function (elKey, content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
-            var me = this;
-            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
-            var _el = this[_slot];
+          // (Re)shows el and arms its fade-out: fades in (the two opacity writes must land
+          // in separate frames, or no transition), then startFade. With a third argument,
+          // only a render that directly follows a real pointer gesture (justMoved === true)
+          // may do so — a data refresh under a still pointer must not reopen a tooltip.
+          armAutoFade: function (el, duration, justMoved) {
+            if (arguments.length >= 3 && justMoved !== true) return;
+            el.style.opacity = '0';
+            requestAnimationFrame(function () { el.style.opacity = '1'; });
+            hecUi.startFade(el, duration);
+          },
+
+          // Fades el out after duration, then closes it.
+          startFade: function (el, duration) {
+            clearTimeout(el._hecFadeTimer);
+            clearTimeout(el._hecRemoveTimer);
+            el._hecFadeTimer = setTimeout(function () { el.style.opacity = '0'; }, duration);
+            el._hecRemoveTimer = setTimeout(function () { hecUi.closeFloating(el); }, duration + 1000);
+          },
+
+          // Removes el and its observer, then calls el._hecOnClose if its owner set one.
+          closeFloating: function (el) {
+            clearTimeout(el._hecFadeTimer);
+            clearTimeout(el._hecRemoveTimer);
+            if (el._hecObserver) el._hecObserver.disconnect();
+            if (el.parentNode) el.remove();
+            if (typeof el._hecOnClose === 'function') el._hecOnClose();
+          },
+
+          // A short text message near a point — a refused drop, an entity already added, a
+          // truncated label's full text: one element per document or shadow root (the
+          // anchor's), reused, faded out after its readingTime. align: 'left' (default —
+          // just right of and above the point), 'center' or 'right' (centered on / ending
+          // at the point, above it). boundsEl: see clampToViewport.
+          showMessage: function (text, clientX, clientY, align, anchorEl, boundsEl) {
+            anchorEl = anchorEl || document.body;
+            var _root = anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+            var _el = _root._hecMessageEl;
             if (!_el) {
               _el = document.createElement('div');
-              _el.id = 'hec-tooltip-' + elKey;
+              _el.id = 'hec-label-tooltip';
+              _el.style.cssText = 'z-index:9999;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ccc);border-radius:4px;padding:4px 8px;font-size:12px;line-height:normal;pointer-events:none;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.2);transition:opacity 1.5s ease;opacity:0;';
+              _root._hecMessageEl = _el;
+            }
+            hecUi.attachFloating(_el, anchorEl);
+            _el.textContent = text;
+            // fixed: against the viewport (client coordinates as they are); absolute:
+            // against the parent it was actually attached to (see attachFloating)
+            var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+            _el.style.left = (clientX - _origin.left + (align === 'center' || align === 'right' ? 0 : 10)) + 'px';
+            _el.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
+            _el.style.top = (clientY - _origin.top - 16) + 'px';
+            hecUi.clampToViewport(_el, boundsEl);
+            hecUi.armAutoFade(_el, hecUi.readingTime(text));
+          },
+
+          // Closes the message shown by showMessage in anchorEl's document or shadow root.
+          closeMessage: function (anchorEl) {
+            var _root = anchorEl && anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+            if (_root._hecMessageEl) hecUi.startFade(_root._hecMessageEl, 0);
+          },
+
+          // Outlines el (a graph's wrapper): solid primary color when valid, dashed error
+          // color otherwise — that one fades out (over 1.5 s) once clearOutline is called.
+          outline: function (el, valid) {
+            if (!el) return;
+            if (el._hecOutlined) hecUi.clearOutline(el, true);
+            el._hecPrevOutline = el.style.outline;
+            el._hecPrevOutlineOffset = el.style.outlineOffset;
+            el._hecPrevTransition = el.style.transition;
+            el._hecOutlined = true;
+            var _color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
+            el.style.transition = '';
+            el.style.outline = '2px ' + (valid ? 'solid' : 'dashed') + ' ' + _color;
+            el.style.outlineOffset = '-2px';
+            if (!valid) requestAnimationFrame(function () { el.style.transition = 'outline-color 1.5s ease'; });
+          },
+
+          // Removes outline(el), fading it out if it was an invalid one (unless immediate).
+          clearOutline: function (el, immediate) {
+            if (!el || !el._hecOutlined) return;
+            el._hecOutlined = false;
+            var _restore = function () {
+              el.style.outline = el._hecPrevOutline || '';
+              el.style.outlineOffset = el._hecPrevOutlineOffset || '';
+              el.style.transition = el._hecPrevTransition || '';
+            };
+            if (!immediate && el.style.transition && el.style.transition.indexOf('outline-color') >= 0) {
+              el.style.outlineColor = 'transparent';
+              setTimeout(function () { if (!el._hecOutlined) _restore(); }, 1500);
+            } else {
+              _restore();
+            }
+          }
+        };
+
+        Chart.Tooltip = Element.extend({
+          initialize: function () {
+            this._model = getBaseModel(this._options);
+            this._lastActive = [];
+          },
+
+          _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
+            var me = this;
+            var _el = this._hecHoverTooltipEl;
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.id = 'hec-tooltip-hover';
               _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
-              this[_slot] = _el;
+              this._hecHoverTooltipEl = _el;
             }
             _el._hecOnClose = onClose;
-            this._hecAttachFloatingTooltip(_el, anchorEl);
+            hecUi.attachFloating(_el, anchorEl);
             _el.style.background = backgroundColor;
             _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
             _el.style.color = textColor;
@@ -10215,7 +10234,7 @@
             } else if (content) {
               _el.appendChild(content);
             }
-            var _wordCount = this._hecCountWords(typeof content === 'string' ? content : (content ? content.textContent : ''));
+            var _readingTime = hecUi.readingTime(typeof content === 'string' ? content : (content ? content.textContent : ''));
 
             if (caret) {
               var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
@@ -10240,17 +10259,18 @@
             var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
             _el.style.left = (x - _origin.left) + 'px';
             _el.style.top = (y - _origin.top) + 'px';
-            this._hecClampToViewport(_el, anchorEl);
-            this._hecArmTooltipAutoFade(_el, this._hecWordBasedFadeDuration(_wordCount), justMoved);
+            // (the area to stay in: the card's, if it says which — floatingBoundsSelector)
+            var _boundsSel = me._chart && me._chart.options.floatingBoundsSelector;
+            hecUi.clampToViewport(_el, _boundsSel && anchorEl && anchorEl.closest ? anchorEl.closest(_boundsSel) : null);
+            hecUi.armAutoFade(_el, _readingTime, justMoved);
 
             function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
           },
 
           // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
           // elKey) tooltip out immediately (duration 0) — never touches the other one.
-          _hecCloseTooltip: function (elKey) {
-            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
-            if (this[_slot]) this._hecStartTooltipFade(this[_slot], 0);
+          _hecCloseTooltip: function () {
+            if (this._hecHoverTooltipEl) hecUi.startFade(this._hecHoverTooltipEl, 0);
           },
 
           // Renders the tooltip as a floating DOM element instead of drawing on the canvas
@@ -10268,7 +10288,7 @@
             if (_vm) _vm.hecJustMoved = false;
 
             if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
-              this._hecCloseTooltip('hover');
+              this._hecCloseTooltip();
               return;
             }
             // A model left half-built by a throw inside Tooltip.update() can still read
@@ -10276,7 +10296,7 @@
             var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
             var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
             if (!_hasContent) {
-              this._hecCloseTooltip('hover');
+              this._hecCloseTooltip();
               return;
             }
 
@@ -10312,7 +10332,6 @@
             var _canvasRect = this._chart.canvas.getBoundingClientRect();
             var _chart = this._chart;
             this._hecShowTooltip(
-              'hover',
               _content,
               _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
               this._chart.canvas,
