@@ -6044,6 +6044,27 @@
               * @param options {IInteractionOptions} options to use
               * @return {Chart.Element[]} Array of elements that are under the point. If none are found, an empty array is returned
               */
+          // Mixed bar/line graph: a curve point close to the pointer wins (the curves are
+          // drawn over the bars), else the bar under the pointer, else the plain 'nearest'.
+          // Plain 'nearest' alone would always prefer the dense curve points, even with the
+          // pointer right on a bar.
+          hecMixed: function (chart, e, options) {
+            var position = getRelativePosition(e, chart);
+            var best = null, bestDist = 8;
+            parseVisibleItems(chart, function (element) {
+              if (chart.getDatasetMeta(element._datasetIndex).bar) return;
+              var cp = element.getCenterPoint();
+              var d = Math.sqrt(Math.pow(position.x - cp.x, 2) + Math.pow(position.y - cp.y, 2));
+              if (d < bestDist) { bestDist = d; best = element; }
+            });
+            if (best) return [best];
+            var onBar = getIntersectItems(chart, position).filter(function (element) {
+              return chart.getDatasetMeta(element._datasetIndex).bar;
+            });
+            if (onBar.length) return onBar.slice(0, 1);
+            return module.exports.modes.nearest(chart, e, { intersect: false, axis: options.axis });
+          },
+
           nearest: function (chart, e, options) {
             var position = getRelativePosition(e, chart);
             options.axis = options.axis || 'xy';

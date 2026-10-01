@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.45b1';
+const Version = '1.1.45';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2075,7 +2075,8 @@ export class HistoryCardState {
                     displayColors: _hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
                 },
                 hover: {
-                    mode: 'nearest',
+                    // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
+                    mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
                     intersect: !_hasCurves,
                     // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
                     // trigger on a pure hover move (no button/contact needed) since
@@ -5435,6 +5436,15 @@ export class HistoryCardState {
         entityOptions.groupId = groupId;
         _pcEntry.groupId = groupId;
 
+        // Y axis bounds: the graph's own options first, else the first entity of the graph
+        // that sets them (on its YAML entry), else entityOptions — taken from every entity
+        // of the graph, not only the one being added (which used to decide alone).
+        for( const _k of ['ymin', 'ymax', 'ystepSize'] ) {
+            if( _graphProps[_k] !== undefined ) continue;
+            const _fromEntity = entities.map(e => e[_k]).find(v => v !== undefined && v !== null);
+            if( _fromEntity !== undefined ) entityOptions[_k] = _fromEntity;
+        }
+
         // The graph's own type: 'bar' as soon as it holds a bar entity (its line entities
         // then drawn as curves over the bars), otherwise the entities' type
         if( type === 'line' || type === 'bar' )
@@ -7543,14 +7553,20 @@ export class HistoryCardState {
             color             : ent.color,
             fill              : ent.fill,
             hidden            : ent.hidden,
-            interval          : interval,
+            interval          : this.parseIntervalConfig(ent.interval) ?? interval,
             isStatic          : true,
             name              : ent.name,
             scale             : ent.scale,
             siConversionFactor: ent.siConversionFactor,
             dashMode          : ent.dashMode,
             lineMode          : ent.lineMode,
-            width             : ent.width,
+            width             : ent.width ?? ent.lineWidth,
+            type              : ent.type,
+            // Y axis bounds set on an entity: the axis is the graph's, so they apply to the
+            // graph the entity is shown in (see addGraph)
+            ymin              : ent.ymin,
+            ymax              : ent.ymax,
+            ystepSize         : ent.ystepSize ?? ent.ystepsize,
             showPoints        : ent.showPoints,
             showMinMax        : ent.showMinMax,
             unit              : ent.unit,
@@ -7639,7 +7655,8 @@ export class HistoryCardState {
                 ylock          : graph.options?.ylock,
                 ymin           : graph.options?.ymin,
                 ymax           : graph.options?.ymax,
-                ystepSize      : graph.options?.ystepSize,
+                // (ystepsize: spelling of the reference config up to 1.1.44, still accepted)
+                ystepSize      : graph.options?.ystepSize ?? graph.options?.ystepsize,
                 fill           : graph.options?.fill,
                 showMinMax     : graph.options?.showMinMax,
                 dashMode       : graph.options?.dashMode,

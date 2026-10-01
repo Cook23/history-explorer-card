@@ -518,6 +518,7 @@ graphs:
       - entity: sensor.power                # measurement (W) → curve
         lineMode: smart
         scale: 0.001                        # W → kW, comparable with the kWh bars
+        unit: kW                            # the unit shown in the legend and tooltip
 ```
 
 Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values.
