@@ -44,9 +44,9 @@ or `maintainAspectRatio`.
 | `labelTooltipEnabled` | `boolean` | `true` | Clicking a truncated Y-axis category label (timeline/arrowline) never shows its full text in a tooltip. |
 | `altSampleModeEnabled` | `boolean` | `true` | Holding Alt while hovering never switches `hover.mode` to `'dataset'` (showing every sample instead of just the nearest point). |
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
-| `panX` | `function({chart, deltaPixels or scale, centerPixels, event})` | none | Card-supplied callback for horizontal (time) panning and zooming. **Not implemented by Chart.js itself** — the shared date range across multiple graphs is considered a card responsibility, not a per-graph one, unlike `zoomY` which Chart.js applies directly (see §3). |
-| `panY` | `function({chart, deltaPixels, event})` | none | Same idea as `panX`, but this one is effectively dead — Y-axis panning is fully handled by Chart.js directly (§3), so nothing calls this anymore. Kept only for backward compatibility if a card ever needs to intercept it. |
-| `zoomX` | `function({chart, scale or deltaY, centerPixels, event})` | none | Card-supplied callback for horizontal zoom (Ctrl+wheel, pinch spread). Same "shared range, card responsibility" reasoning as `panX`. The card implements the Ctrl+wheel case (`deltaY`); a pinch only zooms the Y axis, as before v1.2. Every Ctrl+wheel tick is kept from zooming the page, the debounced ones included. |
+| `panX` | `function({chart, deltaPixels, event})` | none | Card-supplied callback for horizontal (time) panning, called by the one-finger plot drag and by the fingers' common movement in a pinch. **Not implemented by Chart.js itself** — the shared date range across multiple graphs is a card responsibility. The card doesn't use it: it pans the time from the `dragmove` and `pinch` events (§2). Label drags and graph moves never call it. |
+| `panY` | `function({chart, deltaPixels, event})` | none | Never called any more: Y-axis panning, including the vertical movement of a pinch, is applied by Chart.js directly (§3). Kept only for backward compatibility. |
+| `zoomX` | `function({chart, scale or deltaY, centerPixels, event})` | none | Card-supplied callback for horizontal (time) zoom, around `centerPixels`: Ctrl+wheel (`deltaY`) and the horizontal spread of a pinch (`scale`, old spread / new spread, < 1 when the fingers move apart). The card zooms by its fixed range steps, like its zoom buttons: one step per wheel tick, and one per ×1.5 of accumulated pinch spread. Every Ctrl+wheel tick is kept from zooming the page, the debounced ones included. |
 | `dragGhostEnabled` | `boolean` | `true` | No drag ghost (the floating label following the pointer) and no insertion marker during a drag. |
 | `zoomSelectMode` | `boolean` | `false` | When `true`, a drag over the plot area selects a time span (Chart.js draws the selection; the span comes back in `dragend`'s `zoomSelectX0`/`zoomSelectX1`) instead of panning. Set by the card while its zoom button is on. |
 | `dropAllowed` | `boolean` | `true` | Written by the card on the chart a drag is over, from its `dragovergraph` event (§2): `false` shows that graph's drop highlight as refused (dashed, error color), no insertion marker, and the dragging pointer's cursor as `not-allowed` (otherwise `grabbing`). |
@@ -146,6 +146,8 @@ value needs to come back from the card:
   directly.
 - **Y-axis zoom** (Shift+wheel, or the Y-spread of a 2-finger pinch) —
   same, computed via simple scale-factor math on the current min/max.
+- **Y-axis pan during a pinch** (the vertical movement of the fingers' centre) —
+  same as the Y-axis drag: the content follows the fingers.
 - **Y-axis lock** (the padlock icon) — a lock state (`0`=off, `1`=manually
   locked, `2`=auto-engaged by a gesture) lives entirely as
   `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. The

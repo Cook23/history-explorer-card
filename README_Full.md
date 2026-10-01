@@ -455,7 +455,7 @@ The info-panel renders a single interactive line, bar, timeline or arrowline gra
 - Pan left and right through time by dragging the graph
 - Zoom in and out using the time range selector or the mouse wheel with CTRL
 - Y axis lock and interactive Y axis pan (drag on the left label area, cursor changes to `↕`)
-- Two-finger vertical pinch zoom on mobile
+- Two-finger pinch on mobile: vertical zooms the Y axis, horizontal zooms the time, moving both fingers pans
 - Tooltip on hover
 - Long term statistics integration (seamless transition past the history retention limit)
 
@@ -666,7 +666,7 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
 
-**On mobile**, double-tap the Y axis label area then drag, without lifting your finger, to pan the Y scale — this avoids interfering with the page's native scroll. You can also use a two-finger vertical pinch on the graph to zoom the Y axis in or out.
+**On mobile**, double-tap the Y axis label area then drag, without lifting your finger, to pan the Y scale — this avoids interfering with the page's native scroll. With two fingers on a graph: spread or pinch them vertically to zoom the Y axis in or out, horizontally to zoom the time (by the same steps as the zoom buttons); move them together to pan the time and the Y axis.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
 

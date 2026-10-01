@@ -11,6 +11,10 @@ Changelog for the HA History Explorer Card.
 ### Merged — everything from v1.1.42 to v1.1.46
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), and the multi-device sync fixes — see their own entries below. Adapted to the new split of roles: the interaction parts go through Chart.js's gesture system, like everything else
 
+### New — pinch on touch: zoom and pan the time too
+- Spreading or pinching two fingers horizontally zooms the time in or out around the point between them, by the same steps as the zoom buttons (one step per ×1.5 of spread); vertically, it zooms the Y axis as before
+- Moving the two fingers together pans the time, and the Y axis (lost in the v1.2 rework so far)
+
 ### Fixed — dragging the plot (pan) and pinching threw an error and did nothing
 - The table of drag handlers was declared in one function and used in another, where it didn't exist: every drag of the plot and every pinch failed
 
