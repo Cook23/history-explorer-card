@@ -1667,4 +1667,145 @@
         pointerType: e.native && e.native.pointerType ? e.native.pointerType : 'mouse' });
     }
   });
+
+  // ── The hover tooltip, shown as a floating element (methods added to Chart.Tooltip) ──
+
+  helpers.extend(Chart.Tooltip.prototype, {
+    _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
+      var me = this;
+      var _el = this._hecHoverTooltipEl;
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.id = 'hec-tooltip-hover';
+        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
+        this._hecHoverTooltipEl = _el;
+      }
+      _el._hecOnClose = onClose;
+      Chart.hecUi.attachFloating(_el, anchorEl);
+      _el.style.background = backgroundColor;
+      _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
+      _el.style.color = textColor;
+      _el.style.padding = '4px 8px';
+
+      _el.innerHTML = '';
+      if (typeof content === 'string') {
+        _el.appendChild(document.createTextNode(content));
+      } else if (content) {
+        _el.appendChild(content);
+      }
+      var _readingTime = Chart.hecUi.readingTime(typeof content === 'string' ? content : (content ? content.textContent : ''));
+
+      if (caret) {
+        var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
+        var _caretEl = document.createElement('div');
+        _caretEl.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
+        if (caret.yAlign === 'center') {
+          _caretEl.style.top = '50%';
+          _caretEl.style.marginTop = -_cs + 'px';
+          if (caret.xAlign === 'left') { _caretEl.style.left = -(_bw + 8 + _cs - 2) + 'px'; _caretEl.style.borderRightColor = backgroundColor; }
+          else { _caretEl.style.right = -(_bw + 8 + _cs - 2) + 'px'; _caretEl.style.borderLeftColor = backgroundColor; }
+        } else {
+          if (caret.xAlign === 'left') _caretEl.style.left = (_cr - 8) + 'px';
+          else if (caret.xAlign === 'right') _caretEl.style.right = (_cr - 8) + 'px';
+          else { _caretEl.style.left = '50%'; _caretEl.style.marginLeft = -_cs + 'px'; }
+          if (caret.yAlign === 'top') { _caretEl.style.top = -(_bw + 4 + _cs) + 'px'; _caretEl.style.borderBottomColor = backgroundColor; }
+          else { _caretEl.style.bottom = -(_bw + 4 + _cs) + 'px'; _caretEl.style.borderTopColor = backgroundColor; }
+        }
+        _el.appendChild(_caretEl);
+      }
+
+      _el.style.display = 'block';
+      var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+      _el.style.left = (x - _origin.left) + 'px';
+      _el.style.top = (y - _origin.top) + 'px';
+      // (the area to stay in: the card's, if it says which — floatingBoundsSelector)
+      var _boundsSel = me._chart && me._chart.options.floatingBoundsSelector;
+      Chart.hecUi.clampToViewport(_el, _boundsSel && anchorEl && anchorEl.closest ? anchorEl.closest(_boundsSel) : null);
+      Chart.hecUi.armAutoFade(_el, _readingTime, justMoved);
+
+      function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
+    },
+
+    // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
+    // elKey) tooltip out immediately (duration 0) — never touches the other one.
+    _hecCloseTooltip: function () {
+      if (this._hecHoverTooltipEl) Chart.hecUi.startFade(this._hecHoverTooltipEl, 0);
+    },
+
+    // Renders the tooltip as a floating DOM element instead of drawing on the canvas
+    // — the on-canvas draw is hard-clipped to its own graph's canvas, so a short
+    // graph or one near a viewport edge would truncate the tooltip with no way to fix
+    // that from within canvas drawing. Called from draw() below in place of the old
+    // on-canvas path. A pure consumer of _hecShowTooltip/_hecCloseTooltip: builds its
+    // own structured content and knows its own early-close conditions (disabled,
+    // no content) — the generic function knows neither.
+    _hecRenderFloatingTooltip: function () {
+      var me = this;
+      var _vm = this._view;
+
+      var _justMoved = !!(_vm && _vm.hecJustMoved);
+      if (_vm) _vm.hecJustMoved = false;
+
+      if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
+        this._hecCloseTooltip();
+        return;
+      }
+      // A model left half-built by a throw inside Tooltip.update() can still read
+      // tooltipActive === true with its text arrays missing — treat it as empty.
+      var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
+      var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
+      if (!_hasContent) {
+        this._hecCloseTooltip();
+        return;
+      }
+
+      var _content = document.createDocumentFragment();
+      var _addLine = function (text, color, swatch) {
+        var _row = document.createElement('div');
+        if (color) _row.style.color = color;
+        if (swatch) {
+          var _sw = document.createElement('span');
+          _sw.style.cssText = 'display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle;border-radius:2px;border:1px solid ' + swatch.borderColor + ';background:' + swatch.backgroundColor + ';';
+          _row.appendChild(_sw);
+        }
+        _row.appendChild(document.createTextNode(text));
+        _content.appendChild(_row);
+      };
+
+      for (var _ti = 0; _ti < _vm.title.length; _ti++) {
+        var _row = document.createElement('div');
+        _row.style.fontWeight = '600';
+        _row.style.marginBottom = '2px';
+        _row.style.color = _vm.titleFontColor;
+        _row.appendChild(document.createTextNode(_vm.title[_ti]));
+        _content.appendChild(_row);
+      }
+      for (var _bi = 0; _bi < _vm.beforeBody.length; _bi++) _addLine(_vm.beforeBody[_bi]);
+      _vm.body.forEach(function (_item, _i) {
+        for (var _bj = 0; _bj < _item.before.length; _bj++) _addLine(_item.before[_bj]);
+        for (var _lj = 0; _lj < _item.lines.length; _lj++) _addLine(_item.lines[_lj], _vm.labelTextColors[_i], _vm.displayColors ? _vm.labelColors[_i] : null);
+        for (var _aj = 0; _aj < _item.after.length; _aj++) _addLine(_item.after[_aj]);
+      });
+      for (var _ai = 0; _ai < _vm.afterBody.length; _ai++) _addLine(_vm.afterBody[_ai]);
+
+      var _canvasRect = this._chart.canvas.getBoundingClientRect();
+      var _chart = this._chart;
+      this._hecShowTooltip(
+        _content,
+        _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
+        this._chart.canvas,
+        _vm.backgroundColor, _vm.borderColor, _vm.bodyFontColor,
+        { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth },
+        _justMoved,
+        function () {
+          // This tooltip's own early-close side effect: turn off whatever point
+          // is still highlighted as active when the tooltip itself goes away.
+          if (_chart.active && _chart.active.length) {
+            _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
+            _chart.active = [];
+          }
+        }
+      );
+    }
+  });
 })();

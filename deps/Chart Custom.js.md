@@ -5,6 +5,13 @@ This documents everything added or changed in this fork relative to
 repeat anything already covered by the official 2.7.1 docs — only what's
 different here.
 
+Where the code is: **`deps/chart-hec.js`** holds everything the fork adds (the
+gesture detector, hit-testing, zones, overlays, drag feedback, the Y axis lock, the
+floating tooltip, `Chart.hecUi`), added to `Chart.prototype` and
+`Chart.Tooltip.prototype` right after **`deps/Chart.js`** loads. `deps/Chart.js`
+keeps only small changes to stock code, and the hooks calling into the HEC layer
+(§8).
+
 ## 0. The contract between Chart.js and the card (frozen in 1.2.0)
 
 **Chart.js owns every mouse/touch interaction on its own canvas** (gesture
@@ -93,8 +100,11 @@ Stock 2.7.1 gives you `options.onClick` (native click only) and
 `options.legend.onClick` — nothing for long-press, double-click, drag, or
 pinch, and no unified way to know what happened across the whole canvas.
 This fork builds all of that from raw Pointer Events into one detector
-(`_hecGestureHandler`, an addition to `Controller`, not present in 2.7.1)
-that fires a single callback: **`options.customEvent(payload)`**.
+(`deps/chart-hec.js`: `_hecGestureHandler` hands each pointer or wheel event to
+the function of its type — `hecPointerDown`, `hecPointerMove`, `hecPointerUp`,
+`hecPointerCancel`, `hecWheel` — with the event's context; the drags themselves
+are the `HEC_DRAG_HANDLERS` table) that fires a single callback:
+**`options.customEvent(payload)`**.
 
 ### Payload shape (every gesture)
 
@@ -216,9 +226,9 @@ date range spanning multiple graphs is data the card owns, not Chart.js.
 
 ## 4. New hit-testing primitives
 
-Added to every `Controller` instance at `initialize` (not present in
-2.7.1 at all — the closest native equivalent, `getElementAtEvent`, only
-finds *data points*, never legend items or axis labels):
+Methods of every chart (`deps/chart-hec.js`; not present in 2.7.1 at all — the
+closest native equivalent, `getElementAtEvent`, only finds *data points*, never
+legend items or axis labels):
 
 | Method | Signature | Behavior |
 |---|---|---|
@@ -342,4 +352,22 @@ is passed in).
 | `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added, truncated label's full text): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`. |
 | `closeMessage(anchorEl)` | Closes the message of `anchorEl`'s document or shadow root. |
 | `outline(el, valid)` / `clearOutline(el[, immediate])` | Outlines a graph's wrapper — solid primary color when valid, dashed error color otherwise (that one fades out when cleared). |
+
+---
+
+## 8. Hooks in the stock code (`deps/Chart.js`)
+
+What remains changed in `deps/Chart.js` itself — each place marked with a comment
+pointing to `deps/chart-hec.js` or to this file:
+
+| Where | Change |
+|---|---|
+| `Controller.update` | A change of chart type releases the Y axis lock (`_hecYAxisLock`) |
+| `Controller.draw` | After drawing: `_hecUpdateYAxisState`, `_hecUpdateDragTouchOverlays`, `_hecUpdateMoveHandleIcon`, `_hecUpdateLinkMarker` (the overlays follow the layout) |
+| `Controller.handleEvent` | Hover hit-test limited to drawn points; a `mouseout` without movement (the browser's, during a scroll) doesn't close the tooltip; every event goes to `_hecGestureHandler`, with the timing constants (`cfg`) |
+| `Tooltip` | Drawn as a floating element (`_hecRenderFloatingTooltip`, §7 utilities) instead of on the canvas |
+| Platform (DOM) | Canvas `touch-action: pan-y` (§3); pointer and wheel listeners not passive (§5) |
+| Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines) |
+| Linear scale | `ticks.period` labels (§1) |
+| Header, `HEC_CHART_VERSION` | The card's version, logged once at load |
 

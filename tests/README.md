@@ -12,7 +12,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: mouse, touch or cards
+yarn test touch        # one suite: lint, store, mouse, touch or cards
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

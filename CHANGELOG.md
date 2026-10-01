@@ -41,6 +41,15 @@ Changelog for the HA History Explorer Card.
 - The other duplicated code of the card is factored too (entity selector lists, time axes, type menu entries — also shared with the info panel)
 - All documented in `deps/Chart Custom.js.md`
 
+### Changed — the code is organized by role
+- The entities (which one is shown, in which group of linked graphs, in which order) are now kept by one module, `src/history-entity-store.js`, through which every change goes — with its own tests. Dropping a curve and dropping a timeline row now share one operation
+- Everything this fork adds to Chart.js is in its own file, `deps/chart-hec.js`; the gesture detector is split into one function per event
+- The card's code is split by role: history data, datasets, gestures, menus, storage (`src/card-*.js`)
+- Described in `ARCHITECTURE.md`. New checks in `yarn test`: undeclared identifiers, the entity store, a scenario on graphs added from the UI, and the persisted order checked against the screen after each scenario
+
+### Fixed — dropping a curve on a graph below could move that graph up
+- With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
+
 ### Changed — the boundary between Chart.js and the card is fixed, documented and tested
 - Chart.js now tells where each gesture happens: the zone, the label, the position along the time axis, and for a drop, the graph and the place among its labels or rows. The card no longer reads any graph's layout or calls any internal Chart.js function. The contract is described in `deps/Chart Custom.js.md` §0
 - The time axis is moved through two calls only, with a mouse or with fingers: `panX` (a drag, and the fingers of a pinch) and `zoomX` (Ctrl+wheel, and the spread of a pinch, one zoom step at a time)

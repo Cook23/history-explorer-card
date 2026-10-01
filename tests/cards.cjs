@@ -100,5 +100,21 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A curve dropped on a graph of another group, below it: graphs stay in place ──
+    t = await openCard({ ...card([]), combineSameUnits: true }, { height: 1200 });
+    const add2 = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    await t.step('a curve dropped on the graph split off below its own: the graphs keep their order', async () => {
+        for( const id of ['sensor.power', 'sensor.power_kw', 'sensor.power2', 'sensor.rain'] ) { await add2(id); await t.wait(300); }
+        await t.wait(800);
+        await t.dblclick(await t.E('legendPt(0,2)'));
+        const g0 = await t.graphs();
+        if( g0.length !== 3 ) return 'not split: ' + g0.join(' | ');
+        const a = await t.E('legendPt(0,0)'); const c = await t.E('legendPt(1,0)');
+        await t.drag(a, { x: c.x + 30, y: c.y });
+        const g1 = await t.graphs();
+        return /^l:power_kw@/.test(g1[0]) && /power2\+power@/.test(g1[1]) ? ((await t.E('storeProblems()')) || true) : g1.join(' | ');
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
