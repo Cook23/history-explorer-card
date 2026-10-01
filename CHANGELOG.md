@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.46] - unreleased (beta)
+## [v1.1.46] - 2026-10-01
 
 ### New — angles drawn without jumps at 0/360 (`circular`)
 - A wind direction oscillating around the north (3, 2, 1, 0, 359, 358…) jumped across the whole graph at each crossing of 0/360. Angles are now drawn as a continuous curve (3, 2, 1, 0, -1, -2), placed around their circular mean; the tooltip and the Y axis labels show the real values in [0, period)
