@@ -1,4 +1,5 @@
 /*!
+ * HEC fork — synced with history-explorer-card version: 1.2.0b68
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -2918,31 +2919,21 @@
             point._datasetIndex = datasetIndex;
             point._index = index;
 
-            // Silence plateaus ('smart' line mode, see the card's _applySilencePlateaus):
-            // a data point flagged hecPlateauEnd ends a flat stretch drawn as a straight,
-            // dashed segment from the previous point; a hecVirtual point only exists to
-            // shape the curve (never drawn as a dot, never hovered).
-            var hecPlateauEnd = !!(value && value.hecPlateauEnd);
-            var hecVirtual = !!(value && value.hecVirtual);
-
             // Desired view properties
             point._model = {
               x: x,
               y: y,
               skip: custom.skip || isNaN(x) || isNaN(y),
-              hecPlateauEnd: hecPlateauEnd,
-              hecVirtual: hecVirtual,
               // Appearance
-              radius: hecVirtual ? 0 : custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
+              radius: custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, pointOptions.radius),
               pointStyle: custom.pointStyle || helpers.valueAtIndexOrDefault(dataset.pointStyle, index, pointOptions.pointStyle),
               backgroundColor: me.getPointBackgroundColor(point, index),
               borderColor: me.getPointBorderColor(point, index),
               borderWidth: me.getPointBorderWidth(point, index),
-              // (the segment ending at a plateau end is always a straight line)
-              tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
-              steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              tension: meta.dataset._model ? meta.dataset._model.tension : 0,
+              steppedLine: meta.dataset._model ? meta.dataset._model.steppedLine : false,
               // Tooltip
-              hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
+              hitRadius: custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
           },
 
@@ -2955,13 +2946,11 @@
             var sumNeg = 0;
             var i, ds, dsMeta;
 
-            // (hecNoStack: a curve drawn over the bars of a mixed bar/line graph — the
-            // graph's stacked option is about its bars, the curves never stack)
-            if (yScale.options.stacked && !me.getDataset().hecNoStack) {
+            if (yScale.options.stacked) {
               for (i = 0; i < datasetIndex; i++) {
                 ds = chart.data.datasets[i];
                 dsMeta = chart.getDatasetMeta(i);
-                if (dsMeta.type === 'line' && !ds.hecNoStack && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
+                if (dsMeta.type === 'line' && dsMeta.yAxisID === yScale.id && chart.isDatasetVisible(i)) {
                   var stackedRightValue = Number(yScale.getRightValue(ds.data[index]));
                   if (stackedRightValue < 0) {
                     sumNeg += stackedRightValue || 0;
@@ -3038,7 +3027,7 @@
             var ilen = points.length;
             var i = 0;
 
-            const clipArea = { left: area.left, right: area.right, top: area.top - (chart.options.topClipMargin ?? 0), bottom: area.bottom + (chart.options.bottomClipMargin ?? 0) };
+            const clipArea = { left: area.left, right: area.right, top: area.top - (chart.options.topClipMargin ?? 4), bottom: area.bottom + (chart.options.bottomClipMargin ?? 4) };
 
             helpers.canvas.clipArea(chart.ctx, clipArea);
 
@@ -3710,6 +3699,38 @@
       module.exports = function (Chart) {
         var plugins = Chart.plugins;
 
+        // Kept in sync with the header comment and the card's own Version — every
+        // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
+        // Thierry never has to ask which version produced a given log.
+        var HEC_CHART_VERSION = '1.2.0b68';
+        console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
+
+        // Two of the generic hit-test primitives (see the other two,
+        // _hecLegendIndexAt/_hecYAxisIndexAt/_hecFindInstanceAt/_hecFindLegendLabel,
+        // still defined per-instance at Controller.initialize since those genuinely
+        // need `me`) never touch the chart instance at all — pure geometry over
+        // whatever rects/points they're handed. Moved here to true module scope,
+        // defined once and shared by every chart instance, rather than needlessly
+        // recreated as a closure on every single graph construction.
+        //
+        // SUR: strict containment — pointer is inside the candidate's own bounds.
+        //   Used for exact click/drag hit-testing (never wants a tolerance zone).
+        function _hecIsOn(px, py, rect) {
+          return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
+        }
+        // LE PLUS PROCHE: index of the candidate whose center is closest to the
+        // pointer (X and Y combined) — no bounds check at all, just distance.
+        function _hecFindClosest(px, py, rects) {
+          var closestIdx = -1, closestDist = Infinity;
+          for (var i = 0; i < rects.length; i++) {
+            var r = rects[i];
+            var cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+            var dist = Math.abs(px - cx) + Math.abs(py - cy);
+            if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+          }
+          return closestIdx;
+        }
+
         // Create a dictionary of chart types, to allow for extension of existing types
         Chart.types = {};
 
@@ -3833,6 +3854,164 @@
 
             // Before init plugin notification
             plugins.notify(me, 'beforeInit');
+
+            // The remaining two hit-test primitives (_hecFindClosest/_hecIsOn moved
+            // to true module scope above, since they never touched `me`) genuinely
+            // need this instance's own data (its legend, its scales), so they stay
+            // per-instance closures.
+            //
+            // Legend hit-test — SUR (exact), since a legend click/drag must land on
+            // the actual label, not just near it. Cross-graph drag&drop
+            // (Controller._hecGestureHandler's dragovergraph) calls THIS on OTHER
+            // chart instances too, including ones just created and never yet
+            // touched — must exist unconditionally, same as any native Chart.js method.
+            me._hecLegendIndexAt = function (x, y) {
+              var legend = this.legend;
+              if (!legend || !legend.legendHitBoxes) return -1;
+              var lh = legend.legendHitBoxes;
+              var rects = [];
+              for (var i = 0; i < lh.length; i++) rects.push({ x: lh[i].left, y: lh[i].top, width: lh[i].width, height: lh[i].height });
+              var idx = _hecFindClosest(x, y, rects);
+              if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
+              return idx;
+            };
+
+            // Y-axis category label hit-test (timeline/arrowline row under a point) —
+            // SUR (exact), same as legend: cursor/click/drag/tooltip must land on the
+            // actual row, not just near it. Each row's candidate rectangle spans the
+            // full label column width (0 to chartArea.left) — labels don't have their
+            // own individual X bounds, the whole column belongs to whichever row is
+            // vertically closest. Same unconditional-at-construction reasoning as
+            // _hecLegendIndexAt above.
+            me._hecYAxisIndexAt = function (x, y) {
+              var yScale = this.scales && this.scales['y-axis-0'];
+              if (!yScale || !this.data || !this.data.labels || !this.chartArea) return -1;
+              var labels = this.data.labels;
+              var _colWidth = this.chartArea.left;
+              var rects = [];
+              for (var li = 0; li < labels.length; li++) {
+                var py = yScale.getPixelForValue(null, li, li);
+                var _rowH = yScale.height / labels.length;
+                rects.push({ x: 0, y: py - _rowH / 2, width: _colWidth, height: _rowH });
+              }
+              var idx = _hecFindClosest(x, y, rects);
+              if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
+              return idx;
+            };
+
+            // Cross-graph scan — finds whichever OTHER Chart instance's canvas
+            // contains this client position, or null. Factored out (per Thierry)
+            // from what used to be two separately-written scans: the move-handle's
+            // own reorder-target lookup, and the legend/timeline dragovergraph
+            // lookup. Both now share this single implementation; each keeps its own
+            // logic for what to DO with the result (draw directly vs. dispatch
+            // customEvent).
+            me._hecFindInstanceAt = function (clientX, clientY) {
+              if (!Chart.instances) return null;
+              for (var _cid in Chart.instances) {
+                var _other = Chart.instances[_cid];
+                if (_other === me || !_other.canvas) continue;
+                var _r = _other.canvas.getBoundingClientRect();
+                if (clientX >= _r.left && clientX <= _r.right && clientY >= _r.top && clientY <= _r.bottom) {
+                  return _other;
+                }
+              }
+              return null;
+            };
+
+            // Find the best legend-item insertion point near (cx, cy) — migrated
+            // verbatim from the card's own _findLegendLabel, which had reimplemented
+            // this from legendHitBoxes (already this chart's own native data) rather
+            // than anything Chart.js couldn't already provide. With target=false,
+            // just identifies which label is being grabbed (source lookup). With
+            // target=true, additionally computes the insertion marker's position
+            // (midpoint between neighboring labels, or a fixed margin at either
+            // end) and detects a would-be no-op move.
+            me._hecFindLegendLabel = function (cx, cy, excludeIdx, target) {
+              var hitBoxes = me.legend && me.legend.legendHitBoxes;
+              if (!hitBoxes || hitBoxes.length === 0) return null;
+
+              var lines = [];
+              for (var i = 0; i < hitBoxes.length; i++) {
+                if (target && i === excludeIdx) continue;
+                var b = hitBoxes[i];
+                var line = null;
+                for (var li2 = 0; li2 < lines.length; li2++) {
+                  if (Math.abs(lines[li2].top - b.top) <= 4) { line = lines[li2]; break; }
+                }
+                if (!line) { line = { top: b.top, height: b.height, items: [] }; lines.push(line); }
+                line.items.push({ b: b, i: i });
+              }
+              if (lines.length === 0) return null;
+
+              var closestLine = null, closestDistY = Infinity;
+              for (var lj = 0; lj < lines.length; lj++) {
+                var midY = lines[lj].top + lines[lj].height / 2;
+                var dist = Math.abs(cy - midY);
+                if (dist < closestDistY) { closestDistY = dist; closestLine = lines[lj]; }
+              }
+              if (!closestLine) return null;
+              if (cy < closestLine.top || cy > closestLine.top + closestLine.height) return null;
+
+              var firstItem = closestLine.items[0], lastItem = closestLine.items[0];
+              for (var ii = 1; ii < closestLine.items.length; ii++) {
+                if (closestLine.items[ii].b.left < firstItem.b.left) firstItem = closestLine.items[ii];
+                if (closestLine.items[ii].b.left + closestLine.items[ii].b.width > lastItem.b.left + lastItem.b.width) lastItem = closestLine.items[ii];
+              }
+              var lineLeft = firstItem.b.left;
+              var lineRight = lastItem.b.left + lastItem.b.width;
+              if (cx < lineLeft) {
+                var tolLeft = Math.min(firstItem.b.width / 2, 50);
+                if (lineLeft - cx > tolLeft) return null;
+              } else if (cx > lineRight) {
+                var tolRight = Math.min(lastItem.b.width / 2, 50);
+                if (cx - lineRight > tolRight) return null;
+              }
+
+              var closest = null, closestDistX = Infinity;
+              for (var ik = 0; ik < closestLine.items.length; ik++) {
+                var _b = closestLine.items[ik].b;
+                var _midX = _b.left + _b.width / 2;
+                var _d = Math.abs(cx - _midX);
+                if (_d < closestDistX) { closestDistX = _d; closest = closestLine.items[ik]; }
+              }
+              if (!closest) return null;
+
+              var insertBefore = cx < closest.b.left + closest.b.width / 2;
+
+              if (!target) {
+                return { idx: closest.i };
+              }
+
+              var MARGIN = 6;
+              var markerX;
+              if (insertBefore) {
+                var leftNeighbor = null;
+                for (var il = 0; il < closestLine.items.length; il++) {
+                  var _it = closestLine.items[il];
+                  if (_it.i !== closest.i && _it.b.left + _it.b.width <= closest.b.left) {
+                    if (!leftNeighbor || _it.b.left > leftNeighbor.b.left) leftNeighbor = _it;
+                  }
+                }
+                markerX = leftNeighbor ? (leftNeighbor.b.left + leftNeighbor.b.width + closest.b.left) / 2 : closest.b.left - MARGIN;
+              } else {
+                var rightNeighbor = null;
+                for (var ir = 0; ir < closestLine.items.length; ir++) {
+                  var _it2 = closestLine.items[ir];
+                  if (_it2.i !== closest.i && _it2.b.left >= closest.b.left + closest.b.width) {
+                    if (!rightNeighbor || _it2.b.left < rightNeighbor.b.left) rightNeighbor = _it2;
+                  }
+                }
+                markerX = rightNeighbor ? (closest.b.left + closest.b.width + rightNeighbor.b.left) / 2 : closest.b.left + closest.b.width + MARGIN;
+              }
+
+              var tgt = closest.i, src = excludeIdx, insertAt;
+              if (tgt > src) insertAt = insertBefore ? tgt - 1 : tgt;
+              else insertAt = insertBefore ? tgt : tgt + 1;
+              if (insertAt === src) return null;
+
+              return { idx: closest.i, insertBefore: insertBefore, markerX: markerX, markerY: closestLine.top, markerH: closestLine.height };
+            };
 
             helpers.retinaScale(me, me.options.devicePixelRatio);
 
@@ -4095,15 +4274,8 @@
             // longer than that duration, the tooltip closes mid-pan — correct, since nothing
             // here is a new gesture that would legitimately reset it.
             if (me.active && me.active.length && me.options.hover) {
-              // Re-resolve each active element against the reloaded data: a new time range
-              // can shrink a dataset below the active index (element gone), and the tooltip
-              // callbacks (labelColor, positioners) read meta.data[index]._view directly —
-              // a stale index there throws mid-update and leaves a half-built tooltip model.
-              var _stillValid = [];
-              me.active.forEach(function(el) {
-                if (!el || !me.data.datasets[el._datasetIndex]) return;
-                var _cur = me.getDatasetMeta(el._datasetIndex).data[el._index];
-                if (_cur && _cur._view) _stillValid.push(_cur);
+              var _stillValid = me.active.filter(function(el) {
+                return el && me.data.datasets[el._datasetIndex];
               });
               if (_stillValid.length) {
                 me.updateHoverStyle(_stillValid, me.options.hover.mode, true);
@@ -4265,6 +4437,24 @@
 
             me.clear();
 
+            // High-level default behavior: the Y-axis lock auto-resets when the
+            // graph's own type changes (e.g. line <-> bar) — entirely Chart.js's own
+            // responsibility, no card involvement. Detected by comparing config.type
+            // across draw() calls, since the card mutates the same chart instance's
+            // type in place rather than recreating it.
+            if (me._hecLastType === undefined) {
+              me._hecLastType = me.config.type;
+            } else if (me._hecLastType !== me.config.type) {
+              me._hecLastType = me.config.type;
+              if (me._hecYAxisLock && me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0]) {
+                var _tt = me.options.scales.yAxes[0].ticks;
+                _tt.min = _tt.forceMin;
+                _tt.max = _tt.forceMax;
+                _tt.removeEdgeTicks = false;
+                me._hecYAxisLock = 0;
+              }
+            }
+
             if (helpers.isNullOrUndef(easingValue)) {
               easingValue = 1;
             }
@@ -4286,9 +4476,375 @@
 
             me.drawDatasets(easingValue);
             me._drawTooltip(easingValue);
+            me._hecUpdateYAxisState();
+            me._hecUpdateDragTouchOverlays();
+            me._hecUpdateMoveHandleIcon();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
           },
+
+          // Y-axis lock state — high-level default behavior, on by default (see
+          // options.yAxisLockEnabled), fully owned by Chart.js: the lock icon itself,
+          // its click (toggle lock on/off), automatic engagement on zoom/pan/longpress/
+          // dblclick (see _hecEngageYAxisLock below), disengaging the forced min/max so
+          // the axis goes back to auto-computing from the data, AND syncing the
+          // dedicated touch overlay's touch-action from that same lock/click-armed
+          // state. Icon SVG/positioning matches the card's original
+          // createScaleLockIconHtml, drawn as a floating element over the canvas
+          // instead of card-side HTML.
+          // Toggles the Y-axis lock on/off — factored out so it can be called from
+          // the unified custClick handler on the grouped lock+handle zone below, not
+          // just from a native button click anymore.
+          _hecToggleYAxisLock: function () {
+            var me = this;
+            var _yAxis = me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0];
+            if (!_yAxis) return;
+            var _ticks = _yAxis.ticks || {};
+            if (me._hecYAxisLock) {
+              _ticks.min = _ticks.forceMin;
+              _ticks.max = _ticks.forceMax;
+              _ticks.removeEdgeTicks = false;
+              me._hecYAxisLock = 0;
+            } else {
+              me._hecYAxisLock = 1;
+            }
+            me._hecUpdateYAxisState();
+            me.update();
+          },
+
+          _hecUpdateYAxisState: function () {
+            var me = this;
+            if (me.options.yAxisLockEnabled === false || !me.canvas) return;
+            var _yAxis = me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0];
+            if (!_yAxis || me.config.type === 'timeline' || me.config.type === 'arrowline') return;
+            var _ticks = _yAxis.ticks || {};
+            var _forced = _ticks.forceMin !== undefined && _ticks.forceMax !== undefined;
+
+            // Purely visual now, pointer-events:none — the click is handled by the
+            // unified custClick handler on the grouped lock+handle zone, same
+            // relay-to-canvas pattern as everything else. No more native click.
+            var _el = me._hecLockIconEl;
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.style.cssText = 'position:absolute;z-index:10;pointer-events:none;';
+              _el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
+              me._hecLockIconEl = _el;
+            }
+            var _parent = me.canvas.parentNode;
+            if (_parent && _el.parentNode !== _parent) {
+              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+              _parent.appendChild(_el);
+            }
+            _el.style.left = '15px';
+            _el.style.top = '5px';
+            var _svg = _el.children[0];
+            var _showIcon = !(_forced && !me._hecYAxisLock);
+            if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
+            _el.style.opacity = (me._hecYAxisLock) ? '1.0' : '0.3';
+
+            // Y-axis touch overlay — exists only so touch-action applies to this small
+            // zone instead of the whole canvas (a change to touch-action after a
+            // gesture has already started has no effect, so it can't be toggled
+            // dynamically on the canvas itself — it must be a separate element,
+            // static in position, always present). touch-action follows the lock
+            // state alone: none while engaged, removed once disengaged — nothing
+            // else. Forwards every event it receives straight to the canvas so
+            // Chart.js's own gesture handling still does 100% of the actual work.
+            if (me.chartArea) {
+              var _yo = me._hecYAxisTouchEl;
+              if (!_yo) {
+                _yo = document.createElement('div');
+                _yo.style.cssText = 'position:absolute;z-index:0;cursor:ns-resize;';
+                var _forward = function (ev) {
+                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
+                };
+                _yo.addEventListener('pointerdown', _forward);
+                _yo.addEventListener('pointermove', _forward);
+                _yo.addEventListener('pointerup', _forward);
+                _yo.addEventListener('pointercancel', _forward);
+                me._hecYAxisTouchEl = _yo;
+              }
+              if (_parent && _yo.parentNode !== _parent) _parent.appendChild(_yo);
+              _yo.style.left = me.canvas.offsetLeft + 'px';
+              _yo.style.top = (me.canvas.offsetTop + me.chartArea.top) + 'px';
+              _yo.style.width = me.chartArea.left + 'px';
+              _yo.style.height = (me.chartArea.bottom - me.chartArea.top) + 'px';
+              _yo.style.touchAction = (me._hecYAxisLock || me._hecYAxisClickArmed) ? 'none' : '';
+            }
+          },
+
+          // Graph reorder handle symbol (⠿) — purely visual, pointer-events:none.
+          // The actual gesture (drag to reorder) is handled by the separate
+          // _hecMoveHandleTouchEl overlay in _hecUpdateDragTouchOverlays below, same
+          // relay-to-canvas pattern as everything else. Matches the card's original
+          // #mo-N appearance exactly (⠿ character, opacity 0.5, secondary text color).
+          _hecUpdateMoveHandleIcon: function () {
+            var me = this;
+            if (!me.canvas) return;
+            var _el = me._hecMoveHandleIconEl;
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.style.cssText = 'position:absolute;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
+              _el.textContent = '\u283F';
+              me._hecMoveHandleIconEl = _el;
+            }
+            var _parent = me.canvas.parentNode;
+            if (_parent) {
+              if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+              if (_el.parentNode !== _parent) _parent.appendChild(_el);
+            }
+            _el.style.left = me.canvas.offsetLeft + 'px';
+            _el.style.top = me.canvas.offsetTop + 'px';
+            _el.style.display = me.options.moveHandleVisible === false ? 'none' : 'flex';
+          },
+
+          // Drag ghost — a small floating label that follows the pointer during a
+          // legend/label/handle drag, showing what's being moved. Migrated from the
+          // card's own _createGhost/_moveGhost/_destroyGhost: every value it needs
+          // (text, size, color) was already being read from this same chart's own
+          // native data by the card before calling those — Chart.js has all of it
+          // natively, no reason for the card to fetch and hand it back over.
+          // position:fixed on document.body (not the canvas's own parent) since the
+          // ghost must follow the pointer anywhere on screen, not stay confined to
+          // the chart's own bounds. Gated by options.dragGhostEnabled, on by default.
+          _hecShowDragGhost: function (text, width, height, clientX, clientY, anchor, color) {
+            if (this.options.dragGhostEnabled === false) return;
+            this._hecDestroyDragGhost();
+            var _el = document.createElement('div');
+            _el.id = '_hec_ghost';
+            var _transform = anchor === 'topleft' ? 'translate(-9px,-18px)' : 'translate(-50%,-50%)';
+            var _borderColor = color || 'var(--primary-color,#03a9f4)';
+            _el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;opacity:0.65;' +
+              'background:var(--card-background-color,#fff);border:2px solid ' + _borderColor + ';' +
+              'border-radius:4px;padding:2px 8px;font-size:12px;white-space:nowrap;' +
+              'box-shadow:0 2px 8px rgba(0,0,0,0.25);transform:' + _transform + ';' +
+              'width:' + width + 'px;height:' + height + 'px;display:flex;align-items:center;justify-content:center;' +
+              'overflow:hidden;text-overflow:ellipsis;';
+            _el.textContent = text || '';
+            document.body.appendChild(_el);
+            this._hecDragGhostEl = _el;
+            this._hecMoveDragGhost(clientX, clientY);
+          },
+
+          _hecMoveDragGhost: function (clientX, clientY) {
+            var _el = this._hecDragGhostEl;
+            if (_el) { _el.style.left = clientX + 'px'; _el.style.top = clientY + 'px'; }
+          },
+
+          _hecDestroyDragGhost: function () {
+            if (this._hecDragGhostEl) { this._hecDragGhostEl.remove(); this._hecDragGhostEl = null; }
+          },
+
+          // Insertion marker — the small arrow-tipped line shown at a potential drop
+          // position during a legend/label/handle drag. Migrated verbatim from the
+          // card's own _showInsertionMarker/_hideInsertionMarker, same visual
+          // appearance. Kept as a single global element (not per-chart) via
+          // Chart.prototype, matching the original's document.getElementById
+          // singleton — only one drag can be in progress across all charts at once.
+          _hecShowInsertionMarker: function (x, y, width, height, horizontal, color) {
+            if (this.options.dragGhostEnabled === false) return;
+            var _el = document.getElementById('_hec_insert');
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.id = '_hec_insert';
+              document.body.appendChild(_el);
+            }
+            var _c = color || 'var(--primary-color,#03a9f4)';
+            if (horizontal) {
+              _el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;' +
+                'left:' + x + 'px;top:' + (y - 1) + 'px;width:' + width + 'px;height:3px;' +
+                'background:' + _c + ';border-radius:2px;';
+              _el.innerHTML = '<div style="position:absolute;left:-8px;top:-4px;width:0;height:0;' +
+                'border-top:5px solid transparent;border-bottom:5px solid transparent;' +
+                'border-left:8px solid ' + _c + ';"></div>';
+            } else {
+              var _h15 = Math.round(height * 1.5);
+              var _yOff = Math.round((height - _h15) / 2);
+              _el.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;' +
+                'left:' + (x - 6) + 'px;top:' + (y + _yOff) + 'px;width:3px;height:' + _h15 + 'px;' +
+                'background:' + _c + ';border-radius:2px;';
+              _el.innerHTML = '<div style="position:absolute;top:-2px;left:-4px;width:0;height:0;' +
+                'border-left:5px solid transparent;border-right:5px solid transparent;' +
+                'border-top:5px solid ' + _c + ';"></div>';
+            }
+          },
+
+          _hecHideInsertionMarker: function () {
+            var _el = document.getElementById('_hec_insert');
+            if (_el) _el.remove();
+          },
+
+          // Drop-target highlight — an outline drawn around a graph's own canvas
+          // wrapper while a compatible/incompatible drag hovers over it. Migrated
+          // verbatim from the card's own _highlightDropTarget/_clearDropHighlight,
+          // applied to THIS chart's own canvas.parentNode.
+          _hecHighlightDropTarget: function (valid) {
+            this._hecClearDropHighlight();
+            var _wrapper = this.canvas && this.canvas.parentNode;
+            if (!_wrapper) return;
+            _wrapper._hecPrevOutline = _wrapper.style.outline;
+            _wrapper._hecPrevOutlineOffset = _wrapper.style.outlineOffset;
+            _wrapper._hecPrevTransition = _wrapper.style.transition;
+            var _color = valid ? 'var(--primary-color,#03a9f4)' : 'var(--error-color,#f44336)';
+            _wrapper.style.transition = '';
+            _wrapper.style.outline = '2px ' + (valid ? 'solid' : 'dashed') + ' ' + _color;
+            _wrapper.style.outlineOffset = '-2px';
+            if (!valid) {
+              (function (_w) {
+                requestAnimationFrame(function () { _w.style.transition = 'outline-color 1.5s ease'; });
+              })(_wrapper);
+            }
+            this._hecHighlightEl = _wrapper;
+          },
+
+          _hecClearDropHighlight: function () {
+            var _el = this._hecHighlightEl;
+            if (!_el) return;
+            this._hecHighlightEl = null;
+            if (_el.style.transition && _el.style.transition.indexOf('outline-color') >= 0) {
+              _el.style.outlineColor = 'transparent';
+              (function (_e) {
+                setTimeout(function () {
+                  _e.style.outline = _e._hecPrevOutline || '';
+                  _e.style.outlineOffset = _e._hecPrevOutlineOffset || '';
+                  _e.style.transition = _e._hecPrevTransition || '';
+                }, 1500);
+              })(_el);
+            } else {
+              _el.style.outline = _el._hecPrevOutline || '';
+              _el.style.outlineOffset = _el._hecPrevOutlineOffset || '';
+              _el.style.transition = _el._hecPrevTransition || '';
+            }
+          },
+
+          // Zoom-rectangle selection overlay — pure geometry, no knowledge of
+          // startTime/endTime needed (that conversion stays the card's own
+          // responsibility, since the resulting time range is shared across every
+          // graph, not just this one). Migrated verbatim from the card's own
+          // overlay creation/fill logic.
+          _hecShowZoomSelection: function (x0, x1) {
+            if (!this.canvas || !this.chartArea) return;
+            var _el = this._hecZoomSelectionEl;
+            if (!_el) {
+              _el = document.createElement('canvas');
+              _el.style.cssText = 'position:absolute;pointer-events:none;';
+              this.canvas.parentNode.insertBefore(_el, this.canvas);
+              this._hecZoomSelectionEl = _el;
+            }
+            _el.width = this.canvas.width;
+            _el.height = this.canvas.height;
+            var _ctx = _el.getContext('2d');
+            _ctx.clearRect(0, 0, _el.width, _el.height);
+            var _left = Math.min(x0, x1), _right = Math.max(x0, x1);
+            var _cs = getComputedStyle(this.canvas.parentNode || this.canvas);
+            var _themeColor = _cs.getPropertyValue('--secondary-text-color').trim() || '#888';
+            _ctx.globalAlpha = 0.13;
+            _ctx.fillStyle = _themeColor;
+            _ctx.fillRect(_left, this.chartArea.top, _right - _left, this.chartArea.bottom - this.chartArea.top);
+          },
+
+          _hecHideZoomSelection: function () {
+            if (this._hecZoomSelectionEl) { this._hecZoomSelectionEl.remove(); this._hecZoomSelectionEl = null; }
+          },
+
+          // Dynamic touch-blocking overlays for the legend (line/bar) and label
+          // column (timeline/arrowline) — migrating the original #lg-N/#tl-N zones.
+          // Mouse/pen: touch-action is irrelevant to them, drag always works via
+          // normal >10px movement detection, same as everywhere else.
+          // Touch: touch-action:none is only applied while me._hecLabelDragAllowed
+          // is true — set on dblclick on either zone (single flag shared by legend
+          // and timeline on the same graph, since a graph never has both at once),
+          // cleared on mouseup. The 500ms-armed window used for the Y-axis zone
+          // isn't needed here: touch-action:none set at the FIRST click of the
+          // double-click already covers the whole gap up to the second click — once
+          // that second mousedown fires (drag can now start), the block is already
+          // in effect and stays in effect regardless of whether its own timer would
+          // have expired, since the gesture is already underway by then. Same
+          // relay-to-canvas pattern as before — Chart.js still does 100% of the
+          // actual gesture work.
+          _hecUpdateDragTouchOverlays: function () {
+            var me = this;
+            if (!me.canvas || !me.chartArea) return;
+
+            function ensureOverlay(key) {
+              var _el = me[key];
+              if (!_el) {
+                _el = document.createElement('div');
+                _el.style.cssText = 'position:absolute;z-index:0;cursor:move;';
+                var _forward = function (ev) {
+                  me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
+                };
+                _el.addEventListener('pointerdown', _forward);
+                _el.addEventListener('pointermove', _forward);
+                _el.addEventListener('pointerup', _forward);
+                _el.addEventListener('pointercancel', _forward);
+                me[key] = _el;
+              }
+              var _parent = me.canvas.parentNode;
+              if (_parent) {
+                if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+                if (_el.parentNode !== _parent) _parent.appendChild(_el);
+              }
+              _el.style.touchAction = (me._hecLabelDragAllowed || me._hecLabelClickArmed) ? 'none' : '';
+              return _el;
+            }
+
+            if (me.config.type === 'line' || me.config.type === 'bar') {
+              if (me.legend && me.legend.legendHitBoxes && me.legend.legendHitBoxes.length) {
+                // Tight bounding box of the actual legend items (legendHitBoxes),
+                // not legend.left/right — those describe the full layout box
+                // reserved for the legend, which spans the entire chart width for
+                // a horizontal/fullWidth legend regardless of how much of it the
+                // labels actually occupy.
+                var _hb = me.legend.legendHitBoxes;
+                var _lgLeft = Infinity, _lgRight = -Infinity, _lgTop = Infinity, _lgBottom = -Infinity;
+                for (var _hi = 0; _hi < _hb.length; _hi++) {
+                  var _b = _hb[_hi];
+                  if (_b.left < _lgLeft) _lgLeft = _b.left;
+                  if (_b.left + _b.width > _lgRight) _lgRight = _b.left + _b.width;
+                  if (_b.top < _lgTop) _lgTop = _b.top;
+                  if (_b.top + _b.height > _lgBottom) _lgBottom = _b.top + _b.height;
+                }
+                var _lgMargin = 4;
+                var _lg = ensureOverlay('_hecLegendTouchEl');
+                _lg.style.left = (me.canvas.offsetLeft + _lgLeft - _lgMargin) + 'px';
+                _lg.style.top = (me.canvas.offsetTop + _lgTop - _lgMargin) + 'px';
+                _lg.style.width = (_lgRight - _lgLeft + _lgMargin * 2) + 'px';
+                _lg.style.height = (_lgBottom - _lgTop + _lgMargin * 2) + 'px';
+              }
+            } else if (me.config.type === 'timeline' || me.config.type === 'arrowline') {
+              var _tl = ensureOverlay('_hecLabelTouchEl');
+              _tl.style.left = me.canvas.offsetLeft + 'px';
+              _tl.style.top = me.canvas.offsetTop + 'px';
+              _tl.style.width = me.chartArea.left + 'px';
+              _tl.style.height = me.canvas.offsetHeight + 'px';
+            }
+
+            // Grouped lock+handle touch zone — top-left 0-33px × 0-28px, covering
+            // BOTH the move handle (0-15px) AND the lock icon (15-33px) as ONE
+            // single zone that receives every click/drag and lets the gesture
+            // detector's own consumers (lock toggle, graph reorder) sort out what
+            // to do with it — per Thierry's explicit correction: this was
+            // previously only 15px wide, so a touch contact starting directly over
+            // the lock icon never got touch-action:none applied (the click/toggle
+            // still worked, since the canvas has its own native listeners
+            // independent of this overlay — but the touch-scroll-blocking workaround
+            // silently didn't cover that half of the zone). Neutralized (0×0) when
+            // moveHandleVisible is false (only one graph total, per the card) so it
+            // can't intercept a contact for a handle the user can't even see —
+            // the lock icon itself stays visible/clickable in that case via the
+            // canvas's own native handling, just without this overlay's touch
+            // workaround (acceptable: with only one graph, there's no handle drag
+            // to protect from scroll interference in this zone, only the lock
+            // toggle, which doesn't need touch-action changes at all).
+            var _moVisible = me.options.moveHandleVisible !== false;
+            var _mo = ensureOverlay('_hecMoveHandleTouchEl');
+            _mo.style.left = me.canvas.offsetLeft + 'px';
+            _mo.style.top = me.canvas.offsetTop + 'px';
+            _mo.style.width = _moVisible ? '33px' : '0px';
+            _mo.style.height = _moVisible ? '28px' : '0px';
+          },
+
 
           /**
               * @private
@@ -4317,14 +4873,10 @@
               return;
             }
 
-            // Draw datasets reversed to support proper line stacking. The curves of a mixed
-            // bar/line graph (hecNoStack) are drawn in a second pass, over the bars.
-            var datasets = me.data.datasets || [];
-            for (var pass = 0; pass < 2; ++pass) {
-              for (var i = datasets.length - 1; i >= 0; --i) {
-                if (!!datasets[i].hecNoStack === (pass === 1) && me.isDatasetVisible(i)) {
-                  me.drawDataset(i, easingValue);
-                }
+            // Draw datasets reversed to support proper line stacking
+            for (var i = (me.data.datasets || []).length - 1; i >= 0; --i) {
+              if (me.isDatasetVisible(i)) {
+                me.drawDataset(i, easingValue);
               }
             }
 
@@ -4562,7 +5114,10 @@
           eventHandler: function (e) {
             var me = this;
 
+            console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler ENTRY e.type=', e.type, 'chart.id=', me.id);
+
             if (plugins.notify(me, 'beforeEvent', [e]) === false) {
+              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' eventHandler SWALLOWED by beforeEvent plugin hook, e.type=', e.type);
               return;
             }
 
@@ -4621,6 +5176,16 @@
             //     active element — only searches when hoverOptions.hoverEnabled is true.
             // A move under that threshold, or any move at all when hover is disabled,
             // changes nothing: active stays exactly what it was.
+            function _hecOnlyDrawnPoints(_elements) {
+              if (!_elements.length || !me.chartArea) return _elements;
+              return _elements.filter(function (_el) {
+                var _v = _el._view;
+                if (!_v || _v.skip) return false;
+                return _v.x >= me.chartArea.left && _v.x <= me.chartArea.right &&
+                       _v.y >= me.chartArea.top && _v.y <= me.chartArea.bottom;
+              });
+            }
+
             if (e.type === 'mouseout') {
               // A genuine mouseout (the pointer actually left the canvas) is always
               // preceded by a mousemove — that's what carried it across the boundary. The
@@ -4636,6 +5201,9 @@
               if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
+                // A genuine mouseout leaves the canvas entirely — close both
+                // independent tooltip elements (hover and other), not just one.
+                if (me.tooltip) { me.tooltip._hecCloseTooltip('hover'); me.tooltip._hecCloseTooltip('other'); }
               }
               me._hecHasMoved = false;
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
@@ -4643,7 +5211,7 @@
             } else if (e.type === 'mouseup') {
               me._hecHasMoved = false;
             } else if (e.type === 'mousedown') {
-              me.active = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+              me.active = _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
               if (e.x !== null && e.y !== null) {
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
@@ -4667,7 +5235,7 @@
                 // tooltip. A move past the threshold that lands on empty space must leave
                 // active exactly as it was; only overwrite it when the search actually
                 // found something to jump to (point 3).
-                var _found = me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions);
+                var _found = _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
                 if (_found.length) {
                   me.active = _found;
                 }
@@ -4682,12 +5250,11 @@
             // Need to call with native event here to not break backwards compatibility
             helpers.callback(options.onHover || options.hover.onHover, [e.native, me.active], me);
 
-            if (e.type === 'mousedown') {
-              if (options.onClick) {
-                // Use e.native here for backwards compatibility
-                options.onClick.call(me, e.native, me.active);
-              }
-            }
+            // options.onClick used to fire here, directly on mousedown, independently
+            // from any other click detection. It's now invoked from fire('click') in
+            // _hecGestureHandler below — the single detector this and legend.onClick
+            // and customEvent all share, on an actual resolved click (mouseup without
+            // drag), not on the initial press.
 
             // Remove styling for last active (even if it may still be active)
             if (me.lastActive.length) {
@@ -4719,7 +5286,790 @@
               tooltip.pivot();
             }
 
+            // ── Generic gesture detection (customEvent hook + panX/panY/zoomX/zoomY) ─
+            // Timing/threshold constants and overall structure (arm long-press on
+            // pointerdown, cancel it on >10px movement, compare consecutive pointerups
+            // for double-click, pinch center/spread tracking, wheel debounce) are carried
+            // over unchanged from history-explorer-card.js's legendDragStart/Move/End,
+            // timelineDragStart/Move/End, the main-canvas pointerDown/Move/Up/Cancel pinch
+            // block, and wheelScrolled — those values were arrived at empirically there.
+            // Generic here means: this knows nothing about legends, timelines, panning
+            // time, or any card-specific concept — it only reports "this element, this
+            // gesture, this many fingers, these raw deltas" through options.customEvent /
+            // panX / panY / zoomX / zoomY, and stays completely inert (zero-cost,
+            // zero-effect) when none of those callbacks is set.
+            //
+            // Note: e.type here is Chart.js's OWN translated type (mousedown/mousemove/
+            // mouseup — see EVENT_TYPES above), same as the hover/tooltip code just above
+            // uses — except 'pointercancel' and 'wheel', which EVENT_TYPES does not
+            // translate and so arrive under their native names.
+            var _HEC_LONGPRESS_MS = 600;
+            var _HEC_DBLCLICK_MS = 400;
+            var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
+            var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
+            var _HEC_WHEEL_DEBOUNCE_MS = 150;
+
+            // Drag/gesture handlers — per Thierry's explicit instruction, ALL
+            // 2-finger and 1-finger drag gestures are handled uniformly through
+            // this single table, replacing what used to be a scattered if/else-if
+            // chain spread across mousedown, dragstart, and dragmove (plus pinch
+            // as an entirely separate branch). Order is significant — this array
+            // IS the priority order when more than one handler's test would pass.
+            // Most handlers' test(p) runs once at dragstart (p = the pending
+            // gesture object, x0/y0 already set) and returns truthy to claim the
+            // drag; onMove(p, e) runs on every subsequent dragmove for whichever
+            // handler won. The one exception is 'pinch' (see its own comment
+            // below) — its test is re-evaluated on every mousemove instead, since
+            // a 2-finger gesture has no single dragstart threshold moment. No
+            // handler knows about any other.
+            var HEC_DRAG_HANDLERS = [
+              {
+                // Pinch (2 fingers) — structurally different trigger from every
+                // other handler below (gs.count===2, re-tested on every
+                // mousemove, not a single x0/y0 origin tested once past a 10px
+                // threshold), since a pinch has no single starting point the way
+                // a 1-finger drag does. Still folded into this same table (per
+                // Thierry) rather than left as a separately-scattered branch —
+                // same test/onMove shape, just evaluated differently. Always
+                // first: mousedown already nulls gs.pending the instant a second
+                // finger arrives, so this always wins outright once active.
+                name: 'pinch',
+                test: function (p) { return !!gs.pinch; },
+                onMove: function (p, e) {
+                  var pinch = gs.pinch;
+                  var prevCenterX = (pinch.p1.x + pinch.p2.x) / 2;
+                  var prevCenterY = (pinch.p1.y + pinch.p2.y) / 2;
+                  if (pid == pinch.p1id) pinch.p1 = { x: e.x, y: e.y };
+                  else pinch.p2 = { x: e.x, y: e.y };
+                  var newDistX = Math.abs(pinch.p2.x - pinch.p1.x);
+                  var newDistY = Math.abs(pinch.p2.y - pinch.p1.y);
+                  var newCenterX = (pinch.p1.x + pinch.p2.x) / 2;
+                  var newCenterY = (pinch.p1.y + pinch.p2.y) / 2;
+                  var panDX = newCenterX - prevCenterX;
+                  var panDY = newCenterY - prevCenterY;
+                  var _zoomXActive = pinch.distX > cfg.pinchMinDist && newDistX > cfg.pinchMinDist;
+                  var _zoomScaleX = _zoomXActive ? pinch.distX / newDistX : undefined;
+                  if (panDX !== 0 || panDY !== 0 || _zoomXActive) {
+                    // All three (pan center-move X/Y, zoom X spread-change) happen
+                    // at the same instant — one mousemove with 2 fingers — so this
+                    // is a single fused event, not three.
+                    fire('pinch', undefined, undefined, {
+                      panDeltaX: panDX, panDeltaY: panDY,
+                      zoomScaleX: _zoomScaleX, centerPixelsX: newCenterX, centerPixelsY: newCenterY });
+                  }
+                  if (me.options.panEnabled !== false) {
+                    if (panDX !== 0 && typeof me.options.panX === 'function') {
+                      me.options.panX.call(me, { chart: me, deltaPixels: panDX, event: e.native });
+                    }
+                    if (panDY !== 0 && typeof me.options.panY === 'function') {
+                      me.options.panY.call(me, { chart: me, deltaPixels: panDY, event: e.native });
+                    }
+                  }
+                  if (_zoomXActive && me.options.zoomEnabled !== false && typeof me.options.zoomX === 'function') {
+                    me.options.zoomX.call(me, { chart: me, scale: _zoomScaleX, centerPixels: newCenterX, event: e.native });
+                  }
+                  if (me.options.zoomEnabled !== false) {
+                    if (me.options.zoomYEnabled !== false && pinch.y0 !== undefined && pinch.distY > cfg.pinchMinDist && newDistY > cfg.pinchMinDist) {
+                      var _pScale = pinch.distY / newDistY;
+                      var _pMid = (pinch.y0 + pinch.y1) / 2;
+                      var _pHalf = (pinch.y1 - pinch.y0) / 2 * _pScale;
+                      pinch.y0 = _pMid - _pHalf;
+                      pinch.y1 = _pMid + _pHalf;
+                      me.options.scales.yAxes[0].ticks.min = pinch.y0;
+                      me.options.scales.yAxes[0].ticks.max = pinch.y1;
+                      me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                      if (!me._hecYAxisLock) me._hecYAxisLock = 2;
+                      me.update();
+                    }
+                  }
+                  pinch.distX = newDistX;
+                  pinch.distY = newDistY;
+                }
+              },
+              {
+                name: 'yAxisPan',
+                test: function (p) {
+                  if (me.options.yAxisPanEnabled === false || me.config.type === 'timeline' || me.config.type === 'arrowline' || !me.chartArea) return false;
+                  var _inZone = p.x0 >= 0 && p.x0 <= me.chartArea.left && p.y0 >= me.chartArea.top && p.y0 <= me.chartArea.bottom;
+                  var _shiftKey = p.native ? p.native.shiftKey : false;
+                  if (!_shiftKey && !_inZone) return false;
+                  // On touch, entering the Y-axis zone alone isn't enough — the
+                  // long-press must have already fired (unless the lock is already
+                  // engaged), so a normal page scroll starting in that zone isn't
+                  // mistaken for an axis drag. Mouse/pen activate immediately.
+                  if (_inZone && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
+                  var _yScale = me.scales && me.scales['y-axis-0'];
+                  if (!_yScale) return false;
+                  p.dragScaleY0 = _yScale.min;
+                  p.dragScaleY1 = _yScale.max;
+                  p.dragShiftKey = _shiftKey;
+                  return true;
+                },
+                onMove: function (p, e) {
+                  var _yDelta = (e.y - p.y0) * (p.dragScaleY1 - p.dragScaleY0) / (me.chartArea.bottom - me.chartArea.top);
+                  me.options.scales.yAxes[0].ticks.min = p.dragScaleY0 + _yDelta;
+                  me.options.scales.yAxes[0].ticks.max = p.dragScaleY1 + _yDelta;
+                  me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
+                  if (!me._hecYAxisLock) me._hecYAxisLock = 2;
+                  me.update();
+                }
+              },
+              {
+                name: 'legendDrag',
+                test: function (p) {
+                  var _idx = legendIndexAt(p.x0, p.y0);
+                  if (_idx < 0) return false;
+                  p.dragLegendIdx = _idx;
+                  var _box = me.legend && me.legend.legendHitBoxes && me.legend.legendHitBoxes[_idx];
+                  var _color = me.data.datasets[_idx] && me.data.datasets[_idx].borderColor || null;
+                  var _text = me.legend && me.legend.legendItems && me.legend.legendItems[_idx] && me.legend.legendItems[_idx].text || '';
+                  p.dragColor = _color;
+                  me._hecShowDragGhost(_text, _box && _box.width, _box && _box.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'center', _color);
+                  return true;
+                },
+                onMove: function (p, e) {
+                  _hecDragMoveTick(p, e);
+                  var _found = me._hecFindLegendLabel(e.x, e.y, p.dragLegendIdx, true);
+                  if (_found && me.canvas) {
+                    var _mr = me.canvas.getBoundingClientRect();
+                    me._hecShowInsertionMarker(_mr.left + _found.markerX + 2, _mr.top + _found.markerY, 3, _found.markerH, false, p.dragColor);
+                  } else {
+                    me._hecHideInsertionMarker();
+                  }
+                  _hecCrossGraphDragFeedback(p, e);
+                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
+                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
+                  }
+                }
+              },
+              {
+                name: 'timelineDrag',
+                test: function (p) {
+                  if (me.config.type !== 'timeline' && me.config.type !== 'arrowline') return false;
+                  var _idx = yAxisIndexAt(p.x0, p.y0);
+                  if (_idx < 0) return false;
+                  p.dragYIdx = _idx;
+                  var _lbl = me.data.labels[_idx];
+                  var _labelStr = Array.isArray(_lbl) ? _lbl.join(' ') : _lbl;
+                  var _labelW = me.chartArea ? me.chartArea.left : 100;
+                  me._hecShowDragGhost(_labelStr, _labelW, 20, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'center', null);
+                  return true;
+                },
+                onMove: function (p, e) {
+                  _hecDragMoveTick(p, e);
+                  var _yScale = me.scales['y-axis-0'];
+                  var _mr2 = me.canvas.getBoundingClientRect();
+                  var _markerShown = false;
+                  for (var _ei = 0; _ei < me.data.labels.length; _ei++) {
+                    if (_ei === p.dragYIdx) continue;
+                    var _py = _yScale.getPixelForValue(null, _ei, _ei);
+                    var _halfH = (_yScale.height / me.data.labels.length) / 2;
+                    if (Math.abs(e.y - _py) < _halfH) {
+                      var _insertBeforeTL = e.y < _py;
+                      var _my = _mr2.top + _py + (_insertBeforeTL ? -_halfH : _halfH);
+                      me._hecShowInsertionMarker(_mr2.left, _my, _mr2.width, 3, true);
+                      _markerShown = true;
+                      break;
+                    }
+                  }
+                  if (!_markerShown) me._hecHideInsertionMarker();
+                  _hecCrossGraphDragFeedback(p, e);
+                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
+                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
+                  }
+                }
+              },
+              {
+                name: 'zoomSelect',
+                test: function (p) {
+                  return me.options.zoomSelectMode === true && me.chartArea &&
+                    p.x0 > me.chartArea.left && p.x0 < me.chartArea.right;
+                },
+                onMove: function (p, e) {
+                  if (!me.chartArea) return;
+                  var _zX1 = Math.max(Math.min(e.x, me.chartArea.right), me.chartArea.left);
+                  p.dragZoomSelectX1 = _zX1;
+                  me._hecShowZoomSelection(p.x0, _zX1);
+                }
+              },
+              {
+                name: 'lockAndHandle',
+                test: function (p) {
+                  var _inZone = p.x0 >= 0 && p.x0 <= 33 && p.y0 >= 0 && p.y0 <= 28;
+                  if (!_inZone) return false;
+                  var _gRect = me.canvas.getBoundingClientRect();
+                  me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
+                  return true;
+                },
+                onMove: function (p, e) {
+                  _hecDragMoveTick(p, e);
+                  if (e.native && e.native.clientX !== undefined) {
+                    var _hOther = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
+                    if (_hOther) {
+                      var _hr = _hOther.canvas.getBoundingClientRect();
+                      var _hInsertBefore = e.native.clientY < _hr.top + _hr.height / 2;
+                      var _hy = _hInsertBefore ? _hr.top : _hr.bottom;
+                      var _hColor = _hOther.options.insertionForbidden ? 'var(--error-color,#f44336)' : undefined;
+                      me._hecShowInsertionMarker(_hr.left, _hy, _hr.width, 3, true, _hColor);
+                    } else {
+                      me._hecHideInsertionMarker();
+                    }
+                  }
+                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
+                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
+                  }
+                }
+              },
+              {
+                // Default fallback — always matches. Plain horizontal (time) pan,
+                // once nothing else above claimed the drag.
+                name: 'panX',
+                test: function (p) { return true; },
+                onMove: function (p, e) {
+                  _hecDragMoveTick(p, e, true);
+                  if (me.options.panEnabled !== false && typeof me.options.panX === 'function') {
+                    me.options.panX.call(me, { chart: me, deltaPixels: e.x - p.lastX, event: e.native });
+                  }
+                }
+              }
+            ];
+
+            // Common start-of-dragmove work, duplicated identically across most
+            // zones above before this factoring: fire the standard dragmove event,
+            // then follow with the drag ghost if one is showing. panX (the only
+            // zone with no ghost) passes noGhost=true to skip the second half.
+            function _hecDragMoveTick(p, e, noGhost) {
+              fire('dragmove', e.x, e.y, { x: e.x, y: e.y, panDeltaX: e.x - p.lastX });
+              if (!noGhost && me._hecDragGhostEl && e.native) {
+                me._hecMoveDragGhost(e.native.clientX, e.native.clientY);
+              }
+            }
+
+            // Cross-graph drag feedback — scans for whichever OTHER chart's canvas
+            // the pointer is over (the destination canvas gets no native events
+            // while this one holds the pointer capture, so this graph is the only
+            // one that knows a drag is active), then asks that instance to fire its
+            // own customEvent and draws ITS marker/highlight right here too — not
+            // just a scan, despite the earlier name. Used by legendDrag and
+            // timelineDrag only; lockAndHandle does its own separate cross-graph
+            // work above (whole-rectangle geometry, not legendIndex/yAxisIndex).
+            function _hecCrossGraphDragFeedback(p, e) {
+              if (!e.native || e.native.clientX === undefined) return;
+              var _other = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
+              var _dragOverFound = (_other && typeof _other.options.customEvent === 'function') ? _other : null;
+              if (_dragOverFound) {
+                var _r = _other.canvas.getBoundingClientRect();
+                var _ox = e.native.clientX - _r.left;
+                var _oy = e.native.clientY - _r.top;
+                _other.options.customEvent.call(_other, {
+                  chart: _other,
+                  element: null,
+                  legendIndex: _other._hecLegendIndexAt(_ox, _oy),
+                  yAxisIndex: _other._hecYAxisIndexAt(_ox, _oy),
+                  x: _ox,
+                  y: _oy,
+                  gestureType: 'dragovergraph',
+                  pointerCount: gs.count,
+                  button: e.native ? e.native.button : undefined,
+                  event: e.native });
+                if (p.dragLegendIdx >= 0 || p.dragYIdx >= 0) {
+                  _other._hecHighlightDropTarget(_other.options.dropAllowed !== false);
+                }
+                if (_other.options.dropAllowed !== false && p.dragLegendIdx >= 0 && _other.legend && _oy >= _other.legend.top && _oy <= _other.legend.bottom) {
+                  var _oFound = _other._hecFindLegendLabel(_ox, _oy, -2, true);
+                  if (_oFound) {
+                    var _oMr = _other.canvas.getBoundingClientRect();
+                    _other._hecShowInsertionMarker(_oMr.left + _oFound.markerX + 2, _oMr.top + _oFound.markerY, 3, _oFound.markerH, false, p.dragColor);
+                  } else {
+                    _other._hecHideInsertionMarker();
+                  }
+                } else if (_other.options.dropAllowed !== false && p.dragYIdx >= 0 && (_other.config.type === 'timeline' || _other.config.type === 'arrowline') &&
+                           _oy >= 0 && _other.chartArea && _ox < _other.chartArea.left) {
+                  var _oYIdx = _other._hecYAxisIndexAt(_ox, _oy);
+                  if (_oYIdx >= 0) {
+                    var _oYScale = _other.scales['y-axis-0'];
+                    var _oMr2 = _other.canvas.getBoundingClientRect();
+                    var _oPy = _oYScale.getPixelForValue(null, _oYIdx, _oYIdx);
+                    var _oHalfH = (_oYScale.height / _other.data.labels.length) / 2;
+                    var _oInsertBefore = _oy < _oPy;
+                    var _oMy = _oMr2.top + _oPy + (_oInsertBefore ? -_oHalfH : _oHalfH);
+                    _other._hecShowInsertionMarker(_oMr2.left, _oMy, _oMr2.width, 3, true);
+                  } else {
+                    _other._hecHideInsertionMarker();
+                  }
+                }
+              }
+              if (p.dragOverTarget && p.dragOverTarget !== _dragOverFound) {
+                p.dragOverTarget._hecClearDropHighlight();
+                p.dragOverTarget._hecHideInsertionMarker();
+              }
+              p.dragOverTarget = _dragOverFound;
+            }
+
+            // Always run: click detection here is no longer an add-on for customEvent/
+            // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
+            // options.onClick now have (see fire() above), so this must run
+            // unconditionally, the same way wheel's default zoom behavior already does.
+            {
+              me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
+              me._hecGestureHandler(e, {
+                longPressMs: _HEC_LONGPRESS_MS,
+                dblClickMs: _HEC_DBLCLICK_MS,
+                dragSlop: _HEC_DRAG_SLOP,
+                pinchMinDist: _HEC_PINCH_MIN_DIST,
+                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
+            }
+
             return changed;
+          },
+
+          /**
+              * @private
+              * Generic pointer/wheel gesture state machine feeding options.customEvent and
+              * options.panX/panY/zoomX/zoomY. See the comment block in handleEvent above
+              * for provenance of the timing constants and structure.
+              */
+          _hecGestureHandler: function (e, cfg) {
+            var me = this;
+            var gs = me._hecGesture;
+            var pid = e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0;
+            var pointerType = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
+
+            function customEventTarget() {
+              return typeof me.options.customEvent === 'function';
+            }
+            function legendIndexAt(x, y) {
+              return me._hecLegendIndexAt(x, y);
+            }
+
+            function yAxisIndexAt(x, y) {
+              return me._hecYAxisIndexAt(x, y);
+            }
+
+            function truncatedYAxisLabelAt(idx) {
+              if (idx < 0 || !me.data || !me.data.labels || !me.chartArea) return null;
+              var lbl = me.data.labels[idx];
+              var labelStr = helpers.isArray(lbl) ? lbl.join(' ') : lbl;
+              // A label already containing a newline was pre-wrapped upstream — already
+              // fitted to its column, nothing left to detect here.
+              if (typeof labelStr === 'string' && labelStr.indexOf('\n') !== -1) return null;
+              var origName = (me.data.datasets[idx] && me.data.datasets[idx].name) || labelStr;
+              if (!origName) return null;
+              var ctx2 = me.canvas.getContext('2d');
+              ctx2.save();
+              ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
+              var textW = ctx2.measureText(origName).width;
+              ctx2.restore();
+              var availW = me.chartArea.left - 8;
+              return textW > availW ? origName : null;
+            }
+
+            // Single distribution point for every consumer of a detected gesture —
+            // internal (legend click/hover toggle, Controller.options.onClick, label-
+            // truncated tooltip) and external (customEvent) alike. Nothing here
+            // re-derives 'click' from mouseup independently anymore; this is the one
+            // place that decides a gesture happened and tells everyone at once.
+            function fire(gestureType, hitX, hitY, extra) {
+              var _hx = hitX !== undefined ? hitX : e.x;
+              var _hy = hitY !== undefined ? hitY : e.y;
+              if (gestureType === 'click' || gestureType === 'dblclick') {
+                if (me.options.legendClickEnabled !== false && me.legend && typeof me.legend.handleEvent === 'function') {
+                  me.legend.handleEvent({ type: gestureType, x: _hx, y: _hy, native: e.native, chart: me });
+                }
+              }
+              if (gestureType === 'dblclick') {
+                // Simplified touch-action workaround for legend/timeline label drag
+                // (touch only — mouse/pen never need this): touch-action:none was
+                // already applied at the FIRST click of this double-click (see the
+                // click branch below), covering the whole gap up to now. Setting
+                // this flag true just keeps that block in effect through the drag
+                // that follows — it doesn't need to itself trigger anything at this
+                // exact instant, since the block never lapsed.
+                me._hecLabelDragAllowed = true;
+                me._hecUpdateDragTouchOverlays();
+                // Grouped lock+handle zone: dblclick toggles the lock exactly the
+                // same way click does (see the click branch below) — same zone
+                // check, same action, no pointerType distinction.
+                var _dblInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                if (_dblInLockAndHandleZone) {
+                  me._hecToggleYAxisLock();
+                }
+              }
+              if (gestureType === 'dblclick' || gestureType === 'longpress') {
+                // Third and fourth triggers for engaging the Y-axis lock, alongside
+                // drag — same zone check, kept here as a consumer of the
+                // already-detected event, not mixed into its detection.
+                var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me.config.type !== 'timeline' && me.config.type !== 'arrowline' &&
+                  me.chartArea && _hx >= 0 && _hx <= me.chartArea.left && _hy >= me.chartArea.top && _hy <= me.chartArea.bottom;
+                if (_dblYAxisZone && !me._hecYAxisLock) {
+                  me._hecYAxisLock = 2;
+                  me._hecUpdateYAxisState();
+                }
+              }
+              var _yIdx = yAxisIndexAt(_hx, _hy);
+              var _truncated = truncatedYAxisLabelAt(_yIdx);
+              if (gestureType === 'click') {
+                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' click yAxisIndex=', _yIdx, 'truncated=', _truncated, 'labelTooltipEnabled=', me.options.labelTooltipEnabled, 'hasTooltip=', !!me.tooltip, 'chartArea=', me.chartArea, 'labels=', me.data && me.data.labels);
+                if (typeof me.options.onClick === 'function') {
+                  me.options.onClick.call(me, e.native, me.active);
+                }
+                // High-level default behavior, on by default (see
+                // options.labelTooltipEnabled), same as wheelZoomEnabled and legend
+                // click toggling — a plain click on a truncated Y-axis category label
+                // shows its full text, unless explicitly turned off.
+                if (_truncated && me.options.labelTooltipEnabled !== false && me.tooltip) {
+                  var _cx2 = e.native ? e.native.clientX : _hx;
+                  var _cy2 = e.native ? e.native.clientY : _hy;
+                  me.tooltip._hecShowTooltip(
+                    'other',
+                    _truncated,
+                    _cx2 + 10, _cy2 - 16,
+                    me.canvas,
+                    'var(--card-background-color,#fff)', 'var(--divider-color,#ccc)', 'var(--primary-text-color,#333)',
+                    null,
+                    true
+                  );
+                }
+                var _clickInLockAndHandleZone = _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28;
+                if (_clickInLockAndHandleZone) {
+                  // Grouped lock+handle zone: a click here always toggles the lock.
+                  // On mouse/pen, that's the whole story — simple, no two-step: click
+                  // toggles, drag moves the graph, independently. On touch, this
+                  // toggle is provisional: dragstart below (within the same
+                  // _hecLabelDragAllowed-armed window) will toggle it back if a drag
+                  // follows, treating this click as having been the first half of a
+                  // drag gesture rather than a real toggle intent.
+                  me._hecToggleYAxisLock();
+                }
+                // Second trigger for the Y-axis touch overlay's touch-action:none —
+                // a click in this zone arms a 500ms window to anticipate a possible
+                // NEXT contact there (this click itself is already over by the time it
+                // fires, per Thierry), separate from the lock-driven trigger below.
+                var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me.config.type !== 'timeline' && me.config.type !== 'arrowline' &&
+                  me.chartArea && _hx >= 0 && _hx <= me.chartArea.left && _hy >= me.chartArea.top && _hy <= me.chartArea.bottom;
+                if (_clickInYAxisZone) {
+                  me._hecYAxisClickArmed = true;
+                  me._hecUpdateYAxisState();
+                  clearTimeout(me._hecYAxisClickArmedTimer);
+                  me._hecYAxisClickArmedTimer = setTimeout(function () {
+                    me._hecYAxisClickArmed = false;
+                    me._hecUpdateYAxisState();
+                  }, 500);
+                }
+                // Same click-armed mechanism, for the legend/timeline label drag
+                // workaround: a click ANYWHERE on the canvas arms this temporary
+                // flag, covering the gap up to a possible next click on the label
+                // zone — touch-action:none stays applied through that gap even
+                // before the dblclick itself (below) confirms drag is allowed.
+                me._hecLabelClickArmed = true;
+                me._hecUpdateDragTouchOverlays();
+                clearTimeout(me._hecLabelClickArmedTimer);
+                me._hecLabelClickArmedTimer = setTimeout(function () {
+                  me._hecLabelClickArmed = false;
+                  me._hecUpdateDragTouchOverlays();
+                }, 500);
+              }
+              if (!customEventTarget()) return;
+              var el = me.getElementAtEvent ? me.getElementAtEvent(e) : null;
+              var payload = {
+                chart: me,
+                element: el && el[0] ? el[0] : null,
+                legendIndex: legendIndexAt(_hx, _hy),
+                yAxisIndex: _yIdx,
+                truncatedYAxisLabel: _truncated,
+                lockAndHandleZone: _hx >= 0 && _hx <= 33 && _hy >= 0 && _hy <= 28,
+                zoomSelectMode: me.options.zoomSelectMode === true,
+                gestureType: gestureType,
+                pointerCount: gs.count,
+                pointerType: pointerType,
+                button: e.native ? e.native.button : undefined,
+                event: e.native };
+              if (extra) { for (var k in extra) payload[k] = extra[k]; }
+              me.options.customEvent.call(me, payload);
+            }
+
+            // Common drag-end cleanup — was duplicated identically between mouseup
+            // and pointercancel (ghost, marker, drop-target highlight cleanup, then
+            // firing dragend with zoom-selection data if applicable). Factored per
+            // Thierry's explicit request to harmonize the drag-handling code.
+            function _hecEndDrag(p) {
+              me._hecDestroyDragGhost();
+              me._hecHideInsertionMarker();
+              if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
+              if (p.handler && p.handler.name === 'zoomSelect') {
+                me._hecHideZoomSelection();
+                fire('dragend', undefined, undefined, { zoomSelectX0: p.x0, zoomSelectX1: p.dragZoomSelectX1 });
+              } else {
+                fire('dragend', undefined, undefined);
+              }
+            }
+
+            if (e.type === 'mousedown') {
+              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mousedown pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId);
+              gs.pointers[pid] = { x: e.x, y: e.y };
+              gs.count = Object.keys(gs.pointers).length;
+              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' after mousedown gs.pointers=', JSON.stringify(gs.pointers), 'count=', gs.count);
+
+              if (gs.count === 1) {
+                // Four independent events, defined purely by time and distance —
+                // per Thierry's exact spec:
+                //   click     = down/up, stayed within 10px, < 600ms
+                //   longpress = down/up, stayed within 10px, >= 600ms
+                //   dblclick  = down/up/down, stayed within 10px, < 400ms between
+                //               the two downs
+                //   drag      = down, moved past 10px (time doesn't matter)
+                // dblclick DOES prevent this same press's own release from ALSO
+                // producing a click — see dblClickFired below and its use at mouseup.
+                // Long-press remains independent from drag, same as before.
+                var _downNow = Date.now();
+                var _isDblClick = gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
+                if (_isDblClick) {
+                  fire('dblclick', e.x, e.y);
+                }
+                gs.lastMouseDown = _downNow;
+
+                var _pending = { x0: e.x, y0: e.y, pid: pid, dragging: false, pointerType: pointerType, native: e.native,
+                  // Marks that THIS press (the second one of the double-click) was
+                  // itself just recognized as a dblclick — checked at mouseup below
+                  // so its own release doesn't also fire a plain click.
+                  dblClickFired: _isDblClick };
+                gs.pending = _pending;
+
+                gs.longPressTimer = setTimeout(function () {
+                  if (gs.pending !== _pending) return; // drag already started or gesture ended
+                  gs.longPressTimer = null;
+                  // gs.pending stays alive (not cleared) — with the finger still
+                  // down, long-press doesn't end the gesture: a normal drag can
+                  // still follow right after, in the same continuous contact.
+                  _pending.longPressFired = true;
+                  fire('longpress', _pending.x0, _pending.y0);
+                }, cfg.longPressMs);
+
+              } else if (gs.count === 2) {
+                // Second finger while first is already down — start pinch, same structure
+                // as the card's panstate.pinch: track both points and their spread, pan by
+                // center movement, zoom by spread change.
+                if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+                gs.pending = null;
+                var _ids = Object.keys(gs.pointers);
+                var _p1id = _ids[0], _p2id = _ids[1];
+                gs.pinch = {
+                  p1id: _p1id, p2id: _p2id,
+                  p1: { x: gs.pointers[_p1id].x, y: gs.pointers[_p1id].y },
+                  p2: { x: gs.pointers[_p2id].x, y: gs.pointers[_p2id].y } };
+                gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
+                gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
+                // y0/y1 tracked from pinch start, same as the card's original
+                // panstate.pinch — needed for the direct zoomY action below, which
+                // must accumulate scale changes across the whole gesture, not
+                // recompute from the live (already-changing) scale each frame.
+                var _pinchYScale = me.scales && me.scales['y-axis-0'];
+                if (_pinchYScale) {
+                  gs.pinch.y0 = _pinchYScale.min;
+                  gs.pinch.y1 = _pinchYScale.max;
+                }
+              }
+
+            } else if (e.type === 'mousemove') {
+              if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; }
+
+              if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
+                HEC_DRAG_HANDLERS[0].onMove(null, e);
+
+              } else {
+                var p = gs.pending;
+                if (p && p.pid === pid && !p.dragging) {
+                  if (Math.abs(e.x - p.x0) + Math.abs(e.y - p.y0) > cfg.dragSlop) {
+                    if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+                    p.dragging = true;
+                    fire('dragstart', p.x0, p.y0);
+                    // Table-driven zone selection — per Thierry's explicit
+                    // instruction: every zone (Y-axis pan, legend, timeline,
+                    // zoom-select, lock+handle, plain panX) is tried uniformly
+                    // here, in HEC_DRAG_HANDLERS order, first match wins. Each zone's
+                    // test() does its own setup (ghost, scale capture, etc.) and
+                    // returns true to claim the drag.
+                    for (var _zi = 0; _zi < HEC_DRAG_HANDLERS.length; _zi++) {
+                      if (HEC_DRAG_HANDLERS[_zi].test(p)) { p.handler = HEC_DRAG_HANDLERS[_zi]; break; }
+                    }
+                  }
+                } else if (p && p.pid === pid && p.dragging) {
+                  if (p.handler) p.handler.onMove(p, e);
+                }
+                if (p && p.pid === pid) { p.lastX = e.x; p.lastY = e.y; }
+                if (!p) {
+                  // No gesture pending at all — a plain hover with nothing pressed.
+                  var _hLegendIdx = legendIndexAt(e.x, e.y);
+                  var _hYIdx = yAxisIndexAt(e.x, e.y);
+                  // High-level default behavior, on by default (see
+                  // options.cursorEnabled) — Chart.js sets its own canvas's cursor
+                  // style directly, same as wheelZoomEnabled actually zooming: 'move'
+                  // over a draggable legend label (line/bar) or a draggable
+                  // timeline/arrowline Y-axis label, '' otherwise. Static graphs get
+                  // this disabled entirely by the card passing cursorEnabled:false at
+                  // construction time — no separate isStatic concept needed here.
+                  if (me.options.cursorEnabled !== false && me.canvas) {
+                    var _draggable = (_hLegendIdx >= 0 && (me.config.type === 'line' || me.config.type === 'bar')) ||
+                                      (_hYIdx >= 0 && (me.config.type === 'timeline' || me.config.type === 'arrowline'));
+                    me.canvas.style.cursor = _draggable ? 'move' : '';
+                  }
+                  // High-level default behavior, on by default (see
+                  // options.altSampleModeEnabled) — matches the card's original
+                  // altGraph mechanism: holding Alt while hovering a graph switches
+                  // its hover.mode to 'dataset' (show every sample instead of just
+                  // the nearest point), reverting to 'nearest' once Alt is released
+                  // or the pointer leaves. me.options.hover.mode is a native
+                  // Chart.js option already read internally elsewhere — this only
+                  // decides which value it holds.
+                  if (me.options.altSampleModeEnabled !== false && me.options.hover) {
+                    var _altHeld = !!(e.native && e.native.altKey);
+                    var _wantMode = _altHeld ? 'dataset' : (me._hecDefaultHoverMode || 'nearest');
+                    if (me._hecDefaultHoverMode === undefined) {
+                      me._hecDefaultHoverMode = me.options.hover.mode;
+                      _wantMode = _altHeld ? 'dataset' : me._hecDefaultHoverMode;
+                    }
+                    if (me.options.hover.mode !== _wantMode) {
+                      me.options.hover.mode = _wantMode;
+                    }
+                  }
+                  fire('hover', undefined, undefined, { legendIndex: _hLegendIdx, yAxisIndex: _hYIdx });
+                }
+              }
+
+            } else if (e.type === 'mouseup') {
+              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup pid=', pid, 'nativeType=', e.native && e.native.type, 'pointerId=', e.native && e.native.pointerId, 'gs.pointers=', JSON.stringify(gs.pointers), 'gs.pending=', JSON.stringify(gs.pending));
+              // Legend/timeline label drag workaround: armed by custDblClick, always
+              // disarmed here on the raw mouseup itself — not custDragEnd — so it
+              // never stays stuck armed when no drag actually followed the dblclick.
+              if (me._hecLabelDragAllowed) {
+                me._hecLabelDragAllowed = false;
+                me._hecUpdateDragTouchOverlays();
+              }
+              if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
+                // The OTHER finger's current position — whichever pointer isn't the
+                // one lifting right now — is what the card needs to resume the pan
+                // with, and is also what Chart.js's own drag detection below should
+                // restart tracking from once this returns to a single pointer.
+                var _remainingId = (pid == gs.pinch.p1id) ? gs.pinch.p2id : gs.pinch.p1id;
+                var _remainingPt = gs.pointers[_remainingId];
+                gs.pinch = null;
+                if (_remainingPt) {
+                  var _canvasRect = me.canvas.getBoundingClientRect();
+                  // Re-arm gs.pending for the remaining finger — it was never
+                  // created for this pointer (gs.pending is only set at
+                  // gs.count===1, which this finger skipped, having started as
+                  // part of a 2-finger pinch). Without this, its next mousemove
+                  // would never be evaluated against the 10px drag threshold at
+                  // all. Same shape as a normal mousedown's _pending — zone
+                  // selection happens the same way everyone else's does, via
+                  // HEC_DRAG_HANDLERS at the next dragstart, not decided here.
+                  gs.pending = { x0: _remainingPt.x, y0: _remainingPt.y, pid: _remainingId, dragging: false,
+                    pointerType: pointerType, native: e.native, dblClickFired: false };
+                  fire('pinchend', _remainingPt.x, _remainingPt.y, {
+                    clientX: _canvasRect.left + _remainingPt.x,
+                    clientY: _canvasRect.top + _remainingPt.y
+                  });
+                }
+              } else if (gs.longPressTimer) {
+                clearTimeout(gs.longPressTimer); gs.longPressTimer = null;
+              }
+              var pu = gs.pending;
+              console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup decision pu=', JSON.stringify(pu), 'pid=', pid);
+              if (pu && pu.pid === pid) {
+                gs.pending = null;
+                if (pu.dragging) {
+                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> dragend');
+                  _hecEndDrag(pu);
+                } else if (pu.longPressFired) {
+                  // Click and long-press are mutually exclusive — a long-press already
+                  // fired for this contact, so releasing without ever moving does NOT
+                  // become a click, even though gs.pending stayed alive to allow a drag
+                  // to follow (which didn't happen here).
+                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (long-press already fired)');
+                } else if (pu.dblClickFired) {
+                  // Click and dblclick are mutually exclusive too — this same press
+                  // was the second one of a double-click, already fired at its own
+                  // mousedown; releasing it must not ALSO produce a plain click.
+                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> no click (dblclick already fired)');
+                } else {
+                  // click: released without moving, before the long-press timer
+                  // fired (< 600ms), and this press wasn't itself a dblclick's
+                  // second press — per Thierry's spec.
+                  console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> click');
+                  fire('click', undefined, undefined);
+                }
+              } else {
+                console.log('[HEC-DIAG]', HEC_CHART_VERSION, ' mouseup -> NO MATCH, pu was null or wrong pid');
+              }
+              delete gs.pointers[pid];
+              gs.count = Object.keys(gs.pointers).length;
+
+            } else if (e.type === 'pointercancel') {
+              // Adapted from Controller.handleEvent's mouseout discrimination above
+              // (me._hecHasMoved): a genuine cancel is preceded by real movement; one
+              // fired by the browser mid-scroll structurally is not. This is an
+              // adaptation to a different event, not the same verified case — flag as
+              // unproven until confirmed empirically, same as every other timing/gesture
+              // mechanism in this card was.
+              if (me._hecHasMoved) {
+                if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+                if (gs.pending && gs.pending.pid === pid && gs.pending.dragging) {
+                  _hecEndDrag(gs.pending);
+                }
+                if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
+                  gs.pinch = null;
+                }
+                gs.pending = null;
+              }
+              delete gs.pointers[pid];
+              gs.count = Object.keys(gs.pointers).length;
+
+            } else if (e.type === 'wheel') {
+              if (!e.native) return;
+              // Debounce identical to the card's wheelScrolled: rapid-fire wheel ticks
+              // within 150ms of each other are coalesced to one, avoiding runaway zoom
+              // steps on trackpads/high-resolution wheels.
+              var _now2 = Date.now();
+              if (me._hecWheelLast && _now2 - me._hecWheelLast < cfg.wheelDebounceMs) return;
+              me._hecWheelLast = _now2;
+
+              var _native = e.native;
+              fire('wheel', undefined, undefined, {
+                deltaX: _native.deltaX, deltaY: _native.deltaY,
+                ctrlKey: _native.ctrlKey, shiftKey: _native.shiftKey, altKey: _native.altKey });
+
+              // High-level default behavior, same mapping as the card's wheelScrolled:
+              // Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel calls a card-supplied zoomX
+              // callback (the shared date range across all graphs is a card
+              // responsibility, per Thierry). Shift+wheel zoom Y, by contrast, is a
+              // per-graph responsibility Chart.js handles directly on its own Y scale
+              // — no callback needed, same formula the card's original wheelScrolled
+              // used. Configurable, on by default (see options.wheelZoomEnabled /
+              // options.zoomYEnabled below).
+              if (me.options.wheelZoomEnabled !== false) {
+                if (_native.ctrlKey && typeof me.options.zoomX === 'function') {
+                  _native.preventDefault();
+                  me.options.zoomX.call(me, { chart: me, deltaY: _native.deltaY, centerPixels: e.x, event: _native });
+                }
+                if (_native.shiftKey && me.options.zoomYEnabled !== false) {
+                  var _wd = Math.abs(_native.deltaX) > Math.abs(_native.deltaY) ? _native.deltaX : _native.deltaY;
+                  var _yScale = me.scales && me.scales['y-axis-0'];
+                  if (_wd !== 0 && _yScale && me.config.type !== 'timeline' && me.config.type !== 'arrowline') {
+                    var _f = _wd < 0 ? 0.9 : 1.0 / 0.9;
+                    var _t = me.options.scales.yAxes[0].ticks;
+                    if (_t.min === undefined) _t.min = _yScale.min;
+                    if (_t.max === undefined) _t.max = _yScale.max;
+                    var _d = _t.max - _t.min;
+                    _d = _d - _d * _f;
+                    _t.max -= _d * 0.5;
+                    _t.min += _d * 0.5;
+                    _t.removeEdgeTicks = true;
+                    if (!me._hecYAxisLock) me._hecYAxisLock = 2;
+                    me.update();
+                  }
+                }
+              }
+            }
           } });
 
 
@@ -5840,8 +7190,7 @@
           meta = chart.getDatasetMeta(i);
           for (j = 0, jlen = meta.data.length; j < jlen; ++j) {
             var element = meta.data[j];
-            // (hecVirtual: a curve-shaping point of the 'smart' line mode — not a value)
-            if (!element._view.skip && !element._view.hecVirtual) {
+            if (!element._view.skip) {
               handler(element);
             }
           }
@@ -6044,27 +7393,6 @@
               * @param options {IInteractionOptions} options to use
               * @return {Chart.Element[]} Array of elements that are under the point. If none are found, an empty array is returned
               */
-          // Mixed bar/line graph: a curve point close to the pointer wins (the curves are
-          // drawn over the bars), else the bar under the pointer, else the plain 'nearest'.
-          // Plain 'nearest' alone would always prefer the dense curve points, even with the
-          // pointer right on a bar.
-          hecMixed: function (chart, e, options) {
-            var position = getRelativePosition(e, chart);
-            var best = null, bestDist = 8;
-            parseVisibleItems(chart, function (element) {
-              if (chart.getDatasetMeta(element._datasetIndex).bar) return;
-              var cp = element.getCenterPoint();
-              var d = Math.sqrt(Math.pow(position.x - cp.x, 2) + Math.pow(position.y - cp.y, 2));
-              if (d < bestDist) { bestDist = d; best = element; }
-            });
-            if (best) return [best];
-            var onBar = getIntersectItems(chart, position).filter(function (element) {
-              return chart.getDatasetMeta(element._datasetIndex).bar;
-            });
-            if (onBar.length) return onBar.slice(0, 1);
-            return module.exports.modes.nearest(chart, e, { intersect: false, axis: options.axis });
-          },
-
           nearest: function (chart, e, options) {
             var position = getRelativePosition(e, chart);
             options.axis = options.axis || 'xy';
@@ -6173,15 +7501,22 @@
         responsive: true,
         responsiveAnimationDuration: 0,
         maintainAspectRatio: true,
-        // click is needed for Chart.js's own Legend.handleEvent — this card's legend.onClick
-        // (single click toggles visibility, double-click uncombines) relies on native
-        // Chart.js click handling, and the card's own legendDragEnd already synthesizes a
-        // 'click' MouseEvent on the canvas for a genuine click (see history-explorer-card.js)
-        // — restoring this is what that code has always expected, unchanged since before
-        // this session's Pointer Events work. Controller.handleEvent/Tooltip.handleEvent
-        // (hover + tooltip) only ever act on mousedown/mousemove/mouseout, so this doesn't
-        // touch their already-verified behavior.
-        events: ['pointerdown', 'click', 'pointermove', 'pointerout', 'pointerup'],
+        // 'click' is no longer in this list: legend.onClick, Controller.options.onClick,
+        // and customEvent's custClick are now all driven by the single gesture detector
+        // in Controller._hecGestureHandler (mousedown/mousemove/mouseup resolved into a
+        // click/dblclick/longpress/dragstart/dragend verdict), never by a native or
+        // synthetic 'click' DOM event — that's the homogenization Thierry asked for:
+        // one detector, one distribution point, for every consumer. Controller.
+        // handleEvent/Tooltip.handleEvent (hover + tooltip) only ever act on
+        // mousedown/mousemove/mouseout, so removing 'click' doesn't touch their
+        // already-verified behavior. 'pointercancel' and 'wheel' are added here for the
+        // generic gesture detection (customEvent/panX/panY/zoomX/zoomY, see
+        // Controller.handleEvent below) — Controller/Tooltip's hover+tooltip logic above
+        // never reads either event type, so its own already-verified behavior is
+        // untouched by their presence. 'wheel' is bound per-canvas like every other event
+        // here (see platform.addEventListener), so a wheel action only ever reaches the
+        // chart whose canvas the pointer is actually over — never elsewhere on the page.
+        events: ['pointerdown', 'pointermove', 'pointerout', 'pointerup', 'pointercancel', 'wheel'],
         hover: {
           onHover: null,
           mode: 'nearest',
@@ -7922,6 +9257,47 @@
                 context.textAlign = itemToDraw.textAlign;
 
                 var label = itemToDraw.label;
+                // ── Native label wrap (rapatrié depuis history-explorer-card.js's
+                // _wrapLabel) ──────────────────────────────────────────────────────
+                // Chart.js already knows everything this needs — the scale's own
+                // rendering width (me.width) and the exact font it's about to draw
+                // with (tickFont.font) — so the wrap decision belongs here instead of
+                // being pre-computed by the card and handed in as data.labels. Generic:
+                // applies to any scale whose label doesn't fit, not timeline/arrowline
+                // specifically. Idempotent: a label that already arrived pre-wrapped —
+                // as an array, or as a string containing a newline — is left exactly as
+                // given; this only ever wraps a plain single-line string that doesn't fit.
+                if (typeof label === 'string' && label.indexOf('\n') === -1) {
+                  var _availW = me.width - 8;
+                  if (context.measureText(label).width > _availW) {
+                    var _words = label.split(' ');
+                    var _wrapped = null;
+                    if (_words.length > 1) {
+                      var _line1 = '', _line2 = '';
+                      for (var _wi = 0; _wi < _words.length; _wi++) {
+                        var _try = _line1 ? _line1 + ' ' + _words[_wi] : _words[_wi];
+                        if (context.measureText(_try).width <= _availW) {
+                          _line1 = _try;
+                        } else {
+                          _line2 = _words.slice(_wi).join(' ');
+                          break;
+                        }
+                      }
+                      if (_line1 && _line2) _wrapped = [_line1, _line2];
+                    }
+                    if (!_wrapped) {
+                      // No word boundary fits — split at character level
+                      var _split = 0;
+                      for (var _ci = 1; _ci <= label.length; _ci++) {
+                        if (context.measureText(label.substring(0, _ci)).width <= _availW) _split = _ci;
+                        else break;
+                      }
+                      _wrapped = [label.substring(0, _split), label.substring(_split)];
+                    }
+                    label = _wrapped;
+                  }
+                }
+
                 if (helpers.isArray(label)) {
                   var lineHeight = tickFont.size * 1.2;
                   var yStart = -((label.length - 1) * lineHeight) / 2;
@@ -8327,8 +9703,7 @@
             labelColor: function (tooltipItem, chart) {
               var meta = chart.getDatasetMeta(tooltipItem.datasetIndex);
               var activeElement = meta.data[tooltipItem.index];
-              var view = activeElement && activeElement._view;
-              if (!view) return { borderColor: 'rgba(0,0,0,0)', backgroundColor: 'rgba(0,0,0,0)' };
+              var view = activeElement._view;
               return {
                 borderColor: view.borderColor,
                 backgroundColor: view.backgroundColor };
@@ -8666,16 +10041,28 @@
           // _clampToViewport (used there for its other floating popups too) so this file
           // has no outside dependency for it.
           _hecClampToViewport: function (el, anchorEl) {
-            // Clamped to the card itself (the <ha-card id="maincard"> the graphs live
-            // inside), not the whole browser window — the tooltip may overflow anywhere
-            // over the card, but never onto Home Assistant's own surrounding UI (side
-            // menu, header, etc). anchorEl.closest() stays within the same shadow root as
-            // #maincard (both are inside the card's own shadow DOM), so this doesn't run
-            // into the usual closest()-can't-cross-shadow-boundaries limitation. Falls back
-            // to the full window if #maincard can't be found for any reason, matching the
-            // previous behavior rather than failing silently.
-            var _bounds = (anchorEl && anchorEl.closest && anchorEl.closest('#maincard'))
-              ? anchorEl.closest('#maincard').getBoundingClientRect()
+            // Same fix as history-explorer-card's own v1.1.42b12 _clampToViewport,
+            // ported here since on THIS branch the tooltip is genuinely driven by
+            // Chart.js (unlike v1.1.x, where the card never wires a custom: tooltip
+            // config at all, making that branch's Chart.js clamp code dead).
+            //
+            // Left/right/top: the MOST RESTRICTIVE of #maincard and the viewport —
+            // never #maincard alone, since a never-before-mounted card (new
+            // cardName) starts with an empty/transiently tiny #maincard (graphs not
+            // yet loaded/sized), which would wrongly clamp a menu/tooltip into that
+            // tiny box and send it off-screen. Never the viewport alone either, or a
+            // tooltip could bleed onto Home Assistant's own surrounding UI.
+            //
+            // Bottom is the sole exception: viewport ONLY, never #maincard —
+            // reintroducing #maincard there is exactly what caused the original bug
+            // (empty-card height ~130px vs 1300+px once loaded). HA never leaves
+            // meaningful UI below the dashboard content, so the viewport alone is
+            // safe in this one direction.
+            var _card = anchorEl && anchorEl.closest ? anchorEl.closest('#maincard') : null;
+            var _cardR = _card ? _card.getBoundingClientRect() : null;
+            var _bounds = _cardR
+              ? { left: Math.max(_cardR.left, 0), right: Math.min(_cardR.right, window.innerWidth),
+                  top: Math.max(_cardR.top, 0), bottom: window.innerHeight }
               : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
             var _r = el.getBoundingClientRect();
             var _dx = 0, _dy = 0;
@@ -8699,31 +10086,23 @@
 
           _hecStartTooltipFade: function (_el, duration) {
             var me = this;
-            var _chart = me._chart;
             clearTimeout(_el._hecFadeTimer);
             clearTimeout(_el._hecRemoveTimer);
             _el._hecFadeTimer = setTimeout(function () { _el.style.opacity = '0'; }, duration);
-            _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _chart); }, duration + 1000);
+            _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _el._hecOnClose); }, duration + 1000);
           },
 
-          // _chart is passed uniformly by both callers (the timer path above, and the
-          // ResizeObserver safety net below) — homogeneous, even though the safety net's
-          // own case never actually has a point to turn off in practice (it fires because
-          // the graph/view is gone or hidden, so _chart.active is already empty or the
-          // instance itself is torn down/cached away by then; the _chart.active.length
-          // guard below simply no-ops there). removeHoverStyle never turns a point fully
-          // invisible if it's independently kept visible by showPoints (a separate,
-          // permanent pointRadius on the dataset, not hover-driven) — it only resets the
-          // radius back to that dataset's own baseline, whatever that already is.
-          _hecKillFloatingTooltip: function (_el, _chart) {
+          // Generic: removes the element and its ResizeObserver. onClose is an
+          // optional callback the caller supplied when arming the fade (or closing
+          // immediately) — this function has no idea what it means, it just calls it.
+          // The hover tooltip is the only current caller that passes one, to clear its
+          // own active/hover-highlight state; the label tooltip passes none.
+          _hecKillFloatingTooltip: function (_el, onClose) {
             clearTimeout(_el._hecFadeTimer);
             clearTimeout(_el._hecRemoveTimer);
             if (_el._hecObserver) _el._hecObserver.disconnect();
             if (_el.parentNode) _el.remove();
-            if (_chart && _chart.active && _chart.active.length) {
-              _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
-              _chart.active = [];
-            }
+            if (typeof onClose === 'function') onClose();
           },
 
           _hecAttachFloatingTooltip: function (_el, anchorEl) {
@@ -8740,52 +10119,112 @@
                 var _box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
                 var _w = _box ? _box.inlineSize : entries[0].contentRect.width;
                 var _h = _box ? _box.blockSize : entries[0].contentRect.height;
-                if (_w === 0 && _h === 0) me._hecKillFloatingTooltip(_el, me._chart);
+                if (_w === 0 && _h === 0) me._hecKillFloatingTooltip(_el, _el._hecOnClose);
               });
               _el._hecObserver.observe(anchorEl);
             }
+          },
+
+          // content: string, or a DOM Node to be inserted as the tooltip's only child.
+          // caret: null for no caret, or { size, xAlign ('left'/'right'/'center'),
+          //   yAlign ('top'/'bottom'/'center'), cornerRadius, borderWidth } — same
+          //   positioning math the hover tooltip's caret already used, just parameterized.
+          // Padding is fixed at 4px/8px for every tooltip — not a parameter, per
+          // Thierry: all tooltips share the exact same padding, no exceptions.
+          // elKey: which of the two independent tooltip element slots this call
+          // targets — 'hover' or 'other'. The hover tooltip re-renders/closes on
+          // every single event (driven by tooltip.update in Controller.handleEvent,
+          // which runs before any click-driven tooltip like the label one), so
+          // sharing one element meant it would silently close whatever the OTHER
+          // tooltip had just shown. Two independent elements, same generic
+          // display/lifecycle code, fixes that without needing either consumer to
+          // know about the other.
+          _hecShowTooltip: function (elKey, content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
+            var me = this;
+            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
+            var _el = this[_slot];
+            if (!_el) {
+              _el = document.createElement('div');
+              _el.id = 'hec-tooltip-' + elKey;
+              _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
+              this[_slot] = _el;
+            }
+            _el._hecOnClose = onClose;
+            this._hecAttachFloatingTooltip(_el, anchorEl);
+            _el.style.background = backgroundColor;
+            _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
+            _el.style.color = textColor;
+            _el.style.padding = '4px 8px';
+
+            _el.innerHTML = '';
+            if (typeof content === 'string') {
+              _el.appendChild(document.createTextNode(content));
+            } else if (content) {
+              _el.appendChild(content);
+            }
+            var _wordCount = this._hecCountWords(typeof content === 'string' ? content : (content ? content.textContent : ''));
+
+            if (caret) {
+              var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
+              var _caretEl = document.createElement('div');
+              _caretEl.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
+              if (caret.yAlign === 'center') {
+                _caretEl.style.top = '50%';
+                _caretEl.style.marginTop = -_cs + 'px';
+                if (caret.xAlign === 'left') { _caretEl.style.left = -(_bw + 8 + _cs - 2) + 'px'; _caretEl.style.borderRightColor = backgroundColor; }
+                else { _caretEl.style.right = -(_bw + 8 + _cs - 2) + 'px'; _caretEl.style.borderLeftColor = backgroundColor; }
+              } else {
+                if (caret.xAlign === 'left') _caretEl.style.left = (_cr - 8) + 'px';
+                else if (caret.xAlign === 'right') _caretEl.style.right = (_cr - 8) + 'px';
+                else { _caretEl.style.left = '50%'; _caretEl.style.marginLeft = -_cs + 'px'; }
+                if (caret.yAlign === 'top') { _caretEl.style.top = -(_bw + 4 + _cs) + 'px'; _caretEl.style.borderBottomColor = backgroundColor; }
+                else { _caretEl.style.bottom = -(_bw + 4 + _cs) + 'px'; _caretEl.style.borderTopColor = backgroundColor; }
+              }
+              _el.appendChild(_caretEl);
+            }
+
+            _el.style.display = 'block';
+            var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+            _el.style.left = (x - _origin.left) + 'px';
+            _el.style.top = (y - _origin.top) + 'px';
+            this._hecClampToViewport(_el, anchorEl);
+            this._hecArmTooltipAutoFade(_el, this._hecWordBasedFadeDuration(_wordCount), justMoved);
+
+            function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
+          },
+
+          // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
+          // elKey) tooltip out immediately (duration 0) — never touches the other one.
+          _hecCloseTooltip: function (elKey) {
+            var _slot = elKey === 'hover' ? '_hecHoverTooltipEl' : '_hecOtherTooltipEl';
+            if (this[_slot]) this._hecStartTooltipFade(this[_slot], 0);
           },
 
           // Renders the tooltip as a floating DOM element instead of drawing on the canvas
           // — the on-canvas draw is hard-clipped to its own graph's canvas, so a short
           // graph or one near a viewport edge would truncate the tooltip with no way to fix
           // that from within canvas drawing. Called from draw() below in place of the old
-          // on-canvas path.
+          // on-canvas path. A pure consumer of _hecShowTooltip/_hecCloseTooltip: builds its
+          // own structured content and knows its own early-close conditions (disabled,
+          // no content) — the generic function knows neither.
           _hecRenderFloatingTooltip: function () {
             var me = this;
             var _vm = this._view;
-            var _el = this._hecTooltipEl;
 
             var _justMoved = !!(_vm && _vm.hecJustMoved);
             if (_vm) _vm.hecJustMoved = false;
 
             if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
-              if (_el) this._hecStartTooltipFade(_el, 0);
+              this._hecCloseTooltip('hover');
               return;
             }
-            // A model left half-built by a throw inside Tooltip.update() can still read
-            // tooltipActive === true with its text arrays missing — treat it as empty.
-            var _complete = _vm.title && _vm.beforeBody && _vm.body && _vm.afterBody;
-            var _hasContent = _complete && (_vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length);
+            var _hasContent = _vm.title.length || _vm.beforeBody.length || _vm.body.length || _vm.afterBody.length;
             if (!_hasContent) {
-              if (_el) this._hecStartTooltipFade(_el, 0);
+              this._hecCloseTooltip('hover');
               return;
             }
 
-            var _padY = 6, _padX = 8;
-
-            if (!_el) {
-              _el = document.createElement('div');
-              _el.id = 'hec-chart-tooltip';
-              _el.style.cssText = 'z-index:9999;pointer-events:none;border-radius:4px;padding:' + _padY + 'px ' + _padX + 'px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
-              this._hecTooltipEl = _el;
-            }
-            this._hecAttachFloatingTooltip(_el, this._chart.canvas);
-            _el.style.background = _vm.backgroundColor;
-            _el.style.border = _vm.borderWidth + 'px solid ' + _vm.borderColor;
-            _el.style.color = _vm.bodyFontColor;
-
-            var _wordCount = 0;
+            var _content = document.createDocumentFragment();
             var _addLine = function (text, color, swatch) {
               var _row = document.createElement('div');
               if (color) _row.style.color = color;
@@ -8795,20 +10234,16 @@
                 _row.appendChild(_sw);
               }
               _row.appendChild(document.createTextNode(text));
-              _el.appendChild(_row);
-              _wordCount += me._hecCountWords(text);
+              _content.appendChild(_row);
             };
 
-            _el.innerHTML = '';
             for (var _ti = 0; _ti < _vm.title.length; _ti++) {
-              var _t = _vm.title[_ti];
               var _row = document.createElement('div');
               _row.style.fontWeight = '600';
               _row.style.marginBottom = '2px';
               _row.style.color = _vm.titleFontColor;
-              _row.appendChild(document.createTextNode(_t));
-              _el.appendChild(_row);
-              _wordCount += this._hecCountWords(_t);
+              _row.appendChild(document.createTextNode(_vm.title[_ti]));
+              _content.appendChild(_row);
             }
             for (var _bi = 0; _bi < _vm.beforeBody.length; _bi++) _addLine(_vm.beforeBody[_bi]);
             _vm.body.forEach(function (_item, _i) {
@@ -8818,31 +10253,25 @@
             });
             for (var _ai = 0; _ai < _vm.afterBody.length; _ai++) _addLine(_vm.afterBody[_ai]);
 
-            var _caret = document.createElement('div');
-            var _cs = _vm.caretSize, _cr = _vm.cornerRadius, _bw = _vm.borderWidth;
-            var _bg = _vm.backgroundColor;
-            _caret.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
-            if (_vm.yAlign === 'center') {
-              _caret.style.top = '50%';
-              _caret.style.marginTop = -_cs + 'px';
-              if (_vm.xAlign === 'left') { _caret.style.left = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderRightColor = _bg; }
-              else { _caret.style.right = -(_bw + _padX + _cs - 2) + 'px'; _caret.style.borderLeftColor = _bg; }
-            } else {
-              if (_vm.xAlign === 'left') _caret.style.left = (_cr - _padX) + 'px';
-              else if (_vm.xAlign === 'right') _caret.style.right = (_cr - _padX) + 'px';
-              else { _caret.style.left = '50%'; _caret.style.marginLeft = -_cs + 'px'; }
-              if (_vm.yAlign === 'top') { _caret.style.top = -(_bw + _padY + _cs) + 'px'; _caret.style.borderBottomColor = _bg; }
-              else { _caret.style.bottom = -(_bw + _padY + _cs) + 'px'; _caret.style.borderTopColor = _bg; }
-            }
-            _el.appendChild(_caret);
-
-            _el.style.display = 'block';
             var _canvasRect = this._chart.canvas.getBoundingClientRect();
-            var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
-            _el.style.left = (_canvasRect.left - _origin.left + _vm.x) + 'px';
-            _el.style.top = (_canvasRect.top - _origin.top + _vm.y) + 'px';
-            this._hecClampToViewport(_el, this._chart.canvas);
-            this._hecArmTooltipAutoFade(_el, this._hecWordBasedFadeDuration(_wordCount), _justMoved);
+            var _chart = this._chart;
+            this._hecShowTooltip(
+              'hover',
+              _content,
+              _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
+              this._chart.canvas,
+              _vm.backgroundColor, _vm.borderColor, _vm.bodyFontColor,
+              { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth },
+              _justMoved,
+              function () {
+                // This tooltip's own early-close side effect: turn off whatever point
+                // is still highlighted as active when the tooltip itself goes away.
+                if (_chart.active && _chart.active.length) {
+                  _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
+                  _chart.active = [];
+                }
+              }
+            );
           },
 
           // Get the title
@@ -9539,9 +10968,6 @@
           // Stroke Line
           ctx.beginPath();
           lastDrawnIndex = -1;
-          // Silence plateaus ('smart' line mode): left out of this solid pass, collected
-          // and stroked dashed afterwards (a canvas path has a single dash pattern)
-          var plateaus = [];
 
           for (index = 0; index < points.length; ++index) {
             current = points[index];
@@ -9561,9 +10987,6 @@
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
                   ctx.moveTo(currentVM.x, currentVM.y);
-                } else if (currentVM.hecPlateauEnd) {
-                  plateaus.push([previous._view, currentVM]);
-                  ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
                   helpers.canvas.lineTo(ctx, previous._view, current._view);
@@ -9574,20 +10997,6 @@
           }
 
           ctx.stroke();
-
-          if (plateaus.length) {
-            if (ctx.setLineDash) {
-              ctx.setLineDash([4, 4]);
-            }
-            ctx.lineDashOffset = 0;
-            ctx.beginPath();
-            for (index = 0; index < plateaus.length; ++index) {
-              ctx.moveTo(plateaus[index][0].x, plateaus[index][0].y);
-              ctx.lineTo(plateaus[index][1].x, plateaus[index][1].y);
-            }
-            ctx.stroke();
-          }
-
           ctx.restore();
         } });
 
@@ -11961,7 +13370,7 @@
 
                 // Width of each line of legend boxes. Labels wrap onto multiple lines when there are too many to fit on one
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
-                me.leftMargin = me.chart._legendLeftMargin ?? 30;
+                me.leftMargin = me.chart._legendLeftMargin ?? 50;
                 me.rightMargin = me.chart._legendRightMargin ?? 25;
                 var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
                 if (me._ratchetBaseKey !== _baseKey) {
@@ -12210,14 +13619,19 @@
           handleEvent: function (e) {
             var me = this;
             var opts = me.options;
-            var type = e.type === 'mouseup' ? 'click' : e.type;
+            // 'click' is no longer derived here from mouseup — it only ever arrives
+            // already typed 'click' by the single gesture-detection source (Controller.
+            // _hecGestureHandler's custClick), same source customEvent consumes. This is
+            // the homogenization Thierry asked for: one detector, one distribution point,
+            // for every consumer (internal legend/controller and external customEvent).
+            var type = e.type;
             var changed = false;
 
             if (type === 'mousemove') {
               if (!opts.onHover) {
                 return;
               }
-            } else if (type === 'click') {
+            } else if (type === 'click' || type === 'dblclick') {
               if (!opts.onClick) {
                 return;
               }
@@ -12237,9 +13651,12 @@
 
                 if (x >= hitBox.left && x <= hitBox.left + hitBox.width && y >= hitBox.top && y <= hitBox.top + hitBox.height) {
                   // Touching an element
-                  if (type === 'click') {
-                    // use e.native for backwards compatibility
-                    opts.onClick.call(me, e.native, me.legendItems[i]);
+                  if (type === 'click' || type === 'dblclick') {
+                    // use e.native for backwards compatibility; gestureType (3rd arg) is
+                    // the already-resolved verdict from Chart.js's single gesture
+                    // detector — the callback must react to it, not recompute
+                    // simple/double itself from timestamps.
+                    opts.onClick.call(me, e.native, me.legendItems[i], type);
                     changed = true;
                     break;
                   } else if (type === 'mousemove') {
