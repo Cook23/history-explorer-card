@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.47b1';
+const Version = '1.1.47b2';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -25,7 +25,7 @@ export const _TYPE_MENU_DEFS = [
     { type: 'arrowline', lineMode: null },
     { type: 'timeline',  lineMode: null },
     // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // right after 'Line stepped' in the menus' markup
+    // first in the menus' markup (smart, curves, straight, stepped, bar, arrowline, timeline)
     { type: 'line', lineMode: 'smart'   },
 ];
 
@@ -5245,17 +5245,28 @@ export class HistoryCardState {
         return state !== undefined && state !== null && !isNaN(Number(state));
     }
 
+    // The most fitting way to show an entity added from the UI — preselected (bold) in the
+    // type menu, and what "Default" gives for a wildcard match. An entity's own options
+    // (entityOptions type / lineMode) always win; otherwise:
+    //   - an angle (circular: unit °, state class measurement_angle) — arrowline
+    //   - a quantity that only adds up (energy, gas, water, volume: state class
+    //     total_increasing, or total with such a device class or unit) — bar
+    //   - no unit and not a measurement (a state, a count...) — timeline
+    //   - any other measurement — line, smart mode (or the card's own lineMode)
+    // (YAML graph entities without a type keep addGraph's own simpler rule.)
     _detectDefaultType(entity_id)
     {
-        // Same auto-detection as addGraph, used to pre-select the type menu for a
-        // brand-new entity that hasn't been created yet (no graph/persisted entry exists)
         const entityOptions = this.getEntityOptions(entity_id);
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
+        const dc = this.getDeviceClass(entity_id);
+        const _cumulative = sc === 'total_increasing' ||
+            ( sc === 'total' && ( ['energy', 'gas', 'water', 'volume'].includes(dc) || /^([kMG]?Wh|m³|L|gal|ft³|CCF)$/.test(uom ?? '') ) );
         const type = entityOptions?.type ? entityOptions.type :
-                     ( sc === 'total_increasing' ) ? 'bar' :
+                     this._circularPeriod({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
+                     _cumulative ? 'bar' :
                      ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
-        const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+        const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }
 
@@ -5871,10 +5882,10 @@ export class HistoryCardState {
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
-                    <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
-                    <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
-                    <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
                     <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
+                    <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
+                    <a id="et_${i}_0" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_straight')}</a>
+                    <a id="et_${i}_2" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_stepped')}</a>
                     <a id="et_${i}_3" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_bar')}</a>
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>

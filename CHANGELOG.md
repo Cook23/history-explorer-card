@@ -6,6 +6,16 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.1.47] - in progress
 
+### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
+- The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
+- Adding an entity pre-selects (in bold) the most fitting way to show it — Enter right away adds it that way, the arrow keys first highlight it and then move through the others:
+  - its own `entityOptions` `type` / `lineMode`, when set
+  - an angle (unit `°`, or state class `measurement_angle`): arrowline
+  - energy, gas, water or volume that only adds up (state class `total_increasing`, or `total` with such a device class or unit): bar
+  - no unit and not a measurement: timeline
+  - any other measurement: a line in smart mode, instead of curves (or the card's own `lineMode`)
+- "Default", for a wildcard batch, follows the same rules for each entity
+
 ### Fixed — dropping a curve on a graph below could move that graph up
 - With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
 
