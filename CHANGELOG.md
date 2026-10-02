@@ -8,6 +8,9 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
+### Merged — v1.1.47 (in progress)
+- The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page) — see v1.1.47 below; both fixes were already part of this version's own entries
+
 ### Merged — everything from v1.1.42 to v1.1.46
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), and the multi-device sync fixes — see their own entries below. Adapted to the new split of roles: the interaction parts go through Chart.js's gesture system, like everything else
 
@@ -79,6 +82,25 @@ Changelog for the HA History Explorer Card.
 ### Fixed — hover cursors on the Y axis and curve/entity labels briefly went missing
 - A change made to fix an unrelated touch-scrolling issue had accidentally cleared the `↕` (Y axis) and 4-way move cursors shown when hovering those zones with a mouse or stylus
 - Restored, no other behavior affected
+
+
+## [v1.1.47] - in progress
+
+### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
+- The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
+- Adding an entity pre-selects (in bold) the most fitting way to show it — Enter right away adds it that way, the arrow keys first highlight it and then move through the others:
+  - its own `entityOptions` `type` / `lineMode`, when set
+  - an angle (unit `°`, or state class `measurement_angle`): arrowline
+  - energy, gas, water or volume that only adds up (state class `total_increasing`, or `total` with such a device class or unit): bar
+  - no unit and not a measurement: timeline
+  - any other measurement: a line in smart mode, instead of curves (or the card's own `lineMode`)
+- "Default", for a wildcard batch, follows the same rules for each entity
+
+### Fixed — dropping a curve on a graph below could move that graph up
+- With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
+
+### Fixed — Ctrl+wheel could zoom the page as well as the time range
+- On a fast wheel movement, the card zooms once per 150 ms and ignores the ticks in between — and those ignored ticks zoomed the browser's page. Every Ctrl+wheel tick over the card is now kept from zooming the page
 
 
 ## [v1.1.46] - 2026-10-01
