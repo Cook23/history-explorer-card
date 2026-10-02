@@ -8,7 +8,10 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
-### Merged — v1.1.47 (in progress)
+### Merged — v1.1.48 (in progress)
+- Arrowline arrows turn by the entity's `circular` period (360 by default) — see v1.1.48 below
+
+### Merged — v1.1.47
 - The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page) — see v1.1.47 below; both fixes were already part of this version's own entries
 
 ### Merged — everything from v1.1.42 to v1.1.46
@@ -84,11 +87,17 @@ Changelog for the HA History Explorer Card.
 - Restored, no other behavior affected
 
 
-## [v1.1.47] - in progress
+## [v1.1.48] - in progress
+
+### Fixed — arrowline: an angle in radians or grads pointed the wrong way
+- The arrows always turned by the value in degrees, whatever the entity's `circular` period: 1.5708 rad pointed almost north instead of east. They now turn by value / period of a full turn — the entity's `circular` period (set, or detected: 360 for `°` and `measurement_angle`), 360 when it has none
+
+## [v1.1.47] - 2026-10-02
 
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
 - The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
 - Adding an entity pre-selects (in bold) the most fitting way to show it — Enter right away adds it that way, the arrow keys first highlight it and then move through the others:
+  - a state that isn't a number (on/off, text…): timeline, the only possible display — the menu offers nothing else
   - its own `entityOptions` `type` / `lineMode`, when set
   - an angle (unit `°`, or state class `measurement_angle`): arrowline
   - energy, gas, water or volume that only adds up (state class `total_increasing`, or `total` with such a device class or unit): bar
