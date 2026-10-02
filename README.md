@@ -17,30 +17,23 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
-## Using Claude Code, and the v1.2.0 beta
+## v1.2.0 beta
 
-I've started using Claude Code (Opus 5.5) extensively to modify, improve, review, simulate and test this card. It writes the code, reviews it, finds bugs, and runs automated tests in a real browser against a simulated Home Assistant, with a mouse and with real touch events. Versions 1.1.43 and later (smart line mode, linked graphs, bars and curves on the same graph, angles, the new type menu…) were made and tested this way.
+> [!NOTE]
+> **[v1.2.0](https://github.com/Cook23/history-explorer-card/releases/tag/v1.2.0) is available as a beta**, alongside the 1.1 line, which remains the recommended version.
 
-### The v1.2 branch
+**For the user**, v1.2.0 has the same features as v1.1.47, with one change on touch screens:
+- a swipe on a graph always scrolls the page, wherever it starts — no more conflicts between scrolling the page and dragging labels;
+- to drag a label, a graph or the Y axis, tap it first, then press it again and drag;
+- a pinch also zooms the time.
 
-In a previous release, I said I would move to a new v1.2.x branch, with a clear separation in the code: everything that handles the graphs and the user's interaction with them on one side, and the card's own processing (entities, groups, time range, Home Assistant data, saving) on the other. My first attempt got overly complicated and I put it aside. With Claude Code, I went back to it, finished it, and it's now released as **[v1.2.0 beta](https://github.com/Cook23/history-explorer-card/releases/tag/v1.2.0)**, alongside the 1.1 line.
+**In the code**, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is now separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract. The entities are kept by a single module, the code is split by role, and automated tests cover every gesture with a mouse and with fingers, history and statistics, CSV export, refresh, the entity selector, the info panel, the type menu and arrowlines.
 
-For the user, v1.2.0 has the same features as v1.1.47, with one real change, on touch screens: a swipe on a graph now always scrolls the page, wherever it starts. To drag a label, a graph or the Y axis, you tap it first, then press it again and drag. This ends the conflicts between scrolling the page and dragging labels. A pinch also zooms the time now.
+**To try it**, enable *Show beta versions* for this repository in HACS, then download 1.2.0; to go back, download 1.1.47 the same way. So far, v1.2.0 has only been tested in a simulated environment: feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
 
-Under the hood, the code was reorganized:
-- **One place for every interaction with the graphs.** Gestures, touch zones, drag feedback and the Y axis lock are handled by the graph layer alone (a dedicated file on top of Chart.js). The card never reads a graph's layout or listens to a pointer event; it only receives gestures already resolved ("this label was dropped there") and decides what they mean. The contract between the two is documented.
-- **One module for the entities.** Which entity is shown, in which group of linked graphs and in which order, goes through a single module with its own rules and tests.
-- **The card's code split by role.** History data, datasets, gestures, menus and storage each have their own file; the main file went from about 6,400 to 3,400 lines.
-- **Automated tests.** About 120 checks cover every gesture with a mouse and with fingers, history and statistics, CSV export, refresh, the entity selector, the info panel, the type menu and arrowlines. They run before every change.
-- **Bugs found on the way.** Testing v1.2 found a few bugs that were also in 1.1. They were fixed in v1.1.47 as well.
+Both lines are maintained side by side for now (1.1.48bxx and 1.2.1bxx).
 
-The 1.1 line stays the recommended one. Both lines will live side by side for now, and future changes will go to both when it makes sense (1.1.48bxx and 1.2.1bxx).
-
-### How to try it
-
-In HACS, enable *Show beta versions* for this repository, then download 1.2.0. To go back, download 1.1.47 the same way.
-
-So far, v1.2.0 has only been tested in a simulated environment. Your feedback on real devices would help a lot, especially on phones and tablets, and on iOS: tell me what works, what doesn't, and which device and browser you use, in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues).
+**Developed with Claude Code.** Since v1.1.43, this card is modified, reviewed and tested with Claude Code (Opus 5.5), which also runs the automated tests in a real browser against a simulated Home Assistant, with mouse and touch input. Testing v1.2 this way found a few bugs that were also in 1.1; they were fixed in v1.1.47.
 
 ---
 
@@ -70,7 +63,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 
 ## Table of contents
 
-- [Using Claude Code, and the v1.2.0 beta](#using-claude-code-and-the-v120-beta)
+- [v1.2.0 beta](#v120-beta)
 - [Version highlights](#version-highlights)
 - [Install](#install)
 - [Basic usage](#basic-usage)
