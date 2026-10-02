@@ -36,6 +36,23 @@ How the code is organized, and the rules that keep its parts apart: see
   - The same mechanism could color a curve by its own value, extending the bars'
     `color` thresholds to curves.
 
+- **The info panel on every page of Home Assistant.** Today, a new browser tab opened
+  directly on a page that isn't a dashboard (Settings → Entities, History…) shows Home
+  Assistant's own history in an entity's dialog, not the info panel: the card's file is a
+  Lovelace resource, loaded only once a dashboard is shown, and the hook in
+  `src/history-info-panel.js` comes with it.
+  - The file can't load itself earlier: document `frontend: extra_module_url:` (the way
+    card-mod does), with exactly the same URL as the Lovelace resource (`?hacstag=…`
+    included), so that the browser runs it once.
+  - Make a second run harmless anyway (another URL runs it twice):
+    `customElements.define` only if not defined yet, and the `ha-more-info-history`
+    prototype patched only once (patching it twice would make `_oldUpdated` call itself).
+  - Make the panel independent of the card: the hook always installed, the enabled state
+    checked at each render (Home Assistant's own history otherwise), and the enabled state
+    and config read from HA user data (`history-explorer-info-panel`, through the dialog's
+    own `hass`) when localStorage has none — a new browser or device no longer needs a
+    card to be shown first, and switching the panel on or off no longer reloads the page.
+
 ## Planned, once the 1.1 line is dropped
 
 Not before 1.2 is the only line maintained: these changes are too large to port to 1.1.
