@@ -8,7 +8,7 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
-### Merged — v1.1.47 (in progress)
+### Merged — v1.1.47
 - The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page) — see v1.1.47 below; both fixes were already part of this version's own entries
 
 ### Merged — everything from v1.1.42 to v1.1.46
@@ -84,7 +84,7 @@ Changelog for the HA History Explorer Card.
 - Restored, no other behavior affected
 
 
-## [v1.1.47] - in progress
+## [v1.1.47] - 2026-10-02
 
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
 - The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
