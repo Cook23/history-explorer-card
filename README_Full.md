@@ -199,7 +199,7 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 ### Entity display type menu
 
-- A menu lets you choose how any numeric entity is displayed: line (straight, curved or stepped), bar, arrowline or timeline.
+- A menu lets you choose how any numeric entity is displayed: line (smart, curved, straight or stepped), bar, arrowline or timeline — in that order.
 - Opens right after selecting a new numeric entity in the dropdown — nothing is added until a type is chosen (click or keyboard); the choice both sets the type and performs the add in one step.
 - Also opens on a 600ms long-press of a legend label (line/bar) or a timeline/arrowline label, and when re-selecting an already-added entity, to change its type.
 - All-or-nothing: shown in full only for entities whose current state is numeric-convertible; not shown at all otherwise, since a non-numeric entity (on/off, text) can only ever be a timeline — it's added as one directly, no menu.
@@ -326,7 +326,12 @@ Dynamically added entities can be individually removed by clicking the `x` close
 
 Any numeric entity — one whose current state can be read as a number — can be shown as a line (straight, curved or stepped), a bar, an arrowline (bearing) or a timeline. A menu for making this choice opens automatically wherever it's relevant:
 
-- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The currently auto-detected type (based on the entity's `state_class`/`unit_of_measurement`, or an explicit `entityOptions` override) is pre-selected in bold.
+- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
+  - the entity's own `entityOptions` `type` / `lineMode`, when set;
+  - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — arrowline;
+  - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
+  - no unit and not a measurement — timeline;
+  - any other measurement — line, in smart mode (or the card's own `lineMode`).
 - **On a 600ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 

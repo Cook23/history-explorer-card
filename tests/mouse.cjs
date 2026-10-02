@@ -9,14 +9,14 @@ const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', stat
 
 module.exports = async function()
 {
-    const t = await openCard(CFG);
+    const t = await openCard(CFG, { mock: { series: true } });
     const E = x => t.E(x);
 
-    await t.step('hover shows a tooltip', async () => {
+    await t.step('hover shows a tooltip, with the values under the pointer', async () => {
         const pt = await E('graphPtAt(0,0.6)');
-        await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y); await t.wait(500);
-        const tip = await E(`(()=>{ const d=[...document.querySelectorAll('div')].find(d=>d.style.position&&/power|rain/.test(d.textContent)&&d.textContent.length<200); return d?d.textContent:null; })()`);
-        return tip ? true : 'no tooltip';
+        await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y); await t.wait(600);
+        const tip = await E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' ? el.textContent : null; })()`);
+        return /power|rain/.test(tip || '') ? true : 'tooltip: ' + tip;
     });
     await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');

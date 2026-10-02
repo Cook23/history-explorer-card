@@ -22,7 +22,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.0b91';
+const Version = '1.2.0b92';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -1948,17 +1948,28 @@ export class HistoryCardState {
         return state !== undefined && state !== null && !isNaN(Number(state));
     }
 
+    // The most fitting way to show an entity added from the UI — preselected (bold) in the
+    // type menu, and what "Default" gives for a wildcard match. An entity's own options
+    // (entityOptions type / lineMode) always win; otherwise:
+    //   - an angle (circular: unit °, state class measurement_angle) — arrowline
+    //   - a quantity that only adds up (energy, gas, water, volume: state class
+    //     total_increasing, or total with such a device class or unit) — bar
+    //   - no unit and not a measurement (a state, a count...) — timeline
+    //   - any other measurement — line, smart mode (or the card's own lineMode)
+    // (YAML graph entities without a type keep addGraph's own simpler rule.)
     _detectDefaultType(entity_id)
     {
-        // Same auto-detection as addGraph, used to pre-select the type menu for a
-        // brand-new entity that hasn't been created yet (no graph/persisted entry exists)
         const entityOptions = this.getEntityOptions(entity_id);
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
+        const dc = this.getDeviceClass(entity_id);
+        const _cumulative = sc === 'total_increasing' ||
+            ( sc === 'total' && ( ['energy', 'gas', 'water', 'volume'].includes(dc) || /^([kMG]?Wh|m³|L|gal|ft³|CCF)$/.test(uom ?? '') ) );
         const type = entityOptions?.type ? entityOptions.type :
-                     ( sc === 'total_increasing' ) ? 'bar' :
+                     this._circularPeriod({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
+                     _cumulative ? 'bar' :
                      ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
-        const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+        const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }
 

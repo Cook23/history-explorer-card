@@ -27,8 +27,13 @@ const STATES={
  'sensor.energy':ent('sensor.energy','energy','kWh','12','total_increasing'),
  'sensor.power2':ent('sensor.power2','power two','W','300','measurement'),
  'sensor.wind':ent('sensor.wind','wind direction','°','350','measurement'),
+ 'sensor.net_energy':ent('sensor.net_energy','net energy','kWh','3','total'),
+ 'sensor.gas':ent('sensor.gas','gas','m³','120','total_increasing'),
+ 'sensor.tank':ent('sensor.tank','tank','L','800','measurement'),
  'sensor.energy2':ent('sensor.energy2','energy2','kWh','5','total_increasing'),
 };
+STATES['sensor.net_energy'].attributes.device_class='energy';
+STATES['sensor.tank'].attributes.device_class='volume_storage';
 window.userData={};
 window.__ws=[];
 // A state change, as Home Assistant pushes it: new value, new last_changed, new hass object

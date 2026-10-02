@@ -14,6 +14,7 @@ The suites:
 | `cards` | Two cards on one page, menus, graphs added from the UI, linked graphs |
 | `features` | History and long-term statistics, CSV export, refresh, current values, the entity selector, dark theme, another language |
 | `panel` | The info panel in Home Assistant's entity dialog |
+| `typemenu` | The type menu: its order, the type pre-selected for a new entity, the keyboard |
 
 They run the built card (`history-explorer-card.js`) in Chromium, in `page.html` (a card)
 or `panel.html` (the info panel), against `mock-ha.js`: a mock of the Home Assistant APIs
@@ -25,7 +26,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features or panel
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel or typemenu
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

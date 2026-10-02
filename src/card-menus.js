@@ -14,12 +14,12 @@ export const _TYPE_MENU_DEFS = [
     { type: 'arrowline', lineMode: null, label: 'ui.menu.type_arrowline' },
     { type: 'timeline',  lineMode: null, label: 'ui.menu.type_timeline' },
     // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // right after 'Line stepped' (_TYPE_MENU_ORDER)
+    // first (_TYPE_MENU_ORDER)
     { type: 'line', lineMode: 'smart',   label: 'ui.menu.type_line_smart' },
 ];
 // Display order of the type menu's entries (indices in _TYPE_MENU_DEFS), and their style —
 // shared by the card's menu and the info panel's
-export const _TYPE_MENU_ORDER = [0, 1, 2, 6, 3, 4, 5];
+export const _TYPE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
 export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit';
 
 export class CardMenus
