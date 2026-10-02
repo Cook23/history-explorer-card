@@ -48,6 +48,8 @@ graphs:
       hidden: False
 
       # Can be used to scale this entity's value by the given factor
+      # Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the real value.
+      # With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value.
       scale: 1.0
 
       # Unit conversion factor applied on top of `scale` when this entity is auto-grouped with others
@@ -211,6 +213,8 @@ entityOptions:
     lineMode: null
 
     # Can be used to scale a specified entity's value by the given factor
+    # Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the real value.
+    # With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value.
     scale: 1.0
 
     # Unit conversion factor applied on top of `scale` when this entity is auto-grouped with others sharing

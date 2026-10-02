@@ -4,6 +4,14 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.48] - 2026-10-02
+
+### Changed — `scale` without `unit`: the legend and tooltip show the entity's real value
+- `scale` is used for two things: making a curve visible next to larger values, or flipping it (a negative factor), on a graph mixing units; and converting a value into another unit, together with `unit` (e.g. `scale: 0.001` and `unit: kW` for a power in W)
+- Without `unit`, the tooltip showed the scaled value with the entity's own unit — a value that isn't the entity's, in a unit that doesn't match it. It now shows the entity's real value; the curve is still drawn scaled
+- With `unit`, the tooltip still shows the converted value, and the current value in the legend now does too (it showed the unconverted value with the new unit)
+- Angles (`circular`) with a `scale` follow the same rule
+
 ## [v1.1.47] - 2026-10-02
 
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
