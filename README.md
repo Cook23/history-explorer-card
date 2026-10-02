@@ -31,7 +31,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 **To try it**, enable *Show beta versions* for this repository in HACS, then download 1.2.0; to go back, download 1.1.47 the same way. So far, v1.2.0 has only been tested in a simulated environment: feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
 
-Both lines are maintained side by side for now (1.1.48bxx and 1.2.1bxx).
+Both lines, 1.1.x and 1.2.x, are maintained side by side for now.
 
 **Developed with Claude Code.** Since v1.1.43, this card is modified, reviewed and tested with Claude Code (Opus 5.5), which also runs the automated tests in a real browser against a simulated Home Assistant, with mouse and touch input. Testing v1.2 this way found a few bugs that were also in 1.1; they were fixed in v1.1.47.
 
