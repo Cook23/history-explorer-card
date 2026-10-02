@@ -80,7 +80,8 @@ graphs:
 
       # Angles: drawn as a continuous curve across 0/360 (tooltip and Y axis labels show the real values).
       # null/none = automatic (unit '°' or state_class measurement_angle: period 360), false = never,
-      # a number or numeric string = the period, '2pi' = 2π
+      # a number or numeric string = the period, '2pi' = 2π. On an arrowline: a full turn of the
+      # arrows (360 without a period)
       circular: null
 
       # Turns on persistence for this entity's fields — a specific list (e.g. [color, groupId]), or 'entities'/'all'

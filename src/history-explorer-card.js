@@ -1953,6 +1953,7 @@ export class HistoryCardState {
                     name: d.name,
                     arrowColor: d.bColor,
                     arrowBackground: d.fillColor,
+                    arrowPeriod: d.arrowPeriod,
                     data: [ ]
                 });
             }
@@ -5787,6 +5788,9 @@ export class HistoryCardState {
                 "showMinMax": d.showMinMax,
                 // (period of a circular entity in the units shown, before SI conversion)
                 "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this._circularPeriod(d) ?? 0 ) * Math.abs(d.scale ?? 1) || null : null,
+                // (an arrowline's values are angles: a full turn is the entity's circular
+                // period, 360 when it has none)
+                "arrowPeriod": ( _kind === 'arrowline' ) ? ( this._circularPeriod(d) ?? 360 ) : undefined,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),

@@ -23,6 +23,9 @@ Changelog for the HA History Explorer Card.
 ### Fixed — Ctrl+wheel could zoom the page as well as the time range
 - On a fast wheel movement, the card zooms once per 150 ms and ignores the ticks in between — and those ignored ticks zoomed the browser's page. Every Ctrl+wheel tick over the card is now kept from zooming the page
 
+### Fixed — arrowline: an angle in radians or grads pointed the wrong way
+- The arrows always turned by the value in degrees, whatever the entity's `circular` period: 1.5708 rad pointed almost north instead of east. They now turn by value / period of a full turn — the entity's `circular` period (set, or detected: 360 for `°` and `measurement_angle`), 360 when it has none
+
 
 ## [v1.1.46] - 2026-10-01
 
