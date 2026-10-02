@@ -14,7 +14,8 @@ module.exports = async function()
 
     await t.step('hover shows a tooltip, with the values under the pointer', async () => {
         const pt = await E('graphPtAt(0,0.6)');
-        await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y); await t.wait(600);
+        // (moved the way a mouse does: in small steps)
+        await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y, { steps: 10 }); await t.wait(600);
         const tip = await E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' ? el.textContent : null; })()`);
         return /power|rain/.test(tip || '') ? true : 'tooltip: ' + tip;
     });

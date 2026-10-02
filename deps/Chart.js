@@ -1,5 +1,5 @@
 /*!
- * HEC fork — synced with history-explorer-card version: 1.2.0b93
+ * HEC fork — synced with history-explorer-card version: 1.2.0
  * Chart.js
  * http://chartjs.org/
  * Version: 2.7.1
@@ -3714,7 +3714,7 @@
         // Kept in sync with the header comment and the card's own Version — every
         // [HEC-DIAG] trace is prefixed with this, and it's logged once at load, so
         // Thierry never has to ask which version produced a given log.
-        var HEC_CHART_VERSION = '1.2.0b93';
+        var HEC_CHART_VERSION = '1.2.0';
         console.log('[HEC] Chart.js version', HEC_CHART_VERSION);
 
         // (the geometry primitives of the HEC layer are in deps/chart-hec.js)
