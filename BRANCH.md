@@ -7,6 +7,35 @@ This branch is allowed to contain breaking architectural changes.
 How the code is organized, and the rules that keep its parts apart: see
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Planned
+
+1.2-only features, to do when the time comes (each one a reason for a 1.2 release).
+
+- **A curve's or a bar's color taken from another entity.** The color changes along the
+  time axis with the state of another entity — e.g. a room temperature colored by its
+  heating's mode, a power colored by the electricity tariff. Possible YAML:
+  ```yaml
+  - entity: sensor.salon_temperature
+    color:
+      entity: climate.salon             # the entity that decides the color
+      states: { heat: red, off: grey }  # by state…
+      # …or thresholds, for a numeric entity: { 0: blue, 20: orange, 25: red }
+      default: '#3e95cd'
+  ```
+  - Chart.js 2.7.1 gives a curve one stroke color and one fill color (per-segment styling
+    only came with Chart.js 3); a bar can have its own color (already used by the
+    `color` thresholds of bar entities). For curves: a horizontal `CanvasGradient` with
+    hard stops (two stops at the same offset) at the times the color changes, for the
+    stroke and the fill. It is in pixels, so it must be rebuilt on every zoom, pan and
+    resize — a before-draw hook in `deps/chart-hec.js`.
+  - The color entity's history is fetched with the others (same cache), even when it
+    isn't shown, and turned into a step function of time → color.
+  - Bars: a bar covering several states takes, for instance, the one that lasted longest
+    within its interval.
+  - The legend swatch keeps the `default` color. YAML only, not from the UI.
+  - The same mechanism could color a curve by its own value, extending the bars'
+    `color` thresholds to curves.
+
 ## Planned, once the 1.1 line is dropped
 
 Not before 1.2 is the only line maintained: these changes are too large to port to 1.1.
