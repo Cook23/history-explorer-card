@@ -70,6 +70,7 @@ This card offers a highly interactive and configurable way to view the history o
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
 - **v1.2.0** (beta, published alongside the 1.1 line) — On touch, a swipe on a graph always scrolls the page, wherever it starts; a drag (curve or timeline label, ⠿ handle, Y axis labels) starts with a tap: tap, then press again and drag. Pinch also zooms the time (horizontal spread, by the zoom buttons' steps). Under the hood: every interaction with a graph handled in `deps/chart-hec.js` through a documented contract (`deps/Chart Custom.js.md`), the entities kept by one module, the card's code split by role (`ARCHITECTURE.md`), automated tests (`yarn test`).
+- **v1.1.48** — `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value (they showed the scaled value). With `unit`, `scale` is a conversion and the converted value is shown, in the legend's current value too.
 - **v1.1.47** — Type menu reordered: *Line smart*, curves, straight, stepped, then bar, arrowline, timeline. Adding an entity pre-selects the most fitting type (in bold, taken by Enter right away): timeline for a state that isn't a number (the only possible display); its own `entityOptions` type / `lineMode`; arrowline for an angle (unit `°`, state class `measurement_angle`); bar for energy, gas, water or volume that adds up (`total_increasing`, or `total` with such a device class or unit); timeline without unit or measurement; otherwise a smart line (instead of curves). Fixes: a curve dropped on a graph split off below its own no longer moves that graph up; every Ctrl+wheel tick over the card is kept from zooming the page; arrowline arrows turn by the entity's `circular` period (360 by default), so an angle in radians or grads points the right way.
 - **v1.1.46** — New per-entity `circular` option (automatic for a unit of exactly `°` or state class `measurement_angle`; `false`, a period, or `2pi`): angles are drawn as a continuous curve across 0/360, placed around their circular mean, with the real values in [0, period) in the tooltip and on the Y axis labels (only the top label shows a whole turn as 360). A curve going round more than a turn is drawn within a one-turn band, its jumps dashed. `measurement_angle` is treated as `measurement` when choosing the graph type.
 - **v1.1.45** — A bar graph can hold curves too (YAML graph mixing both, a curve changed to bars, a drag or chain merge within linked graphs): curves are drawn over the bars, keep their line mode, aren't affected by the interval and never stack; *Raw line* only turns the bars into raw curves. Fixes: the interval selector always showed *10 min*, hover on a mixed graph, and `type` / `lineWidth` / `interval` / `ymin` / `ymax` / `ystepSize` set on an entity inside `graphs:` were ignored (`ystepsize` accepted too).
@@ -367,7 +368,7 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. All the curves share one Y axis: when their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -532,7 +533,7 @@ graphs:
         unit: kW                            # the unit shown in the legend and tooltip
 ```
 
-Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values.
+Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values (with `unit:` to show the converted value in the new unit, as above).
 
 Set the `stacked` option to `true` to display the bars on top of each other rather than side by side:
 
@@ -1127,7 +1128,8 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
-| `scale` | number | Multiply all values by this factor before display |
+| `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
+| `unit` | string | Unit shown instead of the entity's own (see `scale`) |
 | `hidden` | boolean | Hide this entity by default in the legend |
 | `ymin` | number | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked) |
 | `ymax` | number | Set the initial Y axis maximum (can still be modified interactively; restored when padlock is unlocked) |

@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.1b1] - unreleased
+
+### Merged — v1.1.48
+- `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
+
+
 ## [v1.2.0] - 2026-10-02 — beta
 
 > Published as a pre-release, alongside the 1.1 line: the features of v1.1.47, a new way of dragging on touch screens, and a reorganized code base. Compared with v1.1.47:
@@ -25,6 +31,14 @@ Changelog for the HA History Explorer Card.
 
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
+
+## [v1.1.48] - 2026-10-02
+
+### Changed — `scale` without `unit`: the legend and tooltip show the entity's real value
+- `scale` is used for two things: making a curve visible next to larger values, or flipping it (a negative factor), on a graph mixing units; and converting a value into another unit, together with `unit` (e.g. `scale: 0.001` and `unit: kW` for a power in W)
+- Without `unit`, the tooltip showed the scaled value with the entity's own unit — a value that isn't the entity's, in a unit that doesn't match it. It now shows the entity's real value; the curve is still drawn scaled
+- With `unit`, the tooltip still shows the converted value, and the current value in the legend now does too (it showed the unconverted value with the new unit)
+- Angles (`circular`) with a `scale` follow the same rule
 
 ## [v1.1.47] - 2026-10-02
 
