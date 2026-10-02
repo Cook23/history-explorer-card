@@ -69,6 +69,7 @@ This card offers a highly interactive and configurable way to view the history o
 
 A chronological summary of every release that changed how the card behaves or is configured. For the exhaustive, unabridged list — including bug fixes and internal refactors — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md).
 
+- **v1.1.47** — Type menu reordered: *Line smart*, curves, straight, stepped, then bar, arrowline, timeline. Adding an entity pre-selects the most fitting type (in bold, taken by Enter right away): its own `entityOptions` type / `lineMode`; arrowline for an angle (unit `°`, state class `measurement_angle`); bar for energy, gas, water or volume that adds up (`total_increasing`, or `total` with such a device class or unit); timeline without unit or measurement; otherwise a smart line (instead of curves). Fixes: a curve dropped on a graph split off below its own no longer moves that graph up; every Ctrl+wheel tick over the card is kept from zooming the page.
 - **v1.1.46** — New per-entity `circular` option (automatic for a unit of exactly `°` or state class `measurement_angle`; `false`, a period, or `2pi`): angles are drawn as a continuous curve across 0/360, placed around their circular mean, with the real values in [0, period) in the tooltip and on the Y axis labels (only the top label shows a whole turn as 360). A curve going round more than a turn is drawn within a one-turn band, its jumps dashed. `measurement_angle` is treated as `measurement` when choosing the graph type.
 - **v1.1.45** — A bar graph can hold curves too (YAML graph mixing both, a curve changed to bars, a drag or chain merge within linked graphs): curves are drawn over the bars, keep their line mode, aren't affected by the interval and never stack; *Raw line* only turns the bars into raw curves. Fixes: the interval selector always showed *10 min*, hover on a mixed graph, and `type` / `lineWidth` / `interval` / `ymin` / `ymax` / `ystepSize` set on an entity inside `graphs:` were ignored (`ystepsize` accepted too).
 - **v1.1.44** — "Last one to speak wins" fixed to compare each source with its own image only: a change made on a device (e.g. a display type from the menu) could randomly revert on reload, a device's first load no longer mixes YAML and HA, a YAML option that isn't set never speaks, clearing a value (showing a curve again) is synced and remembered, and the curves of a block of linked graphs no longer come back shuffled after syncing.
@@ -199,7 +200,7 @@ Priority in list form: first matching entry wins per property. Entries can match
 
 ### Entity display type menu
 
-- A menu lets you choose how any numeric entity is displayed: line (straight, curved or stepped), bar, arrowline or timeline.
+- A menu lets you choose how any numeric entity is displayed: line (smart, curved, straight or stepped), bar, arrowline or timeline — in that order.
 - Opens right after selecting a new numeric entity in the dropdown — nothing is added until a type is chosen (click or keyboard); the choice both sets the type and performs the add in one step.
 - Also opens on a 700ms long-press of a legend label (line/bar) or a timeline/arrowline label, and when re-selecting an already-added entity, to change its type.
 - All-or-nothing: shown in full only for entities whose current state is numeric-convertible; not shown at all otherwise, since a non-numeric entity (on/off, text) can only ever be a timeline — it's added as one directly, no menu.
@@ -326,7 +327,12 @@ Dynamically added entities can be individually removed by clicking the `x` close
 
 Any numeric entity — one whose current state can be read as a number — can be shown as a line (straight, curved or stepped), a bar, an arrowline (bearing) or a timeline. A menu for making this choice opens automatically wherever it's relevant:
 
-- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The currently auto-detected type (based on the entity's `state_class`/`unit_of_measurement`, or an explicit `entityOptions` override) is pre-selected in bold.
+- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter). Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
+  - the entity's own `entityOptions` `type` / `lineMode`, when set;
+  - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — arrowline;
+  - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
+  - no unit and not a measurement — timeline;
+  - any other measurement — line, in smart mode (or the card's own `lineMode`).
 - **On a 700ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 

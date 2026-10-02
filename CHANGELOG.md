@@ -4,6 +4,25 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.47] - 2026-10-02
+
+### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
+- The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
+- Adding an entity pre-selects (in bold) the most fitting way to show it — Enter right away adds it that way, the arrow keys first highlight it and then move through the others:
+  - its own `entityOptions` `type` / `lineMode`, when set
+  - an angle (unit `°`, or state class `measurement_angle`): arrowline
+  - energy, gas, water or volume that only adds up (state class `total_increasing`, or `total` with such a device class or unit): bar
+  - no unit and not a measurement: timeline
+  - any other measurement: a line in smart mode, instead of curves (or the card's own `lineMode`)
+- "Default", for a wildcard batch, follows the same rules for each entity
+
+### Fixed — dropping a curve on a graph below could move that graph up
+- With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
+
+### Fixed — Ctrl+wheel could zoom the page as well as the time range
+- On a fast wheel movement, the card zooms once per 150 ms and ignores the ticks in between — and those ignored ticks zoomed the browser's page. Every Ctrl+wheel tick over the card is now kept from zooming the page
+
+
 ## [v1.1.46] - 2026-10-01
 
 ### New — angles drawn without jumps at 0/360 (`circular`)
