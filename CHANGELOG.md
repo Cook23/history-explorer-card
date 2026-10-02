@@ -89,6 +89,7 @@ Changelog for the HA History Explorer Card.
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
 - The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
 - Adding an entity pre-selects (in bold) the most fitting way to show it — Enter right away adds it that way, the arrow keys first highlight it and then move through the others:
+  - a state that isn't a number (on/off, text…): timeline, the only possible display — the menu offers nothing else
   - its own `entityOptions` `type` / `lineMode`, when set
   - an angle (unit `°`, or state class `measurement_angle`): arrowline
   - energy, gas, water or volume that only adds up (state class `total_increasing`, or `total` with such a device class or unit): bar
