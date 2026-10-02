@@ -221,7 +221,7 @@ An incompatible drop shows a brief tooltip explaining the mismatch.
 
 ### Linked graphs
 
-A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. All the curves share one Y axis: when their values aren't of the same order, use `scale:` to make a small one visible next to a large one (the legend and tooltip keep showing its real value). Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
@@ -510,7 +510,8 @@ graphs:
 | `decimation` | ✓ | ✓ | ✓ | `fast` (default), `accurate`, or `false` |
 | `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
-| `scale` | | | ✓ | Multiply values by this factor before display |
+| `scale` | | | ✓ | Multiply values by this factor before drawing — see *6 |
+| `unit` | | | ✓ | Unit shown instead of the entity's own — see *6 |
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |
 | `circular` | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
@@ -534,6 +535,8 @@ graphs:
 *4 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities) above.
 
 *5 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. On an arrowline, it sets what a full turn of the arrows is (360 without a period).
+
+*6 — `scale` without `unit` only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W.
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 

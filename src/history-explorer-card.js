@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.47';
+const Version = '1.1.48';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1040,11 +1040,11 @@ export class HistoryCardState {
     // Return entity label name with current value
     // --------------------------------------------------------------------------------------
 
-    getFormattedLabelName(name, entity, unit)
+    getFormattedLabelName(name, entity, unit, shownScale = 1)
     {
         let label = name;
         const p = 10 ** this.pconfig.roundingPrecision;
-        const v = Math.round(this._hass.states[entity].state * p) / p;
+        const v = Math.round(this._hass.states[entity].state * shownScale * p) / p;
         if( !isNaN(v) ) {
             label += ' (' + v + (unit ? ' ' + unit : '') + ')';
         }
@@ -1880,7 +1880,7 @@ export class HistoryCardState {
                         return config?.showSamples ? ( config.showSamples === true ? 6 : +config.showSamples + 2 ) : 5;
                     })(),
                     hitRadius: 5,
-                    label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit) : d.name,
+                    label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
@@ -1888,6 +1888,8 @@ export class HistoryCardState {
                     domain: d.domain,
                     entity_id: d.entity_id,
                     unit: d.unit,
+                    shownScale: d.shownScale,
+                    hecTextFactor: d.shownScale / d.drawScale,
                     hidden: d.hidden,
                     showMinMax: d.showMinMax ? true : false,
                     siConversionFactor: d.siConversionFactor,
@@ -2065,10 +2067,12 @@ export class HistoryCardState {
                                 if( label ) label += ': ';
                                 const p = 10 ** this.pconfig.roundingPrecision;
                                 const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
+                                // (from the value drawn back to the value shown: see shownScale)
+                                const _tf = data.datasets[item.datasetIndex].hecTextFactor ?? 1;
                                 const _circQ = data.datasets[item.datasetIndex].hecCircular;
-                                let _v = Math.round(item.yLabel / _siFactor * p) / p;
+                                let _v = Math.round(item.yLabel / _siFactor * _tf * p) / p;
                                 // (a circular curve shows its real value, in [0, period))
-                                if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ) * p) / p;
+                                if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ * Math.abs(_tf)) * p) / p;
                                 label += _v;
                                 label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                                 return label;
@@ -5792,6 +5796,12 @@ export class HistoryCardState {
                 // period, 360 when it has none)
                 "arrowPeriod": ( _kind === 'arrowline' ) ? ( this._circularPeriod(d) ?? 360 ) : undefined,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
+                // (the factor between the entity's value and the value shown in the legend and
+                // tooltip: with its own `unit`, `scale` is a conversion and the converted value
+                // is shown; without, it only changes how the curve is drawn and the entity's
+                // real value is shown)
+                "shownScale": ( d.unit !== undefined ) ? ( d.scale ?? 1 ) : 1,
+                "drawScale": d.scale || 1,
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
                 "hidden": d.hidden,
@@ -7682,7 +7692,7 @@ export class HistoryCardState {
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
                     if( this.pconfig.showCurrentValues && g !== this._frozenChart ) {
                         let d = g.chart.data.datasets[i];
-                        d.label = this.getFormattedLabelName(d.name, e.entity, d.unit);
+                        d.label = this.getFormattedLabelName(d.name, e.entity, d.unit, d.shownScale);
                     }
                     changed = true;
                 }
