@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.47] - in progress
+## [v1.1.47] - 2026-10-02
 
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
 - The menu now lists smart, curves, straight, stepped, then bar, arrowline and timeline
