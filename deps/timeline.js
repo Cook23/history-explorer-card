@@ -938,7 +938,10 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
                 let yc = y0 + arrowImage.height / 2;
                 this.chart.ctx.setTransform(origMatrix);
                 this.chart.ctx.translate(xc, yc);
-                this.chart.ctx.rotate((value + 180) / 180.0 * Math.PI);
+                // (a full turn is the dataset's arrowPeriod — the entity's circular period, 360
+                // by default — so an angle in radians or grads points the right way too)
+                const period = this.chart.data.datasets[this.index]?.arrowPeriod || 360;
+                this.chart.ctx.rotate((value / period * 360 + 180) / 180.0 * Math.PI);
                 this.chart.ctx.translate(-xc, -yc);
                 this.chart.ctx.drawImage(arrowImage, x0, y0, arrowImage.width, arrowImage.height);
             }
