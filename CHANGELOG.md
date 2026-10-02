@@ -4,85 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.0] - in progress
+## [v1.2.0] - 2026-10-02 — beta
 
-> This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
+> Published as a pre-release, alongside the 1.1 line: the features of v1.1.47, a new way of dragging on touch screens, and a reorganized code base. Compared with v1.1.47:
 
-### Merged — v1.1.47
-- The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page), and arrowline arrows turning by the entity's `circular` period — see v1.1.47 below; both fixes were already part of this version's own entries
+### Changed — on touch, a drag starts with a tap
+- A swipe on a graph now always scrolls the page, wherever it starts. Until now, a swipe starting on a curve label or a timeline label didn't scroll the page, and one starting on the ⠿ handle moved the graph
+- To drag a curve or timeline label (reorder, move to another graph), the ⠿ handle (reorder graphs) or the Y axis labels (pan the axis), tap it first, then press it again and drag without lifting your finger
+- A long-press still opens the type menu
+- With a mouse or a pen, nothing changes: drag directly
 
-### Merged — everything from v1.1.42 to v1.1.46
-- Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), and the multi-device sync fixes — see their own entries below. Adapted to the new split of roles: the interaction parts go through Chart.js's gesture system, like everything else
+### New — pinch also zooms the time
+- Spreading or pinching two fingers horizontally zooms the time in or out around the point between them, by the same steps as the zoom buttons; vertically, it zooms the Y axis, as before
+- Moving the two fingers together still pans the time and the Y axis
 
-### New — pinch on touch: zoom and pan the time too
-- Spreading or pinching two fingers horizontally zooms the time in or out around the point between them, by the same steps as the zoom buttons (one step per ×1.5 of spread); vertically, it zooms the Y axis as before
-- Moving the two fingers together pans the time, and the Y axis (lost in the v1.2 rework so far)
+### Changed — under the hood
+- Every interaction with a graph (gestures, zones, touch, drag feedback, the Y axis lock) is handled in one place, `deps/chart-hec.js`, through a documented contract with the card (`deps/Chart Custom.js.md`); the card only decides what each gesture means
+- The entities (which one is shown, in which group of linked graphs, in which order) are kept by one module, `src/history-entity-store.js`; the card's code is split by role (`src/card-*.js`) — described in `ARCHITECTURE.md`
+- Automated tests (`yarn test`, see `tests/README.md`): every gesture with a mouse and with fingers, history, statistics, CSV export, refresh, the entity selector, the info panel, the type menu, arrowline
 
-### Fixed — dragging the plot (pan) and pinching threw an error and did nothing
-- The table of drag handlers was declared in one function and used in another, where it didn't exist: every drag of the plot and every pinch failed
-
-### Fixed — with a mouse, a curve, a label or a graph could not be dragged onto another graph
-- The drag was lost as soon as the pointer left its graph (touch was not affected)
-
-### Fixed — after a refused drop, the next drag on the same graph did nothing
-- The first drag left an (invisible) text selection on the page; the next press on it started the browser's own drag-and-drop instead
-
-### Fixed — a drop onto another graph never happened
-- A debug trace, logged at every release, failed on the drag's state while a drag onto another graph was under way, so the release was lost. All the debug traces are removed
-
-### Fixed — on touch, the type menu opened by a long-press closed as soon as the finger was lifted
-
-### Fixed — Ctrl+wheel could zoom the page as well as the time range
-- Only the first tick of a fast wheel movement was kept from zooming the page
-
-### Fixed — dragging a curve over another history-explorer card on the same dashboard highlighted it as a drop target
-- A drag now only reaches the graphs of its own card
-
-### Changed — the rest of the interaction code moved to Chart.js, without any duplicate
-- The chain icon of linked graphs, the drag cursor, the Ctrl+wheel zoom and the circular Y axis labels are now Chart.js's (options `linkMarkerVisible`, `dropAllowed`, `zoomX`, `ticks.period`); the card no longer listens to any pointer or wheel event of a graph, nor sets any cursor
-- One shared implementation of the floating elements (tooltips, messages, menus kept on screen, drop-target outline): `Chart.hecUi`, used by Chart.js and by the card, which had its own copies. Drop positions (curve or timeline label) come from the same Chart.js functions as the insertion markers
-- The other duplicated code of the card is factored too (entity selector lists, time axes, type menu entries — also shared with the info panel)
-- All documented in `deps/Chart Custom.js.md`
-
-### Changed — the code is organized by role
-- The entities (which one is shown, in which group of linked graphs, in which order) are now kept by one module, `src/history-entity-store.js`, through which every change goes — with its own tests. Dropping a curve and dropping a timeline row now share one operation
-- Everything this fork adds to Chart.js is in its own file, `deps/chart-hec.js`; the gesture detector is split into one function per event
-- The card's code is split by role: history data, datasets, gestures, menus, storage (`src/card-*.js`)
-- Described in `ARCHITECTURE.md`. New checks in `yarn test`: undeclared identifiers, the entity store, a scenario on graphs added from the UI, and the persisted order checked against the screen after each scenario
-
-### Fixed — dropping a curve on a graph below could move that graph up
-- With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
-
-### Changed — the boundary between Chart.js and the card is fixed, documented and tested
-- Chart.js now tells where each gesture happens: the zone, the label, the position along the time axis, and for a drop, the graph and the place among its labels or rows. The card no longer reads any graph's layout or calls any internal Chart.js function. The contract is described in `deps/Chart Custom.js.md` §0
-- The time axis is moved through two calls only, with a mouse or with fingers: `panX` (a drag, and the fingers of a pinch) and `zoomX` (Ctrl+wheel, and the spread of a pinch, one zoom step at a time)
-- The card handles each gesture in its own method (click, double-click, long press, start, move and end of a drag). Its drag state belongs to each card, instead of being shared by every card on the page
-- Automated interaction tests (mouse, touch, two cards): `yarn test`, see `tests/README.md`
-
-### Changed — internal architecture rework for how the card handles clicks, drags, and gestures
-- Legend clicks/double-clicks, curve and timeline/arrowline label drag & drop, the entity type menu's long-press, mouse wheel zoom, hover cursors, and the truncated-label tooltip are now all detected and handled through a single, unified mechanism instead of several separate, overlapping ones
-- No user-visible change is intended from this alone — it's a foundation for the touch-related fixes below, and for future work
-
-### Fixed — double-click no longer requires a first click to also complete as a plain click first
-- Previously, a double-click's first tap was resolved as its own click before the second tap could combine into a double-click, occasionally causing both a single-click action (e.g. hiding a curve) and a double-click action (e.g. ungrouping it) to fire from the same gesture
-- A double-click is now recognized starting from the second press itself, without ever waiting on the first tap's own release
-
-### Fixed — a long-press followed immediately by dragging, without lifting your finger, now works as a single continuous gesture
-- Previously, once a long-press fired (e.g. opening the entity type menu), continuing to hold and drag the same finger no longer did anything — you had to lift and start a new, separate drag
-- A long-press and a drag can now both happen within the same continuous touch, one after the other, without lifting your finger in between
-
-### Changed — Y axis pan on touch now uses double-tap-then-drag, to avoid interfering with scrolling
-- The standard way to pan the Y axis on touch devices is now: double-tap the label area, then drag without lifting your finger — a workaround that reliably avoids any interference with the browser's native scroll
-- The Y axis lock icon still engages automatically the same way it always has
-
-### Fixed — the touch-safe zone for dragging a curve label or a timeline/arrowline label was much wider than the label itself
-- On line/bar graphs with few curves, or a short legend, the area you could tap-and-hold on to start a drag stretched across the entire width of the graph, not just the legend's actual labels
-- That zone is now sized to the labels' own actual footprint, plus a small margin, on every graph type
-
-### Fixed — hover cursors on the Y axis and curve/entity labels briefly went missing
-- A change made to fix an unrelated touch-scrolling issue had accidentally cleared the `↕` (Y axis) and 4-way move cursors shown when hovering those zones with a mouse or stylus
-- Restored, no other behavior affected
-
+### Merged — everything from v1.1.42 to v1.1.47
+- Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
 
 ## [v1.1.47] - 2026-10-02
 
