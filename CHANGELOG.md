@@ -8,11 +8,8 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
-### Merged — v1.1.48 (in progress)
-- Arrowline arrows turn by the entity's `circular` period (360 by default) — see v1.1.48 below
-
 ### Merged — v1.1.47
-- The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page) — see v1.1.47 below; both fixes were already part of this version's own entries
+- The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page), and arrowline arrows turning by the entity's `circular` period — see v1.1.47 below; both fixes were already part of this version's own entries
 
 ### Merged — everything from v1.1.42 to v1.1.46
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), and the multi-device sync fixes — see their own entries below. Adapted to the new split of roles: the interaction parts go through Chart.js's gesture system, like everything else
@@ -87,11 +84,6 @@ Changelog for the HA History Explorer Card.
 - Restored, no other behavior affected
 
 
-## [v1.1.48] - in progress
-
-### Fixed — arrowline: an angle in radians or grads pointed the wrong way
-- The arrows always turned by the value in degrees, whatever the entity's `circular` period: 1.5708 rad pointed almost north instead of east. They now turn by value / period of a full turn — the entity's `circular` period (set, or detected: 360 for `°` and `measurement_angle`), 360 when it has none
-
 ## [v1.1.47] - 2026-10-02
 
 ### Changed — the type menu: smart first, and the most fitting type pre-selected for a new entity
@@ -110,6 +102,9 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — Ctrl+wheel could zoom the page as well as the time range
 - On a fast wheel movement, the card zooms once per 150 ms and ignores the ticks in between — and those ignored ticks zoomed the browser's page. Every Ctrl+wheel tick over the card is now kept from zooming the page
+
+### Fixed — arrowline: an angle in radians or grads pointed the wrong way
+- The arrows always turned by the value in degrees, whatever the entity's `circular` period: 1.5708 rad pointed almost north instead of east. They now turn by value / period of a full turn — the entity's `circular` period (set, or detected: 360 for `°` and `measurement_angle`), 360 when it has none
 
 
 ## [v1.1.46] - 2026-10-01
