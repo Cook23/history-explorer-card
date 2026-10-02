@@ -4,6 +4,15 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.47] - in progress
+
+### Fixed — dropping a curve on a graph below could move that graph up
+- With three curves on a graph and one of them split off below it, dropping one of the two others on the split graph moved that graph above its source. The dropped curve now joins the end of the target's group in the saved list, as a dropped timeline row already did, and the graphs stay in place
+
+### Fixed — Ctrl+wheel could zoom the page as well as the time range
+- On a fast wheel movement, the card zooms once per 150 ms and ignores the ticks in between — and those ignored ticks zoomed the browser's page. Every Ctrl+wheel tick over the card is now kept from zooming the page
+
+
 ## [v1.1.46] - 2026-10-01
 
 ### New — angles drawn without jumps at 0/360 (`circular`)

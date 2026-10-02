@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.46';
+const Version = '1.1.47b1';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -2927,6 +2927,9 @@ export class HistoryCardState {
                     // Update groupId in pconfig.entities
                     const _tgtGroupId = this._pcGroupIdOf(_tgt.entities[0].entity);
                     const _eIdx = this._pcEntryIndex(_entity.entity);
+                    // The graph after the source, found before the entry moves: the search
+                    // follows pconfig.entities' order
+                    const _srcNextG = _sameGroup ? this._nextGraph(_src) : this._nextGroup(_src);
                     if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
                         // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
                         // only groupId/color/fill change on a cross-graph move.
@@ -2938,16 +2941,22 @@ export class HistoryCardState {
                         this._setGraphKey(_pcE, _tgt.entities[0].graphKey);
                         _pcE.color = _entity.color;
                         _pcE.fill = _entity.fill;
-                        // Same reason as _uncombineEntity: the entry's groupId just changed
-                        // but it's still at its old array position — regroup now.
-                        this._regroupPcEntities();
+                        // The entry joins the end of its new group's block, as a dropped
+                        // timeline row does — regrouping the whole list instead would move
+                        // the target group up to the entry's old place when the entry came
+                        // from above it (the target graph then jumped above the source)
+                        this.pconfig.entities.splice(_eIdx, 1);
+                        let _tgtLastIdx = -1;
+                        this.pconfig.entities.forEach((en, i) => { if( typeof en === 'object' && en.groupId === _tgtGroupId ) _tgtLastIdx = i; });
+                        if( _tgtLastIdx >= 0 ) this.pconfig.entities.splice(_tgtLastIdx + 1, 0, _pcE);
+                        else this.pconfig.entities.push(_pcE);
                     }
                     // Rebuild source graph without the moved entity (removes the source
                     // graph entirely if it becomes empty). Within one group (several linked
                     // graphs), each graph is rebuilt right where it was — graph-level
                     // neighbor, not the next group, or the block's internal order would change.
                     const _tgtOrigGroupId = _tgt.groupId;
-                    this._detachAndRebuildRemaining(_src, _srcIdx, _sameGroup ? this._nextGraph(_src) : undefined);
+                    this._detachAndRebuildRemaining(_src, _srcIdx, _srcNextG);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
@@ -4459,6 +4468,10 @@ export class HistoryCardState {
 
     wheelScrolled(event)
     {
+        // Ctrl+wheel zooms the time range, never the page — every tick, including those the
+        // debounce below skips
+        if( event.ctrlKey ) event.preventDefault();
+
         const now = Date.now();
         if( this._wheelLast && now - this._wheelLast < 150 ) return;
         this._wheelLast = now;
