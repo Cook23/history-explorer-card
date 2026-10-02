@@ -30,6 +30,8 @@ const STATES={
  'sensor.net_energy':ent('sensor.net_energy','net energy','kWh','3','total'),
  'sensor.gas':ent('sensor.gas','gas','m³','120','total_increasing'),
  'sensor.tank':ent('sensor.tank','tank','L','800','measurement'),
+ 'sensor.wind_rad':ent('sensor.wind_rad','wind (rad)','rad','1.5708','measurement'),
+ 'sensor.wind_grad':ent('sensor.wind_grad','wind (grad)','gon','100','measurement'),
  'sensor.energy2':ent('sensor.energy2','energy2','kWh','5','total_increasing'),
 };
 STATES['sensor.net_energy'].attributes.device_class='energy';

@@ -8,6 +8,9 @@ Changelog for the HA History Explorer Card.
 
 > This entry covers the interaction architecture rework so far; it will be revisited once v1.2.0 is finalized.
 
+### Merged — v1.1.48 (in progress)
+- Arrowline arrows turn by the entity's `circular` period (360 by default) — see v1.1.48 below
+
 ### Merged — v1.1.47
 - The type menu's new order (smart first) and the most fitting type pre-selected for a new entity, and the two fixes found while testing v1.2 (a dropped curve moving a graph up, Ctrl+wheel zooming the page) — see v1.1.47 below; both fixes were already part of this version's own entries
 
@@ -83,6 +86,11 @@ Changelog for the HA History Explorer Card.
 - A change made to fix an unrelated touch-scrolling issue had accidentally cleared the `↕` (Y axis) and 4-way move cursors shown when hovering those zones with a mouse or stylus
 - Restored, no other behavior affected
 
+
+## [v1.1.48] - in progress
+
+### Fixed — arrowline: an angle in radians or grads pointed the wrong way
+- The arrows always turned by the value in degrees, whatever the entity's `circular` period: 1.5708 rad pointed almost north instead of east. They now turn by value / period of a full turn — the entity's `circular` period (set, or detected: 360 for `°` and `measurement_angle`), 360 when it has none
 
 ## [v1.1.47] - 2026-10-02
 
