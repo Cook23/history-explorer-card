@@ -10,9 +10,10 @@ Changelog for the HA History Explorer Card.
 - `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
 - Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
 
-### Merged — v1.1.50
+### Merged — v1.1.50 and v1.1.51 (unreleased)
 - The type menu's submenu named *Interpolation*, its entries named in one short word; every translation reviewed; persistence fixed for a new device and for the display type of a YAML entity — see v1.1.50 below
 - A new test suite, `persistence`: every option that can be changed from the card, with and without persistence, on this device and on a new one, and the last one to speak (the YAML, another device) winning
+- The Interpolation submenu drawn over the type menu, right edges aligned — see v1.1.51 below
 
 ### Changed — under the hood
 - The curve reconstruction algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
@@ -42,6 +43,11 @@ Changelog for the HA History Explorer Card.
 
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
+
+## [v1.1.51] - unreleased
+
+### Changed — the Interpolation submenu drawn over the type menu
+- The submenu of the interpolation algorithms opens over the type menu, level with *Interpolation ▸*, its right edge on the menu's right edge: it no longer takes room beside the menu (it opened on the right of the menu, or on its left at the right edge of the screen)
 
 ## [v1.1.50] - 2026-10-03
 

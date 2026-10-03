@@ -114,17 +114,19 @@ module.exports = async function()
 
     // ── Position ──
     t = await openCard(card(LINE), { height: 700 });
-    await t.step('in the middle: the submenu on the right of its item, level with it', async () => {
+    // Over the menu, level with its item, right edges aligned: no room taken beside the menu
+    const overMenu = b => Math.abs(b.s.right - b.m.right) < 1 && Math.abs(b.s.top - b.i.top) < 1 && b.s.left >= b.m.left;
+    await t.step('in the middle: the submenu over the menu, level with its item, right edges aligned', async () => {
         await t.E(openAt(300, 200)); await t.wait(200);
         const b = await t.E(boxes());
-        const ok = Math.abs(b.s.left - b.m.right) < 4 && Math.abs(b.s.top - b.i.top) < 2 && inView({ ...b.s, vw: b.vw, vh: b.vh });
+        const ok = overMenu(b) && inView({ ...b.s, vw: b.vw, vh: b.vh });
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
         return ok ? true : JSON.stringify(b);
     });
-    await t.step('at the right edge: menu and submenu within the viewport, the submenu on the left of the menu', async () => {
+    await t.step('at the right edge: menu and submenu within the viewport, the submenu still over the menu', async () => {
         await t.E(openAt('innerWidth - 20', 200)); await t.wait(200);
         const b = await t.E(boxes());
-        const ok = inView({ ...b.m, vw: b.vw, vh: b.vh }) && inView({ ...b.s, vw: b.vw, vh: b.vh }) && b.s.right <= b.m.left + 4;
+        const ok = inView({ ...b.m, vw: b.vw, vh: b.vh }) && inView({ ...b.s, vw: b.vw, vh: b.vh }) && overMenu(b);
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
         return ok ? true : JSON.stringify(b);
     });
