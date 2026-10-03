@@ -317,8 +317,10 @@ refresh:
 
 ```yaml
 type: custom:history-explorer-card
-lineMode: curves   # curves (default), lines, stepped, or smart
+lineMode: lines    # curves, lines, stepped, or smart
 ```
+
+Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Line curves* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
 
 `smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
