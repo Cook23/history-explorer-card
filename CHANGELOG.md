@@ -8,13 +8,16 @@ Changelog for the HA History Explorer Card.
 
 ### Merged — v1.1.48 and v1.1.49
 - `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
-- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Reconstruction submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
+- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
+
+### Merged — v1.1.50 (unreleased)
+- The type menu's submenu named *Interpolation*; every translation reviewed — see v1.1.50 below
 
 ### Changed — under the hood
 - The curve reconstruction algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
 - The option names, their synonyms and the levels they're accepted at are in a new module, `src/history-options.js`
 - The card and the info panel share one configuration reader (`applyConfig`), one reaction to new states (`onStatesChanged`) and one automatic refresh (`scheduleAutoRefresh`); submenus are placed by one method (`_openSubmenu`)
-- New test suites `scale` and `options` (the options at every level, the Reconstruction submenu with the keyboard, the mouse and on touch, at the screen edges and inside a shadow root, the load of the automatic refresh, the info panel)
+- New test suites `scale` and `options` (the options at every level, the Interpolation submenu with the keyboard, the mouse and on touch, at the screen edges and inside a shadow root, the load of the automatic refresh, the info panel)
 
 
 ## [v1.2.0] - 2026-10-02 — beta
@@ -38,6 +41,19 @@ Changelog for the HA History Explorer Card.
 
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
+
+## [v1.1.50] - unreleased
+
+### Changed — the type menu's submenu is named *Interpolation*
+- The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
+
+### Changed — clearer translations
+- Every language reviewed so that each text says what it does where it's shown:
+  - dropping a curve on a graph defined in YAML is refused with *Graph defined in YAML* (it said *Static*), and moving a graph between linked graphs with *Linked graphs can't be separated* (it said *Linked graphs*)
+  - the interval selector of bar graphs: the raw curves entry is *Raw line*, as in the documentation, in every language; the intervals read *Per hour / Per day / Per month* where they read *Hour*, *Schedule* (Spanish) or *Monthly*
+  - *Remove all added graphs* and its confirmation say that only the graphs added from the card are removed
+  - arrowlines are named *Direction arrows* in the other languages (calques of *arrowline* before), bars in the plural
+  - spelling, punctuation and wording fixes (French *Désactiver*, Spanish *¿…?*, Dutch, Polish, Danish, Slovak and Russian wording), and the last English placeholders translated (Polish, Swedish and Danish *As line*)
 
 ## [v1.1.49] - 2026-10-03
 

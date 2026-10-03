@@ -173,7 +173,7 @@ Any numeric entity can be shown as a line (straight, curved, stepped or smart), 
 
 The currently active type is shown in bold. Use ArrowUp/ArrowDown and Enter to pick with the keyboard, or click directly. Non-numeric entities (on/off, text states) never show this menu — they can only be a timeline, and are added as such automatically.
 
-For a curve shown in *Line smart* or *Line curves*, the menu starts with **Reconstruction ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve reconstruction](#curve-reconstruction)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
+For a curve shown in *Line smart* or *Line curves*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
 
 In the info panel, a "Type" link appears between the date and range selectors for numeric entities, opening the same menu.
 
@@ -310,9 +310,9 @@ lineMode: lines    # curves, lines, stepped, or smart
 
 Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Line curves* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
 
-### Curve reconstruction
+### Curve interpolation
 
-In `curves` and `smart` modes, the curve between two values is rebuilt by an interpolation algorithm, chosen with `interpolation` (on the card, a graph, an entity or in `entityOptions`) or from the type menu (**Reconstruction ▸**):
+In `curves` and `smart` modes, the curve between two values is rebuilt by an interpolation algorithm, chosen with `interpolation` (on the card, a graph, an entity or in `entityOptions`) or from the type menu (**Interpolation ▸**):
 
 ```yaml
 type: custom:history-explorer-card
@@ -510,7 +510,7 @@ graphs:
 | `fill` | ✓ | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
-| `interpolation` | ✓ | ✓ | ✓ | Curve reconstruction in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` |
+| `interpolation` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` |
 | `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) — `showSamples` is a synonym |
 | `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |

@@ -727,7 +727,7 @@ export class CardGestures
         const _insertBefore = drop.insertBefore;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
-            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), info.clientX, info.clientY, 'left', _srcG.canvas);
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs_split'), info.clientX, info.clientY, 'left', _srcG.canvas);
             return;
         }
 

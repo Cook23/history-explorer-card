@@ -32,11 +32,11 @@ module.exports = async function()
     // ── The type menu offers what fits the entity, its current type marked ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }]), { height: 900 });
     const menu = `(()=>{ const m=el.querySelector('#et_0'); return [...m.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`;
-    await t.step('type menu of a numeric curve: Reconstruction, then every type, smart first and marked', async () => {
+    await t.step('type menu of a numeric curve: Interpolation, then every type, smart first and marked', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300);
-        return m === 'Reconstruction ▸ | Line smart* | Line curves | Line straight | Line stepped | Bar | Arrowline | Timeline | Delete' ? true : m;
+        return m === 'Interpolation ▸ | Line smart* | Line curves | Line straight | Line stepped | Bar | Arrowline | Timeline | Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: timeline only', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
