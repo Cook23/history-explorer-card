@@ -41,6 +41,10 @@ graphs:
       # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
       lineMode: null
 
+      # (curves and smart modes) Curve reconstruction algorithm: monotone (default), steffen, makima or catmullrom.
+      # Otherwise defaults to the graph's, then $.entityOptions', then the card's value at $.interpolation
+      interpolation: null
+
       # Line width, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
       lineWidth: null
 
@@ -105,7 +109,12 @@ graphs:
   type: ? line, bar, arrowline, timeline
 
   # Additional options for the graph. Every option below acts as a shared default for every entity in
-  # this graph (an entity's own value, set directly under $.graphs.entities, always wins over it)
+  # this graph (an entity's own value, set directly under $.graphs.entities, always wins over it).
+  # They can also be set directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set).
+  # Every option is accepted at every level — card, $.entityOptions, graph, entity — the most specific one
+  # winning: entity → graph → entityOptions → card. The options of the graph itself (height, stacked, ylock,
+  # ymin, ymax, ystepSize, showTimeLabels), set on an entity or in entityOptions, apply to the graph the
+  # entity is shown in, the graph's own value winning
   options:
     # Height of the graph, in pixels. Defaults to being either `lineGraphHeight`, `barGraphHeight` or calculated, depending on graph type
     height: null
@@ -121,6 +130,9 @@ graphs:
 
     # (line graph only) Line interpolation mode for every entity in this graph
     lineMode: null
+
+    # (curves and smart modes) Curve reconstruction algorithm for every entity in this graph — see $.interpolation
+    interpolation: null
 
     # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
     lineWidth: null
@@ -140,7 +152,7 @@ graphs:
     exclude: null
 
     # (line graph only) If true, show permanent dots at each measurement point making up the line, for every
-    # entity in this graph (unless overridden per entity — see $.graphs.entities above)
+    # entity in this graph (unless overridden per entity — see $.graphs.entities above). `showSamples` is a synonym
     showPoints: False
 
     # If true, show the time labels on graph
@@ -155,7 +167,7 @@ graphs:
     # Maximum value of the Y-axis (initial bound — automatically calculated by default)
     ymax: null
 
-    # Step size to display on the Y-axis (automatically calculated by default)
+    # Step size to display on the Y-axis (automatically calculated by default). `ystepsize` is a synonym
     ystepSize: null
 
     # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
@@ -211,6 +223,9 @@ entityOptions:
 
     # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
     lineMode: null
+
+    # (curves and smart modes) Curve reconstruction algorithm — see $.interpolation
+    interpolation: null
 
     # Can be used to scale a specified entity's value by the given factor
     # Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the real value.
@@ -294,8 +309,21 @@ rounding: 2
 # for YAML graphs only, set it under each graph's `options:` instead
 lineMode: null
 
+# Curve reconstruction algorithm, for the curves and smart line modes:
+#   monotone   — Chart.js' monotone cubic (Fritsch–Carlson): never overshoots, but flat at every value where the
+#                curve changes direction or repeats a value (the default)
+#   steffen    — monotone too, flat only at the real peaks and troughs, weighted by the spacing of the values
+#   makima     — modified Akima: follows the local trend, flat over flat stretches, hardly any overshoot
+#   catmullrom — the smoothest, may overshoot a little around sharp changes
+# Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Reconstruction)
+interpolation: "monotone"
+
 # Line width for lines in line graphs. `width` is also accepted as an alias
 lineWidth: 2.0
+
+# The options of every graph can also be set here, for every graph of the card (a graph, $.entityOptions or
+# an entity can still set their own): fill, ymin, ymax, ystepSize, ylock, stacked, showTimeLabels — and height,
+# the height of every line and bar graph ($.lineGraphHeight / $.barGraphHeight win over it)
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
 # Can be: points, shortlines, longlines, pointline, or default which is a solid line
@@ -393,10 +421,11 @@ timelineBarHeight: 24
 # Distance from the top of one bar in the timeline graph, to the top of the next bar. (This, minus $.timelineBarHeight, gives the space between bars)
 timelineBarSpacing: 40
 
-# Settings around automatically refreshing the graphs. By default they will refresh only when you refresh the page
+# Settings around automatically refreshing the graphs
 refresh:
-  # If set true, will automatically refresh the graphs as new data comes in for tracked entities
-  automatic: False
+  # Automatically refresh the graphs as new data comes in for tracked entities (on by default since 1.1.49;
+  # set False to refresh only when the page is reloaded, or at the interval below)
+  automatic: True
   # Here you can set the length of the interval (in seconds) after which to automatically refresh the graph data.
   interval: undefined
 

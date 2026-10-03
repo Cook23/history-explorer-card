@@ -4,6 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.49b1] - unreleased
+
+### New — curve reconstruction: a choice of interpolation algorithms
+- In `curves` and `smart` modes, the curve between two values can now be rebuilt by four algorithms, chosen with the new `interpolation` option:
+  - `monotone` (default, unchanged): Chart.js' monotone cubic (Fritsch–Carlson). Never overshoots, but flat at every value where the curve changes direction or repeats a value, hence small breaks in the slope
+  - `steffen`: monotone too, flat only at the real peaks and troughs, slopes weighted by the irregular spacing of the values
+  - `makima`: modified Akima — follows the local trend, flat over flat stretches, no break at each small peak, hardly any overshoot
+  - `catmullrom`: the smoothest, may overshoot a little around sharp changes
+- `interpolation` can be set on the card, in `entityOptions`, on a graph or on an entity
+- The type menu of a curve in *Line smart* or *Line curves* starts with **Reconstruction ▸**: a submenu of the four algorithms, the one in use in bold and pre-selected, navigated like the type menu (arrows, Enter; → opens it, ← or Escape goes back). The choice is saved with the entity. Same menu in the info panel, whose configuration also takes `interpolation`
+
+### Changed — the same options at every level
+- Every display option is now accepted at every level where it makes sense — on the card, in `entityOptions`, on a graph and on an entity — the most specific one winning: entity → graph → `entityOptions` → card. New:
+  - on the card: `fill`, `ymin`, `ymax`, `ystepSize`, `ylock`, `stacked`, `showTimeLabels` and `height` (the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` still win over it), for every graph
+  - on an entity and in `entityOptions`: `ylock`, `stacked`, `height`, `showTimeLabels`, applied to the graph the entity is shown in, like `ymin` / `ymax` / `ystepSize` already were (the graph's own value wins)
+  - on a graph: its options can also be set directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set)
+- Every spelling an option ever had is now accepted at every level: `width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`. Nothing changes for existing configurations
+
+### Changed — automatic refresh on by default
+- `refresh.automatic` is now `true` by default: the graphs follow the values of their entities as they change. Set `automatic: false` to turn it off
+
 ## [v1.1.48] - 2026-10-02
 
 ### Changed — `scale` without `unit`: the legend and tooltip show the entity's real value
