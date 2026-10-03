@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.50b2';
+const Version = '1.1.50b3';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -789,7 +789,7 @@ export class HistoryCardState {
     // individually cover via a per-entity field list.
     _entityPersistenceFields()
     {
-        return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
+        return ['type', 'color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
                 'dashMode', 'lineMode', 'interpolation', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
                 'netBars', 'decimation', 'circular', 'groupId'];
     }
@@ -7496,7 +7496,11 @@ export class HistoryCardState {
         // YAML said last time on this device, HA with what this device last knew of HA. On
         // this device's first load the YAML image is empty, so YAML has spoken here — it
         // wins, then reaches HA (and the other devices) like any other YAML change.
-        const _yamlMirror   = _ls?.yaml_entities ?? [];
+        // The YAML as last seen — by this device, else (a new device: nothing stored here yet)
+        // by the device that last saved to HA, which stored the same image: without it, a
+        // new device would take the YAML as changed and let it win over everything saved
+        const _yamlImage    = _ls ?? _haCard;
+        const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
 
         const _findEntity = (arr, id) => arr.find(e => e.entity === id);
@@ -7705,7 +7709,7 @@ export class HistoryCardState {
 
         // YAML front — compared with the YAML image only
         const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
-                                 String(this.pconfig.yamlDefaultTimeRange) !== String(_ls?.yaml_defaultTimeRange);
+                                 String(this.pconfig.yamlDefaultTimeRange) !== String(_yamlImage?.yaml_defaultTimeRange);
 
         // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
         // as everything else. This was broken as an unrelated side effect of the v1.1.27
@@ -7723,7 +7727,7 @@ export class HistoryCardState {
         const _haInfoChanged = _haInfoEnabled !== undefined &&
                                _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
         const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _ls?.yaml_defaultInfoPanel;
+                                 this.pconfig.defaultInfoPanel !== _yamlImage?.yaml_defaultInfoPanel;
 
         // Apply winning value to active variables — YAML wins if both changed simultaneously
         let _infoPanelChanged = false;

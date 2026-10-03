@@ -19,6 +19,10 @@ Changelog for the HA History Explorer Card.
   - *Remove all added graphs* and its confirmation say that only the graphs added from the card are removed
   - spelling, punctuation and wording fixes (French *Désactiver*, Spanish *¿…?*, Dutch, Polish, Danish, Slovak and Russian wording), and the last English placeholders translated (Polish, Swedish and Danish *As line*)
 
+### Fixed — persistence: a new device gets what's saved; the display type of a YAML entity kept
+- With `enable_multidevice_persistence`, a device opening the card for the first time (or after its browser storage was cleared) got the YAML instead of what was saved from the other devices — the display options of the entities and the time range alike: with nothing stored locally yet, the YAML was taken as just changed, and won. It now compares the YAML with the image the other devices saved in Home Assistant, so the YAML only wins when it really changed
+- The display type of a YAML entity changed from the type menu (a curve turned into bars, for instance) wasn't kept with `enable_persistence` / `enable_multidevice_persistence` — its line mode was, not its type. `type` is now one of the persisted fields, like the others
+
 ## [v1.1.49] - 2026-10-03
 
 ### New — curve reconstruction: a choice of interpolation algorithms
