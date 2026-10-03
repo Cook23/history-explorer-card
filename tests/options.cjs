@@ -224,5 +224,14 @@ module.exports = async function()
     }
     done(await t.close());
 
+    // ── The info panel reads its configuration as the card does (same code) ──
+    t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curve', ylock: true, showSamples: 3 }, mock: { series: true }, height: 800 });
+    await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+    await t.step('info panel config: lineMode alias, a graph option and a synonym at its root, as on the card', async () => {
+        const v = await t.E(`(()=>{ const g=inst().graphs[0]; const d=g.chart.data.datasets[0]; return [inst().pconfig.defaultLineMode, g.ylock, d.pointRadius].join(':'); })()`);
+        return v === 'curves:true:3' ? true : v;
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

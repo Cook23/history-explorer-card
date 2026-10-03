@@ -510,7 +510,6 @@ export class CardMenus
             for( let i of dropdown.getElementsByTagName('a') ) {
                 const friendly = i.textContent.toLowerCase();
                 const entity   = i.dataset.entity?.toLowerCase() || '';
-                const domain   = entity.split('.')[0] || '';
                 let match;
                 if( !filter ) {
                     match = true;
