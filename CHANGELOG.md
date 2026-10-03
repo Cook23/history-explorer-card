@@ -4,6 +4,14 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.49b2] - unreleased
+
+### Fixed — automatic refresh: at most one request every 2 s, never held back
+- With an entity changing more often than every 2 s, the automatic refresh either never came (without `showCurrentValues`: each change postponed it) or reloaded the recent history at almost every change (with `showCurrentValues`, the default). It now reloads it at most once every 2 s, 2 s after the first change, however often the entities change — important now that the automatic refresh is on by default
+
+### Fixed — Reconstruction submenu at the right edge of the screen
+- Opened from a curve near the right edge, the submenu was pushed back over the type menu. It now opens on the left of the menu when there's no room on its right, and like every menu stays within the card and the screen
+
 ## [v1.1.49b1] - unreleased
 
 ### New — curve reconstruction: a choice of interpolation algorithms

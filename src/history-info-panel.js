@@ -286,11 +286,8 @@ function hecHookInfoPanel()
             // Update history when the shown entity state changes
             if( hec_panel.lc != lc ) {
                 hec_panel.lc = lc;
-                if( this.hec_instance.pconfig.refreshEnabled ) {
-                    this.hec_instance.cache[this.hec_instance.cacheSize].valid = false;
-                    if( this.hec_instance.tid ) clearTimeout(this.hec_instance.tid);
-                    this.hec_instance.tid = setTimeout(this.hec_instance.updateHistoryAutoRefresh.bind(this.hec_instance), 2000);
-                }
+                if( this.hec_instance.pconfig.refreshEnabled )
+                    this.hec_instance.scheduleAutoRefresh();
             }
 
         }
