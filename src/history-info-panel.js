@@ -1,6 +1,6 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { infoPanelEnabled, HistoryCardState, INTERPOLATION_LABELS, normalizeInterpolation, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
+import { infoPanelEnabled, HistoryCardState, INTERPOLATION_LABELS, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
 import { i18n } from "./languages.js";
 
 // --------------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ function hecHookInfoPanel()
         const _pcEntry = {
             entity   : entity_id,
             groupId  : instance.g_id,
-            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.width ?? entityOptions?.lineWidth ?? 1.001) : undefined,
+            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.lineWidth ?? 1.001) : undefined,
             interval : instance.parseIntervalConfig(entityOptions?.interval) ?? null,
             isStatic : true,
         };
@@ -129,8 +129,6 @@ function hecHookInfoPanel()
 
             instance.g_id = 0;
 
-            instance.pconfig.customStateColors = {};
-
             instance.stateColors = { ...stateColors };
             instance.stateColorsDark = { ...stateColorsDark };
 
@@ -145,55 +143,16 @@ function hecHookInfoPanel()
             instance.stateColorsDark['running.off']          = defaultInactiveDark;
             instance.stateColorsDark['update.on']            = defaultInactiveDark;
 
-            if( config.stateColors ) {
-                for( let i in config.stateColors ) {
-                    instance.pconfig.customStateColors[i] = parseColor(config.stateColors[i]);
-                }
-            }
-
-            instance.pconfig.entityOptions = config.entityOptions;
-
-            instance.pconfig.labelsVisible =          false;
-            instance.pconfig.cursorMode =             config.cursor?.mode ?? 'hide';
-            instance.pconfig.cursorTypes =            config.cursor?.types ?? ['all'];
-            instance.pconfig.showTooltipColors[0] =   config.tooltip?.showColorsLine ?? config.showTooltipColorsLine ?? true;
-            instance.pconfig.showTooltipColors[1] =   config.tooltip?.showColorsTimeline ?? config.showTooltipColorsTimeline ?? true;
-            instance.pconfig.tooltipSize =            config.tooltip?.size ?? config.tooltipSize ?? 'auto';
-            instance.pconfig.tooltipShowDuration =    config.tooltip?.showDuration ?? config.tooltipShowDuration ?? true;
-            instance.pconfig.tooltipShowLabel =       config.tooltip?.showLabel ?? true;
-            instance.pconfig.tooltipStateTextMode =   config.tooltip?.stateTextMode ?? config.stateTextMode ?? 'auto';
-            instance.pconfig.colorSeed =              config.stateColorSeed ?? 137;
-            instance.pconfig.stateTextMode =          config.stateTextMode ?? 'auto';
-            instance.pconfig.decimation =             config.decimation;
-            instance.pconfig.roundingPrecision =      config.rounding || 2;
-            instance.pconfig.defaultLineMode =        config.lineMode ?? 'lines';
-            instance.pconfig.defaultInterpolation =   normalizeInterpolation(config.interpolation) ?? 'monotone';
-            instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
-            instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
-            instance.pconfig.showCurrentValues =      false;
-            instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;
-            instance.pconfig.axisAddMarginMax =     ( config.axisAddMarginMax !== undefined ) ? config.axisAddMarginMax : false;
-            instance.pconfig.recordedEntitiesOnly =   false;
-            instance.pconfig.filterEntities  =        null;
-            instance.pconfig.combineSameUnits =       false;
-            instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-            instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
-            instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
-            instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
-            instance.pconfig.timeTickShortDate =      config.timeTicks?.dateFormat === 'short';
-            instance.pconfig.lineGraphHeight =      ( config.lineGraphHeight ?? 250 ) * 1;
-            instance.pconfig.barGraphHeight =       ( config.barGraphHeight ?? 150 ) * 1;
-            instance.pconfig.timelineBarHeight =    ( config.timelineBarHeight ?? 24 ) * 1;
-            instance.pconfig.timelineBarSpacing =     40;
-            instance.pconfig.hideLegend =             true;
-            instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? true;
-            // (no refresh.interval: the panel only lives while its dialog is open)
-            instance.pconfig.refreshInterval =        undefined;
-            instance.statistics.enabled =             config.statistics?.enabled ?? true;
-            instance.statistics.mode =                config.statistics?.mode ?? 'mean';
-            instance.statistics.retention =           config.statistics?.retention ?? undefined;
-            instance.statistics.period =              config.statistics?.period ?? 'hour';
-            instance.statistics.force =               undefined;
+            // The configuration, read as the card reads its own — with the panel's own defaults,
+            // and what the panel decides whatever its configuration says
+            instance.applyConfig(config, {
+                defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines' },
+                fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
+                         filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
+                         // (no refresh.interval: the panel only lives while its dialog is open)
+                         refreshInterval: undefined },
+            });
+            instance.statistics.force = undefined;
 
             instance.ui.darkMode = (instance._hass.selectedTheme && instance._hass.selectedTheme.dark) || (instance._hass.themes && instance._hass.themes.darkMode);
             if( config.uimode ) {
@@ -230,7 +189,7 @@ function hecHookInfoPanel()
             // Apply correct toolbar layout (always layout C in info-panel — no sl)
             instance.resizeSelector();
 
-            let ro = new ResizeObserver(entries => {
+            let ro = new ResizeObserver(() => {
                 for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
                 instance.setStepSize(true, instance._this.querySelector('#tb_0')?.clientWidth || null);
                 instance.resizeSelector();
@@ -287,15 +246,6 @@ function hecHookInfoPanel()
         }
     };
 
-    function calcGraphHeight(type)
-    {
-        switch( type ) {
-            case 'line': return hec_panel?.config?.lineGraphHeight ?? 250;
-            case 'bar': return (hec_panel?.config?.barGraphHeight ?? 150) + 24;
-            default: return 90;
-        }
-    }
-
     __fn.prototype._hec_render = function()
     {
         if( !this.hec_instance )
@@ -313,8 +263,6 @@ function hecHookInfoPanel()
         const sc = this.hass.states[entity_id]?.attributes?.state_class;
         const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 
-        const h = calcGraphHeight(type);
-
         // Entity type menu access — same all-or-nothing rule as the main card:
         // only offered when the entity's current state is numeric-convertible
         const _state = this.hass.states[entity_id]?.state;
@@ -324,7 +272,6 @@ function hecHookInfoPanel()
         const optBack = 'var(--card-background-color)';
 
         const bgcol = parseColor(hec_panel?.config?.uiColors?.buttons ?? getComputedStyle(document.body).getPropertyValue('--primary-color') + '1f');
-        const cbcol = parseColor(hec_panel?.config?.uiColors?.closeButton ?? '#0000001f');
         const tools = hec_panel?.config?.uiLayout?.toolbar != 'hide';
         const invertZoom = hec_panel?.config?.uiLayout?.invertZoom === true;
         const interval = hec_panel?.config?.uiLayout?.interval != 'hide';

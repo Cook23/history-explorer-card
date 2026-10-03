@@ -21,6 +21,7 @@ Changelog for the HA History Explorer Card.
   - on an entity and in `entityOptions`: `ylock`, `stacked`, `height`, `showTimeLabels`, applied to the graph the entity is shown in, like `ymin` / `ymax` / `ystepSize` already were (the graph's own value wins)
   - on a graph: its options can also be set directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set)
 - Every spelling an option ever had is now accepted at every level: `width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`. Nothing changes for existing configurations
+- The info panel's configuration is read like the card's: the same options with the same spellings (e.g. `lineMode: curve`, `lineWidth`, `showPoints`, `height`, and the graph options such as `ylock` at its root)
 
 ### Changed — automatic refresh on by default
 - `refresh.automatic` is now `true` by default: the graphs follow the values of their entities as they change. Set `automatic: false` to turn it off
