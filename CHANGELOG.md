@@ -6,15 +6,15 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.1b3] - unreleased
 
-### Merged — v1.1.49b2
-- Automatic refresh at most once every 2 s, never held back by entities changing faster; the Reconstruction submenu opens on the left of the type menu at the right edge of the screen — see v1.1.49b2 below
+### Merged — v1.1.49 (its second beta)
+- Automatic refresh at most once every 2 s, never held back by entities changing faster; the Reconstruction submenu opens on the left of the type menu at the right edge of the screen — see v1.1.49 below
 - The `options` test suite also covers the submenu at the edges of the screen, inside a shadow root (as in Home Assistant) and on a touch screen, and the load of the automatic refresh
 
 
 ## [v1.2.1b2] - unreleased
 
-### Merged — v1.1.49b1
-- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) at every level, and the Reconstruction submenu of the type menu; the same options at every level, every spelling accepted everywhere; automatic refresh on by default — see v1.1.49b1 below
+### Merged — v1.1.49 (its first beta)
+- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) at every level, and the Reconstruction submenu of the type menu; the same options at every level, every spelling accepted everywhere; automatic refresh on by default — see v1.1.49 below
 - In the code: the algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8); the option names, their synonyms and levels in the new module `src/history-options.js`; a new test suite, `options`
 
 
@@ -46,15 +46,7 @@ Changelog for the HA History Explorer Card.
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
 
-## [v1.1.49b2] - unreleased
-
-### Fixed — automatic refresh: at most one request every 2 s, never held back
-- With an entity changing more often than every 2 s, the automatic refresh either never came (without `showCurrentValues`: each change postponed it) or reloaded the recent history at almost every change (with `showCurrentValues`, the default). It now reloads it at most once every 2 s, 2 s after the first change, however often the entities change — important now that the automatic refresh is on by default
-
-### Fixed — Reconstruction submenu at the right edge of the screen
-- Opened from a curve near the right edge, the submenu was pushed back over the type menu. It now opens on the left of the menu when there's no room on its right, and like every menu stays within the card and the screen
-
-## [v1.1.49b1] - unreleased
+## [v1.1.49] - 2026-10-03
 
 ### New — curve reconstruction: a choice of interpolation algorithms
 - In `curves` and `smart` modes, the curve between two values can now be rebuilt by four algorithms, chosen with the new `interpolation` option:
@@ -74,6 +66,9 @@ Changelog for the HA History Explorer Card.
 
 ### Changed — automatic refresh on by default
 - `refresh.automatic` is now `true` by default: the graphs follow the values of their entities as they change. Set `automatic: false` to turn it off
+
+### Fixed — automatic refresh: at most one request every 2 s, never held back
+- With an entity changing more often than every 2 s, the automatic refresh either never came (without `showCurrentValues`: each change postponed it) or reloaded the recent history at almost every change (with `showCurrentValues`, the default). It now reloads it at most once every 2 s, 2 s after the first change, however often the entities change
 
 ## [v1.1.48] - 2026-10-02
 
