@@ -288,8 +288,11 @@ decimation: "fast"
 # How many decimal places to round values to, in tool tips and labels
 rounding: 2
 
-# Line interpolation mode. Can be: curves, lines, stepped, or smart (curves, with silences drawn as flat dashed plateaus)
-lineMode: "curves"
+# Line interpolation mode. Can be: curves, lines, stepped, or smart (curves, with silences drawn as flat dashed plateaus).
+# When not set (null), YAML graphs are drawn as curves and entities added from the UI are pre-selected as smart.
+# When set, it applies to both: e.g. "curves" also pre-selects curves for entities added from the UI. To set a mode
+# for YAML graphs only, set it under each graph's `options:` instead
+lineMode: null
 
 # Line width for lines in line graphs. `width` is also accepted as an alias
 lineWidth: 2.0
