@@ -335,8 +335,8 @@ Any numeric entity — one whose current state can be read as a number — can b
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — arrowline;
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
-  - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Line curves*).
-- For a curve already shown in *Line smart* or *Line curves*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
+  - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
+- For a curve already shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
 - **On a 700ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
@@ -705,7 +705,7 @@ All modes use `borderJoinStyle: round` for constant stroke width at corners and 
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. If the option is not present, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). When it's set, it applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Line curves* too. To keep a mode for your YAML graphs only, set it under each graph's `options:` (or on each entity) instead.
+You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. If the option is not present, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). When it's set, it applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep a mode for your YAML graphs only, set it under each graph's `options:` (or on each entity) instead.
 
 ```yaml
 type: custom:history-explorer-card
@@ -762,7 +762,7 @@ graphs:
         lineMode: smart
 ```
 
-It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Line smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
+It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
 
 How a silence is detected — the same rules as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
 - the sensor's usual interval between values is a running average (EMA) of the intervals, started from their median;
