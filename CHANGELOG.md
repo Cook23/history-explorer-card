@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.50] - unreleased
+## [v1.1.50] - 2026-10-03
 
 ### Changed — the type menu's submenu is named *Interpolation*
 - The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
