@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.49b1';
+const Version = '1.1.49b2';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -344,7 +344,7 @@ export class HistoryCardState {
         this.contentValid = false;
         this.entitiesPopulated = false;
         this.iid = 0;
-        this.tid = 0;
+        this._autoRefreshTid = 0;
         this.lastWidth = 0;
 
 
@@ -2278,11 +2278,6 @@ export class HistoryCardState {
 
     updateHistory()
     {
-        if( this.tid ) {
-            clearTimeout(this.tid);
-            this.tid = 0;
-        }
-
         for( let i of this.ui.dateSelector )
             if( i ) i.innerHTML = moment(this.startTime).format(this.i18n.styleDateSelector);
 
@@ -2392,6 +2387,19 @@ export class HistoryCardState {
 
             // All needed slots already in the cache, generate the chart data
             this.generateGraphDataFromCache();
+    }
+
+    // A shown entity changed: refresh its recent history — at most once every 2 s, however
+    // often the entities change (the next refresh is never postponed by a further change,
+    // and the recent history is only reloaded then, not at each change)
+    scheduleAutoRefresh()
+    {
+        if( this._autoRefreshTid ) return;
+        this._autoRefreshTid = setTimeout(() => {
+            this._autoRefreshTid = 0;
+            this.cache[this.cacheSize].valid = false;
+            this.updateHistoryAutoRefresh();
+        }, 2000);
     }
 
     updateHistoryAutoRefresh()
@@ -5055,6 +5063,21 @@ export class HistoryCardState {
         this._clampToViewport(menuEl);
     }
 
+    // Opens a submenu next to the item of its menu that opens it: on the right of the item,
+    // level with it — or on its left when the room on the right is missing — and, like every
+    // menu (_openMenu), kept within the card and the viewport. The submenu must share the
+    // menu's positioned parent (both are its children).
+    _openSubmenu(subEl, itemEl)
+    {
+        const _menu = itemEl.offsetParent;
+        const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
+        const _item = itemEl.getBoundingClientRect();
+        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.right - _cb.left - 2) + 'px');
+        // Pushed back over its menu by the bounds: on the left of the menu instead
+        if( subEl.getBoundingClientRect().left < _item.right - 4 )
+            this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.left - _cb.left - subEl.offsetWidth + 2) + 'px');
+    }
+
     _navigateMenuArrowKey(visible, key)
     {
         // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity type menu
@@ -6706,13 +6729,7 @@ export class HistoryCardState {
             _el.style.fontWeight = k === _cur ? 'bold' : '';
             if( k === _cur ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
         });
-        // Next to its item, on the right of the type menu (both share the same parent; the
-        // type menu may be shifted by its center/right alignment, a CSS transform)
-        const _w = _menu.offsetWidth;
-        const _shift = /-50%/.test(_menu.style.transform) ? -_w / 2 : /-100%/.test(_menu.style.transform) ? -_w : 0;
-        const _top  = (_menu.offsetTop + _item.offsetTop) + 'px';
-        const _left = (_menu.offsetLeft + _w + _shift - 2) + 'px';
-        this._openMenu(_sub, _top, _left);
+        this._openSubmenu(_sub, _item);
         // Shown with no keyboard highlight yet: the first arrow key highlights the
         // pre-selected algorithm, Enter takes it right away
         _sub.focus();
@@ -6742,10 +6759,8 @@ export class HistoryCardState {
         if( !_g ) return;
         const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
         if( _entIdx < 0 ) return;
-        // g.entities[i] is the entity's pconfig.entities entry itself: saved with it
+        // (g.entities[i] is the entity's pconfig.entities entry itself: saved with it)
         _g.entities[_entIdx].interpolation = algo;
-        const _pcEntry = this.pconfig.entities.find(e => typeof e === 'object' && e.entity === _entity_id);
-        if( _pcEntry ) _pcEntry.interpolation = algo;
         if( _g.chart.data.datasets[_entIdx] ) _g.chart.data.datasets[_entIdx].hecInterpolation = algo;
         _g.chart.update();
         this.writeLocalState();
@@ -8102,11 +8117,8 @@ class HistoryExplorerCard extends HTMLElement
         if( this.instance.contentValid && this.instance.handleChangedEntities() ) {
             if( this.instance.pconfig.showCurrentValues )
                 this.instance.updateHistory();
-            if( this.instance.pconfig.refreshEnabled ) {
-                this.instance.cache[this.instance.cacheSize].valid = false;
-                if( this.instance.tid ) clearTimeout(this.instance.tid);
-                this.instance.tid = setTimeout(this.instance.updateHistoryAutoRefresh.bind(this.instance), 2000);
-            }
+            if( this.instance.pconfig.refreshEnabled )
+                this.instance.scheduleAutoRefresh();
         }
 
     }
