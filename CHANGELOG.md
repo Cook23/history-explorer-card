@@ -10,7 +10,7 @@ Changelog for the HA History Explorer Card.
 - `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
 - Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
 
-### Merged — v1.1.50 (unreleased)
+### Merged — v1.1.50
 - The type menu's submenu named *Interpolation*, its entries named in one short word; every translation reviewed; persistence fixed for a new device and for the display type of a YAML entity — see v1.1.50 below
 - A new test suite, `persistence`: every option that can be changed from the card, with and without persistence, on this device and on a new one, and the last one to speak (the YAML, another device) winning
 
@@ -43,7 +43,7 @@ Changelog for the HA History Explorer Card.
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
 
-## [v1.1.50] - unreleased
+## [v1.1.50] - 2026-10-03
 
 ### Changed — the type menu's submenu is named *Interpolation*
 - The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
