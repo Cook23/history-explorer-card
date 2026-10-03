@@ -285,7 +285,7 @@ function hecHookInfoPanel()
                     ${_isNumeric ? html`
                         <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
                         <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                            <a id="et_${i}_interp" href="#et" style="${_TYPE_MENU_ITEM_STYLE};display:none;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
+                            <a id="et_${i}_interp" href="#et" style="${_TYPE_MENU_ITEM_STYLE};display:none;border-bottom:1px solid #444;">${i18n('ui.menu.type_interpolation')} ▸</a>
                             ${_TYPE_MENU_ORDER.map(k => html`<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`)}
                         </div>
                         <div id="er_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:110px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:3;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">

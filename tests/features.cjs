@@ -156,7 +156,7 @@ module.exports = async function()
     });
     await t.step('French: the menus are in French', async () => {
         const txt = await t.E(`el.querySelector('#ef_0')?.textContent`);
-        return txt === 'Exporter le CSV' ? true : JSON.stringify(txt);
+        return txt === 'Exporter en CSV' ? true : JSON.stringify(txt);
     });
     done(await t.close());
 

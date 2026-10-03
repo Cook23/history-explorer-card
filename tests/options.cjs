@@ -1,5 +1,5 @@
 // The options at every level (card, entityOptions, graph, entity) with their synonyms, the
-// curve reconstruction (interpolation) and its Reconstruction submenu (keyboard, mouse, touch,
+// curve reconstruction (interpolation) and its Interpolation submenu (keyboard, mouse, touch,
 // screen edges, shadow root), automatic refresh (on by default, at most one request every 2 s)
 const { openCard } = require('./lib.cjs');
 
@@ -32,16 +32,16 @@ module.exports = async function()
     await t.step('automatic refresh is on by default', async () => (await t.E('el.instance.pconfig.refreshEnabled')) === true || 'off');
     done(await t.close());
 
-    // ── The Reconstruction submenu ──
+    // ── The Interpolation submenu ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'lines' }] }] }), { height: 900 });
     const menu = `[...el.querySelector('#et_0').querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`;
     const sub = `(()=>{const m=el.querySelector('#er_0'); return m.style.display==='none'?'closed':[...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');})()`;
     const ds = `el.instance.graphs[0].chart.data.datasets.map(d=>d.hecInterpolation).join(',')`;
-    await t.step('a smart curve\'s type menu starts with Reconstruction', async () => {
+    await t.step('a smart curve\'s type menu starts with Interpolation', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        const v = await t.E(menu); return /^Reconstruction ▸ \| Line smart\*/.test(v) ? true : v;
+        const v = await t.E(menu); return /^Interpolation ▸ \| Smart\*/.test(v) ? true : v;
     });
-    await t.step('keyboard: ↑ onto Reconstruction, → opens the submenu, the algorithm in use in bold', async () => {
+    await t.step('keyboard: ↑ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowUp'); await t.page.keyboard.press('ArrowRight'); await t.wait(200);
         const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom' ? true : v;
     });
@@ -57,7 +57,7 @@ module.exports = async function()
         const m = await t.E(`el.querySelector('#et_0').style.display+'/'+el.querySelector('#er_0').style.display`);
         return d.startsWith('steffen') && p === 'steffen' && m === 'none/none' ? true : [d, p, m].join(' ; ');
     });
-    await t.step('mouse: click Reconstruction, then Makima', async () => {
+    await t.step('mouse: click Interpolation, then Makima', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         const v = await t.E(sub);
@@ -65,10 +65,10 @@ module.exports = async function()
         const d = await t.E(ds);
         return v.startsWith('Monotone | Steffen*') && d.startsWith('makima') ? true : v + ' ; ' + d;
     });
-    await t.step('no Reconstruction for a straight line', async () => {
+    await t.step('no Interpolation for a straight line', async () => {
         await t.longPress(await t.E('legendPt(0,1)'));
         const v = await t.E(menu); await t.page.keyboard.press('Escape');
-        return !/Reconstruction/.test(v) ? true : v;
+        return !/Interpolation/.test(v) ? true : v;
     });
     done(await t.close());
 
@@ -79,7 +79,7 @@ module.exports = async function()
         await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.rain'] ) I._createAndPersistEntity(id, 'line', 'smart'); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
         await t.wait(1500); const v = await t.E(all); return /power:steffen/.test(v) && /rain:steffen/.test(v) ? true : v;
     });
-    await t.step('a Reconstruction choice is kept after a reload', async () => {
+    await t.step('a Interpolation choice is kept after a reload', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         await t.E(`el.querySelector('#er_0_makima').click()`); await t.wait(800);
@@ -93,7 +93,7 @@ module.exports = async function()
     // ── The info panel: same submenu, `interpolation` in its configuration ──
     t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curves', interpolation: 'steffen' }, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
-    await t.step('info panel: the Reconstruction submenu, from its configuration\'s interpolation', async () => {
+    await t.step('info panel: the Interpolation submenu, from its configuration\'s interpolation', async () => {
         await t.E(`inst()._this.querySelector('#tf_0').click()`); await t.wait(300);
         await t.E(`inst()._this.querySelector('#et_0_interp').click()`); await t.wait(300);
         const v = await t.E(`[...inst()._this.querySelectorAll('#er_0 a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
@@ -106,7 +106,7 @@ module.exports = async function()
     // ── The submenu at the edges of the screen, inside a shadow root (as in Home
     // Assistant), on a touch screen; the load of the automatic refresh ──
     const LINE = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'curves' }] }] };
-    // Boxes of the type menu, its Reconstruction item and the submenu, and the viewport
+    // Boxes of the type menu, its Interpolation item and the submenu, and the viewport
     const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
         return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#er_0'), vw:innerWidth, vh:innerHeight }; })()`;
     const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
@@ -172,7 +172,7 @@ module.exports = async function()
 
     // ── Touch ──
     t = await openCard(card(LINE), { touch: true, height: 700 });
-    await t.step('touch: long-press the label, tap Reconstruction, tap Steffen', async () => {
+    await t.step('touch: long-press the label, tap Interpolation, tap Steffen', async () => {
         await t.touchLongPress(await t.E('legendPt(0,0)'));
         const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await t.tap(i); await t.wait(500);
