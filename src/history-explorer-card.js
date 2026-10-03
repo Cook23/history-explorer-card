@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1b2';
+const Version = '1.2.1b3';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -225,7 +225,7 @@ export class HistoryCardState {
         this.contentValid = false;
         this.entitiesPopulated = false;
         this.iid = 0;
-        this.tid = 0;
+        this._autoRefreshTid = 0;
         this.lastWidth = 0;
 
 
@@ -1279,11 +1279,6 @@ export class HistoryCardState {
 
     updateHistory()
     {
-        if( this.tid ) {
-            clearTimeout(this.tid);
-            this.tid = 0;
-        }
-
         for( let i of this.ui.dateSelector )
             if( i ) i.innerHTML = moment(this.startTime).format(this.i18n.styleDateSelector);
 
@@ -1393,6 +1388,19 @@ export class HistoryCardState {
 
             // All needed slots already in the cache, generate the chart data
             this.generateGraphDataFromCache();
+    }
+
+    // A shown entity changed: refresh its recent history — at most once every 2 s, however
+    // often the entities change (the next refresh is never postponed by a further change,
+    // and the recent history is only reloaded then, not at each change)
+    scheduleAutoRefresh()
+    {
+        if( this._autoRefreshTid ) return;
+        this._autoRefreshTid = setTimeout(() => {
+            this._autoRefreshTid = 0;
+            this.cache[this.cacheSize].valid = false;
+            this.updateHistoryAutoRefresh();
+        }, 2000);
     }
 
     updateHistoryAutoRefresh()
@@ -1791,6 +1799,21 @@ export class HistoryCardState {
         menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
         for( let _a of menuEl.getElementsByTagName('a') ) _a.style.background = '';
         Chart.hecUi.clampToViewport(menuEl, this._this?.querySelector('#maincard'));
+    }
+
+    // Opens a submenu next to the item of its menu that opens it: on the right of the item,
+    // level with it — or on its left when the room on the right is missing — and, like every
+    // menu (_openMenu), kept within the card and the viewport. The submenu must share the
+    // menu's positioned parent (both are its children).
+    _openSubmenu(subEl, itemEl)
+    {
+        const _menu = itemEl.offsetParent;
+        const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
+        const _item = itemEl.getBoundingClientRect();
+        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.right - _cb.left - 2) + 'px');
+        // Pushed back over its menu by the bounds: on the left of the menu instead
+        if( subEl.getBoundingClientRect().left < _item.right - 4 )
+            this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.left - _cb.left - subEl.offsetWidth + 2) + 'px');
     }
 
     _navigateMenuArrowKey(visible, key)
@@ -2516,7 +2539,7 @@ export class HistoryCardState {
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                    <a id="et_${i}_interp" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
+                    <a id="et_${i}_interp" href="#et" style="${_TYPE_MENU_ITEM_STYLE};display:none;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
                     ${_TYPE_MENU_ORDER.map(k => `<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`).join('')}
                     <a id="et_${i}_delete" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-top:1px solid #444;">${i18n('ui.menu.entity_delete')}</a>
@@ -3262,11 +3285,8 @@ class HistoryExplorerCard extends HTMLElement
         if( this.instance.contentValid && this.instance.handleChangedEntities() ) {
             if( this.instance.pconfig.showCurrentValues )
                 this.instance.updateHistory();
-            if( this.instance.pconfig.refreshEnabled ) {
-                this.instance.cache[this.instance.cacheSize].valid = false;
-                if( this.instance.tid ) clearTimeout(this.instance.tid);
-                this.instance.tid = setTimeout(this.instance.updateHistoryAutoRefresh.bind(this.instance), 2000);
-            }
+            if( this.instance.pconfig.refreshEnabled )
+                this.instance.scheduleAutoRefresh();
         }
 
     }

@@ -1,5 +1,6 @@
 // The options at every level (card, entityOptions, graph, entity) with their synonyms, the
-// curve reconstruction (interpolation) and its Reconstruction submenu, automatic refresh
+// curve reconstruction (interpolation) and its Reconstruction submenu (keyboard, mouse, touch,
+// screen edges, shadow root), automatic refresh (on by default, at most one request every 2 s)
 const { openCard } = require('./lib.cjs');
 
 const card = (o) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, ...o });
@@ -101,6 +102,107 @@ module.exports = async function()
         return v === 'Monotone | Steffen* | Makima | Catmull-Rom' && d === 'catmullrom' ? true : v + ' ; ' + d;
     });
     done(await t.close());
+
+    // ── The submenu at the edges of the screen, inside a shadow root (as in Home
+    // Assistant), on a touch screen; the load of the automatic refresh ──
+    const LINE = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'curves' }] }] };
+    // Boxes of the type menu, its Reconstruction item and the submenu, and the viewport
+    const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
+        return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#er_0'), vw:innerWidth, vh:innerHeight }; })()`;
+    const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
+    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, ${x}, ${y}); I.showInterpolationMenu(0); })()`;
+
+    // ── Position ──
+    t = await openCard(card(LINE), { height: 700 });
+    await t.step('in the middle: the submenu on the right of its item, level with it', async () => {
+        await t.E(openAt(300, 200)); await t.wait(200);
+        const b = await t.E(boxes());
+        const ok = Math.abs(b.s.left - b.m.right) < 4 && Math.abs(b.s.top - b.i.top) < 2 && inView({ ...b.s, vw: b.vw, vh: b.vh });
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
+        return ok ? true : JSON.stringify(b);
+    });
+    await t.step('at the right edge: menu and submenu within the viewport, the submenu on the left of the menu', async () => {
+        await t.E(openAt('innerWidth - 20', 200)); await t.wait(200);
+        const b = await t.E(boxes());
+        const ok = inView({ ...b.m, vw: b.vw, vh: b.vh }) && inView({ ...b.s, vw: b.vw, vh: b.vh }) && b.s.right <= b.m.left + 4;
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
+        return ok ? true : JSON.stringify(b);
+    });
+    await t.step('at the bottom edge: menu and submenu within the viewport', async () => {
+        await t.E(openAt(300, 'innerHeight - 10')); await t.wait(200);
+        const b = await t.E(boxes());
+        const ok = inView({ ...b.m, vw: b.vw, vh: b.vh }) && inView({ ...b.s, vw: b.vw, vh: b.vh });
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
+        return ok ? true : JSON.stringify(b);
+    });
+    done(await t.close());
+
+    // ── Inside a shadow root, as in Home Assistant ──
+    t = await openCard(card(LINE), { height: 700 });
+    await t.E(`(()=>{ const host=document.createElement('div'); document.body.prepend(host); const sr=host.attachShadow({mode:'open'}); sr.appendChild(el); })()`);
+    await t.wait(2500);
+    await t.step('in a shadow root: focus moves to the submenu, both stay open; keyboard choice applied', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowUp'); await t.page.keyboard.press('ArrowRight');
+        await t.wait(500);   // (longer than the focusout check)
+        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
+        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter');
+        await t.wait(400);
+        const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
+        return open === 'block/block' && d === 'makima' ? true : open + ' ; ' + d;
+    });
+    await t.step('in a shadow root: mouse, item then algorithm', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        await t.page.mouse.click(i.x, i.y); await t.wait(500);
+        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
+        const a = await t.E(`(()=>{ const r=el.querySelector('#er_0_catmullrom').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        await t.page.mouse.click(a.x, a.y); await t.wait(400);
+        const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
+        return open === 'block/block' && d === 'catmullrom' ? true : open + ' ; ' + d;
+    });
+    await t.step('in a shadow root: a click outside closes both menus', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
+        await t.page.mouse.click(5, 690); await t.wait(500);
+        const v = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
+        return v === 'none/none' ? true : v;
+    });
+    done(await t.close());
+
+    // ── Touch ──
+    t = await openCard(card(LINE), { touch: true, height: 700 });
+    await t.step('touch: long-press the label, tap Reconstruction, tap Steffen', async () => {
+        await t.touchLongPress(await t.E('legendPt(0,0)'));
+        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        await t.tap(i); await t.wait(500);
+        const open = await t.E(`el.querySelector('#er_0').style.display`);
+        const a = await t.E(`(()=>{ const r=el.querySelector('#er_0_steffen').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        await t.tap(a); await t.wait(500);
+        const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
+        return open === 'block' && d === 'steffen' ? true : open + ' ; ' + d;
+    });
+    done(await t.close());
+
+    // ── Automatic refresh: at most one history request every 2 s, never starved ──
+    for( const showCurrentValues of [true, false] ) {
+        t = await openCard(card({ showCurrentValues, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+        await t.wait(1500);
+        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        await t.step(`refresh (showCurrentValues ${showCurrentValues}): a value changing every 0.5 s → one request every 2 s`, async () => {
+            const n0 = await n();
+            for( let i = 0; i < 20; i++ ) { await t.E(`setState('sensor.power', ${400 + i})`); await t.wait(500); }
+            const k = (await n()) - n0;
+            return k >= 4 && k <= 6 ? true : `${k} requests in 10 s`;
+        });
+        await t.step(`refresh (showCurrentValues ${showCurrentValues}): one change → one request, within 2 s, none after`, async () => {
+            await t.wait(2500); const n0 = await n();
+            await t.E(`setState('sensor.power', 999)`); await t.wait(2600);
+            const n1 = await n(); await t.wait(3000); const n2 = await n();
+            return n1 - n0 === 1 && n2 === n1 ? true : `${n1 - n0} then ${n2 - n1}`;
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };
