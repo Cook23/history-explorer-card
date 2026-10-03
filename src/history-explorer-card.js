@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.49';
+const Version = '1.1.49b4';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -36,13 +36,19 @@ export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
 // How each algorithm is named in the Reconstruction menu (names, not translated)
 export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
 
+// (each unknown value is reported once: it's resolved again at each redraw)
+const _reportedInterpolations = new Set();
+
 export function normalizeInterpolation(v)
 {
     if( v === undefined || v === null ) return undefined;
     const k = String(v).toLowerCase().replace(/[-_ ]/g, '');
     const r = k === 'akima' ? 'makima' : k;
     if( INTERPOLATIONS.includes(r) ) return r;
-    console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
+    if( !_reportedInterpolations.has(v) ) {
+        _reportedInterpolations.add(v);
+        console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
+    }
     return undefined;
 }
 
@@ -68,9 +74,9 @@ export function normalizeOptionSynonyms(o)
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth', 'width',
-    'showPoints', 'showSamples', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'ystepsize', 'showTimeLabels'];
+const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+    'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', ...Object.values(OPTION_SYNONYMS).flat()];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
@@ -2018,7 +2024,6 @@ export class HistoryCardState {
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
         const tooltipSize = this.pconfig.tooltipSize;
-        const _self = this; // captured for tooltips.custom below — `this` there is the Chart.js Tooltip instance
 
         var chart = new Chart(ctx, {
 
@@ -5192,20 +5197,9 @@ export class HistoryCardState {
         return this._allGraphsInDisplayOrder()[0] ?? null;
     }
 
-    _lastGraph()
-    {
-        const _all = this._allGraphsInDisplayOrder();
-        return _all[_all.length - 1] ?? null;
-    }
-
     _isFirstGraph(g)
     {
         return this._firstGraph() === g;
-    }
-
-    _isLastGraph(g)
-    {
-        return this._lastGraph() === g;
     }
 
     // The graph immediately before/after g on screen — needed to number a new graph's
@@ -5250,21 +5244,6 @@ export class HistoryCardState {
 
     // Symmetric to _nextGroup — scans backward from g's first entity for the previous
     // entry whose groupId differs from g's.
-    _previousGroup(g)
-    {
-        const _firstEntity = g.entities[0];
-        const _startIdx = this._pcEntryIndex(_firstEntity.entity);
-        if( _startIdx < 0 ) return null;
-        for( let i = _startIdx - 1; i >= 0; i-- ) {
-            const _e = this.pconfig.entities[i];
-            if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
-            const _eid = entityIdOf(_e);
-            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
-            if( _candidateG ) return _candidateG;
-        }
-        return null;
-    }
-
     _pcEntryInGroup(entityId, groupId)
     {
         // Find an entity's persisted entry, scoped to a specific groupId — groupId alone
@@ -5559,7 +5538,7 @@ export class HistoryCardState {
             }
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
-            entities[0].width     = entities[0].width       ?? entityOptions?.width ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
+            entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
             // the Reconstruction menu — so that changing it on the card, a graph or in
@@ -6222,7 +6201,6 @@ export class HistoryCardState {
             this._inputWidth[i] = inputWA;
             const totalA = dlw + 10 + 400 + slBtnsW + drw + 10; // switch at 400px input width
 
-            const colW = Math.round((w - inputWA - slBtnsW) / 2);
 
             if( totalA + 50 <= w ) {
                 // Layout A : dl | sl | dr on one line
@@ -6414,7 +6392,7 @@ export class HistoryCardState {
             if( _needsIntervalRedraw ) this.updateHistoryWithClearCache();
 
             // Register observer to resize the graphs whenever the maincard dimensions change
-            let ro = new ResizeObserver(entries => { this.resize(); });
+            let ro = new ResizeObserver(() => { this.resize(); });
             ro.observe(this._this.querySelector('#maincard'));
 
             // Per-graph interval now restored in readLocalState (last-one-to-speak-wins)
@@ -6965,7 +6943,6 @@ export class HistoryCardState {
             for( let i of dropdown.getElementsByTagName('a') ) {
                 const friendly = i.textContent.toLowerCase();
                 const entity   = i.dataset.entity?.toLowerCase() || '';
-                const domain   = entity.split('.')[0] || '';
                 let match;
                 if( !filter ) {
                     match = true;
@@ -7655,7 +7632,6 @@ export class HistoryCardState {
         // Migration: renumber dynamic entities with groupId < 1000 to groupId + 1000
         // This avoids collisions with static graph groupIds (0, 1, 2...) which are assigned
         // sequentially from g_id. Dynamic graphs now always use groupId >= 1000.
-        const _yamlGroupIds = new Set(this.pconfig.entities.filter(e => e.isStatic).map(e => e.groupId));
         // (null is "no group", not group 0 — null < 1000 is true in JS, so it must be
         // excluded explicitly, or every ungrouped entity would land in one group 1000)
         const _needsRenumber = this.pconfig.entities.some(e => !e.isStatic && e.groupId !== undefined && e.groupId !== null && e.groupId < 1000);
@@ -7878,6 +7854,84 @@ export class HistoryCardState {
 
 
     // --------------------------------------------------------------------------------------
+    // Configuration
+    // --------------------------------------------------------------------------------------
+
+    // Reads the display and behavior options of a configuration — for the card and for the
+    // info panel alike. defaults: the host's own default values (used when the configuration
+    // doesn't set them); fixed: what the host decides whatever the configuration says.
+    applyConfig(config, { defaults = {}, fixed = {} } = {})
+    {
+        const P = this.pconfig;
+        // (every spelling of an option accepted — see normalizeOptionSynonyms)
+        const c = normalizeOptionSynonyms(config);
+        const d = (k, v) => k in defaults ? defaults[k] : v;
+
+        P.customStateColors = {};
+        for( let i in c.stateColors ?? {} ) P.customStateColors[i] = parseColor(c.stateColors[i]);
+        P.entityOptions =          c.entityOptions;
+
+        P.labelAreaWidth =         c.labelAreaWidth ?? 65;
+        P.labelsVisible =          c.labelsVisible ?? true;
+        P.hideLegend =           ( c.legendVisible == false ) ? true : undefined;
+        P.cursorMode =             c.cursor?.mode ?? d('cursorMode', 'auto');
+        P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', ['timeline']);
+        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? c.showTooltipColorsLine ?? true;
+        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? c.showTooltipColorsTimeline ?? true;
+        P.tooltipSize =            c.tooltip?.size ?? c.tooltipSize ?? 'auto';
+        P.tooltipShowDuration =    c.tooltip?.showDuration ?? c.tooltipShowDuration ?? d('tooltipShowDuration', false);
+        P.tooltipShowLabel =       c.tooltip?.showLabel ?? true;
+        P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? 'auto';
+        P.colorSeed =              c.stateColorSeed ?? 137;
+        P.stateTextMode =          c.stateTextMode ?? 'auto';
+        P.decimation =             c.decimation;
+        P.roundingPrecision =      c.rounding || 2;
+
+        // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
+        P.defaultLineMode =        this.normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
+        P.defaultInterpolation =   normalizeInterpolation(c.interpolation) ?? 'monotone';
+        P.defaultLineWidth =       c.lineWidth ?? 2.0;
+        P.defaultDashMode =        c.dashMode;
+        P.defaultNetBars =         c.netBars;
+        P.defaultInterval =        c.interval;
+        P.defaultShowMinMax =      c.showMinMax;
+        P.defaultShowPoints =      c.showPoints;
+        P.cardGraphDefaults =      Object.fromEntries(
+            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        // (`height`: the height of every line and bar graph, unless lineGraphHeight /
+        // barGraphHeight set their own)
+        P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
+        P.barGraphHeight =       ( c.barGraphHeight ?? c.height ?? 150 ) * 1;
+        P.timelineBarHeight =    ( c.timelineBarHeight ?? 24 ) * 1;
+        P.timelineBarSpacing =   ( c.timelineBarSpacing ?? 40 ) * 1;
+
+        P.showUnavailable =        c.showUnavailable ?? false;
+        P.showCurrentValues =      c.showCurrentValues ?? true;
+        P.axisAddMarginMin =       c.axisAddMarginMin ?? false;
+        P.axisAddMarginMax =       c.axisAddMarginMax ?? false;
+        P.recordedEntitiesOnly =   c.recordedEntitiesOnly ?? false;
+        P.filterEntities =         c.filterEntities;
+        P.excludeFilterEntities =  c.excludeFilterEntities;
+        P.combineSameUnits =       c.combineSameUnits === true;
+        P.defaultTimeRange =       c.defaultTimeRange ?? '24';
+        P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
+        P.timeTickDensity =        c.timeTicks?.density ?? c.timeTickDensity ?? 'high';
+        P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;
+        P.timeTickShortDate =      c.timeTicks?.dateFormat === 'short';
+        // (on by default since 1.1.49: `automatic: false` turns it off)
+        P.refreshEnabled =         c.refresh?.automatic ?? true;
+        P.refreshInterval =        c.refresh?.interval ?? undefined;
+
+        this.statistics.enabled =   c.statistics?.enabled ?? true;
+        this.statistics.mode =      c.statistics?.mode ?? 'mean';
+        this.statistics.retention = c.statistics?.retention ?? undefined;
+        this.statistics.period =    c.statistics?.period ?? 'hour';
+        this.statistics.force =     c.statistics?.force ?? undefined;
+
+        Object.assign(P, fixed);
+    }
+
+    // --------------------------------------------------------------------------------------
     // On demand refresh handling
     // --------------------------------------------------------------------------------------
 
@@ -8053,7 +8107,7 @@ export class HistoryCardState {
                 dashMode       : _opts.dashMode,
                 lineMode       : _opts.lineMode,
                 interpolation  : _opts.interpolation,
-                width          : _opts.lineWidth,
+                lineWidth      : _opts.lineWidth,
                 showPoints     : _opts.showPoints,
                 decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
@@ -8159,81 +8213,16 @@ class HistoryExplorerCard extends HTMLElement
             this.instance.buildGraphListFromConfig(config.graphs)
 
 
-        this.instance.pconfig.customStateColors = {};
-
-        if( config.stateColors ) {
-            for( let i in config.stateColors ) {
-                this.instance.pconfig.customStateColors[i] = parseColor(config.stateColors[i]);
-            }
-        }
-
-        this.instance.pconfig.entityOptions = config.entityOptions;
-
-        this.instance.pconfig.labelAreaWidth =         config.labelAreaWidth ?? 65;
-        this.instance.pconfig.labelsVisible =          config.labelsVisible ?? true;
-        this.instance.pconfig.hideLegend =           ( config.legendVisible == false ) ? true : undefined;
-        this.instance.pconfig.cursorMode =             config.cursor?.mode ?? 'auto';
-        this.instance.pconfig.cursorTypes =            config.cursor?.types ?? ['timeline'];
-        this.instance.pconfig.showTooltipColors[0] =   config.tooltip?.showColorsLine ?? config.showTooltipColorsLine ?? true;
-        this.instance.pconfig.showTooltipColors[1] =   config.tooltip?.showColorsTimeline ?? config.showTooltipColorsTimeline ?? true;
-        this.instance.pconfig.tooltipSize =            config.tooltip?.size ?? config.tooltipSize ?? 'auto';
-        this.instance.pconfig.tooltipShowDuration =    config.tooltip?.showDuration ?? config.tooltipShowDuration ?? false;
-        this.instance.pconfig.tooltipShowLabel =       config.tooltip?.showLabel ?? true;
-        this.instance.pconfig.tooltipStateTextMode =   config.tooltip?.stateTextMode ?? config.stateTextMode ?? 'auto';
-        this.instance.pconfig.colorSeed =              config.stateColorSeed ?? 137;
-        this.instance.pconfig.stateTextMode =          config.stateTextMode ?? 'auto';
-        this.instance.pconfig.decimation =             config.decimation;
-        this.instance.pconfig.roundingPrecision =      config.rounding || 2;
-        this.instance.pconfig.defaultLineMode =        this.instance.normalizeLineMode(config.lineMode);
-        this.instance.pconfig.defaultInterpolation =   normalizeInterpolation(config.interpolation) ?? 'monotone';
-        this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
-        this.instance.pconfig.defaultDashMode =        config.dashMode;
-        this.instance.pconfig.defaultNetBars =         config.netBars;
-        this.instance.pconfig.defaultInterval =        config.interval;
-        this.instance.pconfig.defaultShowMinMax =      config.showMinMax;
-        this.instance.pconfig.defaultShowPoints =      config.showPoints ?? config.showSamples;
-        // The options of every graph that can also be set for the whole card (the graph,
-        // entityOptions or an entity can still set their own)
-        const _cardOpts = normalizeOptionSynonyms(config);
-        this.instance.pconfig.cardGraphDefaults = Object.fromEntries(
-            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => _cardOpts[k] !== undefined).map(k => [k, _cardOpts[k]]));
-        this.instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
-        this.instance.pconfig.showCurrentValues =      config.showCurrentValues ?? true;
-        this.instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;
-        this.instance.pconfig.axisAddMarginMax =     ( config.axisAddMarginMax !== undefined ) ? config.axisAddMarginMax : false;
-        this.instance.pconfig.recordedEntitiesOnly =   config.recordedEntitiesOnly ?? false;
-        this.instance.pconfig.filterEntities  =        config.filterEntities;
-        this.instance.pconfig.excludeFilterEntities =   config.excludeFilterEntities;
-        this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
-        this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-        // What the YAML itself says (undefined if it says nothing) — the only value its
-        // front and its image are about; the '24' fallback above isn't the YAML speaking
+        this.instance.applyConfig(config);
+        // (the card's own: what's saved and how, the CSV export, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
-        this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
-        this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
-        this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
-        this.instance.pconfig.timeTickShortDate =      config.timeTicks?.dateFormat === 'short';
-        // (`height` on the card: the height of every line and bar graph, unless
-        // lineGraphHeight / barGraphHeight set their own)
-        this.instance.pconfig.lineGraphHeight =      ( config.lineGraphHeight ?? config.height ?? 250 ) * 1;
-        this.instance.pconfig.barGraphHeight =       ( config.barGraphHeight ?? config.height ?? 150 ) * 1;
-        this.instance.pconfig.timelineBarHeight =    ( config.timelineBarHeight ?? 24 ) * 1;
-        this.instance.pconfig.timelineBarSpacing =   ( config.timelineBarSpacing ?? 40 ) * 1;
-        // (on by default since 1.1.49: `automatic: false` turns it off)
-        this.instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? true;
-        this.instance.pconfig.refreshInterval =        config.refresh?.interval ?? undefined;
         this.instance.pconfig.exportSeparator =        config.csv?.separator;
         this.instance.pconfig.exportTimeFormat =       config.csv?.timeFormat;
         this.instance.pconfig.exportAttributes =       config.csv?.exportAttributes;
         this.instance.pconfig.exportStatsPeriod =      config.csv?.statisticsPeriod ?? 'hour';
         this.instance.pconfig.exportNumberLocale =     config.csv?.numberLocale;
-        this.instance.statistics.enabled =             config.statistics?.enabled ?? true;
-        this.instance.statistics.mode =                config.statistics?.mode ?? 'mean';
-        this.instance.statistics.retention =           config.statistics?.retention ?? undefined;
-        this.instance.statistics.period =              config.statistics?.period ?? 'hour';
-        this.instance.statistics.force =               config.statistics?.force ?? undefined;
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 
