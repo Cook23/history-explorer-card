@@ -31,7 +31,6 @@ let hec_panel = {};
     hec_panel.show = undefined;
     hec_panel.entity = null;
     hec_panel.iid = null;
-    hec_panel.lc = null;
 
 function hecHookInfoPanel()
 {
@@ -172,7 +171,8 @@ function hecHookInfoPanel()
             instance.pconfig.timelineBarHeight =    ( config.timelineBarHeight ?? 24 ) * 1;
             instance.pconfig.timelineBarSpacing =     40;
             instance.pconfig.hideLegend =             true;
-            instance.pconfig.refreshEnabled =       ( config.refresh?.automatic !== undefined ) ? config.refresh.automatic : true;
+            instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? true;
+            // (no refresh.interval: the panel only lives while its dialog is open)
             instance.pconfig.refreshInterval =        undefined;
             instance.statistics.enabled =             config.statistics?.enabled ?? true;
             instance.statistics.mode =                config.statistics?.mode ?? 'mean';
@@ -255,7 +255,6 @@ function hecHookInfoPanel()
 
             this._injectHistoryExplorer(this.hec_instance);
 
-            hec_panel.lc = this.hass.states[this.entityId]?.last_changed;
 
         } else {
 
@@ -266,14 +265,9 @@ function hecHookInfoPanel()
                 this.hec_instance.updateHistoryWithClearCache();
             }
 
-            const lc = this.hass.states[this.entityId]?.last_changed;
-
-            // Update history when the shown entity state changes
-            if( hec_panel.lc != lc ) {
-                hec_panel.lc = lc;
-                if( this.hec_instance.pconfig.refreshEnabled )
-                    this.hec_instance.scheduleAutoRefresh();
-            }
+            // New states, as for the card
+            this.hec_instance._hass = this.hass;
+            this.hec_instance.onStatesChanged();
 
         }
     };

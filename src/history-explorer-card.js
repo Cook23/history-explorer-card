@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1b3';
+const Version = '1.2.1b4';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -3042,6 +3042,18 @@ export class HistoryCardState {
     // On demand refresh handling
     // --------------------------------------------------------------------------------------
 
+    // Home Assistant pushed new states: if a shown entity changed, its current value in the
+    // legend is updated and the recent history refreshed (scheduleAutoRefresh) — for the card
+    // and the info panel alike
+    onStatesChanged()
+    {
+        if( !this.contentValid || !this.handleChangedEntities() ) return;
+        if( this.pconfig.showCurrentValues )
+            this.updateHistory();
+        if( this.pconfig.refreshEnabled )
+            this.scheduleAutoRefresh();
+    }
+
     handleChangedEntities()
     {
         if( !this.pconfig.showCurrentValues && !this.pconfig.refreshEnabled ) return false;
@@ -3282,12 +3294,7 @@ class HistoryExplorerCard extends HTMLElement
         if( !this.instance.contentValid && !this.instance.iid )
             this.instance.iid = setInterval(this.instance.updateContent.bind(this.instance), 100);
 
-        if( this.instance.contentValid && this.instance.handleChangedEntities() ) {
-            if( this.instance.pconfig.showCurrentValues )
-                this.instance.updateHistory();
-            if( this.instance.pconfig.refreshEnabled )
-                this.instance.scheduleAutoRefresh();
-        }
+        this.instance.onStatesChanged();
 
     }
 
