@@ -10,6 +10,7 @@ const FILES = [
     ['src/history-explorer-card.js', 'module'],
     ['src/history-entity-store.js', 'module'],
     ['src/history-units.js', 'module'],
+    ['src/history-options.js', 'module'],
     ['src/card-history.js', 'module'],
     ['src/card-datasets.js', 'module'],
     ['src/card-gestures.js', 'module'],

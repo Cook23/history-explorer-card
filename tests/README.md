@@ -17,6 +17,7 @@ The suites:
 | `typemenu` | The type menu: its order, the type pre-selected for a new entity, the keyboard |
 | `arrowline` | Arrowline arrows turn by value / the entity's circular period (360 by default) |
 | `scale` | `scale` without `unit` changes only the drawing (real value in the legend and tooltip), with `unit` it converts |
+| `options` | The options at every level (card, entityOptions, graph, entity) with their synonyms, `interpolation` and the Reconstruction submenu (card and info panel, keyboard and mouse, kept after a reload), automatic refresh on by default |
 
 They run the built card (`history-explorer-card.js`) in Chromium, in `page.html` (a card)
 or `panel.html` (the info panel), against `mock-ha.js`: a mock of the Home Assistant APIs
@@ -28,7 +29,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline or scale
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale or options
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

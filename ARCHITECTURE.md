@@ -34,6 +34,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-menus.js` | The entity type menu, the options menu, the entity selector. |
 | `src/card-storage.js` | What is kept between sessions and devices, and the "last one to speak wins" merge of local state, HA user data and YAML. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
+| `src/history-options.js` | The card's options: the curve reconstruction algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
 | `deps/chart-hec.js` | **The interaction layer**: everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, `Chart.hecUi`. |
 | `deps/Chart.js` | Chart.js 2.7.1, with small changes and the hooks calling into `chart-hec.js`. |
@@ -77,5 +78,6 @@ keep them apart. For the details of the boundary with Chart.js, see
 - **mouse**, **touch**, **cards**, **features**, **panel** — the built card in Chromium against a mocked Home
   Assistant: every gesture with a mouse and with fingers (real touch: `touch-action` and
   page scrolling apply), linked graphs, menus, two cards on one page, history and
-  statistics, CSV export, refresh, the entity selector, the info panel; after each scenario,
+  statistics, CSV export, refresh, the entity selector, the info panel, the type menu,
+  arrowlines, `scale`, the options at every level and the Reconstruction submenu; after each scenario,
   the persisted entities must match what is shown.
