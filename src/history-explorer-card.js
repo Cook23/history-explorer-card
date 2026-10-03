@@ -6706,13 +6706,13 @@ export class HistoryCardState {
             _el.style.fontWeight = k === _cur ? 'bold' : '';
             if( k === _cur ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
         });
-        // Next to its item, on the right of the type menu (both share the same parent)
+        // Next to its item, on the right of the type menu (both share the same parent; the
+        // type menu may be shifted by its center/right alignment, a CSS transform)
+        const _w = _menu.offsetWidth;
+        const _shift = /-50%/.test(_menu.style.transform) ? -_w / 2 : /-100%/.test(_menu.style.transform) ? -_w : 0;
         const _top  = (_menu.offsetTop + _item.offsetTop) + 'px';
-        const _left = (_menu.offsetLeft + _menu.offsetWidth - 2) + 'px';
+        const _left = (_menu.offsetLeft + _w + _shift - 2) + 'px';
         this._openMenu(_sub, _top, _left);
-        // (the type menu may be shifted by a CSS transform: center/right alignment)
-        const _shift = _menu.getBoundingClientRect().left - _menu.offsetLeft - ( _sub.getBoundingClientRect().left - _sub.offsetLeft );
-        if( _shift ) { _sub.style.left = (_sub.offsetLeft + _shift) + 'px'; this._clampToViewport(_sub); }
         // Shown with no keyboard highlight yet: the first arrow key highlights the
         // pre-selected algorithm, Enter takes it right away
         _sub.focus();
