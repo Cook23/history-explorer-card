@@ -79,5 +79,6 @@ keep them apart. For the details of the boundary with Chart.js, see
   Assistant: every gesture with a mouse and with fingers (real touch: `touch-action` and
   page scrolling apply), linked graphs, menus, two cards on one page, history and
   statistics, CSV export, refresh, the entity selector, the info panel, the type menu,
-  arrowlines, `scale`, the options at every level and the Interpolation submenu; after each scenario,
+  arrowlines, `scale`, the options at every level and the Interpolation submenu, persistence and the
+  last one to speak; after each scenario,
   the persisted entities must match what is shown.

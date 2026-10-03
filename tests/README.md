@@ -18,6 +18,7 @@ The suites:
 | `arrowline` | Arrowline arrows turn by value / the entity's circular period (360 by default) |
 | `scale` | `scale` without `unit` changes only the drawing (real value in the legend and tooltip), with `unit` it converts |
 | `options` | The options at every level (card, entityOptions, graph, entity) with their synonyms, `interpolation` and the Interpolation submenu (card and info panel, keyboard, mouse and touch, at the screen edges, inside a shadow root, kept after a reload), automatic refresh on by default and at most one request every 2 s |
+| `persistence` | Every option that can be changed from the card (interpolation, line mode, display type, hidden, bar interval, split), and the time range: without persistence, with `enable_persistence`, with `enable_multidevice_persistence` on this device and on a new one; the last one to speak — the YAML, another device — winning |
 
 They run the built card (`history-explorer-card.js`) in Chromium, in `page.html` (a card)
 or `panel.html` (the info panel), against `mock-ha.js`: a mock of the Home Assistant APIs
@@ -29,7 +30,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale or options
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options or persistence
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1b7';
+const Version = '1.2.1b8';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -659,7 +659,7 @@ export class HistoryCardState {
     // individually cover via a per-entity field list.
     _entityPersistenceFields()
     {
-        return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
+        return ['type', 'color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
                 'dashMode', 'lineMode', 'interpolation', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
                 'netBars', 'decimation', 'circular', 'groupId'];
     }

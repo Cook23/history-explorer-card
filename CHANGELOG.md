@@ -11,7 +11,8 @@ Changelog for the HA History Explorer Card.
 - Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
 
 ### Merged — v1.1.50 (unreleased)
-- The type menu's submenu named *Interpolation*, its entries named in one short word; every translation reviewed — see v1.1.50 below
+- The type menu's submenu named *Interpolation*, its entries named in one short word; every translation reviewed; persistence fixed for a new device and for the display type of a YAML entity — see v1.1.50 below
+- A new test suite, `persistence`: every option that can be changed from the card, with and without persistence, on this device and on a new one, and the last one to speak (the YAML, another device) winning
 
 ### Changed — under the hood
 - The curve reconstruction algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
@@ -56,6 +57,10 @@ Changelog for the HA History Explorer Card.
   - the interval selector of bar graphs: the raw curves entry is *Raw line*, as in the documentation, in every language; the intervals read *Per hour / Per day / Per month* where they read *Hour*, *Schedule* (Spanish) or *Monthly*
   - *Remove all added graphs* and its confirmation say that only the graphs added from the card are removed
   - spelling, punctuation and wording fixes (French *Désactiver*, Spanish *¿…?*, Dutch, Polish, Danish, Slovak and Russian wording), and the last English placeholders translated (Polish, Swedish and Danish *As line*)
+
+### Fixed — persistence: a new device gets what's saved; the display type of a YAML entity kept
+- With `enable_multidevice_persistence`, a device opening the card for the first time (or after its browser storage was cleared) got the YAML instead of what was saved from the other devices — the display options of the entities and the time range alike: with nothing stored locally yet, the YAML was taken as just changed, and won. It now compares the YAML with the image the other devices saved in Home Assistant, so the YAML only wins when it really changed
+- The display type of a YAML entity changed from the type menu (a curve turned into bars, for instance) wasn't kept with `enable_persistence` / `enable_multidevice_persistence` — its line mode was, not its type. `type` is now one of the persisted fields, like the others
 
 ## [v1.1.49] - 2026-10-03
 
