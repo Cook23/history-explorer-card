@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.50] - unreleased
+
+### Changed — the type menu's submenu is named *Interpolation*
+- The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
+
+### Changed — clearer translations
+- Every language reviewed so that each text says what it does where it's shown:
+  - dropping a curve on a graph defined in YAML is refused with *Graph defined in YAML* (it said *Static*), and moving a graph between linked graphs with *Linked graphs can't be separated* (it said *Linked graphs*)
+  - the interval selector of bar graphs: the raw curves entry is *Raw line*, as in the documentation, in every language; the intervals read *Per hour / Per day / Per month* where they read *Hour*, *Schedule* (Spanish) or *Monthly*
+  - *Remove all added graphs* and its confirmation say that only the graphs added from the card are removed
+  - arrowlines are named *Direction arrows* in the other languages (calques of *arrowline* before), bars in the plural
+  - spelling, punctuation and wording fixes (French *Désactiver*, Spanish *¿…?*, Dutch, Polish, Danish, Slovak and Russian wording), and the last English placeholders translated (Polish, Swedish and Danish *As line*)
+
 ## [v1.1.49] - 2026-10-03
 
 ### New — curve reconstruction: a choice of interpolation algorithms

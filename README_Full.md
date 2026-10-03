@@ -336,7 +336,7 @@ Any numeric entity — one whose current state can be read as a number — can b
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Line curves*).
-- For a curve already shown in *Line smart* or *Line curves*, the menu starts with **Reconstruction ▸**: a submenu of the [curve reconstruction](#curve-reconstruction) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
+- For a curve already shown in *Line smart* or *Line curves*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
 - **On a 700ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
@@ -699,7 +699,7 @@ See the customizing dynamic line graphs section and the advanced YAML example be
 
 ## Line interpolation modes
 
-Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve reconstruction](#curve-reconstruction). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
+Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve interpolation](#curve-interpolation). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
 All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
@@ -729,9 +729,9 @@ axisAddMarginMin: false
 axisAddMarginMax: false
 ```
 
-### Curve reconstruction
+### Curve interpolation
 
-In `curves` and `smart` modes, the curve between two recorded values is rebuilt by a cubic interpolation. Its algorithm is set with `interpolation` — on the card, in `entityOptions`, on a graph or on an entity — or from the type menu (**Reconstruction ▸**):
+In `curves` and `smart` modes, the curve between two recorded values is rebuilt by a cubic interpolation. Its algorithm is set with `interpolation` — on the card, in `entityOptions`, on a graph or on an entity — or from the type menu (**Interpolation ▸**):
 
 | `interpolation` | How the curve looks |
 |---|---|
@@ -1144,7 +1144,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
-| `interpolation` | string | Curve reconstruction in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve reconstruction](#curve-reconstruction) |
+| `interpolation` | string | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius. `showSamples` is a synonym |
 | `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |

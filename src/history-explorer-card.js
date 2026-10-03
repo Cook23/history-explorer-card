@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.49';
+const Version = '1.1.50b1';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -4047,7 +4047,7 @@ export class HistoryCardState {
         if( !_tgtG || _tgtG === _srcG ) return;
 
         if( this._wouldSplitGroup(_srcG, _tgtG, _insertBefore) ) {
-            this._showLabelTooltip(i18n('ui.menu.linked_graphs'), event.clientX, event.clientY, 'left', event.target);
+            this._showLabelTooltip(i18n('ui.menu.linked_graphs_split'), event.clientX, event.clientY, 'left', event.target);
             return;
         }
 
@@ -5955,7 +5955,7 @@ export class HistoryCardState {
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                    <a id="et_${i}_interp" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
+                    <a id="et_${i}_interp" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-bottom:1px solid #444;">${i18n('ui.menu.type_interpolation')} ▸</a>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
                     <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
@@ -6031,7 +6031,7 @@ export class HistoryCardState {
         const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
         const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
         const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
-        const _etI = this._this.querySelector(`#et_${i}_interp`); if( _etI ) _etI.innerHTML = i18n('ui.menu.type_reconstruction') + ' ▸';
+        const _etI = this._this.querySelector(`#et_${i}_interp`); if( _etI ) _etI.innerHTML = i18n('ui.menu.type_interpolation') + ' ▸';
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
