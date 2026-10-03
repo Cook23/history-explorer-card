@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.48';
+const Version = '1.1.49b1';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -28,6 +28,53 @@ export const _TYPE_MENU_DEFS = [
     // first in the menus' markup (smart, curves, straight, stepped, bar, arrowline, timeline)
     { type: 'line', lineMode: 'smart'   },
 ];
+
+// Curve reconstruction algorithms (the `interpolation` option, for the curves and smart
+// line modes) — the first one is the default; see hecSplineTangents in deps/Chart.js
+export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
+
+// How each algorithm is named in the Reconstruction menu (names, not translated)
+export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
+
+export function normalizeInterpolation(v)
+{
+    if( v === undefined || v === null ) return undefined;
+    const k = String(v).toLowerCase().replace(/[-_ ]/g, '');
+    const r = k === 'akima' ? 'makima' : k;
+    if( INTERPOLATIONS.includes(r) ) return r;
+    console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
+    return undefined;
+}
+
+// Options spelled differently depending on the level they were first offered at: each
+// spelling is accepted at every level (card, entityOptions, graph, entity) — the first
+// name is the one used internally, the others are its synonyms
+const OPTION_SYNONYMS = {
+    lineWidth  : ['width'],
+    showPoints : ['showSamples'],
+    ystepSize  : ['ystepsize'],
+};
+
+export function normalizeOptionSynonyms(o)
+{
+    if( !o || typeof o !== 'object' || Array.isArray(o) ) return o;
+    const r = { ...o };
+    for( const [name, aliases] of Object.entries(OPTION_SYNONYMS) ) {
+        if( r[name] !== undefined ) continue;
+        for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
+    }
+    return r;
+}
+
+// Options that can be set at the graph level — under the graph's `options:`, or directly
+// on the graph next to `type:` / `entities:` (`options:` wins when both are set)
+const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth', 'width',
+    'showPoints', 'showSamples', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
+    'ymin', 'ymax', 'ystepSize', 'ystepsize', 'showTimeLabels'];
+
+// Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
+// on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
+const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels'];
 
 const TOUCH_SLOP = 10; // px — immobility threshold: finger movement below this is treated as stationary (long-press and drag activation)
 
@@ -220,6 +267,8 @@ export class HistoryCardState {
         this.pconfig.decimation           = 'fast';
         this.pconfig.roundingPrecision    = 2;
         this.pconfig.defaultLineMode      = undefined;
+        this.pconfig.defaultInterpolation = 'monotone';
+        this.pconfig.cardGraphDefaults    = {};
         this.pconfig.defaultLineWidth     = undefined;
         this.pconfig.defaultDashMode      = undefined;
         this.pconfig.defaultNetBars       = undefined;
@@ -735,7 +784,7 @@ export class HistoryCardState {
     _entityPersistenceFields()
     {
         return ['color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
-                'dashMode', 'lineMode', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
+                'dashMode', 'lineMode', 'interpolation', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
                 'netBars', 'decimation', 'circular', 'groupId'];
     }
 
@@ -1868,7 +1917,7 @@ export class HistoryCardState {
                             if( d.showPoints === true ) return 4;
                             return +d.showPoints;
                         }
-                        return config?.showSamples ? ( config.showSamples === true ? 4 : +config.showSamples ) : 0;
+                        return config?.showPoints ? ( config.showPoints === true ? 4 : +config.showPoints ) : 0;
                     })(),
                     pointStyle: 'circle',
                     pointBackgroundColor: d.bColor,
@@ -1877,13 +1926,15 @@ export class HistoryCardState {
                             const r = d.showPoints === true ? 4 : +d.showPoints;
                             return r + 2;
                         }
-                        return config?.showSamples ? ( config.showSamples === true ? 6 : +config.showSamples + 2 ) : 5;
+                        return config?.showPoints ? ( config.showPoints === true ? 6 : +config.showPoints + 2 ) : 5;
                     })(),
                     hitRadius: 5,
                     label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
+                    // (the curve reconstruction algorithm, curves and smart modes — see deps/Chart.js)
+                    hecInterpolation: d.interpolation,
                     lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
                     domain: d.domain,
                     entity_id: d.entity_id,
@@ -4859,18 +4910,18 @@ export class HistoryCardState {
                 const key = p.match ?? p.entity;
                 if( !key ) continue;
                 if( this._matchGlob(entity, key) ) {
-                    const { match, entity: _e, ...opts } = p;
+                    const { match, entity: _e, ...opts } = normalizeOptionSynonyms(p);
                     for( const k in opts ) {
                         if( !(k in patched) ) patched[k] = opts[k];
                     }
                 }
             }
             if( Object.keys(patched).length ) {
-                c = Object.assign({}, patched, c ?? {});
+                c = Object.assign({}, patched, normalizeOptionSynonyms(c) ?? {});
             }
         }
 
-        return c ?? undefined;
+        return normalizeOptionSynonyms(c) ?? undefined;
     }
 
     _matchGlob(str, pattern)
@@ -5427,7 +5478,8 @@ export class HistoryCardState {
         // Only keys the graph actually sets: a plain spread would let every graph-level key
         // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
         const _definedGraphProps = Object.fromEntries(Object.entries(_graphProps).filter(([, v]) => v !== undefined));
-        entityOptions = { ...entityOptions, ..._definedGraphProps, groupId };
+        // From the lowest priority to the highest: the card's defaults, entityOptions, the graph
+        entityOptions = { ...this.pconfig.cardGraphDefaults, ...entityOptions, ..._definedGraphProps, groupId };
 
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
@@ -5486,6 +5538,10 @@ export class HistoryCardState {
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
             entities[0].width     = entities[0].width       ?? entityOptions?.width ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
+            // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
+            // the Reconstruction menu — so that changing it on the card, a graph or in
+            // entityOptions still applies to it; see _resolveInterpolation)
+            entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
             entities[0].hidden    = overrideHidden !== undefined ? overrideHidden : (entities[0].hidden ?? entityOptions?.hidden);
             entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
@@ -5589,10 +5645,11 @@ export class HistoryCardState {
         entityOptions.groupId = groupId;
         _pcEntry.groupId = groupId;
 
-        // Y axis bounds: the graph's own options first, else the first entity of the graph
-        // that sets them (on its YAML entry), else entityOptions — taken from every entity
-        // of the graph, not only the one being added (which used to decide alone).
-        for( const _k of ['ymin', 'ymax', 'ystepSize'] ) {
+        // The graph's own options (Y axis bounds, lock, stacking, height, time labels): the
+        // graph's own value first, else the first entity of the graph that sets it (on its
+        // YAML entry), else entityOptions, else the card's — taken from every entity of the
+        // graph, not only the one being added (which used to decide alone).
+        for( const _k of GRAPH_SCOPE_KEYS ) {
             if( _graphProps[_k] !== undefined ) continue;
             const _fromEntity = entities.map(e => e[_k]).find(v => v !== undefined && v !== null);
             if( _fromEntity !== undefined ) entityOptions[_k] = _fromEntity;
@@ -5652,7 +5709,7 @@ export class HistoryCardState {
         const _currentFirst = this._firstGraph();
         const _isFirstOnPage = !_currentFirst || _graphIndex <= (_currentFirst.entities?.[0]?.graphIndex ?? Infinity);
         const _prevG = _isFirstOnPage ? null : this._allGraphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < _graphIndex).pop();
-        const _prevShowTimeLabels = _prevG ? (this.pconfig.graphs[_prevG.groupId ?? null]?.showTimeLabels ?? true) : true;
+        const _prevShowTimeLabels = _prevG ? (_prevG.showTimeLabels ?? true) : true;
         const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
         // Optional title
         if( _graphProps.title !== undefined ) html += `<div style='text-align:center;'>${_graphProps.title}</div>`;
@@ -5787,6 +5844,7 @@ export class HistoryCardState {
                 "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : parseColor(d.fill),
                 "dashMode": d.dashMode,
                 "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
+                "interpolation": this._resolveInterpolation(d),
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
@@ -5840,7 +5898,7 @@ export class HistoryCardState {
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "isStatic": isStatic, "groupId": config?.groupId ?? null };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "showTimeLabels": config?.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
 
@@ -5895,6 +5953,7 @@ export class HistoryCardState {
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                    <a id="et_${i}_interp" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
                     <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
                     <a id="et_${i}_6" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_smart')}</a>
                     <a id="et_${i}_1" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_line_curves')}</a>
@@ -5904,6 +5963,9 @@ export class HistoryCardState {
                     <a id="et_${i}_4" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_arrowline')}</a>
                     <a id="et_${i}_5" href="#et" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_timeline')}</a>
                     <a id="et_${i}_delete" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-top:1px solid #444;">${i18n('ui.menu.entity_delete')}</a>
+                </div>
+                <div id="er_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:110px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:3;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
+                    ${INTERPOLATIONS.map(k => `<a id="er_${i}_${k}" href="#er" style="display:block;padding:5px 10px;text-decoration:none;color:inherit">${INTERPOLATION_LABELS[k]}</a>`).join('')}
                 </div>
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
@@ -5967,6 +6029,7 @@ export class HistoryCardState {
         const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
         const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
         const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
+        const _etI = this._this.querySelector(`#et_${i}_interp`); if( _etI ) _etI.innerHTML = i18n('ui.menu.type_reconstruction') + ' ▸';
         const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
         const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
         const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
@@ -6379,6 +6442,19 @@ export class HistoryCardState {
 
         const _defaultEl = this._this.querySelector(`#et_${input_idx}_default`);
         const _deleteEl  = this._this.querySelector(`#et_${input_idx}_delete`);
+        const _interpEl  = this._this.querySelector(`#et_${input_idx}_interp`);
+        this.hideInterpolationMenu(input_idx);
+        if( _interpEl ) {
+            // Reconstruction (the interpolation algorithm): for an entity already shown as a
+            // curve in curves or smart mode — the only modes it applies to
+            const _e = graph?.entities.find(e => e.entity === entity_id);
+            const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+            const _show = !!_e && ( _e.type ?? graph.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
+            _interpEl.style.display = _show ? 'block' : 'none';
+            _interpEl.style.background = '';
+            _interpEl.style.fontWeight = '';
+            delete _interpEl.dataset.hecSelected;
+        }
         const _titleEl   = this._this.querySelector(`#et_${input_idx}_title`);
         const _isWildcard = Array.isArray(entity_id);
         if( _titleEl ) _titleEl.textContent = _isWildcard ? '*' : entity_id;
@@ -6523,8 +6599,156 @@ export class HistoryCardState {
             delete _a.dataset.hecSelected;
         }
         _menu.style.display = 'none';
+        this.hideInterpolationMenu(input_idx);
         const _fi = this.ui.inputField[input_idx];
         this._resetEntityInput(_fi);
+    }
+
+    // Listeners of the entity type menu et_N and its Reconstruction submenu er_N — shared by
+    // the card and the info panel (whose menu has no "Default" and no "Delete")
+    _initEntityTypeMenu(_ii)
+    {
+        const _etMenu = this._this.querySelector(`#et_${_ii}`);
+        if( !_etMenu ) return;
+        const _erMenu = this._this.querySelector(`#er_${_ii}`);
+        // Click on options — capture:true like es_N
+        this._this.querySelector(`#et_${_ii}_default`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.entityTypeMenuClicked(_ii, 'default', null);
+        }, true);
+        _TYPE_MENU_DEFS.forEach((_def, _idx) => {
+            this._this.querySelector(`#et_${_ii}_${_idx}`)?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode);
+            }, true);
+        });
+        this._this.querySelector(`#et_${_ii}_delete`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const _graph_id = _etMenu._hec_graph_id;
+            const _idx = _etMenu._hec_delete_idx;
+            this.hideEntityTypeMenu(_ii);
+            if( _graph_id === null || _idx === undefined || _idx < 0 ) return;
+            const _g = this.graphs.find(gr => gr.id === _graph_id);
+            if( _g ) this._deleteEntity(_g, _idx);
+        }, true);
+        // Reconstruction: opens the submenu of the algorithms
+        this._this.querySelector(`#et_${_ii}_interp`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showInterpolationMenu(_ii);
+        }, true);
+        INTERPOLATIONS.forEach(k => {
+            this._this.querySelector(`#er_${_ii}_${k}`)?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.entityInterpolationClicked(_ii, k);
+            }, true);
+        });
+        // Keyboard navigation — Enter or → on Reconstruction opens its submenu
+        _etMenu.addEventListener('keydown', (e) => {
+            const _sel = _etMenu.querySelector('a[data-hec-selected]');
+            const _onInterp = _sel && _sel.id === `et_${_ii}_interp` && _sel.style.background;
+            if( e.key === 'ArrowRight' && _onInterp ) {
+                e.preventDefault();
+                this.showInterpolationMenu(_ii);
+                return;
+            }
+            this._menuKeyDown(e, _etMenu, {
+                onClose: () => { if( _erMenu ) _erMenu.style.display = 'none'; this._resetEntityInput(this.ui.inputField[_ii]); },
+            });
+        });
+        // Submenu: same navigation; Escape or ← goes back to the type menu
+        _erMenu?.addEventListener('keydown', (e) => {
+            if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.hideInterpolationMenu(_ii, true);
+                return;
+            }
+            this._menuKeyDown(e, _erMenu);
+        });
+        // Close on focusout — same as es_N; moving between the menu and its submenu
+        // keeps both open
+        const _closeIfLeft = () => {
+            setTimeout(() => {
+                // (the focused element as seen from the menu's own tree: inside Home
+                // Assistant's shadow roots, document.activeElement is only their host)
+                const _a = _etMenu.getRootNode()?.activeElement;
+                const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
+                if( !_in(_etMenu) && !_in(_erMenu) ) this.hideEntityTypeMenu(_ii);
+            }, 150);
+        };
+        _etMenu.addEventListener('focusout', _closeIfLeft);
+        _erMenu?.addEventListener('focusout', _closeIfLeft);
+    }
+
+    // The curve reconstruction algorithm of an entity: its own (YAML entry or Reconstruction
+    // menu), else its graph's, else entityOptions', else the card's
+    _resolveInterpolation(e)
+    {
+        return e?.interpolation
+            ?? normalizeInterpolation(this.pconfig.graphs[e?.groupId]?.interpolation)
+            ?? normalizeInterpolation(this.getEntityOptions(e?.entity)?.interpolation)
+            ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
+    }
+
+    showInterpolationMenu(input_idx)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        const _sub  = this._this.querySelector(`#er_${input_idx}`);
+        const _item = this._this.querySelector(`#et_${input_idx}_interp`);
+        if( !_menu || !_sub || !_item ) return;
+        const _g = this.graphs.find(g => g.id === _menu._hec_graph_id);
+        const _ent = _g?.entities.find(e => e.entity === _menu._hec_entity_id);
+        const _cur = this._resolveInterpolation(_ent);
+        // The algorithm in use is shown in bold and pre-selected, as in the type menu
+        INTERPOLATIONS.forEach(k => {
+            const _el = this._this.querySelector(`#er_${input_idx}_${k}`);
+            if( !_el ) return;
+            _el.style.fontWeight = k === _cur ? 'bold' : '';
+            if( k === _cur ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
+        });
+        // Next to its item, on the right of the type menu (both share the same parent; the
+        // type menu may be shifted by its center/right alignment, a CSS transform)
+        const _w = _menu.offsetWidth;
+        const _shift = /-50%/.test(_menu.style.transform) ? -_w / 2 : /-100%/.test(_menu.style.transform) ? -_w : 0;
+        const _top  = (_menu.offsetTop + _item.offsetTop) + 'px';
+        const _left = (_menu.offsetLeft + _w + _shift - 2) + 'px';
+        this._openMenu(_sub, _top, _left);
+        // Shown with no keyboard highlight yet: the first arrow key highlights the
+        // pre-selected algorithm, Enter takes it right away
+        _sub.focus();
+    }
+
+    hideInterpolationMenu(input_idx, backToMenu = false)
+    {
+        const _sub = this._this.querySelector(`#er_${input_idx}`);
+        if( !_sub ) return;
+        for( let _a of _sub.getElementsByTagName('a') ) {
+            _a.style.background = '';
+            _a.style.fontWeight = '';
+            delete _a.dataset.hecSelected;
+        }
+        _sub.style.display = 'none';
+        if( backToMenu ) this._this.querySelector(`#et_${input_idx}`)?.focus();
+    }
+
+    entityInterpolationClicked(input_idx, algo)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        if( !_menu ) return;
+        const _entity_id = _menu._hec_entity_id;
+        const _graph_id  = _menu._hec_graph_id;
+        this.hideEntityTypeMenu(input_idx);
+        const _g = this.graphs.find(g => g.id === _graph_id);
+        if( !_g ) return;
+        const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
+        if( _entIdx < 0 ) return;
+        // g.entities[i] is the entity's pconfig.entities entry itself: saved with it
+        _g.entities[_entIdx].interpolation = algo;
+        const _pcEntry = this.pconfig.entities.find(e => typeof e === 'object' && e.entity === _entity_id);
+        if( _pcEntry ) _pcEntry.interpolation = algo;
+        if( _g.chart.data.datasets[_entIdx] ) _g.chart.data.datasets[_entIdx].hecInterpolation = algo;
+        _g.chart.update();
+        this.writeLocalState();
     }
 
     entityTypeMenuClicked(input_idx, type, lineMode)
@@ -7127,44 +7351,7 @@ export class HistoryCardState {
         this.ui.inputField[1] = this._this.querySelector(`#b7_1`);
 
         // Entity type menu listeners
-        for( let _ii = 0; _ii < 2; _ii++ ) {
-            const _etMenu = this._this.querySelector(`#et_${_ii}`);
-            if( !_etMenu ) continue;
-            // Click on options — capture:true like es_N
-            this._this.querySelector(`#et_${_ii}_default`)?.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.entityTypeMenuClicked(_ii, 'default', null);
-            }, true);
-            _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                this._this.querySelector(`#et_${_ii}_${_idx}`)?.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode);
-                }, true);
-            });
-            this._this.querySelector(`#et_${_ii}_delete`)?.addEventListener('click', (e) => {
-                e.preventDefault();
-                const _graph_id = _etMenu._hec_graph_id;
-                const _idx = _etMenu._hec_delete_idx;
-                this.hideEntityTypeMenu(_ii);
-                if( _graph_id === null || _idx === undefined || _idx < 0 ) return;
-                const _g = this.graphs.find(gr => gr.id === _graph_id);
-                if( _g ) this._deleteEntity(_g, _idx);
-            }, true);
-            // Keyboard navigation
-            _etMenu.addEventListener('keydown', (e) => {
-                this._menuKeyDown(e, _etMenu, {
-                    onClose: () => this._resetEntityInput(this.ui.inputField[_ii]),
-                });
-            });
-            // Close on focusout — same as es_N
-            _etMenu.addEventListener('focusout', (e) => {
-                setTimeout(() => {
-                    if( !_etMenu.contains(document.activeElement) ) {
-                        this.hideEntityTypeMenu(_ii);
-                    }
-                }, 150);
-            });
-        }
+        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
 
         if( this.pconfig.recordedEntitiesOnly ) {
 
@@ -7711,6 +7898,7 @@ export class HistoryCardState {
 
     _makeStaticEntityEntry(entity, groupId, ent, interval)
     {
+        ent = normalizeOptionSynonyms(ent);
         return {
             entity            : entity,
             groupId           : groupId,
@@ -7724,13 +7912,19 @@ export class HistoryCardState {
             siConversionFactor: ent.siConversionFactor,
             dashMode          : ent.dashMode,
             lineMode          : ent.lineMode,
-            width             : ent.width ?? ent.lineWidth,
+            interpolation     : ent.interpolation,
+            width             : ent.lineWidth,
             type              : ent.type,
             // Y axis bounds set on an entity: the axis is the graph's, so they apply to the
             // graph the entity is shown in (see addGraph)
             ymin              : ent.ymin,
             ymax              : ent.ymax,
-            ystepSize         : ent.ystepSize ?? ent.ystepsize,
+            ystepSize         : ent.ystepSize,
+            // Other options of the graph the entity is shown in (same as the Y axis bounds)
+            ylock             : ent.ylock,
+            stacked           : ent.stacked,
+            height            : ent.height,
+            showTimeLabels    : ent.showTimeLabels,
             showPoints        : ent.showPoints,
             showMinMax        : ent.showMinMax,
             unit              : ent.unit,
@@ -7768,7 +7962,13 @@ export class HistoryCardState {
             }
             const _gid = this.g_id++;
             const _groupId = _gid; // use graph index as groupId for static graphs
-            const _interval = this.parseIntervalConfig(graph.options?.interval) ?? null;
+            // The graph's options: under `options:`, or directly on the graph (`options:`
+            // wins when both are set), with every synonym accepted
+            const _gopts = graph.options && typeof graph.options === 'object' ? graph.options : {};
+            const _opts = normalizeOptionSynonyms({
+                ...Object.fromEntries(GRAPH_OPTION_KEYS.filter(k => graph[k] !== undefined).map(k => [k, graph[k]])),
+                ..._gopts });
+            const _interval = this.parseIntervalConfig(_opts.interval) ?? null;
 
             for( let e of graph.entities ) {
                 if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
@@ -7779,7 +7979,7 @@ export class HistoryCardState {
                     // graph.options.exclude applies to every wildcard entity in this graph;
                     // combined with (not replacing) this entity's own exclude, same pattern
                     // as the other graph-level defaults above.
-                    const _graphExclude = graph.options?.exclude;
+                    const _graphExclude = _opts.exclude;
                     const _combinedExclude = _graphExclude
                         ? [ ...(Array.isArray(_graphExclude) ? _graphExclude : [_graphExclude]),
                             ...(Array.isArray(e.exclude) ? e.exclude : (e.exclude ? [e.exclude] : [])) ]
@@ -7814,23 +8014,22 @@ export class HistoryCardState {
             this.pconfig.graphs[_groupId] = {
                 type           : graph.type,
                 title          : graph.title,
-                showTimeLabels : graph.options?.showTimeLabels,
-                height         : graph.options?.height,
-                stacked        : graph.options?.stacked,
-                ylock          : graph.options?.ylock,
-                ymin           : graph.options?.ymin,
-                ymax           : graph.options?.ymax,
-                // (ystepsize: spelling of the reference config up to 1.1.44, still accepted)
-                ystepSize      : graph.options?.ystepSize ?? graph.options?.ystepsize,
-                fill           : graph.options?.fill,
-                showMinMax     : graph.options?.showMinMax,
-                dashMode       : graph.options?.dashMode,
-                lineMode       : graph.options?.lineMode,
-                width          : graph.options?.width ?? graph.options?.lineWidth,
-                showPoints     : graph.options?.showPoints,
-                decimation     : graph.options?.decimation,
-                netBars        : graph.options?.netBars,
-                showSamples    : graph.options?.showSamples,
+                showTimeLabels : _opts.showTimeLabels,
+                height         : _opts.height,
+                stacked        : _opts.stacked,
+                ylock          : _opts.ylock,
+                ymin           : _opts.ymin,
+                ymax           : _opts.ymax,
+                ystepSize      : _opts.ystepSize,
+                fill           : _opts.fill,
+                showMinMax     : _opts.showMinMax,
+                dashMode       : _opts.dashMode,
+                lineMode       : _opts.lineMode,
+                interpolation  : _opts.interpolation,
+                width          : _opts.lineWidth,
+                showPoints     : _opts.showPoints,
+                decimation     : _opts.decimation,
+                netBars        : _opts.netBars,
             };
         }
     }
@@ -7967,12 +8166,18 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.decimation =             config.decimation;
         this.instance.pconfig.roundingPrecision =      config.rounding || 2;
         this.instance.pconfig.defaultLineMode =        this.instance.normalizeLineMode(config.lineMode);
+        this.instance.pconfig.defaultInterpolation =   normalizeInterpolation(config.interpolation) ?? 'monotone';
         this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
         this.instance.pconfig.defaultDashMode =        config.dashMode;
         this.instance.pconfig.defaultNetBars =         config.netBars;
         this.instance.pconfig.defaultInterval =        config.interval;
         this.instance.pconfig.defaultShowMinMax =      config.showMinMax;
-        this.instance.pconfig.defaultShowPoints =      config.showPoints;
+        this.instance.pconfig.defaultShowPoints =      config.showPoints ?? config.showSamples;
+        // The options of every graph that can also be set for the whole card (the graph,
+        // entityOptions or an entity can still set their own)
+        const _cardOpts = normalizeOptionSynonyms(config);
+        this.instance.pconfig.cardGraphDefaults = Object.fromEntries(
+            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => _cardOpts[k] !== undefined).map(k => [k, _cardOpts[k]]));
         this.instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
         this.instance.pconfig.showCurrentValues =      config.showCurrentValues ?? true;
         this.instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;
@@ -7991,11 +8196,14 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
         this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
         this.instance.pconfig.timeTickShortDate =      config.timeTicks?.dateFormat === 'short';
-        this.instance.pconfig.lineGraphHeight =      ( config.lineGraphHeight ?? 250 ) * 1;
-        this.instance.pconfig.barGraphHeight =       ( config.barGraphHeight ?? 150 ) * 1;
+        // (`height` on the card: the height of every line and bar graph, unless
+        // lineGraphHeight / barGraphHeight set their own)
+        this.instance.pconfig.lineGraphHeight =      ( config.lineGraphHeight ?? config.height ?? 250 ) * 1;
+        this.instance.pconfig.barGraphHeight =       ( config.barGraphHeight ?? config.height ?? 150 ) * 1;
         this.instance.pconfig.timelineBarHeight =    ( config.timelineBarHeight ?? 24 ) * 1;
         this.instance.pconfig.timelineBarSpacing =   ( config.timelineBarSpacing ?? 40 ) * 1;
-        this.instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? false;
+        // (on by default since 1.1.49: `automatic: false` turns it off)
+        this.instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? true;
         this.instance.pconfig.refreshInterval =        config.refresh?.interval ?? undefined;
         this.instance.pconfig.exportSeparator =        config.csv?.separator;
         this.instance.pconfig.exportTimeFormat =       config.csv?.timeFormat;

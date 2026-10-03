@@ -191,6 +191,8 @@ Any numeric entity can be shown as a line (straight, curved, stepped or smart), 
 
 The currently active type is shown in bold. Use ArrowUp/ArrowDown and Enter to pick with the keyboard, or click directly. Non-numeric entities (on/off, text states) never show this menu — they can only be a timeline, and are added as such automatically.
 
+For a curve shown in *Line smart* or *Line curves*, the menu starts with **Reconstruction ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve reconstruction](#curve-reconstruction)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
+
 In the info panel, a "Type" link appears between the date and range selectors for numeric entities, opening the same menu.
 
 ---
@@ -305,9 +307,11 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 ```yaml
 type: custom:history-explorer-card
 refresh:
-  automatic: true    # Refresh when entity values change
+  automatic: true    # Refresh when entity values change (the default — false turns it off)
   interval: 30       # Or refresh every 30 seconds (combine both if needed)
 ```
+
+Since v1.1.49, `automatic` is on by default: set `automatic: false` to turn it off.
 
 ---
 
@@ -321,6 +325,22 @@ lineMode: lines    # curves, lines, stepped, or smart
 ```
 
 Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Line curves* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
+
+### Curve reconstruction
+
+In `curves` and `smart` modes, the curve between two values is rebuilt by an interpolation algorithm, chosen with `interpolation` (on the card, a graph, an entity or in `entityOptions`) or from the type menu (**Reconstruction ▸**):
+
+```yaml
+type: custom:history-explorer-card
+interpolation: makima   # monotone (default), steffen, makima, or catmullrom
+```
+
+| `interpolation` | How the curve looks |
+|---|---|
+| `monotone` (default) | Never overshoots, but flat at every value where the curve changes direction or repeats a value: small breaks in the slope |
+| `steffen` | Never overshoots; flat only at the real peaks and troughs; takes the irregular spacing of the values into account |
+| `makima` | Follows the local trend, flat over flat stretches, no break at each small peak; hardly any overshoot |
+| `catmullrom` | The smoothest; may overshoot a little around sharp changes |
 
 `smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
@@ -503,11 +523,12 @@ graphs:
 |---|:-:|:-:|:-:|---|
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
 | `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
-| `fill` | | ✓ | ✓ | Fill color under the line |
+| `fill` | ✓ | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
+| `interpolation` | ✓ | ✓ | ✓ | Curve reconstruction in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` |
 | `dashMode` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
-| `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) |
+| `showPoints` | ✓ | ✓ | ✓ | Dots at measurement points (`true` = 4px, or numeric radius) — `showSamples` is a synonym |
 | `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
 | `decimation` | ✓ | ✓ | ✓ | `fast` (default), `accurate`, or `false` |
 | `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
@@ -517,20 +538,19 @@ graphs:
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |
 | `circular` | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
-| `ymin` / `ymax` | | | ✓ | Set initial Y axis bounds (can still be modified interactively) |
-| `ystepSize` | | | ✓ | Fix Y axis tick step |
-| `ylock` | | ✓ | | Disable all interactive Y axis pan and zoom |
-| `stacked` | | ✓ | | Stack bars (bar graphs with multiple entities) |
-| `showTimeLabels` | | ✓ | | Show/hide time axis labels on timeline/arrowline graphs (default `true`) |
-| `showSamples` | | ✓ | | Permanently show sample dots |
-| `height` | | ✓ | | Graph height in pixels — see *2 |
+| `ymin` / `ymax` | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively) — see *7 |
+| `ystepSize` | ✓ | ✓ | ✓ | Fix Y axis tick step (`ystepsize` is a synonym) — see *7 |
+| `ylock` | ✓ | ✓ | ✓ | Disable all interactive Y axis pan and zoom — see *7 |
+| `stacked` | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
+| `showTimeLabels` | ✓ | ✓ | ✓ | Show/hide time axis labels on timeline/arrowline graphs (default `true`) — see *7 |
+| `height` | ✓ | ✓ | ✓ | Graph height in pixels — see *2 and *7 |
 | `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
 | `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *4 |
 | `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
 
 *1 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
 
-*2 — there's no single card-level default for `height` — line and bar graphs each have their own global default instead, `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)).
+*2 — `height` on the card sets the height of every line and bar graph; `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)) still set their own, and win over it.
 
 *3 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
 
@@ -539,6 +559,10 @@ graphs:
 *5 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. On an arrowline, it sets what a full turn of the arrows is (360 without a period).
 
 *6 — `scale` without `unit` only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W.
+
+*7 — an option of the graph itself (its Y axis, its stacking, its height, its time labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
+
+Every option is spelled the same at every level where it's accepted, and every spelling it ever had is accepted everywhere (`width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 
