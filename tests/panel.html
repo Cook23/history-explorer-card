@@ -14,7 +14,11 @@ class FakeMoreInfoHistory extends HTMLElement {
   constructor(){ super(); this.attachShadow({mode:'open'}); }
   render(){ return {_$litType$:1,strings:['<div>native</div>'],values:[]}; }
   updated(){}
-  requestUpdate(){ this.shadowRoot.innerHTML=ser(this.render()); this.updated(new Map()); }
+  requestUpdate(){ this.shadowRoot.innerHTML=ser(this.render()); this._rendered=true; this.updated(new Map()); }
+  // A new hass, as Home Assistant pushes it: lit calls updated() again — the rendered markup
+  // doesn't change (same template), so it isn't rendered again here
+  get hass(){ return this._hass; }
+  set hass(v){ const old=this._hass; this._hass=v; if( this._rendered ) this.updated(new Map([['hass', old]])); }
 }
 customElements.define('ha-more-info-history', FakeMoreInfoHistory);
 </script>

@@ -8,7 +8,7 @@ import "../deps/FileSaver.js"
 
 import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
-import { stateColors, stateColorsDark, defaultColors, parseColor, parseColorRange } from "./history-default-colors.js";
+import { stateColors, stateColorsDark, defaultColors, parseColor } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
 import { EntityStore, entityIdOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1b3';
+const Version = '1.2.1';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -1063,7 +1063,6 @@ export class HistoryCardState {
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
         const tooltipSize = this.pconfig.tooltipSize;
-        const _self = this; // captured for tooltips.custom below — `this` there is the Chart.js Tooltip instance
 
         var chart = new Chart(ctx, {
 
@@ -1897,12 +1896,6 @@ export class HistoryCardState {
         return this._allGraphsInDisplayOrder()[0] ?? null;
     }
 
-    _lastGraph()
-    {
-        const _all = this._allGraphsInDisplayOrder();
-        return _all[_all.length - 1] ?? null;
-    }
-
     _isFirstGraph(g)
     {
         return this._firstGraph() === g;
@@ -2186,7 +2179,7 @@ export class HistoryCardState {
             }
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
-            entities[0].width     = entities[0].width       ?? entityOptions?.width ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
+            entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
             // the Reconstruction menu — so that changing it on the card, a graph or in
@@ -2847,7 +2840,6 @@ export class HistoryCardState {
             this._inputWidth[i] = inputWA;
             const totalA = dlw + 10 + 400 + slBtnsW + drw + 10; // switch at 400px input width
 
-            const colW = Math.round((w - inputWA - slBtnsW) / 2);
 
             if( totalA + 50 <= w ) {
                 // Layout A : dl | sl | dr on one line
@@ -2973,7 +2965,7 @@ export class HistoryCardState {
             if( _needsIntervalRedraw ) this.updateHistoryWithClearCache();
 
             // Register observer to resize the graphs whenever the maincard dimensions change
-            let ro = new ResizeObserver(entries => { this.resize(); });
+            let ro = new ResizeObserver(() => { this.resize(); });
             ro.observe(this._this.querySelector('#maincard'));
 
             // Per-graph interval now restored in readLocalState (last-one-to-speak-wins)
@@ -3039,8 +3031,98 @@ export class HistoryCardState {
 
 
     // --------------------------------------------------------------------------------------
+    // Configuration
+    // --------------------------------------------------------------------------------------
+
+    // Reads the display and behavior options of a configuration — for the card and for the
+    // info panel alike. defaults: the host's own default values (used when the configuration
+    // doesn't set them); fixed: what the host decides whatever the configuration says.
+    applyConfig(config, { defaults = {}, fixed = {} } = {})
+    {
+        const P = this.pconfig;
+        // (every spelling of an option accepted — see normalizeOptionSynonyms)
+        const c = normalizeOptionSynonyms(config);
+        const d = (k, v) => k in defaults ? defaults[k] : v;
+
+        P.customStateColors = {};
+        for( let i in c.stateColors ?? {} ) P.customStateColors[i] = parseColor(c.stateColors[i]);
+        P.entityOptions =          c.entityOptions;
+
+        P.labelAreaWidth =         c.labelAreaWidth ?? 65;
+        P.labelsVisible =          c.labelsVisible ?? true;
+        P.hideLegend =           ( c.legendVisible == false ) ? true : undefined;
+        P.cursorMode =             c.cursor?.mode ?? d('cursorMode', 'auto');
+        P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', ['timeline']);
+        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? c.showTooltipColorsLine ?? true;
+        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? c.showTooltipColorsTimeline ?? true;
+        P.tooltipSize =            c.tooltip?.size ?? c.tooltipSize ?? 'auto';
+        P.tooltipShowDuration =    c.tooltip?.showDuration ?? c.tooltipShowDuration ?? d('tooltipShowDuration', false);
+        P.tooltipShowLabel =       c.tooltip?.showLabel ?? true;
+        P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? 'auto';
+        P.colorSeed =              c.stateColorSeed ?? 137;
+        P.stateTextMode =          c.stateTextMode ?? 'auto';
+        P.decimation =             c.decimation;
+        P.roundingPrecision =      c.rounding || 2;
+
+        // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
+        P.defaultLineMode =        this.normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
+        P.defaultInterpolation =   normalizeInterpolation(c.interpolation) ?? 'monotone';
+        P.defaultLineWidth =       c.lineWidth ?? 2.0;
+        P.defaultDashMode =        c.dashMode;
+        P.defaultNetBars =         c.netBars;
+        P.defaultInterval =        c.interval;
+        P.defaultShowMinMax =      c.showMinMax;
+        P.defaultShowPoints =      c.showPoints;
+        P.cardGraphDefaults =      Object.fromEntries(
+            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        // (`height`: the height of every line and bar graph, unless lineGraphHeight /
+        // barGraphHeight set their own)
+        P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
+        P.barGraphHeight =       ( c.barGraphHeight ?? c.height ?? 150 ) * 1;
+        P.timelineBarHeight =    ( c.timelineBarHeight ?? 24 ) * 1;
+        P.timelineBarSpacing =   ( c.timelineBarSpacing ?? 40 ) * 1;
+
+        P.showUnavailable =        c.showUnavailable ?? false;
+        P.showCurrentValues =      c.showCurrentValues ?? true;
+        P.axisAddMarginMin =       c.axisAddMarginMin ?? false;
+        P.axisAddMarginMax =       c.axisAddMarginMax ?? false;
+        P.recordedEntitiesOnly =   c.recordedEntitiesOnly ?? false;
+        P.filterEntities =         c.filterEntities;
+        P.excludeFilterEntities =  c.excludeFilterEntities;
+        P.combineSameUnits =       c.combineSameUnits === true;
+        P.defaultTimeRange =       c.defaultTimeRange ?? '24';
+        P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
+        P.timeTickDensity =        c.timeTicks?.density ?? c.timeTickDensity ?? 'high';
+        P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;
+        P.timeTickShortDate =      c.timeTicks?.dateFormat === 'short';
+        // (on by default since 1.1.49: `automatic: false` turns it off)
+        P.refreshEnabled =         c.refresh?.automatic ?? true;
+        P.refreshInterval =        c.refresh?.interval ?? undefined;
+
+        this.statistics.enabled =   c.statistics?.enabled ?? true;
+        this.statistics.mode =      c.statistics?.mode ?? 'mean';
+        this.statistics.retention = c.statistics?.retention ?? undefined;
+        this.statistics.period =    c.statistics?.period ?? 'hour';
+        this.statistics.force =     c.statistics?.force ?? undefined;
+
+        Object.assign(P, fixed);
+    }
+
+    // --------------------------------------------------------------------------------------
     // On demand refresh handling
     // --------------------------------------------------------------------------------------
+
+    // Home Assistant pushed new states: if a shown entity changed, its current value in the
+    // legend is updated and the recent history refreshed (scheduleAutoRefresh) — for the card
+    // and the info panel alike
+    onStatesChanged()
+    {
+        if( !this.contentValid || !this.handleChangedEntities() ) return;
+        if( this.pconfig.showCurrentValues )
+            this.updateHistory();
+        if( this.pconfig.refreshEnabled )
+            this.scheduleAutoRefresh();
+    }
 
     handleChangedEntities()
     {
@@ -3202,7 +3284,7 @@ export class HistoryCardState {
                 dashMode       : _opts.dashMode,
                 lineMode       : _opts.lineMode,
                 interpolation  : _opts.interpolation,
-                width          : _opts.lineWidth,
+                lineWidth      : _opts.lineWidth,
                 showPoints     : _opts.showPoints,
                 decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
@@ -3282,12 +3364,7 @@ class HistoryExplorerCard extends HTMLElement
         if( !this.instance.contentValid && !this.instance.iid )
             this.instance.iid = setInterval(this.instance.updateContent.bind(this.instance), 100);
 
-        if( this.instance.contentValid && this.instance.handleChangedEntities() ) {
-            if( this.instance.pconfig.showCurrentValues )
-                this.instance.updateHistory();
-            if( this.instance.pconfig.refreshEnabled )
-                this.instance.scheduleAutoRefresh();
-        }
+        this.instance.onStatesChanged();
 
     }
 
@@ -3320,81 +3397,16 @@ class HistoryExplorerCard extends HTMLElement
             this.instance.buildGraphListFromConfig(config.graphs)
 
 
-        this.instance.pconfig.customStateColors = {};
-
-        if( config.stateColors ) {
-            for( let i in config.stateColors ) {
-                this.instance.pconfig.customStateColors[i] = parseColor(config.stateColors[i]);
-            }
-        }
-
-        this.instance.pconfig.entityOptions = config.entityOptions;
-
-        this.instance.pconfig.labelAreaWidth =         config.labelAreaWidth ?? 65;
-        this.instance.pconfig.labelsVisible =          config.labelsVisible ?? true;
-        this.instance.pconfig.hideLegend =           ( config.legendVisible == false ) ? true : undefined;
-        this.instance.pconfig.cursorMode =             config.cursor?.mode ?? 'auto';
-        this.instance.pconfig.cursorTypes =            config.cursor?.types ?? ['timeline'];
-        this.instance.pconfig.showTooltipColors[0] =   config.tooltip?.showColorsLine ?? config.showTooltipColorsLine ?? true;
-        this.instance.pconfig.showTooltipColors[1] =   config.tooltip?.showColorsTimeline ?? config.showTooltipColorsTimeline ?? true;
-        this.instance.pconfig.tooltipSize =            config.tooltip?.size ?? config.tooltipSize ?? 'auto';
-        this.instance.pconfig.tooltipShowDuration =    config.tooltip?.showDuration ?? config.tooltipShowDuration ?? false;
-        this.instance.pconfig.tooltipShowLabel =       config.tooltip?.showLabel ?? true;
-        this.instance.pconfig.tooltipStateTextMode =   config.tooltip?.stateTextMode ?? config.stateTextMode ?? 'auto';
-        this.instance.pconfig.colorSeed =              config.stateColorSeed ?? 137;
-        this.instance.pconfig.stateTextMode =          config.stateTextMode ?? 'auto';
-        this.instance.pconfig.decimation =             config.decimation;
-        this.instance.pconfig.roundingPrecision =      config.rounding || 2;
-        this.instance.pconfig.defaultLineMode =        this.instance.normalizeLineMode(config.lineMode);
-        this.instance.pconfig.defaultInterpolation =   normalizeInterpolation(config.interpolation) ?? 'monotone';
-        this.instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
-        this.instance.pconfig.defaultDashMode =        config.dashMode;
-        this.instance.pconfig.defaultNetBars =         config.netBars;
-        this.instance.pconfig.defaultInterval =        config.interval;
-        this.instance.pconfig.defaultShowMinMax =      config.showMinMax;
-        this.instance.pconfig.defaultShowPoints =      config.showPoints ?? config.showSamples;
-        // The options of every graph that can also be set for the whole card (the graph,
-        // entityOptions or an entity can still set their own)
-        const _cardOpts = normalizeOptionSynonyms(config);
-        this.instance.pconfig.cardGraphDefaults = Object.fromEntries(
-            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => _cardOpts[k] !== undefined).map(k => [k, _cardOpts[k]]));
-        this.instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
-        this.instance.pconfig.showCurrentValues =      config.showCurrentValues ?? true;
-        this.instance.pconfig.axisAddMarginMin =     ( config.axisAddMarginMin !== undefined ) ? config.axisAddMarginMin : false;
-        this.instance.pconfig.axisAddMarginMax =     ( config.axisAddMarginMax !== undefined ) ? config.axisAddMarginMax : false;
-        this.instance.pconfig.recordedEntitiesOnly =   config.recordedEntitiesOnly ?? false;
-        this.instance.pconfig.filterEntities  =        config.filterEntities;
-        this.instance.pconfig.excludeFilterEntities =   config.excludeFilterEntities;
-        this.instance.pconfig.combineSameUnits =       config.combineSameUnits === true;
-        this.instance.pconfig.defaultTimeRange =       config.defaultTimeRange ?? '24';
-        // What the YAML itself says (undefined if it says nothing) — the only value its
-        // front and its image are about; the '24' fallback above isn't the YAML speaking
+        this.instance.applyConfig(config);
+        // (the card's own: what's saved and how, the CSV export, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
-        this.instance.pconfig.defaultTimeOffset =      config.defaultTimeOffset ?? undefined;
-        this.instance.pconfig.timeTickDensity =        config.timeTicks?.density ?? config.timeTickDensity ?? 'high';
-        this.instance.pconfig.timeTickOverride =       config.timeTicks?.densityOverride ?? undefined;
-        this.instance.pconfig.timeTickShortDate =      config.timeTicks?.dateFormat === 'short';
-        // (`height` on the card: the height of every line and bar graph, unless
-        // lineGraphHeight / barGraphHeight set their own)
-        this.instance.pconfig.lineGraphHeight =      ( config.lineGraphHeight ?? config.height ?? 250 ) * 1;
-        this.instance.pconfig.barGraphHeight =       ( config.barGraphHeight ?? config.height ?? 150 ) * 1;
-        this.instance.pconfig.timelineBarHeight =    ( config.timelineBarHeight ?? 24 ) * 1;
-        this.instance.pconfig.timelineBarSpacing =   ( config.timelineBarSpacing ?? 40 ) * 1;
-        // (on by default since 1.1.49: `automatic: false` turns it off)
-        this.instance.pconfig.refreshEnabled =         config.refresh?.automatic ?? true;
-        this.instance.pconfig.refreshInterval =        config.refresh?.interval ?? undefined;
         this.instance.pconfig.exportSeparator =        config.csv?.separator;
         this.instance.pconfig.exportTimeFormat =       config.csv?.timeFormat;
         this.instance.pconfig.exportAttributes =       config.csv?.exportAttributes;
         this.instance.pconfig.exportStatsPeriod =      config.csv?.statisticsPeriod ?? 'hour';
         this.instance.pconfig.exportNumberLocale =     config.csv?.numberLocale;
-        this.instance.statistics.enabled =             config.statistics?.enabled ?? true;
-        this.instance.statistics.mode =                config.statistics?.mode ?? 'mean';
-        this.instance.statistics.retention =           config.statistics?.retention ?? undefined;
-        this.instance.statistics.period =              config.statistics?.period ?? 'hour';
-        this.instance.statistics.force =               config.statistics?.force ?? undefined;
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 

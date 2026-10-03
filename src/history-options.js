@@ -8,13 +8,19 @@ export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
 // How each algorithm is named in the Reconstruction menu (names, not translated)
 export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
 
+// (each unknown value is reported once: it's resolved again at each redraw)
+const _reportedInterpolations = new Set();
+
 export function normalizeInterpolation(v)
 {
     if( v === undefined || v === null ) return undefined;
     const k = String(v).toLowerCase().replace(/[-_ ]/g, '');
     const r = k === 'akima' ? 'makima' : k;
     if( INTERPOLATIONS.includes(r) ) return r;
-    console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
+    if( !_reportedInterpolations.has(v) ) {
+        _reportedInterpolations.add(v);
+        console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
+    }
     return undefined;
 }
 
@@ -40,9 +46,9 @@ export function normalizeOptionSynonyms(o)
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth', 'width',
-    'showPoints', 'showSamples', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'ystepsize', 'showTimeLabels'];
+export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+    'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', ...Object.values(OPTION_SYNONYMS).flat()];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)

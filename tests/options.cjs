@@ -204,5 +204,34 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── The info panel refreshes the same way (same code as the card) ──
+    t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
+    await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+    {
+        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        await t.step('info panel refresh: a value changing every 0.5 s → one request every 2 s', async () => {
+            const n0 = await n();
+            for( let i = 0; i < 20; i++ ) { await t.E(`setState('sensor.power', ${400 + i})`); await t.wait(500); }
+            const k = (await n()) - n0;
+            return k >= 4 && k <= 6 ? true : `${k} requests in 10 s`;
+        });
+        await t.step('info panel refresh: one change → one request, within 2 s, none after', async () => {
+            await t.wait(2500); const n0 = await n();
+            await t.E(`setState('sensor.power', 999)`); await t.wait(2600);
+            const n1 = await n(); await t.wait(3000); const n2 = await n();
+            return n1 - n0 === 1 && n2 === n1 ? true : `${n1 - n0} then ${n2 - n1}`;
+        });
+    }
+    done(await t.close());
+
+    // ── The info panel reads its configuration as the card does (same code) ──
+    t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curve', ylock: true, showSamples: 3 }, mock: { series: true }, height: 800 });
+    await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+    await t.step('info panel config: lineMode alias, a graph option and a synonym at its root, as on the card', async () => {
+        const v = await t.E(`(()=>{ const g=inst().graphs[0]; const d=g.chart.data.datasets[0]; return [inst().pconfig.defaultLineMode, g.ylock, d.pointRadius].join(':'); })()`);
+        return v === 'curves:true:3' ? true : v;
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

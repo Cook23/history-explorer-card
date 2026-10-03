@@ -1113,7 +1113,6 @@
     // chart instances too, including ones just created and never yet
     // touched — must exist unconditionally, same as any native Chart.js method.
     _hecLegendIndexAt: function (x, y) {
-      var me = this;
       var legend = this.legend;
       if (!legend || !legend.legendHitBoxes) return -1;
       var lh = legend.legendHitBoxes;
@@ -1132,7 +1131,6 @@
     // vertically closest. Same unconditional-at-construction reasoning as
     // _hecLegendIndexAt above.
     _hecYAxisIndexAt: function (x, y) {
-      var me = this;
       var yScale = this.scales && this.scales['y-axis-0'];
       if (!yScale || !this.data || !this.data.labels || !this.chartArea) return -1;
       var labels = this.data.labels;
@@ -1155,7 +1153,6 @@
     // distance. Shared by the insertion markers (in this chart and in another one) and
     // by the card, which places the dropped entity from it.
     _hecYAxisInsertAt: function (y, excludeIdx, nearest) {
-      var me = this;
       var yScale = this.scales && this.scales['y-axis-0'];
       var labels = this.data && this.data.labels;
       if (!yScale || !labels || !labels.length) return null;
@@ -1842,7 +1839,6 @@
     // own structured content and knows its own early-close conditions (disabled,
     // no content) — the generic function knows neither.
     _hecRenderFloatingTooltip: function () {
-      var me = this;
       var _vm = this._view;
 
       var _justMoved = !!(_vm && _vm.hecJustMoved);
