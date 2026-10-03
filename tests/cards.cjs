@@ -36,7 +36,7 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300);
-        return m === 'Interpolation ▸ | Line smart* | Line curves | Line straight | Line stepped | Bar | Arrowline | Timeline | Delete' ? true : m;
+        return m === 'Interpolation ▸ | Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline | Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: timeline only', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));

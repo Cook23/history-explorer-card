@@ -39,7 +39,7 @@ module.exports = async function()
     const ds = `el.instance.graphs[0].chart.data.datasets.map(d=>d.hecInterpolation).join(',')`;
     await t.step('a smart curve\'s type menu starts with Interpolation', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        const v = await t.E(menu); return /^Interpolation ▸ \| Line smart\*/.test(v) ? true : v;
+        const v = await t.E(menu); return /^Interpolation ▸ \| Smart\*/.test(v) ? true : v;
     });
     await t.step('keyboard: ↑ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowUp'); await t.page.keyboard.press('ArrowRight'); await t.wait(200);

@@ -173,7 +173,7 @@ Any numeric entity can be shown as a line (straight, curved, stepped or smart), 
 
 The currently active type is shown in bold. Use ArrowUp/ArrowDown and Enter to pick with the keyboard, or click directly. Non-numeric entities (on/off, text states) never show this menu — they can only be a timeline, and are added as such automatically.
 
-For a curve shown in *Line smart* or *Line curves*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
+For a curve shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
 
 In the info panel, a "Type" link appears between the date and range selectors for numeric entities, opening the same menu.
 
@@ -308,7 +308,7 @@ type: custom:history-explorer-card
 lineMode: lines    # curves, lines, stepped, or smart
 ```
 
-Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Line curves* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
+Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
 
 ### Curve interpolation
 
