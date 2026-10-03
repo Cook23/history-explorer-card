@@ -41,7 +41,7 @@ graphs:
       # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
       lineMode: null
 
-      # (curves and smart modes) Curve reconstruction algorithm: monotone (default), steffen, makima or catmullrom.
+      # (curves and smart modes) Interpolation algorithm: monotone (default), steffen, makima or catmullrom.
       # Otherwise defaults to the graph's, then $.entityOptions', then the card's value at $.interpolation
       interpolation: null
 
@@ -131,7 +131,7 @@ graphs:
     # (line graph only) Line interpolation mode for every entity in this graph
     lineMode: null
 
-    # (curves and smart modes) Curve reconstruction algorithm for every entity in this graph — see $.interpolation
+    # (curves and smart modes) Interpolation algorithm for every entity in this graph — see $.interpolation
     interpolation: null
 
     # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
@@ -224,7 +224,7 @@ entityOptions:
     # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
     lineMode: null
 
-    # (curves and smart modes) Curve reconstruction algorithm — see $.interpolation
+    # (curves and smart modes) Interpolation algorithm — see $.interpolation
     interpolation: null
 
     # Can be used to scale a specified entity's value by the given factor
@@ -309,13 +309,13 @@ rounding: 2
 # for YAML graphs only, set it under each graph's `options:` instead
 lineMode: null
 
-# Curve reconstruction algorithm, for the curves and smart line modes:
+# Interpolation algorithm, for the curves and smart line modes:
 #   monotone   — Chart.js' monotone cubic (Fritsch–Carlson): never overshoots, but flat at every value where the
 #                curve changes direction or repeats a value (the default)
 #   steffen    — monotone too, flat only at the real peaks and troughs, weighted by the spacing of the values
 #   makima     — modified Akima: follows the local trend, flat over flat stretches, hardly any overshoot
 #   catmullrom — the smoothest, may overshoot a little around sharp changes
-# Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Reconstruction)
+# Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Interpolation)
 interpolation: "monotone"
 
 # Line width for lines in line graphs. `width` is also accepted as an alias
