@@ -4,24 +4,17 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.1b3] - unreleased
+## [v1.2.1] - unreleased
 
-### Merged — v1.1.49 (its second beta)
-- Automatic refresh at most once every 2 s, never held back by entities changing faster; the Reconstruction submenu opens on the left of the type menu at the right edge of the screen — see v1.1.49 below
-- The `options` test suite also covers the submenu at the edges of the screen, inside a shadow root (as in Home Assistant) and on a touch screen, and the load of the automatic refresh
-
-
-## [v1.2.1b2] - unreleased
-
-### Merged — v1.1.49 (its first beta)
-- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) at every level, and the Reconstruction submenu of the type menu; the same options at every level, every spelling accepted everywhere; automatic refresh on by default — see v1.1.49 below
-- In the code: the algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8); the option names, their synonyms and levels in the new module `src/history-options.js`; a new test suite, `options`
-
-
-## [v1.2.1b1] - unreleased
-
-### Merged — v1.1.48
+### Merged — v1.1.48 and v1.1.49
 - `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
+- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Reconstruction submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
+
+### Changed — under the hood
+- The curve reconstruction algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
+- The option names, their synonyms and the levels they're accepted at are in a new module, `src/history-options.js`
+- The card and the info panel share one configuration reader (`applyConfig`), one reaction to new states (`onStatesChanged`) and one automatic refresh (`scheduleAutoRefresh`); submenus are placed by one method (`_openSubmenu`)
+- New test suites `scale` and `options` (the options at every level, the Reconstruction submenu with the keyboard, the mouse and on touch, at the screen edges and inside a shadow root, the load of the automatic refresh, the info panel)
 
 
 ## [v1.2.0] - 2026-10-02 — beta
