@@ -4,6 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.51] - unreleased
+
+### Changed — the Interpolation submenu drawn over the type menu
+- The submenu of the interpolation algorithms opens over the type menu, level with *Interpolation ▸*, its right edge on the menu's right edge: it no longer takes room beside the menu (it opened on the right of the menu, or on its left at the right edge of the screen)
+
 ## [v1.1.50] - 2026-10-03
 
 ### Changed — the type menu's submenu is named *Interpolation*

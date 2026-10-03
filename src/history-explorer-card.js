@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.50';
+const Version = '1.1.51b1';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -5068,19 +5068,16 @@ export class HistoryCardState {
         this._clampToViewport(menuEl);
     }
 
-    // Opens a submenu next to the item of its menu that opens it: on the right of the item,
-    // level with it — or on its left when the room on the right is missing — and, like every
-    // menu (_openMenu), kept within the card and the viewport. The submenu must share the
-    // menu's positioned parent (both are its children).
+    // Opens a submenu over its menu, level with the item that opens it, its right edge on the
+    // menu's right edge — so it takes no room beside the menu — and, like every menu
+    // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
+    // positioned parent (both are its children).
     _openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
-        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.right - _cb.left - 2) + 'px');
-        // Pushed back over its menu by the bounds: on the left of the menu instead
-        if( subEl.getBoundingClientRect().left < _item.right - 4 )
-            this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.left - _cb.left - subEl.offsetWidth + 2) + 'px');
+        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 
     _navigateMenuArrowKey(visible, key)
