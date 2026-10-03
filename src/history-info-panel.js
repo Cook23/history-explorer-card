@@ -2,6 +2,7 @@
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
 import { infoPanelEnabled, HistoryCardState, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
 import { _TYPE_MENU_DEFS, _TYPE_MENU_ORDER, _TYPE_MENU_ITEM_STYLE } from "./card-menus.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, normalizeInterpolation } from "./history-options.js";
 import { i18n } from "./languages.js";
 
 // --------------------------------------------------------------------------------------
@@ -152,6 +153,7 @@ function hecHookInfoPanel()
             instance.pconfig.decimation =             config.decimation;
             instance.pconfig.roundingPrecision =      config.rounding || 2;
             instance.pconfig.defaultLineMode =        config.lineMode ?? 'lines';
+            instance.pconfig.defaultInterpolation =   normalizeInterpolation(config.interpolation) ?? 'monotone';
             instance.pconfig.defaultLineWidth =       config.lineWidth ?? config.width ?? 2.0;
             instance.pconfig.showUnavailable =        config.showUnavailable ?? false;
             instance.pconfig.showCurrentValues =      false;
@@ -195,33 +197,11 @@ function hecHookInfoPanel()
             const _tf0 = instance._this.querySelector('#tf_0');
             if( _tf0 ) {
                 instance.ui.inputField[0] = _tf0;
-                const _etMenu = instance._this.querySelector('#et_0');
-                _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                    instance._this.querySelector(`#et_0_${_idx}`)?.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        instance.entityTypeMenuClicked(0, _def.type, _def.lineMode);
-                    }, true);
-                });
+                instance._initEntityTypeMenu(0);
                 _tf0.addEventListener('click', () => {
                     const _g = instance.graphs[0];
                     if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');
                 });
-                if( _etMenu ) {
-                    // Keyboard navigation — same shared logic as the main card
-                    _etMenu.addEventListener('keydown', (e) => {
-                        instance._menuKeyDown(e, _etMenu, {
-                            onClose: () => instance._resetEntityInput(instance.ui.inputField[0]),
-                        });
-                    });
-                    // Close on focusout — same as main card
-                    _etMenu.addEventListener('focusout', () => {
-                        setTimeout(() => {
-                            if( !_etMenu.contains(document.activeElement) ) {
-                                instance.hideEntityTypeMenu(0);
-                            }
-                        }, 150);
-                    });
-                }
             }
 
             instance.contentValid = true;
@@ -367,7 +347,11 @@ function hecHookInfoPanel()
                     ${_isNumeric ? html`
                         <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
                         <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
+                            <a id="et_${i}_interp" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-bottom:1px solid #444;">${i18n('ui.menu.type_reconstruction')} ▸</a>
                             ${_TYPE_MENU_ORDER.map(k => html`<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`)}
+                        </div>
+                        <div id="er_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:110px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:3;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
+                            ${INTERPOLATIONS.map(k => html`<a id="er_${i}_${k}" href="#er" style="${_TYPE_MENU_ITEM_STYLE}">${INTERPOLATION_LABELS[k]}</a>`)}
                         </div>
                     ` : ''}
                     </div>

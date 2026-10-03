@@ -35,6 +35,108 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Curve reconstruction — the dataset option `hecInterpolation` (Chart Custom.js.md §1),
+  // used by the line controller's updateBezierControlPoints hook (§8) instead of
+  // helpers.splineCurveMonotone when it names another algorithm than 'monotone'.
+  // Tangents of a cubic Hermite curve through the points (x, y), by algorithm
+  // (the card's `interpolation` option, besides Chart.js' own monotone one):
+  // - steffen: monotone (no overshoot, flat only at the real extrema), slopes
+  //   weighted by the spacing of the points (M. Steffen, 1990);
+  // - makima: modified Akima — follows the local trend, flat over flat stretches,
+  //   no flattening at each small peak, hardly any overshoot;
+  // - catmullrom: the slope of the chord through both neighbours — the smoothest,
+  //   may overshoot a little around sharp changes.
+  helpers.hecSplineTangents = function (x, y, algo) {
+    var n = x.length;
+    var m = new Array(n).fill(0);
+    if (n < 2) {
+      return m;
+    }
+    var h = [], d = [], k;
+    for (k = 0; k < n - 1; ++k) {
+      h.push(x[k + 1] - x[k]);
+      d.push(h[k] !== 0 ? (y[k + 1] - y[k]) / h[k] : 0);
+    }
+    if (n === 2) {
+      return [d[0], d[0]];
+    }
+    var i;
+    if (algo === 'catmullrom') {
+      for (i = 1; i < n - 1; ++i) {
+        var span = x[i + 1] - x[i - 1];
+        m[i] = span !== 0 ? (y[i + 1] - y[i - 1]) / span : 0;
+      }
+      m[0] = d[0];
+      m[n - 1] = d[n - 2];
+    } else if (algo === 'steffen') {
+      for (i = 1; i < n - 1; ++i) {
+        var hs = h[i - 1] + h[i];
+        var p = hs !== 0 ? (d[i - 1] * h[i] + d[i] * h[i - 1]) / hs : 0;
+        m[i] = (Math.sign(d[i - 1]) + Math.sign(d[i])) * Math.min(Math.abs(d[i - 1]), Math.abs(d[i]), 0.5 * Math.abs(p));
+      }
+      m[0] = d[0];
+      m[n - 1] = d[n - 2];
+    } else {
+      // makima: the slopes extended by two on each side (linear extrapolation)
+      var dd = function (j) {
+        if (j >= 0 && j < n - 1) {
+          return d[j];
+        }
+        if (j === -1) {
+          return 2 * d[0] - d[1];
+        }
+        if (j === -2) {
+          return 2 * (2 * d[0] - d[1]) - d[0];
+        }
+        if (j === n - 1) {
+          return 2 * d[n - 2] - d[n - 3];
+        }
+        return 2 * (2 * d[n - 2] - d[n - 3]) - d[n - 2];
+      };
+      for (i = 0; i < n; ++i) {
+        var a = dd(i - 2), b = dd(i - 1), c = dd(i), e = dd(i + 1);
+        var w1 = Math.abs(e - c) + Math.abs(e + c) / 2;
+        var w2 = Math.abs(b - a) + Math.abs(b + a) / 2;
+        m[i] = (w1 + w2) !== 0 ? (w1 * b + w2 * c) / (w1 + w2) : 0;
+      }
+    }
+    return m;
+  };
+  // Bézier control points of the points, by algorithm (see hecSplineTangents),
+  // computed separately for each run of points not skipped
+  helpers.hecSplineCurve = function (points, algo) {
+    var run = [];
+    var flush = function () {
+      var x = run.map(function (md) { return md.x; });
+      var y = run.map(function (md) { return md.y; });
+      var m = helpers.hecSplineTangents(x, y, algo);
+      for (var i = 0; i < run.length; ++i) {
+        var md = run[i], dx;
+        if (i > 0) {
+          dx = (md.x - run[i - 1].x) / 3;
+          md.controlPointPreviousX = md.x - dx;
+          md.controlPointPreviousY = md.y - dx * m[i];
+        }
+        if (i < run.length - 1) {
+          dx = (run[i + 1].x - md.x) / 3;
+          md.controlPointNextX = md.x + dx;
+          md.controlPointNextY = md.y + dx * m[i];
+        }
+      }
+      run = [];
+    };
+    for (var i = 0; i < (points || []).length; ++i) {
+      var md = points[i]._model;
+      if (md.skip) {
+        flush();
+      } else {
+        run.push(md);
+      }
+    }
+    flush();
+  };
+
+  // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one

@@ -92,6 +92,12 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
+### Dataset option
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
+
 ---
 
 ## 2. The `customEvent` gesture system
@@ -369,5 +375,6 @@ pointing to `deps/chart-hec.js` or to this file:
 | Platform (DOM) | Canvas `touch-action: pan-y` (§3); pointer and wheel listeners not passive (§5) |
 | Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines) |
 | Linear scale | `ticks.period` labels (§1) |
+| Line controller, `updateBezierControlPoints` | `hecInterpolation` (§1): another algorithm than `'monotone'` goes to `helpers.hecSplineCurve` |
 | Header, `HEC_CHART_VERSION` | The card's version, logged once at load |
 

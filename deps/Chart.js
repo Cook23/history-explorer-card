@@ -3001,7 +3001,14 @@
             }
 
             if (meta.dataset._model.cubicInterpolationMode === 'monotone') {
-              helpers.splineCurveMonotone(points);
+              // (hecInterpolation: another curve reconstruction algorithm than Chart.js' own
+              // monotone one — helpers.hecSplineCurve is in deps/chart-hec.js)
+              var hecAlgo = me.getDataset().hecInterpolation;
+              if (hecAlgo && hecAlgo !== 'monotone') {
+                helpers.hecSplineCurve(points, hecAlgo);
+              } else {
+                helpers.splineCurveMonotone(points);
+              }
             } else {
               for (i = 0, ilen = points.length; i < ilen; ++i) {
                 point = points[i];

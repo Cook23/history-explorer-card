@@ -3,6 +3,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { INTERPOLATIONS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
@@ -57,6 +58,19 @@ export class CardMenus
 
         const _defaultEl = this._this.querySelector(`#et_${input_idx}_default`);
         const _deleteEl  = this._this.querySelector(`#et_${input_idx}_delete`);
+        const _interpEl  = this._this.querySelector(`#et_${input_idx}_interp`);
+        this.hideInterpolationMenu(input_idx);
+        if( _interpEl ) {
+            // Reconstruction (the interpolation algorithm): for an entity already shown as a
+            // curve in curves or smart mode — the only modes it applies to
+            const _e = graph?.entities.find(e => e.entity === entity_id);
+            const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+            const _show = !!_e && ( _e.type ?? graph.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
+            _interpEl.style.display = _show ? 'block' : 'none';
+            _interpEl.style.background = '';
+            _interpEl.style.fontWeight = '';
+            delete _interpEl.dataset.hecSelected;
+        }
         const _titleEl   = this._this.querySelector(`#et_${input_idx}_title`);
         const _isWildcard = Array.isArray(entity_id);
         if( _titleEl ) _titleEl.textContent = _isWildcard ? '*' : entity_id;
@@ -163,8 +177,146 @@ export class CardMenus
             delete _a.dataset.hecSelected;
         }
         _menu.style.display = 'none';
+        this.hideInterpolationMenu(input_idx);
         const _fi = this.ui.inputField[input_idx];
         this._resetEntityInput(_fi);
+    }
+
+    // Listeners of the entity type menu et_N and its Reconstruction submenu er_N — shared by
+    // the card and the info panel (whose menu has no "Default" and no "Delete")
+    _initEntityTypeMenu(_ii)
+    {
+        const _etMenu = this._this.querySelector(`#et_${_ii}`);
+        if( !_etMenu ) return;
+        const _erMenu = this._this.querySelector(`#er_${_ii}`);
+        // Click on options — capture:true like es_N
+        this._this.querySelector(`#et_${_ii}_default`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.entityTypeMenuClicked(_ii, 'default', null);
+        }, true);
+        _TYPE_MENU_DEFS.forEach((_def, _idx) => {
+            this._this.querySelector(`#et_${_ii}_${_idx}`)?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode);
+            }, true);
+        });
+        this._this.querySelector(`#et_${_ii}_delete`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const _graph_id = _etMenu._hec_graph_id;
+            const _idx = _etMenu._hec_delete_idx;
+            this.hideEntityTypeMenu(_ii);
+            if( _graph_id === null || _idx === undefined || _idx < 0 ) return;
+            const _g = this.graphs.find(gr => gr.id === _graph_id);
+            if( _g ) this._deleteEntity(_g, _idx);
+        }, true);
+        // Reconstruction: opens the submenu of the algorithms
+        this._this.querySelector(`#et_${_ii}_interp`)?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showInterpolationMenu(_ii);
+        }, true);
+        INTERPOLATIONS.forEach(k => {
+            this._this.querySelector(`#er_${_ii}_${k}`)?.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.entityInterpolationClicked(_ii, k);
+            }, true);
+        });
+        // Keyboard navigation — Enter or → on Reconstruction opens its submenu
+        _etMenu.addEventListener('keydown', (e) => {
+            const _sel = _etMenu.querySelector('a[data-hec-selected]');
+            const _onInterp = _sel && _sel.id === `et_${_ii}_interp` && _sel.style.background;
+            if( e.key === 'ArrowRight' && _onInterp ) {
+                e.preventDefault();
+                this.showInterpolationMenu(_ii);
+                return;
+            }
+            this._menuKeyDown(e, _etMenu, {
+                onClose: () => { if( _erMenu ) _erMenu.style.display = 'none'; this._resetEntityInput(this.ui.inputField[_ii]); },
+            });
+        });
+        // Submenu: same navigation; Escape or ← goes back to the type menu
+        _erMenu?.addEventListener('keydown', (e) => {
+            if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.hideInterpolationMenu(_ii, true);
+                return;
+            }
+            this._menuKeyDown(e, _erMenu);
+        });
+        // Close on focusout — same as es_N; moving between the menu and its submenu
+        // keeps both open
+        const _closeIfLeft = () => {
+            setTimeout(() => {
+                // (the focused element as seen from the menu's own tree: inside Home
+                // Assistant's shadow roots, document.activeElement is only their host)
+                const _a = _etMenu.getRootNode()?.activeElement;
+                const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
+                if( !_in(_etMenu) && !_in(_erMenu) ) this.hideEntityTypeMenu(_ii);
+            }, 150);
+        };
+        _etMenu.addEventListener('focusout', _closeIfLeft);
+        _erMenu?.addEventListener('focusout', _closeIfLeft);
+    }
+
+    showInterpolationMenu(input_idx)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        const _sub  = this._this.querySelector(`#er_${input_idx}`);
+        const _item = this._this.querySelector(`#et_${input_idx}_interp`);
+        if( !_menu || !_sub || !_item ) return;
+        const _g = this.graphs.find(g => g.id === _menu._hec_graph_id);
+        const _ent = _g?.entities.find(e => e.entity === _menu._hec_entity_id);
+        const _cur = this._resolveInterpolation(_ent);
+        // The algorithm in use is shown in bold and pre-selected, as in the type menu
+        INTERPOLATIONS.forEach(k => {
+            const _el = this._this.querySelector(`#er_${input_idx}_${k}`);
+            if( !_el ) return;
+            _el.style.fontWeight = k === _cur ? 'bold' : '';
+            if( k === _cur ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
+        });
+        // Next to its item, on the right of the type menu (both share the same parent; the
+        // type menu may be shifted by its center/right alignment, a CSS transform)
+        const _w = _menu.offsetWidth;
+        const _shift = /-50%/.test(_menu.style.transform) ? -_w / 2 : /-100%/.test(_menu.style.transform) ? -_w : 0;
+        const _top  = (_menu.offsetTop + _item.offsetTop) + 'px';
+        const _left = (_menu.offsetLeft + _w + _shift - 2) + 'px';
+        this._openMenu(_sub, _top, _left);
+        // Shown with no keyboard highlight yet: the first arrow key highlights the
+        // pre-selected algorithm, Enter takes it right away
+        _sub.focus();
+    }
+
+    hideInterpolationMenu(input_idx, backToMenu = false)
+    {
+        const _sub = this._this.querySelector(`#er_${input_idx}`);
+        if( !_sub ) return;
+        for( let _a of _sub.getElementsByTagName('a') ) {
+            _a.style.background = '';
+            _a.style.fontWeight = '';
+            delete _a.dataset.hecSelected;
+        }
+        _sub.style.display = 'none';
+        if( backToMenu ) this._this.querySelector(`#et_${input_idx}`)?.focus();
+    }
+
+    entityInterpolationClicked(input_idx, algo)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        if( !_menu ) return;
+        const _entity_id = _menu._hec_entity_id;
+        const _graph_id  = _menu._hec_graph_id;
+        this.hideEntityTypeMenu(input_idx);
+        const _g = this.graphs.find(g => g.id === _graph_id);
+        if( !_g ) return;
+        const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
+        if( _entIdx < 0 ) return;
+        // g.entities[i] is the entity's pconfig.entities entry itself: saved with it
+        _g.entities[_entIdx].interpolation = algo;
+        const _pcEntry = this.store.entry(_entity_id);
+        if( _pcEntry ) _pcEntry.interpolation = algo;
+        if( _g.chart.data.datasets[_entIdx] ) _g.chart.data.datasets[_entIdx].hecInterpolation = algo;
+        _g.chart.update();
+        this.writeLocalState();
     }
 
     entityTypeMenuClicked(input_idx, type, lineMode)
@@ -708,44 +860,7 @@ export class CardMenus
         this.ui.inputField[1] = this._this.querySelector(`#b7_1`);
 
         // Entity type menu listeners
-        for( let _ii = 0; _ii < 2; _ii++ ) {
-            const _etMenu = this._this.querySelector(`#et_${_ii}`);
-            if( !_etMenu ) continue;
-            // Click on options — capture:true like es_N
-            this._this.querySelector(`#et_${_ii}_default`)?.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.entityTypeMenuClicked(_ii, 'default', null);
-            }, true);
-            _TYPE_MENU_DEFS.forEach((_def, _idx) => {
-                this._this.querySelector(`#et_${_ii}_${_idx}`)?.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode);
-                }, true);
-            });
-            this._this.querySelector(`#et_${_ii}_delete`)?.addEventListener('click', (e) => {
-                e.preventDefault();
-                const _graph_id = _etMenu._hec_graph_id;
-                const _idx = _etMenu._hec_delete_idx;
-                this.hideEntityTypeMenu(_ii);
-                if( _graph_id === null || _idx === undefined || _idx < 0 ) return;
-                const _g = this.graphs.find(gr => gr.id === _graph_id);
-                if( _g ) this._deleteEntity(_g, _idx);
-            }, true);
-            // Keyboard navigation
-            _etMenu.addEventListener('keydown', (e) => {
-                this._menuKeyDown(e, _etMenu, {
-                    onClose: () => this._resetEntityInput(this.ui.inputField[_ii]),
-                });
-            });
-            // Close on focusout — same as es_N
-            _etMenu.addEventListener('focusout', (e) => {
-                setTimeout(() => {
-                    if( !_etMenu.contains(document.activeElement) ) {
-                        this.hideEntityTypeMenu(_ii);
-                    }
-                }, 150);
-            });
-        }
+        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
 
         if( this.pconfig.recordedEntitiesOnly ) {
 

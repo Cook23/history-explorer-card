@@ -336,6 +336,7 @@ Any numeric entity — one whose current state can be read as a number — can b
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Line curves*).
+- For a curve already shown in *Line smart* or *Line curves*, the menu starts with **Reconstruction ▸**: a submenu of the [curve reconstruction](#curve-reconstruction) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
 - **On a 600ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
@@ -699,7 +700,7 @@ See the customizing dynamic line graphs section and the advanced YAML example be
 
 ## Line interpolation modes
 
-Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, use monotone Steffen interpolation with a tension of 0.1 — smooth and natural-looking, appropriate for signals already filtered, and guaranteed never to overshoot horizontally on steep fronts. Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
+Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`), the default, are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve reconstruction](#curve-reconstruction). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
 All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
 
@@ -728,6 +729,24 @@ type: custom:history-explorer-card
 axisAddMarginMin: false
 axisAddMarginMax: false
 ```
+
+### Curve reconstruction
+
+In `curves` and `smart` modes, the curve between two recorded values is rebuilt by a cubic interpolation. Its algorithm is set with `interpolation` — on the card, in `entityOptions`, on a graph or on an entity — or from the type menu (**Reconstruction ▸**):
+
+| `interpolation` | How the curve looks |
+|---|---|
+| `monotone` (default) | Chart.js' own monotone cubic (Fritsch–Carlson). Never overshoots, but the slope is set to zero at every value where the curve changes direction or repeats a value, and doesn't take the spacing of the values into account: small breaks in the slope, especially with rounded or noisy sensors |
+| `steffen` | Monotone too (M. Steffen, 1990): never overshoots, flat only at the real peaks and troughs, slopes weighted by the irregular spacing of the values |
+| `makima` | Modified Akima: follows the local trend, stays flat over flat stretches, no break at each small peak; hardly any overshoot |
+| `catmullrom` | The slope of the chord through both neighbours: the smoothest, but may overshoot a little around sharp changes |
+
+```yaml
+type: custom:history-explorer-card
+interpolation: makima
+```
+
+An interpolation from Fourier / Shannon reconstruction isn't offered: Home Assistant records a value when it changes, at irregular times, and many sensors jump (a set point, a power switching on) — a band-limited reconstruction would ring around every jump and show values the sensor never had.
 
 ### Smart mode: silences shown as flat dashed plateaus
 
@@ -1015,13 +1034,13 @@ See [Persistence for specific entities](#persistence-for-specific-entities) for 
 
 ### Auto refresh
 
-By default the card will not refresh on its own when sensor values change. It can be manually refreshed by reloading the page. If you would like your card to automatically reflect changing values on the fly, two strategies can be enabled. Both can be combined if needed. 
+The card can reflect changing values on the fly in two ways. Both can be combined if needed.
 
-Automatic refresh will monitor the entities that are displayed in your graphs for changes and refresh the graphs as needed. This strategy will usually cover the most common use cases and is recommended if you have just a few entities display in your history explorer card and if these entities don't change too often.
+Automatic refresh monitors the entities that are displayed in your graphs for changes and refreshes the graphs as needed. Since v1.1.49 it's on by default; turn it off with `automatic: false` (the card then refreshes only when the page is reloaded, or at the interval below):
 ```yaml
 type: custom:history-explorer-card
 refresh:
-  automatic: true
+  automatic: false
 ```
 
 If you have many fast changing entities displayed in your graphs, then auto refresh can strain your database bandwidth due to the constant requests. In this case it is better to use a regular update interval, independent of the sensor changes. The following example will refresh the card at a fixed rate, every 30 seconds. You will need to reload the page after changing the refresh interval.
@@ -1126,14 +1145,15 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
+| `interpolation` | string | Curve reconstruction in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve reconstruction](#curve-reconstruction) |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
-| `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius |
+| `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius. `showSamples` is a synonym |
 | `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
 | `unit` | string | Unit shown instead of the entity's own (see `scale`) |
 | `hidden` | boolean | Hide this entity by default in the legend |
 | `ymin` | number | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked) |
 | `ymax` | number | Set the initial Y axis maximum (can still be modified interactively; restored when padlock is unlocked) |
-| `ystepSize` | number | Fix the Y axis tick step size |
+| `ystepSize` | number | Fix the Y axis tick step size (`ystepsize` is a synonym) |
 | `ylock` | boolean | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | Graph height in pixels (overrides global height settings) |
 | `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
@@ -1142,13 +1162,33 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `stacked` | boolean | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
 | `process` | string | Javascript expression to transform state values before display |
 | `showMinMax` | string or boolean | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
-| `showSamples` | boolean or number | Show sample dots for this graph (graph-level option). `true` = radius 4px, or numeric radius |
 | `showTimeLabels` | boolean | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
 | `exclude` | string, list, or `{entity: ...}` | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
 
-`width` is still accepted everywhere as an alias for `lineWidth` (for backward compatibility with existing configurations) — both names work identically at every level.
+#### The same options at every level
 
-`fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` can also be set under a manually defined graph's own `options:`, acting as the default for every entity in that graph — the same role `height` already plays above. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
+Every option above, except the ones that only make sense for a single entity (`type`, `color`, `name`, `hidden`, `scale`, `unit`, `process`, `circular`), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
+
+The options of the graph itself — `ymin`, `ymax`, `ystepSize`, `ylock`, `stacked`, `height`, `showTimeLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph, `lineGraphHeight` / `barGraphHeight` still setting their own and winning over it.
+
+An option is spelled the same at every level, and every spelling it ever had is accepted everywhere: `width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`. A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
+
+```yaml
+type: custom:history-explorer-card
+interpolation: makima          # every curve of the card
+ylock: true                    # every graph of the card
+graphs:
+  - type: line
+    lineMode: smart            # same as under options:
+    options:
+      ylock: false             # this graph only
+    entities:
+      - entity: sensor.outside_temperature
+      - entity: sensor.inside_temperature
+        interpolation: steffen # this curve only
+```
+
+`fill`, `showMinMax`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1163,7 +1203,7 @@ graphs:
       - entity: sensor.*power*
 ```
 
-`dashMode`, `netBars`, `interval`, `showMinMax` and `showPoints` can additionally be set once at the card's root level, the same way `lineMode`, `lineWidth` and `decimation` already could — acting as the fallback default when neither the entity nor its graph specify a value:
+On the card, they act as the fallback default when neither the entity, its graph nor `entityOptions` set a value:
 
 ```yaml
 type: custom:history-explorer-card
