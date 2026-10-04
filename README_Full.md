@@ -208,24 +208,32 @@ Dynamically added entities can be individually removed by clicking the `x` close
 
 ### Choosing an entity's display type
 
-An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline. The type menu opens:
+An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline.
 
-- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
+The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+- **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
+- **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
+- **Arrange ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
+
+The type menu opens:
+
+- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold in *Display* — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
   - a state that isn't a number (on/off, text…) — timeline, the only possible display (the menu offers nothing else);
   - the entity's own `entityOptions` `type` / `lineMode`, when set;
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — direction arrows;
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
-- For a curve already shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
-- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added. Opened this way, the menu also offers **Delete**, to remove the entity from the card.
+- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or arrange it (**Arrange ▸**).
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
-For a **wildcard match** (multiple new entities added at once), the menu gets an extra **"Default"** entry at the top, pre-selected by default:
+For a **wildcard match** (multiple new entities added at once), *Display* gets an extra **"Default"** entry at the top, pre-selected by default:
 - Choosing **"Default"** creates each matched entity with its own individually auto-detected type — exactly as if each had been added on its own.
 - Choosing any other option applies that single type to every entity in the batch — except for an entity whose state isn't a number, always created as a timeline. When no entity of the batch has a number as its state, the menu only offers *Timeline*.
 
-Keyboard use: ArrowUp/ArrowDown moves a highlight between the options (starting from the pre-selected one), Enter confirms; pressing Enter without moving the highlight confirms the pre-selected/default option directly.
+Keyboard use: in a submenu, ArrowUp/ArrowDown moves a highlight between the options (starting from the pre-selected one), Enter confirms; pressing Enter without moving the highlight confirms the pre-selected/default option directly.
 
 The type chosen this way is persisted the same way as everything else added through the UI — synchronized with your HA user account and restored across all devices.
 

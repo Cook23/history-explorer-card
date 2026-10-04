@@ -161,7 +161,14 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
-The type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
+The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+- **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
+- **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
+- **Arrange ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
+
+In *Display*, the type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
 - *Timeline* for a state that isn't a number;
 - the entity's own `entityOptions` `type` / `lineMode`, when set;
 - *Direction* (arrows) for an angle (unit `°`, or state class `measurement_angle`);
@@ -169,11 +176,7 @@ The type in use — or, for an entity being added, the most fitting one — is s
 - *Timeline* for an entity without unit that isn't a measurement;
 - otherwise a *Smart* line (or the card's own `lineMode`, when set).
 
-For several entities added at once with a wildcard, the menu starts with *Default*: each entity gets its own most fitting type.
-
-Opened by a long-press on a label, the menu also offers *Delete*, to remove the entity from the card.
-
-For a curve shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
+For several entities added at once with a wildcard, *Display* starts with *Default*: each entity gets its own most fitting type.
 
 In the info panel, a "Type" link appears between the date and range selectors when the entity's state is a number, opening the same menu.
 

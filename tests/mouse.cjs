@@ -22,10 +22,10 @@ module.exports = async function()
         return t1 === null ? true : 'tooltip: ' + t1;
     });
     await t.step('a click on the curves opens the tooltip, with the values under the pointer; hovering moves it', async () => {
-        const pt = await E('graphPtAt(0,0.6)');
-        await t.page.mouse.click(pt.x - 150, pt.y); await t.wait(500);
+        const p1 = await E('pointPt(0,0.3)'), p2 = await E('pointPt(0,0.7)');
+        await t.page.mouse.click(p1.x, p1.y); await t.wait(500);
         const t1 = await tip();
-        await t.page.mouse.move(pt.x + 150, pt.y, { steps: 15 }); await t.wait(500);
+        await t.page.mouse.move(p2.x, p2.y, { steps: 15 }); await t.wait(500);
         const t2 = await tip();
         return /power|rain/.test(t1 || '') && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
     });

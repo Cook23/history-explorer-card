@@ -31,21 +31,64 @@ module.exports = async function()
 
     // ── The type menu offers what fits the entity, its current type marked ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }]), { height: 900 });
-    const menu = `(()=>{ const m=el.querySelector('#et_0'); return [...m.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`;
-    await t.step('type menu of a numeric curve: Interpolation, then every type, smart first and marked', async () => {
+    // The entries shown in the menu and in each submenu (the marked one with *); the open
+    // submenu after a colon
+    const menu = `(()=>{ const list=id=>[...el.querySelectorAll(id+' a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');
+        const open=['rep','interp','org'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
+        return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_org_sub')].join(' || '); })()`;
+    const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300); };
+    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Interpolation, Arrange', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
-        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300);
-        return m === 'Interpolation ▸ | Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline | Delete' ? true : m;
+        await closeMenu();
+        return m === 'Display ▸ | Interpolation ▸ | Arrange ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
     });
-    await t.step('type menu of a binary sensor: timeline only', async () => {
+    await t.step('type menu of a binary sensor: Display (timeline only), Arrange', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
-        return m === 'Timeline* | Delete' ? true : m;
+        await closeMenu();
+        return m === 'Display ▸ | Arrange ▸ || open: rep || Timeline* || Delete' ? true : m;
     });
     done(await t.close());
 
-    // ── Adding an entity already shown: a message, and that graph outlined for a moment ──
+    // ── The Arrange submenu: separate, merge back, delete — the same as the gestures ──
+    t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900 });
+    const org = `[...el.querySelectorAll('#et_0_org_sub a')].filter(a=>a.style.display!=='none').map(a=>a.id.replace('et_0_','')).join(',')`;
+    const arrange = async (gi, li, action) => {
+        await t.longPress(await t.E(`legendPt(${gi},${li})`));
+        await t.E(`el.querySelector('#et_0_org').click()`); await t.wait(200);
+        const v = await t.E(org);
+        if( action ) { await t.E(`el.querySelector('#et_0_${action}').click()`); await t.wait(800); }
+        else await closeMenu();
+        return v;
+    };
+    await t.step('Arrange on a curve of a YAML graph: separate, delete; separate takes it into a linked graph', async () => {
+        const v = await arrange(0, 0, 'split');
+        const g = await t.graphs();
+        return v === 'split,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
+    });
+    await t.step('Arrange on the curve taken out: merge back (no separate: alone in its graph); merged back', async () => {
+        const v = await arrange(1, 0, 'merge');
+        const g = await t.graphs();
+        return v === 'merge,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
+    });
+    await t.step('Arrange, delete: the curve removed', async () => {
+        const id = await t.E(`graphAt(0).entities[1].entity`);
+        await arrange(0, 1, 'delete');
+        const g = await t.graphs();
+        return g.length === 1 && !g[0].split(/[:+@]/).includes(id.split('.')[1]) ? true : id + ' -> ' + g.join(' | ');
+    });
+    await t.step('the menu is wide enough for its items beside an open submenu', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        const r = await t.E(`(()=>{ const m=el.querySelector('#et_0').getBoundingClientRect(), s=el.querySelector('#et_0_rep_sub').getBoundingClientRect();
+            const w=Math.max(...[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>{ const g=document.createRange(); g.selectNodeContents(a); return g.getBoundingClientRect().right; }));
+            return { free: s.left - w, right: Math.abs(s.right - m.right) }; })()`);
+        await closeMenu();
+        return r.free > 0 && r.right < 1 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+        // ── Adding an entity already shown: a message, and that graph outlined for a moment ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }]), { height: 900 });
     const outlines = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.canvas.parentNode.style.outline||'-').join(' / ')`);
     await t.step('adding an entity already shown says so and outlines its graph, cleared soon after', async () => {

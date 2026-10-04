@@ -1,8 +1,7 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
 import { infoPanelEnabled, HistoryCardState, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
-import { _TYPE_MENU_DEFS, _TYPE_MENU_ORDER, _TYPE_MENU_ITEM_STYLE } from "./card-menus.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
+import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
 
 // --------------------------------------------------------------------------------------
@@ -156,6 +155,9 @@ function hecHookInfoPanel()
             const _tf0 = instance._this.querySelector('#tf_0');
             if( _tf0 ) {
                 instance.ui.inputField[0] = _tf0;
+                // (the card's menu markup, without what only the card offers)
+                const _etw = instance._this.querySelector('#etw_0');
+                if( _etw ) _etw.innerHTML = typeMenuHtml(0, false);
                 instance._initEntityTypeMenu(0);
                 _tf0.addEventListener('click', () => {
                     const _g = instance.graphs[0];
@@ -284,13 +286,7 @@ function hecHookInfoPanel()
                     <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;">
                     ${_isNumeric ? html`
                         <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
-                        <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                            <a id="et_${i}_interp" href="#et" style="${_TYPE_MENU_ITEM_STYLE};display:none;border-bottom:1px solid #444;">${i18n('ui.menu.type_interpolation')} ▸</a>
-                            ${_TYPE_MENU_ORDER.map(k => html`<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`)}
-                        </div>
-                        <div id="er_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:110px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:3;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                            ${INTERPOLATIONS.map(k => html`<a id="er_${i}_${k}" href="#er" style="${_TYPE_MENU_ITEM_STYLE}">${INTERPOLATION_LABELS[k]}</a>`)}
-                        </div>
+                        <div id="etw_${i}" style="display:contents"></div>
                     ` : ''}
                     </div>
                     <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">

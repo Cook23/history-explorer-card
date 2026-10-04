@@ -31,7 +31,7 @@ module.exports = async function()
         await t.wait(400);
         const open = await E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
         const ctx = await E('window.__ctx');
-        await t.page.keyboard.press('Escape'); await t.wait(300);
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
         return open && ctx === 0 ? true : `menu open: ${open}, browser menu: ${ctx}`;
     });
     await t.step('tip on a YAML curve label, barrel button pressed twice: split into a linked graph', async () => {
@@ -57,10 +57,10 @@ module.exports = async function()
         return tip === null ? true : 'tooltip: ' + tip;
     });
     await t.step('a tap on the curves opens it, hovering then moves it', async () => {
-        const a = await E(`graphPtAt(${gi},0.5)`);
-        await t.penTap({ x: a.x - 150, y: a.y }); await t.wait(400);
+        const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
+        await t.penTap(p1); await t.wait(400);
         const t1 = await E(TIP(gi));
-        await t.penHover({ x: a.x - 150, y: a.y }, { x: a.x + 150, y: a.y }); await t.wait(400);
+        await t.penHover(p1, p2); await t.wait(400);
         const t2 = await E(TIP(gi));
         return t1 && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
     });
