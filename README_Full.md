@@ -211,7 +211,7 @@ An entity whose current state can be read as a number can be shown as a line (*S
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
 - For a curve already shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
-- **On a 700 ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added. Opened this way, the menu also offers **Delete**, to remove the entity from the card.
+- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added. Opened this way, the menu also offers **Delete**, to remove the entity from the card.
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
 For a **wildcard match** (multiple new entities added at once), the menu gets an extra **"Default"** entry at the top, pre-selected by default:
@@ -251,7 +251,7 @@ A curve can be extracted from a grouped graph by double-clicking its label in th
 
 On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
 
-A long-press (700ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+A long-press on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
 
 #### Linked graphs
 
@@ -285,7 +285,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
-- **Long-press** (700ms) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
