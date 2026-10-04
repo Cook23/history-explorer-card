@@ -20,7 +20,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > [!IMPORTANT]
 > **This is version 1.2, a beta**
 >
-> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. Both have the same features; they differ only on touch screens. In 1.2:
+> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. For now, the main difference between the two is how the card responds to touch on phones and tablets. In 1.2:
 > - a swipe on a graph always scrolls the page, wherever it starts;
 > - to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag;
 > - a pinch also zooms the time.
