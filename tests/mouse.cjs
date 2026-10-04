@@ -12,14 +12,40 @@ module.exports = async function()
     const t = await openCard(CFG, { mock: { series: true } });
     const E = x => t.E(x);
 
-    await t.step('hover shows a tooltip, with the values under the pointer', async () => {
+    // The hover tooltip of graph 0: its text while shown, else null
+    const tip = () => E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
+    await t.step('hover alone opens no tooltip', async () => {
         const pt = await E('graphPtAt(0,0.6)');
         // (moved the way a mouse does: in small steps)
         await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y, { steps: 10 }); await t.wait(600);
-        const tip = await E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' ? el.textContent : null; })()`);
-        return /power|rain/.test(tip || '') ? true : 'tooltip: ' + tip;
+        const t1 = await tip();
+        return t1 === null ? true : 'tooltip: ' + t1;
     });
-    await t.step('legend click hides then shows a curve', async () => {
+    await t.step('a click on the curves opens the tooltip, with the values under the pointer; hovering moves it', async () => {
+        const p1 = await E('pointPt(0,0.3)'), p2 = await E('pointPt(0,0.7)');
+        await t.page.mouse.click(p1.x, p1.y); await t.wait(500);
+        const t1 = await tip();
+        await t.page.mouse.move(p2.x, p2.y, { steps: 15 }); await t.wait(500);
+        const t2 = await tip();
+        return /power|rain/.test(t1 || '') && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
+    });
+    await t.step('leaving the curves closes it; back over them, nothing until the next click', async () => {
+        const pt = await E('graphPtAt(0,0.6)'); const y = await E('yaPt(0,0.6)');
+        await t.page.mouse.move(y.x, y.y, { steps: 15 }); await t.wait(1300);   // (closes with a fade)
+        const t1 = await tip();
+        await t.page.mouse.move(pt.x, pt.y, { steps: 15 }); await t.wait(500);
+        const t2 = await tip();
+        return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
+    });
+    await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
+        const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);
+            const a0=b[0], a1=b[1], gap=a1.left-(a0.left+a0.width), my=a0.top+a0.height/2;
+            return [at(a0.left+3,my), at(a0.left+a0.width+2,my), at(a1.left-2,my), at(a0.left+a0.width+gap/2,my), at(a0.left-40,my),
+                    at(a0.left+3, c.chartArea.top+3), gap].join(); })()`);
+        // on 0, beside 0, beside 1, halfway: none, far: none, on the curves under it: none (then the gap)
+        return /^0,0,1,-1,-1,-1,/.test(r) ? true : r;
+    });
+        await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');
         await t.page.mouse.click(pt.x, pt.y); await t.wait(700); const a = (await t.graphs())[0];
         await t.wait(500);

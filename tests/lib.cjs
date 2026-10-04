@@ -96,6 +96,28 @@ class Tester
         }
         await this.touch('touchEnd', []); await this.wait(1000);
     }
+    // ── Pen (Pointer Events of pointerType 'pen', sent to the element under the point:
+    // the card's logic, not the browser's own handling of a real pen) ──
+    // buttons: 1 the tip, 2 the barrel button, 3 both, 0 hovering
+    pen(type, q, buttons, button) {
+        return this.E(`(()=>{ const t=document.elementFromPoint(${q.x},${q.y});
+            t.dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true,
+                composed: true, clientX: ${q.x}, clientY: ${q.y}, buttons: ${buttons}, button: ${button ?? -1}, pressure: ${buttons & 1 ? 0.5 : 0} })); })()`);
+    }
+    async penTap(q, barrel) { await this.pen('pointerdown', q, barrel ? 3 : 1, barrel ? 2 : 0); await this.wait(60); await this.pen('pointerup', q, 0, barrel ? 2 : 0); }
+    async penDrag(a, c, barrel, steps = 14) {
+        const b = barrel ? 3 : 1;
+        await this.pen('pointerdown', a, b, barrel ? 2 : 0); await this.wait(40);
+        for( let i = 1; i <= steps; i++ ) { await this.pen('pointermove', { x: a.x + (c.x - a.x) * i / steps, y: a.y + (c.y - a.y) * i / steps }, b); await this.wait(25); }
+        await this.pen('pointerup', c, 0, barrel ? 2 : 0); await this.wait(800);
+    }
+    // The tip held down on q, the barrel button pressed twice
+    async penBarrelDouble(q) {
+        await this.pen('pointerdown', q, 1, 0); await this.wait(60);
+        for( let i = 0; i < 2; i++ ) { await this.pen('pointermove', q, 3, 2); await this.wait(60); await this.pen('pointermove', q, 1, 2); await this.wait(60); }
+        await this.pen('pointerup', q, 0, 0); await this.wait(900);
+    }
+    async penHover(a, c, steps = 10) { for( let i = 1; i <= steps; i++ ) { await this.pen('pointermove', { x: a.x + (c.x - a.x) * i / steps, y: a.y + (c.y - a.y) * i / steps }, 0); await this.wait(25); } }
     scrollY() { return this.E('scrollY'); }
     async scrollTop() { await this.E('scrollTo(0,0)'); await this.wait(300); }
 }

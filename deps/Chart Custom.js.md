@@ -67,6 +67,7 @@ or `maintainAspectRatio`.
 | `yAxisPanEnabled` | `boolean` | `true` | Dragging directly on the Y-axis label zone (or Shift+drag anywhere on a `line`/`bar` graph) never pans the Y scale. Never applies to `timeline`/`arrowline` graphs regardless. |
 | `yAxisLockEnabled` | `boolean` | `true` | The Y-axis lock icon (padlock) is never drawn, never engages automatically, and the grouped lock+handle click/dblclick toggle (§5) does nothing. |
 | `legendClickEnabled` | `boolean` | `true` | A click/double-click on a legend label is not forwarded to the stock `legend.onClick`. The card sets it to `false`: it handles legend clicks like every other gesture, from `customEvent` (`click`/`dblclick` with `legendIndex`). |
+| `hover.activateOnContact` | `boolean` | `false` | A hover move only moves a tooltip that a contact (click, tap) on the plot area opened; leaving the plot area, or the canvas (a pen moving out of hover range), closes it, and the next hover opens nothing. The card sets it to `true`. |
 | `labelTooltipEnabled` | `boolean` | `true` | Clicking a truncated Y-axis category label (timeline/arrowline) never shows its full text in a tooltip. |
 | `altSampleModeEnabled` | `boolean` | `true` | Holding Alt while hovering never switches `hover.mode` to `'dataset'` (showing every sample instead of just the nearest point). |
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
@@ -153,7 +154,9 @@ and `dblclick`, and nothing at all for long-press or drag.
 | `gestureType` | Fires when | Its own payload fields |
 |---|---|---|
 | `click` | Pointer released, stayed within 10px, before the 600ms long-press timer fired, and this same press wasn't the second half of a double-click | — |
-| `dblclick` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`), not at release | — |
+| *(pen)* | The barrel button (secondary button, `buttons & 2`) changes the meaning of a press: held at contact and released without a drag, `longpress` (at release, instead of `click`); held at contact and dragged, a plain drag; pressed twice while the tip stays down, `dblclick` (no `click` at release). The browser's own context menu is kept off the graph for such a press | — |
+| `dblclickdown` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`): what a drag following that press needs (touch-action block, Y-axis pan) is armed right away, and the first press's `click` can be undone | — |
+| `dblclick` | That second press is released without having become a drag (and before the long-press timer) — fires at the **second release** (`pointerup`), like the browser's own `dblclick`: only then is it known to be a double-click rather than a tap-then-drag | — |
 | `longpress` | Pointer held stationary (within 10px) for 600ms without releasing | — |
 | `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
 | `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
@@ -185,12 +188,15 @@ marker said:
   the same contact's release never also fires `click`.
 - `click` and `dblclick` are mutually exclusive — the second press of a
   double-click never also produces its own `click` at release.
+- `dblclick` and `dragstart` are mutually exclusive — a second press that
+  becomes a drag (tap-then-drag) never produces a `dblclick`; it only had its
+  `dblclickdown`. Likewise `dblclick` and `longpress`.
 - `longpress` and `dragstart` are **not** exclusive — holding, having
   long-press fire, then moving without lifting your finger starts a drag
   normally afterward, in the same continuous contact.
-- `dblclick` and `dragstart` are **not** exclusive either, for the same
-  reason (this is what makes the "double-tap-then-drag" touch workaround
-  in §5 possible at all).
+- `dblclickdown` and `dragstart` are **not** exclusive either, for the same
+  reason (this is what makes the "tap-then-drag" touch workaround in §5
+  possible at all).
 
 ---
 
@@ -213,7 +219,7 @@ value needs to come back from the card:
   `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. The
   card never reads or writes this value directly (see §6 for why that
   matters) — it can only see it change by receiving the resulting
-  `customEvent`s (e.g. a `click` or `dblclick` with `zone: 'lockAndHandle'`).
+  `customEvent`s (e.g. a `click` or `dblclickdown` with `zone: 'lockAndHandle'`).
 - **Alt-key sample mode** — `options.hover.mode` (already a native 2.7.1
   option) is switched between its normal value and `'dataset'` while Alt
   is held, purely by Chart.js watching `hover` gestures.
@@ -238,12 +244,9 @@ legend items or axis labels):
 
 | Method | Signature | Behavior |
 |---|---|---|
-| `_hecIsOn(px, py, rect)` | → `boolean` | Strict containment — "is this point exactly inside this rectangle". |
-| `_hecIsNear(px, py, rect)` | → `boolean` | Containment with a 30%-of-size tolerance zone around the rectangle (X capped at 50px either side). |
-| `_hecFindClosest(px, py, rects)` | → index or `-1` | Closest candidate by combined X+Y distance, no distance cap. |
-| `_hecFindNearest(px, py, rects)` | → index or `-1` | Closest candidate, but only returned if it also passes `_hecIsNear` — otherwise `-1`. |
-| `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item (if any) is under this point — exact containment (`_hecIsOn`) against each item's real `legendHitBoxes` rectangle. |
-| `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — exact containment, closest-row candidate spans the whole label column width. |
+| `_hecPick(px, py, rects)` (private) | → index or `-1` | The general picking rule: the candidate the point is on; else the nearest one, if within a small margin and clearly nearer than the next one — a point clearly beside every candidate, or about halfway between two, picks none. |
+| `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item is under this point — `_hecPick` against each item's real `legendHitBoxes` rectangle, within the legend's band only, never on a control (lock+handle, chain icon). |
+| `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — `_hecPick`, each row spanning the whole label column, within that column only, never on a control. |
 | `_hecFindLegendLabel(x, y, excludeIdx, target)` | → `{ idx, insertBefore, markerX, markerY, markerH }` or `null` | Where a legend label dropped at this point lands (closest line, then closest label; `target` = finding an insertion point, skipping `excludeIdx`, the label being dragged; `null` for a no-op). Used by the insertion marker and by `dragend`'s `drop`. |
 | `_hecYAxisInsertAt(y, excludeIdx, nearest)` | → `{ idx, insertBefore, markerY }` or `null` | Where a timeline/arrowline row dropped at this height lands: the row it's over (skipping `excludeIdx`), before or after its middle; with `nearest`, the nearest row whatever the distance. Used by the insertion markers and by `dragend`'s `drop`. |
 | `_hecZoneAt(x, y)`, `_hecPlotFactor(x)`, `_hecLabelRect(legendIdx, yIdx)`, `_hecChartAt(clientX, clientY)` | | The payload's `zone`, `xFactor`, `labelRect`, and the chart under a client point (`overChart`, `drop.chart`). |
@@ -297,9 +300,10 @@ browser; a mouse or pen doesn't). Chart.js's pointer and wheel listeners are not
 They sit right next to each other, and treating a click/drag on either as
 part of the same interaction lets a small ergonomic trick work: a click
 anywhere in that 33×28px zone always toggles the Y-axis lock. On touch, if
-that click turns out to be the first half of a double-click (drag intent,
-not a real toggle), the second press toggles the lock back — undoing the
-first toggle — and the drag that follows moves the graph. On mouse/pen,
+that click turns out to be the first half of a double-click or of a
+tap-then-drag (not a real toggle), the second press (`dblclickdown`) toggles
+the lock back — undoing the first toggle — and the drag that follows moves
+the graph. On mouse/pen,
 there's no such ambiguity: click toggles, drag moves, independently.
 
 ### The touch-action workaround, in general
@@ -311,7 +315,7 @@ gesture starts to have any effect on it:
 1. A `click` anywhere relevant arms a **500ms window** with
    `touch-action: none` already applied — covering the gap up to a
    possible second click.
-2. If a `dblclick` follows within that window, whatever it's protecting
+2. If a second press (`dblclickdown`) follows within that window, whatever it's protecting
    (Y-axis pan, curve/label drag) is now confirmed underway, and the
    block stays in effect for as long as needed (until the gesture's own
    `mouseup`, or — for the Y-axis specifically — until the lock
@@ -320,7 +324,7 @@ gesture starts to have any effect on it:
    reverts to normal, letting the page scroll freely again.
 
 This is why the *standard* way to drag anything in these zones on a touch
-device is **double-tap, then drag without lifting your finger** — a
+device is **tap, then press again and drag without lifting your finger** — a
 single continuous drag (or a long-press-then-drag, which still works but
 isn't the primary path anymore) can't reliably block scroll this way,
 since there's only one gesture-start moment to set `touch-action` on, and

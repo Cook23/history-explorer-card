@@ -141,7 +141,14 @@ Once you release the mouse button after dragging (or release your finger from th
 
 Clicking the date selector will bring you back to the current date and time without changing your zoom level. A double click on the date selector will bring your back and also reset your zoom to the configured default range.
 
-Like in the native HA history panel, you can hover over the chart line or state timelines to get a tooltip of the selected values or state.
+Click or tap a chart line or a state timeline to get a tooltip of the selected values or state.
+
+The tooltip then follows the mouse — or a pen held above the screen — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
+
+**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). The barrel button adds shortcuts, like a mouse's right button:
+- barrel button held, drag: moves a label, a graph (⠿ handle) or the Y axis right away, or pans the time on the curves;
+- barrel button held, tap on a label: opens its type menu;
+- tip held on a label, barrel button pressed twice: the same as a double tap (a curve taken out into its own graph).
 
 ### Adding entities
 
@@ -201,24 +208,32 @@ Dynamically added entities can be individually removed by clicking the `x` close
 
 ### Choosing an entity's display type
 
-An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline. The type menu opens:
+An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline.
 
-- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
+The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+- **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
+- **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
+
+The type menu opens:
+
+- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold in *Display* — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
   - a state that isn't a number (on/off, text…) — timeline, the only possible display (the menu offers nothing else);
   - the entity's own `entityOptions` `type` / `lineMode`, when set;
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — direction arrows;
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
-- For a curve already shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: a submenu of the [curve interpolation](#curve-interpolation) algorithms, the one in use in bold and pre-selected. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
-- **On a 600 ms long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added. Opened this way, the menu also offers **Delete**, to remove the entity from the card.
+- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or change its layout (**Layout ▸**).
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
-For a **wildcard match** (multiple new entities added at once), the menu gets an extra **"Default"** entry at the top, pre-selected by default:
+For a **wildcard match** (multiple new entities added at once), *Display* gets an extra **"Default"** entry at the top, pre-selected by default:
 - Choosing **"Default"** creates each matched entity with its own individually auto-detected type — exactly as if each had been added on its own.
 - Choosing any other option applies that single type to every entity in the batch — except for an entity whose state isn't a number, always created as a timeline. When no entity of the batch has a number as its state, the menu only offers *Timeline*.
 
-Keyboard use: ArrowUp/ArrowDown moves a highlight between the options (starting from the pre-selected one), Enter confirms; pressing Enter without moving the highlight confirms the pre-selected/default option directly.
+Keyboard use: in a submenu, ArrowUp/ArrowDown moves a highlight between the options (starting from the pre-selected one), Enter confirms; pressing Enter without moving the highlight confirms the pre-selected/default option directly.
 
 The type chosen this way is persisted the same way as everything else added through the UI — synchronized with your HA user account and restored across all devices.
 
@@ -251,7 +266,7 @@ A curve can be extracted from a grouped graph by double-clicking its label in th
 
 On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
 
-A long-press (600 ms) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+A long-press on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
 
 #### Linked graphs
 
@@ -285,7 +300,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
-- **Long-press** (600 ms) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
@@ -337,7 +352,7 @@ The info-panel renders a single interactive line, bar, timeline or arrowline gra
 - Zoom in and out using the time range selector or the mouse wheel with CTRL
 - Y axis lock and interactive Y axis pan (drag on the left label area, cursor changes to `↕`)
 - With two fingers on a touch screen: vertical pinch zooms the Y axis, horizontal pinch zooms the time, moving both fingers pans
-- Tooltip on hover
+- Tooltip on a click or a tap, then following the pointer
 - The display type menu and its Interpolation submenu, through the *Type* link (when the entity's state is a number)
 - Long term statistics integration (seamless transition past the history retention limit)
 

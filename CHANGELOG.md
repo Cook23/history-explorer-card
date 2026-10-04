@@ -4,6 +4,31 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.2] - 2026-10-04
+
+### Changed — a label is picked when touched just beside it
+- A click or a touch just beside a curve's legend label or a timeline label takes that label, as if it had landed on it — unless it's clearly beside every label, about halfway between two of them, on the curves, or on a control (the ⠿ handle, the padlock, the chain icon): then it takes none. One rule for every label (`_hecPick` in `deps/chart-hec.js`), replacing the exact hit-test
+- Test: the picking rule (on a label, beside it, halfway between two, far, on the curves)
+
+### Changed — the type menu in three submenus: Display, Interpolation, Layout
+- The type menu now has three items, each opening its submenu over the menu, right-aligned, level with it: **Display ▸** (the types: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline*, and *Default* for a wildcard add), open as soon as the menu opens; **Interpolation ▸** (for a curve in *Smart* or *Curve*); **Layout ▸**, from a long-press on a label: *Separate* (as a double-click on the label), *Merge back* (as a double-click on the chain icon), *Delete*. Every action of a gesture is now also in a menu
+- The menu has a minimum width, so the open submenu never hides its items' names
+- One markup for the card's menu and the info panel's (`typeMenuHtml`), one mechanism for every submenu (`showTypeSubmenu` / `hideTypeSubmenus`, replacing the Interpolation-only functions)
+- Tests: the Layout submenu (separate, merge back, delete), the menu's width beside an open submenu; the type menu tests follow the new structure
+
+### Changed — the tooltip opens on a click or a tap, then follows the pointer
+- Hovering over a graph no longer opens the tooltip by itself. A click or a tap on the curves opens it; moving the mouse — or a pen held above the screen — then moves it, until the pointer leaves the curves or the pen moves away from the screen
+- `deps/Chart.js`: new option `hover.activateOnContact` (`deps/Chart Custom.js.md` §1)
+
+### New — pen: the barrel button as shortcuts
+- Barrel button held, drag: moves a label, a graph or the Y axis right away (no tap first), or pans the time; barrel button held, tap on a label: its type menu; tip held on a label and barrel button pressed twice: as a double tap. The browser's own context menu stays off the graphs. The tip alone works as a finger, as before
+- Tests: new suite `pen` (barrel drag, barrel tap, barrel double press, tip tap, the tooltip opened by a tap and moved by hovering); the mouse tooltip tests follow the new behavior
+
+### Fixed — touch: tap then drag moved a label out of its graph instead of moving it
+- Tapping a curve or timeline label, then pressing it again to drag it, took it out into a graph of its own (as a double-tap does) instead of moving it, and hid the curve: the second press was taken as a double-click as soon as it touched the screen. A double-click is now only recognized when the second press is released without a drag, as the browser itself does; and the second press undoes what the first tap did (show/hide a curve, as it already did for the Y axis lock)
+- `deps/chart-hec.js`: the second press fires `dblclickdown` at once (it arms what a drag needs: the touch-action block, the Y axis pan), and `dblclick` only at its release, if it didn't become a drag (`deps/Chart Custom.js.md` §2, §5)
+- Tests: tap-then-drag of a curve label and of a timeline label of a YAML graph (moved, never split, nothing hidden), double-tap of a curve label (split, every curve still shown)
+
 ## [v1.2.1] - 2026-10-04
 
 ### Merged — v1.1.48 and v1.1.49

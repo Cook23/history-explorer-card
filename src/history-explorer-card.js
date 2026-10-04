@@ -15,15 +15,15 @@ import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { CardHistory } from "./card-history.js";
 import { CardDatasets } from "./card-datasets.js";
 import { CardGestures } from "./card-gestures.js";
-import { CardMenus, _TYPE_MENU_DEFS, _TYPE_MENU_ORDER, _TYPE_MENU_ITEM_STYLE } from "./card-menus.js";
+import { CardMenus, typeMenuHtml } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import "./history-info-panel.js"
 
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1';
+const Version = '1.2.2';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -1211,14 +1211,15 @@ export class HistoryCardState {
                     // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
                     mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
                     intersect: !_hasCurves,
-                    // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
-                    // trigger on a pure hover move (no button/contact needed) since
-                    // hoverEnabled is true — matching this card's desktop behaviour. See
-                    // Chart.Controller.handleEvent / Tooltip.handleEvent in Chart.js: the
-                    // hit-test only ever re-runs on a real contact or on a pointer move of at
-                    // least 4px since the last one that found something, never as a side
-                    // effect of the chart's own data refreshing under a still pointer.
+                    // The tooltip opens on a contact (click, tap) on the plot area; a hover
+                    // move — mouse, or a pen above the screen — then moves it, until the
+                    // pointer leaves the plot area or the canvas (activateOnContact, see
+                    // Chart.Controller.handleEvent in Chart.js). The hit-test only ever
+                    // re-runs on a real contact or on a pointer move of at least 4px since
+                    // the last one that found something, never as a side effect of the
+                    // chart's own data refreshing under a still pointer.
                     hoverEnabled: true,
+                    activateOnContact: true,
                     // Default is 400ms — was likely relied on as a rough anti-flicker delay
                     // before handleEvent's own move-threshold existed; that threshold is now
                     // what actually prevents flicker, so this generic delay is just latency
@@ -2065,6 +2066,13 @@ export class HistoryCardState {
         }
     }
 
+    // Graph g can be merged into the graph right above it (see _mergeLinkedGraph)
+    _canMergeLinkedGraph(g)
+    {
+        const _upper = this._previousGraph(g);
+        return !!_upper && this._sameGroup(_upper, g) && this._typesCompatible(_upper.type, g.type);
+    }
+
     // Merges graph g into the graph right above it, when both belong to the same group
     // (linked) — the reverse of a static uncombine or of a type change, whatever the units.
     // Only the chart type can prevent it (a line and a bar/timeline can't share one chart).
@@ -2527,16 +2535,7 @@ export class HistoryCardState {
             <div id='sl_${i}' style="display:none;padding-left:10px;padding-right:10px;text-align:center;grid-area:sl;justify-self:center;min-width:0;overflow:hidden;">
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
-                <div id="et_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:130px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                    <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-                    <a id="et_${i}_interp" href="#et" style="${_TYPE_MENU_ITEM_STYLE};display:none;border-bottom:1px solid #444;">${i18n('ui.menu.type_interpolation')} ▸</a>
-                    <a id="et_${i}_default" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit">${i18n('ui.menu.type_default')}</a>
-                    ${_TYPE_MENU_ORDER.map(k => `<a id="et_${i}_${k}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}">${i18n(_TYPE_MENU_DEFS[k].label)}</a>`).join('')}
-                    <a id="et_${i}_delete" href="#et" style="display:none;padding:5px 10px;text-decoration:none;color:inherit;border-top:1px solid #444;">${i18n('ui.menu.entity_delete')}</a>
-                </div>
-                <div id="er_${i}" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:110px;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:3;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                    ${INTERPOLATIONS.map(k => `<a id="er_${i}_${k}" href="#er" style="${_TYPE_MENU_ITEM_STYLE}">${INTERPOLATION_LABELS[k]}</a>`).join('')}
-                </div>
+                ${typeMenuHtml(i, true)}
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
                     <a id="ef_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
@@ -2662,16 +2661,7 @@ export class HistoryCardState {
     {
         let ef = this._this.querySelector(`#ef_${i}`); if( ef ) ef.innerHTML = i18n('ui.menu.export_csv');
         // Entity type menu labels — updated here so language is already set
-        const _etDefault = this._this.querySelector(`#et_${i}_default`); if( _etDefault ) _etDefault.innerHTML = i18n('ui.menu.type_default');
-        const _et0 = this._this.querySelector(`#et_${i}_0`); if( _et0 ) _et0.innerHTML = i18n('ui.menu.type_line_straight');
-        const _et1 = this._this.querySelector(`#et_${i}_1`); if( _et1 ) _et1.innerHTML = i18n('ui.menu.type_line_curves');
-        const _et2 = this._this.querySelector(`#et_${i}_2`); if( _et2 ) _et2.innerHTML = i18n('ui.menu.type_line_stepped');
-        const _et6 = this._this.querySelector(`#et_${i}_6`); if( _et6 ) _et6.innerHTML = i18n('ui.menu.type_line_smart');
-        const _etI = this._this.querySelector(`#et_${i}_interp`); if( _etI ) _etI.innerHTML = i18n('ui.menu.type_interpolation') + ' ▸';
-        const _et3 = this._this.querySelector(`#et_${i}_3`); if( _et3 ) _et3.innerHTML = i18n('ui.menu.type_bar');
-        const _et4 = this._this.querySelector(`#et_${i}_4`); if( _et4 ) _et4.innerHTML = i18n('ui.menu.type_arrowline');
-        const _et5 = this._this.querySelector(`#et_${i}_5`); if( _et5 ) _et5.innerHTML = i18n('ui.menu.type_timeline');
-        const _etDelete = this._this.querySelector(`#et_${i}_delete`); if( _etDelete ) _etDelete.innerHTML = i18n('ui.menu.entity_delete');
+        this.relabelTypeMenu(i);
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
         let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');

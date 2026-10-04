@@ -16,22 +16,23 @@
 
   // ── Geometry primitives (no chart instance involved) ──
 
-  // SUR: strict containment — pointer is inside the candidate's own bounds.
-  //   Used for exact click/drag hit-testing (never wants a tolerance zone).
-  function _hecIsOn(px, py, rect) {
-    return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
-  }
-  // LE PLUS PROCHE: index of the candidate whose center is closest to the
-  // pointer (X and Y combined) — no bounds check at all, just distance.
-  function _hecFindClosest(px, py, rects) {
-    var closestIdx = -1, closestDist = Infinity;
+  // Picking a label under a pointer: the one the pointer is on; else the nearest one, if
+  // it's near enough (within PICK_MARGIN px) and clearly nearer than the next one (by more
+  // than PICK_AMBIGUITY px) — a point clearly beside every label, or about halfway between
+  // two, picks none. Simpler to hit, without picking what wasn't aimed at.
+  var PICK_MARGIN = 12;
+  var PICK_AMBIGUITY = 4;
+  function _hecPick(px, py, rects) {
+    var best = -1, d1 = Infinity, d2 = Infinity;
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i];
-      var cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-      var dist = Math.abs(px - cx) + Math.abs(py - cy);
-      if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+      var dx = Math.max(r.x - px, 0, px - (r.x + r.width));
+      var dy = Math.max(r.y - py, 0, py - (r.y + r.height));
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
     }
-    return closestIdx;
+    if (best < 0 || d1 === 0) return best;
+    return d1 <= PICK_MARGIN && d2 - d1 > PICK_AMBIGUITY ? best : -1;
   }
 
   // ---------------------------------------------------------------------------
@@ -654,7 +655,7 @@
         me.legend.handleEvent({ type: gestureType, x: _hx, y: _hy, native: e.native, chart: me });
       }
     }
-    if (gestureType === 'dblclick') {
+    if (gestureType === 'dblclickdown') {
       // Simplified touch-action workaround for legend/timeline label drag
       // (touch only — mouse/pen never need this): touch-action:none was
       // already applied at the FIRST click of this double-click (see the
@@ -664,15 +665,17 @@
       // exact instant, since the block never lapsed.
       me._hecLabelDragAllowed = true;
       me._hecUpdateDragTouchOverlays();
-      // Grouped lock+handle zone: dblclick toggles the lock exactly the
-      // same way click does (see the click branch below) — same zone
-      // check, same action, no pointerType distinction.
+      // Grouped lock+handle zone: the second press toggles the lock exactly
+      // the same way click does (see the click branch below) — same zone
+      // check, same action, no pointerType distinction: it undoes the first
+      // press's click, which was the first half of a double-click or of a
+      // tap-then-drag, not a toggle.
       var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
       if (_dblInLockAndHandleZone) {
         me._hecToggleYAxisLock();
       }
     }
-    if (gestureType === 'dblclick' || gestureType === 'longpress') {
+    if (gestureType === 'dblclickdown' || gestureType === 'longpress') {
       // Third and fourth triggers for engaging the Y-axis lock, alongside
       // drag — same zone check, kept here as a consumer of the
       // already-detected event, not mixed into its detection.
@@ -825,6 +828,46 @@
   }
 
   // mousedown
+  // ── Pen barrel button ──
+  // The barrel button is reported as the secondary button (buttons bit 2), at the
+  // contact or as a chorded change while the tip is down (Pointer Events).
+  function penBarrel(c) {
+    return c.pointerType === 'pen' && !!(c.e.native && c.e.native.buttons & 2);
+  }
+
+  // The barrel button pressed while the tip stays down (p: that contact): two quick
+  // presses are a dblclick (the pen's alias of a double tap, where the tip is); the
+  // first one already cancels the long-press, the contact now being the button's
+  function penBarrelPressed(c, p) {
+    var gs = c.gs, _down = penBarrel(c);
+    if (_down && !p.barrelDown) {
+      guardContextMenu(c.me);
+      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      var _now = Date.now();
+      if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.dblClickMs) {
+        fire(c, 'dblclick', p.x0, p.y0);
+        p.barrelPressedAt = 0;
+      } else {
+        p.barrelPressedAt = _now;
+      }
+      p.barrelPressed = true;
+    }
+    p.barrelDown = _down;
+  }
+
+  // The browser's own context menu, which a barrel press also opens, kept off the
+  // graph for that press (on the canvas and the touch overlays over it, both under
+  // the canvas's parent)
+  function guardContextMenu(me) {
+    me._hecBarrelAt = Date.now();
+    var _host = me.canvas && me.canvas.parentNode;
+    if (!_host || _host._hecContextMenuGuard) return;
+    _host._hecContextMenuGuard = true;
+    _host.addEventListener('contextmenu', function (ev) {
+      if (me._hecBarrelAt && Date.now() - me._hecBarrelAt < 1500) ev.preventDefault();
+    });
+  }
+
   function hecPointerDown(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     gs.pointers[pid] = { x: e.x, y: e.y };
@@ -844,24 +887,34 @@
       // per Thierry's exact spec:
       //   click     = down/up, stayed within 10px, < 600ms
       //   longpress = down/up, stayed within 10px, >= 600ms
-      //   dblclick  = down/up/down, stayed within 10px, < 400ms between
-      //               the two downs
+      //   dblclickdown = down/up/down, stayed within 10px, < 400ms between
+      //               the two downs — at the second down: what a drag
+      //               following the second press needs is armed right away
+      //   dblclick  = the same, released without moving — at the second up,
+      //               like the browser's own: only then is it known not to be
+      //               a tap-then-drag
       //   drag      = down, moved past 10px (time doesn't matter)
-      // dblclick DOES prevent this same press's own release from ALSO
-      // producing a click — see dblClickFired below and its use at mouseup.
+      // The second press never produces its own click at release — see
+      // dblClickFired below and its use at mouseup.
       // Long-press remains independent from drag, same as before.
+      // Pen with its barrel button held at contact: a right-click, as on every
+      // system — released without a drag, it's a longpress (see mouseup); a drag
+      // is a plain drag, the button keeping the browser from scrolling. It never
+      // counts as half of a double-click.
+      var _barrel = penBarrel(c);
+      if (_barrel) guardContextMenu(me);
       var _downNow = Date.now();
-      var _isDblClick = gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
+      var _isDblClick = !_barrel && gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
       if (_isDblClick) {
-        fire(c, 'dblclick', e.x, e.y);
+        fire(c, 'dblclickdown', e.x, e.y);
       }
-      gs.lastMouseDown = _downNow;
+      gs.lastMouseDown = _barrel ? 0 : _downNow;
 
       var _pending = { x0: e.x, y0: e.y, pid: pid, dragging: false, pointerType: pointerType, native: e.native,
-        // Marks that THIS press (the second one of the double-click) was
-        // itself just recognized as a dblclick — checked at mouseup below
-        // so its own release doesn't also fire a plain click.
-        dblClickFired: _isDblClick };
+        // Marks that THIS press is the second one of a double-click — checked
+        // at mouseup below: released without a drag, it's a dblclick, never
+        // a plain click.
+        dblClickFired: _isDblClick, barrel: _barrel, barrelDown: _barrel };
       gs.pending = _pending;
 
       gs.longPressTimer = setTimeout(function () {
@@ -909,6 +962,7 @@
 
     } else {
       var p = gs.pending;
+      if (p && p.pid === pid && !p.dragging && pointerType === 'pen') penBarrelPressed(c, p);
       if (p && p.pid === pid && !p.dragging) {
         if (Math.abs(e.x - p.x0) + Math.abs(e.y - p.y0) > cfg.dragSlop) {
           if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
@@ -970,9 +1024,9 @@
   // mouseup
   function hecPointerUp(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-    // Legend/timeline label drag workaround: armed by custDblClick, always
-    // disarmed here on the raw mouseup itself — not custDragEnd — so it
-    // never stays stuck armed when no drag actually followed the dblclick.
+    // Legend/timeline label drag workaround: armed by the second press
+    // (dblclickdown), always disarmed here on the raw mouseup itself — not
+    // custDragEnd — so it never stays stuck armed when no drag followed.
     if (me._hecLabelDragAllowed) {
       me._hecLabelDragAllowed = false;
       me._hecUpdateDragTouchOverlays();
@@ -1012,10 +1066,16 @@
         // fired for this contact, so releasing without ever moving does NOT
         // become a click, even though gs.pending stayed alive to allow a drag
         // to follow (which didn't happen here).
+      } else if (pu.barrelPressed) {
+        // The barrel button was pressed while the tip stayed down: whatever it did
+        // (a double press is a dblclick) was done then — no click at release
+      } else if (pu.barrel) {
+        // Pen tapped with its barrel button held: the type menu, as a long-press
+        fire(c, 'longpress', pu.x0, pu.y0);
       } else if (pu.dblClickFired) {
-        // Click and dblclick are mutually exclusive too — this same press
-        // was the second one of a double-click, already fired at its own
-        // mousedown; releasing it must not ALSO produce a plain click.
+        // The second press of a double-click, released without a drag: a
+        // dblclick (and never also a plain click)
+        fire(c, 'dblclick', undefined, undefined);
       } else {
         // click: released without moving, before the long-press timer
         // fired (< 600ms), and this press wasn't itself a dblclick's
@@ -1107,8 +1167,8 @@
 
   helpers.extend(Chart.prototype, {
 
-    // Legend hit-test — SUR (exact), since a legend click/drag must land on
-    // the actual label, not just near it. Cross-graph drag&drop
+    // Legend hit-test — the label picked (_hecPick) within the legend's band only, never
+    // from the plot area under it nor from a control (_hecOnControl). Cross-graph drag&drop
     // (Controller._hecGestureHandler's dragovergraph) calls THIS on OTHER
     // chart instances too, including ones just created and never yet
     // touched — must exist unconditionally, same as any native Chart.js method.
@@ -1118,18 +1178,15 @@
       var lh = legend.legendHitBoxes;
       var rects = [];
       for (var i = 0; i < lh.length; i++) rects.push({ x: lh[i].left, y: lh[i].top, width: lh[i].width, height: lh[i].height });
-      var idx = _hecFindClosest(x, y, rects);
-      if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
-      return idx;
+      if (y < legend.top || y > legend.bottom || this._hecOnControl(x, y)) return -1;
+      return _hecPick(x, y, rects);
     },
 
-    // Y-axis category label hit-test (timeline/arrowline row under a point) —
-    // SUR (exact), same as legend: cursor/click/drag/tooltip must land on the
-    // actual row, not just near it. Each row's candidate rectangle spans the
-    // full label column width (0 to chartArea.left) — labels don't have their
-    // own individual X bounds, the whole column belongs to whichever row is
-    // vertically closest. Same unconditional-at-construction reasoning as
-    // _hecLegendIndexAt above.
+    // Y-axis category label hit-test (timeline/arrowline row under a point) — the row
+    // picked (_hecPick) within the label column only (0 to chartArea.left), never from
+    // the plot area beside it nor from a control (_hecOnControl). Each row's candidate rectangle spans the whole column:
+    // labels don't have their own individual X bounds. Same unconditional-at-construction
+    // reasoning as _hecLegendIndexAt above.
     _hecYAxisIndexAt: function (x, y) {
       var yScale = this.scales && this.scales['y-axis-0'];
       if (!yScale || !this.data || !this.data.labels || !this.chartArea) return -1;
@@ -1141,9 +1198,8 @@
         var _rowH = yScale.height / labels.length;
         rects.push({ x: 0, y: py - _rowH / 2, width: _colWidth, height: _rowH });
       }
-      var idx = _hecFindClosest(x, y, rects);
-      if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
-      return idx;
+      if (x < 0 || x > _colWidth || this._hecOnControl(x, y)) return -1;
+      return _hecPick(x, y, rects);
     },
 
     // Where a timeline/arrowline row dropped at canvas-relative y lands: the row it's
@@ -1418,6 +1474,12 @@
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
       return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+    },
+
+    // On one of the controls drawn over the graph's top left corner (lock+handle, chain
+    // icon): never a label's, even within a label's picking margin
+    _hecOnControl: function (x, y) {
+      return this._hecInLockAndHandleZone(x, y) || this._hecInLinkMarkerZone(x, y);
     },
 
     _hecInLinkMarkerZone: function (x, y) {

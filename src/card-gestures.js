@@ -24,6 +24,9 @@ export class CardGestures
         if( !g ) return;
         switch( info.gestureType ) {
             case 'click':         return this._onGraphClick(info, g);
+            // (the second press of a double-click or of a tap-then-drag: the first
+            // press's click was its first half, not a show/hide — undone)
+            case 'dblclickdown':  return this._onGraphClick(info, g);
             case 'dblclick':      return this._onGraphDblClick(info, g);
             case 'longpress':     return this._onGraphLongPress(info, g);
             case 'dragstart':     return this._onDragStart(info, g);
@@ -608,7 +611,7 @@ export class CardGestures
             const _entity = g.entities[idx];
             _entity.siConversionFactor = undefined;
             this._setGraphKey(_entity, this._newGraphKey());
-            // Forced visible — see the dynamic case below for why.
+            // Forced visible — see the dynamic case below.
             _entity.hidden = undefined;
             const _nextG = this._nextGraph(g);
             this._detachAndRebuildRemaining(g, idx, _nextG);
@@ -622,11 +625,8 @@ export class CardGestures
         _entity.siConversionFactor = undefined;
         const _newGroupId = this.store.newGroupId();
         // Preserve all existing persisted fields (type, lineMode, interval, ...) —
-        // only groupId/color/fill change on uncombine, EXCEPT hidden: the first click of
-        // the double-click already toggled visibility before the second click reached us,
-        // so the persisted hidden state is stale. What the user always wants after an
-        // uncombine is to SEE the extracted curve — force it visible rather than reversing
-        // the stale toggle (which could land on hidden again depending on prior state).
+        // only groupId/color/fill change on uncombine, EXCEPT hidden: what the user always
+        // wants after taking a curve out is to SEE it, so it's forced visible.
         const _pcE = this.store.entry(_entity.entity);
         let _pcExtracted = null;
         if( _pcE ) {

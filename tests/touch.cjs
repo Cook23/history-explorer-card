@@ -35,11 +35,20 @@ module.exports = async function()
         await t.tap(a); await t.wait(800); const g2 = (await t.graphs())[0];
         return /power_kw\(h\)/.test(g1) && !/\(h\)/.test(g2) ? true : `${g1} / ${g2}`;
     });
-    await step('tap then drag a curve label reorders it, page not scrolled', async () => {
+    await step('tap then drag a curve label reorders it, never split, page not scrolled', async () => {
         const g0 = await t.graphs(); const a = await E('legendPt(0,0)'); const c = await E('legendPt(0,2)');
         await t.tapDrag(a, { x: c.x + 5, y: c.y });
         const y = await t.scrollY(); const g1 = await t.graphs();
-        return g1[0] !== g0[0] && y === 0 ? true : `scrollY=${y} ${g0[0]} -> ${g1[0]}`;
+        // same graphs, the first one's curves only reordered (a double-tap would split one off)
+        const same = (x, z) => [x, z].map(v => v.replace(/^.:|@.*$/g, '').split('+').sort().join()).reduce((p, q) => p === q);
+        return g1.length === g0.length && g1[0] !== g0[0] && same(g1[0], g0[0]) && y === 0 ? true : `scrollY=${y} ${g0.join(' | ')} -> ${g1.join(' | ')}`;
+    });
+    await step('tap then drag a timeline label of a YAML graph: moved, never split', async () => {
+        const n0 = (await t.graphs()).length; const i = (await t.graphs()).findIndex(x => x.startsWith('t:'));
+        const s0 = (await t.graphs())[i]; const a = await E(`tlPt(${i},0)`); const c = await E(`tlPt(${i},1)`);
+        await t.tapDrag(a, { x: c.x, y: c.y + 10 });
+        const g1 = await t.graphs();
+        return g1.length === n0 && g1[i] !== s0 ? true : `${s0} -> ${g1.join(' | ')}`;
     });
     await step('tap then drag on the Y axis pans the Y scale, page not scrolled', async () => {
         const r0 = await E('yRange(1)'); const a = await E('yaPt(1,0.5)');
@@ -60,11 +69,11 @@ module.exports = async function()
         const s1 = (await t.graphs()).find(x => x.startsWith('t:'));
         return s1 !== s0 ? true : `${s0} -> ${s1}`;
     });
-    await step('double-tap a YAML curve label splits it into a linked graph', async () => {
+    await step('double-tap a YAML curve label splits it into a linked graph, every curve still shown', async () => {
         const g0 = await t.graphs(); const gi = g0.findIndex(x => /power/.test(x));
         await t.doubleTap(await E(`legendPt(${gi},0)`));
-        const n1 = (await t.graphs()).length;
-        return n1 === g0.length + 1 ? true : `graphs ${g0.length} -> ${n1}`;
+        const g1 = await t.graphs();
+        return g1.length === g0.length + 1 && !g1.some(x => /\(h\)/.test(x)) ? true : `${g0.join(' | ')} -> ${g1.join(' | ')}`;
     });
     await step('double-tap the chain icon merges the linked graphs', async () => {
         const c = await E('chainShown()'); const gi = c.indexOf('1');

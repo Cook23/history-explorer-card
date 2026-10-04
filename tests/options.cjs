@@ -35,14 +35,15 @@ module.exports = async function()
     // ── The Interpolation submenu ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'lines' }] }] }), { height: 900 });
     const menu = `[...el.querySelector('#et_0').querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`;
-    const sub = `(()=>{const m=el.querySelector('#er_0'); return m.style.display==='none'?'closed':[...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');})()`;
+    const sub = `(()=>{const m=el.querySelector('#et_0_interp_sub'); return m.style.display==='none'?'closed':[...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');})()`;
     const ds = `el.instance.graphs[0].chart.data.datasets.map(d=>d.hecInterpolation).join(',')`;
-    await t.step('a smart curve\'s type menu starts with Interpolation', async () => {
+    await t.step('a smart curve\'s type menu offers Interpolation, after Display', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        const v = await t.E(menu); return /^Interpolation ▸ \| Smart\*/.test(v) ? true : v;
+        const v = await t.E(menu); return /^Display ▸ \| Interpolation ▸/.test(v) ? true : v;
     });
-    await t.step('keyboard: ↑ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
-        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowUp'); await t.page.keyboard.press('ArrowRight'); await t.wait(200);
+    await t.step('keyboard: ← back to the menu, ↓ ↓ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
+        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
+        await t.wait(200);
         const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom' ? true : v;
     });
     await t.step('Escape goes back to the type menu, still open', async () => {
@@ -54,20 +55,20 @@ module.exports = async function()
         await t.page.keyboard.press('Enter'); await t.wait(200);
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(400);
         const d = await t.E(ds); const p = await t.E(`el.instance.store.entry('sensor.power')?.interpolation`);
-        const m = await t.E(`el.querySelector('#et_0').style.display+'/'+el.querySelector('#er_0').style.display`);
+        const m = await t.E(`el.querySelector('#et_0').style.display+'/'+el.querySelector('#et_0_interp_sub').style.display`);
         return d.startsWith('steffen') && p === 'steffen' && m === 'none/none' ? true : [d, p, m].join(' ; ');
     });
     await t.step('mouse: click Interpolation, then Makima', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         const v = await t.E(sub);
-        await t.E(`el.querySelector('#er_0_makima').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#et_0_algo_makima').click()`); await t.wait(300);
         const d = await t.E(ds);
         return v.startsWith('Monotone | Steffen*') && d.startsWith('makima') ? true : v + ' ; ' + d;
     });
     await t.step('no Interpolation for a straight line', async () => {
         await t.longPress(await t.E('legendPt(0,1)'));
-        const v = await t.E(menu); await t.page.keyboard.press('Escape');
+        const v = await t.E(menu); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
         return !/Interpolation/.test(v) ? true : v;
     });
     done(await t.close());
@@ -82,7 +83,7 @@ module.exports = async function()
     await t.step('a Interpolation choice is kept after a reload', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
-        await t.E(`el.querySelector('#er_0_makima').click()`); await t.wait(800);
+        await t.E(`el.querySelector('#et_0_algo_makima').click()`); await t.wait(800);
         const before = await t.E(all);
         await t.page.reload(); await t.wait(3500);
         const after = await t.E(all);
@@ -96,8 +97,8 @@ module.exports = async function()
     await t.step('info panel: the Interpolation submenu, from its configuration\'s interpolation', async () => {
         await t.E(`inst()._this.querySelector('#tf_0').click()`); await t.wait(300);
         await t.E(`inst()._this.querySelector('#et_0_interp').click()`); await t.wait(300);
-        const v = await t.E(`[...inst()._this.querySelectorAll('#er_0 a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
-        await t.E(`inst()._this.querySelector('#er_0_catmullrom').click()`); await t.wait(300);
+        const v = await t.E(`[...inst()._this.querySelectorAll('#et_0_interp_sub a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+        await t.E(`inst()._this.querySelector('#et_0_algo_catmullrom').click()`); await t.wait(300);
         const d = await t.E(`inst().graphs[0].chart.data.datasets[0].hecInterpolation`);
         return v === 'Monotone | Steffen* | Makima | Catmull-Rom' && d === 'catmullrom' ? true : v + ' ; ' + d;
     });
@@ -108,9 +109,9 @@ module.exports = async function()
     const LINE = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'curves' }] }] };
     // Boxes of the type menu, its Interpolation item and the submenu, and the viewport
     const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
-        return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#er_0'), vw:innerWidth, vh:innerHeight }; })()`;
+        return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#et_0_interp_sub'), vw:innerWidth, vh:innerHeight }; })()`;
     const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
-    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, ${x}, ${y}); I.showInterpolationMenu(0); })()`;
+    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, ${x}, ${y}); I.showTypeSubmenu(0, 'interp'); })()`;
 
     // ── Position ──
     t = await openCard(card(LINE), { height: 700 });
@@ -145,9 +146,9 @@ module.exports = async function()
     await t.wait(2500);
     await t.step('in a shadow root: focus moves to the submenu, both stay open; keyboard choice applied', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowUp'); await t.page.keyboard.press('ArrowRight');
+        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
         await t.wait(500);   // (longer than the focusout check)
-        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
+        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#et_0_interp_sub').style.display`);
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter');
         await t.wait(400);
         const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
@@ -155,10 +156,10 @@ module.exports = async function()
     });
     await t.step('in a shadow root: mouse, item then algorithm', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+20,y:r.top+r.height/2}; })()`);
         await t.page.mouse.click(i.x, i.y); await t.wait(500);
-        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
-        const a = await t.E(`(()=>{ const r=el.querySelector('#er_0_catmullrom').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#et_0_interp_sub').style.display`);
+        const a = await t.E(`(()=>{ const r=el.querySelector('#et_0_algo_catmullrom').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await t.page.mouse.click(a.x, a.y); await t.wait(400);
         const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
         return open === 'block/block' && d === 'catmullrom' ? true : open + ' ; ' + d;
@@ -167,7 +168,7 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         await t.page.mouse.click(5, 690); await t.wait(500);
-        const v = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#er_0').style.display`);
+        const v = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#et_0_interp_sub').style.display`);
         return v === 'none/none' ? true : v;
     });
     done(await t.close());
@@ -176,10 +177,10 @@ module.exports = async function()
     t = await openCard(card(LINE), { touch: true, height: 700 });
     await t.step('touch: long-press the label, tap Interpolation, tap Steffen', async () => {
         await t.touchLongPress(await t.E('legendPt(0,0)'));
-        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const i = await t.E(`(()=>{ const r=el.querySelector('#et_0_interp').getBoundingClientRect(); return {x:r.left+20,y:r.top+r.height/2}; })()`);
         await t.tap(i); await t.wait(500);
-        const open = await t.E(`el.querySelector('#er_0').style.display`);
-        const a = await t.E(`(()=>{ const r=el.querySelector('#er_0_steffen').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+        const open = await t.E(`el.querySelector('#et_0_interp_sub').style.display`);
+        const a = await t.E(`(()=>{ const r=el.querySelector('#et_0_algo_steffen').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
         await t.tap(a); await t.wait(500);
         const d = await t.E(`el.instance.graphs[0].chart.data.datasets[0].hecInterpolation`);
         return open === 'block' && d === 'steffen' ? true : open + ' ; ' + d;
