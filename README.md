@@ -154,7 +154,7 @@ excludeFilterEntities:
 An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars, as direction arrows or as a timeline; any other entity only as a timeline. The type menu opens:
 
 - right after selecting an entity to add in the dropdown (see [Adding entities](#adding-entities)) — always, even when *Timeline* is the only choice, so you can check before it's added;
-- on a 700 ms long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
+- on a long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
 - when selecting an entity that's already shown, to change its type.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
