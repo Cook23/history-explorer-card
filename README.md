@@ -17,27 +17,24 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
-## Two versions: 1.1 and 1.2 (beta)
-
-> [!NOTE]
-> This is the **1.2** line, available as a beta (pre-release) alongside the **1.1** line, which is the recommended version. Both have the same features.
-
-The two lines differ only on touch screens. In 1.2:
-- a swipe on a graph always scrolls the page, wherever it starts;
-- to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag;
-- a pinch also zooms the time.
-
-In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
-
-**To try 1.2**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
-
-**Developed with Claude Code**, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.
+> [!IMPORTANT]
+> **This is version 1.2, a beta**
+>
+> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. Both have the same features; they differ only on touch screens. In 1.2:
+> - a swipe on a graph always scrolls the page, wherever it starts;
+> - to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag;
+> - a pinch also zooms the time.
+>
+> In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
+>
+> **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
+>
+> *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
 ---
 
 ## Table of contents
 
-- [Two versions: 1.1 and 1.2 (beta)](#two-versions-11-and-12-beta)
 - [Install](#install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
