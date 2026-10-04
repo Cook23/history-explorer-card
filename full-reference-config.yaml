@@ -423,8 +423,8 @@ timelineBarSpacing: 40
 
 # Settings around automatically refreshing the graphs
 refresh:
-  # Automatically refresh the graphs as new data comes in for tracked entities (on by default since 1.1.49;
-  # set False to refresh only when the page is reloaded, or at the interval below)
+  # Automatically refresh the graphs as new data comes in for tracked entities, at most once every 2 seconds
+  # (on by default; set False to refresh only when the page is reloaded, or at the interval below)
   automatic: True
   # Here you can set the length of the interval (in seconds) after which to automatically refresh the graph data.
   interval: undefined

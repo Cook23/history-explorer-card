@@ -4,9 +4,9 @@
 
 Entities can be added through a searchable dropdown showing friendly names (with the entity ID available in a tooltip) and each entity's current state value, or defined statically in YAML — the two can be freely combined on the same card. Wildcard patterns (`sensor.*power*`) add every matching entity at once, sorted alphabetically. Hovering or keyboard-highlighting an entry previews whether it will be added or is already present, before the selection is confirmed; if it's already on the card, a tooltip and a highlight on the containing graph flag the duplicate.
 
-Every new numeric entity goes through a display type menu — line (straight, curved, stepped, or smart), bar, arrowline, or timeline — and that same menu reopens at any time afterward to change the type, or delete the entity from a combined graph.
+Every entity added goes through the display type menu — line (smart, curve, straight or stepped), bar, direction arrows, or timeline — with the most fitting type pre-selected, so the display can be checked before anything is added; the menu opens even when the entity can only be shown as a timeline. The same menu reopens at any time afterward to change the type, choose how a curve is interpolated, or delete the entity.
 
-Entities added from the UI with compatible units (including SI-prefixed ones like W/kW) combine onto the same graph automatically. A graph defined in YAML always shows all its entities together, whatever their units — and it can mix bars and curves: the curves are drawn over the bars, never stacked, and keep their own line mode.
+With `combineSameUnits`, entities added from the UI with compatible units (including SI-prefixed ones like W/kW) combine onto the same graph automatically. A graph defined in YAML always shows all its entities together, whatever their units — and it can mix bars and curves: the curves are drawn over the bars, never stacked, and keep their own line mode.
 
 ## Interactive editing directly on the graphs
 
@@ -14,15 +14,17 @@ A single click on a curve or entity label shows or hides it. A double-click extr
 
 ## Line appearance and statistics
 
+Curves can be drawn between their values by four interpolation algorithms — `monotone` (the default), `steffen`, `makima` or `catmullrom` — set with the `interpolation` option or from the type menu.
+
 The *smart* line mode draws a curve while a sensor reports at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a long spline or diagonal suggesting a gradual change that never happened (same silence detection as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration).
 
-Angles — a wind direction, for example — no longer jump across the whole graph at each crossing of 0/360: they're drawn as a continuous curve around their average direction, while the tooltip and the Y axis keep showing the real values. Automatic for entities in `°` or with state class `measurement_angle`, adjustable per entity with `circular` (another period, `2pi`, or off).
+Angles — a wind direction, for example — are drawn without jumping across the whole graph at each crossing of 0/360: they're drawn as a continuous curve around their average direction, while the tooltip and the Y axis keep showing the real values. Automatic for entities in `°` or with state class `measurement_angle`, adjustable per entity with `circular` (another period, `2pi`, or off).
 
 Line graphs also support a shaded min/max statistical band (drawn from either long-term statistics or full history), permanent sample point dots at each measurement, and custom dash patterns (including a full custom Canvas dash array, not just the built-in named styles). Display options — color, fill, line width, dash style, and more — can be set per entity, or targeted at a whole family of sensors at once using `entityOptions`'s list form, matching by device class, domain, or a glob/wildcard pattern (e.g. `match: "sensor.*_power"`). Timeline graphs come with a broad set of sensible default state colors across most Home Assistant domains (green for active/good, red for stopped/armed/locked, amber for transitional, grey for unknown), customizable per state via `stateColors`.
 
 ## Persistence and multi-device sync
 
-Interactive changes — added entities, their order, grouping, display type and visibility — are remembered automatically and synced across every device signed into the same Home Assistant account, via HA's own user storage. Whatever the source — the YAML, this device, or another one — the last change made wins: editing the YAML applies it, and a change made on one device reaches the others. For entities defined in YAML, persistence can be enabled or disabled per field, so a dashboard can either always reset to its YAML defaults or remember specific user adjustments, as needed.
+Entities added from the card — and every interactive change made to them: their order, grouping, display type, interpolation, bar interval and visibility — are remembered automatically and synced across every device signed into the same Home Assistant account, via HA's own user storage. Whatever the source — the YAML, this device, or another one — the last change made wins: editing the YAML applies it, and a change made on one device reaches the others. For entities defined in YAML, persistence can be enabled or disabled per field, so a dashboard can either always reset to its YAML defaults or remember specific user adjustments, as needed.
 
 ## Replacing Home Assistant's own history popup
 
@@ -30,6 +32,6 @@ The card can stand in for Home Assistant's native "more info" history graph enti
 
 ## Configuration flexibility
 
-Style options — fill, min/max band, dash style, line interpolation mode, line width, sample points, decimation, and net-metering mode — can be set once as a shared default for an entire graph, once for the whole card, or on an individual entity, with the most specific value always winning. Entity filtering (`filterEntities`, `excludeFilterEntities`, and per-entity `exclude`) accepts a plain string, a list of strings, or a more explicit object form, whichever is more convenient for a given case.
+Every display option can be set on an individual entity, as a default for an entire graph, in `entityOptions`, or once for the whole card, the most specific value always winning — and every spelling an option has is accepted at every level. Entity filtering (`filterEntities`, `excludeFilterEntities`, and per-entity `exclude`) accepts a plain string, a list of strings, or a more explicit object form, whichever is more convenient for a given case.
 
 Malformed YAML — an incorrectly-shaped `exclude:`, for instance — is logged to the console and skipped for just that one entry, rather than breaking the whole card.
