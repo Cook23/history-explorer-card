@@ -6,7 +6,7 @@ This is a custom history card for Home Assistant. This card offers a highly inte
 
 ## Features
 
-The card can contain one or multiple charts, every chart can display the history of one or multiple entities. Currently the card supports line charts for numerical entities and timeline charts for non-numerical ones. Easily slide along your entire history and zoom into your data to analyze all details. The order the charts are displayed in the history, as well as the colors used for charts and timeline states are all fully configurable. The card entities can be added and removed on the fly without changing the configuration.
+The card can contain one or multiple charts, every chart can display the history of one or multiple entities. The card supports line and bar charts and direction arrows for numerical entities, and timeline charts for every entity. Easily slide along your entire history and zoom into your data to analyze all details. The order the charts are displayed in the history, as well as the colors used for charts and timeline states are all fully configurable. The card entities can be added and removed on the fly without changing the configuration.
 
 ![history-explorer-demo](https://github.com/alexarch21/history-explorer-card/raw/main/images/screenshots/history-explorer-demo-480.gif)
 
