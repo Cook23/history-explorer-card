@@ -6,6 +6,10 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.2] - unreleased
 
+### Changed — a label is picked when touched just beside it
+- A click or a touch just beside a curve's legend label or a timeline label takes that label, as if it had landed on it — unless it's clearly beside every label, about halfway between two of them, on the curves, or on a control (the ⠿ handle, the padlock, the chain icon): then it takes none. One rule for every label (`_hecPick` in `deps/chart-hec.js`), replacing the exact hit-test
+- Test: the picking rule (on a label, beside it, halfway between two, far, on the curves)
+
 ### Changed — the type menu in three submenus: Display, Interpolation, Layout
 - The type menu now has three items, each opening its submenu over the menu, right-aligned, level with it: **Display ▸** (the types: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline*, and *Default* for a wildcard add), open as soon as the menu opens; **Interpolation ▸** (for a curve in *Smart* or *Curve*); **Layout ▸**, from a long-press on a label: *Separate* (as a double-click on the label), *Merge back* (as a double-click on the chain icon), *Delete*. Every action of a gesture is now also in a menu
 - The menu has a minimum width, so the open submenu never hides its items' names

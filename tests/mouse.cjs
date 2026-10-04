@@ -37,7 +37,15 @@ module.exports = async function()
         const t2 = await tip();
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
-    await t.step('legend click hides then shows a curve', async () => {
+    await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
+        const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);
+            const a0=b[0], a1=b[1], gap=a1.left-(a0.left+a0.width), my=a0.top+a0.height/2;
+            return [at(a0.left+3,my), at(a0.left+a0.width+2,my), at(a1.left-2,my), at(a0.left+a0.width+gap/2,my), at(a0.left-40,my),
+                    at(a0.left+3, c.chartArea.top+3), gap].join(); })()`);
+        // on 0, beside 0, beside 1, halfway: none, far: none, on the curves under it: none (then the gap)
+        return /^0,0,1,-1,-1,-1,/.test(r) ? true : r;
+    });
+        await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');
         await t.page.mouse.click(pt.x, pt.y); await t.wait(700); const a = (await t.graphs())[0];
         await t.wait(500);

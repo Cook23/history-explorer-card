@@ -16,22 +16,23 @@
 
   // ── Geometry primitives (no chart instance involved) ──
 
-  // SUR: strict containment — pointer is inside the candidate's own bounds.
-  //   Used for exact click/drag hit-testing (never wants a tolerance zone).
-  function _hecIsOn(px, py, rect) {
-    return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
-  }
-  // LE PLUS PROCHE: index of the candidate whose center is closest to the
-  // pointer (X and Y combined) — no bounds check at all, just distance.
-  function _hecFindClosest(px, py, rects) {
-    var closestIdx = -1, closestDist = Infinity;
+  // Picking a label under a pointer: the one the pointer is on; else the nearest one, if
+  // it's near enough (within PICK_MARGIN px) and clearly nearer than the next one (by more
+  // than PICK_AMBIGUITY px) — a point clearly beside every label, or about halfway between
+  // two, picks none. Simpler to hit, without picking what wasn't aimed at.
+  var PICK_MARGIN = 12;
+  var PICK_AMBIGUITY = 4;
+  function _hecPick(px, py, rects) {
+    var best = -1, d1 = Infinity, d2 = Infinity;
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i];
-      var cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-      var dist = Math.abs(px - cx) + Math.abs(py - cy);
-      if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+      var dx = Math.max(r.x - px, 0, px - (r.x + r.width));
+      var dy = Math.max(r.y - py, 0, py - (r.y + r.height));
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
     }
-    return closestIdx;
+    if (best < 0 || d1 === 0) return best;
+    return d1 <= PICK_MARGIN && d2 - d1 > PICK_AMBIGUITY ? best : -1;
   }
 
   // ---------------------------------------------------------------------------
@@ -1166,8 +1167,8 @@
 
   helpers.extend(Chart.prototype, {
 
-    // Legend hit-test — SUR (exact), since a legend click/drag must land on
-    // the actual label, not just near it. Cross-graph drag&drop
+    // Legend hit-test — the label picked (_hecPick) within the legend's band only, never
+    // from the plot area under it nor from a control (_hecOnControl). Cross-graph drag&drop
     // (Controller._hecGestureHandler's dragovergraph) calls THIS on OTHER
     // chart instances too, including ones just created and never yet
     // touched — must exist unconditionally, same as any native Chart.js method.
@@ -1177,18 +1178,15 @@
       var lh = legend.legendHitBoxes;
       var rects = [];
       for (var i = 0; i < lh.length; i++) rects.push({ x: lh[i].left, y: lh[i].top, width: lh[i].width, height: lh[i].height });
-      var idx = _hecFindClosest(x, y, rects);
-      if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
-      return idx;
+      if (y < legend.top || y > legend.bottom || this._hecOnControl(x, y)) return -1;
+      return _hecPick(x, y, rects);
     },
 
-    // Y-axis category label hit-test (timeline/arrowline row under a point) —
-    // SUR (exact), same as legend: cursor/click/drag/tooltip must land on the
-    // actual row, not just near it. Each row's candidate rectangle spans the
-    // full label column width (0 to chartArea.left) — labels don't have their
-    // own individual X bounds, the whole column belongs to whichever row is
-    // vertically closest. Same unconditional-at-construction reasoning as
-    // _hecLegendIndexAt above.
+    // Y-axis category label hit-test (timeline/arrowline row under a point) — the row
+    // picked (_hecPick) within the label column only (0 to chartArea.left), never from
+    // the plot area beside it nor from a control (_hecOnControl). Each row's candidate rectangle spans the whole column:
+    // labels don't have their own individual X bounds. Same unconditional-at-construction
+    // reasoning as _hecLegendIndexAt above.
     _hecYAxisIndexAt: function (x, y) {
       var yScale = this.scales && this.scales['y-axis-0'];
       if (!yScale || !this.data || !this.data.labels || !this.chartArea) return -1;
@@ -1200,9 +1198,8 @@
         var _rowH = yScale.height / labels.length;
         rects.push({ x: 0, y: py - _rowH / 2, width: _colWidth, height: _rowH });
       }
-      var idx = _hecFindClosest(x, y, rects);
-      if (idx < 0 || !_hecIsOn(x, y, rects[idx])) return -1;
-      return idx;
+      if (x < 0 || x > _colWidth || this._hecOnControl(x, y)) return -1;
+      return _hecPick(x, y, rects);
     },
 
     // Where a timeline/arrowline row dropped at canvas-relative y lands: the row it's
@@ -1477,6 +1474,12 @@
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
       return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+    },
+
+    // On one of the controls drawn over the graph's top left corner (lock+handle, chain
+    // icon): never a label's, even within a label's picking margin
+    _hecOnControl: function (x, y) {
+      return this._hecInLockAndHandleZone(x, y) || this._hecInLinkMarkerZone(x, y);
     },
 
     _hecInLinkMarkerZone: function (x, y) {

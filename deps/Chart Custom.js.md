@@ -244,12 +244,9 @@ legend items or axis labels):
 
 | Method | Signature | Behavior |
 |---|---|---|
-| `_hecIsOn(px, py, rect)` | → `boolean` | Strict containment — "is this point exactly inside this rectangle". |
-| `_hecIsNear(px, py, rect)` | → `boolean` | Containment with a 30%-of-size tolerance zone around the rectangle (X capped at 50px either side). |
-| `_hecFindClosest(px, py, rects)` | → index or `-1` | Closest candidate by combined X+Y distance, no distance cap. |
-| `_hecFindNearest(px, py, rects)` | → index or `-1` | Closest candidate, but only returned if it also passes `_hecIsNear` — otherwise `-1`. |
-| `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item (if any) is under this point — exact containment (`_hecIsOn`) against each item's real `legendHitBoxes` rectangle. |
-| `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — exact containment, closest-row candidate spans the whole label column width. |
+| `_hecPick(px, py, rects)` (private) | → index or `-1` | The general picking rule: the candidate the point is on; else the nearest one, if within a small margin and clearly nearer than the next one — a point clearly beside every candidate, or about halfway between two, picks none. |
+| `_hecLegendIndexAt(x, y)` | → index or `-1` | Which legend item is under this point — `_hecPick` against each item's real `legendHitBoxes` rectangle, within the legend's band only, never on a control (lock+handle, chain icon). |
+| `_hecYAxisIndexAt(x, y)` | → index or `-1` | Which Y-axis category row (timeline/arrowline only) is under this point — `_hecPick`, each row spanning the whole label column, within that column only, never on a control. |
 | `_hecFindLegendLabel(x, y, excludeIdx, target)` | → `{ idx, insertBefore, markerX, markerY, markerH }` or `null` | Where a legend label dropped at this point lands (closest line, then closest label; `target` = finding an insertion point, skipping `excludeIdx`, the label being dragged; `null` for a no-op). Used by the insertion marker and by `dragend`'s `drop`. |
 | `_hecYAxisInsertAt(y, excludeIdx, nearest)` | → `{ idx, insertBefore, markerY }` or `null` | Where a timeline/arrowline row dropped at this height lands: the row it's over (skipping `excludeIdx`), before or after its middle; with `nearest`, the nearest row whatever the distance. Used by the insertion markers and by `dragend`'s `drop`. |
 | `_hecZoneAt(x, y)`, `_hecPlotFactor(x)`, `_hecLabelRect(legendIdx, yIdx)`, `_hecChartAt(clientX, clientY)` | | The payload's `zone`, `xFactor`, `labelRect`, and the chart under a client point (`overChart`, `drop.chart`). |
