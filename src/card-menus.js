@@ -26,33 +26,33 @@ export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decora
 // The type menu's items, each opening its submenu over the menu, right-aligned, level with
 // it: what the entity is shown as (open when the menu opens), how its curve is
 // interpolated, and what to do with it in its graph (the card's long-press menu only)
-const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', org: 'ui.menu.type_organization' };
-// The organization submenu's entries (et_N_<key>)
-const _ORG_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', delete: 'ui.menu.entity_delete' };
+const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', layout: 'ui.menu.type_layout' };
+// The layout submenu's entries (et_N_<key>)
+const _LAYOUT_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', delete: 'ui.menu.entity_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
-// wildcard add, and the organization submenu) and the info panel's
+// wildcard add, and the layout submenu) and the info panel's
 export function typeMenuHtml(i, full)
 {
     const a = (id, label, hidden) => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${hidden ? ';display:none' : ''}">${label}</a>`;
     const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
-    const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || k !== 'org');
+    const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || k !== 'layout');
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
             ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true)).join('')}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
-        ${full ? sub('org', Object.keys(_ORG_ENTRIES).map(k => a(`et_${i}_${k}`, i18n(_ORG_ENTRIES[k]), true))) : ''}`;
+        ${full ? sub('layout', Object.keys(_LAYOUT_ENTRIES).map(k => a(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]), true))) : ''}`;
 }
 
 export class CardMenus
 {
     // --------------------------------------------------------------------------------------
-    // Entity type menu: Representation ▸, Interpolation ▸, Organization ▸
+    // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸
     // --------------------------------------------------------------------------------------
 
     // The type menu's names, in the card's language (set once it's known)
@@ -62,7 +62,7 @@ export class CardMenus
         for( const k in _TYPE_SUBMENUS ) set(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸');
         set(`et_${i}_default`, i18n('ui.menu.type_default'));
         _TYPE_MENU_DEFS.forEach((d, k) => set(`et_${i}_${k}`, i18n(d.label)));
-        for( const k in _ORG_ENTRIES ) set(`et_${i}_${k}`, i18n(_ORG_ENTRIES[k]));
+        for( const k in _LAYOUT_ENTRIES ) set(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]));
     }
 
     // Shows the representation submenu's entries for an entity — only Timeline when it
@@ -120,9 +120,9 @@ export class CardMenus
         // the only modes it applies to
         const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
         show(q('interp'), !!_e && ( _e.type ?? graph.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' ));
-        // Organization: an entity already in a graph, from a long-press on its own label
+        // Layout: an entity already in a graph, from a long-press on its own label
         const _longPress = !!graph && anchorClientX !== null && anchorClientY !== null;
-        show(q('org'), _longPress);
+        show(q('layout'), _longPress);
         show(q('split'), _longPress && this._canUncombine(graph));
         show(q('merge'), _longPress && this._canMergeLinkedGraph(graph));
         show(q('delete'), _longPress);
@@ -208,7 +208,7 @@ export class CardMenus
         this._resetEntityInput(this.ui.inputField[input_idx]);
     }
 
-    // The type menu's submenus present in this menu (the info panel's has no organization)
+    // The type menu's submenus present in this menu (the info panel's has no layout)
     _typeSubmenus(input_idx)
     {
         return Object.keys(_TYPE_SUBMENUS).map(k => this._this.querySelector(`#et_${input_idx}_${k}_sub`)).filter(s => s);
@@ -240,7 +240,7 @@ export class CardMenus
     }
 
     // Listeners of the type menu et_N and its submenus — shared by the card and the info
-    // panel (whose menu has no "Default" and no organization)
+    // panel (whose menu has no "Default" and no layout)
     _initEntityTypeMenu(_ii)
     {
         const _etMenu = this._this.querySelector(`#et_${_ii}`);
@@ -252,7 +252,7 @@ export class CardMenus
         _on('default', () => this.entityTypeMenuClicked(_ii, 'default', null));
         _TYPE_MENU_DEFS.forEach((_def, _idx) => _on(_idx, () => this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode)));
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
-        for( const k in _ORG_ENTRIES ) _on(k, () => this.entityOrganizationClicked(_ii, k));
+        for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
             const _sel = _etMenu.querySelector('a[data-hec-selected]');
@@ -307,10 +307,10 @@ export class CardMenus
         this.writeLocalState();
     }
 
-    // Organization: the entity taken out into its own graph (as a double-click on its
+    // Layout: the entity taken out into its own graph (as a double-click on its
     // label), its linked graph merged back into the one above (as a double-click on the
     // chain icon), or the entity deleted
-    entityOrganizationClicked(input_idx, action)
+    entityLayoutClicked(input_idx, action)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( !_menu ) return;

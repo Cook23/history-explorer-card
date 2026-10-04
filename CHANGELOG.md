@@ -6,11 +6,11 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.2] - unreleased
 
-### Changed — the type menu in three submenus: Display, Interpolation, Arrange
-- The type menu now has three items, each opening its submenu over the menu, right-aligned, level with it: **Display ▸** (the types: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline*, and *Default* for a wildcard add), open as soon as the menu opens; **Interpolation ▸** (for a curve in *Smart* or *Curve*); **Arrange ▸**, from a long-press on a label: *Separate* (as a double-click on the label), *Merge back* (as a double-click on the chain icon), *Delete*. Every action of a gesture is now also in a menu
+### Changed — the type menu in three submenus: Display, Interpolation, Layout
+- The type menu now has three items, each opening its submenu over the menu, right-aligned, level with it: **Display ▸** (the types: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline*, and *Default* for a wildcard add), open as soon as the menu opens; **Interpolation ▸** (for a curve in *Smart* or *Curve*); **Layout ▸**, from a long-press on a label: *Separate* (as a double-click on the label), *Merge back* (as a double-click on the chain icon), *Delete*. Every action of a gesture is now also in a menu
 - The menu has a minimum width, so the open submenu never hides its items' names
 - One markup for the card's menu and the info panel's (`typeMenuHtml`), one mechanism for every submenu (`showTypeSubmenu` / `hideTypeSubmenus`, replacing the Interpolation-only functions)
-- Tests: the Arrange submenu (separate, merge back, delete), the menu's width beside an open submenu; the type menu tests follow the new structure
+- Tests: the Layout submenu (separate, merge back, delete), the menu's width beside an open submenu; the type menu tests follow the new structure
 
 ### Changed — the tooltip opens on a click or a tap, then follows the pointer
 - Hovering over a graph no longer opens the tooltip by itself. A click or a tap on the curves opens it; moving the mouse — or a pen held above the screen — then moves it, until the pointer leaves the curves or the pen moves away from the screen

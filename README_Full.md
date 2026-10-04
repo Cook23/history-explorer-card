@@ -213,7 +213,7 @@ An entity whose current state can be read as a number can be shown as a line (*S
 The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Arrange ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
@@ -226,7 +226,7 @@ The type menu opens:
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
-- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or arrange it (**Arrange ▸**).
+- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or change its layout (**Layout ▸**).
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
 For a **wildcard match** (multiple new entities added at once), *Display* gets an extra **"Default"** entry at the top, pre-selected by default:

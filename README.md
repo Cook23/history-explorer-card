@@ -164,7 +164,7 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Arrange ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
