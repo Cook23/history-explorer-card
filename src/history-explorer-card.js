@@ -1010,7 +1010,7 @@ export class HistoryCardState {
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
-                    // (the curve reconstruction algorithm, curves and smart modes — see deps/chart-hec.js)
+                    // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
                     hecInterpolation: d.interpolation,
                     lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
                     domain: d.domain,
@@ -1721,8 +1721,8 @@ export class HistoryCardState {
         return normalizeOptionSynonyms(c) ?? undefined;
     }
 
-    // The curve reconstruction algorithm of an entity: its own (YAML entry or Reconstruction
-    // menu), else its graph's, else entityOptions', else the card's
+    // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
+    // submenu), else its graph's, else entityOptions', else the card's
     _resolveInterpolation(e)
     {
         return e?.interpolation
@@ -1800,19 +1800,16 @@ export class HistoryCardState {
         Chart.hecUi.clampToViewport(menuEl, this._this?.querySelector('#maincard'));
     }
 
-    // Opens a submenu next to the item of its menu that opens it: on the right of the item,
-    // level with it — or on its left when the room on the right is missing — and, like every
-    // menu (_openMenu), kept within the card and the viewport. The submenu must share the
-    // menu's positioned parent (both are its children).
+    // Opens a submenu over its menu, level with the item that opens it, its right edge on the
+    // menu's right edge — so it takes no room beside the menu — and, like every menu
+    // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
+    // positioned parent (both are its children).
     _openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
-        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.right - _cb.left - 2) + 'px');
-        // Pushed back over its menu by the bounds: on the left of the menu instead
-        if( subEl.getBoundingClientRect().left < _item.right - 4 )
-            this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.left - _cb.left - subEl.offsetWidth + 2) + 'px');
+        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 
     _navigateMenuArrowKey(visible, key)
@@ -2182,7 +2179,7 @@ export class HistoryCardState {
             entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
-            // the Reconstruction menu — so that changing it on the card, a graph or in
+            // the Interpolation submenu — so that changing it on the card, a graph or in
             // entityOptions still applies to it; see _resolveInterpolation)
             entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;

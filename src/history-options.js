@@ -1,11 +1,11 @@
-// The card's options: the curve reconstruction algorithms, the synonyms of the option
+// The card's options: the curve interpolation algorithms, the synonyms of the option
 // names, and which options can be set at which level (card, entityOptions, graph, entity).
 
-// Curve reconstruction algorithms (the `interpolation` option, for the curves and smart
+// Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js
 export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
 
-// How each algorithm is named in the Reconstruction menu (names, not translated)
+// How each algorithm is named in the Interpolation submenu (names, not translated)
 export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
 
 // (each unknown value is reported once: it's resolved again at each redraw)
