@@ -3001,7 +3001,7 @@
             }
 
             if (meta.dataset._model.cubicInterpolationMode === 'monotone') {
-              // (hecInterpolation: another curve reconstruction algorithm than Chart.js' own
+              // (hecInterpolation: another curve interpolation algorithm than Chart.js' own
               // monotone one — helpers.hecSplineCurve is in deps/chart-hec.js)
               var hecAlgo = me.getDataset().hecInterpolation;
               if (hecAlgo && hecAlgo !== 'monotone') {

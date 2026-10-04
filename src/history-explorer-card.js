@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.1b9';
+const Version = '1.2.1';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -1010,7 +1010,7 @@ export class HistoryCardState {
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
-                    // (the curve reconstruction algorithm, curves and smart modes — see deps/chart-hec.js)
+                    // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
                     hecInterpolation: d.interpolation,
                     lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
                     domain: d.domain,
@@ -1721,8 +1721,8 @@ export class HistoryCardState {
         return normalizeOptionSynonyms(c) ?? undefined;
     }
 
-    // The curve reconstruction algorithm of an entity: its own (YAML entry or Reconstruction
-    // menu), else its graph's, else entityOptions', else the card's
+    // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
+    // submenu), else its graph's, else entityOptions', else the card's
     _resolveInterpolation(e)
     {
         return e?.interpolation
@@ -2179,7 +2179,7 @@ export class HistoryCardState {
             entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
-            // the Reconstruction menu — so that changing it on the card, a graph or in
+            // the Interpolation submenu — so that changing it on the card, a graph or in
             // entityOptions still applies to it; see _resolveInterpolation)
             entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;

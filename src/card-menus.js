@@ -61,7 +61,7 @@ export class CardMenus
         const _interpEl  = this._this.querySelector(`#et_${input_idx}_interp`);
         this.hideInterpolationMenu(input_idx);
         if( _interpEl ) {
-            // Reconstruction (the interpolation algorithm): for an entity already shown as a
+            // Interpolation (the algorithm): for an entity already shown as a
             // curve in curves or smart mode — the only modes it applies to
             const _e = graph?.entities.find(e => e.entity === entity_id);
             const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
@@ -182,7 +182,7 @@ export class CardMenus
         this._resetEntityInput(_fi);
     }
 
-    // Listeners of the entity type menu et_N and its Reconstruction submenu er_N — shared by
+    // Listeners of the entity type menu et_N and its Interpolation submenu er_N — shared by
     // the card and the info panel (whose menu has no "Default" and no "Delete")
     _initEntityTypeMenu(_ii)
     {
@@ -209,7 +209,7 @@ export class CardMenus
             const _g = this.graphs.find(gr => gr.id === _graph_id);
             if( _g ) this._deleteEntity(_g, _idx);
         }, true);
-        // Reconstruction: opens the submenu of the algorithms
+        // Interpolation: opens the submenu of the algorithms
         this._this.querySelector(`#et_${_ii}_interp`)?.addEventListener('click', (e) => {
             e.preventDefault();
             this.showInterpolationMenu(_ii);
@@ -220,7 +220,7 @@ export class CardMenus
                 this.entityInterpolationClicked(_ii, k);
             }, true);
         });
-        // Keyboard navigation — Enter or → on Reconstruction opens its submenu
+        // Keyboard navigation — Enter or → on Interpolation opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
             const _sel = _etMenu.querySelector('a[data-hec-selected]');
             const _onInterp = _sel && _sel.id === `et_${_ii}_interp` && _sel.style.background;

@@ -4,19 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.1] - unreleased
+## [v1.2.1] - 2026-10-04
 
 ### Merged — v1.1.48 and v1.1.49
 - `scale` without `unit` only changes how a curve is drawn: the legend and tooltip show the entity's real value — see v1.1.48 below
-- Curve reconstruction: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
+- Curve interpolation: the `interpolation` option (monotone, steffen, makima, catmullrom) and the Interpolation submenu of the type menu; the same options at every level, every spelling accepted everywhere, the info panel's configuration included; automatic refresh on by default, at most once every 2 s — see v1.1.49 below
 
-### Merged — v1.1.50 and v1.1.51 (unreleased)
+### Merged — v1.1.50 and v1.1.51
 - The type menu's submenu named *Interpolation*, its entries named in one short word; every translation reviewed; persistence fixed for a new device and for the display type of a YAML entity — see v1.1.50 below
 - A new test suite, `persistence`: every option that can be changed from the card, with and without persistence, on this device and on a new one, and the last one to speak (the YAML, another device) winning
-- The Interpolation submenu drawn over the type menu, right edges aligned — see v1.1.51 below
+- The Interpolation submenu drawn over the type menu, right edges aligned; *interpolation* everywhere in the documentation — see v1.1.51 below
 
 ### Changed — under the hood
-- The curve reconstruction algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
+- The curve interpolation algorithms are in `deps/chart-hec.js` (`helpers.hecSplineCurve`), called from the line controller through the new dataset option `hecInterpolation` (`deps/Chart Custom.js.md` §1, §8)
 - The option names, their synonyms and the levels they're accepted at are in a new module, `src/history-options.js`
 - The card and the info panel share one configuration reader (`applyConfig`), one reaction to new states (`onStatesChanged`) and one automatic refresh (`scheduleAutoRefresh`); submenus are placed by one method (`_openSubmenu`)
 - New test suites `scale` and `options` (the options at every level, the Interpolation submenu with the keyboard, the mouse and on touch, at the screen edges and inside a shadow root, the load of the automatic refresh, the info panel)
@@ -44,15 +44,18 @@ Changelog for the HA History Explorer Card.
 ### Merged — everything from v1.1.42 to v1.1.47
 - Smart line mode, YAML graphs whatever the units, linked graphs (split, merge, chain icon), bars and curves on the same graph, angles without jumps at 0/360 (`circular`), the multi-device sync fixes, the type menu with the most fitting type pre-selected, arrowline arrows turning by the `circular` period — see their own entries below
 
-## [v1.1.51] - unreleased
+## [v1.1.51] - 2026-10-04
 
 ### Changed — the Interpolation submenu drawn over the type menu
 - The submenu of the interpolation algorithms opens over the type menu, level with *Interpolation ▸*, its right edge on the menu's right edge: it no longer takes room beside the menu (it opened on the right of the menu, or on its left at the right edge of the screen)
 
+### Changed — the documentation says *Interpolation* everywhere
+- The README, README_Full and the code's comments call the curve algorithms and their submenu *interpolation* everywhere (some still said *reconstruction*), and name the type menu's entries as the menu now shows them (*Smart*, *Curve*…)
+
 ## [v1.1.50] - 2026-10-03
 
 ### Changed — the type menu's submenu is named *Interpolation*
-- The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
+- The submenu of the interpolation algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
 
 ### Changed — the type menu's entries named in one short word
 - In every language, the type menu's entries are now one short word: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline* in English (*Line smart, Line curves, Line straight, Line stepped, Bar, Arrowline, Timeline* before) — in French *Intelligent, Courbe, Droite, Escalier, Histogramme, Direction, Chronologie*
@@ -70,7 +73,7 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.1.49] - 2026-10-03
 
-### New — curve reconstruction: a choice of interpolation algorithms
+### New — curve interpolation: a choice of interpolation algorithms
 - In `curves` and `smart` modes, the curve between two values can now be rebuilt by four algorithms, chosen with the new `interpolation` option:
   - `monotone` (default, unchanged): Chart.js' monotone cubic (Fritsch–Carlson). Never overshoots, but flat at every value where the curve changes direction or repeats a value, hence small breaks in the slope
   - `steffen`: monotone too, flat only at the real peaks and troughs, slopes weighted by the irregular spacing of the values

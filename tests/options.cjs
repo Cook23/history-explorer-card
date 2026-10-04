@@ -1,5 +1,5 @@
 // The options at every level (card, entityOptions, graph, entity) with their synonyms, the
-// curve reconstruction (interpolation) and its Interpolation submenu (keyboard, mouse, touch,
+// curve interpolation (interpolation) and its Interpolation submenu (keyboard, mouse, touch,
 // screen edges, shadow root), automatic refresh (on by default, at most one request every 2 s)
 const { openCard } = require('./lib.cjs');
 

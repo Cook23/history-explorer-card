@@ -35,7 +35,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Curve reconstruction — the dataset option `hecInterpolation` (Chart Custom.js.md §1),
+  // Curve interpolation — the dataset option `hecInterpolation` (Chart Custom.js.md §1),
   // used by the line controller's updateBezierControlPoints hook (§8) instead of
   // helpers.splineCurveMonotone when it names another algorithm than 'monotone'.
   // Tangents of a cubic Hermite curve through the points (x, y), by algorithm
