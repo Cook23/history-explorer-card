@@ -67,6 +67,7 @@ or `maintainAspectRatio`.
 | `yAxisPanEnabled` | `boolean` | `true` | Dragging directly on the Y-axis label zone (or Shift+drag anywhere on a `line`/`bar` graph) never pans the Y scale. Never applies to `timeline`/`arrowline` graphs regardless. |
 | `yAxisLockEnabled` | `boolean` | `true` | The Y-axis lock icon (padlock) is never drawn, never engages automatically, and the grouped lock+handle click/dblclick toggle (§5) does nothing. |
 | `legendClickEnabled` | `boolean` | `true` | A click/double-click on a legend label is not forwarded to the stock `legend.onClick`. The card sets it to `false`: it handles legend clicks like every other gesture, from `customEvent` (`click`/`dblclick` with `legendIndex`). |
+| `hover.activateOnContact` | `boolean` | `false` | A hover move only moves a tooltip that a contact (click, tap) on the plot area opened; leaving the plot area, or the canvas (a pen moving out of hover range), closes it, and the next hover opens nothing. The card sets it to `true`. |
 | `labelTooltipEnabled` | `boolean` | `true` | Clicking a truncated Y-axis category label (timeline/arrowline) never shows its full text in a tooltip. |
 | `altSampleModeEnabled` | `boolean` | `true` | Holding Alt while hovering never switches `hover.mode` to `'dataset'` (showing every sample instead of just the nearest point). |
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
@@ -153,6 +154,7 @@ and `dblclick`, and nothing at all for long-press or drag.
 | `gestureType` | Fires when | Its own payload fields |
 |---|---|---|
 | `click` | Pointer released, stayed within 10px, before the 600ms long-press timer fired, and this same press wasn't the second half of a double-click | — |
+| *(pen)* | The barrel button (secondary button, `buttons & 2`) changes the meaning of a press: held at contact and released without a drag, `longpress` (at release, instead of `click`); held at contact and dragged, a plain drag; pressed twice while the tip stays down, `dblclick` (no `click` at release). The browser's own context menu is kept off the graph for such a press | — |
 | `dblclickdown` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`): what a drag following that press needs (touch-action block, Y-axis pan) is armed right away, and the first press's `click` can be undone | — |
 | `dblclick` | That second press is released without having become a drag (and before the long-press timer) — fires at the **second release** (`pointerup`), like the browser's own `dblclick`: only then is it known to be a double-click rather than a tap-then-drag | — |
 | `longpress` | Pointer held stationary (within 10px) for 600ms without releasing | — |

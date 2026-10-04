@@ -79,7 +79,8 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Pan**: click and drag left or right on any graph
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
-- **Tooltip**: hover over any graph to see values or state details
+- **Tooltip**: click or tap the curves to see the values or state details under the pointer; the tooltip then follows the mouse (or a pen above the screen) until the pointer leaves the curves
+- **With a pen**: the tip works as a finger. Barrel button held: a drag moves a label, a graph or the Y axis right away, a tap on a label opens its type menu. Tip on a label and the barrel button pressed twice: as a double tap
 - **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again within half a second and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis
 
 ---
@@ -155,7 +156,7 @@ excludeFilterEntities:
 An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars, as direction arrows or as a timeline; any other entity only as a timeline. The type menu opens:
 
 - right after selecting an entity to add in the dropdown (see [Adding entities](#adding-entities)) — always, even when *Timeline* is the only choice, so you can check before it's added;
-- on a 600 ms long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
+- on a long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
 - when selecting an entity that's already shown, to change its type.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)

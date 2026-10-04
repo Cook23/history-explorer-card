@@ -12,12 +12,30 @@ module.exports = async function()
     const t = await openCard(CFG, { mock: { series: true } });
     const E = x => t.E(x);
 
-    await t.step('hover shows a tooltip, with the values under the pointer', async () => {
+    // The hover tooltip of graph 0: its text while shown, else null
+    const tip = () => E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
+    await t.step('hover alone opens no tooltip', async () => {
         const pt = await E('graphPtAt(0,0.6)');
         // (moved the way a mouse does: in small steps)
         await t.page.mouse.move(pt.x - 200, pt.y); await t.page.mouse.move(pt.x, pt.y, { steps: 10 }); await t.wait(600);
-        const tip = await E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' ? el.textContent : null; })()`);
-        return /power|rain/.test(tip || '') ? true : 'tooltip: ' + tip;
+        const t1 = await tip();
+        return t1 === null ? true : 'tooltip: ' + t1;
+    });
+    await t.step('a click on the curves opens the tooltip, with the values under the pointer; hovering moves it', async () => {
+        const pt = await E('graphPtAt(0,0.6)');
+        await t.page.mouse.click(pt.x - 150, pt.y); await t.wait(500);
+        const t1 = await tip();
+        await t.page.mouse.move(pt.x + 150, pt.y, { steps: 15 }); await t.wait(500);
+        const t2 = await tip();
+        return /power|rain/.test(t1 || '') && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
+    });
+    await t.step('leaving the curves closes it; back over them, nothing until the next click', async () => {
+        const pt = await E('graphPtAt(0,0.6)'); const y = await E('yaPt(0,0.6)');
+        await t.page.mouse.move(y.x, y.y, { steps: 15 }); await t.wait(1300);   // (closes with a fade)
+        const t1 = await tip();
+        await t.page.mouse.move(pt.x, pt.y, { steps: 15 }); await t.wait(500);
+        const t2 = await tip();
+        return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
     await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');

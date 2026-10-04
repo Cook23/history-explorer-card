@@ -827,6 +827,46 @@
   }
 
   // mousedown
+  // ── Pen barrel button ──
+  // The barrel button is reported as the secondary button (buttons bit 2), at the
+  // contact or as a chorded change while the tip is down (Pointer Events).
+  function penBarrel(c) {
+    return c.pointerType === 'pen' && !!(c.e.native && c.e.native.buttons & 2);
+  }
+
+  // The barrel button pressed while the tip stays down (p: that contact): two quick
+  // presses are a dblclick (the pen's alias of a double tap, where the tip is); the
+  // first one already cancels the long-press, the contact now being the button's
+  function penBarrelPressed(c, p) {
+    var gs = c.gs, _down = penBarrel(c);
+    if (_down && !p.barrelDown) {
+      guardContextMenu(c.me);
+      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      var _now = Date.now();
+      if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.dblClickMs) {
+        fire(c, 'dblclick', p.x0, p.y0);
+        p.barrelPressedAt = 0;
+      } else {
+        p.barrelPressedAt = _now;
+      }
+      p.barrelPressed = true;
+    }
+    p.barrelDown = _down;
+  }
+
+  // The browser's own context menu, which a barrel press also opens, kept off the
+  // graph for that press (on the canvas and the touch overlays over it, both under
+  // the canvas's parent)
+  function guardContextMenu(me) {
+    me._hecBarrelAt = Date.now();
+    var _host = me.canvas && me.canvas.parentNode;
+    if (!_host || _host._hecContextMenuGuard) return;
+    _host._hecContextMenuGuard = true;
+    _host.addEventListener('contextmenu', function (ev) {
+      if (me._hecBarrelAt && Date.now() - me._hecBarrelAt < 1500) ev.preventDefault();
+    });
+  }
+
   function hecPointerDown(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     gs.pointers[pid] = { x: e.x, y: e.y };
@@ -856,18 +896,24 @@
       // The second press never produces its own click at release — see
       // dblClickFired below and its use at mouseup.
       // Long-press remains independent from drag, same as before.
+      // Pen with its barrel button held at contact: a right-click, as on every
+      // system — released without a drag, it's a longpress (see mouseup); a drag
+      // is a plain drag, the button keeping the browser from scrolling. It never
+      // counts as half of a double-click.
+      var _barrel = penBarrel(c);
+      if (_barrel) guardContextMenu(me);
       var _downNow = Date.now();
-      var _isDblClick = gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
+      var _isDblClick = !_barrel && gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
       if (_isDblClick) {
         fire(c, 'dblclickdown', e.x, e.y);
       }
-      gs.lastMouseDown = _downNow;
+      gs.lastMouseDown = _barrel ? 0 : _downNow;
 
       var _pending = { x0: e.x, y0: e.y, pid: pid, dragging: false, pointerType: pointerType, native: e.native,
         // Marks that THIS press is the second one of a double-click — checked
         // at mouseup below: released without a drag, it's a dblclick, never
         // a plain click.
-        dblClickFired: _isDblClick };
+        dblClickFired: _isDblClick, barrel: _barrel, barrelDown: _barrel };
       gs.pending = _pending;
 
       gs.longPressTimer = setTimeout(function () {
@@ -915,6 +961,7 @@
 
     } else {
       var p = gs.pending;
+      if (p && p.pid === pid && !p.dragging && pointerType === 'pen') penBarrelPressed(c, p);
       if (p && p.pid === pid && !p.dragging) {
         if (Math.abs(e.x - p.x0) + Math.abs(e.y - p.y0) > cfg.dragSlop) {
           if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
@@ -1018,6 +1065,12 @@
         // fired for this contact, so releasing without ever moving does NOT
         // become a click, even though gs.pending stayed alive to allow a drag
         // to follow (which didn't happen here).
+      } else if (pu.barrelPressed) {
+        // The barrel button was pressed while the tip stayed down: whatever it did
+        // (a double press is a dblclick) was done then — no click at release
+      } else if (pu.barrel) {
+        // Pen tapped with its barrel button held: the type menu, as a long-press
+        fire(c, 'longpress', pu.x0, pu.y0);
       } else if (pu.dblClickFired) {
         // The second press of a double-click, released without a drag: a
         // dblclick (and never also a plain click)

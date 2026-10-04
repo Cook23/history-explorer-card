@@ -4675,6 +4675,12 @@
               });
             }
 
+            // (fork) hover.activateOnContact: a hover move only moves a tooltip that a
+            // contact on the plot area opened — the tooltip "mode" — and leaving the plot
+            // area, or the canvas (a pen moved out of hover range), ends that mode
+            var _contactMode = hoverOptions.activateOnContact === true;
+            var _inPlot = e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
+
             if (e.type === 'mouseout') {
               // A genuine mouseout (the pointer actually left the canvas) is always
               // preceded by a mousemove — that's what carried it across the boundary. The
@@ -4690,6 +4696,7 @@
               if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
+                me._hecTooltipMode = false;
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
                 if (me.tooltip) me.tooltip._hecCloseTooltip();
@@ -4701,14 +4708,22 @@
             } else if (e.type === 'mouseup') {
               me._hecHasMoved = false;
             } else if (e.type === 'mousedown') {
-              me.active = _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
+              // (contact mode: a contact outside the plot area opens nothing — it ends the
+              // mode, like leaving the plot area)
+              me._hecTooltipMode = !_contactMode || _inPlot;
+              me.active = me._hecTooltipMode ? _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions)) : [];
               if (e.x !== null && e.y !== null) {
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
             } else if (e.type === 'mousemove') {
               me._hecHasMoved = true;
               var _searched = false;
-              if (hoverOptions.hoverEnabled) {
+              if (_contactMode && me._hecTooltipMode && !_inPlot) {
+                // Left the plot area: the tooltip mode ends, the tooltip closes
+                me._hecTooltipMode = false;
+                me.active = [];
+                me._hecLastHitXY = undefined;
+              } else if (hoverOptions.hoverEnabled && (!_contactMode || me._hecTooltipMode)) {
                 if (!me._hecLastHitXY || e.x === null || e.y === null) {
                   _searched = true;
                 } else {

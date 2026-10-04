@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.2b1';
+const Version = '1.2.2b2';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -1211,14 +1211,15 @@ export class HistoryCardState {
                     // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
                     mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
                     intersect: !_hasCurves,
-                    // Mouse/pen/touch all trigger on genuine contact (down); mouse/pen also
-                    // trigger on a pure hover move (no button/contact needed) since
-                    // hoverEnabled is true — matching this card's desktop behaviour. See
-                    // Chart.Controller.handleEvent / Tooltip.handleEvent in Chart.js: the
-                    // hit-test only ever re-runs on a real contact or on a pointer move of at
-                    // least 4px since the last one that found something, never as a side
-                    // effect of the chart's own data refreshing under a still pointer.
+                    // The tooltip opens on a contact (click, tap) on the plot area; a hover
+                    // move — mouse, or a pen above the screen — then moves it, until the
+                    // pointer leaves the plot area or the canvas (activateOnContact, see
+                    // Chart.Controller.handleEvent in Chart.js). The hit-test only ever
+                    // re-runs on a real contact or on a pointer move of at least 4px since
+                    // the last one that found something, never as a side effect of the
+                    // chart's own data refreshing under a still pointer.
                     hoverEnabled: true,
+                    activateOnContact: true,
                     // Default is 400ms — was likely relied on as a rough anti-flicker delay
                     // before handleEvent's own move-threshold existed; that threshold is now
                     // what actually prevents flicker, so this generic delay is just latency

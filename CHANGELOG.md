@@ -6,6 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.2] - unreleased
 
+### Changed — the tooltip opens on a click or a tap, then follows the pointer
+- Hovering over a graph no longer opens the tooltip by itself. A click or a tap on the curves opens it; moving the mouse — or a pen held above the screen — then moves it, until the pointer leaves the curves or the pen moves away from the screen
+- `deps/Chart.js`: new option `hover.activateOnContact` (`deps/Chart Custom.js.md` §1)
+
+### New — pen: the barrel button as shortcuts
+- Barrel button held, drag: moves a label, a graph or the Y axis right away (no tap first), or pans the time; barrel button held, tap on a label: its type menu; tip held on a label and barrel button pressed twice: as a double tap. The browser's own context menu stays off the graphs. The tip alone works as a finger, as before
+- Tests: new suite `pen` (barrel drag, barrel tap, barrel double press, tip tap, the tooltip opened by a tap and moved by hovering); the mouse tooltip tests follow the new behavior
+
 ### Fixed — touch: tap then drag moved a label out of its graph instead of moving it
 - Tapping a curve or timeline label, then pressing it again to drag it, took it out into a graph of its own (as a double-tap does) instead of moving it, and hid the curve: the second press was taken as a double-click as soon as it touched the screen. A double-click is now only recognized when the second press is released without a drag, as the browser itself does; and the second press undoes what the first tap did (show/hide a curve, as it already did for the Y axis lock)
 - `deps/chart-hec.js`: the second press fires `dblclickdown` at once (it arms what a drag needs: the touch-action block, the Y axis pan), and `dblclick` only at its release, if it didn't become a drag (`deps/Chart Custom.js.md` §2, §5)
