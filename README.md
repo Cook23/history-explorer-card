@@ -17,35 +17,24 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
-## Version highlights
-
-A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
-
-- **v1.2.0** (beta, alongside 1.1) — On touch, a swipe on a graph always scrolls the page; a drag starts with a tap (tap, then press again and drag). Pinch also zooms the time. Gestures handled in one documented layer, code organized by role, automated tests.
-- **v1.1.49** — Curve interpolation: choose how *Curve* and *Smart* lines are drawn between values (`interpolation`: monotone, steffen, makima, catmullrom), also from a new *Interpolation* submenu of the type menu. Every option accepted at every level (card, `entityOptions`, graph, entity) with all its spellings; automatic refresh on by default.
-- **v1.1.47** — The type menu lists *Smart* first, and adding an entity pre-selects the most fitting display: smart line for a measurement, arrowline for an angle, bars for energy or volume that adds up, timeline for a state.
-- **v1.1.46** — Angles (wind direction…) drawn without jumps at 0/360: a continuous curve, real values in the tooltip and on the Y axis — automatic for `°` and `measurement_angle`, or set with `circular`.
-- **v1.1.45** — Bars and curves on the same graph: curves drawn over the bars, never stacked; *Raw line* only turns the bars into raw curves.
-- **v1.1.43** — New `smart` line mode (silences drawn as flat dashed plateaus); YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.
-- **v1.1.38** — Graph-level and card-level style defaults, wildcard entities sorted alphabetically, more flexible YAML formats, and malformed config no longer blanks the whole card.
-- **v1.1.32** — Persistence options renamed (opt-out to opt-in) — nothing persists by default, except dynamically-added entities.
-- **v1.1.31** — Popups and menus no longer get clipped near a viewport edge; smoother.
-- **v1.1.30** — Added persistence-control options for time range and entities — renamed in v1.1.32, see above.
-- **v1.1.29** — Change any entity's display type on the fly (line, bar, arrowline, timeline) from a simple menu.
-- **v1.1.26** — Touch-friendly Y axis panning, and a new `ylock` option to lock a graph's Y axis range.
-- **v1.1.25** — Bar graph interval (10 min / hourly / daily / monthly) is now remembered across reloads.
-- **v1.1.23** — New unified entity picker (desktop and mobile) showing friendly names, with wildcard bulk-add.
-- **v1.1.19** — Default info panel state and default time range can be set in YAML, and are remembered per user across devices.
-- **v1.1.18** — Info panel can be turned on by default; richer default state colors across most Home Assistant domains.
-- **v1.1.12** — Your graph layout and preferences now sync across devices through your Home Assistant account.
-- **v1.1.10** — Drag & drop to reorder and combine graphs, plus automatic grouping of entities sharing compatible units.
-- **v1.1.0** — First release of this fork: pattern-based entity options, min/max band, and sample point display.
+> [!IMPORTANT]
+> **This is version 1.2, a beta**
+>
+> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. Both have the same features; they differ only on touch screens. In 1.2:
+> - a swipe on a graph always scrolls the page, wherever it starts;
+> - to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag;
+> - a pinch also zooms the time.
+>
+> In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
+>
+> **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
+>
+> *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
 ---
 
 ## Table of contents
 
-- [Version highlights](#version-highlights)
 - [Install](#install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
@@ -91,7 +80,7 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
 - **Tooltip**: hover over any graph to see values or state details
-- **Move**: on touch devices, moving an item (curve by its legend, graph, or Y-axis) uses a different gesture to avoid conflicts with the browser's native scrolling. Double-click and drag instead of click and drag.
+- **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again within half a second and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis
 
 ---
 
@@ -126,7 +115,7 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 Clicking an entry in the dropdown adds it directly — no separate button required.
 
-For a numeric entity, a menu pops up right after selection (click or second Enter) letting you choose how it should be displayed (line, bar, arrowline or timeline) before it's actually added — see [Choosing an entity's display type](#choosing-an-entitys-display-type) below. Non-numeric entities (on/off, text states) are added directly as a timeline, since that's the only representation that makes sense for them.
+Right after the selection (click or second Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
 The entity selector accepts `*` wildcards:
 ```
@@ -163,19 +152,29 @@ excludeFilterEntities:
 
 ## Choosing an entity's display type
 
-Any numeric entity can be shown as a line (straight, curved, stepped or smart), bar, arrowline (bearing) or timeline. A menu for picking this opens whenever it's relevant:
+An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars, as direction arrows or as a timeline; any other entity only as a timeline. The type menu opens:
 
-- Right after selecting a new numeric entity in the dropdown (see [Adding entities](#adding-entities))
-- On a 600ms long-press of a legend label (line/bar graphs) or a timeline/arrowline label
-- When re-selecting an entity that's already added, to change its type
+- right after selecting an entity to add in the dropdown (see [Adding entities](#adding-entities)) — always, even when *Timeline* is the only choice, so you can check before it's added;
+- on a 600 ms long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
+- when selecting an entity that's already shown, to change its type.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
-The currently active type is shown in bold. Use ArrowUp/ArrowDown and Enter to pick with the keyboard, or click directly. Non-numeric entities (on/off, text states) never show this menu — they can only be a timeline, and are added as such automatically.
+The type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
+- *Timeline* for a state that isn't a number;
+- the entity's own `entityOptions` `type` / `lineMode`, when set;
+- *Direction* (arrows) for an angle (unit `°`, or state class `measurement_angle`);
+- *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit);
+- *Timeline* for an entity without unit that isn't a measurement;
+- otherwise a *Smart* line (or the card's own `lineMode`, when set).
 
-For a curve shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu.
+For several entities added at once with a wildcard, the menu starts with *Default*: each entity gets its own most fitting type.
 
-In the info panel, a "Type" link appears between the date and range selectors for numeric entities, opening the same menu.
+Opened by a long-press on a label, the menu also offers *Delete*, to remove the entity from the card.
+
+For a curve shown in *Smart* or *Curve*, the menu starts with **Interpolation ▸**: it opens a submenu to choose how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use shown in bold. Click it, or press Enter or → on it; ← or Escape goes back to the type menu. The choice is saved with the entity.
+
+In the info panel, a "Type" link appears between the date and range selectors when the entity's state is a number, opening the same menu.
 
 ---
 
@@ -198,9 +197,8 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 - **Single-click** a curve label to show/hide it
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
-- **Drag** a curve label left or right to reorder curves within the same graph
+- **Drag** a curve label left or right to reorder curves within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - **Drag** a curve label onto another graph to move it there (compatible units only — any unit within a group of [linked graphs](#linked-graphs))
-- On mobile, double-tap a curve label then drag to start moving it
 
 An incompatible drop shows a brief tooltip explaining the mismatch.
 
@@ -216,7 +214,7 @@ Linked graphs can always be merged back as long as their display types can share
 
 ### Reordering graphs
 
-Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On mobile, double-tap the ⠿ symbol then drag to start reordering.
+Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On a touch screen, tap the ⠿ symbol, then press it again within half a second and drag.
 
 Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
@@ -224,11 +222,10 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 
 ![image](https://user-images.githubusercontent.com/60828821/198171854-f643a628-25f7-4f5a-ac50-f0914a5e265e.png)
 
-- **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph
+- **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - **Double-click** an entity label to extract it into its own graph
 - **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Click a truncated label to see the full name in a tooltip
-- On mobile, double-tap an entity label then drag to start moving it
 
 The page scrolls automatically when dragging near the top or bottom of the screen.
 
@@ -240,7 +237,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On mobile, double-tap the label area then drag to pan the Y axis. With two fingers on a graph: spread or pinch them horizontally to zoom the time in or out, vertically to zoom the Y axis; move them together to pan the time and the Y axis.
+The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕; on a touch screen, tap it, then press it again within half a second and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time.
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -279,7 +276,7 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 
 - `enable_persistence` — this device remembers on its own (local browser storage only).
 - `enable_multidevice_persistence` — this device remembers *and* syncs across your other devices via your HA account.
-- Last one to speak wins: YAML, each device's UI, and your HA account (for multi-device) are each compared with what they said last time — whichever changed most recently wins. An entity edited in YAML gets its YAML values back (on every device), the others keep theirs. A device opening the card for the first time counts as YAML speaking on that device.
+- Last one to speak wins: YAML, each device's UI, and your HA account (for multi-device) are each compared with what they said last time — whichever changed most recently wins. An entity edited in YAML gets its YAML values back (on every device), the others keep theirs. A device opening the card for the first time gets what's saved in your HA account with `enable_multidevice_persistence` (the YAML, if it changed since), and the YAML with `enable_persistence` alone.
 - Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
 > For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
@@ -295,13 +292,13 @@ refresh:
   interval: 30       # Or refresh every 30 seconds (combine both if needed)
 ```
 
-Since v1.1.49, `automatic` is on by default: set `automatic: false` to turn it off.
+The automatic refresh reloads the recent history at most once every 2 seconds, however often the entities change.
 
 ---
 
 ## Line chart appearance
 
-### Interpolation mode
+### Line mode
 
 ```yaml
 type: custom:history-explorer-card
@@ -328,7 +325,7 @@ interpolation: makima   # monotone (default), steffen, makima, or catmullrom
 
 `smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
-Angles (a wind direction, for example) no longer jump across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
+Angles (a wind direction, for example) are drawn without jumping across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
@@ -378,7 +375,7 @@ showUnavailable: true
 
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
-Entities with a `total_increasing` state class are automatically shown as bar charts. Use the interval selector on the graph to switch between 10m, hourly, daily and monthly views.
+Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between 10 min, hourly, daily and monthly bars (hourly by default), or *Raw line*.
 
 A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves share one Y axis — for incompatible units (e.g. kWh bars and a W curve) use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
@@ -480,7 +477,7 @@ entityOptions:
 
 ## Card, graph, and entity-level options
 
-Every display/behavior property below can be set at up to three levels — as a shared default for the whole **card**, as a shared default for one **graph** (`graphs: - options:`), or directly on one **entity**. The most specific level wins: entity beats graph, graph beats card.
+Every display/behavior property below can be set at up to four levels — as a default for the whole **card**, in **`entityOptions`** (targeted by entity id, device class, domain or pattern), as a default for one **graph**, or directly on one **entity**. The most specific level wins: **entity → graph → `entityOptions` → card**.
 
 ```yaml
 type: custom:history-explorer-card
@@ -532,7 +529,7 @@ graphs:
 | `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *4 |
 | `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
 
-*1 — `width` is still accepted as an alias for `lineWidth`, for backward compatibility.
+*1 — `width` is a synonym of `lineWidth`.
 
 *2 — `height` on the card sets the height of every line and bar graph; `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)) still set their own, and win over it.
 
@@ -546,7 +543,7 @@ graphs:
 
 *7 — an option of the graph itself (its Y axis, its stacking, its height, its time labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
-Every option is spelled the same at every level where it's accepted, and every spelling it ever had is accepted everywhere (`width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
+Every option is spelled the same at every level where it's accepted, and its synonyms are accepted everywhere (`width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 
@@ -660,7 +657,7 @@ graphs:
 
 > For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
 
-`options:` can also carry styling properties (`fill`, `showMinMax`, `dashMode`, `lineMode`, `lineWidth`, `showPoints`, `decimation`, `netBars`) as a shared default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
+A graph's `options:` (or the graph itself) can also carry the entity options marked ✓ in the **Graph** column of [Card, graph, and entity-level options](#card-graph-and-entity-level-options), as a default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
 
 ---
 
