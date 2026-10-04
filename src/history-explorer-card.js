@@ -23,7 +23,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.2b5';
+const Version = '1.2.2';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by

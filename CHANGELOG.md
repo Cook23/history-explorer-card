@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.2] - unreleased
+## [v1.2.2] - 2026-10-04
 
 ### Changed — a label is picked when touched just beside it
 - A click or a touch just beside a curve's legend label or a timeline label takes that label, as if it had landed on it — unless it's clearly beside every label, about halfway between two of them, on the curves, or on a control (the ⠿ handle, the padlock, the chain icon): then it takes none. One rule for every label (`_hecPick` in `deps/chart-hec.js`), replacing the exact hit-test
