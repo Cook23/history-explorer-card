@@ -41,8 +41,8 @@ Both lines, 1.1.x and 1.2.x, are maintained side by side for now.
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
 
-- **v1.1.49** — Curve reconstruction: choose how *Line curves* and *Line smart* are drawn between values (`interpolation`: monotone, steffen, makima, catmullrom), also from a new *Reconstruction* submenu of the type menu. Every option accepted at every level (card, `entityOptions`, graph, entity) with all its spellings; automatic refresh on by default.
-- **v1.1.47** — The type menu lists *Line smart* first, and adding an entity pre-selects the most fitting display: smart line for a measurement, arrowline for an angle, bars for energy or volume that adds up, timeline for a state.
+- **v1.1.49** — Curve interpolation: choose how *Curve* and *Smart* lines are drawn between values (`interpolation`: monotone, steffen, makima, catmullrom), also from a new *Interpolation* submenu of the type menu. Every option accepted at every level (card, `entityOptions`, graph, entity) with all its spellings; automatic refresh on by default.
+- **v1.1.47** — The type menu lists *Smart* first, and adding an entity pre-selects the most fitting display: smart line for a measurement, arrowline for an angle, bars for energy or volume that adds up, timeline for a state.
 - **v1.1.46** — Angles (wind direction…) drawn without jumps at 0/360: a continuous curve, real values in the tooltip and on the Y axis — automatic for `°` and `measurement_angle`, or set with `circular`.
 - **v1.1.45** — Bars and curves on the same graph: curves drawn over the bars, never stacked; *Raw line* only turns the bars into raw curves.
 - **v1.1.43** — New `smart` line mode (silences drawn as flat dashed plateaus); YAML graphs show all their entities together whatever the units; linked graphs can be split and merged back (double-click, drag, chain icon); several multi-device sync fixes.

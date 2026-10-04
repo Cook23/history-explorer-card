@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.50';
+const Version = '1.1.51';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -29,11 +29,11 @@ export const _TYPE_MENU_DEFS = [
     { type: 'line', lineMode: 'smart'   },
 ];
 
-// Curve reconstruction algorithms (the `interpolation` option, for the curves and smart
+// Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes) — the first one is the default; see hecSplineTangents in deps/Chart.js
 export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
 
-// How each algorithm is named in the Reconstruction menu (names, not translated)
+// How each algorithm is named in the Interpolation submenu (names, not translated)
 export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
 
 // (each unknown value is reported once: it's resolved again at each redraw)
@@ -1939,7 +1939,7 @@ export class HistoryCardState {
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
-                    // (the curve reconstruction algorithm, curves and smart modes — see deps/Chart.js)
+                    // (the curve interpolation algorithm, curves and smart modes — see deps/Chart.js)
                     hecInterpolation: d.interpolation,
                     lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
                     domain: d.domain,
@@ -5068,19 +5068,16 @@ export class HistoryCardState {
         this._clampToViewport(menuEl);
     }
 
-    // Opens a submenu next to the item of its menu that opens it: on the right of the item,
-    // level with it — or on its left when the room on the right is missing — and, like every
-    // menu (_openMenu), kept within the card and the viewport. The submenu must share the
-    // menu's positioned parent (both are its children).
+    // Opens a submenu over its menu, level with the item that opens it, its right edge on the
+    // menu's right edge — so it takes no room beside the menu — and, like every menu
+    // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
+    // positioned parent (both are its children).
     _openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
-        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.right - _cb.left - 2) + 'px');
-        // Pushed back over its menu by the bounds: on the left of the menu instead
-        if( subEl.getBoundingClientRect().left < _item.right - 4 )
-            this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_item.left - _cb.left - subEl.offsetWidth + 2) + 'px');
+        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 
     _navigateMenuArrowKey(visible, key)
@@ -5541,7 +5538,7 @@ export class HistoryCardState {
             entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
             entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
             // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
-            // the Reconstruction menu — so that changing it on the card, a graph or in
+            // the Interpolation submenu — so that changing it on the card, a graph or in
             // entityOptions still applies to it; see _resolveInterpolation)
             entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
@@ -6446,7 +6443,7 @@ export class HistoryCardState {
         const _interpEl  = this._this.querySelector(`#et_${input_idx}_interp`);
         this.hideInterpolationMenu(input_idx);
         if( _interpEl ) {
-            // Reconstruction (the interpolation algorithm): for an entity already shown as a
+            // Interpolation (the algorithm): for an entity already shown as a
             // curve in curves or smart mode — the only modes it applies to
             const _e = graph?.entities.find(e => e.entity === entity_id);
             const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
@@ -6605,7 +6602,7 @@ export class HistoryCardState {
         this._resetEntityInput(_fi);
     }
 
-    // Listeners of the entity type menu et_N and its Reconstruction submenu er_N — shared by
+    // Listeners of the entity type menu et_N and its Interpolation submenu er_N — shared by
     // the card and the info panel (whose menu has no "Default" and no "Delete")
     _initEntityTypeMenu(_ii)
     {
@@ -6632,7 +6629,7 @@ export class HistoryCardState {
             const _g = this.graphs.find(gr => gr.id === _graph_id);
             if( _g ) this._deleteEntity(_g, _idx);
         }, true);
-        // Reconstruction: opens the submenu of the algorithms
+        // Interpolation: opens the submenu of the algorithms
         this._this.querySelector(`#et_${_ii}_interp`)?.addEventListener('click', (e) => {
             e.preventDefault();
             this.showInterpolationMenu(_ii);
@@ -6643,7 +6640,7 @@ export class HistoryCardState {
                 this.entityInterpolationClicked(_ii, k);
             }, true);
         });
-        // Keyboard navigation — Enter or → on Reconstruction opens its submenu
+        // Keyboard navigation — Enter or → on Interpolation opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
             const _sel = _etMenu.querySelector('a[data-hec-selected]');
             const _onInterp = _sel && _sel.id === `et_${_ii}_interp` && _sel.style.background;
@@ -6681,8 +6678,8 @@ export class HistoryCardState {
         _erMenu?.addEventListener('focusout', _closeIfLeft);
     }
 
-    // The curve reconstruction algorithm of an entity: its own (YAML entry or Reconstruction
-    // menu), else its graph's, else entityOptions', else the card's
+    // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
+    // submenu), else its graph's, else entityOptions', else the card's
     _resolveInterpolation(e)
     {
         return e?.interpolation
