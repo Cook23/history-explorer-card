@@ -4,15 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.1.51] - unreleased
+## [v1.1.51] - 2026-10-04
 
 ### Changed — the Interpolation submenu drawn over the type menu
 - The submenu of the interpolation algorithms opens over the type menu, level with *Interpolation ▸*, its right edge on the menu's right edge: it no longer takes room beside the menu (it opened on the right of the menu, or on its left at the right edge of the screen)
 
+### Changed — the documentation says *Interpolation* everywhere
+- The README, README_Full and the code's comments call the curve algorithms and their submenu *interpolation* everywhere (some still said *reconstruction*), and name the type menu's entries as the menu now shows them (*Smart*, *Curve*…)
+
 ## [v1.1.50] - 2026-10-03
 
 ### Changed — the type menu's submenu is named *Interpolation*
-- The submenu of the curve reconstruction algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
+- The submenu of the interpolation algorithms, at the top of the type menu, is now named **Interpolation ▸** (it was *Reconstruction ▸*), like the `interpolation` option it sets
 
 ### Changed — the type menu's entries named in one short word
 - In every language, the type menu's entries are now one short word: *Smart, Curve, Straight, Stepped, Bar, Direction, Timeline* in English (*Line smart, Line curves, Line straight, Line stepped, Bar, Arrowline, Timeline* before) — in French *Intelligent, Courbe, Droite, Escalier, Histogramme, Direction, Chronologie*
@@ -30,7 +33,7 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.1.49] - 2026-10-03
 
-### New — curve reconstruction: a choice of interpolation algorithms
+### New — curve interpolation: a choice of interpolation algorithms
 - In `curves` and `smart` modes, the curve between two values can now be rebuilt by four algorithms, chosen with the new `interpolation` option:
   - `monotone` (default, unchanged): Chart.js' monotone cubic (Fritsch–Carlson). Never overshoots, but flat at every value where the curve changes direction or repeats a value, hence small breaks in the slope
   - `steffen`: monotone too, flat only at the real peaks and troughs, slopes weighted by the irregular spacing of the values
