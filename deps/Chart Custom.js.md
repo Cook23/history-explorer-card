@@ -153,7 +153,8 @@ and `dblclick`, and nothing at all for long-press or drag.
 | `gestureType` | Fires when | Its own payload fields |
 |---|---|---|
 | `click` | Pointer released, stayed within 10px, before the 600ms long-press timer fired, and this same press wasn't the second half of a double-click | — |
-| `dblclick` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`), not at release | — |
+| `dblclickdown` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`): what a drag following that press needs (touch-action block, Y-axis pan) is armed right away, and the first press's `click` can be undone | — |
+| `dblclick` | That second press is released without having become a drag (and before the long-press timer) — fires at the **second release** (`pointerup`), like the browser's own `dblclick`: only then is it known to be a double-click rather than a tap-then-drag | — |
 | `longpress` | Pointer held stationary (within 10px) for 600ms without releasing | — |
 | `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
 | `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
@@ -185,12 +186,15 @@ marker said:
   the same contact's release never also fires `click`.
 - `click` and `dblclick` are mutually exclusive — the second press of a
   double-click never also produces its own `click` at release.
+- `dblclick` and `dragstart` are mutually exclusive — a second press that
+  becomes a drag (tap-then-drag) never produces a `dblclick`; it only had its
+  `dblclickdown`. Likewise `dblclick` and `longpress`.
 - `longpress` and `dragstart` are **not** exclusive — holding, having
   long-press fire, then moving without lifting your finger starts a drag
   normally afterward, in the same continuous contact.
-- `dblclick` and `dragstart` are **not** exclusive either, for the same
-  reason (this is what makes the "double-tap-then-drag" touch workaround
-  in §5 possible at all).
+- `dblclickdown` and `dragstart` are **not** exclusive either, for the same
+  reason (this is what makes the "tap-then-drag" touch workaround in §5
+  possible at all).
 
 ---
 
@@ -213,7 +217,7 @@ value needs to come back from the card:
   `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. The
   card never reads or writes this value directly (see §6 for why that
   matters) — it can only see it change by receiving the resulting
-  `customEvent`s (e.g. a `click` or `dblclick` with `zone: 'lockAndHandle'`).
+  `customEvent`s (e.g. a `click` or `dblclickdown` with `zone: 'lockAndHandle'`).
 - **Alt-key sample mode** — `options.hover.mode` (already a native 2.7.1
   option) is switched between its normal value and `'dataset'` while Alt
   is held, purely by Chart.js watching `hover` gestures.
@@ -297,9 +301,10 @@ browser; a mouse or pen doesn't). Chart.js's pointer and wheel listeners are not
 They sit right next to each other, and treating a click/drag on either as
 part of the same interaction lets a small ergonomic trick work: a click
 anywhere in that 33×28px zone always toggles the Y-axis lock. On touch, if
-that click turns out to be the first half of a double-click (drag intent,
-not a real toggle), the second press toggles the lock back — undoing the
-first toggle — and the drag that follows moves the graph. On mouse/pen,
+that click turns out to be the first half of a double-click or of a
+tap-then-drag (not a real toggle), the second press (`dblclickdown`) toggles
+the lock back — undoing the first toggle — and the drag that follows moves
+the graph. On mouse/pen,
 there's no such ambiguity: click toggles, drag moves, independently.
 
 ### The touch-action workaround, in general
@@ -311,7 +316,7 @@ gesture starts to have any effect on it:
 1. A `click` anywhere relevant arms a **500ms window** with
    `touch-action: none` already applied — covering the gap up to a
    possible second click.
-2. If a `dblclick` follows within that window, whatever it's protecting
+2. If a second press (`dblclickdown`) follows within that window, whatever it's protecting
    (Y-axis pan, curve/label drag) is now confirmed underway, and the
    block stays in effect for as long as needed (until the gesture's own
    `mouseup`, or — for the Y-axis specifically — until the lock
@@ -320,7 +325,7 @@ gesture starts to have any effect on it:
    reverts to normal, letting the page scroll freely again.
 
 This is why the *standard* way to drag anything in these zones on a touch
-device is **double-tap, then drag without lifting your finger** — a
+device is **tap, then press again and drag without lifting your finger** — a
 single continuous drag (or a long-press-then-drag, which still works but
 isn't the primary path anymore) can't reliably block scroll this way,
 since there's only one gesture-start moment to set `touch-action` on, and

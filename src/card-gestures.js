@@ -24,6 +24,9 @@ export class CardGestures
         if( !g ) return;
         switch( info.gestureType ) {
             case 'click':         return this._onGraphClick(info, g);
+            // (the second press of a double-click or of a tap-then-drag: the first
+            // press's click was its first half, not a show/hide — undone)
+            case 'dblclickdown':  return this._onGraphClick(info, g);
             case 'dblclick':      return this._onGraphDblClick(info, g);
             case 'longpress':     return this._onGraphLongPress(info, g);
             case 'dragstart':     return this._onDragStart(info, g);

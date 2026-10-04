@@ -654,7 +654,7 @@
         me.legend.handleEvent({ type: gestureType, x: _hx, y: _hy, native: e.native, chart: me });
       }
     }
-    if (gestureType === 'dblclick') {
+    if (gestureType === 'dblclickdown') {
       // Simplified touch-action workaround for legend/timeline label drag
       // (touch only — mouse/pen never need this): touch-action:none was
       // already applied at the FIRST click of this double-click (see the
@@ -664,15 +664,17 @@
       // exact instant, since the block never lapsed.
       me._hecLabelDragAllowed = true;
       me._hecUpdateDragTouchOverlays();
-      // Grouped lock+handle zone: dblclick toggles the lock exactly the
-      // same way click does (see the click branch below) — same zone
-      // check, same action, no pointerType distinction.
+      // Grouped lock+handle zone: the second press toggles the lock exactly
+      // the same way click does (see the click branch below) — same zone
+      // check, same action, no pointerType distinction: it undoes the first
+      // press's click, which was the first half of a double-click or of a
+      // tap-then-drag, not a toggle.
       var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
       if (_dblInLockAndHandleZone) {
         me._hecToggleYAxisLock();
       }
     }
-    if (gestureType === 'dblclick' || gestureType === 'longpress') {
+    if (gestureType === 'dblclickdown' || gestureType === 'longpress') {
       // Third and fourth triggers for engaging the Y-axis lock, alongside
       // drag — same zone check, kept here as a consumer of the
       // already-detected event, not mixed into its detection.
@@ -844,23 +846,27 @@
       // per Thierry's exact spec:
       //   click     = down/up, stayed within 10px, < 600ms
       //   longpress = down/up, stayed within 10px, >= 600ms
-      //   dblclick  = down/up/down, stayed within 10px, < 400ms between
-      //               the two downs
+      //   dblclickdown = down/up/down, stayed within 10px, < 400ms between
+      //               the two downs — at the second down: what a drag
+      //               following the second press needs is armed right away
+      //   dblclick  = the same, released without moving — at the second up,
+      //               like the browser's own: only then is it known not to be
+      //               a tap-then-drag
       //   drag      = down, moved past 10px (time doesn't matter)
-      // dblclick DOES prevent this same press's own release from ALSO
-      // producing a click — see dblClickFired below and its use at mouseup.
+      // The second press never produces its own click at release — see
+      // dblClickFired below and its use at mouseup.
       // Long-press remains independent from drag, same as before.
       var _downNow = Date.now();
       var _isDblClick = gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
       if (_isDblClick) {
-        fire(c, 'dblclick', e.x, e.y);
+        fire(c, 'dblclickdown', e.x, e.y);
       }
       gs.lastMouseDown = _downNow;
 
       var _pending = { x0: e.x, y0: e.y, pid: pid, dragging: false, pointerType: pointerType, native: e.native,
-        // Marks that THIS press (the second one of the double-click) was
-        // itself just recognized as a dblclick — checked at mouseup below
-        // so its own release doesn't also fire a plain click.
+        // Marks that THIS press is the second one of a double-click — checked
+        // at mouseup below: released without a drag, it's a dblclick, never
+        // a plain click.
         dblClickFired: _isDblClick };
       gs.pending = _pending;
 
@@ -970,9 +976,9 @@
   // mouseup
   function hecPointerUp(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-    // Legend/timeline label drag workaround: armed by custDblClick, always
-    // disarmed here on the raw mouseup itself — not custDragEnd — so it
-    // never stays stuck armed when no drag actually followed the dblclick.
+    // Legend/timeline label drag workaround: armed by the second press
+    // (dblclickdown), always disarmed here on the raw mouseup itself — not
+    // custDragEnd — so it never stays stuck armed when no drag followed.
     if (me._hecLabelDragAllowed) {
       me._hecLabelDragAllowed = false;
       me._hecUpdateDragTouchOverlays();
@@ -1013,9 +1019,9 @@
         // become a click, even though gs.pending stayed alive to allow a drag
         // to follow (which didn't happen here).
       } else if (pu.dblClickFired) {
-        // Click and dblclick are mutually exclusive too — this same press
-        // was the second one of a double-click, already fired at its own
-        // mousedown; releasing it must not ALSO produce a plain click.
+        // The second press of a double-click, released without a drag: a
+        // dblclick (and never also a plain click)
+        fire(c, 'dblclick', undefined, undefined);
       } else {
         // click: released without moving, before the long-press timer
         // fired (< 600ms), and this press wasn't itself a dblclick's

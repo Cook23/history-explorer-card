@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.2] - unreleased
+
+### Fixed — touch: tap then drag moved a label out of its graph instead of moving it
+- Tapping a curve or timeline label, then pressing it again to drag it, took it out into a graph of its own (as a double-tap does) instead of moving it, and hid the curve: the second press was taken as a double-click as soon as it touched the screen. A double-click is now only recognized when the second press is released without a drag, as the browser itself does; and the second press undoes what the first tap did (show/hide a curve, as it already did for the Y axis lock)
+- `deps/chart-hec.js`: the second press fires `dblclickdown` at once (it arms what a drag needs: the touch-action block, the Y axis pan), and `dblclick` only at its release, if it didn't become a drag (`deps/Chart Custom.js.md` §2, §5)
+- Tests: tap-then-drag of a curve label and of a timeline label of a YAML graph (moved, never split, nothing hidden), double-tap of a curve label (split, every curve still shown)
+
 ## [v1.2.1] - 2026-10-04
 
 ### Merged — v1.1.48 and v1.1.49
