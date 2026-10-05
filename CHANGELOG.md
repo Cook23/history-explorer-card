@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.3] - unreleased
+## [v1.2.3] - 2026-10-05
 
 ### Changed — the browser's context menu on a label opens its type menu
 - A right click on a curve label or a timeline label opens its type menu, as a long-press does; the browser's own menu never opens on a graph. A mouse's other buttons start no gesture (a right click no longer shows/hides a curve or starts a drag)
