@@ -23,7 +23,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > The **1.2** line is published as a beta (pre-release) alongside this **1.1** line, which remains the recommended version. It is a rewrite of the card's code, and is where the interactions on phones, tablets and with a pen are being reworked. What 1.2 changes today:
 > - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch also zooms the time;
 > - **the tooltip** opens on a click or a tap on the curves, then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it;
-> - **a pen**: the tip works as a finger; with the barrel button held, a drag moves a label, a graph or the Y axis right away and a tap on a label opens its type menu;
+> - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
 > - **the type menu** in three submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*) — so that every action of a gesture is also in a menu;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two.
 >
