@@ -133,10 +133,14 @@ module.exports = async function()
         const g = await t.graphs();
         return g.length === 4 && /^l:power_kw@/.test(g[1]) && g[0].split('@')[1] !== g[1].split('@')[1] ? (await check()) : g.join(' | ');
     });
-    await t.step('drag it onto the rain graph below is refused (unit), onto the power graph above merges it', async () => {
+    await t.step('drag it onto the rain graph below (another unit): moved there, an axis each', async () => {
         await t.drag(await t.E('legendPt(1,0)'), await t.E('graphPtAt(2,0.15)'));
-        if( (await t.graphs()).length !== 4 ) return 'not refused: ' + (await t.graphs()).join(' | ');
-        const a = await t.E('legendPt(1,0)'); const c = await t.E('legendPt(0,0)');
+        const g = await t.graphs(); const axes = await t.E('graphAt(1).chart.options.scales.yAxes.length');
+        return g.length === 3 && /rain\+power_kw|power_kw\+rain/.test(g[1]) && axes === 2 ? (await check()) : g.join(' | ') + ' axes=' + axes;
+    });
+    await t.step('then onto the power graph above: merged with it', async () => {
+        const n = await t.E('graphAt(1).chart.data.datasets.findIndex(d=>d.entity_id===\'sensor.power_kw\')');
+        const a = await t.E(`legendPt(1,${n})`); const c = await t.E('legendPt(0,0)');
         await t.drag(a, { x: c.x + 30, y: c.y });
         const g = await t.graphs();
         return g.length === 3 && /power\+power_kw|power_kw\+power/.test(g[0]) ? (await check()) : g.join(' | ');

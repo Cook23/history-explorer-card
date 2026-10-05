@@ -111,11 +111,18 @@ module.exports = async function()
         const g = await t.graphs();
         return g.length === 3 && /rain/.test(g[0]) ? true : g.join(' | ');
     });
-    await t.step('drag a curve onto an unrelated graph of another unit is refused, with a message', async () => {
+    await t.step('drag a curve onto another YAML graph, of another unit: it moves there; dragged back, back in place', async () => {
+        const g0 = await t.graphs();
         const a = await E('legendPt(0,0)'); const c = await E('graphPtAt(1,0.1)');
         await t.drag(a, c);
-        const g = await t.graphs(); const tip = await E('tip()');
-        return /power/.test(g[0]) && !/power/.test(g[1]) && tip ? true : g.join(' | ') + ' message=' + tip;
+        const g1 = await t.graphs();
+        const n = await E('graphAt(1).chart.data.datasets.length');
+        const b = await E(`legendPt(1,${n - 1})`); const d = await E('legendPt(0,0)');
+        await t.drag(b, { x: d.x - 30, y: d.y });
+        const g2 = await t.graphs();
+        const names = x => x.replace(/^.:|@.*$/g, '').split('+');
+        const name = names(g0[0])[0];
+        return !names(g1[0]).includes(name) && names(g1[1]).includes(name) && g2.join() === g0.join() ? true : JSON.stringify({ g0, g1, g2 });
     });
     await t.step('click a truncated timeline label shows its full name', async () => {
         const i = (await t.graphs()).findIndex(x => x.startsWith('t:'));

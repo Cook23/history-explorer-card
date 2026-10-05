@@ -23,7 +23,9 @@ export class CardStorage
         // already has: applying it changes nothing.
         const data = {
             // Active values
-            entities            : this.pconfig.entities,
+            // (an entity dropped where its placement isn't saved: saved where it was — see
+            // _moveEntity)
+            entities            : this.store.savedList(),
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
@@ -182,13 +184,7 @@ export class CardStorage
             // storage — multidevice always wins over local for whatever it covers, since a
             // field enabled by either ends up in _enabledFields regardless, while only
             // _multiFields fields can also be won by the HA front below.
-            const _resolveEnabledFields = (_entityFields, _cardRaw) => {
-                if( _entityFields !== undefined ) return _entityFields;
-                const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities', 'order'], !_yamlE);
-                return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
-            };
-            const _multiFields = _resolveEnabledFields(_yamlE?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence);
-            const _localFields = _resolveEnabledFields(_yamlE?.enablePersistence, this.pconfig.enablePersistence);
+            const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
             const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
             const _haE = _findEntity(_haEntities, id);
@@ -384,6 +380,31 @@ export class CardStorage
 
         return false; // interval redraw handled via pconfig.entities in createContent
     }
+    // The fields of an entity whose value is saved: { multi (on every device), local (on
+    // this device) } — the YAML entity's own enable_* options (staticEntry), else the card's
+    // 'entities' switch, which defaults to every field for an entity added from the card
+    // (no YAML value to fall back to) and to none for a YAML one
+    _persistedFieldSets(staticEntry)
+    {
+        const _resolve = (_entityFields, _cardRaw) => {
+            if( _entityFields !== undefined ) return _entityFields;
+            const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities', 'order'], !staticEntry);
+            return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
+        };
+        return { multi: _resolve(staticEntry?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence),
+                 local: _resolve(staticEntry?.enablePersistence, this.pconfig.enablePersistence) };
+    }
+
+    // Is what graph g holds — its entities' group — saved? A YAML graph's (one holding a
+    // YAML entity) follows that entity's options — not saved, by default; a graph added
+    // from the card is
+    _graphPlacementPersisted(g)
+    {
+        const _e = g.entities.find(e => e.isStatic);
+        const { multi, local } = this._persistedFieldSets(_e ?? null);
+        return multi.has('groupId') || local.has('groupId');
+    }
+
     async writeInfoPanelConfig(forceUpdate = false)
     {
         if( !infoPanelEnabled ) {

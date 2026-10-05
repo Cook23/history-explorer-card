@@ -5,7 +5,6 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { getSIFactor, areSICompatible } from "./history-units.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -131,10 +130,7 @@ export class CardGestures
         }
         let _compatible;
         if( d.kind === 'curve' ) {
-            const _e = d.g.entities[d.idx];
-            const _srcUnit = _e ? this.getUnitOfMeasure(_e.entity, _e.unit) : undefined;
-            const _tgtUnit = g.entities[0] ? this.getUnitOfMeasure(g.entities[0].entity, g.entities[0].unit) : undefined;
-            _compatible = this._dropCompatibility(d.g, g, _srcUnit, _tgtUnit, _e) === null;
+            _compatible = this._dropCompatibility(d.g, g, d.g.entities[d.idx]) === null;
             g.chart.options.dropAllowed = _compatible;
             if( info.zone !== 'legend' ) { this._unfreezeChart(); return; }
         } else {
@@ -262,17 +258,14 @@ export class CardGestures
 
     // A curve (legend label _srcIdx of graph _src) dropped on graph _tgt (undefined: none),
     // next to its legend label drop.index — reordered within its own graph (on another of
-    // its labels), or moved into another graph if their units and groups allow it
+    // its labels), or moved into another graph that can show it
     _finalizeLegendDrop(info, _src, _srcIdx, _tgt, drop)
     {
         if( !_tgt ) return;
         if( _tgt === _src ) {
             if( drop.index < 0 ) return;
         } else {
-            const _e = _src.entities[_srcIdx];
-            const _srcUnit = _e ? this.getUnitOfMeasure(_e.entity, _e.unit) : undefined;
-            const _tgtUnit = _tgt.entities[0] ? this.getUnitOfMeasure(_tgt.entities[0].entity, _tgt.entities[0].unit) : undefined;
-            const _refusal = this._dropCompatibility(_src, _tgt, _srcUnit, _tgtUnit, _e);
+            const _refusal = this._dropCompatibility(_src, _tgt, _src.entities[_srcIdx]);
             if( _refusal !== null ) {
                 this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
                 return;
@@ -286,8 +279,7 @@ export class CardGestures
     _finalizeTimelineDrop(info, _src, _srcIdx, _tgt, drop)
     {
         if( !_tgt ) return;
-        const _refusal = ( _tgt.type !== _src.type ) ? `${_src.type} ≠ ${_tgt.type}`
-                       : ( _tgt !== _src ) ? this._dropCompatibility(_src, _tgt) : null;
+        const _refusal = this._dropCompatibility(_src, _tgt);
         if( _refusal !== null ) {
             this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
             return;
@@ -330,6 +322,13 @@ export class CardGestures
             const _entry = this.store.find(_entity.entity);
             const _tgtGroupId = this.store.groupIdOf(tgt.entities[0].entity);
             if( typeof _entry === 'object' && _tgtGroupId !== undefined ) {
+                // A drop is saved only when both graphs' placements are (a YAML graph's isn't,
+                // by default): otherwise the entity is saved where it was before
+                // (unsavedFrom), so that a reload puts everything back as it was — no
+                // duplicate, nothing lost. Dropped back in its own group, it's saved there.
+                const _saved = ( this._graphPlacementPersisted(src) && this._graphPlacementPersisted(tgt) ) || _tgtGroupId === _entry.unsavedFrom?.groupId;
+                if( _saved ) delete _entry.unsavedFrom;
+                else _entry.unsavedFrom ??= this.store.placementOf(_entry);
                 // Every other persisted field (type, lineMode, hidden...) stays
                 this.store.moveToGroup(_entry, _tgtGroupId);
                 // Joins the target's own sub-graph of that group (see _uncombineEntity)
@@ -487,26 +486,16 @@ export class CardGestures
     }
 
     // Can one of src's entities be dropped onto another graph tgt? Returns null if so, or
-    // the short text explaining why not (shown as a tooltip at the drop point).
-    // - Within one group: always, as long as the chart type matches — units don't matter,
-    //   the group's entities are meant to be shown together (see addGraph).
-    // - Across groups: never to or from a static (YAML) graph — its composition is the
-    //   YAML's; otherwise same type and compatible units, as before.
-    _dropCompatibility(src, tgt, srcUnit, tgtUnit, srcEntity = null)
+    // the short text explaining why not (shown as a tooltip at the drop point). Whenever
+    // the target graph can show it: curves and bars together, a timeline row on a timeline,
+    // an arrowline row on an arrowline — whatever the units (two groups of units get an
+    // axis each, more share one) and whichever graphs, YAML ones included (a drop onto a
+    // graph whose placement isn't saved isn't saved either: see _moveEntity).
+    _dropCompatibility(src, tgt, srcEntity = null)
     {
         // The dragged entity's own type (a bar graph can also hold line entities)
         const _srcType = srcEntity?.type ?? src.type;
-        if( this._sameGroup(src, tgt) )
-            return this._typesCompatible(_srcType, tgt.type) ? null : `${_srcType} ≠ ${tgt.type}`;
-        // Across groups, only the same type — curves and bars only mix within one group
-        if( _srcType !== tgt.type ) return `${_srcType} ≠ ${tgt.type}`;
-        if( src.isStatic || tgt.isStatic ) return i18n('ui.menu.type_static');
-        if( srcUnit !== undefined && tgtUnit !== undefined && !areSICompatible(srcUnit, tgtUnit) ) {
-            const _srcBase = getSIFactor(srcUnit).base || srcUnit;
-            const _tgtBase = getSIFactor(tgtUnit).base || tgtUnit;
-            return `${_srcBase} ≠ ${_tgtBase}`;
-        }
-        return null;
+        return this._typesCompatible(_srcType, tgt.type) ? null : `${_srcType} ≠ ${tgt.type}`;
     }
 
     _clearAllDragFeedback() {

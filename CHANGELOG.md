@@ -6,6 +6,13 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.5] - unreleased
 
+### Changed — a curve dropped onto any line or bar graph
+- A curve's label dropped onto another line or bar graph is moved there whatever its unit: lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs. Only the display type refuses a drop (a curve onto a timeline or arrowline graph, a timeline entity onto a line or bar graph). Adding an entity is unchanged: `combineSameUnits` only joins compatible units
+- A drop is saved only when the placement of both graphs is (`entities` persistence): a curve dropped onto a graph defined in YAML, or taken out of one, is saved where it was before, so a reload brings both graphs back as they were, without a duplicate or a lost curve; dropped back into its own graph, it's saved there again
+- `EntityStore.placementOf` and `savedList` (the list saved, each curve dropped without saving at its placement before the drop); `_persistedFieldSets` shared by the reading of the saved state and the drop
+- Removed: the unused translation `ui.menu.type_static`
+- Tests: a curve dropped onto a YAML graph of another unit, then back; dropped onto a graph below then merged with one above; reloads after a drop from a dynamic graph onto a YAML one, from a YAML graph onto a dynamic one (no duplicate), between two dynamic graphs (saved)
+
 ### Fixed — Alt and Shift + drag, as in 1.1
 - Alt (Option on Mac) held while moving over a graph shows every sample of its curves again; moving without it, or leaving the graph, hides them. Lost in the 1.2 rewrite
 - Shift + drag moves the graph both ways again — the time and the Y axis together; it only moved the Y axis

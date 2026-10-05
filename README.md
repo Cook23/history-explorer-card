@@ -220,16 +220,18 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** (or right click) a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
-- **Drag** a curve label onto another graph to move it there (compatible units only — any unit within a group of [linked graphs](#linked-graphs))
+- **Drag** a curve label onto another line or bar graph to move it there, whatever its unit — a graph defined in YAML included
 
-An incompatible drop shows a brief tooltip explaining the mismatch.
+A curve can't be dropped onto a timeline or arrowline graph (nor a timeline entity onto a line or bar graph): the drop is refused with a brief tooltip. Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own.
+
+A drop is saved only when both graphs are: a graph defined in YAML saves nothing by default (see [Time range and display defaults](#time-range-and-display-defaults)), so a curve dropped onto it, or taken out of it, is back in its own graph after a reload — nothing duplicated, nothing lost.
 
 ### Linked graphs
 
 A graph defined in YAML always shows all its entities together, whatever their units. With two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
-- **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
+- **Drag** a curve label onto another graph of the same linked group to put it back
 - **Double-click** the chain icon to merge the two linked graphs back into one
 
 Linked graphs can always be merged back as long as their display types can share a graph (lines and bars can; a timeline or arrowline can't share a graph with anything else). The same applies to entities added from the UI: changing a curve's display type to one its graph can't show (e.g. a line to a timeline) moves it to a linked graph, and changing it back returns it to its graph; changing a line to bars keeps it in its graph. An entity added from the UI never joins a graph of another display type on its own. A double-click on a label of a graph added from the UI takes that curve out of its group instead.
