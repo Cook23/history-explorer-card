@@ -606,9 +606,7 @@ export class CardGraphs
         const _nextG = this._nextGraph(g);
         this._detachGraph(_upper);
         this._detachGraph(g);
-        _all.forEach((en, i) => {
-            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: _nextG, groupId: _groupId, entry: en });
-        });
+        this._rebuildGraph(_all, _groupId, _nextG);
         this._syncGroupOrder(_groupId);
         this.writeLocalState();
         this.updateHistory();
@@ -1064,5 +1062,24 @@ export class CardGraphs
         const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "showTimeLabels": config?.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
+    }
+
+    // --------------------------------------------------------------------------------------
+    // Rebuilding a graph
+    // --------------------------------------------------------------------------------------
+
+    // Builds one graph of group groupId from entities (in that order), right before graph
+    // nextG (null: at the end) — combined into one graph whatever their units, each with its
+    // persisted entry of that group, its color and fill. options: more addGraph options for
+    // each (e.g. the graph's interval; fill: null to recompute it for a new type)
+    _rebuildGraph(entities, groupId, nextG, options = {})
+    {
+        const _saved = this.pconfig.combineSameUnits;
+        this.pconfig.combineSameUnits = true;
+        entities.forEach((en, i) => {
+            const _pe = this.store.inGroup(en.entity, groupId);
+            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en, ...options });
+        });
+        this.pconfig.combineSameUnits = _saved;
     }
 }

@@ -350,19 +350,6 @@ export class CardGestures
         this.updateHistory();
     }
 
-    // Builds one graph of group groupId from entities (in that order), right before graph
-    // nextG (null: at the end) — combined into one graph whatever their units, each with its
-    // persisted entry of that group
-    _rebuildGraph(entities, groupId, nextG)
-    {
-        const _saved = this.pconfig.combineSameUnits;
-        this.pconfig.combineSameUnits = true;
-        entities.forEach((en, i) => {
-            const _pe = this.store.inGroup(en.entity, groupId);
-            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en });
-        });
-        this.pconfig.combineSameUnits = _saved;
-    }
 
     // Line and bar entities can share one graph (curves drawn over the bars); timeline and
     // arrowline graphs only ever hold their own type.

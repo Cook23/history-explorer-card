@@ -131,86 +131,77 @@ function hecHookInfoPanel()
 
     __fn.prototype._injectHistoryExplorer = function(instance)
     {
-            instance.initLocalization();
+        instance.initLocalization();
 
-            instance.insertUIHtmlText(0);
+        instance.insertUIHtmlText(0);
 
-            instance._wireToolbar(0);
+        instance._wireToolbar(0);
 
+        const config = hec_panel.config ?? {};
 
-            const config = hec_panel.config ?? {};
+        instance.g_id = 0;
 
-            instance.g_id = 0;
+        instance.stateColors = { ...stateColors };
+        instance.stateColorsDark = { ...stateColorsDark };
 
-            instance.stateColors = { ...stateColors };
-            instance.stateColorsDark = { ...stateColorsDark };
+        instance.stateColors['off']                      = defaultGood;
+        instance.stateColors['binary_sensor.multiple']   = '#e5ad23';
+        instance.stateColors['battery_charging.off']     = defaultInactiveLight;
+        instance.stateColors['plug.off']                 = defaultInactiveLight;
+        instance.stateColors['running.off']              = defaultInactiveLight;
+        instance.stateColors['update.on']                = defaultInactiveLight;
+        instance.stateColorsDark['battery_charging.off'] = defaultInactiveDark;
+        instance.stateColorsDark['plug.off']             = defaultInactiveDark;
+        instance.stateColorsDark['running.off']          = defaultInactiveDark;
+        instance.stateColorsDark['update.on']            = defaultInactiveDark;
 
-            instance.stateColors['off']                      = defaultGood;
-            instance.stateColors['binary_sensor.multiple']   = '#e5ad23';
-            instance.stateColors['battery_charging.off']     = defaultInactiveLight;
-            instance.stateColors['plug.off']                 = defaultInactiveLight;
-            instance.stateColors['running.off']              = defaultInactiveLight;
-            instance.stateColors['update.on']                = defaultInactiveLight;
-            instance.stateColorsDark['battery_charging.off'] = defaultInactiveDark;
-            instance.stateColorsDark['plug.off']             = defaultInactiveDark;
-            instance.stateColorsDark['running.off']          = defaultInactiveDark;
-            instance.stateColorsDark['update.on']            = defaultInactiveDark;
+        // The configuration, read as the card reads its own — with the panel's own defaults,
+        // and what the panel decides whatever its configuration says
+        instance.applyConfig(config, {
+            defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines' },
+            fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
+                     filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
+                     // (no refresh.interval: the panel only lives while its dialog is open)
+                     refreshInterval: undefined },
+        });
+        instance.statistics.force = undefined;
 
-            // The configuration, read as the card reads its own — with the panel's own defaults,
-            // and what the panel decides whatever its configuration says
-            instance.applyConfig(config, {
-                defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines' },
-                fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
-                         filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
-                         // (no refresh.interval: the panel only lives while its dialog is open)
-                         refreshInterval: undefined },
+        instance.applyTheme(config);
+
+        this._setEntityOptions(instance);
+
+        // Entity type menu — "Type" link click opens the same menu as the main card,
+        // conditioned identically (numeric entity state → full menu, otherwise not rendered)
+        const _tf0 = instance._this.querySelector('#tf_0');
+        if( _tf0 ) {
+            instance.ui.inputField[0] = _tf0;
+            // (the card's menu markup, without what only the card offers)
+            const _etw = instance._this.querySelector('#etw_0');
+            if( _etw ) _etw.innerHTML = typeMenuHtml(0, false);
+            instance._initEntityTypeMenu(0);
+            _tf0.addEventListener('click', () => {
+                const _g = instance.graphs[0];
+                if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');
             });
-            instance.statistics.force = undefined;
+        }
 
-            instance.ui.darkMode = (instance._hass.selectedTheme && instance._hass.selectedTheme.dark) || (instance._hass.themes && instance._hass.themes.darkMode);
-            if( config.uimode ) {
-                if( config.uimode === 'dark' ) instance.ui.darkMode = true; else
-                if( config.uimode === 'light' ) instance.ui.darkMode = false;
-            }
+        instance.contentValid = true;
 
-            instance.pconfig.graphLabelColor = parseColor(config.uiColors?.labels ?? (instance.ui.darkMode ? '#9b9b9b' : '#333'));
-            instance.pconfig.graphGridColor  = parseColor(config.uiColors?.gridlines ?? (instance.ui.darkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"));
-            instance.pconfig.cursorLineColor = parseColor(config.uiColors?.cursorline ?? instance.pconfig.graphGridColor);
+        instance.databaseCallback = this._databaseCallback.bind(this);
 
-            this._setEntityOptions(instance);
+        instance.setTimeRangeFromString(String(instance.pconfig.defaultTimeRange));
 
-            // Entity type menu — "Type" link click opens the same menu as the main card,
-            // conditioned identically (numeric entity state → full menu, otherwise not rendered)
-            const _tf0 = instance._this.querySelector('#tf_0');
-            if( _tf0 ) {
-                instance.ui.inputField[0] = _tf0;
-                // (the card's menu markup, without what only the card offers)
-                const _etw = instance._this.querySelector('#etw_0');
-                if( _etw ) _etw.innerHTML = typeMenuHtml(0, false);
-                instance._initEntityTypeMenu(0);
-                _tf0.addEventListener('click', () => {
-                    const _g = instance.graphs[0];
-                    if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');
-                });
-            }
+        instance.today(false);
 
-            instance.contentValid = true;
+        // Apply correct toolbar layout (always layout C in info-panel — no sl)
+        instance.resizeSelector();
 
-            instance.databaseCallback = this._databaseCallback.bind(this);
-
-            instance.setTimeRangeFromString(String(instance.pconfig.defaultTimeRange));
-
-            instance.today(false);
-
-            // Apply correct toolbar layout (always layout C in info-panel — no sl)
+        let ro = new ResizeObserver(() => {
+            for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
+            instance.setStepSize(true, instance._this.querySelector('#tb_0')?.clientWidth || null);
             instance.resizeSelector();
-
-            let ro = new ResizeObserver(() => {
-                for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
-                instance.setStepSize(true, instance._this.querySelector('#tb_0')?.clientWidth || null);
-                instance.resizeSelector();
-            });
-            ro.observe(this);
+        });
+        ro.observe(this);
     };
 
     function isExcluded(hass, entity_id)

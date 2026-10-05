@@ -381,14 +381,20 @@ export class CardSelector
     _previewEntityTooltip(entity_id, ii)
     {
         if( this._hass.states[entity_id] === undefined ) return;
-        const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
         const _exists = this.store.has(entity_id);
         const _existingG = _exists ? this.graphs.find(g => g.entities.some(e => e.entity === entity_id)) : null;
-        const _r = _existingG?.canvas.getBoundingClientRect();
+        this._selectorTooltip(ii, (_exists ? i18n('ui.label.already_exists') : i18n('ui.label.add')) + ': ' + entity_id, _existingG);
+    }
+
+    // A message over entity selector ii (centered above its input field), else over graph g,
+    // else at the top of the window
+    _selectorTooltip(ii, text, g = null)
+    {
+        const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
+        const _r = g?.canvas.getBoundingClientRect();
         const _tx = _ir ? _ir.left + _ir.width / 2 : (_r ? _r.left + _r.width / 2 : window.innerWidth / 2);
         const _ty = _ir ? _ir.top : (_r ? _r.top + _r.height / 2 : 0);
-        const _label = (_exists ? i18n('ui.label.already_exists') : i18n('ui.label.add')) + ': ' + entity_id;
-        this._showLabelTooltip(_label, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG?.canvas ?? document.body);
+        this._showLabelTooltip(text, _tx, _ty, 'center', this.ui.inputField[ii] ?? g?.canvas ?? document.body);
     }
 
     addEntitySelected(ii)
@@ -434,18 +440,12 @@ export class CardSelector
             // New entities take priority: defer creation, show the type menu for them —
             // always, even if none is numeric (reduced to timeline only in that case)
             if( _newIds.length ) {
-                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
-                const _ty = _ir ? _ir.top : 0;
-                this._showLabelTooltip(i18n('ui.label.add') + ': ' + _newIds.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
+                this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + _newIds.join('; '));
                 this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
             }
 
             if( _duplicates.length ) {
-                const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-                const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
-                const _ty = _ir ? _ir.top : 0;
-                this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '), _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
+                this._selectorTooltip(ii, i18n('ui.label.already_exists') + ': ' + _duplicates.join('; '));
                 // Show type-change menu for a duplicate only if no new-entity menu is already
                 // shown above (avoid two competing menus for one combined action) — shown
                 // even for a non-numeric duplicate (reduced to timeline only, nothing to
@@ -503,11 +503,7 @@ export class CardSelector
                 // Entity already exists — show tooltip and highlight containing graph
                 const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === entity_id));
                 if( _existingG ) {
-                    const _r = _existingG.canvas.getBoundingClientRect();
-                    const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-                    const _tx = _ir ? _ir.left + _ir.width / 2 : _r.left + _r.width / 2;
-                    const _ty = _ir ? _ir.top : _r.top + _r.height / 2;
-                    this._showLabelTooltip(i18n('ui.label.already_exists') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? _existingG.canvas);
+                    this._selectorTooltip(ii, i18n('ui.label.already_exists') + ': ' + entity_id, _existingG);
                     this.showEntityTypeMenu(ii, entity_id, _existingG);
                     this._flagGraphs([_existingG]);
                 }
@@ -517,10 +513,7 @@ export class CardSelector
             // Brand-new entity — nothing created yet. Always show the type menu, even for
             // a non-numeric entity (reduced to timeline only, its one valid representation)
             // — keeps the same two-step add/cancel process homogeneous for every entity.
-            const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-            const _tx = _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2;
-            const _ty = _ir ? _ir.top : 0;
-            this._showLabelTooltip(i18n('ui.label.add') + ': ' + entity_id, _tx, _ty, 'center', this.ui.inputField[ii] ?? document.body);
+            this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + entity_id);
             this.showEntityTypeMenu(ii, entity_id, null);
 
         }
