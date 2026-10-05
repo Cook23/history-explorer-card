@@ -6,6 +6,10 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.5] - unreleased
 
+### Code — long functions split
+- `addGraph`: the entity's options in its graph (`_optionsInGraph`), its display defaults (`_applyEntityDefaults`), the graph it joins (`_combineTarget`), a free color there (`_freeColorIn`), a new graph's place (`_newGraphIndex`) and element (`_graphElement`)
+- `readLocalState`: the saved sources read (`_readSavedSources`), then the last one to speak resolved for the entities (`_resolveEntities`, `_resolveEntity`), the time range (`_resolveTimeRange`), the info panel's switch (`_resolveInfoPanel`, `_registerInfoPanelDefault`); the card-level persistence of a category in one place (`_cardPersists`)
+
 ### Code — the card's state split by role
 - `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated
 - `addGraph` takes its options by name (`{ color, before, groupId, entry, ... }`) instead of nine positional arguments; `newGraph` builds the chart from `_chartData` (`_curveDataset`), `_chartYAxis` and `_chartTooltips`
