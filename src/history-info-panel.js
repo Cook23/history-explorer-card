@@ -1,7 +1,7 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
 import { HistoryCardState } from "./history-explorer-card";
-import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./card-config.js";
+import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure, baseTypePure } from "./card-config.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
 
@@ -91,9 +91,7 @@ function hecHookInfoPanel()
 
         const entityOptions = instance.getEntityOptions(entity_id);
 
-        const uom = instance.getUnitOfMeasure(entity_id);
-        const sc = instance.getStateClass(entity_id);
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type || baseTypePure(instance._hass, entity_id);
 
         // Make sure the panel always starts with the same default graph color
         instance.pconfig.nextDefaultColor = 0;
@@ -278,9 +276,7 @@ function hecHookInfoPanel()
 
         const entityOptions = getEntityOptionsPure(this.hass, hec_panel?.config?.entityOptions, entity_id);
 
-        const uom = this.hass.states[entity_id]?.attributes?.unit_of_measurement;
-        const sc = this.hass.states[entity_id]?.attributes?.state_class;
-        const type = entityOptions?.type ? entityOptions.type : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        const type = entityOptions?.type || baseTypePure(this.hass, entity_id);
 
         // Entity type menu access — same all-or-nothing rule as the main card:
         // only offered when the entity's current state is numeric-convertible

@@ -6,10 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.5] - unreleased
 
+### Fixed — `recordedEntitiesOnly` in any time zone
+- The entity selector limited to recorded entities asked Home Assistant for the last hour without its time zone, read as UTC: ahead of UTC, it asked for an hour still to come
+
 ### Code — long functions split
 - `addGraph`: the entity's options in its graph (`_optionsInGraph`), its display defaults (`_applyEntityDefaults`), the graph it joins (`_combineTarget`), a free color there (`_freeColorIn`), a new graph's place (`_newGraphIndex`) and element (`_graphElement`)
 - `readLocalState`: the saved sources read (`_readSavedSources`), then the last one to speak resolved for the entities (`_resolveEntities`, `_resolveEntity`), the time range (`_resolveTimeRange`), the info panel's switch (`_resolveInfoPanel`, `_registerInfoPanelDefault`); the card-level persistence of a category in one place (`_cardPersists`)
 - `buildChartData`: a curve's points (`_lineSamples`, its min/max band in one place: `_withMinMax`), a bar entity's bars (`_barSamples`), a timeline's rows (`_timelineRows`); how an entity is drawn and its circular values moved from `card-gestures.js` to `card-datasets.js`
+- One rule for the type an entity is shown as when nothing sets it (`baseTypePure`: a YAML entity, the info panel), written three times; the requests to Home Assistant's recorder built in one place (`historyRequest`, `statisticsRequest`), written five times in three files
 
 ### Code — the card's state split by role
 - `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated

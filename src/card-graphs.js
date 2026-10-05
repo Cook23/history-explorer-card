@@ -9,6 +9,7 @@ import { i18n } from "./languages.js";
 import { entityIdOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeInterpolation, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { baseTypePure } from "./card-config.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -656,11 +657,8 @@ export class CardGraphs
 
         const { graphProps: _graphProps, options: entityOptions } = this._optionsInGraph(entity_id, groupId);
 
-        const uom = this.getUnitOfMeasure(entity_id);
-        const sc = this.getStateClass(entity_id);
-        const _overrideType = entry?.type ?? entityOptions?.type;
         // (let: becomes the graph's type below, once combined)
-        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        let type = ( entry?.type ?? entityOptions?.type ) || baseTypePure(this._hass, entity_id);
 
         // The entity's single source of truth: entry is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used

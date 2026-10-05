@@ -336,7 +336,7 @@ export class CardSelector
             for( let i of this.ui.inputField )
                 if( i ) i.placeholder = i18n("ui.label.loading");
 
-            const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ss');
+            const t0 = moment().subtract(1, "hour");
 
             const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
             const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
@@ -348,15 +348,7 @@ export class CardSelector
                 if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) l.push(e);
             }
 
-            const d = {
-                type: "history/history_during_period",
-                start_time: t0,
-                minimal_response: true,
-                no_attributes: true,
-                entity_ids: l
-
-            };
-            this._hass.callWS(d).then(this.entityCollectorCallback.bind(this), this.entityCollectorFailed.bind(this));
+            this._hass.callWS(this.historyRequest(l, t0)).then(this.entityCollectorCallback.bind(this), this.entityCollectorFailed.bind(this));
 
         } else
 
