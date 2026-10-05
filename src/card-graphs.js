@@ -66,165 +66,26 @@ export class CardGraphs
             return [label, moment(d[0]).format(this.i18n.styleDateTimeTooltip), moment(d[1]).format(this.i18n.styleDateTimeTooltip)];
     }
 
-    newGraph(canvas, graphtype, datasets, config, isStatic = false)
+    newGraph(canvas, graphtype, datasets, config)
     {
         const ctx = canvas.getContext('2d');
-
-        var datastructure;
-
-        // The curves of each Y axis (see _assignYAxes)
-        const _onAxis = id => datasets.filter(d => ( d.yAxisID ?? LEFT_Y_AXIS ) === id);
-        // An axis' unit: its curves' (converted to one SI unit: see _applySIConversion) —
-        // none when they have incompatible units: no single unit describes the axis then,
-        // the legend and tooltip still show each entity's own
-        const _axisUnit = list => list.some(d => !areSICompatible(d.unit, list[0].unit)) ? '' : ( list[0]?.axisUnit ?? list[0]?.unit );
-        // An axis of circular curves only, all of the same period: its labels show the real
-        // values, in [0, period) (Chart.js ticks.period)
-        const _axisPeriod = list => {
-            const _p0 = list[0]?.circular;
-            return ( _p0 && list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
-        };
-
-        if( graphtype == 'line' || graphtype == 'bar' ) {
-
-            datastructure = {
-                datasets: []
-            };
-
-            for( let d of datasets ) {
-                datastructure.datasets.push({
-                    // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
-                    type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
-                    hecNoStack: graphtype == 'bar' && d.kind === 'line',
-                    hecCircular: d.circular,
-                    borderColor: d.bColor,
-                    backgroundColor: d.fillColor,
-                    borderWidth: d.width,
-                    borderDash: Array.isArray(d.dashMode) ? d.dashMode : ( d.dashMode === 'points' ) ? [1, 5] : ( d.dashMode === 'shortlines' ) ? [5, 5] : ( d.dashMode === 'longlines' ) ? [10, 8] : ( d.dashMode === 'pointline' ) ? [15, 3, 3, 3] : undefined,
-                    pointRadius: (() => {
-                        if( d.showPoints !== undefined ) {
-                            if( d.showPoints === false || d.showPoints === 0 ) return 0;
-                            if( d.showPoints === true ) return 4;
-                            return +d.showPoints;
-                        }
-                        return config?.showPoints ? ( config.showPoints === true ? 4 : +config.showPoints ) : 0;
-                    })(),
-                    pointStyle: 'circle',
-                    pointBackgroundColor: d.bColor,
-                    pointHoverRadius: (() => {
-                        if( d.showPoints !== undefined && d.showPoints !== false && d.showPoints !== 0 ) {
-                            const r = d.showPoints === true ? 4 : +d.showPoints;
-                            return r + 2;
-                        }
-                        return config?.showPoints ? ( config.showPoints === true ? 6 : +config.showPoints + 2 ) : 5;
-                    })(),
-                    hitRadius: 5,
-                    label: this._legendLabel(d),
-                    yAxisID: d.yAxisID,
-                    // (stacked bars: those of each Y axis in their own column — stacking
-                    // values of two scales on each other would mean nothing)
-                    stack: d.yAxisID,
-                    name: d.name,
-                    steppedLine: d.mode === 'stepped',
-                    cubicInterpolationMode: 'monotone',
-                    // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
-                    hecInterpolation: d.interpolation,
-                    lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
-                    domain: d.domain,
-                    entity_id: d.entity_id,
-                    unit: d.unit,
-                    shownScale: d.shownScale,
-                    hecTextFactor: d.shownScale / d.drawScale,
-                    hidden: d.hidden,
-                    showMinMax: d.showMinMax ? true : false,
-                    siConversionFactor: d.siConversionFactor,
-                    borderJoinStyle: 'round',
-                    borderCapStyle: 'round',
-                    data: { }
-                });
-            }
-
-        } else if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
-
-            datastructure = {
-                labels: [ ],
-                datasets: [ ]
-            };
-
-            for( let d of datasets ) {
-                datastructure.labels.push(this.pconfig.labelsVisible ? d.name : '');
-                datastructure.datasets.push({
-                    domain: d.domain,
-                    device_class: d.device_class,
-                    entity_id: d.entity_id,
-                    unit: d.unit,
-                    name: d.name,
-                    arrowColor: d.bColor,
-                    arrowBackground: d.fillColor,
-                    arrowPeriod: d.arrowPeriod,
-                    data: [ ]
-                });
-            }
-
-        }
 
         // Any dataset drawn as a curve / as bars (a bar graph can hold both)
         const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
-        const tooltipSize = this.pconfig.tooltipSize;
-
-        // A Y axis, left or right (the right one only for a line or bar graph with a second
-        // group of units — see _assignYAxes): the same bounds and step (ymin, ymax, ystepSize)
-        // for both, its own unit and circular labels; the grid is the left axis'
-        const _yAxis = (id) => {
-            const _list = _onAxis(id);
-            const _unit = ( graphtype == 'line' || graphtype == 'bar' ) ? _axisUnit(_list) : undefined;
-            const _right = id === RIGHT_Y_AXIS;
-            return {
-                id,
-                position: _right ? 'right' : 'left',
-                afterFit: (scaleInstance) => {
-                    scaleInstance.width = this.pconfig.labelAreaWidth;
-                },
-                afterDataLimits: (me) => {
-                    const epsilon = 0.0001;
-                    if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
-                    if( config?.ymax == null && this.pconfig.axisAddMarginMax && _hasCurves && !_hasBars ) me.max += epsilon;
-                },
-                ticks: {
-                    fontColor: this.pconfig.graphLabelColor,
-                    min: config?.ymin ?? undefined,
-                    max: config?.ymax ?? undefined,
-                    forceMin: config?.ymin ?? undefined,
-                    forceMax: config?.ymax ?? undefined,
-                    stepSize: config?.ystepSize ?? undefined,
-                    period: _axisPeriod(_list)
-                },
-                gridLines: {
-                    color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
-                    drawOnChartArea: !_right
-                },
-                scaleLabel: {
-                    display: _unit !== undefined && _unit !== '',
-                    labelString: _unit,
-                    fontColor: this.pconfig.graphLabelColor
-                },
-                barThickness: this.pconfig.timelineBarHeight - 4,
-                stacked: config?.stacked
-            };
-        };
+        const _yAxis = id => this._chartYAxis(id, graphtype, datasets, config, _hasCurves && !_hasBars);
 
         var chart = new Chart(ctx, {
 
             type: graphtype,
 
-            data: datastructure,
+            data: this._chartData(graphtype, datasets, config),
 
             options: {
-                // Static (YAML) graphs have draggable legend/timeline labels too (since
-                // v1.1.43): their curves can be split (double-click) and re-combined (drag)
-                // within their own group of linked graphs — see _dropCompatibility.
+                // Static (YAML) graphs have draggable legend/timeline labels too: their
+                // curves can be split (double-click) and dropped onto another graph — see
+                // _dropCompatibility.
                 cursorEnabled: true,
                 // Chart.js's floating tooltips stay within the card (see Chart.hecUi.clampToViewport)
                 floatingBoundsSelector: '#maincard',
@@ -267,7 +128,7 @@ export class CardGraphs
                         },
                         stacked: config?.stacked
                     }],
-                    yAxes: [_yAxis(LEFT_Y_AXIS), ...( _onAxis(RIGHT_Y_AXIS).length ? [_yAxis(RIGHT_Y_AXIS)] : [] )],
+                    yAxes: [_yAxis(LEFT_Y_AXIS), ...( datasets.some(d => d.yAxisID === RIGHT_Y_AXIS) ? [_yAxis(RIGHT_Y_AXIS)] : [] )],
                 },
                 topClipMargin : 4,
                 bottomClipMargin: 4,
@@ -279,55 +140,7 @@ export class CardGraphs
                 animation: {
                     duration: 0
                 },
-                tooltips: {
-                    callbacks: {
-                        label: (item, data) => {
-                            if( graphtype == 'line' || graphtype == 'bar' ) {
-                                let label = '';
-                                if( this.pconfig.tooltipShowLabel ) label = data.datasets[item.datasetIndex].name || '';
-                                if( label ) label += ': ';
-                                const p = 10 ** this.pconfig.roundingPrecision;
-                                const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
-                                // (from the value drawn back to the value shown: see shownScale)
-                                const _tf = data.datasets[item.datasetIndex].hecTextFactor ?? 1;
-                                const _circQ = data.datasets[item.datasetIndex].hecCircular;
-                                let _v = Math.round(item.yLabel / _siFactor * _tf * p) / p;
-                                // (a circular curve shows its real value, in [0, period))
-                                if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ * Math.abs(_tf)) * p) / p;
-                                label += _v;
-                                label += ' ' + (data.datasets[item.datasetIndex].unit || '');
-                                return label;
-                            } else if( graphtype == 'timeline' ) {
-                                const dataset = data.datasets[item.datasetIndex];
-                                const d = dataset.data[item.index];
-                                let label = d[2];
-                                if( this.pconfig.tooltipStateTextMode == 'auto' )
-                                    label = this.getLocalizedState(label, dataset.domain, dataset.device_class, dataset.entity_id);
-                                return this.generateTooltipContents(label, d, tooltipSize, datasets.length);
-                            } else if( graphtype == 'arrowline' ) {
-                                const d = data.datasets[item.datasetIndex].data[item.index];
-                                const p = 10 ** this.pconfig.roundingPrecision;
-                                let label = Math.round(d[2] * p) / p;
-                                label += ' ' + (data.datasets[item.datasetIndex].unit || '');
-                                return this.generateTooltipContents(label, d, 'slim');
-                            }
-                        },
-                        title: function(tooltipItems, data) {
-                            let title = '';
-                            if( tooltipItems.length > 0 ) {
-                                if( graphtype == 'line' || graphtype == 'bar' ) {
-                                    title = tooltipItems[0].xLabel;
-                                } else {
-                                    title = ( tooltipSize !== 'slim' ) ? ( data.datasets[tooltipItems[0].datasetIndex]?.name ?? '' ) : '';
-                                }
-                            }
-                            return title;
-                        }
-                    },
-                    yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
-                    caretPadding: 8,
-                    displayColors: _hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
-                },
+                tooltips: this._chartTooltips(graphtype, datasets, _hasCurves),
                 hover: {
                     // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
                     mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
@@ -391,6 +204,187 @@ export class CardGraphs
         chart.callerInstance = this;
 
         return chart;
+    }
+
+    // The datasets of a chart: a line or bar graph's curves and bars (each drawn on its Y
+    // axis, stacked per axis), a timeline's or arrowline's rows
+    _chartData(graphtype, datasets, config)
+    {
+        if( graphtype == 'line' || graphtype == 'bar' )
+            return { datasets: datasets.map(d => this._curveDataset(d, graphtype, config)) };
+
+        return {
+            labels: datasets.map(d => this.pconfig.labelsVisible ? d.name : ''),
+            datasets: datasets.map(d => ({
+                domain: d.domain,
+                device_class: d.device_class,
+                entity_id: d.entity_id,
+                unit: d.unit,
+                name: d.name,
+                arrowColor: d.bColor,
+                arrowBackground: d.fillColor,
+                arrowPeriod: d.arrowPeriod,
+                data: [ ]
+            }))
+        };
+    }
+
+    _curveDataset(d, graphtype, config)
+    {
+        // The samples' dots: the entity's showPoints, else the graph's (a radius, true: 4);
+        // a hovered one 2px larger (5 when none is shown)
+        const _radius = v => v === true ? 4 : +v;
+        const _own = d.showPoints, _graph = config?.showPoints;
+        const _ownOn = _own !== undefined && _own !== false && _own !== 0;
+        const _pointRadius = _own !== undefined ? ( _ownOn ? _radius(_own) : 0 ) : ( _graph ? _radius(_graph) : 0 );
+        const _pointHoverRadius = _ownOn ? _radius(_own) + 2 : _graph ? _radius(_graph) + 2 : 5;
+        const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
+        return {
+            // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
+            type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
+            hecNoStack: graphtype == 'bar' && d.kind === 'line',
+            hecCircular: d.circular,
+            borderColor: d.bColor,
+            backgroundColor: d.fillColor,
+            borderWidth: d.width,
+            borderDash: Array.isArray(d.dashMode) ? d.dashMode : _dashes[d.dashMode],
+            pointRadius: _pointRadius,
+            pointStyle: 'circle',
+            pointBackgroundColor: d.bColor,
+            pointHoverRadius: _pointHoverRadius,
+            hitRadius: 5,
+            label: this._legendLabel(d),
+            yAxisID: d.yAxisID,
+            // (stacked bars: those of each Y axis in their own column — stacking
+            // values of two scales on each other would mean nothing)
+            stack: d.yAxisID,
+            name: d.name,
+            steppedLine: d.mode === 'stepped',
+            cubicInterpolationMode: 'monotone',
+            // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
+            hecInterpolation: d.interpolation,
+            lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
+            domain: d.domain,
+            entity_id: d.entity_id,
+            unit: d.unit,
+            shownScale: d.shownScale,
+            hecTextFactor: d.shownScale / d.drawScale,
+            hidden: d.hidden,
+            showMinMax: d.showMinMax ? true : false,
+            siConversionFactor: d.siConversionFactor,
+            borderJoinStyle: 'round',
+            borderCapStyle: 'round',
+            data: { }
+        };
+    }
+
+    // A Y axis, left or right (the right one only for a line or bar graph with a second
+    // group of units — see _assignYAxes): the same bounds and step (ymin, ymax, ystepSize)
+    // for both, its own unit and circular labels; the grid is the left axis'.
+    // curvesOnly: a margin may be added below and above (axisAddMarginMin / Max)
+    _chartYAxis(id, graphtype, datasets, config, curvesOnly)
+    {
+        // The curves of the axis (see _assignYAxes)
+        const _list = datasets.filter(d => ( d.yAxisID ?? LEFT_Y_AXIS ) === id);
+        // Its unit: its curves' (converted to one SI unit: see _applySIConversion) — none
+        // when they have incompatible units: no single unit describes the axis then, the
+        // legend and tooltip still show each entity's own
+        const _unit = ( graphtype == 'line' || graphtype == 'bar' )
+            ? ( _list.some(d => !areSICompatible(d.unit, _list[0].unit)) ? '' : ( _list[0]?.axisUnit ?? _list[0]?.unit ) )
+            : undefined;
+        // An axis of circular curves only, all of the same period: its labels show the real
+        // values, in [0, period) (Chart.js ticks.period)
+        const _p0 = _list[0]?.circular;
+        const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
+        const _right = id === RIGHT_Y_AXIS;
+        return {
+            id,
+            position: _right ? 'right' : 'left',
+            afterFit: (scaleInstance) => {
+                scaleInstance.width = this.pconfig.labelAreaWidth;
+            },
+            afterDataLimits: (me) => {
+                const epsilon = 0.0001;
+                if( config?.ymin == null && this.pconfig.axisAddMarginMin && curvesOnly ) me.min -= epsilon;
+                if( config?.ymax == null && this.pconfig.axisAddMarginMax && curvesOnly ) me.max += epsilon;
+            },
+            ticks: {
+                fontColor: this.pconfig.graphLabelColor,
+                min: config?.ymin ?? undefined,
+                max: config?.ymax ?? undefined,
+                forceMin: config?.ymin ?? undefined,
+                forceMax: config?.ymax ?? undefined,
+                stepSize: config?.ystepSize ?? undefined,
+                period: _period
+            },
+            gridLines: {
+                color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
+                drawOnChartArea: !_right
+            },
+            scaleLabel: {
+                display: _unit !== undefined && _unit !== '',
+                labelString: _unit,
+                fontColor: this.pconfig.graphLabelColor
+            },
+            barThickness: this.pconfig.timelineBarHeight - 4,
+            stacked: config?.stacked
+        };
+    }
+
+    // The tooltip of a chart: a curve's value in its unit (circular ones in [0, period)), a
+    // timeline's state and its time span, an arrowline's value
+    _chartTooltips(graphtype, datasets, hasCurves)
+    {
+        const tooltipSize = this.pconfig.tooltipSize;
+        return {
+            callbacks: {
+                label: (item, data) => {
+                    if( graphtype == 'line' || graphtype == 'bar' ) {
+                        let label = '';
+                        if( this.pconfig.tooltipShowLabel ) label = data.datasets[item.datasetIndex].name || '';
+                        if( label ) label += ': ';
+                        const p = 10 ** this.pconfig.roundingPrecision;
+                        const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
+                        // (from the value drawn back to the value shown: see shownScale)
+                        const _tf = data.datasets[item.datasetIndex].hecTextFactor ?? 1;
+                        const _circQ = data.datasets[item.datasetIndex].hecCircular;
+                        let _v = Math.round(item.yLabel / _siFactor * _tf * p) / p;
+                        // (a circular curve shows its real value, in [0, period))
+                        if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ * Math.abs(_tf)) * p) / p;
+                        label += _v;
+                        label += ' ' + (data.datasets[item.datasetIndex].unit || '');
+                        return label;
+                    } else if( graphtype == 'timeline' ) {
+                        const dataset = data.datasets[item.datasetIndex];
+                        const d = dataset.data[item.index];
+                        let label = d[2];
+                        if( this.pconfig.tooltipStateTextMode == 'auto' )
+                            label = this.getLocalizedState(label, dataset.domain, dataset.device_class, dataset.entity_id);
+                        return this.generateTooltipContents(label, d, tooltipSize, datasets.length);
+                    } else if( graphtype == 'arrowline' ) {
+                        const d = data.datasets[item.datasetIndex].data[item.index];
+                        const p = 10 ** this.pconfig.roundingPrecision;
+                        let label = Math.round(d[2] * p) / p;
+                        label += ' ' + (data.datasets[item.datasetIndex].unit || '');
+                        return this.generateTooltipContents(label, d, 'slim');
+                    }
+                },
+                title: function(tooltipItems, data) {
+                    let title = '';
+                    if( tooltipItems.length > 0 ) {
+                        if( graphtype == 'line' || graphtype == 'bar' ) {
+                            title = tooltipItems[0].xLabel;
+                        } else {
+                            title = ( tooltipSize !== 'slim' ) ? ( data.datasets[tooltipItems[0].datasetIndex]?.name ?? '' ) : '';
+                        }
+                    }
+                    return title;
+                }
+            },
+            yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
+            caretPadding: 8,
+            displayColors: hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
+        };
     }
 
     // --------------------------------------------------------------------------------------
@@ -612,7 +606,7 @@ export class CardGraphs
         this._detachGraph(_upper);
         this._detachGraph(g);
         _all.forEach((en, i) => {
-            this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, null, _groupId, en);
+            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: _nextG, groupId: _groupId, entry: en });
         });
         this._syncGroupOrder(_groupId);
         this.writeLocalState();
@@ -644,9 +638,19 @@ export class CardGraphs
         this.writeLocalState();
     }
 
-    addGraph(entity_id, noAutoGroup = false, overrideColor = null, overrideFill = null, targetGraph = null, overrideHidden = undefined, isStatic = false, overrideInterval = null, groupId = null, overrideEntityProps = null)
+    addGraph(entity_id, { noAutoGroup = false, color = null, fill = null, before = null, hidden = undefined, isStatic = false, interval = null, groupId = null, entry = null } = {})
     {
-        // Add dynamic entity
+        // Shows an entity: in a graph of its group it can join (its type, its sub-graph),
+        // else — a new entity, without a group — in the last graph if its units are
+        // compatible (combineSameUnits), else in a new graph placed right before `before`
+        // (last when null). Options:
+        //   noAutoGroup  never joins a graph: a new graph
+        //   color, fill  the curve's color, else its entry's / entityOptions' / the palette's
+        //   hidden       the curve hidden (else as its entry or entityOptions say)
+        //   isStatic     a graph defined in YAML (no close button; kept static when rebuilt)
+        //   interval     the bar interval of the graph
+        //   groupId      the group the entity belongs to
+        //   entry        its entry of the entity list (pconfig.entities), when it has one
 
         if( this._hass.states[entity_id] == undefined ) return;
 
@@ -662,18 +666,18 @@ export class CardGraphs
 
         const uom = this.getUnitOfMeasure(entity_id);
         const sc = this.getStateClass(entity_id);
-        const _overrideType = overrideEntityProps?.type ?? entityOptions?.type;
+        const _overrideType = entry?.type ?? entityOptions?.type;
         // (let: becomes the graph's type below, once combined — see _graphType)
         let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 
-        // The entity's single source of truth: overrideEntityProps is already the
+        // The entity's single source of truth: entry is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
         // throughout this file). If not (a genuinely new entity), create one now and use
         // it — g.entities[0] below is this SAME object, never a copy, so there is nothing
         // left to keep in sync between "session" and "persisted" entity data.
-        // (an overrideEntityProps that isn't a persisted entry yet — a plain runtime object —
+        // (an entry that isn't a persisted entry yet — a plain runtime object —
         // is registered as one, rather than leaving a second, disconnected copy)
-        const _pcEntry = this.store.add(overrideEntityProps ?? { entity: entity_id });
+        const _pcEntry = this.store.add(entry ?? { entity: entity_id });
         _pcEntry.entity = entity_id;
         // The entity's own display type — kept per entity, since a graph can now hold both
         // line and bar entities (see _entityKind)
@@ -695,9 +699,9 @@ export class CardGraphs
         // entities[i].color directly but must still round-trip correctly through drag/uncombine/type-switch
         if( type == 'line' || type == 'arrowline' || type == 'bar' || type == 'timeline' ) {
 
-            if( overrideColor ) {
-                entities[0].color = overrideColor;
-                entities[0].fill = overrideFill ?? 'rgba(0,0,0,0)';
+            if( color ) {
+                entities[0].color = color;
+                entities[0].fill = fill ?? 'rgba(0,0,0,0)';
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
                 entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
@@ -720,7 +724,7 @@ export class CardGraphs
             // entityOptions still applies to it; see _resolveInterpolation)
             entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
             entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
-            entities[0].hidden    = overrideHidden !== undefined ? overrideHidden : (entities[0].hidden ?? entityOptions?.hidden);
+            entities[0].hidden    = hidden !== undefined ? hidden : (entities[0].hidden ?? entityOptions?.hidden);
             entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
             entities[0].showPoints= entities[0].showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
             entities[0].decimation= entities[0].decimation  ?? entityOptions?.decimation;
@@ -843,7 +847,7 @@ export class CardGraphs
         // entities (any of them — a line entity rebuilt last must not reset it), else the
         // configured one. Needed before the graph is built: it decides how bar entities
         // are drawn (bars, or raw curves for interval 4).
-        const _graphInterval = overrideInterval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
+        const _graphInterval = interval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
             ?? this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval) ?? 1;
         entityOptions._graphInterval = _graphInterval;
 
@@ -851,18 +855,18 @@ export class CardGraphs
         // wide), tracked per entity (all entities of one displayed graph share the same
         // value) since there's no separate per-graph persisted structure. Combine already
         // adopted the target graph's value above (_adoptedGraphIndex). A genuinely new
-        // graph is placed right before targetGraph (see insertion below) — its index is
-        // the average of targetGraph's index and its true on-screen previous neighbor's
-        // (0 if none, i.e. inserting at the very top). targetGraph=null means nothing
+        // graph is placed right before `before` (see insertion below) — its index is
+        // the average of `before`'s index and its true on-screen previous neighbor's
+        // (0 if none, i.e. inserting at the very top). `before` null means nothing
         // follows: index is the last on-screen graph's, rounded up, + 1 (or 1 if there are
         // no graphs yet).
         let _graphIndex;
         if( combine ) {
             _graphIndex = _adoptedGraphIndex ?? 1;
-        } else if( targetGraph?.entities?.[0]?.graphIndex !== undefined ) {
-            const _prevG = this._previousGraph(targetGraph);
+        } else if( before?.entities?.[0]?.graphIndex !== undefined ) {
+            const _prevG = this._previousGraph(before);
             const _beforeIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
-            _graphIndex = (_beforeIdx + targetGraph.entities[0].graphIndex) / 2;
+            _graphIndex = (_beforeIdx + before.entities[0].graphIndex) / 2;
         } else {
             const _all = this._allGraphsInDisplayOrder();
             const _lastIdx = _all[_all.length - 1]?.entities?.[0]?.graphIndex;
@@ -903,12 +907,12 @@ export class CardGraphs
         e.innerHTML = html;
 
         let gl = this._this.querySelector('#graphlist');
-        const _tgtDiv = ( targetGraph && targetGraph.canvas?.parentNode ) ? this._graphDiv(targetGraph) : null;
+        const _tgtDiv = ( before && before.canvas?.parentNode ) ? this._graphDiv(before) : null;
         if( _combineInsertBefore && (_combineGl ?? gl).contains(_combineInsertBefore) ) {
             (_combineGl ?? gl).insertBefore(e, _combineInsertBefore);
         } else if( _tgtDiv && _tgtDiv.parentNode ) {
-            // Insert right before targetGraph — "the graph this one belongs right before".
-            // targetGraph=null (or no longer valid) falls through to the last-position
+            // Insert right before `before` — "the graph this one belongs right before".
+            // `before` null (or no longer valid) falls through to the last-position
             // fallback below, same as "nothing after it, insert last".
             _tgtDiv.parentNode.insertBefore(e, _tgtDiv);
         } else {
@@ -926,10 +930,10 @@ export class CardGraphs
 
         // Apply interval override if provided
         const _dynG = this.graphs.find(g => g.id === _dynGid);
-        if( _dynG && overrideInterval !== null && overrideInterval !== undefined ) {
-            _dynG.interval = overrideInterval;
+        if( _dynG && interval !== null && interval !== undefined ) {
+            _dynG.interval = interval;
             const _bd = this._this.querySelector(`#bd-${_dynGid}`);
-            if( _bd ) _bd.value = overrideInterval;
+            if( _bd ) _bd.value = interval;
         }
 
         // Connect the close button event listener (only for dynamic graphs)
@@ -1042,7 +1046,7 @@ export class CardGraphs
             }
         }
 
-        const chart = this.newGraph(canvas, type, datasets, config, isStatic);
+        const chart = this.newGraph(canvas, type, datasets, config);
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 

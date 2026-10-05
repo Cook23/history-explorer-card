@@ -430,13 +430,13 @@ export class CardMenus
                     // fill is not persisted across a type change: it's derived from color+type,
                     // not a type-independent value. Pass null so addGraph recomputes it correctly
                     // for the target type (transparent for line/arrowline/timeline, solid for bar).
-                    this.addGraph(en.entity, i === 0, _pe?.color ?? en.color, null, _nextG, undefined, false, null, _origGroupId, _pe ?? en);
+                    this.addGraph(en.entity, { noAutoGroup: i === 0, color: _pe?.color ?? en.color, before: _nextG, groupId: _origGroupId, entry: _pe ?? en });
                 });
                 this.pconfig.combineSameUnits = _savedCombine;
                 // Re-add extracted entity — color only; fill recomputed for the new type (see
                 // above). Goes right before whatever followed the original graph _g — i.e.
                 // right after the just-rebuilt remaining-entities graph.
-                this.addGraph(_entity.entity, false, _pcEntry?.color ?? _entity.color, null, _nextG, undefined, false, _entity.interval ?? null, _origGroupId, _pcEntry ?? _entity);
+                this.addGraph(_entity.entity, { color: _pcEntry?.color ?? _entity.color, before: _nextG, interval: _entity.interval, groupId: _origGroupId, entry: _pcEntry ?? _entity });
                 // Sync the freshly-computed fill (correct for the NEW type) back into
                 // pconfig.entities, so persistence stays consistent with what the next
                 // rebuild will read as overrideFill — no need to special-case fill at rebuild time
@@ -650,7 +650,7 @@ export class CardMenus
         // time here: a duplicate entry, never displayed, used to carry the groupId instead,
         // leaving the displayed one with none (so a type change couldn't link its graphs).
         const _entry = { type, lineMode };
-        this.addGraph(eid, false, null, null, null, undefined, false, null, null, _entry);
+        this.addGraph(eid, { entry: _entry });
         const _g = this.graphs.find(g => g.entities.includes(_entry));
         if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
             // A brand-new graph (or one left without a group by that old bug): a group of its own

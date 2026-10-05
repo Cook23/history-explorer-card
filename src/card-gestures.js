@@ -360,7 +360,7 @@ export class CardGestures
         this.pconfig.combineSameUnits = true;
         entities.forEach((en, i) => {
             const _pe = this.store.inGroup(en.entity, groupId);
-            this.addGraph(en.entity, i === 0, en.color, en.fill, nextG, undefined, false, null, groupId, _pe ?? en);
+            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en });
         });
         this.pconfig.combineSameUnits = _saved;
     }
@@ -605,7 +605,7 @@ export class CardGestures
             _entity.hidden = undefined;
             const _nextG = this._nextGraph(g);
             this._detachAndRebuildRemaining(g, idx, _nextG);
-            this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, true, null, g.groupId, _entity);
+            this.addGraph(_entity.entity, { noAutoGroup: true, color: _entity.color, fill: _entity.fill, before: _nextG, hidden: false, isStatic: true, groupId: g.groupId, entry: _entity });
             this._syncGroupOrder(g.groupId);
             this.writeLocalState();
             this.updateHistory();
@@ -637,7 +637,7 @@ export class CardGestures
         // Extracted entity goes right before whatever followed the original graph g —
         // i.e. right after the just-rebuilt remaining-entities graph (addGraph inserting
         // before _nextG naturally lands it there).
-        this.addGraph(_entity.entity, true, _entity.color, _entity.fill, _nextG, false, false, null, _newGroupId, _pcExtracted ?? _entity);
+        this.addGraph(_entity.entity, { noAutoGroup: true, color: _entity.color, fill: _entity.fill, before: _nextG, hidden: false, groupId: _newGroupId, entry: _pcExtracted ?? _entity });
         // Persist now — after the reconstruction, not before — so the freshly computed
         // graphIndex (and everything else addGraph resolved) is what actually gets saved.
         this.writeLocalState();

@@ -394,7 +394,7 @@ export class HistoryCardState {
                     // walking the group in its true display order already.
                     _group.entities.forEach((_e) => {
                         const _eid = entityIdOf(_e);
-                        this.addGraph(_eid, false, _e.color, _e.fill, null, _e.hidden, _e.isStatic, _e.interval, _group.groupId, _e);
+                        this.addGraph(_eid, { color: _e.color, fill: _e.fill, hidden: _e.hidden, isStatic: _e.isStatic, interval: _e.interval, groupId: _group.groupId, entry: _e });
                     });
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
                 }

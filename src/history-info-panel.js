@@ -128,7 +128,7 @@ function hecHookInfoPanel()
         instance.pconfig.entities = [_pcEntry];
 
         instance.graphs = [];
-        instance.addGraph(entity_id, true, entityOptions?.color, entityOptions?.fill, null, undefined, true, instance.parseIntervalConfig(entityOptions?.interval) ?? null, instance.g_id, _pcEntry);
+        instance.addGraph(entity_id, { noAutoGroup: true, color: entityOptions?.color, fill: entityOptions?.fill, isStatic: true, interval: instance.parseIntervalConfig(entityOptions?.interval), groupId: instance.g_id, entry: _pcEntry });
     }
 
     __fn.prototype._injectHistoryExplorer = function(instance)

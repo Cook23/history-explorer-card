@@ -437,7 +437,7 @@ export class CardToolbar
             const _groupId = g.groupId;
             this._detachGraph(g);
             _entities.forEach((en, i) => {
-                this.addGraph(en.entity, i === 0, en.color, en.fill, _nextG, undefined, false, _value, _groupId, en);
+                this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: _nextG, interval: _value, groupId: _groupId, entry: en });
             });
         }
 
