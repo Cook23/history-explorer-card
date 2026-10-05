@@ -6,6 +6,11 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.4] - unreleased
 
+### New — thresholds on the value of another entity, states and `default` in thresholds
+- Thresholds with an `entity` key compare that entity's value instead of the value shown, at each point along its history: a heat pump's power colored by its mode (`{ entity: sensor.heat_pump_mode, heat: red, cool: blue }`)
+- In thresholds, everywhere: a number key is a threshold, any other key a state compared exactly as written (case included), `default` the color of every value they don't cover
+- Tests: thresholds on an entity's states (with `default`, and a state not listed without one: the palette)
+
 ### New — a color held by an entity, thresholds on curves, RGB triplets
 - `color` is a value or an entity holding that value — the same values everywhere: a color (any CSS color, a CSS variable, an RGB triplet `[r, g, b]`, also as text `r, g, b` or `(r, g, b)`), or thresholds on the value shown (`{ 0: blue, 20: red }`, also as text: JSON, or a dictionary as a Home Assistant template writes it). Named by its entity_id, an entity's state holds the color: the curve takes, at each point, the color that entity had then — its history is loaded with the card's, and a change of its state refreshes the graph
 - Thresholds now color curves too (each point by its value), not only bars

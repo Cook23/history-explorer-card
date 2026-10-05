@@ -6,21 +6,24 @@ import { parseColor, parseColorValue, colorForValue } from "./history-default-co
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
-// An entity's `color` names another entity when it's an entity_id (no CSS color has a dot):
-// that entity's state then holds the color, in any form `color` itself accepts
+// The entity an entity's `color` reads, or null: an entity_id (no CSS color has a dot),
+// whose state then holds the color, in any form `color` itself accepts; or the `entity` of
+// thresholds, whose value they then compare instead of the value shown
 const _ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
 export function colorEntityOf(e)
 {
-    const c = typeof e?.color === 'string' ? e.color.trim() : '';
-    return _ENTITY_ID.test(c) ? c : null;
+    const c = e?.color;
+    const id = ( typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? c.entity : '' ).trim();
+    return _ENTITY_ID.test(id) ? id : null;
 }
 
 export class CardDatasets
 {
     // --------------------------------------------------------------------------------------
-    // Colors: `color` is a value (a color, or thresholds on the value shown), or an entity
-    // whose state holds one — then it varies along the curve, with that entity's history.
-    // Evaluated at each point (each bar): a curve changes color on a point, never between two.
+    // Colors: `color` is a value (a color, or thresholds on the value shown), an entity
+    // whose state holds one, or thresholds on the value of an entity — then it varies along
+    // the curve, with that entity's history. Evaluated at each point (each bar): a curve
+    // changes color on a point, never between two.
     // --------------------------------------------------------------------------------------
 
     // The color of entity e at time t (ms) for the value v, or undefined when none applies
@@ -29,17 +32,18 @@ export class CardDatasets
     _colorFunction(e, colorHistory)
     {
         const _ce = colorEntityOf(e);
-        if( !_ce ) {
-            const _spec = parseColorValue(e.color);
-            return _spec?.thresholds ? (t, v) => colorForValue(_spec, v) : null;
-        }
-        // (the color entity's states, each read once; the calls come in increasing time)
-        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: moment(p.last_changed).valueOf(), spec: parseColorValue(p.state) }));
+        const _spec = typeof e.color === 'object' ? parseColorValue(e.color) : null;
+        if( !_ce ) return _spec && !_spec.color ? (t, v) => colorForValue(_spec, v) : null;
+        // The color entity's states over time, each read once (the calls come in increasing
+        // time): thresholds compare them; else each holds a color value
+        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: moment(p.last_changed).valueOf(), state: p.state,
+            spec: _spec ? null : parseColorValue(p.state) }));
         let k = -1;
         return (t, v) => {
             if( k >= 0 && _states[k].t > t ) k = -1;
             while( k + 1 < _states.length && _states[k + 1].t <= t ) k++;
-            return k >= 0 ? colorForValue(_states[k].spec, v) : undefined;
+            if( k < 0 ) return undefined;
+            return _spec ? colorForValue(_spec, _states[k].state) : colorForValue(_states[k].spec, v);
         };
     }
 
@@ -48,8 +52,10 @@ export class CardDatasets
     _currentColor(e)
     {
         const _ce = colorEntityOf(e);
-        const _spec = parseColorValue(_ce ? this._hass?.states[_ce]?.state : e.color);
-        return colorForValue(_spec, Number(this._hass?.states[e.entity]?.state)) ?? e.paletteColor;
+        const _state = id => this._hass?.states[id]?.state;
+        if( _ce && typeof e.color === 'object' ) return colorForValue(parseColorValue(e.color), _state(_ce)) ?? e.paletteColor;
+        const _spec = parseColorValue(_ce ? _state(_ce) : e.color);
+        return colorForValue(_spec, Number(_state(e.entity))) ?? e.paletteColor;
     }
 
     // A fill color like `fill` (its transparency), in color c — or undefined when `fill`

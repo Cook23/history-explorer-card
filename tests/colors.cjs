@@ -17,7 +17,9 @@ module.exports = async function()
         { type: 'line', entities: [{ entity: 'sensor.watering_cycle', color: [255, 0, 0] }] },
         { type: 'line', entities: [{ entity: 'sensor.days_to_watering', color: 'input_text.not_a_color' }] },
         { type: 'bar', entities: [{ entity: 'sensor.energy', color: 'input_text.curve_color' }] },
-    ] }), { height: 1500, mock: { series: true } });
+        { type: 'line', entities: [{ entity: 'sensor.rain', color: { entity: 'sensor.clim_mode', hot: 'red', cold: 'blue', default: 'grey' } }] },
+        { type: 'line', entities: [{ entity: 'sensor.wind', color: { entity: 'sensor.clim_mode', hot: 'red', cold: 'blue' } }] },
+    ] }), { height: 2000, mock: { series: true } });
     await t.wait(800);
     // Graph gi's first dataset: its color steps, its points (time, value), its colors, its legend swatch
     const ds = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, d=c.data.datasets[0], l=c.legend.legendItems[0];
@@ -61,6 +63,18 @@ module.exports = async function()
         const d = await ds(5);
         const cols = Array.isArray(d.fill) ? [...new Set(d.fill)].sort().join() : null;
         return cols === '#0000ff,red' && d.legend.fill === d.fill[d.fill.length - 1] ? true : JSON.stringify({ cols, legend: d.legend });
+    });
+    // (the mocked sensor.clim_mode: hot, cold, off, in turn every 2 h)
+    const mode = x => ['hot', 'cold', 'off'][Math.floor(x / 7200e3) % 3];
+    await t.step('thresholds on the value of an entity (its states): each point colored by the state then', async () => {
+        const d = await ds(6); const want = { hot: 'red', cold: 'blue', off: 'grey' };
+        const ok = d.steps && d.steps.every(s => s.borderColor === want[mode(s.x)]);
+        return d.steps && colorsOf(d) === 'blue,grey,red' && ok ? true : JSON.stringify(d.steps);
+    });
+    await t.step('thresholds on the value of an entity, a state not listed and no default: a color of the palette', async () => {
+        const d = await ds(7);
+        const off = d.steps && d.steps.filter(s => mode(s.x) === 'off').map(s => s.borderColor);
+        return off && off.length && off.every(c => c !== 'red' && c !== 'blue') ? true : JSON.stringify(d.steps);
     });
     await t.step('the entity holding the color changes: the curve takes the new color from then on', async () => {
         // (Home Assistant pushes its states again and again: the card compares each push with the previous one)

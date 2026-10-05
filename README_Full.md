@@ -430,8 +430,11 @@ Set the `stacked` option to `true` to display the bars on top of each other rath
 The `color` of a curve or of bars is a value, or an entity holding that value. The same values are accepted everywhere — in a graph's entity, in `entityOptions`, and in the state of an entity:
 
 - **a color**: any CSS color (`red`, `#3e95cd`, `#3e95cd80`, `rgb(62, 149, 205)`, `rgba(...)`, `hsl(...)`), a CSS variable (`--my-special-green`), or an RGB triplet: `[62, 149, 205]`, also written `62, 149, 205` or `(62, 149, 205)`;
-- **thresholds** on the value shown: value / color pairs, as many as you want. Each value takes the color of the highest threshold at or below it; below every threshold, the lowest one's. A curve is colored point by point, bars bar by bar (by the value of each bar). The keys can be quoted or not (`0: blue`, `'1.0': green`);
-- **an entity** (its entity_id): its state holds one of the above, as text — a color, a triplet, or thresholds written as JSON (`{"0": "blue", "20": "red"}`) or as a Home Assistant template writes a dictionary (`{0: 'blue', 20: 'red'}`). The curve then takes, at each point, the color that entity had at that time: its history is loaded with the card's, and the curve follows when it changes.
+- **thresholds** on the value shown: key / color pairs, as many as you want. A number key is a threshold: a value takes the color of the highest threshold at or below it — below every threshold, the lowest one's. Any other key is a state, compared exactly as it is written (case included): `heat: red`. `default` is the color of every value they don't cover. A curve is colored point by point, bars bar by bar (by the value of each bar). The keys can be quoted or not (`0: blue`, `'1.0': green`);
+- **thresholds on the value of another entity**: the same, with an `entity` key — they compare that entity's value (a number or a state) instead of the value shown, at each point: for a heat pump's power, its mode (`heat: red`, `cool: blue`);
+- **an entity** (its entity_id): its state holds one of the above, as text — a color, a triplet, or thresholds written as JSON (`{"0": "blue", "20": "red"}`) or as a Home Assistant template writes a dictionary (`{0: 'blue', 20: 'red'}`).
+
+With an entity — thresholds on its value, or holding the color — the curve takes, at each point, the color that applied at that time: the entity's history is loaded with the card's, and the curve follows when it changes.
 
 ```yaml
 entityOptions:
@@ -444,11 +447,17 @@ entityOptions:
 graphs:
   - type: line
     entities:
+      - entity: sensor.heat_pump_power
+        color:                         # the heat pump's mode at each point
+          entity: sensor.heat_pump_mode
+          heat: red
+          cool: blue
+          default: grey                # any other mode (off, fan...)
       - entity: sensor.living_room_temperature
-        color: sensor.heating_color    # the color of the curve, at each point, is the one this entity had then
+        color: sensor.heating_color    # an entity holding the color itself
 ```
 
-The color of an entity can be set by a template sensor, for instance the heating's mode:
+The color held by an entity can be set by a template sensor, for instance from the heating's mode:
 
 ```yaml
 template:
@@ -461,7 +470,7 @@ template:
 
 - The color is evaluated at each point (each bar): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
 - The legend shows the color now — as the value shown in the label is the value now.
-- When no valid color applies (the entity holding it unavailable, its state not a color, or no history of it — an entity holding text has no long-term statistics), the curve takes a color of the automatic palette.
+- When no valid color applies (a value thresholds don't cover and no `default`, the entity holding the color unavailable, its state not a color, or no history of it — an entity holding text has no long-term statistics), the curve takes a color of the automatic palette.
 - Two curves of one graph whose `color` you set to the same value both keep it; only a color the card chose itself is changed to tell a curve from the others.
 
 #### Net metering
@@ -1050,7 +1059,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | Property | Type | Description |
 |---|---|---|
 | `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
-| `color` | string, list or object | Line/bar color: a color, thresholds on the value, or an entity holding either — see [Colors](#colors) |
+| `color` | string, list or object | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |

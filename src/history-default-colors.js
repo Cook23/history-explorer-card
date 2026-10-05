@@ -272,30 +272,47 @@ function _parseThresholdText(s)
 }
 
 const _isColor = c => typeof c === 'string' && c !== '' && ( typeof CSS === 'undefined' || !CSS.supports || CSS.supports('color', c) );
+const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.trim() !== '' ) ? Number(v) : NaN;
 
 // The value of a color option — the same forms whether it's given in the configuration or
-// read from an entity's state: a color (see parseColor), or thresholds on the value shown
-// ({ value: color, ... }, or the same as text) → { color } or { thresholds: [[value, color],
-// ...] in increasing order }, or null when it's neither
+// read from an entity's state: a color (see parseColor), or thresholds (an object, or the
+// same as text): a number key is a threshold, any other key a state compared as it is
+// written, `default` the color of every value they don't cover (`entity`, the entity whose
+// value they compare — see colorEntityOf — is left to the caller) → { color }, or
+// { thresholds: [[value, color], ...] in increasing order, states: { state: color },
+// default }, or null when it's neither
 export function parseColorValue(v)
 {
     if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim());
     if( v && typeof v === 'object' && !Array.isArray(v) ) {
-        const _th = Object.entries(v).map(([k, c]) => [Number(k), parseColor(c)])
-            .filter(([k, c]) => !isNaN(k) && _isColor(c)).sort((a, b) => a[0] - b[0]);
-        return _th.length ? { thresholds: _th } : null;
+        const spec = { thresholds: [], states: {}, default: undefined };
+        for( const [k, c0] of Object.entries(v) ) {
+            const c = parseColor(c0);
+            if( k === 'entity' || !_isColor(c) ) continue;
+            if( k === 'default' ) spec.default = c;
+            else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
+            else spec.states[k] = c;
+        }
+        spec.thresholds.sort((a, b) => a[0] - b[0]);
+        return spec.thresholds.length || Object.keys(spec.states).length || spec.default ? spec : null;
     }
     const c = parseColor(v);
     return _isColor(c) ? { color: c } : null;
 }
 
-// The color a value takes (see parseColorValue): the color itself, or that of the highest
-// threshold at or below the value — below every threshold, the lowest one's
+// The color a value takes (see parseColorValue): the color itself; a state listed, its
+// color; a number, the color of the highest threshold at or below it — below every
+// threshold, the lowest one's; any other value, the default color (undefined when none)
 export function colorForValue(spec, value)
 {
     if( !spec ) return undefined;
     if( spec.color ) return spec.color;
-    let c = spec.thresholds[0][1];
-    for( const [k, col] of spec.thresholds ) if( value >= k ) c = col;
-    return c;
+    if( Object.prototype.hasOwnProperty.call(spec.states, String(value)) ) return spec.states[String(value)];
+    const n = _number(value);
+    if( spec.thresholds.length && !isNaN(n) ) {
+        let c = spec.thresholds[0][1];
+        for( const [k, col] of spec.thresholds ) if( n >= k ) c = col;
+        return c;
+    }
+    return spec.default;
 }

@@ -30,7 +30,7 @@ graphs:
       name: null
 
       # Colour of the line/bar in the graph, defaults to automatically assigning a colour:
-      # a colour, thresholds on the value ({ 0: blue, 20: red }), or an entity holding either
+      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` on that entity's value), or an entity holding either
       color: null
 
       # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'
@@ -211,7 +211,7 @@ entityOptions:
     circular: null
 
     # Colour of the line in the graph, defaults to automatically assigning a colour:
-    # a colour, thresholds on the value ({ 0: blue, 20: red }), or an entity holding either
+    # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` on that entity's value), or an entity holding either
     color: null
 
     # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'

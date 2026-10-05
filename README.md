@@ -403,13 +403,17 @@ entityOptions:
       1.5: red
 ```
 
-Or with another entity: `color` then names an entity whose state holds the color (or thresholds), and the curve takes, at each point, the color that entity had then. The legend shows the color now:
+Or with another entity: thresholds with an `entity` compare its value (a number or a state) at each point; `default` colors what they don't list. The legend shows the color now:
 ```yaml
 graphs:
   - type: line
     entities:
-      - entity: sensor.living_room_temperature
-        color: sensor.heating_color
+      - entity: sensor.heat_pump_power
+        color:
+          entity: sensor.heat_pump_mode
+          heat: red
+          cool: blue
+          default: grey
 ```
 
 > For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#bar-graphs-for-total-increasing-entities)
@@ -518,7 +522,7 @@ graphs:
 | Option | Card | Graph | Entity | Description |
 |---|:-:|:-:|:-:|---|
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
-| `color` | | | ✓ | Line/bar color: a color, thresholds on the value, or an entity holding either |
+| `color` | | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either |
 | `fill` | ✓ | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |

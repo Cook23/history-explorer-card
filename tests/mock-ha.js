@@ -37,7 +37,9 @@ const STATES={
  'input_text.curve_color':ent('input_text.curve_color','curve color',null,'#0000ff'),
  'input_text.curve_thresholds':ent('input_text.curve_thresholds','curve thresholds',null,"{0: 'green', 800: 'red'}"),
  'input_text.not_a_color':ent('input_text.not_a_color','not a color',null,'nothing'),
+ 'sensor.clim_mode':ent('sensor.clim_mode','clim mode',null,'hot'),
 };
+STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
 STATES['sensor.net_energy'].attributes.device_class='energy';
