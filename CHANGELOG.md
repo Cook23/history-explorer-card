@@ -6,6 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.4] - unreleased
 
+### New — two Y axes on a graph
+- A line or bar graph has up to two Y axes, one per group of compatible units: the first group on the left, the second on the right, each with its own scale, title, SI conversion (W and kW: one unit) and circular labels. With more than two groups, one shared axis without a title, as before
+- An entity's `yAxis` (`left`, `right`; on the entity or in `entityOptions`) puts it on that side whatever its unit
+- The curves of the right axis are marked with a small arrow ▸ in the legend; `ymin` / `ymax` / `ystepSize` apply to both axes
+- Linked graphs keep the same room on the right when one of them has a right axis: their time stays aligned
+- The min/max band (`showMinMax`) is drawn on its curve's own axis
+- Tests: new suite `yaxes` (two groups, three, `yAxis`, linked graphs aligned, a right-axis curve on its own scale, `entityOptions`)
+
 ### New — the info panel on every page of Home Assistant
 - Loaded through `frontend: extra_module_url` (documented: the exact URL of the dashboard resource), the card's file hooks the entity dialog's history on any page — Settings, History, a page opened directly — not only once a dashboard is shown
 - The hook is always installed; whether the panel replaces Home Assistant's own history is decided at each render. Switching it on or off no longer reloads the page

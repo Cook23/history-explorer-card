@@ -61,15 +61,17 @@ export const minmaxfill_plugin = {
     afterDatasetsDraw: (chart) => {
 
         const { ctx, chartArea: { top, bottom, left, right } } = chart;
-        const yScale = chart.scales['y-axis-0'];
         const xScale = chart.scales['x-axis-0'];
 
-        if( !yScale || !xScale ) return;
+        if( !xScale ) return;
 
         for( let di = 0; di < chart.data.datasets.length; di++ ) {
 
             const dataset = chart.data.datasets[di];
             if( !dataset.showMinMax ) continue;
+            // (the curve's own Y axis: a graph can have two)
+            const yScale = chart.scales[chart.getDatasetMeta(di).yAxisID];
+            if( !yScale ) continue;
 
             const points = dataset.data;
             if( !points || points.length < 2 ) continue;

@@ -254,7 +254,7 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. All the curves share one Y axis: when their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale and title, and the curves of the right axis are marked with a small arrow ▸ in the legend. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned. With more than two groups of units, the curves share one Y axis whose title is left empty; the legend and the tooltip still show each entity's value in its own unit. When their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -433,7 +433,7 @@ graphs:
         unit: kW                            # the unit shown in the legend and tooltip
 ```
 
-Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values (with `unit:` to show the converted value in the new unit, as above).
+Bars and curves follow the same rule: energy bars and a power curve, two groups of units, get an axis each — the bars on the left, the curve on the right. Compatible units (W and kW...) share an axis, converted automatically.
 
 Set the `stacked` option to `true` to display the bars on top of each other rather than side by side:
 
@@ -1080,6 +1080,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `interpolation` | string | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius. `showSamples` is a synonym |
+| `yAxis` | string | `left` or `right`: the Y axis of a line or bar entity. By default, a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis |
 | `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
 | `unit` | string | Unit shown instead of the entity's own (see `scale`) |
 | `hidden` | boolean | Hide this entity by default in the legend |

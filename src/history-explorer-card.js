@@ -64,6 +64,11 @@ export function getEntityOptionsPure(hass, entityOptions, entity)
 
 const ranges = [1, 2, 6, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368, 8760];
 
+// The Y axes of a line or bar graph: on the left (Chart.js's own first Y axis), and on the
+// right for a second group of units (see _assignYAxes)
+const LEFT_Y_AXIS = 'y-axis-0';
+const RIGHT_Y_AXIS = 'y-axis-1';
+
 
 // --------------------------------------------------------------------------------------
 // HA entity history info panel enabled flag
@@ -828,6 +833,11 @@ export class HistoryCardState {
     // graph's
     _applyTimeAxis(g)
     {
+        // (linked graphs keep their time aligned: when one of them has a right Y axis, the
+        // others keep the same room on the right)
+        const _hasRight = x => x.chart.options.scales.yAxes.some(a => a.id === RIGHT_Y_AXIS);
+        const _room = !_hasRight(g) && g.groupId != null && this.graphs.some(x => x.groupId === g.groupId && _hasRight(x));
+        g.chart.options.layout.padding.right = _room ? this.pconfig.labelAreaWidth : 0;
         const _time = g.chart.options.scales.xAxes[0].time;
         _time.unit = this.activeRange.tickStepUnit;
         _time.stepSize = this.activeRange.tickStepSize;
@@ -926,6 +936,14 @@ export class HistoryCardState {
     // Return entity label name with current value
     // --------------------------------------------------------------------------------------
 
+    // A curve's legend label: its name, with its value now (showCurrentValues), and a small
+    // arrow when it's on the right Y axis
+    _legendLabel(d)
+    {
+        const _label = this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name;
+        return d.yAxisID === RIGHT_Y_AXIS ? _label + ' ▸' : _label;
+    }
+
     getFormattedLabelName(name, entity, unit, shownScale = 1)
     {
         let label = name;
@@ -968,11 +986,18 @@ export class HistoryCardState {
 
         var datastructure;
 
-        let scaleUnit;
-
-        // (see ticks.period below)
-        const _period0 = datasets[0]?.circular;
-        const _tickPeriod = ( _period0 && datasets.every(d => d.circular === _period0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _period0 : undefined;
+        // The curves of each Y axis (see _assignYAxes)
+        const _onAxis = id => datasets.filter(d => ( d.yAxisID ?? LEFT_Y_AXIS ) === id);
+        // An axis' unit: its curves' (converted to one SI unit: see _applySIConversion) —
+        // none when they have incompatible units: no single unit describes the axis then,
+        // the legend and tooltip still show each entity's own
+        const _axisUnit = list => list.some(d => !areSICompatible(d.unit, list[0].unit)) ? '' : ( list[0]?.axisUnit ?? list[0]?.unit );
+        // An axis of circular curves only, all of the same period: its labels show the real
+        // values, in [0, period) (Chart.js ticks.period)
+        const _axisPeriod = list => {
+            const _p0 = list[0]?.circular;
+            return ( _p0 && list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
+        };
 
         if( graphtype == 'line' || graphtype == 'bar' ) {
 
@@ -1008,7 +1033,8 @@ export class HistoryCardState {
                         return config?.showPoints ? ( config.showPoints === true ? 6 : +config.showPoints + 2 ) : 5;
                     })(),
                     hitRadius: 5,
-                    label: this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name,
+                    label: this._legendLabel(d),
+                    yAxisID: d.yAxisID,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
@@ -1027,14 +1053,7 @@ export class HistoryCardState {
                     borderCapStyle: 'round',
                     data: { }
                 });
-                scaleUnit = scaleUnit ?? d.unit;
-                if( d.siConversionFactor !== undefined && datasets._siRefUnit ) scaleUnit = datasets._siRefUnit;
             }
-
-            // Incompatible units sharing one graph (a YAML graph mixing e.g. days, mm and a
-            // unitless value): no single unit describes the Y axis, so don't label it with
-            // whichever came first — the legend and tooltip still show each entity's own unit.
-            if( datasets.some(d => !areSICompatible(d.unit, datasets[0].unit)) ) scaleUnit = '';
 
         } else if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
 
@@ -1065,6 +1084,47 @@ export class HistoryCardState {
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
         const tooltipSize = this.pconfig.tooltipSize;
+
+        // A Y axis, left or right (the right one only for a line or bar graph with a second
+        // group of units — see _assignYAxes): the same bounds and step (ymin, ymax, ystepSize)
+        // for both, its own unit and circular labels; the grid is the left axis'
+        const _yAxis = (id) => {
+            const _list = _onAxis(id);
+            const _unit = ( graphtype == 'line' || graphtype == 'bar' ) ? _axisUnit(_list) : undefined;
+            const _right = id === RIGHT_Y_AXIS;
+            return {
+                id,
+                position: _right ? 'right' : 'left',
+                afterFit: (scaleInstance) => {
+                    scaleInstance.width = this.pconfig.labelAreaWidth;
+                },
+                afterDataLimits: (me) => {
+                    const epsilon = 0.0001;
+                    if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
+                    if( config?.ymax == null && this.pconfig.axisAddMarginMax && _hasCurves && !_hasBars ) me.max += epsilon;
+                },
+                ticks: {
+                    fontColor: this.pconfig.graphLabelColor,
+                    min: config?.ymin ?? undefined,
+                    max: config?.ymax ?? undefined,
+                    forceMin: config?.ymin ?? undefined,
+                    forceMax: config?.ymax ?? undefined,
+                    stepSize: config?.ystepSize ?? undefined,
+                    period: _axisPeriod(_list)
+                },
+                gridLines: {
+                    color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
+                    drawOnChartArea: !_right
+                },
+                scaleLabel: {
+                    display: _unit !== undefined && _unit !== '',
+                    labelString: _unit,
+                    fontColor: this.pconfig.graphLabelColor
+                },
+                barThickness: this.pconfig.timelineBarHeight - 4,
+                stacked: config?.stacked
+            };
+        };
 
         var chart = new Chart(ctx, {
 
@@ -1118,37 +1178,7 @@ export class HistoryCardState {
                         },
                         stacked: config?.stacked
                     }],
-                    yAxes: [{
-                        afterFit: (scaleInstance) => {
-                            scaleInstance.width = this.pconfig.labelAreaWidth;
-                        },
-                        afterDataLimits: (me) => {
-                            const epsilon = 0.0001;
-                            if( config?.ymin == null && this.pconfig.axisAddMarginMin && _hasCurves && !_hasBars ) me.min -= epsilon;
-                            if( config?.ymax == null && this.pconfig.axisAddMarginMax && _hasCurves && !_hasBars ) me.max += epsilon;
-                        },
-                        ticks: {
-                            fontColor: this.pconfig.graphLabelColor,
-                            min: config?.ymin ?? undefined,
-                            max: config?.ymax ?? undefined,
-                            forceMin: config?.ymin ?? undefined,
-                            forceMax: config?.ymax ?? undefined,
-                            stepSize: config?.ystepSize ?? undefined,
-                            // Graph of circular curves only, all of the same period: the labels
-                            // show the real values, in [0, period) (Chart.js ticks.period)
-                            period: _tickPeriod
-                        },
-                        gridLines: {
-                            color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
-                        },
-                        scaleLabel: {
-                            display: scaleUnit !== undefined && scaleUnit !== '',
-                            labelString: scaleUnit,
-                            fontColor: this.pconfig.graphLabelColor
-                        },
-                        barThickness: this.pconfig.timelineBarHeight - 4,
-                        stacked: config?.stacked
-                    }],
+                    yAxes: [_yAxis(LEFT_Y_AXIS), ...( _onAxis(RIGHT_Y_AXIS).length ? [_yAxis(RIGHT_Y_AXIS)] : [] )],
                 },
                 topClipMargin : 4,
                 bottomClipMargin: 4,
@@ -2202,6 +2232,7 @@ export class HistoryCardState {
             entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
             entities[0].process   = entities[0].process     ?? entityOptions?.process;
             entities[0].circular  = entities[0].circular    ?? entityOptions?.circular;
+            entities[0].yAxis     = entities[0].yAxis       ?? entityOptions?.yAxis;
 
             if( type == 'bar' ) {
                 entities[0].fill = entities[0].color;
@@ -2429,6 +2460,39 @@ export class HistoryCardState {
         }
     }
 
+    // Each curve's Y axis (line and bar graphs): one per group of compatible units, at most
+    // two — the first group on the left, the second on the right; beyond two, every curve
+    // on one shared axis without a unit. An entity's `yAxis` (left, right) puts it on that
+    // side whatever its unit.
+    _assignYAxes(datasets, entities)
+    {
+        const _groups = [];
+        for( const d of datasets ) if( !_groups.some(u => areSICompatible(u, d.unit)) ) _groups.push(d.unit);
+        datasets.forEach((d, i) => {
+            const _side = entities[i].yAxis;
+            const _right = ( _side === 'right' || _side === 'left' ) ? _side === 'right' : _groups.length === 2 && !areSICompatible(d.unit, _groups[0]);
+            d.yAxisID = _right ? RIGHT_Y_AXIS : LEFT_Y_AXIS;
+        });
+    }
+
+    // The curves of one Y axis converted to one SI unit (W and kW: kW, from their values
+    // now), when they all share one base unit and not all the same unit: each one's
+    // siConversionFactor, and the axis' unit (axisUnit)
+    _applySIConversion(list, entities)
+    {
+        const _units = list.map(d => d.unit);
+        if( !_units.length || !_units.every(u => areSICompatible(u, _units[0])) || _units.every(u => u === _units[0]) ) return;
+        const { unit: _refUnit, targetFactor: _targetFactor } = chooseSIUnit(list.map(d => ({
+            unit: d.unit,
+            maxVal: Math.abs(parseFloat(this._hass.states[d.entity_id]?.state) || 0)
+        })));
+        list.forEach((d, i) => {
+            d.siConversionFactor = getSIFactor(d.unit).factor / _targetFactor;
+            entities[i].siConversionFactor = d.siConversionFactor;
+            d.axisUnit = _refUnit;
+        });
+    }
+
     addGraphToCanvas(gid, type, entities, config, isStatic = false)
     {
         const canvas = this._this.querySelector(`#graph${gid}`);
@@ -2471,22 +2535,12 @@ export class HistoryCardState {
             });
         }
 
-        // Compute SI conversion factors if all datasets share the same base SI unit
+        // The Y axes, and on each one, its curves converted to one SI unit
         if( type === 'line' || type === 'bar' ) {
-            const _units = datasets.map(d => d.unit);
-            if( _units.length > 0 && _units.every(u => areSICompatible(u, _units[0])) && _units.some((u,i,a) => u !== a[0]) ) {
-                // Estimate max value from current HA state for each entity
-                const _unitsWithMax = datasets.map(d => ({
-                    unit: d.unit,
-                    maxVal: Math.abs(parseFloat(this._hass.states[d.entity_id]?.state) || 0)
-                }));
-                const { unit: _refUnit, targetFactor: _targetFactor } = chooseSIUnit(_unitsWithMax);
-                for( let i = 0; i < datasets.length; i++ ) {
-                    const { factor: _srcFactor } = getSIFactor(datasets[i].unit);
-                    datasets[i].siConversionFactor = _srcFactor / _targetFactor;
-                    entities[i].siConversionFactor = datasets[i].siConversionFactor;
-                }
-                datasets._siRefUnit = _refUnit;
+            this._assignYAxes(datasets, entities);
+            for( const id of [LEFT_Y_AXIS, RIGHT_Y_AXIS] ) {
+                const _idx = datasets.map((d, i) => d.yAxisID === id ? i : -1).filter(i => i >= 0);
+                this._applySIConversion(_idx.map(i => datasets[i]), _idx.map(i => entities[i]));
             }
         }
 
@@ -3128,7 +3182,7 @@ export class HistoryCardState {
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
                     if( this.pconfig.showCurrentValues && g !== this._frozenChart ) {
                         let d = g.chart.data.datasets[i];
-                        d.label = this.getFormattedLabelName(d.name, e.entity, d.unit, d.shownScale);
+                        d.label = this._legendLabel(d);
                     }
                     changed = true;
                 }
@@ -3188,6 +3242,7 @@ export class HistoryCardState {
             netBars           : ent.netBars,
             decimation        : ent.decimation,
             circular          : ent.circular,
+            yAxis             : ent.yAxis,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
