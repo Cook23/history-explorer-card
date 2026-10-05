@@ -57,6 +57,23 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Circular labels and stacked bars, per axis ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.wind' }] },
+        { type: 'bar', stacked: true, entities: [{ entity: 'sensor.energy' }, { entity: 'sensor.energy2' }, { entity: 'sensor.gas' }] },
+    ] }), { height: 1000, mock: { series: true } });
+    await t.step('a circular curve on the right axis: that axis\' labels wrap around (period 360), the left one\'s don\'t', async () => {
+        const p = await t.E(`graphAt(0).chart.options.scales.yAxes.map(a=>a.ticks.period ?? null)`);
+        return p[0] === null && p[1] === 360 ? true : JSON.stringify(p);
+    });
+    await t.step('stacked bars on two axes: each axis\' bars stacked in their own column', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(1).chart; const x=i=>c.getDatasetMeta(i).data.map(b=>Math.round(b._model.x)); const base=i=>c.getDatasetMeta(i).data.map(b=>Math.round(b._model.base));
+            return { axes: c.data.datasets.map(d=>d.yAxisID), x0: x(0)[5], x1: x(1)[5], x2: x(2)[5], top0: Math.round(c.getDatasetMeta(0).data[5]._model.y), base1: base(1)[5] }; })()`);
+        // (energy and energy2, in kWh, on the left: one column, energy2 on top of energy; gas, in m³, on the right: a column of its own)
+        return r.axes.join() === 'y-axis-0,y-axis-0,y-axis-1' && r.x0 === r.x1 && r.x2 !== r.x0 && r.base1 === r.top0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── Gestures: an axis' label column moves that axis; Shift, a pinch, the padlock: both ──
     const twoAxes = card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] });
     const ranges = () => t.E('[yRange(0), yRangeRight(0)]');

@@ -1035,6 +1035,9 @@ export class HistoryCardState {
                     hitRadius: 5,
                     label: this._legendLabel(d),
                     yAxisID: d.yAxisID,
+                    // (stacked bars: those of each Y axis in their own column — stacking
+                    // values of two scales on each other would mean nothing)
+                    stack: d.yAxisID,
                     name: d.name,
                     steppedLine: d.mode === 'stepped',
                     cubicInterpolationMode: 'monotone',
