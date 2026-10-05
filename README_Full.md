@@ -9,7 +9,7 @@
 
 > **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54. The first version of this fork is 1.1.0 — see [Differences from upstream](#differences-from-upstream).
 
-> For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/main/README.md).
+> For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md).
 
 This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
@@ -66,17 +66,17 @@ This card offers a highly interactive and configurable way to view the history o
 
 ## Differences from upstream
 
-This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card); its first version is 1.1.0. Here is what it adds or changes compared with that version — each point is detailed in the sections below.
+This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card); its first version is 1.1.0. Here is what it adds or changes compared with that version — each point is detailed in the sections below. This is the documentation of the **1.2** line, a rewrite of the card's code: what it adds over the 1.1 line is marked **(1.2)**.
 
 ### Adding entities
 
 - **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry adds it. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined. `excludeFilterEntities` removes entities from what `filterEntities` lets through.
-- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link.
+- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*), sent as a report.
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
 
 ### Organizing graphs
 
-- **Combining by unit** — with `combineSameUnits`, entities added from the card with compatible units, SI prefixes included (W and kW), share one graph; each value is shown in its own unit. A graph defined in YAML always shows all its entities together, whatever their units, bars and curves included (the curves drawn over the bars).
+- **Combining by unit** — with `combineSameUnits`, entities added from the card with compatible units, SI prefixes included (W and kW), share one graph; each value is shown in its own unit. A graph defined in YAML always shows all its entities together, whatever their units, bars and curves included (the curves drawn over the bars). **(1.2)** Two groups of units get a Y axis each, left and right (`yAxis` chooses the side), the curves of the right one marked ▸ in the legend.
 - **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press within half a second.
 
 ### Drawing
@@ -86,10 +86,19 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 - **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
 - **Display options** — `showMinMax` (min/max band from long-term statistics, or over the whole graph), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
+- **Colors (1.2)** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
 
 ### Y axis
 
-Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a horizontal one zooms the time); `ylock` locks it against any interactive change; `axisAddMarginMin` / `axisAddMarginMax` add a margin below and above the curves.
+Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a horizontal one zooms the time); `ylock` locks it against any interactive change; `axisAddMarginMin` / `axisAddMarginMax` add a margin below and above the curves. **(1.2)** With two Y axes, dragging the labels of one moves that one; Shift, the pinch and the padlock act on both.
+
+### Touch, pen and mouse (1.2)
+
+- **Touch** — a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch zooms the time and the Y axis, and pans both.
+- **Tooltip** — it opens on a click or a tap on the curves, then follows the mouse (or a pen held above the screen) until the pointer leaves the curves; hovering alone no longer opens it.
+- **Pen** — the tip works as a finger; where the browser passes its button on (Chrome, the Home Assistant app), a tap with it held on a label opens the type menu.
+- **Right click** on a label opens its type menu, as a long-press does; the browser's own menu never opens on a graph.
+- **Labels** are picked when touched just beside them, never when the touch is about halfway between two.
 
 ### Options
 
@@ -102,6 +111,10 @@ What is changed from the card is saved in your Home Assistant user account and s
 ### Interface
 
 The toolbar adapts its layout to the card's width; menus and tooltips stay within the card and the screen; the graph tooltip is an HTML element, readable at any size.
+
+### Info panel
+
+**(1.2)** Loaded through `frontend: extra_module_url`, the card's file puts the info panel in an entity's popup on every page of Home Assistant, not only once a dashboard was shown; switching the panel on or off no longer reloads the page, and a new browser or device takes the choice from your Home Assistant user data.
 
 ---
 
@@ -354,7 +367,13 @@ frontend:
     - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...
 ```
 
-Use **exactly** the URL of the card's dashboard resource (*Settings → Dashboards → ⋮ → Resources*), `?hacstag=…` included: the browser then runs the file only once. Restart Home Assistant, then reload the page. With another URL the file runs twice — harmless, but loaded twice. After a card update through HACS, the resource's `hacstag` changes: update the URL here too — otherwise the file runs twice, and the browser may keep serving its cached copy for the old URL.
+Restart Home Assistant, then reload the page.
+
+**About `?hacstag=…`** — it isn't required: `/hacsfiles/history-explorer-card/history-explorer-card.js` alone works. It's a tag HACS adds to the URL of the card's dashboard resource, and changes at each update, so that browsers fetch the new version. Using **exactly** that URL (*Settings → Dashboards → ⋮ → Resources*), tag included, is still the better choice:
+- the browser runs a file only once per URL: with the same URL as the resource, the card's file is loaded once; with another one, it's loaded twice — harmless (the card is made for it), only heavier;
+- with the tag, the browser fetches the new version after an update; without it, it may keep using a copy from its cache for the info panel until the page is fully reloaded.
+
+After each card update through HACS, copy the resource's URL into `extra_module_url` again.
 
 ### What the info-panel supports
 
@@ -604,7 +623,7 @@ Pressing the axis lock icon will temporarily disable autoscaling and lock the Y 
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis can also be interactively modified. Pressing and holding the `SHIFT` key will unlock interactive zooming and panning of the graph in vertical direction. Pressing your mouse button while holding `SHIFT` over a graph will allow you to drag the graph into both horizontal and vertical directions. Using the mousewheel while holding `SHIFT` will change the Y axis scale. When interacting with the Y axis, the axis lock icon will automatically be enabled. Click the icon to go back to the default scale at any time.
+The Y axis can also be interactively modified. Pressing and holding the `SHIFT` key will unlock interactive zooming and panning of the graph in vertical direction. Pressing your mouse button while holding `SHIFT` over a graph lets you drag the Y axis up and down from anywhere on the graph. Using the mousewheel while holding `SHIFT` will change the Y axis scale. When interacting with the Y axis, the axis lock icon will automatically be enabled. Click the icon to go back to the default scale at any time.
 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
 
@@ -768,11 +787,9 @@ Custom pattern: an array of pixel lengths `[on, off, on, off, ...]` following th
 
 ### Displaying individual samples
 
-Holding the `Alt` key (or `Option` key on Mac) while hovering over a graph will reveal all the individual samples making up the line chart:
-
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-If you would like to permanently show individual samples, use `showPoints` (or its synonym `showSamples`) — on the card, in `entityOptions`, on a graph or on an entity. It accepts a boolean or a numeric radius in pixels:
+To show the individual samples making up a line chart, use `showPoints` (or its synonym `showSamples`) — on the card, in `entityOptions`, on a graph or on an entity. It accepts a boolean or a numeric radius in pixels:
 
 ```yaml
 type: custom:history-explorer-card
