@@ -904,6 +904,11 @@
   // ── Pen barrel button ──
   // The barrel button is reported as the secondary button (buttons bit 2), at the
   // contact or as a chorded change while the tip is down (Pointer Events).
+  // The long-press under way, if any, called off
+  function cancelLongPress(gs) {
+    if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+  }
+
   function penBarrel(c) {
     return c.pointerType === 'pen' && !!(c.e.native && c.e.native.buttons & 2);
   }
@@ -914,7 +919,7 @@
   function penBarrelPressed(c, p) {
     var gs = c.gs, _down = penBarrel(c);
     if (_down && !p.barrelDown) {
-      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      cancelLongPress(gs);
       var _now = Date.now();
       if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.dblClickMs) {
         fire(c, 'dblclick', p.x0, p.y0);
@@ -938,7 +943,7 @@
     var p = gs.pending;
     if (p) {
       if (p.longPressFired) return;
-      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      cancelLongPress(gs);
       p.longPressFired = true;
       fire(c, 'longpress', p.x0, p.y0);
       return;
@@ -1014,7 +1019,7 @@
     } else if (gs.count === 2) {
       // Second finger while first is already down — start pinch: track both
       // points and their spread, pan by centre movement, zoom by spread change.
-      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      cancelLongPress(gs);
       gs.pending = null;
       var _ids = Object.keys(gs.pointers);
       var _p1id = _ids[0], _p2id = _ids[1];
@@ -1047,7 +1052,7 @@
       if (p && p.pid === pid && !p.dragging && pointerType === 'pen') penBarrelPressed(c, p);
       if (p && p.pid === pid && !p.dragging) {
         if (Math.abs(e.x - p.x0) + Math.abs(e.y - p.y0) > cfg.dragSlop) {
-          if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+          cancelLongPress(gs);
           p.dragging = true;
           fire(c, 'dragstart', p.x0, p.y0);
           // Table-driven zone selection — per Thierry's explicit
@@ -1135,8 +1140,8 @@
           pointerType: pointerType, native: e.native, dblClickFired: false };
         fire(c, 'pinchend', _remainingPt.x, _remainingPt.y);
       }
-    } else if (gs.longPressTimer) {
-      clearTimeout(gs.longPressTimer); gs.longPressTimer = null;
+    } else {
+      cancelLongPress(gs);
     }
     var pu = gs.pending;
     if (pu && pu.pid === pid) {
@@ -1180,7 +1185,7 @@
     // the browser turns into its context menu) leaves the gesture to finish as it was.
     var _pt = gs.pointers[pid];
     if (_pt && _pt.moved) {
-      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      cancelLongPress(gs);
       if (gs.pending && gs.pending.pid === pid && gs.pending.dragging) {
         _hecEndDrag(c, gs.pending);
       }
