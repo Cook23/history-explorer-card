@@ -425,9 +425,13 @@ Set the `stacked` option to `true` to display the bars on top of each other rath
 
 ![image](https://github.com/alexarch21/history-explorer-card/assets/60828821/715f0416-6b4f-4b0d-869b-c732e7f2dd8d)
 
-#### Color ranges
+#### Colors
 
-Bar graphs can be color coded depending on the value they display rather than having a single color. The color range thresholds are provided as value pairs under the color key. You can provide as many thresholds as you want. Both dynamic and YAML defined graphs are supported.
+The `color` of a curve or of bars is a value, or an entity holding that value. The same values are accepted everywhere — in a graph's entity, in `entityOptions`, and in the state of an entity:
+
+- **a color**: any CSS color (`red`, `#3e95cd`, `#3e95cd80`, `rgb(62, 149, 205)`, `rgba(...)`, `hsl(...)`), a CSS variable (`--my-special-green`), or an RGB triplet: `[62, 149, 205]`, also written `62, 149, 205` or `(62, 149, 205)`;
+- **thresholds** on the value shown: value / color pairs, as many as you want. Each value takes the color of the highest threshold at or below it; below every threshold, the lowest one's. A curve is colored point by point, bars bar by bar (by the value of each bar). The keys can be quoted or not (`0: blue`, `'1.0': green`);
+- **an entity** (its entity_id): its state holds one of the above, as text — a color, a triplet, or thresholds written as JSON (`{"0": "blue", "20": "red"}`) or as a Home Assistant template writes a dictionary (`{0: 'blue', 20: 'red'}`). The curve then takes, at each point, the color that entity had at that time: its history is loaded with the card's, and the curve follows when it changes.
 
 ```yaml
 entityOptions:
@@ -437,8 +441,28 @@ entityOptions:
       '0.0': blue   # Bar is blue between below and up to 1.0 kWh
       '1.0': green  # Bar is green between 1.0 - 1.5 kWh
       '1.5': red    # Bar is red at 1.5 kWh and above
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.living_room_temperature
+        color: sensor.heating_color    # the color of the curve, at each point, is the one this entity had then
 ```
+
+The color of an entity can be set by a template sensor, for instance the heating's mode:
+
+```yaml
+template:
+  - sensor:
+      - name: heating color
+        state: "{{ {'heat': 'red', 'off': 'grey'}.get(states('climate.living_room'), 'blue') }}"
+```
+
 ![image](https://user-images.githubusercontent.com/60828821/197369661-9c75c9fe-e33f-4790-8348-8ae103880bfb.png)
+
+- The color is evaluated at each point (each bar): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
+- The legend shows the color now — as the value shown in the label is the value now.
+- When no valid color applies (the entity holding it unavailable, its state not a color, or no history of it — an entity holding text has no long-term statistics), the curve takes a color of the automatic palette.
+- Two curves of one graph whose `color` you set to the same value both keep it; only a color the card chose itself is changed to tell a curve from the others.
 
 #### Net metering
 
@@ -1026,7 +1050,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | Property | Type | Description |
 |---|---|---|
 | `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
-| `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
+| `color` | string, list or object | Line/bar color: a color, thresholds on the value, or an entity holding either — see [Colors](#colors) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |

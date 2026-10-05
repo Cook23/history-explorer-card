@@ -2,6 +2,7 @@
 // long-term statistics), filled on demand for the time window shown, and the user's own
 // state process function. Part of HistoryCardState (added to it in history-explorer-card.js).
 
+import { colorEntityOf } from "./card-datasets.js";
 const moment = window.HXLocal_moment;
 
 export class CardHistory
@@ -76,60 +77,61 @@ export class CardHistory
         return -1;
     }
 
+    // The entities whose history is loaded: those shown, and those giving a shown entity
+    // its color (see colorEntityOf) — each once
+    historyEntityIds()
+    {
+        const ids = new Set();
+        for( const g of this.graphs ) for( const e of g.entities ) ids.add(e.entity);
+        for( const id of this.colorEntityIds() ) ids.add(id);
+        return [...ids];
+    }
+
+    // The entities giving a shown entity its color
+    colorEntityIds()
+    {
+        const ids = new Set();
+        for( const g of this.graphs ) for( const e of g.entities ) { const c = colorEntityOf(e); if( c ) ids.add(c); }
+        return ids;
+    }
+
+    // An entity's history over cache slots c0 to c1, from the cache — with, first, its last
+    // state before c0 when an earlier slot has it, so that the graphs have one value just
+    // before the start of their own data (no interpolation issue at the start of a curve,
+    // no state disappearing at the start of a timeline). Empty when the cache has none.
+    cachedHistory(entity, c0, c1)
+    {
+        let r = [];
+        for( let i = c0; i <= c1; i++ ) {
+            const k = this.findCacheEntityIndex(i, entity);
+            if( k >= 0 ) r = r.concat(this.cache[i].data[k]);
+        }
+        for( let i = c0 - 1; i >= 0 && this.cache[i].valid; i-- ) {
+            const k = this.findCacheEntityIndex(i, entity);
+            const n = k >= 0 ? this.cache[i].data[k].length : 0;
+            if( n > 0 ) {
+                r.unshift({ "last_changed": this.cache[i].data[k][n-1].last_changed, "state": this.cache[i].data[k][n-1].state });
+                break;
+            }
+        }
+        return r;
+    }
+
+    // The graphs' data for the time window shown, from the cache: one history per shown
+    // entity, in the graphs' order (an empty one when the cache has none, so that the
+    // indices stay in step with buildChartData), and the color entities' by entity_id
     generateGraphDataFromCache()
     {
         let c0 = this.mapStartTimeToCacheSlot(this.startTime);
         let c1 = this.mapEndTimeToCacheSlot(this.endTime);
 
         if( c0 >= 0 && c1 >= 0 ) {
-
-            //console.log(`merge from ${c0} to ${c1}`);
-
-            // Build partial data
-            // The result data for the charts is expected in order of the charts entities, but the cache might not hold data
-            // for all the entities or it might be in a different order. So for every chart entity, search the cache for a match.
-            // If no match found, then add en empty record into the result, so to keep the indices in sync for buildChartData().
-            let result = [];
-            for( let i = c0; i <= c1; i++ ) {
-                let j = 0;
-                for( let g of this.graphs ) {
-                    for( let e of g.entities ) {
-                    if( result[j] == undefined ) result[j] = [];
-                        const k = this.findCacheEntityIndex(i, e.entity);
-                        if( k >= 0 )
-                            result[j] = result[j].concat(this.cache[i].data[k]);
-                        j++;
-                    }
-                }
-            }
-
-            // Add the very last state from the cache slot just before the requested one, if possible.
-            // This is to ensure that the charts have one data point just before the start of their own data
-            // This avoids interpolation issues at the chart start and disappearing states at the beginning of timelines.
-            if( c0 > 0 && this.cache[c0-1].valid ) {
-                let j = 0;
-                for( let g of this.graphs ) {
-                    for( let e of g.entities ) {
-                        for( let i = c0-1; i >= 0 && this.cache[i].valid; i-- ) {
-                            const k = this.findCacheEntityIndex(i, e.entity);
-                            if( k >= 0 ) {
-                                let n = this.cache[i].data[k].length;
-                                if( n > 0 ) {
-                                    result[j].unshift({ "last_changed": this.cache[i].data[k][n-1].last_changed, "state": this.cache[i].data[k][n-1].state });
-                                    break;
-                                }
-                            }
-                        }
-                        j++;
-                    }
-                }
-
-            }
-
-            this.buildChartData(result);
-
+            const result = [];
+            for( const g of this.graphs ) for( const e of g.entities ) result.push(this.cachedHistory(e.entity, c0, c1));
+            const colorHistory = {};
+            for( const id of this.colorEntityIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1);
+            this.buildChartData(result, colorHistory);
         } else
-
             this.buildChartData(null);
     }
 

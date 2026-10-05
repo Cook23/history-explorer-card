@@ -11753,17 +11753,20 @@
             // lineWidth :
             generateLabels: function (chart) {
               var data = chart.data;
+              // HEC: colors given per element (an array): the swatch takes the last element's
+              // — on a time axis, the most recent one, as the value shown in the label
+              var last = function (c) { return helpers.isArray(c) ? c[c.length - 1] : c; };
               return helpers.isArray(data.datasets) ? data.datasets.map(function (dataset, i) {
                 return {
                   text: dataset.label,
-                  fillStyle: !helpers.isArray(dataset.backgroundColor) ? dataset.backgroundColor : dataset.backgroundColor[0],
+                  fillStyle: last(dataset.backgroundColor),
                   hidden: !chart.isDatasetVisible(i),
                   lineCap: dataset.borderCapStyle,
                   lineDash: dataset.borderDash,
                   lineDashOffset: dataset.borderDashOffset,
                   lineJoin: dataset.borderJoinStyle,
                   lineWidth: dataset.borderWidth,
-                  strokeStyle: dataset.borderColor,
+                  strokeStyle: last(dataset.borderColor),
                   pointStyle: dataset.pointStyle,
 
                   // Below is extra data used for toggling the datasets

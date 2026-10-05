@@ -93,10 +93,11 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
-### Dataset option
+### Dataset options
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
+| `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
 
 ---
@@ -380,7 +381,7 @@ pointing to `deps/chart-hec.js` or to this file:
 | `Controller.handleEvent` | Hover hit-test limited to drawn points; a `mouseout` without movement (the browser's, during a scroll) doesn't close the tooltip; every event goes to `_hecGestureHandler`, with the timing constants (`cfg`) |
 | `Tooltip` | Drawn as a floating element (`_hecRenderFloatingTooltip`, §7 utilities) instead of on the canvas |
 | Platform (DOM) | Canvas `touch-action: pan-y` (§3); pointer and wheel listeners not passive (§5) |
-| Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines) |
+| Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines); a dataset whose colors are given per element (arrays: bars colored one by one) shows the last element's in its swatch — on a time axis, the most recent |
 | Linear scale | `ticks.period` labels (§1) |
 | Line controller, `updateBezierControlPoints` | `hecInterpolation` (§1): another algorithm than `'monotone'` goes to `helpers.hecSplineCurve` |
 | Header, `HEC_CHART_VERSION` | The card's version, logged once at load |

@@ -138,6 +138,73 @@
   };
 
   // ---------------------------------------------------------------------------
+  // Color steps — the dataset option `colorSteps` (Chart Custom.js.md §1): a line whose
+  // color changes along the X axis. A list of { x, borderColor, backgroundColor }, sorted
+  // by x: from each x on, until the next one, the line's stroke and fill take that step's
+  // colors (one left undefined: the dataset's own). Chart.js 2.7 gives a line one stroke
+  // and one fill color, so they become horizontal gradients with hard stops at the steps
+  // — in pixels, hence rebuilt at each update (zoom, pan, resize); each point takes the
+  // colors of its step (through its `custom` colors, which Chart.js also restores them
+  // from after a hover; cleared before each update, set again after it).
+  function _hecStepColors(ds, step) {
+    return {
+      border: step && step.borderColor !== undefined ? step.borderColor : ds.borderColor,
+      fill: step && step.backgroundColor !== undefined ? step.backgroundColor : ds.backgroundColor };
+  }
+
+  Chart.plugins.register({
+    id: 'hecColorSteps',
+    beforeDatasetUpdate: function (chart, args) {
+      (args.meta.data || []).forEach(function (pt) {
+        if (!pt._hecStepColored) return;
+        delete pt.custom.backgroundColor;
+        delete pt.custom.borderColor;
+        pt._hecStepColored = false;
+      });
+    },
+    afterDatasetUpdate: function (chart, args) {
+      var ds = chart.data.datasets[args.index];
+      var steps = ds && ds.colorSteps;
+      var meta = args.meta, line = meta.dataset, area = chart.chartArea;
+      var xs = chart.scales[meta.xAxisID];
+      if (!steps || !steps.length || !line || !line._model || !xs || !area || !(area.right > area.left)) return;
+      var w = area.right - area.left;
+      var px = steps.map(function (s) { return xs.getPixelForValue(s.x); });
+      // (the colors at a pixel: those of the last step at or before it)
+      var at = function (p) {
+        var k = -1;
+        while (k + 1 < px.length && px[k + 1] <= p) k++;
+        return _hecStepColors(ds, steps[k]);
+      };
+      var stroke = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+      var fill = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+      var cur = at(area.left);
+      stroke.addColorStop(0, cur.border);
+      fill.addColorStop(0, cur.fill);
+      for (var i = 0; i < px.length; i++) {
+        var o = (px[i] - area.left) / w;
+        if (o <= 0) continue;
+        if (o >= 1) break;
+        var next = _hecStepColors(ds, steps[i]);
+        stroke.addColorStop(o, cur.border); stroke.addColorStop(o, next.border);
+        fill.addColorStop(o, cur.fill); fill.addColorStop(o, next.fill);
+        cur = next;
+      }
+      stroke.addColorStop(1, cur.border);
+      fill.addColorStop(1, cur.fill);
+      line._model.borderColor = stroke;
+      line._model.backgroundColor = fill;
+      (meta.data || []).forEach(function (pt) {
+        if (!pt._model) return;
+        var c = at(pt._model.x);
+        pt.custom = pt.custom || {};
+        pt.custom.backgroundColor = pt._model.backgroundColor = c.border;
+        pt.custom.borderColor = pt._model.borderColor = c.border;
+        pt._hecStepColored = true;
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one

@@ -8,7 +8,7 @@ import "../deps/FileSaver.js"
 
 import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
-import { stateColors, stateColorsDark, defaultColors, parseColor } from "./history-default-colors.js";
+import { stateColors, stateColorsDark, defaultColors, parseColor, parseColorValue } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
 import { EntityStore, entityIdOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
@@ -1317,17 +1317,11 @@ export class HistoryCardState {
             this.loader.startIndex = l0;
             this.loader.endIndex = l1;
 
-            // Prepare db retrieval request for all visible entities
-            let n = 0;
+            // Prepare db retrieval request for all visible entities, and those giving them their color
             let t0 = this.loader.startTime.replace('+', '%2b');
             let t1 = this.loader.endTime.replace('+', '%2b');
-            let l = [];
-            for( let g of this.graphs ) {
-                for( let e of g.entities ) {
-                    l.push(e.entity);
-                    n++;
-                }
-            }
+            const l = this.historyEntityIds();
+            const n = l.length;
 
             if( n > 0 ) {
 
@@ -2177,11 +2171,16 @@ export class HistoryCardState {
             } else if( entityOptions?.color ) {
                 entities[0].color = entityOptions?.color;
                 entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
+                entities[0].colorSet = true;
             } else if( entities[0].color === "#000000" ) {
                 const c = this.getNextDefaultColor();
                 entities[0].color = c.color;
                 entities[0].fill = _ownFill ?? entityOptions?.fill ?? c.fill;
             }
+            // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
+            // palette's where none applies (see _currentColor)
+            if( !parseColorValue(entities[0].color)?.color )
+                entities[0].paletteColor = entities[0].paletteColor ?? this.getNextDefaultColor().color;
 
             entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
             entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
@@ -2257,8 +2256,10 @@ export class HistoryCardState {
 
             // Color conflict check now happens here, against the REAL combine target —
             // works regardless of whether the caller knew about this target in advance
-            // (e.g. a brand-new entity created via the type menu, groupId starting null)
-            if( entities[0].color !== undefined ) {
+            // (e.g. a brand-new entity created via the type menu, groupId starting null).
+            // Only for a color the card picked: one the configuration sets (colorSet) is kept,
+            // even when another curve of the graph has it.
+            if( entities[0].color !== undefined && !entities[0].colorSet ) {
                 const _usedColors = _cand.entities.map(e => e.color);
                 if( _usedColors.includes(entities[0].color) ) {
                     const _free = defaultColors.find(c => !_usedColors.includes(c.color));
@@ -2439,9 +2440,10 @@ export class HistoryCardState {
             datasets.push({
                 "kind": _kind,
                 "name": ( d.name === undefined ) ? this._hass.states[d.entity]?.attributes?.friendly_name : d.name,
-                "bColor": parseColor(d.color),
-                // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : parseColor(d.fill),
+                "bColor": this._currentColor(d),
+                // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
+                // a bar is filled with its own color)
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this._currentColor(d) : parseColor(d.fill),
                 "dashMode": d.dashMode,
                 "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
                 "interpolation": this._resolveInterpolation(d),
@@ -3132,6 +3134,12 @@ export class HistoryCardState {
                 i++;
             }
         }
+        // (an entity giving a shown entity its color: that curve changes too)
+        for( const id of this.colorEntityIds() ) {
+            const lc = this._hass.states[id]?.last_changed;
+            if( this.stateMap.has(id) && lc != this.stateMap.get(id) ) changed = true;
+            this.stateMap.set(id, lc);
+        }
 
         return changed;
     }
@@ -3148,6 +3156,7 @@ export class HistoryCardState {
             entity            : entity,
             groupId           : groupId,
             color             : ent.color,
+            colorSet          : ent.color !== undefined || undefined,
             fill              : ent.fill,
             hidden            : ent.hidden,
             interval          : this.parseIntervalConfig(ent.interval) ?? interval,

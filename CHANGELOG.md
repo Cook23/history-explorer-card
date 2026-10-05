@@ -6,6 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.4] - unreleased
 
+### New — a color held by an entity, thresholds on curves, RGB triplets
+- `color` is a value or an entity holding that value — the same values everywhere: a color (any CSS color, a CSS variable, an RGB triplet `[r, g, b]`, also as text `r, g, b` or `(r, g, b)`), or thresholds on the value shown (`{ 0: blue, 20: red }`, also as text: JSON, or a dictionary as a Home Assistant template writes it). Named by its entity_id, an entity's state holds the color: the curve takes, at each point, the color that entity had then — its history is loaded with the card's, and a change of its state refreshes the graph
+- Thresholds now color curves too (each point by its value), not only bars
+- The color is evaluated at each point (each bar): a curve changes color on a point, its fill with it (with the transparency of its `fill`). The legend shows the color now; where no valid color applies, a color of the automatic palette
+- Two curves of one graph set to the same `color` both keep it: only a color the card chose itself is changed to tell the curves apart
+- `deps/chart-hec.js`: new dataset option `colorSteps` (a line whose color changes along the X axis); `deps/Chart.js`: a legend swatch takes the last of colors given per element (`deps/Chart Custom.js.md` §1, §8). `src/history-default-colors.js`: one reader for every form of a color value (`parseColorValue`, `colorForValue`); `src/card-history.js`: one read of an entity's cached history (`cachedHistory`) for the shown entities and those holding a color
+- Tests: new suite `colors` (a color from an entity along its history, the legend now, thresholds on a curve, thresholds held by an entity, a triplet, no valid color, bars, the entity changing, two curves set to the same color)
+
 ### Fixed — pen: a tap with its button no longer undoes the tap before it
 - In Chrome and the Home Assistant app (Android), a tap with the pen's button held reports no contact at all, only a context menu (measured with *Tests (beta) ▸ Pen events*). 1.2.3 took a context menu coming soon after a tap at the same place as that tap's second half and undid it: a tap on a label (curve hidden), then a tap with the button on it within a couple of seconds, showed the curve again. A context menu now only opens the type menu; it's ignored only right after the release of a contact whose own long press already opened it (a browser reporting it at the release)
 - `deps/chart-hec.js`: `undoesClick` removed from the `longpress` payload (`deps/Chart Custom.js.md` §2)

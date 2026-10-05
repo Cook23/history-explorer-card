@@ -33,17 +33,24 @@ const STATES={
  'sensor.wind_rad':ent('sensor.wind_rad','wind (rad)','rad','1.5708','measurement'),
  'sensor.wind_grad':ent('sensor.wind_grad','wind (grad)','gon','100','measurement'),
  'sensor.energy2':ent('sensor.energy2','energy2','kWh','5','total_increasing'),
+ // colors held by entities (an entity's `color`): series cycle through attributes.values
+ 'input_text.curve_color':ent('input_text.curve_color','curve color',null,'#0000ff'),
+ 'input_text.curve_thresholds':ent('input_text.curve_thresholds','curve thresholds',null,"{0: 'green', 800: 'red'}"),
+ 'input_text.not_a_color':ent('input_text.not_a_color','not a color',null,'nothing'),
 };
+STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
+STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
 STATES['sensor.net_energy'].attributes.device_class='energy';
 STATES['sensor.tank'].attributes.device_class='volume_storage';
 window.userData={};
 window.__ws=[];
 // A state change, as Home Assistant pushes it: new value, new last_changed, new hass object
-window.setState=(id,v)=>{ const t=new Date().toISOString(); STATES[id]={...STATES[id],state:String(v),last_changed:t,last_updated:t}; (window.hassTargets||[]).forEach(x=>{ x.hass=mkHass(); }); };
+window.setState=(id,v)=>{ const t=new Date().toISOString(); STATES[id]={...STATES[id],state:String(v),last_changed:t,last_updated:t,setAt:Date.parse(t)/1000}; (window.hassTargets||[]).forEach(x=>{ x.hass=mkHass(); }); };
 // Value of entity id at time t (s) in the mocked history
 const isNum=id=>!isNaN(Number(STATES[id].state));
 const base=id=>Number(STATES[id].state)||1;
 function valueAt(id,t){
+  const v=STATES[id].attributes.values; if(v) return v[Math.floor(t/7200)%v.length];
   if(!isNum(id)) return Math.floor(t/7200)%2 ? 'on' : 'off';
   if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
   return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
@@ -55,6 +62,8 @@ function history(d){
     if(!STATES[e]) continue;
     if(!MOCK.series){ r[e]=[{s:STATES[e].state,lu:Math.max(t0,kept)}]; continue; }
     const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/600)*600; t<t1; t+=600) pts.push({s:valueAt(e,t),lu:t});
+    // (a state the test set is the history from its time on)
+    const tSet=STATES[e].setAt; if(tSet>=t0 && tSet<t1){ while(pts.length && pts[pts.length-1].lu>=tSet) pts.pop(); pts.push({s:STATES[e].state,lu:tSet}); }
     if(pts.length) r[e]=pts;
   }
   return r;
