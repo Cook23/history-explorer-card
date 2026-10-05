@@ -285,15 +285,15 @@ Graphs sharing the same group are shown as a solid block with a chain icon 🔗 
 
 Graphs added from the UI work the same way: changing a curve's display type to one its graph can't show (e.g. a line into a timeline) moves it to a new graph linked to its original one, and changing its type back to a compatible one returns it to that original graph. A double-click on a label of a graph added from the UI, on the other hand, takes that curve out of its group entirely (no link).
 
-Within a group, curves can always be shown together again, whatever their units, as long as their display types match:
+Within a group, curves can always be shown together again, as long as their display types match:
 - **Drag** a curve (or timeline entity) label onto another graph of the same group
 - **Double-click** the chain icon to merge the graph below it into the graph above it
 
-A curve of a YAML graph can't be dropped onto a graph of another group, and a curve from elsewhere can't be dropped onto a YAML graph.
-
 #### Moving curves between graphs
 
-A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Only graphs with compatible SI units are accepted as drop targets — except within a group of linked graphs, where any unit is accepted (see *Linked graphs* above). The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. An incompatible drop shows a brief tooltip explaining the mismatch (e.g. `W ≠ m`). On a touch screen, tap the label, then press it again within half a second and drag.
+A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. **(1.2)** Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see *Y axis*). Only the display type limits a drop: a curve can't go onto a timeline or arrowline graph, nor a timeline entity onto a line or bar graph — the drop is refused with a brief tooltip (e.g. `line ≠ timeline`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again within half a second and drag.
+
+**(1.2)** A drop is saved only when the placement of both graphs is (the `entities` persistence of their entities, see *Persistence*). A graph defined in YAML saves nothing by default: a curve dropped onto it, or taken out of it, is saved where it was before the drop, so a reload brings both graphs back as they were — nothing duplicated, nothing lost. Dropped back into its own graph, the curve is saved there again.
 
 #### Reordering curves within a graph
 

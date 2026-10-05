@@ -162,5 +162,31 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A curve dragged onto another graph: saved only when both graphs' placements are ──
+    t = await openCard({ ...YAML(), graphs: [YAML().graphs[0]] }, { mock: { series: true }, height: 1400 });
+    const add = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    // Each graph: its entities, in display order
+    const layout = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance._allGraphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
+    const dragOnto = async (id, ontoId) => { await t.drag(await legendPtOf(id), await graphPtOf(ontoId)); await t.wait(800); };
+    await add('sensor.rain'); await t.wait(400); await add('sensor.tank'); await t.wait(1200);
+    const initial = await layout();
+    await t.step('a curve added from the card dropped onto a YAML graph: shown there, back in its own graph after a reload', async () => {
+        await dragOnto('sensor.rain', 'sensor.power');
+        const l1 = await layout(); await reload(); const l2 = await layout();
+        return /power\+power2\+rain/.test(l1) && l2 === initial ? true : JSON.stringify({ initial, l1, l2 });
+    });
+    await t.step('a YAML curve dropped onto a graph added from the card: shown there, back in its YAML graph after a reload, no duplicate', async () => {
+        await dragOnto('sensor.power2', 'sensor.rain');
+        const l1 = await layout(); await reload(); const l2 = await layout();
+        return /rain\+power2|power2\+rain/.test(l1) && l2 === initial ? true : JSON.stringify({ initial, l1, l2 });
+    });
+    await t.step('between two graphs added from the card: the drop is saved', async () => {
+        await dragOnto('sensor.rain', 'sensor.tank');
+        const l1 = await layout(); await reload(); const l2 = await layout();
+        return /tank\+rain|rain\+tank/.test(l1) && l2 === l1 ? true : JSON.stringify({ l1, l2 });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

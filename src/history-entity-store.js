@@ -49,6 +49,36 @@ export class EntityStore
     // A new dynamic group id
     newGroupId() { return this.nextGroupId++; }
 
+    // Where an entry is now: its group, its graph in that group, and the entry before it in
+    // the list (its place in the display order) — see unsavedFrom
+    placementOf(entry)
+    {
+        const i = this.list.indexOf(entry);
+        return { groupId: entry.groupId, graphKey: entry.graphKey, graphIndex: entry.graphIndex,
+                 after: i > 0 ? entityIdOf(this.list[i - 1]) : null };
+    }
+
+    // The list as it is saved: an entry moved where its placement isn't saved (its
+    // unsavedFrom: the placementOf it had before) is saved at that placement — right after
+    // the entry it followed, else after the last one of its group, else last
+    savedList()
+    {
+        const out = this.list.filter(e => !e?.unsavedFrom);
+        for( const e of this.list.filter(e => e?.unsavedFrom) ) {
+            const { unsavedFrom: u, ...saved } = e;
+            for( const k of ['groupId', 'graphKey', 'graphIndex'] ) {
+                if( u[k] === undefined ) delete saved[k]; else saved[k] = u[k];
+            }
+            let i = u.after === null ? -1 : out.findIndex(x => entityIdOf(x) === u.after);
+            if( i < 0 && u.after !== null ) {
+                out.forEach((x, k) => { if( isObj(x) && x.groupId === u.groupId ) i = k; });
+                if( i < 0 ) i = out.length - 1;
+            }
+            out.splice(i + 1, 0, saved);
+        }
+        return out;
+    }
+
     // ── Changes ──
 
     // Registers an entry (once)
