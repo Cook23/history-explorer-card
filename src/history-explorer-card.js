@@ -483,13 +483,15 @@ export class HistoryCardState {
         }
     }
 
+    // The panel switched on or off (here, or on another device): saved where the panel reads
+    // it at each render (writeInfoPanelConfig) — it applies the next time an entity's dialog
+    // shows its history, without reloading the page — and the menu entry follows
     applyInfoPanelState()
     {
-        const _ls = JSON.parse(window.localStorage.getItem('history-explorer-info-panel') || 'null') || {};
-        if( infoPanelEnabled !== !!_ls.enabled ) {
+        if( infoPanelEnabled !== !!window.localStorage.getItem('history-explorer-info-panel') )
             this.writeInfoPanelConfig(true);
-            location.reload();
-        }
+        for( const ei of this._this.querySelectorAll('[id^="ei_"]') )
+            ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
     }
 
 
@@ -3474,7 +3476,11 @@ class HistoryExplorerCard extends HTMLElement
 
 console.info(`%c HISTORY-EXPLORER-CARD %c Version ${Version}`, "color:white;background:blue;font-weight:bold", "color:black;background:white;font-weight:bold");
 
-customElements.define('history-explorer-card', HistoryExplorerCard);
+// (this file may run twice — as a dashboard resource and through frontend: extra_module_url,
+// from two URLs: the element is defined once)
+if( !customElements.get('history-explorer-card') )
+    customElements.define('history-explorer-card', HistoryExplorerCard);
 
 window.customCards = window.customCards || [];
-window.customCards.push({ type: 'history-explorer-card', name: 'History Explorer Card', preview: false, description: 'An interactive history viewer card'});
+if( !window.customCards.some(c => c.type === 'history-explorer-card') )
+    window.customCards.push({ type: 'history-explorer-card', name: 'History Explorer Card', preview: false, description: 'An interactive history viewer card'});

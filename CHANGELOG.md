@@ -6,6 +6,13 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.4] - unreleased
 
+### New — the info panel on every page of Home Assistant
+- Loaded through `frontend: extra_module_url` (documented: the exact URL of the dashboard resource), the card's file hooks the entity dialog's history on any page — Settings, History, a page opened directly — not only once a dashboard is shown
+- The hook is always installed; whether the panel replaces Home Assistant's own history is decided at each render. Switching it on or off no longer reloads the page
+- A browser where the card never ran takes the panel's state and configuration from Home Assistant's user data (once per page), and saves them
+- The file can run twice (two URLs): the card is defined once, listed once in the card picker, and the dialog hooked once
+- Tests: the panel off then on then off without reload, on from Home Assistant's user data, off there too, the file loaded twice
+
 ### New — thresholds on the value of another entity, states and `default` in thresholds
 - Thresholds with an `entity` key compare that entity's value instead of the value shown, at each point along its history: a heat pump's power colored by its mode (`{ entity: sensor.heat_pump_mode, heat: red, cool: blue }`)
 - In thresholds, everywhere: a number key is a threshold, any other key a state compared exactly as written (case included), `default` the color of every value they don't cover

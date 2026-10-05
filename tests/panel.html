@@ -4,10 +4,12 @@
 <!-- The card's info panel: the history section of Home Assistant's entity dialog
      (ha-more-info-history, faked here: it renders what the card puts in its place),
      against the mocked Home Assistant (mock-ha.js). The panel's config comes from the test
-     (window.PANEL_CFG). -->
+     (window.PANEL_CFG; null: the panel off, nothing saved in this browser); window.LOAD_TWICE
+     loads the card's file a second time, from another URL. -->
 <script src="mock-ha.js"></script>
 <script>
-localStorage.setItem('history-explorer-info-panel', JSON.stringify({ config: window.PANEL_CFG || {} }));
+if( window.PANEL_CFG !== null ) localStorage.setItem('history-explorer-info-panel', JSON.stringify({ config: window.PANEL_CFG || {} }));
+else localStorage.removeItem('history-explorer-info-panel');
 // lit's template result, rendered to HTML text
 const ser=(t)=>{ if(t==null||t===false) return ''; if(typeof t!=='object') return String(t); if(Array.isArray(t)) return t.map(ser).join(''); let o=''; t.strings.forEach((x,k)=>{ o+=x; if(k<t.values.length) o+=ser(t.values[k]); }); return o; };
 class FakeMoreInfoHistory extends HTMLElement {
@@ -23,6 +25,7 @@ class FakeMoreInfoHistory extends HTMLElement {
 customElements.define('ha-more-info-history', FakeMoreInfoHistory);
 </script>
 <script src="../history-explorer-card.js"></script>
+<script>if( window.LOAD_TWICE ) document.write('<script src="../history-explorer-card.js?again"><\/script>');</script>
 <script>
 // Opens the entity dialog's history of entity eid
 window.openPanel=(eid)=>{ const p=document.createElement('ha-more-info-history'); p.entityId=eid; p.hass=mkHass(); document.getElementById('host').appendChild(p); p.requestUpdate(); window.P=p; window.hassTargets=[p]; return true; };

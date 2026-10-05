@@ -342,6 +342,20 @@ Once enabled, clicking any entity anywhere on your Lovelace dashboard will open 
 
 The `defaultInfoPanel` option uses "last one to speak wins" logic: changing the YAML value overrides the user preference only when the YAML value actually changes. The user can still toggle the info panel on or off through the card UI.
 
+Switching the info panel on or off applies the next time an entity's popup shows its history, without reloading the page. The choice is saved for your Home Assistant user: a browser or a device where no card was shown yet uses it too.
+
+### On every page of Home Assistant
+
+The card's file is a dashboard resource: Home Assistant only loads it once a dashboard is shown. A page opened directly in a new tab — Settings → Entities, History, Logbook… — shows Home Assistant's own history in an entity's popup until a dashboard has been opened. To have the info panel on every page, load the card's file as soon as Home Assistant starts, in `configuration.yaml`:
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...
+```
+
+Use **exactly** the URL of the card's dashboard resource (*Settings → Dashboards → ⋮ → Resources*), `?hacstag=…` included: the browser then runs the file only once. Restart Home Assistant, then reload the page. With another URL the file runs twice — harmless, but loaded twice. After a card update through HACS, the resource's `hacstag` changes: update the URL here too — otherwise the file runs twice, and the browser may keep serving its cached copy for the old URL.
+
 ### What the info-panel supports
 
 The info-panel renders a single interactive line, bar, timeline or arrowline graph for the selected entity, using the same rendering engine as the main card. All interactive features are available:

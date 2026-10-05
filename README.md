@@ -96,7 +96,15 @@ infoPanel: true
 defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
 ```
 
-Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. Ungrouping, drag & drop and CSV export are not available in the popup.
+Once enabled, clicking any entity anywhere opens the history explorer graph instead. Switching it on or off applies right away, without reloading the page. Ungrouping, drag & drop and CSV export are not available in the popup.
+
+On every page of Home Assistant — Settings, History, a page opened directly in a new tab — once the card's file is also loaded through `configuration.yaml`, with the exact URL of its dashboard resource (*Settings → Dashboards → Resources*):
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the resource's URL, as it is
+```
 
 > For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#overriding-the-ha-more-info-history-info-panel)
 

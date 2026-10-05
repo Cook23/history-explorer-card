@@ -1,6 +1,6 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { infoPanelEnabled, HistoryCardState, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
+import { HistoryCardState, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
 import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
 
@@ -23,21 +23,51 @@ const html = litHtml(1);
 
 // --------------------------------------------------------------------------------------
 // HA history more info panel override
+//
+// The history of Home Assistant's entity dialog (ha-more-info-history) is hooked as soon as
+// this file runs — by a dashboard showing a card, or earlier on any page through
+// `frontend: extra_module_url` — and stays hooked: whether the panel replaces Home
+// Assistant's own history is decided at each render, from what the card saves
+// (localStorage 'history-explorer-info-panel': present = on, with the panel's config), or,
+// on a browser where the card never ran, from the same data in Home Assistant's user data.
 // --------------------------------------------------------------------------------------
+
+const INFO_PANEL_KEY = 'history-explorer-info-panel';
 
 let hec_panel = {};
     hec_panel.config = null;
     hec_panel.show = undefined;
     hec_panel.entity = null;
-    hec_panel.iid = null;
+
+// Is the panel on? Its config read along (hec_panel.config)
+function panelEnabled()
+{
+    let data = null;
+    try { data = JSON.parse(window.localStorage.getItem(INFO_PANEL_KEY)); } catch( e ) { /* none */ }
+    if( data ) hec_panel.config = data.config;
+    return !!data;
+}
+
+// Nothing saved in this browser: what Home Assistant's user data says, asked once per page
+// (whichever copy of this file asks); on, it's saved here and the dialog rendered again
+function fetchPanelState(el)
+{
+    if( window.__hecInfoPanelFetched || !el.hass?.callWS ) return;
+    window.__hecInfoPanelFetched = true;
+    el.hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_KEY }).then(r => {
+        if( !r?.value || window.localStorage.getItem(INFO_PANEL_KEY) ) return;
+        window.localStorage.setItem(INFO_PANEL_KEY, JSON.stringify(r.value));
+        el.requestUpdate?.();
+    }, () => {});
+}
 
 function hecHookInfoPanel()
 {
     let __fn = customElements.get("ha-more-info-history");
-    if( !__fn ) return;
-
-    clearInterval(hec_panel.iid);
-    hec_panel.iid = null;
+    // (hooked once: another copy of this file — loaded from another URL — leaves it as it is;
+    // hooking it twice would make _oldUpdated call itself)
+    if( !__fn || __fn.prototype._hecHooked ) return;
+    __fn.prototype._hecHooked = true;
 
     __fn.prototype._databaseCallback = function(valid)
     {
@@ -196,12 +226,11 @@ function hecHookInfoPanel()
 
     __fn.prototype._hec_updated = function(changedProps)
     {
+        if( !panelEnabled() ) return this._oldUpdated(changedProps);
 
         if( !this.hec_instance ) {
 
             hec_panel.show = undefined;
-
-            readLocalConfig();
 
             this.hec_instance = new HistoryCardState();
 
@@ -235,8 +264,10 @@ function hecHookInfoPanel()
 
     __fn.prototype._hec_render = function()
     {
-        if( !this.hec_instance )
-            readLocalConfig();
+        if( !panelEnabled() ) {
+            fetchPanelState(this);
+            return this._oldRender();
+        }
 
         const entity_id = this.entityId;
 
@@ -340,21 +371,11 @@ function hecHookInfoPanel()
         }
     };
 
-    function readLocalConfig()
-    {
-        let data = JSON.parse(window.localStorage.getItem('history-explorer-info-panel'));
-        if( data )
-            hec_panel.config = data.config;
-    }
-
-    if( infoPanelEnabled ) {
-        __fn.prototype._oldUpdated = __fn.prototype.updated;
-        __fn.prototype._oldRender = __fn.prototype.render;
-        __fn.prototype.updated = __fn.prototype._hec_updated;
-        __fn.prototype.render = __fn.prototype._hec_render;
-    }
-
+    __fn.prototype._oldUpdated = __fn.prototype.updated;
+    __fn.prototype._oldRender = __fn.prototype.render;
+    __fn.prototype.updated = __fn.prototype._hec_updated;
+    __fn.prototype.render = __fn.prototype._hec_render;
 }
 
-hec_panel.iid = setInterval(hecHookInfoPanel, 100);
+customElements.whenDefined('ha-more-info-history').then(hecHookInfoPanel);
 
