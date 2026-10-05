@@ -79,8 +79,9 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Pan**: click and drag left or right on any graph
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
-- **Tooltip**: click or tap the curves to see the values or state details under the pointer; the tooltip then follows the mouse (or a pen above the screen) until the pointer leaves the curves
-- **With a pen**: the tip works as a finger. Barrel button held: a drag moves a label, a graph or the Y axis right away, a tap on a label opens its type menu. Tip on a label and the barrel button pressed twice: as a double tap
+- **Tooltip**: click or tap the curves to see the values or state details under the pointer; the tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves
+- **Right click** on a label: opens its type menu, as a long-press does
+- **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome, a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
 - **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again within half a second and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis
 
 ---
@@ -156,15 +157,16 @@ excludeFilterEntities:
 An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars, as direction arrows or as a timeline; any other entity only as a timeline. The type menu opens:
 
 - right after selecting an entity to add in the dropdown (see [Adding entities](#adding-entities)) — always, even when *Timeline* is the only choice, so you can check before it's added;
-- on a long-press of a legend label (line/bar graphs) or of a timeline/arrowline label;
+- on a long-press (or a right click) of a legend label (line/bar graphs) or of a timeline/arrowline label;
 - when selecting an entity that's already shown, to change its type.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
-The type menu has three items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
@@ -200,7 +202,7 @@ When multiple curves share a graph, the Y axis and tooltips always show each ent
 
 - **Single-click** a curve label to show/hide it
 - **Double-click** a curve label to extract it into its own graph
-- **Long-press** a curve label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** (or right click) a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - **Drag** a curve label onto another graph to move it there (compatible units only — any unit within a group of [linked graphs](#linked-graphs))
 
@@ -228,7 +230,7 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 
 - **Drag** an entity label to move it to another timeline/arrowline graph, or to reorder it within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - **Double-click** an entity label to extract it into its own graph
-- **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** (or right click) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Click a truncated label to see the full name in a tooltip
 
 The page scrolls automatically when dragging near the top or bottom of the screen.
