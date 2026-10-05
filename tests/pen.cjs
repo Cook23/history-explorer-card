@@ -72,5 +72,23 @@ module.exports = async function()
         const t2 = await E(TIP(gi));
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
+    await t.step('a tap the browser takes over (pointercancel), then a hover reported as a mouse: the tooltip stays open and follows', async () => {
+        const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
+        await t.pen('pointerdown', p1, 1, 0); await t.pen('pointermove', { x: p1.x + 2, y: p1.y }, 1);
+        await t.pen('pointercancel', p1, 0, 0); await t.pen('pointerout', p1, 0, 0); await t.pen('pointerleave', p1, 0, 0);
+        await t.wait(400); const t1 = await E(TIP(gi));
+        await t.penHover(p1, p2, 10, 'mouse'); await t.wait(400); const t2 = await E(TIP(gi));
+        await t.pen('pointerout', p2, 0, -1, 'mouse'); await t.wait(1300);
+        return t1 && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
+    });
+    await t.step('a tap with the barrel button in Chrome (a plain tap, then a context menu): the type menu, the curve not hidden', async () => {
+        const a = await E('legendPt(0,0)');
+        await t.penTap(a); await t.wait(300);
+        const prevented = await t.contextMenu(a); await t.wait(400);
+        const open = await E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
+        const g = await t.graphs();
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
+        return open && prevented && !g.some(x => /\(h\)/.test(x)) ? true : JSON.stringify({ open, prevented, g });
+    });
     return t.close();
 };

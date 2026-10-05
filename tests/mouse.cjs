@@ -45,6 +45,15 @@ module.exports = async function()
         // on 0, beside 0, beside 1, halfway: none, far: none, on the curves under it: none (then the gap)
         return /^0,0,1,-1,-1,-1,/.test(r) ? true : r;
     });
+        await t.step('right click on a curve label: its type menu, the curve not hidden, no browser menu', async () => {
+        const pt = await E('legendPt(0,1)');
+        await E(`window.__ctxShown=0; document.addEventListener('contextmenu', e => { if( !e.defaultPrevented ) window.__ctxShown++; }, { once: true })`);
+        await t.page.mouse.click(pt.x, pt.y, { button: 'right' }); await t.wait(500);
+        const open = await E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
+        const g = (await t.graphs())[0]; const shown = await E('window.__ctxShown');
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400);
+        return open && !/\(h\)/.test(g) && shown === 0 ? true : JSON.stringify({ open, g, shown });
+    });
         await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');
         await t.page.mouse.click(pt.x, pt.y); await t.wait(700); const a = (await t.graphs())[0];

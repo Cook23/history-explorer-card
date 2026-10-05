@@ -4683,10 +4683,11 @@
 
             if (e.type === 'mouseout') {
               // A genuine mouseout (the pointer actually left the canvas) is always
-              // preceded by a mousemove — that's what carried it across the boundary. The
-              // synthetic one a non-hover device fires automatically right after mouseup
-              // (per the W3C Pointer Events spec) is, structurally, never preceded by a
-              // move at all — only by that mouseup. Tracking which of the two happened
+              // preceded by a hover move (no contact) — that's what carried it across the
+              // boundary. The one a browser fires right after a mouseup (a non-hover device,
+              // per the W3C Pointer Events spec, or a pen lifting off) or a pointercancel (a
+              // contact it took over to scroll) is never preceded by one — only by that
+              // mouseup or pointercancel. Tracking which of the two happened
               // last is a reliable way to tell them apart; comparing the reported
               // coordinates against the canvas bounds isn't (verified empirically: real
               // mouseout events can report coordinates still well inside those bounds,
@@ -4705,9 +4706,10 @@
               me._hecHasMoved = false;
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
               // active stays exactly what it was, same as a below-threshold mousemove.
-            } else if (e.type === 'mouseup') {
+            } else if (e.type === 'mouseup' || e.type === 'pointercancel') {
               me._hecHasMoved = false;
             } else if (e.type === 'mousedown') {
+              me._hecHasMoved = false;
               // (contact mode: a contact outside the plot area opens nothing — it ends the
               // mode, like leaving the plot area)
               me._hecTooltipMode = !_contactMode || _inPlot;
@@ -4716,7 +4718,10 @@
                 me._hecLastHitXY = { x: e.x, y: e.y };
               }
             } else if (e.type === 'mousemove') {
-              me._hecHasMoved = true;
+              // (only a move without contact — a hover — can carry the pointer out: the
+              // pointerout a browser sends when it takes a contact over, or when a pen
+              // lifts off, doesn't leave the graph)
+              if (!e.native || !e.native.buttons) me._hecHasMoved = true;
               var _searched = false;
               if (_contactMode && me._hecTooltipMode && !_inPlot) {
                 // Left the plot area: the tooltip mode ends, the tooltip closes
@@ -4813,6 +4818,7 @@
             var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
+            var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a tap or long press is that gesture's
 
             // Always run: click detection here is no longer an add-on for customEvent/
             // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
@@ -4825,7 +4831,8 @@
                 dblClickMs: _HEC_DBLCLICK_MS,
                 dragSlop: _HEC_DRAG_SLOP,
                 pinchMinDist: _HEC_PINCH_MIN_DIST,
-                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS });
+                wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS,
+                contextMenuAfterMs: _HEC_CONTEXTMENU_AFTER_MS });
             }
 
             return changed;
@@ -6300,7 +6307,7 @@
         // untouched by their presence. 'wheel' is bound per-canvas like every other event
         // here (see platform.addEventListener), so a wheel action only ever reaches the
         // chart whose canvas the pointer is actually over — never elsewhere on the page.
-        events: ['pointerdown', 'pointermove', 'pointerout', 'pointerup', 'pointercancel', 'wheel'],
+        events: ['pointerdown', 'pointermove', 'pointerout', 'pointerup', 'pointercancel', 'wheel', 'contextmenu'],
         hover: {
           onHover: null,
           mode: 'nearest',

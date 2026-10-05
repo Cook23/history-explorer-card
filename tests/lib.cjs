@@ -99,9 +99,10 @@ class Tester
     // ── Pen (Pointer Events of pointerType 'pen', sent to the element under the point:
     // the card's logic, not the browser's own handling of a real pen) ──
     // buttons: 1 the tip, 2 the barrel button, 3 both, 0 hovering
-    pen(type, q, buttons, button) {
+    // pointerType: 'pen', or 'mouse' as some browsers report a pen's hover (Firefox on Android)
+    pen(type, q, buttons, button, pointerType = 'pen') {
         return this.E(`(()=>{ const t=document.elementFromPoint(${q.x},${q.y});
-            t.dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: 'pen', isPrimary: true, bubbles: true, cancelable: true,
+            t.dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: '${pointerType}', isPrimary: true, bubbles: true, cancelable: true,
                 composed: true, clientX: ${q.x}, clientY: ${q.y}, buttons: ${buttons}, button: ${button ?? -1}, pressure: ${buttons & 1 ? 0.5 : 0} })); })()`);
     }
     async penTap(q, barrel) { await this.pen('pointerdown', q, barrel ? 3 : 1, barrel ? 2 : 0); await this.wait(60); await this.pen('pointerup', q, 0, barrel ? 2 : 0); }
@@ -117,7 +118,12 @@ class Tester
         for( let i = 0; i < 2; i++ ) { await this.pen('pointermove', q, 3, 2); await this.wait(60); await this.pen('pointermove', q, 1, 2); await this.wait(60); }
         await this.pen('pointerup', q, 0, 0); await this.wait(900);
     }
-    async penHover(a, c, steps = 10) { for( let i = 1; i <= steps; i++ ) { await this.pen('pointermove', { x: a.x + (c.x - a.x) * i / steps, y: a.y + (c.y - a.y) * i / steps }, 0); await this.wait(25); } }
+    async penHover(a, c, steps = 10, pointerType = 'pen') { for( let i = 1; i <= steps; i++ ) { await this.pen('pointermove', { x: a.x + (c.x - a.x) * i / steps, y: a.y + (c.y - a.y) * i / steps }, 0, -1, pointerType); await this.wait(25); } }
+    // The browser's context menu request at q (a right click, a long press, a pen's barrel button)
+    contextMenu(q) {
+        return this.E(`(()=>{ const t=document.elementFromPoint(${q.x},${q.y}); const e=new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, clientX: ${q.x}, clientY: ${q.y}, button: 2 });
+            t.dispatchEvent(e); return e.defaultPrevented; })()`);
+    }
     scrollY() { return this.E('scrollY'); }
     async scrollTop() { await this.E('scrollTo(0,0)'); await this.wait(300); }
 }

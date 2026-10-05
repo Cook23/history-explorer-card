@@ -71,7 +71,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Adding entities
 
 - **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry adds it. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined. `excludeFilterEntities` removes entities from what `filterEntities` lets through.
-- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link.
+- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link.
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
 
 ### Organizing graphs
@@ -143,12 +143,9 @@ Clicking the date selector will bring you back to the current date and time with
 
 Click or tap a chart line or a state timeline to get a tooltip of the selected values or state.
 
-The tooltip then follows the mouse — or a pen held above the screen — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
+The tooltip then follows the mouse — or a pen held above the screen, in the browsers that report it — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
 
-**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). The barrel button adds shortcuts, like a mouse's right button:
-- barrel button held, drag: moves a label, a graph (⠿ handle) or the Y axis right away, or pans the time on the curves;
-- barrel button held, tap on a label: opens its type menu;
-- tip held on a label, barrel button pressed twice: the same as a double tap (a curve taken out into its own graph).
+**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome, a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same.
 
 ### Adding entities
 
@@ -226,7 +223,7 @@ The type menu opens:
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
   - no unit and not a measurement — timeline;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
-- **On a long-press** of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or change its layout (**Layout ▸**).
+- **On a long-press** (or a right click) of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type of an entity that's already added, or change its layout (**Layout ▸**).
 - **When re-selecting an entity that's already present** in a graph — same effect as the long-press, reached via the entity selector instead.
 
 For a **wildcard match** (multiple new entities added at once), *Display* gets an extra **"Default"** entry at the top, pre-selected by default:
@@ -266,7 +263,7 @@ A curve can be extracted from a grouped graph by double-clicking its label in th
 
 On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
 
-A long-press on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
+A long-press (or a right click) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
 
 #### Linked graphs
 
@@ -300,7 +297,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
-- **Long-press** an entity label to open the [display type menu](#choosing-an-entitys-display-type)
+- **Long-press** (or right click) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
 - Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip

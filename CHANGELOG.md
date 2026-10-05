@@ -4,6 +4,23 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.3] - unreleased
+
+### Changed — the browser's context menu on a label opens its type menu
+- A right click on a curve label or a timeline label opens its type menu, as a long-press does; the browser's own menu never opens on a graph. A mouse's other buttons start no gesture (a right click no longer shows/hides a curve or starts a drag)
+- With a pen in Chrome, a tap with the button held is reported as a plain tap, then a context menu: it opens the type menu, and what the tap did (show/hide a curve, the Y axis lock) is undone
+- A long press the browser reports as a context menu before the card's own long-press delay opens the type menu once
+- `deps/chart-hec.js`: the browser's `contextmenu` is a gesture source (`hecContextMenu`): during a contact, that contact's `longpress`; right after a `click` at the same place, a `longpress` with `undoesClick`; right after a `longpress`, nothing (`deps/Chart Custom.js.md` §2)
+- Tests: right click on a curve label (type menu, curve not hidden, no browser menu), a pen tap with its button in Chrome
+
+### Fixed — pen: the tooltip closed right after the tap that opened it
+- When the browser took over the tap that opened the tooltip (a slight move of the tip: the page may scroll), it reported the pen as leaving the graph, which closed the tooltip, so hovering then moved nothing. Only a pointer moving out while hovering now closes it
+- `deps/chart-hec.js`: a gesture the browser takes over ends on the move of that same pointer, no longer on the tooltip's own state
+- Test: a tap the browser takes over, then a hover reported as a mouse (Firefox): the tooltip stays open and follows
+
+### Docs
+- The pen's button is only documented where the browser passes it on (Chrome: a tap with it held, as a right click); hover follows the pen in the browsers that report it
+
 ## [v1.2.2] - 2026-10-04
 
 ### Changed — a label is picked when touched just beside it

@@ -688,6 +688,13 @@
     }
     var _yIdx = yAxisIndexAt(c, _hx, _hy);
     var _truncated = truncatedYAxisLabelAt(c, _yIdx);
+    if (gestureType === 'click' || gestureType === 'longpress') {
+      gs.lastGesture = { type: gestureType, t: Date.now(), x: _hx, y: _hy };
+    }
+    if (gestureType === 'longpress' && extra && extra.undoesClick && me._hecInLockAndHandleZone(_hx, _hy)) {
+      // (the click it undoes had toggled the lock — see the click branch below)
+      me._hecToggleYAxisLock();
+    }
     if (gestureType === 'click') {
       if (typeof me.options.onClick === 'function') {
         me.options.onClick.call(me, e.native, me.active);
@@ -841,7 +848,6 @@
   function penBarrelPressed(c, p) {
     var gs = c.gs, _down = penBarrel(c);
     if (_down && !p.barrelDown) {
-      guardContextMenu(c.me);
       if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
       var _now = Date.now();
       if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.dblClickMs) {
@@ -855,21 +861,35 @@
     p.barrelDown = _down;
   }
 
-  // The browser's own context menu, which a barrel press also opens, kept off the
-  // graph for that press (on the canvas and the touch overlays over it, both under
-  // the canvas's parent)
-  function guardContextMenu(me) {
-    me._hecBarrelAt = Date.now();
-    var _host = me.canvas && me.canvas.parentNode;
-    if (!_host || _host._hecContextMenuGuard) return;
-    _host._hecContextMenuGuard = true;
-    _host.addEventListener('contextmenu', function (ev) {
-      if (me._hecBarrelAt && Date.now() - me._hecBarrelAt < 1500) ev.preventDefault();
-    });
+  // The browser's context menu request: a right click, a long press, a pen's barrel
+  // button (Chrome reports a tap made with it as a plain tap, then this). On a graph the
+  // browser's own menu never opens: it's the longpress gesture. During a contact, it's
+  // that contact's long press, fired now unless already; after a tap or a long press at
+  // the same place, it's that same gesture's: a click is undone (undoesClick, its first
+  // half rather than a click), a long press already acted
+  function hecContextMenu(c) {
+    var gs = c.gs, e = c.e, cfg = c.cfg;
+    if (e.native) e.native.preventDefault();
+    var p = gs.pending;
+    if (p) {
+      if (p.longPressFired) return;
+      if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
+      p.longPressFired = true;
+      fire(c, 'longpress', p.x0, p.y0);
+      return;
+    }
+    var last = gs.lastGesture;
+    gs.lastGesture = null;
+    var same = last && Date.now() - last.t < cfg.contextMenuAfterMs && Math.abs(last.x - e.x) + Math.abs(last.y - e.y) <= cfg.dragSlop;
+    if (same && last.type === 'longpress') return;
+    fire(c, 'longpress', e.x, e.y, same ? { undoesClick: true } : undefined);
   }
 
   function hecPointerDown(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    // A mouse's other buttons start no gesture: its right button acts through the
+    // contextmenu gesture (a pen's barrel button is handled below)
+    if (pointerType === 'mouse' && e.native && e.native.button > 0) return;
     gs.pointers[pid] = { x: e.x, y: e.y };
     gs.count = Object.keys(gs.pointers).length;
     // Keep receiving this pointer's moves/release once it leaves the canvas —
@@ -902,7 +922,6 @@
       // is a plain drag, the button keeping the browser from scrolling. It never
       // counts as half of a double-click.
       var _barrel = penBarrel(c);
-      if (_barrel) guardContextMenu(me);
       var _downNow = Date.now();
       var _isDblClick = !_barrel && gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
       if (_isDblClick) {
@@ -955,7 +974,7 @@
   // mousemove
   function hecPointerMove(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-    if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; }
+    if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; gs.pointers[pid].moved = true; }
 
     if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
       HEC_DRAG_HANDLERS[0].onMove(c, null, e);
@@ -1091,13 +1110,11 @@
   // pointercancel
   function hecPointerCancel(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-    // Adapted from Controller.handleEvent's mouseout discrimination above
-    // (me._hecHasMoved): a genuine cancel is preceded by real movement; one
-    // fired by the browser mid-scroll structurally is not. This is an
-    // adaptation to a different event, not the same verified case — flag as
-    // unproven until confirmed empirically, same as every other timing/gesture
-    // mechanism in this card was.
-    if (me._hecHasMoved) {
+    // A cancel after this pointer moved is the browser taking the contact over (a
+    // swipe it scrolls): the gesture ends. One with no move before it (a long press
+    // the browser turns into its context menu) leaves the gesture to finish as it was.
+    var _pt = gs.pointers[pid];
+    if (_pt && _pt.moved) {
       if (gs.longPressTimer) { clearTimeout(gs.longPressTimer); gs.longPressTimer = null; }
       if (gs.pending && gs.pending.pid === pid && gs.pending.dragging) {
         _hecEndDrag(c, gs.pending);
@@ -1161,7 +1178,7 @@
     }
   }
 
-  var GESTURE_EVENTS = { mousedown: hecPointerDown, mousemove: hecPointerMove, mouseup: hecPointerUp, pointercancel: hecPointerCancel, wheel: hecWheel };
+  var GESTURE_EVENTS = { mousedown: hecPointerDown, mousemove: hecPointerMove, mouseup: hecPointerUp, pointercancel: hecPointerCancel, wheel: hecWheel, contextmenu: hecContextMenu };
 
   // ── Methods added to every chart ──
 
@@ -1448,10 +1465,10 @@
           // events (the click that follows a long-press would otherwise take the focus
           // away from the type menu it just opened, closing it). Scrolling isn't one of
           // these: on touch it's only ever governed by touch-action.
-          if (ev.type === 'pointerdown') ev.preventDefault();
+          if (ev.type === 'pointerdown' || ev.type === 'contextmenu') ev.preventDefault();
           me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
         };
-        ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(function (t) {
+        ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'contextmenu'].forEach(function (t) {
           _el.addEventListener(t, _forward);
         });
         me[key] = _el;
