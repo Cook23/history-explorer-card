@@ -221,7 +221,6 @@ export class CardGestures
     }
 
 
-
     // A short message near a point (Chart.hecUi.showMessage), kept within the card
     _showLabelTooltip(label, clientX, clientY, align = 'left', anchorEl = document.body) {
         Chart.hecUi.showMessage(label, clientX, clientY, align, anchorEl, this._this?.querySelector('#maincard'));
@@ -371,111 +370,6 @@ export class CardGestures
     {
         const _xy = t => t === 'line' || t === 'bar';
         return a === b || ( _xy(a) && _xy(b) );
-    }
-
-    // How one entity of graph g is drawn: its bars, unless the graph's interval is 'raw
-    // line' (4) — which only ever turns its bar entities into raw curves. A graph holding
-    // at least one bar entity is a 'bar' graph (interval selector), its line entities
-    // being drawn as curves over the bars.
-    _entityKind(g, e)
-    {
-        if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
-        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
-    }
-
-    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
-    // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
-    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360), false
-    // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
-    // period <= 0, disables it with a warning.
-    _circularPeriod(e)
-    {
-        const c = e?.circular;
-        if( c === false ) return null;
-        if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
-            if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
-            return ( this.getUnitOfMeasure(e.entity, e.unit) === '°' ) ? 360 : null;
-        }
-        let P = NaN;
-        if( typeof c === 'number' ) P = c;
-        else if( typeof c === 'string' ) {
-            const t = c.replace(/\s+/g, '').toLowerCase();
-            P = ( t === '2pi' ) ? 2 * Math.PI : ( t === '' ? NaN : Number(t) );
-        }
-        if( !isFinite(P) || P <= 0 ) {
-            this._circularWarned = this._circularWarned ?? new Set();
-            if( !this._circularWarned.has(e.entity) ) {
-                this._circularWarned.add(e.entity);
-                console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(c)} for ${e.entity} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
-            }
-            return null;
-        }
-        return P;
-    }
-
-    // Circular values (period P) made into a continuous curve, on a copy of the samples (they
-    // are shared with the cache). Each value is first brought into [0, P), then a step of more
-    // than P/2 from the previous valid value is taken as a crossing of 0 (3, 1, 359 → 3, 1, -1).
-    // The whole curve is then moved by a multiple of P to sit around its circular mean c in
-    // [0, P). Should it span more than a turn (it went round several times), every value is put
-    // in the one-turn band [c - P/2, c + P/2) instead: band is then true, and its jumps get
-    // dashed (_markCircularJumps).
-    _unwrapCircular(data, P)
-    {
-        const mod = v => ( ( v % P ) + P ) % P;
-        const idx = [], raw = [], un = [];
-        let prev = null, offset = 0, sumS = 0, sumC = 0;
-        for( let i = 0; i < data.length; i++ ) {
-            const st = data[i].state;
-            if( st === null || st === undefined || st === '' ) continue;
-            const v = Number(st);
-            if( !isFinite(v) ) continue;
-            const r = mod(v);
-            if( prev !== null ) {
-                if( r - prev > P / 2 ) offset -= P; else
-                if( r - prev < -P / 2 ) offset += P;
-            }
-            prev = r;
-            idx.push(i); raw.push(r); un.push(r + offset);
-            sumS += Math.sin(r / P * 2 * Math.PI);
-            sumC += Math.cos(r / P * 2 * Math.PI);
-        }
-        if( !idx.length ) return { data, band: false };
-
-        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[0];
-        const mean = un.reduce((a, v) => a + v, 0) / un.length;
-        const k = Math.round(( c - mean ) / P) * P;
-        let lo = Infinity, hi = -Infinity;
-        for( let m = 0; m < un.length; m++ ) { un[m] += k; lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
-        const band = ( hi - lo > P );
-        if( band ) for( let m = 0; m < un.length; m++ ) un[m] = ( c - P / 2 ) + mod(raw[m] - ( c - P / 2 ));
-
-        const out = data.slice();
-        for( let m = 0; m < idx.length; m++ ) {
-            const p = data[idx[m]];
-            const q = { ...p, state: un[m] };
-            // (a min/max carried by the sample moves with it)
-            const shift = un[m] - Number(p.state);
-            if( p.yMin != null ) q.yMin = p.yMin + shift;
-            if( p.yMax != null ) q.yMax = p.yMax + shift;
-            out[idx[m]] = q;
-        }
-        return { data: out, band };
-    }
-
-    // A circular curve put in a one-turn band jumps where it crosses the band's edge: the
-    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode.
-    // Q: the period in chart units.
-    _markCircularJumps(s, Q)
-    {
-        for( let k = 1; k < s.length; k++ )
-            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) s[k].hecPlateauEnd = true;
-    }
-
-    // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)
-    _wrapCircular(v, Q)
-    {
-        return ( ( v % Q ) + Q ) % Q;
     }
 
     // Same group of linked graphs (a static YAML graph split by double-click, or a group

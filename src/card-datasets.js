@@ -191,11 +191,11 @@ export class CardDatasets
 
     buildChartData(result, colorHistory)
     {
-        let m_now = moment();
-        let m_start = moment(this.startTime);
-        let m_end = moment(this.endTime);
-
-        const isDataValid = state => this.pconfig.showUnavailable || !['unavailable', 'unknown'].includes(state);
+        // The time window drawn: now, its start and end, and which states are drawn
+        const w = {
+            now: moment(), start: moment(this.startTime), end: moment(this.endTime),
+            isValid: state => this.pconfig.showUnavailable || !['unavailable', 'unknown'].includes(state)
+        };
 
         let id = 0;
 
@@ -207,260 +207,42 @@ export class CardDatasets
 
                 if( this.state.updateCanvas && this.state.updateCanvas !== g.canvas ) continue;
 
-                var s = [];
-                var bcol = [];
+                const e = g.entities[j];
+                const _dataset = g.chart.data.datasets[j];
+                let s = [];
+                let bcol = [];
 
                 if( result && result.length > id ) {
 
-                    var n = result[id].length;
-
-                    const process = this.buildProcessFunction(g.entities[j].process);
+                    const process = this.buildProcessFunction(e.process);
 
                     // Per entity: a bar graph can hold curves too (see _entityKind)
-                    const _kind = this._entityKind(g, g.entities[j]);
+                    const _kind = this._entityKind(g, e);
 
                     // Circular values (angles): a continuous curve, see _unwrapCircular
-                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this._circularPeriod(g.entities[j]) : null;
+                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this._circularPeriod(e) : null;
                     let _circBand = false;
                     if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
 
                     if( _kind == 'line' ) {
-
-                        // Fill line chart buffer
-
-                        const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
-
-                        const clusterMode = g.entities[j].decimation ?? this.pconfig.decimation ?? 'fast';
-
-                        if( n > 2 && clusterMode && this.activeRange.dataClusterSize > 0 ) {
-
-                            let last_time = this.momentCache(result[id][0].last_changed);
-                            let max_state = null, max_time = null;
-                            let min_state = null, min_time = null;
-
-                            for( let i = 0; i < n; i++ ) {
-                                let state = this.process(result[id][i].state, process);
-                                if( isDataValid(state) ) {
-                                    state *= scale;
-                                    let this_time = this.momentCache(result[id][i].last_changed);
-                                    if( clusterMode == 'accurate' ) {
-                                        if( max_state === null || state > max_state ) { max_state = state; max_time = this_time; }
-                                        if( min_state === null || state < min_state ) { min_state = state; min_time = this_time; }
-                                    }
-                                    if( !i || this_time.diff(last_time) >= this.activeRange.dataClusterSize ) {
-                                        if( clusterMode == 'accurate' ) {
-                                            if( min_time < max_time ) {
-                                                s.push({ x: min_time, y: min_state});
-                                                s.push({ x: max_time, y: max_state});
-                                            } else {
-                                                s.push({ x: max_time, y: max_state});
-                                                s.push({ x: min_time, y: min_state});
-                                            }
-                                        } else
-                                            s.push({ x: this_time, y: state});
-                                        last_time = this_time;
-                                        max_state = min_state = null;
-                                    }
-                                }
-                            }
-
-                        } else {
-
-                            for( let i = 0; i < n; i++ ) {
-                                const state = this.process(result[id][i].state, process);
-                                if( isDataValid(state) ) {
-                                    {
-                                    const pt = { x: result[id][i].last_changed, y: state * scale };
-                                    const showMM = g.entities[j].showMinMax;
-                                    if( showMM ) {
-                                        if( result[id][i].yMin != null ) {
-                                            pt.yMin = result[id][i].yMin * scale;
-                                            pt.yMax = result[id][i].yMax * scale;
-                                        } else if( (showMM === 'history' || showMM === 'states') && this.minmaxCache?.[g.entities[j].entity] ) {
-                                            const mm = this.minmaxCache[g.entities[j].entity];
-                                            const ts = moment(result[id][i].last_changed).valueOf();
-                                            const bucket = Math.floor(ts / 3600000) * 3600000;
-                                            const slot = mm[bucket] ?? mm[bucket - 3600000];
-                                            if( slot ) { pt.yMin = slot.yMin * scale; pt.yMax = slot.yMax * scale; }
-                                        }
-                                    }
-                                    s.push(pt);
-                                }
-                                }
-                            }
-                        }
-
-                        let _extended = false;
-                        if( m_now > m_end && s.length > 0 && moment(s[s.length-1].x) < m_end ) {
-                            const state = this.process(result[id][n-1].state, process);
-                            if( isDataValid(state) ) {
-                                const pt = { x: m_end, y: state * scale };
-                                const showMM = g.entities[j].showMinMax;
-                                if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
-                                s.push(pt);
-                                _extended = true;
-                            }
-                        } else if( m_now <= m_end && s.length > 0 && moment(s[s.length-1].x) < m_now ) {
-                            const state = this.process(result[id][n-1].state, process);
-                            if( isDataValid(state) ) {
-                                const pt = { x: m_now, y: state * scale };
-                                const showMM = g.entities[j].showMinMax;
-                                if( showMM && result[id][n-1].yMin != null ) { pt.yMin = result[id][n-1].yMin * scale; pt.yMax = result[id][n-1].yMax * scale; }
-                                s.push(pt);
-                                _extended = true;
-                            }
-                        }
-
-                        if( (this.normalizeLineMode(g.entities[j].lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
-                            // Silences are detected on every recorded value (before decimation)
-                            const _raw = [];
-                            for( let i = 0; i < n; i++ ) {
-                                const state = this.process(result[id][i].state, process);
-                                if( !isDataValid(state) ) continue;
-                                const y = state * scale;
-                                if( !isNaN(y) ) _raw.push({ t: moment(result[id][i].last_changed).valueOf(), y });
-                            }
-                            s = this._applySilencePlateaus(s, _raw, _extended);
-                        }
-
+                        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+                        s = this._lineSamples(e, result[id], process, scale, w);
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
-
-                        const _colorFn = this._colorFunction(g.entities[j], colorHistory);
-                        if( _colorFn ) this._applyPointColors(g.chart.data.datasets[j], g.entities[j], s, _colorFn, scale, parseColor(g.entities[j].fill));
-
-                    } else if( _kind == 'bar' && n > 0 ) {
-
-                        const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
-                        const netBars = g.entities[j].netBars ?? false;
-
-                        const _colorFn = this._colorFunction(g.entities[j], colorHistory);
-
-                        let td;
-                        if( g.interval == 0 ) td = moment.duration(10, "minute"); else
-                        if( g.interval == 1 ) td = moment.duration(1, "hour"); else
-                        if( g.interval == 2 ) td = moment.duration(1, "day"); else
-                        if( g.interval == 3 ) td = moment.duration(1, "month");
-
-                        let i = 0;
-                        let y0 = this.process(result[id][0].state, process) * 1.0;
-                        let y1 = y0;
-
-                        // Start time of the range, snapped to interval boundary
-                        const f = ( g.interval <= 1 ) ? 'YYYY-MM-DDTHH[:00:00]' : ( g.interval <= 2 ) ? 'YYYY-MM-DDT[00:00:00]' : 'YYYY-MM-[01]T[00:00:00]';
-                        let t = moment(moment(m_start).format(f));
-
-                        // Search for the first state in the time range
-                        while( i < n && moment(result[id][i].last_changed) <= t ) {
-                            y0 = this.process(result[id][i++].state, process) * 1.0;
-                        }
-
-                        // Calculate differentials over the time range in interval sized stacks, add a half interval at the end so that the last bar doesn't jump
-                        // Add them to the graph with a half interval time offset, so that the stacks align at the center of their respective intervals
-                        for( ; t <= m_end + td; ) {
-                            let te = moment(t).add(td);
-                            y1 = y0;
-                            let d = 0;
-                            while( i < n && this.momentCache(result[id][i].last_changed) < te ) {
-                                const state = this.process(result[id][i].state, process) * 1.0;
-                                if( !isNaN(state) ) {
-                                    if( !netBars && state < y1 ) {
-                                        d += y1 - y0;
-                                        y0 = state;
-                                    }
-                                    y1 = state;
-                                }
-                                i++;
-                            }
-                            d += y1 - y0;
-                            s.push({ x: t + td / 2.0, y: d * scale});
-                            if( _colorFn )
-                                bcol.push(_colorFn(t + td / 2.0, d) ?? g.entities[j].paletteColor);
-                            t = te;
-                            y0 = y1;
-                        }
-
+                        const _colorFn = this._colorFunction(e, colorHistory);
+                        if( _colorFn ) this._applyPointColors(_dataset, e, s, _colorFn, scale, parseColor(e.fill));
+                    } else if( _kind == 'bar' && result[id].length > 0 ) {
+                        ({ s, bcol } = this._barSamples(g, e, result[id], process, w, this._colorFunction(e, colorHistory)));
                     } else if( g.type == 'timeline' || g.type == 'arrowline' ) {
-
-                        // Fill timeline chart buffer
-
-                        const clusterMode = g.entities[j].decimation ?? this.pconfig.decimation ?? 'fast';
-                        let enableClustering = clusterMode != false;
-
-                        if( g.type == 'arrowline' || process ) enableClustering = false;
-
-                        let merged = 0;
-                        let mt0, mt1;
-                        let state;
-
-                        const m_max = ( m_now < m_end ) ? m_now : m_end;
-
-                        for( let i = 0; i < n; i++ ) {
-
-                            // Start and end timecode of current state block
-                            let t0 = result[id][i].last_changed;
-                            let t1 = ( i < n-1 ) ? result[id][i+1].last_changed : m_max;
-
-                            // Not currently merging small blocks ?
-                            if( !merged ) {
-
-                                // State of the current block
-                                state = this.processRaw(result[id][i].state, process);
-
-                                // Skip noop state changes (can happen at cache slot boundaries)
-                                while( i < n-1 && this.processRaw(result[id][i].state, process) == this.processRaw(result[id][i+1].state, process) ) {
-                                    ++i;
-                                    t1 = ( i < n-1 ) ? result[id][i+1].last_changed : m_max;
-                                }
-
-                            }
-
-                            let moment_t0 = this.momentCache(t0);
-                            let moment_t1 = ( t1 === m_max ) ? moment(t1) : this.momentCache(t1);
-
-                            if( !enableClustering || moment_t1.diff(moment_t0) >= this.activeRange.dataClusterSize || i == n-1 ) {
-                                // Larger than merge limit, finish a potential current merge before proceeding with new block
-                                // Also stop merging when hitting the last state block regardless of size, otherwise it wont be committed
-                                if( merged > 0 ) {
-                                    t0 = mt0;
-                                    t1 = mt1;
-                                    moment_t0 = moment(t0);
-                                    moment_t1 = moment(t1);
-                                    i--;
-                                }
-                            } else {
-                                // Below merge limit, start merge (keep the first state for possible single block merges) or extend current one
-                                if( !merged ) { mt0 = t0; state = this.processRaw(result[id][i].state, process); }
-                                mt1 = t1;
-                                merged++;
-                                continue;
-                            }
-
-                            // Add the current block to the graph
-                            if( moment_t1 >= m_start ) {
-                                if( moment_t1 > m_end ) t1 = this.endTime;
-                                if( moment_t0 > m_end ) break;
-                                if( moment_t0 < m_start ) t0 = this.startTime;
-                                let e = [];
-                                e.push(t0);
-                                e.push(t1);
-                                e.push(( merged > 1 ) ? 'multiple' : String(state));
-                                s.push(e);
-                            }
-
-                            // Merging always stops when a block was added
-                            merged = 0;
-
-                        }
-
+                        s = this._timelineRows(g, e, result[id], process, w);
                     }
 
                 }
 
-                g.chart.data.datasets[j].data = s;
+                _dataset.data = s;
 
                 if( bcol.length > 0 ) {
-                    g.chart.data.datasets[j].backgroundColor = bcol;
-                    g.chart.data.datasets[j].borderColor = bcol;
+                    _dataset.backgroundColor = bcol;
+                    _dataset.borderColor = bcol;
                 }
 
                 updated = true;
@@ -470,5 +252,341 @@ export class CardDatasets
             if( updated ) this._applyTimeAxis(g);
 
         }
+    }
+
+    // A point's min/max band (showMinMax): the sample's own (long-term statistics), else —
+    // for 'history' / 'states' — the hour's from the min/max cache
+    _withMinMax(pt, e, sample, scale, fromCache = true)
+    {
+        const showMM = e.showMinMax;
+        if( !showMM ) return pt;
+        if( sample.yMin != null ) {
+            pt.yMin = sample.yMin * scale;
+            pt.yMax = sample.yMax * scale;
+        } else if( fromCache && (showMM === 'history' || showMM === 'states') && this.minmaxCache?.[e.entity] ) {
+            const mm = this.minmaxCache[e.entity];
+            const ts = moment(sample.last_changed).valueOf();
+            const bucket = Math.floor(ts / 3600000) * 3600000;
+            const slot = mm[bucket] ?? mm[bucket - 3600000];
+            if( slot ) { pt.yMin = slot.yMin * scale; pt.yMax = slot.yMax * scale; }
+        }
+        return pt;
+    }
+
+    // A curve's points: its samples (decimated to the cluster size, 'fast' or 'accurate'),
+    // its last value carried to the end of the window (or now), its silences as plateaus in
+    // smart mode
+    _lineSamples(e, data, process, scale, w)
+    {
+        const n = data.length;
+        let s = [];
+        const clusterMode = e.decimation ?? this.pconfig.decimation ?? 'fast';
+
+        if( n > 2 && clusterMode && this.activeRange.dataClusterSize > 0 ) {
+
+            let last_time = this.momentCache(data[0].last_changed);
+            let max_state = null, max_time = null;
+            let min_state = null, min_time = null;
+
+            for( let i = 0; i < n; i++ ) {
+                let state = this.process(data[i].state, process);
+                if( w.isValid(state) ) {
+                    state *= scale;
+                    let this_time = this.momentCache(data[i].last_changed);
+                    if( clusterMode == 'accurate' ) {
+                        if( max_state === null || state > max_state ) { max_state = state; max_time = this_time; }
+                        if( min_state === null || state < min_state ) { min_state = state; min_time = this_time; }
+                    }
+                    if( !i || this_time.diff(last_time) >= this.activeRange.dataClusterSize ) {
+                        if( clusterMode == 'accurate' ) {
+                            if( min_time < max_time ) {
+                                s.push({ x: min_time, y: min_state});
+                                s.push({ x: max_time, y: max_state});
+                            } else {
+                                s.push({ x: max_time, y: max_state});
+                                s.push({ x: min_time, y: min_state});
+                            }
+                        } else
+                            s.push({ x: this_time, y: state});
+                        last_time = this_time;
+                        max_state = min_state = null;
+                    }
+                }
+            }
+
+        } else {
+
+            for( let i = 0; i < n; i++ ) {
+                const state = this.process(data[i].state, process);
+                if( w.isValid(state) )
+                    s.push(this._withMinMax({ x: data[i].last_changed, y: state * scale }, e, data[i], scale));
+            }
+        }
+
+        // The last value carried to the end of the window, or to now when the window
+        // reaches it
+        let _extended = false;
+        const _until = ( w.now > w.end ) ? w.end : w.now;
+        if( s.length > 0 && moment(s[s.length-1].x) < _until ) {
+            const state = this.process(data[n-1].state, process);
+            if( w.isValid(state) ) {
+                s.push(this._withMinMax({ x: _until, y: state * scale }, e, data[n-1], scale, false));
+                _extended = true;
+            }
+        }
+
+        if( (this.normalizeLineMode(e.lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+            // Silences are detected on every recorded value (before decimation)
+            const _raw = [];
+            for( let i = 0; i < n; i++ ) {
+                const state = this.process(data[i].state, process);
+                if( !w.isValid(state) ) continue;
+                const y = state * scale;
+                if( !isNaN(y) ) _raw.push({ t: moment(data[i].last_changed).valueOf(), y });
+            }
+            s = this._applySilencePlateaus(s, _raw, _extended);
+        }
+
+        return s;
+    }
+
+    // A bar entity's bars: what it added over each interval of the graph (10 minutes, an
+    // hour, a day, a month) — a counter reset starting again from its new value, unless
+    // netBars — each bar at the middle of its interval; its colors when they vary (colorFn)
+    _barSamples(g, e, data, process, w, colorFn)
+    {
+        const n = data.length;
+        const s = [], bcol = [];
+        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+        const netBars = e.netBars ?? false;
+
+        let td;
+        if( g.interval == 0 ) td = moment.duration(10, "minute"); else
+        if( g.interval == 1 ) td = moment.duration(1, "hour"); else
+        if( g.interval == 2 ) td = moment.duration(1, "day"); else
+        if( g.interval == 3 ) td = moment.duration(1, "month");
+
+        let i = 0;
+        let y0 = this.process(data[0].state, process) * 1.0;
+        let y1 = y0;
+
+        // Start time of the range, snapped to interval boundary
+        const f = ( g.interval <= 1 ) ? 'YYYY-MM-DDTHH[:00:00]' : ( g.interval <= 2 ) ? 'YYYY-MM-DDT[00:00:00]' : 'YYYY-MM-[01]T[00:00:00]';
+        let t = moment(moment(w.start).format(f));
+
+        // Search for the first state in the time range
+        while( i < n && moment(data[i].last_changed) <= t ) {
+            y0 = this.process(data[i++].state, process) * 1.0;
+        }
+
+        // Calculate differentials over the time range in interval sized stacks, add a half interval at the end so that the last bar doesn't jump
+        // Add them to the graph with a half interval time offset, so that the stacks align at the center of their respective intervals
+        for( ; t <= w.end + td; ) {
+            let te = moment(t).add(td);
+            y1 = y0;
+            let d = 0;
+            while( i < n && this.momentCache(data[i].last_changed) < te ) {
+                const state = this.process(data[i].state, process) * 1.0;
+                if( !isNaN(state) ) {
+                    if( !netBars && state < y1 ) {
+                        d += y1 - y0;
+                        y0 = state;
+                    }
+                    y1 = state;
+                }
+                i++;
+            }
+            d += y1 - y0;
+            s.push({ x: t + td / 2.0, y: d * scale});
+            if( colorFn )
+                bcol.push(colorFn(t + td / 2.0, d) ?? e.paletteColor);
+            t = te;
+            y0 = y1;
+        }
+
+        return { s, bcol };
+    }
+
+    // A timeline's or arrowline's rows: [start, end, state] blocks within the window, the
+    // blocks shorter than the cluster size merged into one ('multiple') on a timeline
+    _timelineRows(g, e, data, process, w)
+    {
+        const n = data.length;
+        const s = [];
+        const clusterMode = e.decimation ?? this.pconfig.decimation ?? 'fast';
+        let enableClustering = clusterMode != false;
+
+        if( g.type == 'arrowline' || process ) enableClustering = false;
+
+        let merged = 0;
+        let mt0, mt1;
+        let state;
+
+        const m_max = ( w.now < w.end ) ? w.now : w.end;
+
+        for( let i = 0; i < n; i++ ) {
+
+            // Start and end timecode of current state block
+            let t0 = data[i].last_changed;
+            let t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;
+
+            // Not currently merging small blocks ?
+            if( !merged ) {
+
+                // State of the current block
+                state = this.processRaw(data[i].state, process);
+
+                // Skip noop state changes (can happen at cache slot boundaries)
+                while( i < n-1 && this.processRaw(data[i].state, process) == this.processRaw(data[i+1].state, process) ) {
+                    ++i;
+                    t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;
+                }
+
+            }
+
+            let moment_t0 = this.momentCache(t0);
+            let moment_t1 = ( t1 === m_max ) ? moment(t1) : this.momentCache(t1);
+
+            if( !enableClustering || moment_t1.diff(moment_t0) >= this.activeRange.dataClusterSize || i == n-1 ) {
+                // Larger than merge limit, finish a potential current merge before proceeding with new block
+                // Also stop merging when hitting the last state block regardless of size, otherwise it wont be committed
+                if( merged > 0 ) {
+                    t0 = mt0;
+                    t1 = mt1;
+                    moment_t0 = moment(t0);
+                    moment_t1 = moment(t1);
+                    i--;
+                }
+            } else {
+                // Below merge limit, start merge (keep the first state for possible single block merges) or extend current one
+                if( !merged ) { mt0 = t0; state = this.processRaw(data[i].state, process); }
+                mt1 = t1;
+                merged++;
+                continue;
+            }
+
+            // Add the current block to the graph
+            if( moment_t1 >= w.start ) {
+                if( moment_t1 > w.end ) t1 = this.endTime;
+                if( moment_t0 > w.end ) break;
+                if( moment_t0 < w.start ) t0 = this.startTime;
+                s.push([t0, t1, ( merged > 1 ) ? 'multiple' : String(state)]);
+            }
+
+            // Merging always stops when a block was added
+            merged = 0;
+
+        }
+
+        return s;
+    }
+
+    // --------------------------------------------------------------------------------------
+    // How an entity is drawn: as a curve, bars or rows; circular values
+    // --------------------------------------------------------------------------------------
+
+    // How one entity of graph g is drawn: its bars, unless the graph's interval is 'raw
+    // line' (4) — which only ever turns its bar entities into raw curves. A graph holding
+    // at least one bar entity is a 'bar' graph (interval selector), its line entities
+    // being drawn as curves over the bars.
+    _entityKind(g, e)
+    {
+        if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
+        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
+    }
+
+    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
+    // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
+    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360), false
+    // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
+    // period <= 0, disables it with a warning.
+    _circularPeriod(e)
+    {
+        const c = e?.circular;
+        if( c === false ) return null;
+        if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
+            if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
+            return ( this.getUnitOfMeasure(e.entity, e.unit) === '°' ) ? 360 : null;
+        }
+        let P = NaN;
+        if( typeof c === 'number' ) P = c;
+        else if( typeof c === 'string' ) {
+            const t = c.replace(/\s+/g, '').toLowerCase();
+            P = ( t === '2pi' ) ? 2 * Math.PI : ( t === '' ? NaN : Number(t) );
+        }
+        if( !isFinite(P) || P <= 0 ) {
+            this._circularWarned = this._circularWarned ?? new Set();
+            if( !this._circularWarned.has(e.entity) ) {
+                this._circularWarned.add(e.entity);
+                console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(c)} for ${e.entity} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
+            }
+            return null;
+        }
+        return P;
+    }
+
+    // Circular values (period P) made into a continuous curve, on a copy of the samples (they
+    // are shared with the cache). Each value is first brought into [0, P), then a step of more
+    // than P/2 from the previous valid value is taken as a crossing of 0 (3, 1, 359 → 3, 1, -1).
+    // The whole curve is then moved by a multiple of P to sit around its circular mean c in
+    // [0, P). Should it span more than a turn (it went round several times), every value is put
+    // in the one-turn band [c - P/2, c + P/2) instead: band is then true, and its jumps get
+    // dashed (_markCircularJumps).
+    _unwrapCircular(data, P)
+    {
+        const mod = v => ( ( v % P ) + P ) % P;
+        const idx = [], raw = [], un = [];
+        let prev = null, offset = 0, sumS = 0, sumC = 0;
+        for( let i = 0; i < data.length; i++ ) {
+            const st = data[i].state;
+            if( st === null || st === undefined || st === '' ) continue;
+            const v = Number(st);
+            if( !isFinite(v) ) continue;
+            const r = mod(v);
+            if( prev !== null ) {
+                if( r - prev > P / 2 ) offset -= P; else
+                if( r - prev < -P / 2 ) offset += P;
+            }
+            prev = r;
+            idx.push(i); raw.push(r); un.push(r + offset);
+            sumS += Math.sin(r / P * 2 * Math.PI);
+            sumC += Math.cos(r / P * 2 * Math.PI);
+        }
+        if( !idx.length ) return { data, band: false };
+
+        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[0];
+        const mean = un.reduce((a, v) => a + v, 0) / un.length;
+        const k = Math.round(( c - mean ) / P) * P;
+        let lo = Infinity, hi = -Infinity;
+        for( let m = 0; m < un.length; m++ ) { un[m] += k; lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
+        const band = ( hi - lo > P );
+        if( band ) for( let m = 0; m < un.length; m++ ) un[m] = ( c - P / 2 ) + mod(raw[m] - ( c - P / 2 ));
+
+        const out = data.slice();
+        for( let m = 0; m < idx.length; m++ ) {
+            const p = data[idx[m]];
+            const q = { ...p, state: un[m] };
+            // (a min/max carried by the sample moves with it)
+            const shift = un[m] - Number(p.state);
+            if( p.yMin != null ) q.yMin = p.yMin + shift;
+            if( p.yMax != null ) q.yMax = p.yMax + shift;
+            out[idx[m]] = q;
+        }
+        return { data: out, band };
+    }
+
+    // A circular curve put in a one-turn band jumps where it crosses the band's edge: the
+    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode.
+    // Q: the period in chart units.
+    _markCircularJumps(s, Q)
+    {
+        for( let k = 1; k < s.length; k++ )
+            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) s[k].hecPlateauEnd = true;
+    }
+
+    // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)
+    _wrapCircular(v, Q)
+    {
+        return ( ( v % Q ) + Q ) % Q;
     }
 }
