@@ -212,11 +212,13 @@ fork's card previously handled itself) are now applied by Chart.js
 directly, since the chart already has every piece of data it needs — no
 value needs to come back from the card:
 
-- **Y-axis pan** (dragging the Y-axis label zone, or Shift+drag anywhere
-  on a `line`/`bar` chart) — moves `options.scales.yAxes[0].ticks.min/max`
-  directly.
+- **Y-axis pan** (dragging an axis' label zone — left, or right on a chart with
+  a right axis — or Shift+drag anywhere on a `line`/`bar` chart) — moves the
+  `ticks.min/max` of that axis, or of every Y axis with Shift, directly
+  (`_hecValueYAxes` / `_hecSetYRanges`).
 - **Y-axis zoom** (Shift+wheel, or the Y-spread of a 2-finger pinch) —
-  same, computed via simple scale-factor math on the current min/max.
+  same, on every Y axis, each around its own middle (simple scale-factor math
+  on its current min/max).
 - **Y-axis pan during a pinch** (the vertical movement of the fingers' centre) —
   same as the Y-axis drag: the content follows the fingers.
 - **Y-axis lock** (the padlock icon) — a lock state (`0`=off, `1`=manually

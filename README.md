@@ -391,7 +391,7 @@ showUnavailable: true
 
 Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between 10 min, hourly, daily and monthly bars (hourly by default), or *Raw line*.
 
-A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves share one Y axis — for incompatible units (e.g. kWh bars and a W curve) use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
 ```yaml
 entityOptions:

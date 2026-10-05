@@ -4,10 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.4] - unreleased
+## [v1.2.4] - 2026-10-05
 
 ### New — two Y axes on a graph
 - A line or bar graph has up to two Y axes, one per group of compatible units: the first group on the left, the second on the right, each with its own scale, title, SI conversion (W and kW: one unit) and circular labels. With more than two groups, one shared axis without a title, as before
+- A graph that mixes exactly two groups of units — energy bars and a power curve, a power and a temperature — now shows them on two axes (it used to be one axis without a unit)
 - An entity's `yAxis` (`left`, `right`; on the entity or in `entityOptions`) puts it on that side whatever its unit
 - The curves of the right axis are marked with a small arrow ▸ in the legend; `ymin` / `ymax` / `ystepSize` apply to both axes
 - Linked graphs keep the same room on the right when one of them has a right axis: their time stays aligned
