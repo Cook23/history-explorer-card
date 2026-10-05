@@ -381,4 +381,179 @@ export class CardHistory
             return null;
         }
     }
+
+    // --------------------------------------------------------------------------------------
+    // Rebuild the charts for the current start and end time, load cache as needed
+    // --------------------------------------------------------------------------------------
+
+    findFirstIndex(array, range, predicate)
+    {
+        let l = range.start - 1;
+        while( l++ < range.end ) {
+            if( predicate(array[l]) ) return l;
+        }
+        return -1;
+    }
+
+    findLastIndex(array, range, predicate)
+    {
+        let l = range.end + 1;
+        while( l-- > range.start ) {
+            if( predicate(array[l]) ) return l;
+        }
+        return -1;
+    }
+
+    updateHistory()
+    {
+        for( let i of this.ui.dateSelector )
+            if( i ) i.innerHTML = moment(this.startTime).format(this.i18n.styleDateSelector);
+
+        // Prime the cache on first call
+        if( !this.cache.length ) this.initCache();
+
+        // Check if we need to grow the cache due to an overflow
+        if( moment(this.startTime) < this.cache[0].start_m ) this.growCache(365);
+
+        // Get cache slot indices for beginning and end of requested time range
+        let c0 = this.mapStartTimeToCacheSlot(this.startTime);
+        let c1 = this.mapEndTimeToCacheSlot(this.endTime);
+
+        //console.log(`Slots ${c0} to ${c1}`);
+
+        // Get the cache slot (sub)range that needs to be retrieved from the db
+        let l0 = ( c0 >= 0 ) ? this.findFirstIndex(this.cache, { 'start': c0, 'end': c1 }, function(e) { return !e.valid; }) : -1;
+        let l1 = ( c1 >= 0 ) ? this.findLastIndex(this.cache, { 'start': c0, 'end': c1 }, function(e) { return !e.valid; }) : -1;
+
+        if( l0 >= 0 ) {
+
+            // Requested data range is not yet loaded. Get it from database first and update the chart data aysnc when fetched.
+
+            // TODO: handle this with a scheduled reload
+            if( this.state.loading ) {
+                if( l0 >= this.loader.startIndex && l1 <= this.loader.endIndex ) return;
+                console.log(`Slots ${l0} to ${l1} need loading`);
+                console.log(`Double loading blocked, slots ${this.loader.startIndex} to ${this.loader.endIndex} are currently loading`);
+                return;
+            }
+
+            //console.log(`Slots ${l0} to ${l1} need loading`);
+
+            this.loader.startTime = this.cache[l0].start;
+            this.loader.endTime = this.cache[l1].end;
+            this.loader.startIndex = l0;
+            this.loader.endIndex = l1;
+
+            // Prepare db retrieval request for all visible entities, and those giving them their color
+            let t0 = this.loader.startTime.replace('+', '%2b');
+            let t1 = this.loader.endTime.replace('+', '%2b');
+            const l = this.historyEntityIds();
+            const n = l.length;
+
+            if( n > 0 ) {
+
+                this.state.loading = true;
+
+                if( this.statistics.force )
+                    this.limitSlot = this.cacheSize + 1;
+
+                if( !this.statistics.enabled || l0 > this.limitSlot ) {
+
+                    // Issue history retrieval call, initiate async cache loading
+                    const d = {
+                        type: "history/history_during_period",
+                        start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+                        end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+                        minimal_response: true,
+                        no_attributes: true,
+                        entity_ids: l
+                    };
+                    this._hass.callWS(d).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
+
+                    // Parallel statistics query for entities with showMinMax:'history'/'states'
+                    const lmm = [];
+                    for( const g of this.graphs )
+                        for( const e of g.entities ) {
+                            const v = e.showMinMax;
+                            if( v === 'history' || v === 'states' || v === true || v === 'statistics' )
+                                lmm.push(e.entity);
+                        }
+                    if( lmm.length ) {
+                        const dmm = {
+                            type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? 'recorder/statistics_during_period' : 'history/statistics_during_period',
+                            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+                            end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+                            period: this.statistics.period ?? 'hour',
+                            statistic_ids: lmm
+                        };
+                        this._hass.callWS(dmm).then(this.minmaxCallback.bind(this), () => {});
+                    }
+
+                } else {
+
+                    // Issue statistics retrieval call
+                    const d = {
+                        type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
+                        start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+                        end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+                        period: this.statistics.period,
+                        statistic_ids: l
+                    };
+                    this._hass.callWS(d).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
+
+                }
+
+            }
+
+        } else
+
+            // All needed slots already in the cache, generate the chart data
+            this.generateGraphDataFromCache();
+    }
+
+    // A shown entity changed: refresh its recent history — at most once every 2 s, however
+    // often the entities change (the next refresh is never postponed by a further change,
+    // and the recent history is only reloaded then, not at each change)
+    scheduleAutoRefresh()
+    {
+        if( this._autoRefreshTid ) return;
+        this._autoRefreshTid = setTimeout(() => {
+            this._autoRefreshTid = 0;
+            this.cache[this.cacheSize].valid = false;
+            this.updateHistoryAutoRefresh();
+        }, 2000);
+    }
+
+    updateHistoryAutoRefresh()
+    {
+        const now = moment();
+        const last = moment(this.endTime);
+
+        // If auto scroll is allowed (scrolled at or past the previous last event) then adjust the x position
+        // if the new event is past the visible graph area.
+        if( this.state.autoScroll && last < now ) {
+            this.today();
+        } else {
+            this.updateHistory();
+        }
+    }
+
+    updateHistoryWithClearCache()
+    {
+        if( !this.state.loading ) {
+            this.cache.length = 0;
+            this.updateHistory();
+        }
+    }
+
+    updateAxes()
+    {
+        for( let g of this.graphs ) {
+            if( !this.state.updateCanvas || this.state.updateCanvas === g.canvas ) {
+                g.chart.options.scales.xAxes[0].time.min = this.startTime;
+                g.chart.options.scales.xAxes[0].time.max = this.endTime;
+                g.chart.update();
+            }
+        }
+    }
 }

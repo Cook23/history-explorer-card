@@ -16,7 +16,8 @@ keep them apart. For the details of the boundary with Chart.js, see
  card-datasets.js ── data → datasets           history-entity-store.js ── the entities:
         │                                                   ▲        groups, order, options
         ▼                                                   │
- history-explorer-card.js ── graphs, layout, toolbar ───────┤
+ card-graphs.js ── graphs, axes, linked groups ─────────────┤
+ card-timerange.js, card-toolbar.js, card-selector.js       │
         │        ▲                                          │
         │        │ customEvent, panX, zoomX                 │
         ▼        │                                          │
@@ -26,13 +27,18 @@ keep them apart. For the details of the boundary with Chart.js, see
 
 | File | Role |
 |---|---|
-| `src/history-explorer-card.js` | The card itself (`HistoryExplorerCard`) and its state (`HistoryCardState`): configuration, building and laying out the graphs, the toolbars, the time range, localization. Its methods are spread over the `card-*.js` files below, added to the class at the end of this file. |
+| `src/history-explorer-card.js` | The card itself (`HistoryExplorerCard`) and its state (`HistoryCardState`): its life cycle, the card's content, the state colors, localization. The state's methods are spread over the `card-*.js` files below by role, added to the class at the end of this file. |
+| `src/card-config.js` | The YAML options applied, what Home Assistant and the entity options say of an entity (domain, device class, unit, default type), the graphs built from the YAML. |
+| `src/card-timerange.js` | The time window shown: its range, its moves (days, today, zoom steps), the time axis of each graph. |
 | `src/history-entity-store.js` | **The model**: the persisted list of entities (`pconfig.entities`) — which entity is shown, in which group of linked graphs, in which order, with its own options. Every change to that list goes through it. Pure data, no DOM. |
-| `src/card-history.js` | The history data: the cache of what Home Assistant returned, filled on demand for the time window shown. |
+| `src/card-history.js` | The history data: the cache of what Home Assistant returned, filled on demand for the time window shown, and the graphs updated from it. |
+| `src/card-graphs.js` | The graphs: each chart created (axes, legend, tooltip), filled with its entities (two Y axes, SI conversion), placed in the display order, linked, merged, removed. |
 | `src/card-datasets.js` | From history data to what the graphs draw: line modes, bars by interval, circular values, timelines. |
 | `src/card-gestures.js` | What the gestures on the graphs mean — and the entity moves they lead to (split, merge, drop, reorder). |
-| `src/card-menus.js` | The entity type menu, the options menu, the entity selector. |
-| `src/card-storage.js` | What is kept between sessions and devices, and the "last one to speak wins" merge of local state, HA user data and YAML. |
+| `src/card-menus.js` | The entity type menu, the options menu, their keyboard navigation. |
+| `src/card-selector.js` | The entity selector: the entities listed and filtered, and those it adds (wildcards included) or removes. |
+| `src/card-toolbar.js` | The card's HTML: the toolbars and their menu entries, the interval selector of bar graphs, the layout as the card resizes. |
+| `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
@@ -65,8 +71,12 @@ keep them apart. For the details of the boundary with Chart.js, see
 | How entities are grouped, ordered, moved, saved | `src/history-entity-store.js` (rules), `src/card-gestures.js` (operations), `src/card-storage.js` (persistence) |
 | What a curve looks like | `src/card-datasets.js` |
 | How data is fetched | `src/card-history.js` |
-| A menu or the entity selector | `src/card-menus.js` |
-| Options, layout, toolbar | `src/history-explorer-card.js` |
+| A menu | `src/card-menus.js` |
+| The entity selector | `src/card-selector.js` |
+| How a graph is built, its axes | `src/card-graphs.js` |
+| The time range | `src/card-timerange.js` |
+| An option | `src/history-options.js` (names, levels), `src/card-config.js` (applied) |
+| The toolbar, the layout | `src/card-toolbar.js` |
 
 ## Tests
 

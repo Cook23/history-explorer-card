@@ -116,5 +116,33 @@ module.exports = async function()
         st.normalizeGroupIds(() => 'line');
         return st.newGroupId() === 1011 && st.newGroupId() === 1012 ? true : 'wrong ids';
     });
+    // An entry moved without saving its placement: saved back where it was
+    const moved = (st, id, groupId) => { const e = st.find(id); e.unsavedFrom = st.placementOf(e); st.moveToGroup(e, groupId); return e; };
+    const showSaved = st => st.savedList().map(e => e.entity + '@' + e.groupId).join(' ');
+    step('savedList: a moved entry is saved at its place before the move', () => {
+        const st = mk('a@1', 'b@1', 'c@1', 'd@2');
+        moved(st, 'b', 2);
+        return expect(show(st) + ' / ' + showSaved(st), 'a@1 c@1 d@2 b@2 / a@1 b@1 c@1 d@2');
+    });
+    step('savedList: the entry before it gone, after the one before that', () => {
+        const st = mk('a@1', 'b@1', 'c@1', 'd@1', 'e@2');
+        moved(st, 'c', 2); st.remove('b');
+        return expect(showSaved(st), 'a@1 c@1 d@1 e@2');
+    });
+    step('savedList: every entry before it in its group gone, first of its group', () => {
+        const st = mk('x@0', 'a@1', 'b@1', 'c@1', 'e@2');
+        moved(st, 'b', 2); st.remove('a');
+        return expect(showSaved(st), 'x@0 b@1 c@1 e@2');
+    });
+    step('savedList: its group gone, after the nearest entry before it', () => {
+        const st = mk('x@0', 'a@1', 'e@2');
+        moved(st, 'a', 2);
+        return expect(showSaved(st), 'x@0 a@1 e@2');
+    });
+    step('savedList: the unsavedFrom mark itself is never saved', () => {
+        const st = mk('a@1', 'b@2');
+        moved(st, 'a', 2);
+        return st.savedList().every(e => !('unsavedFrom' in e)) && st.find('a').unsavedFrom ? true : JSON.stringify(st.savedList());
+    });
     return { passed, failed };
 };
