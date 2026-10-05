@@ -4,6 +4,14 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.5] - unreleased
+
+### Fixed — Alt and Shift + drag, as in 1.1
+- Alt (Option on Mac) held while moving over a graph shows every sample of its curves again; moving without it, or leaving the graph, hides them. Lost in the 1.2 rewrite
+- Shift + drag moves the graph both ways again — the time and the Y axis together; it only moved the Y axis
+- `deps/chart-hec.js`: the samples shown by the plugin `hecShowSamples` (`_hecSetShowSamples`); the Shift drag also goes to `panX` (`deps/Chart Custom.js.md` §3)
+- Tests: Alt shows and hides the samples, Shift + drag moves the time and the Y axis
+
 ## [v1.2.4] - 2026-10-05
 
 ### New — two Y axes on a graph

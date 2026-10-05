@@ -365,7 +365,7 @@ entities:
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-To show the individual data points:
+Hold **Alt** (Option on Mac) while moving over a graph to reveal its individual data points. To show them permanently:
 
 ```yaml
 entityOptions:
