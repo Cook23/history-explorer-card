@@ -8,8 +8,8 @@
 # History explorer card
 
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
-> For the complete reference documentation, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md).
-> New to this fork? See what it adds over the original card: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/main/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/main/FORK_DESCRIPTION_FR.md) 🇫🇷
+> For the complete reference documentation, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md).
+> New to this fork? See what it adds over the original card: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION_FR.md) 🇫🇷
 
 A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
 
@@ -20,14 +20,20 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > [!IMPORTANT]
 > **This is version 1.2, a beta**
 >
-> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. For now, the main difference between the two is how the card responds to touch on phones and tablets. In 1.2:
-> - a swipe on a graph always scrolls the page, wherever it starts;
-> - to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag;
-> - a pinch also zooms the time.
+> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. It is a rewrite of the card's code, where the interactions on phones, tablets and with a pen are being reworked, and the line that gets the new features. What 1.2 changes today:
+> - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch also zooms the time;
+> - **the tooltip** opens on a click or a tap on the curves, then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it;
+> - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
+> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
+> - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
+> - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
+> - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
+> - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
+> - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
 > In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
 >
-> **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used.
+> **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, pens, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used — for a pen, the report of *Tests (beta) ▸ Pen events*.
 >
 > *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
@@ -106,7 +112,7 @@ frontend:
     - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the resource's URL, as it is
 ```
 
-> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#overriding-the-ha-more-info-history-info-panel)
+> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#overriding-the-ha-more-info-history-info-panel)
 
 ---
 
@@ -156,7 +162,7 @@ excludeFilterEntities:
   - 'sensor.energy_cost'
 ```
 
-`filterEntities` and `excludeFilterEntities` accept a single string, a list of strings, or (for `exclude:` under a YAML entity) the object form `{entity: '...'}` — see [README_Full.md — YAML graph configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs) for the per-entity `exclude:` option and examples.
+`filterEntities` and `excludeFilterEntities` accept a single string, a list of strings, or (for `exclude:` under a YAML entity) the object form `{entity: '...'}` — see [README_Full.md — YAML graph configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs) for the per-entity `exclude:` option and examples.
 
 ---
 
@@ -266,7 +272,7 @@ graphs:
 
 `ymin` and `ymax` set the initial Y axis range and the range restored when the padlock is unlocked. They do not prevent the user from modifying the axis interactively. Use `ylock: true` to fully disable interactive Y axis changes.
 
-> For full details → [README_Full.md — Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#y-axis-scaling)
+> For full details → [README_Full.md — Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#y-axis-scaling)
 
 ---
 
@@ -293,7 +299,7 @@ enable_multidevice_persistence: range     # this device's time range syncs acros
 - Last one to speak wins: YAML, each device's UI, and your HA account (for multi-device) are each compared with what they said last time — whichever changed most recently wins. An entity edited in YAML gets its YAML values back (on every device), the others keep theirs. A device opening the card for the first time gets what's saved in your HA account with `enable_multidevice_persistence` (the YAML, if it changed since), and the YAML with `enable_persistence` alone.
 - Accepts `range` (the time range), `entities` (dynamically-added ones, or specific fields per static entity), `order` (the display order of your graphs — card-level only), `all` to cover everything, or `none` to explicitly turn persistence off where it would otherwise default on — e.g. a card with only dynamic entities that you *don't* want remembered.
 
-> For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#default-view-and-time-ranges)
+> For full details → [README_Full.md — Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#default-view-and-time-ranges)
 
 ---
 
@@ -337,9 +343,9 @@ interpolation: makima   # monotone (default), steffen, makima, or catmullrom
 | `makima` | Follows the local trend, flat over flat stretches, no break at each small peak; hardly any overshoot |
 | `catmullrom` | The smoothest; may overshoot a little around sharp changes |
 
-`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
-Angles (a wind direction, for example) are drawn without jumping across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
+Angles (a wind direction, for example) are drawn without jumping across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#circular-values-angles).
 
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
@@ -381,7 +387,7 @@ By default the card interpolates over unavailable states. To show gaps instead:
 showUnavailable: true
 ```
 
-> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#line-interpolation-modes)
+> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-interpolation-modes)
 
 ---
 
@@ -424,7 +430,7 @@ graphs:
           default: grey
 ```
 
-> For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#bar-graphs-for-total-increasing-entities)
+> For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#bar-graphs-for-total-increasing-entities)
 
 ---
 
@@ -448,7 +454,7 @@ stateColors:
   off: '#ff0000'
 ```
 
-> For full details (color priority rules, stateColorSeed) → [README_Full.md — Timeline charts](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#timeline-charts)
+> For full details (color priority rules, stateColorSeed) → [README_Full.md — Timeline charts](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#timeline-charts)
 
 ---
 
@@ -481,7 +487,7 @@ statistics:
   retention: 90    # optional: override history retention period in days
 ```
 
-> For full details → [README_Full.md — Long term statistics](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#long-term-statistics)
+> For full details → [README_Full.md — Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics)
 
 ---
 
@@ -498,7 +504,7 @@ entityOptions:
     type: arrowline
 ```
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#customizing-dynamically-added-graphs)
 
 ---
 
@@ -573,9 +579,9 @@ graphs:
 
 Every option is spelled the same at every level where it's accepted, and its synonyms are accepted everywhere (`width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
-> Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
+> Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml).
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#customizing-dynamically-added-graphs)
 
 ---
 
@@ -647,7 +653,7 @@ statistics:
   retention: 90           # optional: override history retention period in days
 ```
 
-> For full details → [README_Full.md — Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#configuring-the-ui)
+> For full details → [README_Full.md — Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
 
 ---
 
@@ -683,7 +689,7 @@ graphs:
         color: black
 ```
 
-> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
+> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs)
 
 A graph's `options:` (or the graph itself) can also carry the entity options marked ✓ in the **Graph** column of [Card, graph, and entity-level options](#card-graph-and-entity-level-options), as a default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
 
