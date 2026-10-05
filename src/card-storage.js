@@ -419,4 +419,96 @@ export class CardStorage
             try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-info-panel', value: _data }); } catch(e) {}
         }
     }
+
+    // --------------------------------------------------------------------------------------
+    // Persistence scopes
+    // --------------------------------------------------------------------------------------
+
+    // Normalizes a persistence-scope YAML value (string, array, or undefined) into a Set of
+    // categories. 'all' expands to every category valid for the given scope; 'none' resolves
+    // to an explicitly empty Set — distinct from returning undefined for an unset value, so
+    // callers can tell "explicitly disabled" apart from "not configured, use the contextual
+    // default" (see _resolvePersistenceDefault).
+    normalizePersistenceCategories(value, allCategories)
+    {
+        if( value === undefined || value === null ) return undefined;
+        const _arr = Array.isArray(value) ? value : [value];
+        if( _arr.includes('none') ) return new Set();
+        return new Set(_arr.includes('all') ? allCategories : _arr.filter(c => allCategories.includes(c)));
+    }
+
+    // Resolves the effective category Set for a card-level persistence option, applying the
+    // contextual default only when the option was never configured at all (raw === undefined
+    // — an explicit 'none' already normalizes to an empty Set, which is left as-is here).
+    // The default differs by context: dynamic entities (added through the UI, no YAML entry
+    // to fall back to) default to 'all' — restoring the pre-1.1.32 behavior unless explicitly
+    // overridden with 'none' — while static entities and range default to 'none', since they
+    // always have a YAML value to fall back to.
+    _resolvePersistenceDefault(raw, allCategories, defaultAll)
+    {
+        if( raw !== undefined ) return raw;
+        return defaultAll ? new Set(allCategories) : new Set();
+    }
+
+    // Fields of a static entity that enable_persistence/enable_multidevice_persistence can
+    // individually cover via a per-entity field list.
+    _entityPersistenceFields()
+    {
+        return ['type', 'color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
+                'dashMode', 'lineMode', 'interpolation', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
+                'netBars', 'decimation', 'circular', 'groupId'];
+    }
+
+    // Entity-scope persistence option: a list of specific field names, or 'entities'/'all' as
+    // a shorthand for all coverable fields (the whole entity), or 'none' to explicitly cover
+    // none of them. Shared by enable_multidevice_persistence and enable_persistence
+    // entity-level parsing.
+    resolveEntityPersistenceFields(value)
+    {
+        if( value === undefined || value === null ) return undefined;
+        const _arr = (Array.isArray(value) ? value : [value]).map(v => v === 'entities' ? 'all' : v);
+        return this.normalizePersistenceCategories(_arr, this._entityPersistenceFields());
+    }
+
+    // Resolves the display order of a set of entity ids — static or dynamic — following the
+    // exact same "last one to speak wins" priority as any other persisted property, expressed
+    // as the same three independent, sequential steps used for a field's own value: YAML
+    // wins unconditionally on change; if nothing is enabled, the order stays at its base
+    // (YAML's own order for static entities); otherwise HA wins if multidevice is enabled and
+    // its order changed since its own mirror, else local wins. `yamlIds` is null for dynamic
+    // entities, which have no YAML order concept — steps 1 and the YAML half of step 2 are
+    // skipped for them. Ids present in `candidateIds` but missing from the resolved order
+    // (e.g. a newly-added entity) are appended at the end; ids in the resolved order but no
+    // longer in `candidateIds` (e.g. an entity removed from YAML) are dropped.
+    // Order is card-only (see the 'order' category, alongside 'range'/'entities') — not a
+    // per-entity field: a position only means something relative to every other entity, so
+    // there's no coherent way to persist one entity's position independently of the rest.
+    _resolveOrder(candidateIds, yamlIds, yamlIdsMirror, haIds, haIdsMirror, lsIds, orderEnabled, orderMultidevice)
+    {
+        // YAML front — always wins on change, unconditionally, exactly like any other field
+        if( yamlIds ) {
+            const _yamlChanged = JSON.stringify(yamlIds) !== JSON.stringify(yamlIdsMirror);
+            if( _yamlChanged ) return this._finishOrder(yamlIds, candidateIds);
+        }
+
+        // Nothing persists unless explicitly enabled — the order stays at its base (YAML's
+        // own order for static entities), mirroring how a field with nothing enabled simply
+        // keeps its initial YAML value
+        if( !orderEnabled ) return this._finishOrder(yamlIds ?? lsIds, candidateIds);
+
+        // HA front — only when multidevice is enabled, same as for individual fields
+        const _haChanged = orderMultidevice && JSON.stringify(haIds) !== JSON.stringify(haIdsMirror);
+        return this._finishOrder(_haChanged ? haIds : lsIds, candidateIds);
+    }
+
+    // Shared tail for _resolveOrder: drops ids no longer present in candidateIds (e.g. an
+    // entity removed from YAML), then appends any candidate missing from the chosen order
+    // (e.g. a newly-added entity) at the end.
+    _finishOrder(order, candidateIds)
+    {
+        const _known = new Set(candidateIds);
+        const _result = order.filter(id => _known.has(id));
+        for( const id of candidateIds ) if( !_result.includes(id) ) _result.push(id);
+        return _result;
+    }
 }

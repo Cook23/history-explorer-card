@@ -1,6 +1,7 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
-import { HistoryCardState, getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./history-explorer-card";
+import { HistoryCardState } from "./history-explorer-card";
+import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure } from "./card-config.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
 

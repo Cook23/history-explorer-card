@@ -6,6 +6,10 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.5] - unreleased
 
+### Code — the card's state split by role
+- `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated
+- Tests: the new modules are linted
+
 ### Changed — a curve dropped onto any line or bar graph
 - A curve's label dropped onto another line or bar graph is moved there whatever its unit: lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs. Only the display type refuses a drop (a curve onto a timeline or arrowline graph, a timeline entity onto a line or bar graph). Adding an entity is unchanged: `combineSameUnits` only joins compatible units
 - A drop is saved only when the placement of both graphs is (`entities` persistence): a curve dropped onto a graph defined in YAML, or taken out of one, is saved where it was before, so a reload brings both graphs back as they were, without a duplicate or a lost curve; dropped back into its own graph, it's saved there again
