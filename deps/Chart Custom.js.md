@@ -215,7 +215,11 @@ value needs to come back from the card:
 - **Y-axis pan** (dragging an axis' label zone — left, or right on a chart with
   a right axis — or Shift+drag anywhere on a `line`/`bar` chart) — moves the
   `ticks.min/max` of that axis, or of every Y axis with Shift, directly
-  (`_hecValueYAxes` / `_hecSetYRanges`).
+  (`_hecValueYAxes` / `_hecSetYRanges`). With Shift, the time moves too: the
+  drag also goes to `panX` (start, move, end), as a plain drag would.
+- **Samples shown** (Alt, or Option, held while the pointer moves over the chart) —
+  every sample of its curves is drawn as a dot (plugin `hecShowSamples`), until the
+  pointer moves without Alt or leaves the chart (`_hecSetShowSamples`).
 - **Y-axis zoom** (Shift+wheel, or the Y-spread of a 2-finger pinch) —
   same, on every Y axis, each around its own middle (simple scale-factor math
   on its current min/max).

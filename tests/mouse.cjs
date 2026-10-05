@@ -160,6 +160,26 @@ module.exports = async function()
         const tooltips = await E(`el.instance._allGraphsInDisplayOrder()[${li}].chart.options.tooltips.enabled`);
         return r1[0] < r0[0] && mode === false && tooltips === true ? true : JSON.stringify({ r0, r1, mode, tooltips });
     });
+    await t.step('Alt held while moving over a graph shows every sample, moving without it hides them', async () => {
+        const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
+        const shown = () => E(`graphAt(${li}).chart.getDatasetMeta(0).data.filter(p=>p._model.radius>0).length`);
+        const n0 = await shown(); const a = await E(`graphPtAt(${li},0.5)`);
+        await t.page.mouse.move(a.x, a.y); await t.page.keyboard.down('Alt');
+        await t.page.mouse.move(a.x + 20, a.y); await t.wait(200); const n1 = await shown();
+        await t.page.keyboard.up('Alt'); await t.page.mouse.move(a.x + 40, a.y); await t.wait(200); const n2 = await shown();
+        const total = await E(`graphAt(${li}).chart.getDatasetMeta(0).data.length`);
+        // (at most the point under the pointer shown before and after: its hover style)
+        return n0 <= 1 && n1 > total / 2 && n2 <= 1 ? true : JSON.stringify({ n0, n1, n2, total });
+    });
+    await t.step('Shift + drag on a graph moves it both ways: the time and the Y axis', async () => {
+        const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
+        const st = async () => [await E('el.instance.startTime'), await E(`yRange(${li})`)];
+        const s0 = await st(); const c = await E(`graphPtAt(${li},0.5)`);
+        await t.page.keyboard.down('Shift'); await t.drag(c, { x: c.x - 150, y: c.y + 50 }); await t.page.keyboard.up('Shift'); await t.wait(1200);
+        const s1 = await st();
+        const p = await E(`lockPt(${li})`); await t.page.mouse.click(p.x, p.y); await t.wait(400);   // (the Y axis released)
+        return s1[0] !== s0[0] && s1[1].join() !== s0[1].join() ? true : JSON.stringify({ s0, s1 });
+    });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     return t.close();
 };

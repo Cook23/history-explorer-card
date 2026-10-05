@@ -205,6 +205,22 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // Samples shown — while _hecShowSamples is set (Alt held over the chart, see
+  // _hecSetShowSamples), each sample of a curve is drawn as a dot, the ones its dataset
+  // already shows keeping their own size; a point that only shapes the curve (hecVirtual)
+  // stays hidden
+  var HEC_SAMPLE_RADIUS = 3;
+  Chart.plugins.register({
+    id: 'hecShowSamples',
+    afterDatasetUpdate: function (chart, args) {
+      if (!chart._hecShowSamples || !args.meta.dataset) return;
+      var _data = chart.data.datasets[args.index].data || [];
+      (args.meta.data || []).forEach(function (pt, i) {
+        if (pt._model && !(pt._model.radius > 0) && !(_data[i] && _data[i].hecVirtual)) pt._model.radius = HEC_SAMPLE_RADIUS;
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one
@@ -472,10 +488,13 @@
         p.dragYRanges = me._hecYRanges();
         p.dragYAxes = _axes.map(function (a) { return _shiftKey || a.side === _side; });
         p.dragShiftKey = _shiftKey;
+        // (with Shift, the graph moves both ways: the time too, as a plain drag moves it)
+        if (_shiftKey) panX(c, 'start');
         return true;
       },
       onMove: function (c, p, e) {
         var me = c.me;
+        if (p.dragShiftKey) panX(c, 'move', e.x - p.lastX);
         var _h = me.chartArea.bottom - me.chartArea.top;
         me._hecSetYRanges(p.dragYRanges.map(function (r, i) {
           if (!p.dragYAxes[i]) return undefined;
@@ -876,7 +895,7 @@
       fire(c, 'dragend', undefined, undefined, { zoomSelectFactor0: me._hecPlotFactor(p.x0),
         zoomSelectFactor1: p.dragZoomSelectX1 !== undefined ? me._hecPlotFactor(p.dragZoomSelectX1) : undefined });
     } else {
-      if (_hName === 'panX') panX(c, 'end');
+      if (_hName === 'panX' || p.dragShiftKey) panX(c, 'end');
       fire(c, 'dragend', undefined, undefined, { drop: _hecDropAt(c, p) });
     }
   }
@@ -1017,6 +1036,8 @@
   function hecPointerMove(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; gs.pointers[pid].moved = true; }
+    // Alt (Option) held while the pointer moves over the chart: every sample shown
+    me._hecSetShowSamples(!!(e.native && e.native.altKey));
 
     if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
       HEC_DRAG_HANDLERS[0].onMove(c, null, e);
@@ -1428,6 +1449,15 @@
       if (x >= 0 && x < _a.left) return 'left';
       if (x > _a.right && this._hecValueYAxes().some(function (a) { return a.side === 'right'; })) return 'right';
       return null;
+    },
+
+    // Shows or hides every sample of the curves (see the hecShowSamples plugin): on while
+    // the pointer moves over the chart with Alt (Option) held, off when it moves without,
+    // or leaves the chart
+    _hecSetShowSamples: function (on) {
+      if (!!this._hecShowSamples === on) return;
+      this._hecShowSamples = on;
+      this.update();
     },
 
     // The current range of each Y axis (see _hecValueYAxes): [[min, max], ...]

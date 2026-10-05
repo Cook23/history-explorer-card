@@ -4692,6 +4692,7 @@
                 me.active = [];
                 me._hecLastHitXY = undefined;
                 me._hecTooltipMode = false;
+                me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
                 if (me.tooltip) me.tooltip._hecCloseTooltip();
