@@ -57,5 +57,64 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Gestures: an axis' label column moves that axis; Shift, a pinch, the padlock: both ──
+    const twoAxes = card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] });
+    const ranges = () => t.E('[yRange(0), yRangeRight(0)]');
+    const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+    t = await openCard(twoAxes, { height: 800, mock: { series: true } });
+    let r0 = await ranges();
+    await t.step('mouse: dragging the left labels moves the left axis only', async () => {
+        const a = await t.E('yaPt(0, 0.5)');
+        await t.drag(a, { x: a.x, y: a.y + 60 }); await t.wait(300);
+        const r = await ranges();
+        return !same(r[0], r0[0]) && same(r[1], r0[1]) ? true : JSON.stringify({ r0, r });
+    });
+    await t.step('mouse: dragging the right labels moves the right axis only', async () => {
+        const r1 = await ranges(); const a = await t.E('yaRightPt(0, 0.5)');
+        await t.drag(a, { x: a.x, y: a.y + 60 }); await t.wait(300);
+        const r = await ranges();
+        return same(r[0], r1[0]) && !same(r[1], r1[1]) && r[1][0] > r1[1][0] ? true : JSON.stringify({ r1, r });
+    });
+    await t.step('the padlock releases both axes', async () => {
+        const p = await t.E('lockPt(0)'); await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const r = await ranges();
+        return same(r[0], r0[0]) && same(r[1], r0[1]) ? true : JSON.stringify({ r0, r });
+    });
+    await t.step('Shift + drag on the curves moves both axes', async () => {
+        const r1 = await ranges(); const c = await t.E('graphPtAt(0, 0.5)');
+        await t.page.keyboard.down('Shift'); await t.drag(c, { x: c.x, y: c.y + 50 }); await t.page.keyboard.up('Shift'); await t.wait(300);
+        const r = await ranges();
+        const p = await t.E('lockPt(0)'); await t.page.mouse.click(p.x, p.y); await t.wait(400);   // (released again)
+        return !same(r[0], r1[0]) && !same(r[1], r1[1]) ? true : JSON.stringify({ r1, r });
+    });
+    await t.step('Shift + wheel zooms both axes, each around its own middle', async () => {
+        const c = await t.E('graphPtAt(0, 0.5)');
+        await t.page.mouse.move(c.x, c.y); await t.page.keyboard.down('Shift');
+        await t.page.mouse.wheel(0, -100); await t.wait(300); await t.page.keyboard.up('Shift');
+        const r = await ranges();
+        const narrower = (a, b) => a[1] - a[0] < b[1] - b[0] - 1e-6;
+        const mid = a => (a[0] + a[1]) / 2;
+        return narrower(r[0], r0[0]) && narrower(r[1], r0[1]) && Math.abs(mid(r[1]) - mid(r0[1])) < 0.05 * (r0[1][1] - r0[1][0]) ? true : JSON.stringify({ r0, r });
+    });
+    done(await t.close());
+
+    t = await openCard(twoAxes, { touch: true, height: 800, scrollRoom: 1500, mock: { series: true } });
+    r0 = await ranges();
+    await t.step('touch: tap the right labels, then press again and drag: the right axis moves, the page doesn\'t scroll', async () => {
+        const a = await t.E('yaRightPt(0, 0.5)');
+        await t.tapDrag(a, { x: a.x, y: a.y + 60 });
+        const r = await ranges(); const y = await t.scrollY();
+        return same(r[0], r0[0]) && !same(r[1], r0[1]) && y === 0 ? true : JSON.stringify({ r0, r, y });
+    });
+    await t.step('touch: a vertical pinch zooms both axes', async () => {
+        await t.E('graphAt(0).chart._hecToggleYAxisLock()'); await t.wait(300);   // (released: back to the auto ranges)
+        const r1 = await ranges(); const c = await t.E('graphPtAt(0, 0.5)');
+        await t.pinch(c, { x: 0, y: -4 }, { x: 0, y: 4 });
+        const r = await ranges();
+        const narrower = (a, b) => a[1] - a[0] < b[1] - b[0] - 1e-6;
+        return narrower(r[0], r1[0]) && narrower(r[1], r1[1]) ? true : JSON.stringify({ r1, r });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

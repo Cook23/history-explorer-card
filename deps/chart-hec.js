@@ -434,32 +434,20 @@
           if (_zStep) { pinch.zoomAcc = 1; zoomX(c, _zStep, newCenterX); }
         }
         // Y pan by the vertical movement of the fingers' centre — the content follows
-        // the fingers, as with the one-finger Y axis pan (yAxisPan) — applied here
-        // like the Y zoom below: the Y scale is this chart's own
+        // the fingers, as with the one-finger Y axis pan (yAxisPan) — and Y zoom by
+        // their vertical spread, each axis around its own middle: every Y axis of the
+        // chart moves together (pinch.yRanges, tracked from the pinch's start)
         var _yRange = me.chartArea ? me.chartArea.bottom - me.chartArea.top : 0;
-        if (panDY !== 0 && _yRange > 0 && pinch.y0 !== undefined && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
-          var _pShift = panDY * (pinch.y1 - pinch.y0) / _yRange;
-          pinch.y0 += _pShift;
-          pinch.y1 += _pShift;
-          me.options.scales.yAxes[0].ticks.min = pinch.y0;
-          me.options.scales.yAxes[0].ticks.max = pinch.y1;
-          me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-          if (!me._hecYAxisLock) me._hecYAxisLock = 2;
-          me.update();
+        var _yr = pinch.yRanges;
+        if (panDY !== 0 && _yRange > 0 && _yr.length && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
+          _yr.forEach(function (r) { var _sh = panDY * (r[1] - r[0]) / _yRange; r[0] += _sh; r[1] += _sh; });
+          me._hecSetYRanges(_yr);
         }
-        if (me.options.zoomEnabled !== false) {
-          if (me.options.zoomYEnabled !== false && pinch.y0 !== undefined && pinch.distY > cfg.pinchMinDist && newDistY > cfg.pinchMinDist) {
-            var _pScale = pinch.distY / newDistY;
-            var _pMid = (pinch.y0 + pinch.y1) / 2;
-            var _pHalf = (pinch.y1 - pinch.y0) / 2 * _pScale;
-            pinch.y0 = _pMid - _pHalf;
-            pinch.y1 = _pMid + _pHalf;
-            me.options.scales.yAxes[0].ticks.min = pinch.y0;
-            me.options.scales.yAxes[0].ticks.max = pinch.y1;
-            me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-            if (!me._hecYAxisLock) me._hecYAxisLock = 2;
-            me.update();
-          }
+        if (me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false && _yr.length &&
+            pinch.distY > cfg.pinchMinDist && newDistY > cfg.pinchMinDist) {
+          var _pScale = pinch.distY / newDistY;
+          _yr.forEach(function (r) { var _mid = (r[0] + r[1]) / 2, _half = (r[1] - r[0]) / 2 * _pScale; r[0] = _mid - _half; r[1] = _mid + _half; });
+          me._hecSetYRanges(_yr);
         }
         pinch.distX = newDistX;
         pinch.distY = newDistY;
@@ -469,30 +457,31 @@
       name: 'yAxisPan',
       test: function (c, p) {
         var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        if (me.options.yAxisPanEnabled === false || me.config.type === 'timeline' || me.config.type === 'arrowline' || !me.chartArea) return false;
-        var _inZone = p.x0 >= 0 && p.x0 <= me.chartArea.left && p.y0 >= me.chartArea.top && p.y0 <= me.chartArea.bottom;
+        if (me.options.yAxisPanEnabled === false || !me.chartArea) return false;
+        var _axes = me._hecValueYAxes();
+        if (!_axes.length) return false;
+        // On an axis' label column, that axis; anywhere with Shift, every axis
+        var _side = me._hecYAxisSideAt(p.x0, p.y0);
         var _shiftKey = p.native ? p.native.shiftKey : false;
-        if (!_shiftKey && !_inZone) return false;
+        if (!_shiftKey && !_side) return false;
         // On touch, entering the Y-axis zone alone isn't enough — the
         // long-press must have already fired (unless the lock is already
         // engaged), so a normal page scroll starting in that zone isn't
         // mistaken for an axis drag. Mouse/pen activate immediately.
-        if (_inZone && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
-        var _yScale = me.scales && me.scales['y-axis-0'];
-        if (!_yScale) return false;
-        p.dragScaleY0 = _yScale.min;
-        p.dragScaleY1 = _yScale.max;
+        if (_side && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
+        p.dragYRanges = me._hecYRanges();
+        p.dragYAxes = _axes.map(function (a) { return _shiftKey || a.side === _side; });
         p.dragShiftKey = _shiftKey;
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        var _yDelta = (e.y - p.y0) * (p.dragScaleY1 - p.dragScaleY0) / (me.chartArea.bottom - me.chartArea.top);
-        me.options.scales.yAxes[0].ticks.min = p.dragScaleY0 + _yDelta;
-        me.options.scales.yAxes[0].ticks.max = p.dragScaleY1 + _yDelta;
-        me.options.scales.yAxes[0].ticks.removeEdgeTicks = true;
-        if (!me._hecYAxisLock) me._hecYAxisLock = 2;
-        me.update();
+        var me = c.me;
+        var _h = me.chartArea.bottom - me.chartArea.top;
+        me._hecSetYRanges(p.dragYRanges.map(function (r, i) {
+          if (!p.dragYAxes[i]) return undefined;
+          var _d = (e.y - p.y0) * (r[1] - r[0]) / _h;
+          return [r[0] + _d, r[1] + _d];
+        }));
       }
     },
     {
@@ -746,8 +735,7 @@
       // Third and fourth triggers for engaging the Y-axis lock, alongside
       // drag — same zone check, kept here as a consumer of the
       // already-detected event, not mixed into its detection.
-      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me.config.type !== 'timeline' && me.config.type !== 'arrowline' &&
-        me.chartArea && _hx >= 0 && _hx <= me.chartArea.left && _hy >= me.chartArea.top && _hy <= me.chartArea.bottom;
+      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
       if (_dblYAxisZone && !me._hecYAxisLock) {
         me._hecYAxisLock = 2;
         me._hecUpdateYAxisState();
@@ -784,8 +772,7 @@
       // a click in this zone arms a 500ms window to anticipate a possible
       // NEXT contact there (this click itself is already over by the time it
       // fires, per Thierry), separate from the lock-driven trigger below.
-      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me.config.type !== 'timeline' && me.config.type !== 'arrowline' &&
-        me.chartArea && _hx >= 0 && _hx <= me.chartArea.left && _hy >= me.chartArea.top && _hy <= me.chartArea.bottom;
+      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
       if (_clickInYAxisZone) {
         me._hecYAxisClickArmed = true;
         me._hecUpdateYAxisState();
@@ -1019,14 +1006,10 @@
       gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
       gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
       panX(c, 'start');
-      // y0/y1 tracked from pinch start — needed for the direct Y zoom, which
+      // The Y ranges tracked from pinch start — needed for the direct Y zoom, which
       // must accumulate scale changes across the whole gesture, not
-      // recompute from the live (already-changing) scale each frame.
-      var _pinchYScale = me.scales && me.scales['y-axis-0'];
-      if (_pinchYScale) {
-        gs.pinch.y0 = _pinchYScale.min;
-        gs.pinch.y1 = _pinchYScale.max;
-      }
+      // recompute from the live (already-changing) scales each frame.
+      gs.pinch.yRanges = me._hecYRanges();
     }
   }
 
@@ -1221,19 +1204,13 @@
       }
       if (_native.shiftKey && me.options.zoomYEnabled !== false) {
         var _wd = Math.abs(_native.deltaX) > Math.abs(_native.deltaY) ? _native.deltaX : _native.deltaY;
-        var _yScale = me.scales && me.scales['y-axis-0'];
-        if (_wd !== 0 && _yScale && me.config.type !== 'timeline' && me.config.type !== 'arrowline') {
+        if (_wd !== 0 && me._hecValueYAxes().length) {
+          // (every Y axis, each around its own middle)
           var _f = _wd < 0 ? 0.9 : 1.0 / 0.9;
-          var _t = me.options.scales.yAxes[0].ticks;
-          if (_t.min === undefined) _t.min = _yScale.min;
-          if (_t.max === undefined) _t.max = _yScale.max;
-          var _d = _t.max - _t.min;
-          _d = _d - _d * _f;
-          _t.max -= _d * 0.5;
-          _t.min += _d * 0.5;
-          _t.removeEdgeTicks = true;
-          if (!me._hecYAxisLock) me._hecYAxisLock = 2;
-          me.update();
+          me._hecSetYRanges(me._hecYRanges().map(function (r) {
+            var _d = (r[1] - r[0]) * (1 - _f) * 0.5;
+            return [r[0] + _d, r[1] - _d];
+          }));
         }
       }
     }
@@ -1431,19 +1408,68 @@
     // state. Icon SVG/positioning matches the card's original
     // createScaleLockIconHtml, drawn as a floating element over the canvas
     // instead of card-side HTML.
+    // The Y axes a gesture moves — those of a line or bar chart (a timeline's or an
+    // arrowline's rows don't move): { opts, scale, side ('left', 'right') }, the left one
+    // first. Every Y gesture (pan, pinch, Shift+wheel) and the lock go through these.
+    _hecValueYAxes: function () {
+      var me = this;
+      if (me.config.type === 'timeline' || me.config.type === 'arrowline' || !me.options.scales || !me.scales) return [];
+      return (me.options.scales.yAxes || []).map(function (o, i) {
+        return { opts: o, scale: me.scales[o.id || 'y-axis-' + i], side: o.position === 'right' ? 'right' : 'left' };
+      }).filter(function (a) { return a.scale; });
+    },
+
+    // The Y axis whose label column a canvas-relative point is in: 'left' (from the
+    // canvas' left edge to the plot area), 'right' (past the plot area, when the chart has
+    // a right axis), or null
+    _hecYAxisSideAt: function (x, y) {
+      var _a = this.chartArea;
+      if (!_a || y < _a.top || y > _a.bottom) return null;
+      if (x >= 0 && x < _a.left) return 'left';
+      if (x > _a.right && this._hecValueYAxes().some(function (a) { return a.side === 'right'; })) return 'right';
+      return null;
+    },
+
+    // The current range of each Y axis (see _hecValueYAxes): [[min, max], ...]
+    _hecYRanges: function () {
+      return this._hecValueYAxes().map(function (a) { return [a.scale.min, a.scale.max]; });
+    },
+
+    // Sets the range of each Y axis (ranges: one [min, max] per axis of _hecValueYAxes;
+    // an undefined one leaves that axis as it is) — a range set by hand engages the lock
+    _hecSetYRanges: function (ranges) {
+      var me = this;
+      me._hecValueYAxes().forEach(function (a, i) {
+        if (!ranges[i]) return;
+        a.opts.ticks.min = ranges[i][0];
+        a.opts.ticks.max = ranges[i][1];
+        a.opts.ticks.removeEdgeTicks = true;
+      });
+      if (!me._hecYAxisLock) me._hecYAxisLock = 2;
+      me.update();
+    },
+
+    // Gives every Y axis back its own range (its configured ymin / ymax, else the data's)
+    // and releases the lock
+    _hecReleaseYAxes: function () {
+      var me = this;
+      (me.options.scales && me.options.scales.yAxes || []).forEach(function (o) {
+        var _t = o.ticks || {};
+        _t.min = _t.forceMin;
+        _t.max = _t.forceMax;
+        _t.removeEdgeTicks = false;
+      });
+      me._hecYAxisLock = 0;
+    },
+
     // Toggles the Y-axis lock on/off — factored out so it can be called from
     // the unified custClick handler on the grouped lock+handle zone below, not
     // just from a native button click anymore.
     _hecToggleYAxisLock: function () {
       var me = this;
-      var _yAxis = me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0];
-      if (!_yAxis) return;
-      var _ticks = _yAxis.ticks || {};
+      if (!me.options.scales || !me.options.scales.yAxes || !me.options.scales.yAxes.length) return;
       if (me._hecYAxisLock) {
-        _ticks.min = _ticks.forceMin;
-        _ticks.max = _ticks.forceMax;
-        _ticks.removeEdgeTicks = false;
-        me._hecYAxisLock = 0;
+        me._hecReleaseYAxes();
       } else {
         me._hecYAxisLock = 1;
       }
@@ -1485,13 +1511,20 @@
       // state alone: none while engaged, removed once disengaged — nothing
       // else. Forwards every event it receives straight to the canvas so
       // Chart.js's own gesture handling still does 100% of the actual work.
+      // (one per Y axis: the left one's label column, and the right one's when there is one)
       if (me.chartArea) {
-        var _yo = me._hecTouchOverlay('_hecYAxisTouchEl', 'ns-resize');
-        _yo.style.left = me.canvas.offsetLeft + 'px';
-        _yo.style.top = (me.canvas.offsetTop + me.chartArea.top) + 'px';
-        _yo.style.width = me.chartArea.left + 'px';
-        _yo.style.height = (me.chartArea.bottom - me.chartArea.top) + 'px';
-        _yo.style.touchAction = (me._hecYAxisLock || me._hecYAxisClickArmed) ? 'none' : '';
+        var _hasRight = me._hecValueYAxes().some(function (a) { return a.side === 'right'; });
+        [['_hecYAxisTouchEl', 0, me.chartArea.left, true],
+         ['_hecRightYAxisTouchEl', me.chartArea.right, me.width - me.chartArea.right, _hasRight]].forEach(function (z) {
+          if (!z[3]) { if (me[z[0]]) me[z[0]].style.display = 'none'; return; }
+          var _yo = me._hecTouchOverlay(z[0], 'ns-resize');
+          _yo.style.display = '';
+          _yo.style.left = (me.canvas.offsetLeft + z[1]) + 'px';
+          _yo.style.top = (me.canvas.offsetTop + me.chartArea.top) + 'px';
+          _yo.style.width = z[2] + 'px';
+          _yo.style.height = (me.chartArea.bottom - me.chartArea.top) + 'px';
+          _yo.style.touchAction = (me._hecYAxisLock || me._hecYAxisClickArmed) ? 'none' : '';
+        });
       }
     },
 
@@ -1575,7 +1608,7 @@
       var _l = this.legend, _a = this.chartArea;
       if (_l && _l.height > 0 && y >= _l.top && y <= _l.bottom) return 'legend';
       if (_a && y >= _a.top && y <= _a.bottom) {
-        if (x >= 0 && x < _a.left) return 'yAxis';
+        if (this._hecYAxisSideAt(x, y)) return 'yAxis';
         if (x >= _a.left && x <= _a.right) return 'plot';
       }
       return 'other';

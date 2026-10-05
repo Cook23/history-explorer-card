@@ -12,7 +12,9 @@ Changelog for the HA History Explorer Card.
 - The curves of the right axis are marked with a small arrow ▸ in the legend; `ymin` / `ymax` / `ystepSize` apply to both axes
 - Linked graphs keep the same room on the right when one of them has a right axis: their time stays aligned
 - The min/max band (`showMinMax`) is drawn on its curve's own axis
-- Tests: new suite `yaxes` (two groups, three, `yAxis`, linked graphs aligned, a right-axis curve on its own scale, `entityOptions`)
+- Gestures: dragging the label column of an axis — left or right, mouse or tap-then-drag — moves that axis only; Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle; the padlock locks and releases both
+- `deps/chart-hec.js`: every Y gesture and the lock go through `_hecValueYAxes`, `_hecYAxisSideAt`, `_hecYRanges`, `_hecSetYRanges`, `_hecReleaseYAxes`; the zone `yAxis` includes the right axis' column, which has its own touch zone (`deps/Chart Custom.js.md` §2, §5)
+- Tests: new suite `yaxes` (two groups, three, `yAxis`, linked graphs aligned, a right-axis curve on its own scale, `entityOptions`; dragging each axis, Shift + drag, Shift + wheel, the padlock, tap-then-drag on the right axis, the pinch)
 
 ### New — the info panel on every page of Home Assistant
 - Loaded through `frontend: extra_module_url` (documented: the exact URL of the dashboard resource), the card's file hooks the entity dialog's history on any page — Settings, History, a page opened directly — not only once a dashboard is shown

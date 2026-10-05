@@ -4292,13 +4292,7 @@
               me._hecLastType = me.config.type;
             } else if (me._hecLastType !== me.config.type) {
               me._hecLastType = me.config.type;
-              if (me._hecYAxisLock && me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0]) {
-                var _tt = me.options.scales.yAxes[0].ticks;
-                _tt.min = _tt.forceMin;
-                _tt.max = _tt.forceMax;
-                _tt.removeEdgeTicks = false;
-                me._hecYAxisLock = 0;
-              }
+              if (me._hecYAxisLock) me._hecReleaseYAxes();
             }
 
             if (helpers.isNullOrUndef(easingValue)) {

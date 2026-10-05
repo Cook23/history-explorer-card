@@ -128,7 +128,8 @@ card may need, so it never has to compute one from the chart's layout.
   clientX, clientY,    // the same point, client (viewport) coordinates
   zone,                // where that point is: 'linkMarker' (chain icon, §5),
                        // 'lockAndHandle' (§5), 'legend' (its band, whole width),
-                       // 'yAxis' (left of the plot area), 'plot', or 'other'
+                       // 'yAxis' (a Y axis' label column: left of the plot area, or right
+                       // of it on a chart with a right axis), 'plot', or 'other'
   xFactor,             // where x is along the time axis: 0 at the plot area's left
                        // edge, 1 at its right edge (undefined before the first layout)
   legendIndex,         // legend label under the point, or -1
@@ -281,7 +282,7 @@ nowhere at all.
 | `_hecLockIconEl` | 18×18px @ `(15, 5)` | The Y-axis lock padlock SVG. `pointer-events: none` — purely visual, the actual click is handled by the gesture detector (`zone: 'lockAndHandle'`). |
 | `_hecMoveHandleIconEl` | 15×28px @ `(0, 0)` | The `⠿` graph-reorder handle glyph. Also `pointer-events: none`, same reasoning. |
 | `_hecMoveHandleTouchEl` | 33×28px @ `(0, 0)` (0×0 if `moveHandleVisible` is `false`) | The single real touch target covering **both** the lock icon and the move handle as one zone (see below) — `touch-action` toggled dynamically. |
-| `_hecYAxisTouchEl` | Matches the Y-axis label column | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
+| `_hecYAxisTouchEl`, `_hecRightYAxisTouchEl` | Match the Y axes' label columns (the right one only on a chart with a right axis) | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
 | `_hecLegendTouchEl` | Tight bounding box of the legend's actual `legendHitBoxes`, +4px margin | Same dynamic `touch-action`, for dragging a curve label. Only exists for `line`/`bar` charts. |
 | `_hecLabelTouchEl` | Full label column height | Same dynamic `touch-action`, for dragging a timeline/arrowline entity label. Only exists for `timeline`/`arrowline` charts. |
 | `_hecLinkMarkerEl` | 22×22px, 23px above the canvas, centered under the Y axis labels | The linked-graphs chain icon (`linkMarkerVisible`), a relay zone like the others: its gestures come back as `customEvent`s with `zone: 'linkMarker'`. Where it overlaps the lock+handle zone, it wins. |

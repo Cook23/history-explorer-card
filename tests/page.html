@@ -29,6 +29,9 @@ window.lockOf=(gi)=>graphAt(gi).chart._hecYAxisLock||0;
 window.lockPt=(gi)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClientRect(); return {x:r.left+24,y:r.top+14}; };
 window.yaPt=(gi,frac)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClientRect(); const a=g.chart.chartArea; return {x:r.left+a.left/2,y:r.top+a.top+(a.bottom-a.top)*(frac??0.5)}; };
 window.yRange=(gi)=>{ const s=graphAt(gi).chart.scales['y-axis-0']; return [+s.min.toFixed(2),+s.max.toFixed(2)]; };
+// The right Y axis: a point in its label column, its range
+window.yaRightPt=(gi,frac)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClientRect(); const a=g.chart.chartArea; return {x:r.left+(a.right+g.chart.width)/2,y:r.top+a.top+(a.bottom-a.top)*(frac??0.5)}; };
+window.yRangeRight=(gi)=>{ const s=graphAt(gi).chart.scales['y-axis-1']; return [+s.min.toFixed(2),+s.max.toFixed(2)]; };
 window.timeRange=()=>[el.instance.startTime,el.instance.endTime];
 window.chainShown=()=>el.instance._allGraphsInDisplayOrder().map(g=>g.chart.options.linkMarkerVisible?1:0).join('');
 // The persisted list agrees with the screen: each group's entries contiguous, groups in
