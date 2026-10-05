@@ -41,13 +41,13 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸ | Interpolation ▸ | Layout ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
+        return m === 'Display ▸ | Interpolation ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: Display (timeline only), Layout', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸ | Layout ▸ || open: rep || Timeline* || Delete' ? true : m;
+        return m === 'Display ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Timeline* || Delete' ? true : m;
     });
     done(await t.close());
 
@@ -85,6 +85,23 @@ module.exports = async function()
             return { free: s.left - w, right: Math.abs(s.right - m.right) }; })()`);
         await closeMenu();
         return r.free > 0 && r.right < 1 ? true : JSON.stringify(r);
+    });
+    // ── Tests ▸: the pen events test, in a dialog over the page ──
+    const dlg = `[...document.body.children].find(d => d.shadowRoot && d.shadowRoot.querySelector('.dlg'))`;
+    await t.step('Tests ▸ Pen events: its dialog, a pen contact reported, closed by Escape, the menu closed', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
+        const entries = await t.E(`[...el.querySelectorAll('#et_0_tests_sub a')].map(a=>a.textContent).join()`);
+        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        const title = await t.E(`${dlg}?.shadowRoot.getElementById('title').textContent`);
+        await t.E(`${dlg}.shadowRoot.getElementById('padFree').dispatchEvent(new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'pen', buttons: 1, button: 0, bubbles: true }))`);
+        const check = await t.E(`${dlg}.shadowRoot.querySelector('#checks li').textContent`);
+        const log = await t.E(`${dlg}.shadowRoot.getElementById('log').textContent`);
+        const menuOpen = await t.E('menuOpen()');
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        const gone = await t.E(`!${dlg}`);
+        return entries === 'Pen events' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && !menuOpen && gone
+            ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
     });
     done(await t.close());
 

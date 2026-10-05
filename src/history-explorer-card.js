@@ -19,11 +19,11 @@ import { CardMenus, typeMenuHtml } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import "./history-info-panel.js"
+import { Version } from "./version.js";
 
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.2.3b1';
 
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by

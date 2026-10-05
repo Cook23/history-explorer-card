@@ -13,6 +13,11 @@ Changelog for the HA History Explorer Card.
 - `deps/chart-hec.js`: the browser's `contextmenu` is a gesture source (`hecContextMenu`): during a contact, that contact's `longpress`; right after a `click` at the same place, a `longpress` with `undoesClick`; right after a `longpress`, nothing (`deps/Chart Custom.js.md` §2)
 - Tests: right click on a curve label (type menu, curve not hidden, no browser menu), a pen tap with its button in Chrome
 
+### New — the type menu's Tests (beta) ▸ submenu: what the browser or app gives the card
+- Last item of the card's type menu, set apart: diagnostics run right where the card is shown — a browser, the Home Assistant app — so that users can report what each system gives the card. First one: *Pen events* (what the browser reports of a pen on a zone that scrolls like a graph and on one that doesn't: its type, hover, its button, a long press, the browser taking a gesture over), in a dialog over the page in the Home Assistant theme; its report (card version, browser, checklist, event log) is copied, or sent as a prefilled GitHub issue
+- `src/card-tests.js`: the tests' registry (the submenu is built from it), the dialog they share, the pen events test; `src/version.js`: the card's version, for the reports
+- Test: Tests ▸ Pen events (its dialog, a pen contact reported, closed by Escape); the type menu tests list the new item
+
 ### Fixed — pen: the tooltip closed right after the tap that opened it
 - When the browser took over the tap that opened the tooltip (a slight move of the tip: the page may scroll), it reported the pen as leaving the graph, which closed the tooltip, so hovering then moved nothing. Only a pointer moving out while hovering now closes it
 - `deps/chart-hec.js`: a gesture the browser takes over ends on the move of that same pointer, no longer on the tooltip's own state

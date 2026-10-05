@@ -4,6 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
+import { CARD_TESTS, openCardTest } from "./card-tests.js";
 const moment = window.HXLocal_moment;
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
@@ -25,8 +26,11 @@ export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decora
 
 // The type menu's items, each opening its submenu over the menu, right-aligned, level with
 // it: what the entity is shown as (open when the menu opens), how its curve is
-// interpolated, and what to do with it in its graph (the card's long-press menu only)
-const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', layout: 'ui.menu.type_layout' };
+// interpolated, what to do with it in its graph (from a long-press), and, last, the tests
+// a user can run to report what their browser or app gives the card (card-tests.js)
+const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', layout: 'ui.menu.type_layout', tests: 'ui.menu.type_tests' };
+// The submenus only the card's menu has, not the info panel's
+const _CARD_ONLY_SUBMENUS = ['layout', 'tests'];
 // The layout submenu's entries (et_N_<key>)
 const _LAYOUT_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', delete: 'ui.menu.entity_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
@@ -34,25 +38,28 @@ const _TYPE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
-// wildcard add, and the layout submenu) and the info panel's
+// wildcard add, the layout and tests submenus) and the info panel's
 export function typeMenuHtml(i, full)
 {
-    const a = (id, label, hidden) => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${hidden ? ';display:none' : ''}">${label}</a>`;
+    const a = (id, label, hidden, style = '') => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${style}${hidden ? ';display:none' : ''}">${label}</a>`;
     const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
-    const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || k !== 'layout');
+    const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k));
+    // (the tests set apart from what concerns the entity)
+    const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true)).join('')}
+            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
-        ${full ? sub('layout', Object.keys(_LAYOUT_ENTRIES).map(k => a(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]), true))) : ''}`;
+        ${full ? sub('layout', Object.keys(_LAYOUT_ENTRIES).map(k => a(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]), true))) : ''}
+        ${full ? sub('tests', Object.keys(CARD_TESTS).map(k => a(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label)))) : ''}`;
 }
 
 export class CardMenus
 {
     // --------------------------------------------------------------------------------------
-    // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸
+    // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸, Tests ▸
     // --------------------------------------------------------------------------------------
 
     // The type menu's names, in the card's language (set once it's known)
@@ -63,6 +70,7 @@ export class CardMenus
         set(`et_${i}_default`, i18n('ui.menu.type_default'));
         _TYPE_MENU_DEFS.forEach((d, k) => set(`et_${i}_${k}`, i18n(d.label)));
         for( const k in _LAYOUT_ENTRIES ) set(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]));
+        for( const k in CARD_TESTS ) set(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label));
     }
 
     // Shows the representation submenu's entries for an entity — only Timeline when it
@@ -127,6 +135,7 @@ export class CardMenus
         show(q('merge'), _longPress && this._canMergeLinkedGraph(graph));
         show(q('delete'), _longPress);
         show(q('rep'), true);
+        show(q('tests'), true);
 
         const _titleEl = q('title');
         if( _titleEl ) {
@@ -208,7 +217,7 @@ export class CardMenus
         this._resetEntityInput(this.ui.inputField[input_idx]);
     }
 
-    // The type menu's submenus present in this menu (the info panel's has no layout)
+    // The type menu's submenus present in this menu (the info panel's has no layout, no tests)
     _typeSubmenus(input_idx)
     {
         return Object.keys(_TYPE_SUBMENUS).map(k => this._this.querySelector(`#et_${input_idx}_${k}_sub`)).filter(s => s);
@@ -240,7 +249,7 @@ export class CardMenus
     }
 
     // Listeners of the type menu et_N and its submenus — shared by the card and the info
-    // panel (whose menu has no "Default" and no layout)
+    // panel (whose menu has no "Default", no layout and no tests)
     _initEntityTypeMenu(_ii)
     {
         const _etMenu = this._this.querySelector(`#et_${_ii}`);
@@ -253,6 +262,7 @@ export class CardMenus
         _TYPE_MENU_DEFS.forEach((_def, _idx) => _on(_idx, () => this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode)));
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
         for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
+        for( const k in CARD_TESTS ) _on(`test_${k}`, () => { this.hideEntityTypeMenu(_ii); openCardTest(k); });
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
             const _sel = _etMenu.querySelector('a[data-hec-selected]');
