@@ -104,13 +104,15 @@ defaultInfoPanel: true   # set default enabled state; user preference is otherwi
 
 Once enabled, clicking any entity anywhere opens the history explorer graph instead. Switching it on or off applies right away, without reloading the page. Ungrouping, drag & drop and CSV export are not available in the popup.
 
-On every page of Home Assistant — Settings, History, a page opened directly in a new tab — once the card's file is also loaded through `configuration.yaml`, with the exact URL of its dashboard resource (*Settings → Dashboards → Resources*):
+Home Assistant only loads the card's file once a dashboard is shown: a page opened directly (Settings, History…) shows its own history until then. To have the info panel on every page, load the file in `configuration.yaml` too:
 
 ```yaml
 frontend:
   extra_module_url:
-    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the resource's URL, as it is
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # copy the URL of the card's resource
 ```
+
+The `?hacstag=…` part isn't required — the file works without it — but with the exact URL of the card's dashboard resource (*Settings → Dashboards → ⋮ → Resources*) the browser loads the file once instead of twice, and gets the new version after each update. HACS changes it at each update: copy it again then.
 
 > For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#overriding-the-ha-more-info-history-info-panel)
 
@@ -363,7 +365,7 @@ entities:
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-Hold **Alt** (Option on Mac) while hovering to reveal individual data points. To show them permanently:
+To show the individual data points:
 
 ```yaml
 entityOptions:
