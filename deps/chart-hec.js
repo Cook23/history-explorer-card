@@ -688,13 +688,6 @@
     }
     var _yIdx = yAxisIndexAt(c, _hx, _hy);
     var _truncated = truncatedYAxisLabelAt(c, _yIdx);
-    if (gestureType === 'click' || gestureType === 'longpress') {
-      gs.lastGesture = { type: gestureType, t: Date.now(), x: _hx, y: _hy };
-    }
-    if (gestureType === 'longpress' && extra && extra.undoesClick && me._hecInLockAndHandleZone(_hx, _hy)) {
-      // (the click it undoes had toggled the lock — see the click branch below)
-      me._hecToggleYAxisLock();
-    }
     if (gestureType === 'click') {
       if (typeof me.options.onClick === 'function') {
         me.options.onClick.call(me, e.native, me.active);
@@ -861,12 +854,11 @@
     p.barrelDown = _down;
   }
 
-  // The browser's context menu request: a right click, a long press, a pen's barrel
-  // button (Chrome reports a tap made with it as a plain tap, then this). On a graph the
-  // browser's own menu never opens: it's the longpress gesture. During a contact, it's
-  // that contact's long press, fired now unless already; after a tap or a long press at
-  // the same place, it's that same gesture's: a click is undone (undoesClick, its first
-  // half rather than a click), a long press already acted
+  // The browser's context menu request: a right click, a long press, a tap with a pen's
+  // button (Chrome: no contact reported at all, only this). On a graph the browser's own
+  // menu never opens: it's the longpress gesture. During a contact, it's that contact's
+  // long press, fired now unless already; right after a contact released from its long
+  // press, at the same place (a browser reporting it at the release), it's that one's
   function hecContextMenu(c) {
     var gs = c.gs, e = c.e, cfg = c.cfg;
     if (e.native) e.native.preventDefault();
@@ -878,11 +870,10 @@
       fire(c, 'longpress', p.x0, p.y0);
       return;
     }
-    var last = gs.lastGesture;
-    gs.lastGesture = null;
-    var same = last && Date.now() - last.t < cfg.contextMenuAfterMs && Math.abs(last.x - e.x) + Math.abs(last.y - e.y) <= cfg.dragSlop;
-    if (same && last.type === 'longpress') return;
-    fire(c, 'longpress', e.x, e.y, same ? { undoesClick: true } : undefined);
+    var last = gs.longPressReleased;
+    gs.longPressReleased = null;
+    if (last && Date.now() - last.t < cfg.contextMenuAfterMs && Math.abs(last.x - e.x) + Math.abs(last.y - e.y) <= cfg.dragSlop) return;
+    fire(c, 'longpress', e.x, e.y);
   }
 
   function hecPointerDown(c) {
@@ -902,6 +893,7 @@
       try { me.canvas.setPointerCapture(e.native.pointerId); } catch (_err) { /* pointer already gone */ }
     }
 
+    gs.longPressReleased = null;
     if (gs.count === 1) {
       // Four independent events, defined purely by time and distance —
       // per Thierry's exact spec:
@@ -1084,7 +1076,9 @@
         // Click and long-press are mutually exclusive — a long-press already
         // fired for this contact, so releasing without ever moving does NOT
         // become a click, even though gs.pending stayed alive to allow a drag
-        // to follow (which didn't happen here).
+        // to follow (which didn't happen here). A context menu the browser
+        // reports for it now, at the release, is that same long press's.
+        gs.longPressReleased = { t: Date.now(), x: pu.x0, y: pu.y0 };
       } else if (pu.barrelPressed) {
         // The barrel button was pressed while the tip stayed down: whatever it did
         // (a double press is a dblclick) was done then — no click at release

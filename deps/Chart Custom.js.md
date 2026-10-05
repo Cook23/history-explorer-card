@@ -158,7 +158,7 @@ and `dblclick`, and nothing at all for long-press or drag.
 | *(mouse)* | A press of any button other than the main one starts no gesture: the right button acts through the browser's `contextmenu` (`longpress`) | — |
 | `dblclickdown` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`): what a drag following that press needs (touch-action block, Y-axis pan) is armed right away, and the first press's `click` can be undone | — |
 | `dblclick` | That second press is released without having become a drag (and before the long-press timer) — fires at the **second release** (`pointerup`), like the browser's own `dblclick`: only then is it known to be a double-click rather than a tap-then-drag | — |
-| `longpress` | Pointer held stationary (within 10px) for 600ms without releasing — or the browser's `contextmenu` (a right click, a long press it reports first, a tap with a pen's button in Chrome: a plain tap, then this). The browser's own menu never opens on the graph. During a contact, it's that contact's `longpress`, fired once; within 2.5s of a `click` or a `longpress` at the same place (within 10px), it's that same gesture's: after a `longpress`, nothing more; after a `click`, a `longpress` with `undoesClick` — the `click` was its first half, and what it did is to be undone (the Y-axis lock toggle is undone here) | `undoesClick`: `true` in that case, else absent |
+| `longpress` | Pointer held stationary (within 10px) for 600ms without releasing — or the browser's `contextmenu` (a right click, a long press it reports first, a tap with a pen's button in Chrome and its web views: no contact reported, only this). The browser's own menu never opens on the graph. During a contact, it's that contact's `longpress`, fired once; within 2.5s of the release of a contact whose `longpress` fired, at the same place (within 10px), it's that one's (a browser reporting it at the release): nothing more | — |
 | `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
 | `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
 | `dragovergraph` | During a drag, the pointer is over a *different* chart of the same `dragScope` — sent through that chart's own `customEvent`, its payload relative to that chart | for a graph move: `insertBefore` (the pointer is above that graph's middle) |
@@ -186,8 +186,7 @@ marker said:
 ### Mutual exclusion rules (all intentional, not incidental)
 
 - `click` and `longpress` are mutually exclusive — if long-press fires,
-  the same contact's release never also fires `click`; and a `contextmenu`
-  right after a `click` gives a `longpress` with `undoesClick`.
+  the same contact's release never also fires `click`.
 - One contact gives one `longpress` at most, whether from the timer or from
   the browser's `contextmenu` (the other is then ignored).
 - `click` and `dblclick` are mutually exclusive — the second press of a

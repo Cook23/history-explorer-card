@@ -4818,7 +4818,7 @@
             var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
-            var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a tap or long press is that gesture's
+            var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a contact released from its long press is that one's
 
             // Always run: click detection here is no longer an add-on for customEvent/
             // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.

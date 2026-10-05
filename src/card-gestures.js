@@ -69,14 +69,11 @@ export class CardGestures
         if( idx >= 0 && this._canUncombine(g) ) this._uncombineEntity(g, idx);
     }
 
-    // Long press on a label — or the browser's context menu: a right click, a pen's barrel
-    // button — the entity's type menu, under the label (line/bar: numeric entities only)
+    // Long press on a label — or the browser's context menu: a right click, a tap with a
+    // pen's button — the entity's type menu, under the label (line/bar: numeric entities only)
     // or level with the finger (timeline/arrowline row)
     _onGraphLongPress(info, g)
     {
-        // (a context menu right after a tap at the same place: the tap was its first
-        // half — a pen's barrel button in Chrome — so its show/hide is undone)
-        if( info.undoesClick ) this._onGraphClick(info, g);
         const _r = info.labelRect;
         if( !_r ) return;
         if( info.legendIndex >= 0 && !this._isRowGraph(g) ) {

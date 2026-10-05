@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.4] - unreleased
+
+### Fixed — pen: a tap with its button no longer undoes the tap before it
+- In Chrome and the Home Assistant app (Android), a tap with the pen's button held reports no contact at all, only a context menu (measured with *Tests (beta) ▸ Pen events*). 1.2.3 took a context menu coming soon after a tap at the same place as that tap's second half and undid it: a tap on a label (curve hidden), then a tap with the button on it within a couple of seconds, showed the curve again. A context menu now only opens the type menu; it's ignored only right after the release of a contact whose own long press already opened it (a browser reporting it at the release)
+- `deps/chart-hec.js`: `undoesClick` removed from the `longpress` payload (`deps/Chart Custom.js.md` §2)
+- Tests: a tap with the pen's button (a context menu only), a tap then a tap with the button on the same label (the curve stays hidden), a long press then the context menu at its release (one long press)
+
+### Changed — Tests (beta) ▸ Pen events: tap or swipe, and what the browser took over
+- Each contact's release gives how far the tip went (from its start to its end, and the farthest) and how long it lasted; a contact the browser takes over (pointercancel) then says whether anything really scrolled, and a new check flags a contact cancelled within the tap distance with nothing scrolled (a tap the browser took over); a context menu gives the time since, and the distance from, the last contact on its zone
+- One "Mark" button per trial: taps, short swipes, long press, taps with the pen's button, the button alone, hovering
+- Test: the dialog's contact line (distance, duration)
+
 ## [v1.2.3] - 2026-10-05
 
 ### Changed — the browser's context menu on a label opens its type menu
