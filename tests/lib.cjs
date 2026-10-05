@@ -10,21 +10,23 @@ const pageUrl = name => 'file://' + path.join(__dirname, name);
 // A page showing one card with config cfg. opts: { touch, height, scrollRoom (px of page
 // below the card, so the page can scroll), mock (the mocked Home Assistant's settings, see
 // page.html), page ('panel.html': the info panel instead
-// of a card), panel (the info panel's config) }
+// of a card), panel (the info panel's config — null: the panel off), userData (Home
+// Assistant's user data to start with), init (more of the page's init script) }
 async function openCard(cfg, opts = {})
 {
     const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
     const ctx = await browser.newContext({ viewport: { width: 1000, height: opts.height || 1400 }, hasTouch: !!opts.touch });
     const page = await ctx.newPage();
     // Home Assistant's user data (the card's saved state), kept for the page's lifetime
-    const userData = {};
+    const userData = { ...(opts.userData || {}) };
     await page.exposeFunction('__getUD', k => userData[k] ?? null);
     await page.exposeFunction('__setUD', (k, v) => { userData[k] = v; });
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     let init = 'window.CFG=' + JSON.stringify({ ...cfg, cardName: (cfg.cardName || 'test') + Date.now() }) + ';';
     if( opts.mock ) init += 'window.MOCK=' + JSON.stringify(opts.mock) + ';';
-    if( opts.panel ) init += 'window.PANEL_CFG=' + JSON.stringify(opts.panel) + ';';
+    if( opts.panel !== undefined ) init += 'window.PANEL_CFG=' + JSON.stringify(opts.panel) + ';';
+    if( opts.init ) init += opts.init;
     if( opts.scrollRoom ) init += `document.addEventListener("DOMContentLoaded",()=>{ const s=document.createElement("div"); s.style.height="${opts.scrollRoom}px"; document.body.appendChild(s); });`;
     await page.addInitScript(init);
     await page.goto(pageUrl(opts.page || 'page.html'));

@@ -81,7 +81,7 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
 - **Tooltip**: click or tap the curves to see the values or state details under the pointer; the tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves
 - **Right click** on a label: opens its type menu, as a long-press does
-- **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome, a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
+- **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
 - **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again within half a second and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis
 
 ---
@@ -96,7 +96,15 @@ infoPanel: true
 defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
 ```
 
-Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. Ungrouping, drag & drop and CSV export are not available in the popup.
+Once enabled, clicking any entity anywhere opens the history explorer graph instead. Switching it on or off applies right away, without reloading the page. Ungrouping, drag & drop and CSV export are not available in the popup.
+
+On every page of Home Assistant — Settings, History, a page opened directly in a new tab — once the card's file is also loaded through `configuration.yaml`, with the exact URL of its dashboard resource (*Settings → Dashboards → Resources*):
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the resource's URL, as it is
+```
 
 > For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#overriding-the-ha-more-info-history-info-panel)
 
@@ -210,7 +218,7 @@ An incompatible drop shows a brief tooltip explaining the mismatch.
 
 ### Linked graphs
 
-A graph defined in YAML always shows all its entities together, whatever their units — the Y axis title is left empty when the units differ, the legend and tooltip still show each entity's own unit. All the curves share one Y axis: when their values aren't of the same order, use `scale:` to make a small one visible next to a large one (the legend and tooltip keep showing its real value). Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+A graph defined in YAML always shows all its entities together, whatever their units. With two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back, whatever its unit
@@ -243,7 +251,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area (left side of the graph) to pan the Y axis — the cursor changes to ↕; on a touch screen, tap it, then press it again within half a second and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time.
+The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again within half a second and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both.
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -383,7 +391,7 @@ showUnavailable: true
 
 Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between 10 min, hourly, daily and monthly bars (hourly by default), or *Raw line*.
 
-A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves share one Y axis — for incompatible units (e.g. kWh bars and a W curve) use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
 ```yaml
 entityOptions:
@@ -392,15 +400,28 @@ entityOptions:
     interval: 10m
 ```
 
-Color ranges based on value:
+Colors that change with the value — thresholds, for curves and bars alike:
 ```yaml
 entityOptions:
   energy:
     type: bar
     color:
-      '0.0': blue
-      '1.0': green
-      '1.5': red
+      0: blue
+      1: green
+      1.5: red
+```
+
+Or with another entity: thresholds with an `entity` compare its value (a number or a state) at each point; `default` colors what they don't list. The legend shows the color now:
+```yaml
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.heat_pump_power
+        color:
+          entity: sensor.heat_pump_mode
+          heat: red
+          cool: blue
+          default: grey
 ```
 
 > For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#bar-graphs-for-total-increasing-entities)
@@ -509,7 +530,7 @@ graphs:
 | Option | Card | Graph | Entity | Description |
 |---|:-:|:-:|:-:|---|
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
-| `color` | | | ✓ | Line/bar color (HTML, CSS variable, or color range object) |
+| `color` | | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either |
 | `fill` | ✓ | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
@@ -521,6 +542,7 @@ graphs:
 | `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
 | `scale` | | | ✓ | Multiply values by this factor before drawing — see *6 |
+| `yAxis` | | | ✓ | `left` or `right`: the Y axis of the curve (by default, the second group of units goes on the right) |
 | `unit` | | | ✓ | Unit shown instead of the entity's own — see *6 |
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |

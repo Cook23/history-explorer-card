@@ -95,12 +95,13 @@ module.exports = async function()
         await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
         const title = await t.E(`${dlg}?.shadowRoot.getElementById('title').textContent`);
         await t.E(`${dlg}.shadowRoot.getElementById('padFree').dispatchEvent(new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'pen', buttons: 1, button: 0, bubbles: true }))`);
+        await t.E(`${dlg}.shadowRoot.getElementById('padFree').dispatchEvent(new PointerEvent('pointerup', { pointerId: 7, pointerType: 'pen', buttons: 0, button: 0, bubbles: true }))`);
         const check = await t.E(`${dlg}.shadowRoot.querySelector('#checks li').textContent`);
         const log = await t.E(`${dlg}.shadowRoot.getElementById('log').textContent`);
         const menuOpen = await t.E('menuOpen()');
         await t.page.keyboard.press('Escape'); await t.wait(200);
         const gone = await t.E(`!${dlg}`);
-        return entries === 'Pen events' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && !menuOpen && gone
+        return entries === 'Pen events' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
             ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
     });
     done(await t.close());

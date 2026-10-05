@@ -4292,13 +4292,7 @@
               me._hecLastType = me.config.type;
             } else if (me._hecLastType !== me.config.type) {
               me._hecLastType = me.config.type;
-              if (me._hecYAxisLock && me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0]) {
-                var _tt = me.options.scales.yAxes[0].ticks;
-                _tt.min = _tt.forceMin;
-                _tt.max = _tt.forceMax;
-                _tt.removeEdgeTicks = false;
-                me._hecYAxisLock = 0;
-              }
+              if (me._hecYAxisLock) me._hecReleaseYAxes();
             }
 
             if (helpers.isNullOrUndef(easingValue)) {
@@ -4818,7 +4812,7 @@
             var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
-            var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a tap or long press is that gesture's
+            var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a contact released from its long press is that one's
 
             // Always run: click detection here is no longer an add-on for customEvent/
             // pan/zoom consumers — it's the ONLY source legend.onClick and Controller.
@@ -11753,17 +11747,20 @@
             // lineWidth :
             generateLabels: function (chart) {
               var data = chart.data;
+              // HEC: colors given per element (an array): the swatch takes the last element's
+              // — on a time axis, the most recent one, as the value shown in the label
+              var last = function (c) { return helpers.isArray(c) ? c[c.length - 1] : c; };
               return helpers.isArray(data.datasets) ? data.datasets.map(function (dataset, i) {
                 return {
                   text: dataset.label,
-                  fillStyle: !helpers.isArray(dataset.backgroundColor) ? dataset.backgroundColor : dataset.backgroundColor[0],
+                  fillStyle: last(dataset.backgroundColor),
                   hidden: !chart.isDatasetVisible(i),
                   lineCap: dataset.borderCapStyle,
                   lineDash: dataset.borderDash,
                   lineDashOffset: dataset.borderDashOffset,
                   lineJoin: dataset.borderJoinStyle,
                   lineWidth: dataset.borderWidth,
-                  strokeStyle: dataset.borderColor,
+                  strokeStyle: last(dataset.borderColor),
                   pointStyle: dataset.pointStyle,
 
                   // Below is extra data used for toggling the datasets

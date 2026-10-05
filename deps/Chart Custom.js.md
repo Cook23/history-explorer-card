@@ -93,10 +93,11 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
-### Dataset option
+### Dataset options
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
+| `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
 
 ---
@@ -127,7 +128,8 @@ card may need, so it never has to compute one from the chart's layout.
   clientX, clientY,    // the same point, client (viewport) coordinates
   zone,                // where that point is: 'linkMarker' (chain icon, §5),
                        // 'lockAndHandle' (§5), 'legend' (its band, whole width),
-                       // 'yAxis' (left of the plot area), 'plot', or 'other'
+                       // 'yAxis' (a Y axis' label column: left of the plot area, or right
+                       // of it on a chart with a right axis), 'plot', or 'other'
   xFactor,             // where x is along the time axis: 0 at the plot area's left
                        // edge, 1 at its right edge (undefined before the first layout)
   legendIndex,         // legend label under the point, or -1
@@ -158,7 +160,7 @@ and `dblclick`, and nothing at all for long-press or drag.
 | *(mouse)* | A press of any button other than the main one starts no gesture: the right button acts through the browser's `contextmenu` (`longpress`) | — |
 | `dblclickdown` | A second press lands within 400ms of a first press that also stayed within 10px — fires at the **second press itself** (`pointerdown`): what a drag following that press needs (touch-action block, Y-axis pan) is armed right away, and the first press's `click` can be undone | — |
 | `dblclick` | That second press is released without having become a drag (and before the long-press timer) — fires at the **second release** (`pointerup`), like the browser's own `dblclick`: only then is it known to be a double-click rather than a tap-then-drag | — |
-| `longpress` | Pointer held stationary (within 10px) for 600ms without releasing — or the browser's `contextmenu` (a right click, a long press it reports first, a tap with a pen's button in Chrome: a plain tap, then this). The browser's own menu never opens on the graph. During a contact, it's that contact's `longpress`, fired once; within 2.5s of a `click` or a `longpress` at the same place (within 10px), it's that same gesture's: after a `longpress`, nothing more; after a `click`, a `longpress` with `undoesClick` — the `click` was its first half, and what it did is to be undone (the Y-axis lock toggle is undone here) | `undoesClick`: `true` in that case, else absent |
+| `longpress` | Pointer held stationary (within 10px) for 600ms without releasing — or the browser's `contextmenu` (a right click, a long press it reports first, a tap with a pen's button in Chrome and its web views: no contact reported, only this). The browser's own menu never opens on the graph. During a contact, it's that contact's `longpress`, fired once; within 2.5s of the release of a contact whose `longpress` fired, at the same place (within 10px), it's that one's (a browser reporting it at the release): nothing more | — |
 | `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
 | `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
 | `dragovergraph` | During a drag, the pointer is over a *different* chart of the same `dragScope` — sent through that chart's own `customEvent`, its payload relative to that chart | for a graph move: `insertBefore` (the pointer is above that graph's middle) |
@@ -186,8 +188,7 @@ marker said:
 ### Mutual exclusion rules (all intentional, not incidental)
 
 - `click` and `longpress` are mutually exclusive — if long-press fires,
-  the same contact's release never also fires `click`; and a `contextmenu`
-  right after a `click` gives a `longpress` with `undoesClick`.
+  the same contact's release never also fires `click`.
 - One contact gives one `longpress` at most, whether from the timer or from
   the browser's `contextmenu` (the other is then ignored).
 - `click` and `dblclick` are mutually exclusive — the second press of a
@@ -211,11 +212,13 @@ fork's card previously handled itself) are now applied by Chart.js
 directly, since the chart already has every piece of data it needs — no
 value needs to come back from the card:
 
-- **Y-axis pan** (dragging the Y-axis label zone, or Shift+drag anywhere
-  on a `line`/`bar` chart) — moves `options.scales.yAxes[0].ticks.min/max`
-  directly.
+- **Y-axis pan** (dragging an axis' label zone — left, or right on a chart with
+  a right axis — or Shift+drag anywhere on a `line`/`bar` chart) — moves the
+  `ticks.min/max` of that axis, or of every Y axis with Shift, directly
+  (`_hecValueYAxes` / `_hecSetYRanges`).
 - **Y-axis zoom** (Shift+wheel, or the Y-spread of a 2-finger pinch) —
-  same, computed via simple scale-factor math on the current min/max.
+  same, on every Y axis, each around its own middle (simple scale-factor math
+  on its current min/max).
 - **Y-axis pan during a pinch** (the vertical movement of the fingers' centre) —
   same as the Y-axis drag: the content follows the fingers.
 - **Y-axis lock** (the padlock icon) — a lock state (`0`=off, `1`=manually
@@ -281,7 +284,7 @@ nowhere at all.
 | `_hecLockIconEl` | 18×18px @ `(15, 5)` | The Y-axis lock padlock SVG. `pointer-events: none` — purely visual, the actual click is handled by the gesture detector (`zone: 'lockAndHandle'`). |
 | `_hecMoveHandleIconEl` | 15×28px @ `(0, 0)` | The `⠿` graph-reorder handle glyph. Also `pointer-events: none`, same reasoning. |
 | `_hecMoveHandleTouchEl` | 33×28px @ `(0, 0)` (0×0 if `moveHandleVisible` is `false`) | The single real touch target covering **both** the lock icon and the move handle as one zone (see below) — `touch-action` toggled dynamically. |
-| `_hecYAxisTouchEl` | Matches the Y-axis label column | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
+| `_hecYAxisTouchEl`, `_hecRightYAxisTouchEl` | Match the Y axes' label columns (the right one only on a chart with a right axis) | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
 | `_hecLegendTouchEl` | Tight bounding box of the legend's actual `legendHitBoxes`, +4px margin | Same dynamic `touch-action`, for dragging a curve label. Only exists for `line`/`bar` charts. |
 | `_hecLabelTouchEl` | Full label column height | Same dynamic `touch-action`, for dragging a timeline/arrowline entity label. Only exists for `timeline`/`arrowline` charts. |
 | `_hecLinkMarkerEl` | 22×22px, 23px above the canvas, centered under the Y axis labels | The linked-graphs chain icon (`linkMarkerVisible`), a relay zone like the others: its gestures come back as `customEvent`s with `zone: 'linkMarker'`. Where it overlaps the lock+handle zone, it wins. |
@@ -381,7 +384,7 @@ pointing to `deps/chart-hec.js` or to this file:
 | `Controller.handleEvent` | Hover hit-test limited to drawn points; a `mouseout` without movement (the browser's, during a scroll) doesn't close the tooltip; every event goes to `_hecGestureHandler`, with the timing constants (`cfg`) |
 | `Tooltip` | Drawn as a floating element (`_hecRenderFloatingTooltip`, §7 utilities) instead of on the canvas |
 | Platform (DOM) | Canvas `touch-action: pan-y` (§3); pointer and wheel listeners not passive (§5) |
-| Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines) |
+| Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines); a dataset whose colors are given per element (arrays: bars colored one by one) shows the last element's in its swatch — on a time axis, the most recent |
 | Linear scale | `ticks.period` labels (§1) |
 | Line controller, `updateBezierControlPoints` | `hecInterpolation` (§1): another algorithm than `'monotone'` goes to `helpers.hecSplineCurve` |
 | Header, `HEC_CHART_VERSION` | The card's version, logged once at load |

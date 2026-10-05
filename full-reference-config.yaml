@@ -29,7 +29,8 @@ graphs:
       # Custom display name, overriding the entity's friendly name
       name: null
 
-      # Colour of the line/bar in the graph, defaults to automatically assigning a colour
+      # Colour of the line/bar in the graph, defaults to automatically assigning a colour:
+      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` on that entity's value), or an entity holding either
       color: null
 
       # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'
@@ -209,7 +210,8 @@ entityOptions:
     # Angles: see $.graphs.entities.circular
     circular: null
 
-    # Colour of the line in the graph, defaults to automatically assigning a colour
+    # Colour of the line in the graph, defaults to automatically assigning a colour:
+    # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` on that entity's value), or an entity holding either
     color: null
 
     # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'

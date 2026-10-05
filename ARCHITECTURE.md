@@ -80,5 +80,5 @@ keep them apart. For the details of the boundary with Chart.js, see
   page scrolling apply), linked graphs, menus, two cards on one page, history and
   statistics, CSV export, refresh, the entity selector, the info panel, the type menu,
   arrowlines, `scale`, the options at every level and the Interpolation submenu, persistence and the
-  last one to speak, the pen; after each scenario,
+  last one to speak, the pen, the colors (a value, thresholds, an entity holding them), the two Y axes; after each scenario,
   the persisted entities must match what is shown.

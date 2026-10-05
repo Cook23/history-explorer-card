@@ -4,6 +4,49 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.4] - 2026-10-05
+
+### New — two Y axes on a graph
+- A line or bar graph has up to two Y axes, one per group of compatible units: the first group on the left, the second on the right, each with its own scale, title, SI conversion (W and kW: one unit) and circular labels. With more than two groups, one shared axis without a title, as before
+- A graph that mixes exactly two groups of units — energy bars and a power curve, a power and a temperature — now shows them on two axes (it used to be one axis without a unit)
+- An entity's `yAxis` (`left`, `right`; on the entity or in `entityOptions`) puts it on that side whatever its unit
+- The curves of the right axis are marked with a small arrow ▸ in the legend; `ymin` / `ymax` / `ystepSize` apply to both axes
+- Linked graphs keep the same room on the right when one of them has a right axis: their time stays aligned
+- The min/max band (`showMinMax`) is drawn on its curve's own axis; circular labels are per axis (a wind direction on the right axis wraps around, a power on the left doesn't); stacked bars: those of each axis stacked in a column of their own
+- Gestures: dragging the label column of an axis — left or right, mouse or tap-then-drag — moves that axis only; Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle; the padlock locks and releases both
+- `deps/chart-hec.js`: every Y gesture and the lock go through `_hecValueYAxes`, `_hecYAxisSideAt`, `_hecYRanges`, `_hecSetYRanges`, `_hecReleaseYAxes`; the zone `yAxis` includes the right axis' column, which has its own touch zone (`deps/Chart Custom.js.md` §2, §5)
+- Tests: new suite `yaxes` (two groups, three, `yAxis`, linked graphs aligned, a right-axis curve on its own scale, `entityOptions`, circular labels and stacked bars per axis; dragging each axis, Shift + drag, Shift + wheel, the padlock, tap-then-drag on the right axis, the pinch)
+
+### New — the info panel on every page of Home Assistant
+- Loaded through `frontend: extra_module_url` (documented: the exact URL of the dashboard resource), the card's file hooks the entity dialog's history on any page — Settings, History, a page opened directly — not only once a dashboard is shown
+- The hook is always installed; whether the panel replaces Home Assistant's own history is decided at each render. Switching it on or off no longer reloads the page
+- A browser where the card never ran takes the panel's state and configuration from Home Assistant's user data (once per page), and saves them
+- The file can run twice (two URLs): the card is defined once, listed once in the card picker, and the dialog hooked once
+- Tests: the panel off then on then off without reload, on from Home Assistant's user data, off there too, the file loaded twice
+
+### New — thresholds on the value of another entity, states and `default` in thresholds
+- Thresholds with an `entity` key compare that entity's value instead of the value shown, at each point along its history: a heat pump's power colored by its mode (`{ entity: sensor.heat_pump_mode, heat: red, cool: blue }`)
+- In thresholds, everywhere: a number key is a threshold, any other key a state compared exactly as written (case included), `default` the color of every value they don't cover
+- Tests: thresholds on an entity's states (with `default`, and a state not listed without one: the palette)
+
+### New — a color held by an entity, thresholds on curves, RGB triplets
+- `color` is a value or an entity holding that value — the same values everywhere: a color (any CSS color, a CSS variable, an RGB triplet `[r, g, b]`, also as text `r, g, b` or `(r, g, b)`), or thresholds on the value shown (`{ 0: blue, 20: red }`, also as text: JSON, or a dictionary as a Home Assistant template writes it). Named by its entity_id, an entity's state holds the color: the curve takes, at each point, the color that entity had then — its history is loaded with the card's, and a change of its state refreshes the graph
+- Thresholds now color curves too (each point by its value), not only bars
+- The color is evaluated at each point (each bar): a curve changes color on a point, its fill with it (with the transparency of its `fill`). The legend shows the color now; where no valid color applies, a color of the automatic palette
+- Two curves of one graph set to the same `color` both keep it: only a color the card chose itself is changed to tell the curves apart
+- `deps/chart-hec.js`: new dataset option `colorSteps` (a line whose color changes along the X axis); `deps/Chart.js`: a legend swatch takes the last of colors given per element (`deps/Chart Custom.js.md` §1, §8). `src/history-default-colors.js`: one reader for every form of a color value (`parseColorValue`, `colorForValue`); `src/card-history.js`: one read of an entity's cached history (`cachedHistory`) for the shown entities and those holding a color
+- Tests: new suite `colors` (a color from an entity along its history, the legend now, thresholds on a curve, thresholds held by an entity, a triplet, no valid color, bars, the entity changing, two curves set to the same color)
+
+### Fixed — pen: a tap with its button no longer undoes the tap before it
+- In Chrome and the Home Assistant app (Android), a tap with the pen's button held reports no contact at all, only a context menu (measured with *Tests (beta) ▸ Pen events*). 1.2.3 took a context menu coming soon after a tap at the same place as that tap's second half and undid it: a tap on a label (curve hidden), then a tap with the button on it within a couple of seconds, showed the curve again. A context menu now only opens the type menu; it's ignored only right after the release of a contact whose own long press already opened it (a browser reporting it at the release)
+- `deps/chart-hec.js`: `undoesClick` removed from the `longpress` payload (`deps/Chart Custom.js.md` §2)
+- Tests: a tap with the pen's button (a context menu only), a tap then a tap with the button on the same label (the curve stays hidden), a long press then the context menu at its release (one long press)
+
+### Changed — Tests (beta) ▸ Pen events: tap or swipe, and what the browser took over
+- Each contact's release gives how far the tip went (from its start to its end, and the farthest) and how long it lasted; a contact the browser takes over (pointercancel) then says whether anything really scrolled, and a new check flags a contact cancelled within the tap distance with nothing scrolled (a tap the browser took over); a context menu gives the time since, and the distance from, the last contact on its zone
+- One "Mark" button per trial: taps, short swipes, long press, taps with the pen's button, the button alone, hovering
+- Test: the dialog's contact line (distance, duration)
+
 ## [v1.2.3] - 2026-10-05
 
 ### Changed — the browser's context menu on a label opens its type menu

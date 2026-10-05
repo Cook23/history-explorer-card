@@ -241,22 +241,78 @@ export const stateColorsDark = {
 
 };
 
+// An RGB triplet written as text: "r, g, b", "[r, g, b]" or "(r, g, b)"
+const _RGB_TRIPLET = /^[\[(]?\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*[\])]?$/;
+
+// A color, in any of the forms an option giving one accepts: any CSS color, a CSS variable
+// (--name), an RGB triplet ([r, g, b], or as text) → a CSS color. Thresholds (an object)
+// are returned as they are: see parseColorValue.
 export function parseColor(c)
 {
-    if( c && c.constructor == Object ) return c;
-    while( c && c.startsWith('--') ) c = getComputedStyle(document.body).getPropertyValue(c);
-    return c;
+    if( Array.isArray(c) ) return c.length >= 3 ? `rgb(${c[0]},${c[1]},${c[2]})` : undefined;
+    if( typeof c !== 'string' ) return c;
+    c = c.trim();
+    while( c.startsWith('--') ) c = getComputedStyle(document.body).getPropertyValue(c).trim();
+    const t = c.match(_RGB_TRIPLET);
+    return t ? `rgb(${t[1]},${t[2]},${t[3]})` : c;
 }
 
-export function parseColorRange(r, v)
+// Thresholds written as text — JSON, or a dict as a Home Assistant template writes it
+// (single quotes, keys left unquoted)
+function _parseThresholdText(s)
 {
-    let c, c1, m, n;
-
-    for( let i in r ) {
-        const j = i*1;
-        if( v >= j && (m == undefined || j > m) ) { c = r[i]; m = j; }
-        if( v < j && (n == undefined || j < n) ) { c1 = r[i]; n = j; }
+    const _dq = s.replace(/'/g, '"');
+    for( const t of [s, _dq, _dq.replace(/([{,]\s*)(-?\d+(?:\.\d+)?)\s*:/g, '$1"$2":')] ) {
+        try {
+            const o = JSON.parse(t);
+            if( o && typeof o === 'object' && !Array.isArray(o) ) return o;
+        } catch( e ) { /* next form */ }
     }
+    return null;
+}
 
-    return c ?? c1;
+const _isColor = c => typeof c === 'string' && c !== '' && ( typeof CSS === 'undefined' || !CSS.supports || CSS.supports('color', c) );
+const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.trim() !== '' ) ? Number(v) : NaN;
+
+// The value of a color option — the same forms whether it's given in the configuration or
+// read from an entity's state: a color (see parseColor), or thresholds (an object, or the
+// same as text): a number key is a threshold, any other key a state compared as it is
+// written, `default` the color of every value they don't cover (`entity`, the entity whose
+// value they compare — see colorEntityOf — is left to the caller) → { color }, or
+// { thresholds: [[value, color], ...] in increasing order, states: { state: color },
+// default }, or null when it's neither
+export function parseColorValue(v)
+{
+    if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim());
+    if( v && typeof v === 'object' && !Array.isArray(v) ) {
+        const spec = { thresholds: [], states: {}, default: undefined };
+        for( const [k, c0] of Object.entries(v) ) {
+            const c = parseColor(c0);
+            if( k === 'entity' || !_isColor(c) ) continue;
+            if( k === 'default' ) spec.default = c;
+            else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
+            else spec.states[k] = c;
+        }
+        spec.thresholds.sort((a, b) => a[0] - b[0]);
+        return spec.thresholds.length || Object.keys(spec.states).length || spec.default ? spec : null;
+    }
+    const c = parseColor(v);
+    return _isColor(c) ? { color: c } : null;
+}
+
+// The color a value takes (see parseColorValue): the color itself; a state listed, its
+// color; a number, the color of the highest threshold at or below it — below every
+// threshold, the lowest one's; any other value, the default color (undefined when none)
+export function colorForValue(spec, value)
+{
+    if( !spec ) return undefined;
+    if( spec.color ) return spec.color;
+    if( Object.prototype.hasOwnProperty.call(spec.states, String(value)) ) return spec.states[String(value)];
+    const n = _number(value);
+    if( spec.thresholds.length && !isNaN(n) ) {
+        let c = spec.thresholds[0][1];
+        for( const [k, col] of spec.thresholds ) if( n >= k ) c = col;
+        return c;
+    }
+    return spec.default;
 }

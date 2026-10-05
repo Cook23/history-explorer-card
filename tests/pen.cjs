@@ -81,14 +81,35 @@ module.exports = async function()
         await t.pen('pointerout', p2, 0, -1, 'mouse'); await t.wait(1300);
         return t1 && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
     });
-    await t.step('a tap with the barrel button in Chrome (a plain tap, then a context menu): the type menu, the curve not hidden', async () => {
+    // A tap with the pen's button (Chrome and its web views, the Home Assistant app): no
+    // contact reported at all, only a context menu, a moment later, where the pen is
+    const menuOpen = () => E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
+    const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300); };
+    await t.step('a tap with the pen\'s button on a curve label (only a context menu): its type menu, no browser menu', async () => {
         const a = await E('legendPt(0,0)');
-        await t.penTap(a); await t.wait(300);
         const prevented = await t.contextMenu(a); await t.wait(400);
-        const open = await E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
-        const g = await t.graphs();
-        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
+        const open = await menuOpen(); const g = await t.graphs();
+        await closeMenu();
         return open && prevented && !g.some(x => /\(h\)/.test(x)) ? true : JSON.stringify({ open, prevented, g });
+    });
+    await t.step('a tap on a curve label, then a tap with the pen\'s button on it: the curve stays hidden, its type menu', async () => {
+        const a = await E('legendPt(0,0)');
+        await t.penTap(a); await t.wait(800);
+        const g1 = await t.graphs();
+        await t.contextMenu(a); await t.wait(400);
+        const open = await menuOpen(); const g2 = await t.graphs();
+        await closeMenu();
+        await t.penTap(a); await t.wait(800);   // (shown again for the next steps)
+        return open && /\(h\)/.test(g1[0]) && g2[0] === g1[0] ? true : JSON.stringify({ open, g1, g2 });
+    });
+    await t.step('a long press, then the context menu a browser reports at the release: one long press only', async () => {
+        const a = await E('legendPt(0,1)');
+        await E(`(()=>{ window.__lp=0; const c=graphAt(0).chart; const f=c.options.customEvent; c.options.customEvent=(p)=>{ if( p.gestureType==='longpress' ) window.__lp++; return f(p); }; })()`);
+        await t.pen('pointerdown', a, 1, 0); await t.wait(900); await t.pen('pointerup', a, 0, 0);
+        await t.contextMenu(a); await t.wait(400);
+        const n = await E('window.__lp'); const open = await menuOpen();
+        await closeMenu();
+        return n === 1 && open ? true : JSON.stringify({ n, open });
     });
     return t.close();
 };

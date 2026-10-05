@@ -145,7 +145,7 @@ Click or tap a chart line or a state timeline to get a tooltip of the selected v
 
 The tooltip then follows the mouse — or a pen held above the screen, in the browsers that report it — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
 
-**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome, a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same. To see what your browser or app reports of a pen, and report it: type menu, *Tests (beta) ▸ Pen events*.
+**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same. To see what your browser or app reports of a pen, and report it: type menu, *Tests (beta) ▸ Pen events*.
 
 ### Adding entities
 
@@ -254,7 +254,7 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. When the units differ, the Y axis title is left empty; the legend and the tooltip still show each entity's value in its own unit. All the curves share one Y axis: when their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice. Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale and title, and the curves of the right axis are marked with a small arrow ▸ in the legend. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned. With more than two groups of units, the curves share one Y axis whose title is left empty; the legend and the tooltip still show each entity's value in its own unit. When their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -342,6 +342,20 @@ Once enabled, clicking any entity anywhere on your Lovelace dashboard will open 
 
 The `defaultInfoPanel` option uses "last one to speak wins" logic: changing the YAML value overrides the user preference only when the YAML value actually changes. The user can still toggle the info panel on or off through the card UI.
 
+Switching the info panel on or off applies the next time an entity's popup shows its history, without reloading the page. The choice is saved for your Home Assistant user: a browser or a device where no card was shown yet uses it too.
+
+### On every page of Home Assistant
+
+The card's file is a dashboard resource: Home Assistant only loads it once a dashboard is shown. A page opened directly in a new tab — Settings → Entities, History, Logbook… — shows Home Assistant's own history in an entity's popup until a dashboard has been opened. To have the info panel on every page, load the card's file as soon as Home Assistant starts, in `configuration.yaml`:
+
+```yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...
+```
+
+Use **exactly** the URL of the card's dashboard resource (*Settings → Dashboards → ⋮ → Resources*), `?hacstag=…` included: the browser then runs the file only once. Restart Home Assistant, then reload the page. With another URL the file runs twice — harmless, but loaded twice. After a card update through HACS, the resource's `hacstag` changes: update the URL here too — otherwise the file runs twice, and the browser may keep serving its cached copy for the old URL.
+
 ### What the info-panel supports
 
 The info-panel renders a single interactive line, bar, timeline or arrowline graph for the selected entity, using the same rendering engine as the main card. All interactive features are available:
@@ -419,15 +433,22 @@ graphs:
         unit: kW                            # the unit shown in the legend and tooltip
 ```
 
-Bars and curves share one Y axis. Compatible units (W and kW...) are converted automatically as usual; incompatible ones (energy bars and a power curve) can make one of them look tiny — use `scale:` to bring them to comparable values (with `unit:` to show the converted value in the new unit, as above).
+Bars and curves follow the same rule: energy bars and a power curve, two groups of units, get an axis each — the bars on the left, the curve on the right. Compatible units (W and kW...) share an axis, converted automatically.
 
-Set the `stacked` option to `true` to display the bars on top of each other rather than side by side:
+Set the `stacked` option to `true` to display the bars on top of each other rather than side by side (with two Y axes, the bars of each axis are stacked in a column of their own):
 
 ![image](https://github.com/alexarch21/history-explorer-card/assets/60828821/715f0416-6b4f-4b0d-869b-c732e7f2dd8d)
 
-#### Color ranges
+#### Colors
 
-Bar graphs can be color coded depending on the value they display rather than having a single color. The color range thresholds are provided as value pairs under the color key. You can provide as many thresholds as you want. Both dynamic and YAML defined graphs are supported.
+The `color` of a curve or of bars is a value, or an entity holding that value. The same values are accepted everywhere — in a graph's entity, in `entityOptions`, and in the state of an entity:
+
+- **a color**: any CSS color (`red`, `#3e95cd`, `#3e95cd80`, `rgb(62, 149, 205)`, `rgba(...)`, `hsl(...)`), a CSS variable (`--my-special-green`), or an RGB triplet: `[62, 149, 205]`, also written `62, 149, 205` or `(62, 149, 205)`;
+- **thresholds** on the value shown: key / color pairs, as many as you want. A number key is a threshold: a value takes the color of the highest threshold at or below it — below every threshold, the lowest one's. Any other key is a state, compared exactly as it is written (case included): `heat: red`. `default` is the color of every value they don't cover. A curve is colored point by point, bars bar by bar (by the value of each bar). The keys can be quoted or not (`0: blue`, `'1.0': green`);
+- **thresholds on the value of another entity**: the same, with an `entity` key — they compare that entity's value (a number or a state) instead of the value shown, at each point: for a heat pump's power, its mode (`heat: red`, `cool: blue`);
+- **an entity** (its entity_id): its state holds one of the above, as text — a color, a triplet, or thresholds written as JSON (`{"0": "blue", "20": "red"}`) or as a Home Assistant template writes a dictionary (`{0: 'blue', 20: 'red'}`).
+
+With an entity — thresholds on its value, or holding the color — the curve takes, at each point, the color that applied at that time: the entity's history is loaded with the card's, and the curve follows when it changes.
 
 ```yaml
 entityOptions:
@@ -437,8 +458,34 @@ entityOptions:
       '0.0': blue   # Bar is blue between below and up to 1.0 kWh
       '1.0': green  # Bar is green between 1.0 - 1.5 kWh
       '1.5': red    # Bar is red at 1.5 kWh and above
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.heat_pump_power
+        color:                         # the heat pump's mode at each point
+          entity: sensor.heat_pump_mode
+          heat: red
+          cool: blue
+          default: grey                # any other mode (off, fan...)
+      - entity: sensor.living_room_temperature
+        color: sensor.heating_color    # an entity holding the color itself
 ```
+
+The color held by an entity can be set by a template sensor, for instance from the heating's mode:
+
+```yaml
+template:
+  - sensor:
+      - name: heating color
+        state: "{{ {'heat': 'red', 'off': 'grey'}.get(states('climate.living_room'), 'blue') }}"
+```
+
 ![image](https://user-images.githubusercontent.com/60828821/197369661-9c75c9fe-e33f-4790-8348-8ae103880bfb.png)
+
+- The color is evaluated at each point (each bar): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
+- The legend shows the color now — as the value shown in the label is the value now.
+- When no valid color applies (a value thresholds don't cover and no `default`, the entity holding the color unavailable, its state not a color, or no history of it — an entity holding text has no long-term statistics), the curve takes a color of the automatic palette.
+- Two curves of one graph whose `color` you set to the same value both keep it; only a color the card chose itself is changed to tell a curve from the others.
 
 #### Net metering
 
@@ -560,6 +607,8 @@ Pressing the axis lock icon will temporarily disable autoscaling and lock the Y 
 The Y axis can also be interactively modified. Pressing and holding the `SHIFT` key will unlock interactive zooming and panning of the graph in vertical direction. Pressing your mouse button while holding `SHIFT` over a graph will allow you to drag the graph into both horizontal and vertical directions. Using the mousewheel while holding `SHIFT` will change the Y axis scale. When interacting with the Y axis, the axis lock icon will automatically be enabled. Click the icon to go back to the default scale at any time.
 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
+
+**With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle, so the curves keep their positions relative to each other; the padlock locks and releases both.
 
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again within half a second and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
@@ -1026,13 +1075,14 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | Property | Type | Description |
 |---|---|---|
 | `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
-| `color` | string or object | Line/bar color (HTML color, CSS variable, or color range object for bars) |
+| `color` | string, list or object | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors) |
 | `fill` | string | Fill color under the line |
 | `lineWidth` | number | Line width in pixels |
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `interpolation` | string | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius. `showSamples` is a synonym |
+| `yAxis` | string | `left` or `right`: the Y axis of a line or bar entity. By default, a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis |
 | `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
 | `unit` | string | Unit shown instead of the entity's own (see `scale`) |
 | `hidden` | boolean | Hide this entity by default in the legend |

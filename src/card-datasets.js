@@ -2,12 +2,94 @@
 // shown — line modes (smart, stepped...), bars by interval, circular values, timelines.
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { parseColorRange } from "./history-default-colors.js";
+import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
+// The entity an entity's `color` reads, or null: an entity_id (no CSS color has a dot),
+// whose state then holds the color, in any form `color` itself accepts; or the `entity` of
+// thresholds, whose value they then compare instead of the value shown
+const _ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
+export function colorEntityOf(e)
+{
+    const c = e?.color;
+    const id = ( typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? c.entity : '' ).trim();
+    return _ENTITY_ID.test(id) ? id : null;
+}
+
 export class CardDatasets
 {
+    // --------------------------------------------------------------------------------------
+    // Colors: `color` is a value (a color, or thresholds on the value shown), an entity
+    // whose state holds one, or thresholds on the value of an entity — then it varies along
+    // the curve, with that entity's history. Evaluated at each point (each bar): a curve
+    // changes color on a point, never between two.
+    // --------------------------------------------------------------------------------------
+
+    // The color of entity e at time t (ms) for the value v, or undefined when none applies
+    // (no valid color then): (t, v) => color. null when e's color is a constant — nothing
+    // to evaluate. colorHistory: the history of the color entities, by entity_id.
+    _colorFunction(e, colorHistory)
+    {
+        const _ce = colorEntityOf(e);
+        const _spec = typeof e.color === 'object' ? parseColorValue(e.color) : null;
+        if( !_ce ) return _spec && !_spec.color ? (t, v) => colorForValue(_spec, v) : null;
+        // The color entity's states over time, each read once (the calls come in increasing
+        // time): thresholds compare them; else each holds a color value
+        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: moment(p.last_changed).valueOf(), state: p.state,
+            spec: _spec ? null : parseColorValue(p.state) }));
+        let k = -1;
+        return (t, v) => {
+            if( k >= 0 && _states[k].t > t ) k = -1;
+            while( k + 1 < _states.length && _states[k + 1].t <= t ) k++;
+            if( k < 0 ) return undefined;
+            return _spec ? colorForValue(_spec, _states[k].state) : colorForValue(_states[k].spec, v);
+        };
+    }
+
+    // The color of entity e now, for its current value — the legend's, and the curve's until
+    // its history is drawn; the palette's (e.paletteColor) when no valid color applies
+    _currentColor(e)
+    {
+        const _ce = colorEntityOf(e);
+        const _state = id => this._hass?.states[id]?.state;
+        if( _ce && typeof e.color === 'object' ) return colorForValue(parseColorValue(e.color), _state(_ce)) ?? e.paletteColor;
+        const _spec = parseColorValue(_ce ? _state(_ce) : e.color);
+        return colorForValue(_spec, Number(_state(e.entity))) ?? e.paletteColor;
+    }
+
+    // A fill color like `fill` (its transparency), in color c — or undefined when `fill`
+    // shows nothing (no fill then)
+    _fillLike(c, fill)
+    {
+        const _f = Chart.helpers.color(fill);
+        if( !c || !_f.valid || !_f.alpha() ) return undefined;
+        const _c = Chart.helpers.color(c);
+        return _c.valid ? _c.alpha(_f.alpha()).rgbString() : undefined;
+    }
+
+    // The colors of a curve's points (see _colorFunction): the dataset's colorSteps (one
+    // where the color changes), and its own colors made those of the point now (the last
+    // one at or before now) — the legend's
+    _applyPointColors(ds, e, s, colorFn, scale, fill)
+    {
+        const _steps = [];
+        const _now = Date.now();
+        let _prev, _current;
+        for( const pt of s ) {
+            const t = moment(pt.x).valueOf();
+            const c = colorFn(t, scale ? pt.y / scale : pt.y) ?? e.paletteColor;
+            if( c !== _prev ) _steps.push({ x: t, borderColor: c, backgroundColor: this._fillLike(c, fill) });
+            _prev = c;
+            if( t <= _now || _current === undefined ) _current = c;
+        }
+        ds.colorSteps = _steps.length > 1 ? _steps : undefined;
+        if( _current ) {
+            ds.borderColor = ds.pointBackgroundColor = _current;
+            ds.backgroundColor = this._fillLike(_current, fill) ?? ds.backgroundColor;
+        }
+    }
+
     // --------------------------------------------------------------------------------------
     // Graph data generation
     // --------------------------------------------------------------------------------------
@@ -107,7 +189,7 @@ export class CardDatasets
         return out;
     }
 
-    buildChartData(result)
+    buildChartData(result, colorHistory)
     {
         let m_now = moment();
         let m_start = moment(this.startTime);
@@ -243,12 +325,15 @@ export class CardDatasets
 
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
 
+                        const _colorFn = this._colorFunction(g.entities[j], colorHistory);
+                        if( _colorFn ) this._applyPointColors(g.chart.data.datasets[j], g.entities[j], s, _colorFn, scale, parseColor(g.entities[j].fill));
+
                     } else if( _kind == 'bar' && n > 0 ) {
 
                         const scale = (g.entities[j].scale ?? 1.0) * (g.entities[j].siConversionFactor ?? 1.0);
                         const netBars = g.entities[j].netBars ?? false;
 
-                        const colorRange = ( g.entities[j].color && g.entities[j].color.constructor == Object ) ? g.entities[j].color : null;
+                        const _colorFn = this._colorFunction(g.entities[j], colorHistory);
 
                         let td;
                         if( g.interval == 0 ) td = moment.duration(10, "minute"); else
@@ -288,8 +373,8 @@ export class CardDatasets
                             }
                             d += y1 - y0;
                             s.push({ x: t + td / 2.0, y: d * scale});
-                            if( colorRange )
-                                bcol.push(parseColorRange(colorRange, d));
+                            if( _colorFn )
+                                bcol.push(_colorFn(t + td / 2.0, d) ?? g.entities[j].paletteColor);
                             t = te;
                             y0 = y1;
                         }

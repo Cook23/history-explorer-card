@@ -135,6 +135,7 @@ const PEN_CHECKS = [
     ['barrelChord', 'pen button pressed while the tip is down (buttons 1 → 3)'],
     ['eraser',      'eraser (buttons has 32)'],
     ['cancel',      'pointercancel: the browser took the gesture (scrolling)'],
+    ['tapCancel',   'a contact cancelled with nothing scrolled and within 10px (a tap the browser took over)'],
     ['ctx',         'contextmenu event'],
     ['mouseBtn2',   'mousedown / mouseup / auxclick with the secondary button (button 2)'],
     ['keys',        'key event (keydown / keyup) — some pens send their button as a key'],
@@ -146,11 +147,18 @@ const PEN_PAD_EVENTS = ['pointerover', 'pointerenter', 'pointerdown', 'pointermo
 const PEN_PAGE_EVENTS = ['keydown', 'keyup', 'selectstart'];
 const PEN_LOG_MAX = 300;
 const PEN_MOVE_LOG_MS = 120;   // (moves logged at most this often, so that the log stays readable)
+const PEN_TAP_SLOP = 10;       // px: within this, a contact is a tap (the card's drag threshold)
+const PEN_SCROLL_CHECK_MS = 250;   // after a cancel: has anything scrolled by then?
+// The trials, each with its "Mark" button
+const PEN_MARKS = [
+    ['taps', 'taps with the tip'], ['swipes', 'short swipes up'], ['long', 'long press with the tip'],
+    ['btnTap', 'taps with the pen\'s button held'], ['btnAlone', 'the pen\'s button alone, tip down'], ['hover', 'hovering'],
+];
 
 function buildPenEventsTest(body)
 {
     body.insertAdjacentHTML('beforeend', `<style>${PEN_CSS}</style>
-        <p class="lead">Use the pen on the two zones below: hover over them without touching, tap, drag, long press; then the same with the pen's button held, and press the button twice with the tip down. Before a trial, tap its "Mark" button so that the log shows where it starts. The checklist fills in with what this browser or app really reports.</p>
+        <p class="lead">Use the pen on the two zones below, one trial at a time: before each, tap its "Mark" button so that the log shows where it starts. Each contact's release gives how far the tip went (d: from its start to its end, max: the farthest) and how long it lasted; a contact the browser takes over says whether anything really scrolled; a context menu says how long after, and how far from, the last contact on its zone. The checklist fills in with what this browser or app really reports.</p>
         <section class="box"><h2>What this browser reports</h2><ul class="checks" id="checks"></ul></section>
         <div class="pads">
             <div class="pad" id="padScroll"><div><b>Like a graph</b>a vertical swipe may scroll</div></div>
@@ -161,8 +169,7 @@ function buildPenEventsTest(body)
             <h2>Event log (newest first)</h2>
             <pre class="log mono" id="log"></pre>
             <div class="row">
-                <button id="markBtn" type="button">Mark: pen button alone</button>
-                <button id="markLong" type="button">Mark: long press</button>
+                ${PEN_MARKS.map(([k, l]) => `<button id="mark_${k}" type="button">Mark: ${l}</button>`).join('')}
                 <button id="clear" type="button">Clear</button>
             </div>
         </section>`);
@@ -171,19 +178,27 @@ function buildPenEventsTest(body)
     const lines = [];
     const lastBtns = {};
     const t0 = performance.now();
-    let lastMoveLog = 0, lastDown = null, contact = false, lastSel = 0;
+    let lastMoveLog = 0, contact = false, lastSel = 0;
+    // The contacts under way (by pointerId), and each zone's last one, ended
+    const contacts = {}, lastContact = {};
+    const scroller = body.closest('.dlg');
+    const scrollPos = () => ( scroller ? scroller.scrollTop : 0 ) + window.scrollY;
+    const dist = (a, x, y) => Math.round(Math.hypot(x - a.x, y - a.y));
 
     const renderChecks = () => {
         $('checks').innerHTML = PEN_CHECKS.map(([k, label]) => {
-            const _warn = ( k === 'touchType' || k === 'cancel' ) && seen[k];
+            const _warn = ( k === 'touchType' || k === 'cancel' || k === 'tapCancel' ) && seen[k];
             return `<li><span class="pill mono${seen[k] ? ( _warn ? ' warn' : ' yes' ) : ''}">${seen[k] ? 'yes' : '—'}</span><span>${label}</span></li>`;
         }).join('');
     };
     const stamp = () => String(Math.round(performance.now() - t0)).padStart(6) + 'ms';
-    const line = (e, where) => {
-        let _extra = '';
+    const line = (e, where, extra = '') => {
+        let _extra = extra;
         if( e.type.startsWith('key') ) _extra = ` key=${e.key} code=${e.code}`;
-        if( e.type === 'contextmenu' ) _extra = ` ${lastDown === null ? 'no pointerdown yet' : Math.round(performance.now() - lastDown) + 'ms after pointerdown'}, contact=${contact}`;
+        if( e.type === 'contextmenu' ) {
+            const _l = lastContact[where];
+            _extra = ` contact=${contact}, ` + ( _l ? `${Math.round(performance.now() - _l.t)}ms after the last contact here ended, ${dist(_l, e.clientX, e.clientY)}px from it` : 'no contact here yet' );
+        }
         return `${stamp()} ${where.padEnd(6)} ${e.type.padEnd(15)} ${String(e.pointerType ?? '-').padEnd(5)} btn=${String(e.button ?? '-').padStart(2)} btns=${String(e.buttons ?? '-').padStart(2)} p=${(e.pressure ?? 0).toFixed(2)}${_extra}`;
     };
     const push = (text) => {
@@ -194,8 +209,30 @@ function buildPenEventsTest(body)
     const onEvent = (e) => {
         const where = e.currentTarget?.id === 'padScroll' ? 'graph' : e.currentTarget?.id === 'padFree' ? 'free' : 'page';
         const pt = e.pointerType, b = e.buttons ?? 0;
-        if( e.type === 'pointerdown' ) { lastDown = performance.now(); contact = true; }
-        if( e.type === 'pointerup' || e.type === 'pointercancel' ) contact = false;
+        // A contact: how far and how long, and, taken over by the browser, did anything scroll
+        let _extra = '';
+        if( e.type === 'pointerdown' ) {
+            contact = true;
+            contacts[e.pointerId] = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t: performance.now(), max: 0, scroll: scrollPos() };
+        }
+        const _c = contacts[e.pointerId];
+        if( _c && e.type === 'pointermove' ) { _c.lx = e.clientX; _c.ly = e.clientY; _c.max = Math.max(_c.max, dist(_c, e.clientX, e.clientY)); }
+        if( _c && ( e.type === 'pointerup' || e.type === 'pointercancel' ) ) {
+            contact = false;
+            delete contacts[e.pointerId];
+            // (a pointercancel's own position isn't reliable, often 0: its contact's last one)
+            const _ex = e.type === 'pointercancel' ? _c.lx : e.clientX, _ey = e.type === 'pointercancel' ? _c.ly : e.clientY;
+            const _d = dist(_c, _ex, _ey);
+            _c.max = Math.max(_c.max, _d);
+            _extra = ` d=${_d}px max=${_c.max}px ${Math.round(performance.now() - _c.t)}ms`;
+            lastContact[where] = { x: _ex, y: _ey, t: performance.now() };
+            if( e.type === 'pointercancel' ) setTimeout(() => {
+                const _s = Math.round(scrollPos() - _c.scroll);
+                if( _s === 0 && _c.max <= PEN_TAP_SLOP ) seen.tapCancel = true;
+                push(`${stamp()} ${where.padEnd(6)} (after the cancel: ${_s ? `scrolled ${_s}px` : 'nothing scrolled'})`);
+                renderChecks();
+            }, PEN_SCROLL_CHECK_MS);
+        }
         if( e.type === 'pointermove' && pt && pt !== 'pen' && b === 0 && (e.pressure ?? 0) === 0 ) seen.hoverAny = true;
         if( /^(mousedown|mouseup|auxclick)$/.test(e.type) && e.button === 2 ) seen.mouseBtn2 = true;
         if( e.type.startsWith('key') ) seen.keys = true;
@@ -211,11 +248,11 @@ function buildPenEventsTest(body)
         if( ( e.type === 'pointerleave' || e.type === 'pointerout' ) && b === 0 ) seen.leave = true;
         if( e.type === 'contextmenu' ) { seen.ctx = true; e.preventDefault(); }
         if( e.pointerId !== undefined ) lastBtns[e.pointerId] = b;
-        $('now').textContent = line(e, where);
+        $('now').textContent = line(e, where, _extra);
         const _now = performance.now();
         if( e.type !== 'pointermove' || _now - lastMoveLog > PEN_MOVE_LOG_MS || ( b !== 0 && e.button >= 0 ) ) {
             if( e.type === 'pointermove' ) lastMoveLog = _now;
-            push(line(e, where));
+            push(line(e, where, _extra));
         }
         renderChecks();
     };
@@ -226,8 +263,7 @@ function buildPenEventsTest(body)
     for( const t of PEN_PAGE_EVENTS ) document.addEventListener(t, onEvent);
     document.addEventListener('selectionchange', onSelectionChange);
     const mark = (text) => push(`${stamp()} ---- ${text} ----`);
-    $('markBtn').addEventListener('click', () => mark('next: pen button alone (tip on a zone, then press the button)'));
-    $('markLong').addEventListener('click', () => mark('next: long press with the tip, no button'));
+    for( const [k, l] of PEN_MARKS ) $(`mark_${k}`).addEventListener('click', () => mark(`next: ${l}`));
     $('clear').addEventListener('click', () => {
         lines.length = 0;
         for( const k in seen ) delete seen[k];
