@@ -9,7 +9,8 @@ Changelog for the HA History Explorer Card.
 ### Code — the card's state split by role
 - `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated
 - `addGraph` takes its options by name (`{ color, before, groupId, entry, ... }`) instead of nine positional arguments; `newGraph` builds the chart from `_chartData` (`_curveDataset`), `_chartYAxis` and `_chartTooltips`
-- Tests: the new modules are linted
+- A curve dropped without saving is saved back at its exact place, even when the curve before it has been removed since (right after the nearest one before it still in its group); the fields the card keeps on an entry (`colorSet`, `paletteColor`, `unsavedFrom`) are described in `history-entity-store.js`
+- Tests: the new modules are linted; the place a curve dropped without saving is saved at (store)
 
 ### Changed — a curve dropped onto any line or bar graph
 - A curve's label dropped onto another line or bar graph is moved there whatever its unit: lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs. Only the display type refuses a drop (a curve onto a timeline or arrowline graph, a timeline entity onto a line or bar graph). Adding an entity is unchanged: `combineSameUnits` only joins compatible units

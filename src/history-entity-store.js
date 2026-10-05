@@ -7,6 +7,11 @@
 //     of one or more linked graphs), and the list's order is the display order between
 //     groups — within a group, graphIndex orders the graphs;
 //   - dynamic groups (added from the UI) have ids >= 1000, YAML ones below.
+// Besides the options, the card keeps on an entry: colorSet (its color comes from the
+// configuration — kept even when another curve of its graph has it), paletteColor (the
+// palette's color drawn where its color — an entity's, thresholds — gives none), both saved
+// so they stay the same after a reload; and unsavedFrom (where it was before a move that
+// isn't saved — see savedList), never saved.
 // Pure data: it knows nothing about graphs, charts, the DOM or Home Assistant. The graphs
 // on screen are built from it by the card.
 
@@ -49,18 +54,19 @@ export class EntityStore
     // A new dynamic group id
     newGroupId() { return this.nextGroupId++; }
 
-    // Where an entry is now: its group, its graph in that group, and the entry before it in
-    // the list (its place in the display order) — see unsavedFrom
+    // Where an entry is now: its group, its graph in that group, and the entries before it
+    // in the list (its place in the display order) — see unsavedFrom
     placementOf(entry)
     {
         const i = this.list.indexOf(entry);
         return { groupId: entry.groupId, graphKey: entry.graphKey, graphIndex: entry.graphIndex,
-                 after: i > 0 ? entityIdOf(this.list[i - 1]) : null };
+                 preceding: this.list.slice(0, i).map(entityIdOf) };
     }
 
     // The list as it is saved: an entry moved where its placement isn't saved (its
     // unsavedFrom: the placementOf it had before) is saved at that placement — right after
-    // the entry it followed, else after the last one of its group, else last
+    // the nearest entry before it still in its group, else first of its group, else right
+    // after the nearest entry before it still in the list, else first
     savedList()
     {
         const out = this.list.filter(e => !e?.unsavedFrom);
@@ -69,12 +75,18 @@ export class EntityStore
             for( const k of ['groupId', 'graphKey', 'graphIndex'] ) {
                 if( u[k] === undefined ) delete saved[k]; else saved[k] = u[k];
             }
-            let i = u.after === null ? -1 : out.findIndex(x => entityIdOf(x) === u.after);
-            if( i < 0 && u.after !== null ) {
-                out.forEach((x, k) => { if( isObj(x) && x.groupId === u.groupId ) i = k; });
-                if( i < 0 ) i = out.length - 1;
-            }
-            out.splice(i + 1, 0, saved);
+            const inGroup = k => isObj(out[k]) && out[k].groupId === u.groupId;
+            const after = test => {
+                for( let j = u.preceding.length - 1; j >= 0; j-- ) {
+                    const k = out.findIndex(x => entityIdOf(x) === u.preceding[j]);
+                    if( k >= 0 && test(k) ) return k + 1;
+                }
+                return -1;
+            };
+            let i = after(inGroup);
+            if( i < 0 ) i = out.findIndex((x, k) => inGroup(k));
+            if( i < 0 ) i = after(() => true);
+            out.splice(Math.max(i, 0), 0, saved);
         }
         return out;
     }
