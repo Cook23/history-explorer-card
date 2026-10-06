@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.9] - 2026-10-06
+
+### New — values over a graph, a compact look: replacing mini-graph-card
+- `showState`: each curve's value now, in large, in its color, over the graph; `showStats`: its `min`, `average` and `max` over the window shown, the min and max with their time — from its history, the average weighted by time, recomputed as the window moves. At every level (card, entityOptions, graph, entity)
+- `showGrid: false` (no grid lines), `yLabels: inside` (the Y labels inside the plot, which takes the whole width), `fill: fade` (the curve's color fading out downwards — `deps/chart-hec.js`: dataset option `hecFillFade`)
+- `look: mini`: the look of mini-graph-card at once — the card's own options still win; the time can still be panned and zoomed. README_Full: how each mini-graph-card option translates
+
+### Fixed — a default fill on a curve with its own color
+- A curve given its own `color` ignored the `fill` set on the card, its graph or in entityOptions (it was always left transparent); it takes it now, unless it sets its own
+
 ## [v1.2.8] - 2026-10-06
 
 ### New — the same curve in several graphs

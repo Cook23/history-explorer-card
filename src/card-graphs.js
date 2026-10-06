@@ -124,7 +124,7 @@ export class CardGraphs
                             maxRotation: 0
                         },
                         gridLines: {
-                            color: this.pconfig.graphGridColor
+                            color: ( config?.showGrid === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphGridColor
                         },
                         stacked: config?.stacked
                     }],
@@ -247,6 +247,8 @@ export class CardGraphs
             hecCircular: d.circular,
             borderColor: d.bColor,
             backgroundColor: d.fillColor,
+            // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
+            hecFillFade: d.fillFade && d.kind === 'line',
             borderWidth: d.width,
             borderDash: Array.isArray(d.dashMode) ? d.dashMode : _dashes[d.dashMode],
             pointRadius: _pointRadius,
@@ -298,11 +300,13 @@ export class CardGraphs
         const _p0 = _list[0]?.circular;
         const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
         const _right = id === RIGHT_Y_AXIS;
+        // (yLabels: inside — the labels drawn inside the plot, which then takes the whole width)
+        const _inside = config?.yLabels === 'inside';
         return {
             id,
             position: _right ? 'right' : 'left',
             afterFit: (scaleInstance) => {
-                scaleInstance.width = this.pconfig.labelAreaWidth;
+                scaleInstance.width = _inside ? 0 : this.pconfig.labelAreaWidth;
             },
             afterDataLimits: (me) => {
                 const epsilon = 0.0001;
@@ -316,14 +320,16 @@ export class CardGraphs
                 forceMin: config?.ymin ?? undefined,
                 forceMax: config?.ymax ?? undefined,
                 stepSize: config?.ystepSize ?? undefined,
-                period: _period
+                period: _period,
+                mirror: _inside,
+                padding: _inside ? -6 : undefined
             },
             gridLines: {
-                color: ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
+                color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
                 drawOnChartArea: !_right
             },
             scaleLabel: {
-                display: _unit !== undefined && _unit !== '',
+                display: !_inside && _unit !== undefined && _unit !== '',
                 labelString: _unit,
                 fontColor: this.pconfig.graphLabelColor
             },
@@ -823,7 +829,8 @@ export class CardGraphs
         // drag, uncombine and type changes)
         if( color ) {
             e.color = color;
-            e.fill = fill ?? 'rgba(0,0,0,0)';
+            // (its own fill, else the default one — the card's, its graph's or entityOptions')
+            e.fill = fill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
         } else if( entityOptions?.color ) {
             e.color = entityOptions?.color;
             e.fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
@@ -1024,6 +1031,7 @@ export class CardGraphs
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar is filled with its own color)
                 "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this._currentColor(d) : parseColor(d.fill),
+                "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
                 "mode": this.normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
                 "interpolation": this._resolveInterpolation(d),

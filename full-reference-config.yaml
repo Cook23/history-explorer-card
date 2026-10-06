@@ -41,8 +41,15 @@ graphs:
       # entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
       color: null
 
-      # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'
+      # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color';
+      # fade: the line's colour fading out downwards
       fill: null
+
+      # The value now, in large, over the graph (the curve's colour and unit)
+      showState: false
+
+      # min, average, max over the time window shown, over the graph (a name, a list, or true: all three)
+      showStats: null
 
       # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
       dashMode: "solid"
@@ -126,7 +133,7 @@ graphs:
   # They can also be set directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set).
   # Every option is accepted at every level — card, $.entityOptions, graph, entity — the most specific one
   # winning: entity → graph → entityOptions → card. The options of the graph itself (height, stacked, ylock,
-  # ymin, ymax, ystepSize, showTimeLabels), set on an entity or in entityOptions, apply to the graph the
+  # ymin, ymax, ystepSize, showTimeLabels, showGrid, yLabels), set on an entity or in entityOptions, apply to the graph the
   # entity is shown in, the graph's own value winning
   options:
     # Height of the graph, in pixels. Defaults to being either `lineGraphHeight`, `barGraphHeight` or calculated, depending on graph type
@@ -170,6 +177,12 @@ graphs:
 
     # If true, show the time labels on graph
     showTimeLabels: True
+
+    # False: no grid lines on the graph
+    showGrid: True
+
+    # inside: the Y labels inside the plot, which then takes the whole width (no label area)
+    yLabels: null
 
     # For bar charts, this can be set to True to enable stacking the values
     stacked: False
@@ -348,8 +361,14 @@ lineWidth: 2.0
 yAxis: auto
 
 # The options of every graph can also be set here, for every graph of the card (a graph, $.entityOptions or
-# an entity can still set their own): fill, ymin, ymax, ystepSize, ylock, stacked, showTimeLabels — and height,
-# the height of every line and bar graph ($.lineGraphHeight / $.barGraphHeight win over it)
+# an entity can still set their own): fill, ymin, ymax, ystepSize, ylock, stacked, showTimeLabels, showGrid,
+# yLabels, showState, showStats — and height, the height of every line and bar graph ($.lineGraphHeight /
+# $.barGraphHeight win over it)
+
+# A set of options at once — the card's own options still win. mini: what mini-graph-card shows (header: hide,
+# no toolbar nor selector, showState: true, showStats: [min, max], showTimeLabels: false, showGrid: false,
+# yLabels: inside, fill: fade, height: 150)
+look: null
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
 # Can be: points, shortlines, longlines, pointline, or default which is a solid line

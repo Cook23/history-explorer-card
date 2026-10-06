@@ -226,6 +226,8 @@ export class CardDatasets
                     let _circBand = false;
                     if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
 
+                    if( _kind == 'line' ) this._keepValueSamples(g, j, result[id], process);
+
                     if( _kind == 'line' ) {
                         const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
                         s = this._lineSamples(e, result[id], process, scale, w);
@@ -251,7 +253,7 @@ export class CardDatasets
 
             }
 
-            if( updated ) this._applyTimeAxis(g);
+            if( updated ) { this._applyTimeAxis(g); this._showValues(g); }
 
         }
     }

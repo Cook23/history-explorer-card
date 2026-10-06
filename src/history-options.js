@@ -46,10 +46,31 @@ export function normalizeOptionSynonyms(o)
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'yAxis', ...Object.values(OPTION_SYNONYMS).flat()];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', ...Object.values(OPTION_SYNONYMS).flat()];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
-export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels'];
+export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels'];
+
+// Looks: a set of options given at once with `look:` — the card's own options still win.
+// mini: what mini-graph-card shows — no header, toolbar nor selector, each curve's value
+// now and its minimum and maximum over the window, no time labels nor grid, the Y labels
+// inside the plot, a fill fading out, a small graph
+export const LOOKS = {
+    mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
+            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150 },
+};
+
+// The card's configuration with its look's options under its own
+export function withLook(config)
+{
+    if( config?.look === undefined ) return config;
+    const _look = LOOKS[config.look];
+    if( !_look ) {
+        console.warn(`history-explorer-card: unknown look '${config.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
+        return config;
+    }
+    return { ..._look, ...config, uiLayout: { ..._look.uiLayout, ...config.uiLayout } };
+}

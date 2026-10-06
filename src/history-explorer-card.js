@@ -20,6 +20,8 @@ import { CardDatasets } from "./card-datasets.js";
 import { CardGestures } from "./card-gestures.js";
 import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
+import { CardValues } from "./card-values.js";
+import { withLook } from "./history-options.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
 
@@ -110,6 +112,7 @@ export class HistoryCardState {
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
         this.pconfig.cardGraphDefaults    = {};
+        this.pconfig.cardShow             = {};
         this.pconfig.defaultLineWidth     = undefined;
         this.pconfig.defaultDashMode      = undefined;
         this.pconfig.defaultNetBars       = undefined;
@@ -534,7 +537,7 @@ export class HistoryCardState {
 
 // HistoryCardState's methods are spread over several files by role (see each file's
 // header) — added to it here, as if written in the class itself
-for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage] )
+for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage, CardValues] )
     for( const name of Object.getOwnPropertyNames(part.prototype) )
         if( name !== 'constructor' )
             Object.defineProperty(HistoryCardState.prototype, name, Object.getOwnPropertyDescriptor(part.prototype, name));
@@ -615,7 +618,8 @@ class HistoryExplorerCard extends HTMLElement
     // The user supplied configuration. Throw an exception and Lovelace will render an error card.
     setConfig(config)
     {
-        this.config = config;
+        // (look: a set of options given at once — see history-options.js)
+        this.config = withLook(config);
         this.configSet = true;
     }
 

@@ -536,6 +536,7 @@ export class CardHistory
                 g.chart.options.scales.xAxes[0].time.min = this.startTime;
                 g.chart.options.scales.xAxes[0].time.max = this.endTime;
                 g.chart.update();
+                this._showValues(g);
             }
         }
     }
