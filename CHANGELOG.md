@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [Unreleased]
+
+### Fixed — the point of a curve's tooltip goes with it
+- Once the tooltip of a curve had faded out by itself, the point it showed stayed highlighted on the graph until the next move or click: it was turned off without the graph being redrawn. It now fades out with the tooltip
+- Tests: left still over a curve, the tooltip goes after its reading time, and the graph is redrawn without its point
+
 ## [v1.1.53] - 2026-10-06
 
 ### Fixed — a right or middle click on a curve label leaves the curve as it is
