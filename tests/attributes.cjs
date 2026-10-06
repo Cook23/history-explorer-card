@@ -20,9 +20,9 @@ module.exports = async function()
         const v = await shown(t);
         return /^line:climate\.salon\.current_temperature#(\d+)\+climate\.salon\.temperature#\d+ \| timeline:climate\.salon#\d+\+climate\.salon\.hvac_action#\d+$/.test(v) && Number(v.match(/current_temperature#(\d+)/)[1]) > 100 ? true : v;
     });
-    await t.step('named after the entity and the attribute, with the unit set (the attribute after the entity id the same)', async () => {
+    await t.step('named after the entity, a colon and the attribute, with the unit set (the attribute after the entity id the same)', async () => {
         const v = await t.E(`el.instance.graphs[0].chart.data.datasets.map(d=>d.name+' / '+d.unit).join(', ')`);
-        return v === 'salon Current temperature / °C, salon Temperature / °C' ? true : v;
+        return v === 'salon : Current temperature / °C, salon : Temperature / °C' ? true : v;
     });
     await t.step('their history asked once per entity, with its attributes and every change; the states as usual', async () => {
         const r = await t.E(`__ws.filter(w=>w.type==='history/history_during_period').map(w=>w.ids.join()+':'+w.attributes+':'+w.allChanges).join(' ; ')`);

@@ -65,7 +65,8 @@ export function seriesAttributes(s)
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:
 // its value as the state (see attributeValue), its entity's last update as its last
-// change, its entity's name and its own as its name, the unit its value gives (never the
+// change, its entity's name and its own as its name ("salon : Current temperature" — the
+// colon tells an attribute from an entity), the unit its value gives (never the
 // entity's), a number taken as a measurement (shown as a curve, as an entity measuring
 // something); undefined when there's no such entity or attribute
 export function seriesState(hass, id)
@@ -76,7 +77,7 @@ export function seriesState(hass, id)
     if( !_s.attributes || !( attribute in _s.attributes ) ) return undefined;
     const { value: _v, unit: _unit } = attributeValue(_s.attributes[attribute]);
     return { entity_id: id, state: _v === null ? 'unknown' : String(_v), last_changed: _s.last_updated, last_updated: _s.last_updated,
-             attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' ' + attributeLabel(attribute),
+             attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' : ' + attributeLabel(attribute),
                            ...( _unit ? { unit_of_measurement: _unit } : {} ),
                            ...( typeof _v === 'number' ? { state_class: 'measurement' } : {} ) } };
 }

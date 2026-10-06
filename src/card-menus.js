@@ -297,8 +297,12 @@ export class CardMenus
         const _title = this.pconfig.graphs[graph.groupId]?.title;
         if( _title ) return _title;
         const _starts = graph.entities.map(e => {
+            // (an attribute's ':' between its entity's name and its own is kept, not counted
+            // as a word: "salon : Current...")
             const _words = String(e.name ?? this.stateOf(e.entity)?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
-            return _words.slice(0, 2).join(' ') + ( _words.length > 2 ? '...' : '' );
+            const _counted = _words.map((w, i) => _words.slice(0, i + 1).filter(x => x !== ':').length);
+            const _n = _counted.indexOf(2) + 1 || _words.length;
+            return _words.slice(0, _n).join(' ') + ( _n < _words.length ? '...' : '' );
         });
         return [...new Set(_starts)].join(', ');
     }

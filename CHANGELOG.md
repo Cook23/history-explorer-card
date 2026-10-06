@@ -4,12 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.9b1] - unreleased
-
-### Fixed — the Y axis labels drawn again
-- 1.2.8 drew no Y axis labels — the values beside a line or bar graph, the names of a timeline's or an arrowline's rows: the option added for `yLabels: inside` replaced Chart.js' own spacing of the labels even when not inside
-
-## [v1.2.8] - 2026-10-06
+## [v1.2.9b2] - unreleased
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
 - `showState`: each curve's value now, in large, in its color, over the graph; `showStats`: its `min`, `average` and `max` over the window shown, the min and max with their time — from its history, the average weighted by time, recomputed as the window moves. At every level (card, entityOptions, graph, entity)
@@ -32,7 +27,7 @@ Changelog for the HA History Explorer Card.
 
 
 ### New — an entity's attributes as curves
-- `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named after the entity and the attribute; `unit:` gives it a unit (Home Assistant gives none)
+- `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named `entity : attribute` (the colon tells an attribute from an entity); `unit:` gives it a unit (Home Assistant gives none)
 - The entity selector: an entity with attributes that can be shown opens a submenu first, as the type menu's submenus — *Value* (its state) pre-selected, then each attribute with its current value
 - The history of an attribute is asked with every change of its entity's attributes, only for the entities with an attribute shown; an attribute has no long-term statistics (its curve covers what the history keeps)
 
