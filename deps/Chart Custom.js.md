@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
-| Card → Chart.js | stock 2.7.1 methods | `update()`, `resize()`, `getDatasetMeta()` — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu) — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -78,6 +78,7 @@ or `maintainAspectRatio`.
 | `dropAllowed` | `boolean` | `true` | Written by the card on the chart a drag is over, from its `dragovergraph` event (§2): `false` shows that graph's drop highlight as refused (dashed, error color), no insertion marker, and the dragging pointer's cursor as `not-allowed` (otherwise `grabbing`). |
 | `insertionForbidden` | `boolean` | `false` | Written by the card during a graph move, from the `dragovergraph` it receives (with `insertBefore`): `true` draws the graph-move insertion marker in the error color (dropping there would split a block of linked graphs). |
 | `linkMarkerVisible` | `boolean` | `false` | When `true`, the linked-graphs chain icon is drawn straddling this chart's top edge, under the labels of the graph above (§5). The card sets it on the lower graph of two linked ones. A double-click/double-tap on it fires `customEvent` with `zone: 'linkMarker'`. |
+| `handleButtons` | `array` | `null` | Buttons drawn over the lock+handle zone (§5) in place of the handle and the padlock, each `{ id, text, disabled }` — `text` an icon, `disabled` greyed and struck through in red. The zone is then 18px per button (at least 33px); a click on one fires `customEvent` (`click`, `zone: 'lockAndHandle'`) with `handleButton: id` and `handleButtonDisabled`, and neither toggles the lock nor starts a graph drag. A swipe starting on one is reported at its end: `dragend` with `swipe` (`'up'`, `'down'`, or `null` under 10px) and that button's `handleButton`; on touch, the zone keeps that swipe (`touch-action: none`) instead of scrolling the page. The card shows them during a cut (where what was cut can be pasted). |
 | `linkMarkerTitle` | `string` | `''` | Hover text of the chain icon (the card's translated text). |
 | `floatingBoundsSelector` | CSS selector | none | The area Chart.js's floating elements (hover tooltip, truncated-label message) stay in: the closest ancestor of the canvas matching it, else the viewport only (see `Chart.hecUi.clampToViewport`, §7). The card passes `'#maincard'` — Chart.js knows nothing about the card's markup. |
 | `legend.leftMargin` / `legend.rightMargin` | `number` (px) | `50` / `25` | Room kept free at both ends of the legend's lines (`options.legend`, next to the stock legend options). The card sets `rightMargin` so the legend keeps clear of the buttons it draws over the graph's top right corner. |
@@ -93,14 +94,27 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
+### Plugin options (`options.plugins`)
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `hecCursorLine` | `{ show, shared, color }` | none | A vertical line under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` at once (the card's `cursor.mode: all`); `color` its stroke. |
+
 ### Dataset options
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
 | `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
+| `showMinMax` | `boolean` | `false` | A line dataset whose points carry `yMin` / `yMax`: the area between them shaded in the dataset's line color (alpha 0.15), on its own Y axis (plugin `hecMinMaxBand`). |
 
 ---
+
+### Public method
+
+`chart.hecSetYAxisLocked(locked)` locks (`true`) or releases (`false`) the chart's Y axes, as
+a click on the padlock does — for a menu entry that does the same. Nothing on a chart
+without a lock (`yAxisLockEnabled: false`, a timeline or arrowline).
 
 ## 2. The `customEvent` gesture system
 
@@ -141,6 +155,10 @@ card may need, so it never has to compute one from the chart's layout.
   pointerCount,        // how many pointers are down
   pointerType,         // 'mouse' | 'touch' | 'pen'
   button,              // native event.button, or undefined
+  handleButton,        // the id of the handleButtons button under the point (§1), else
+  handleButtonDisabled,// undefined — and whether it's disabled
+  yAxisLocked,         // whether the Y axes are locked (the padlock); undefined on a
+                       // chart without a lock
   event,               // the native PointerEvent (or the one a touch overlay forwards, §5)
   // ...plus the gestureType's own fields, below
 }
@@ -164,7 +182,7 @@ and `dblclick`, and nothing at all for long-press or drag.
 | `dragstart` | Pointer moves past 10px total (either axis combined) while still down — the payload's point is where the press started | — |
 | `dragmove` | Pointer continues moving while a drag is active — the payload's point is the pointer's | `overChart`: the chart of the same `dragScope` under the pointer (this one included), or `null` |
 | `dragovergraph` | During a drag, the pointer is over a *different* chart of the same `dragScope` — sent through that chart's own `customEvent`, its payload relative to that chart | for a graph move: `insertBefore` (the pointer is above that graph's middle) |
-| `dragend` | Pointer released or gesture cancelled while a drag was active | zoom selection: `zoomSelectFactor0`, `zoomSelectFactor1` (its two ends along the time axis, see `xFactor`). Label or graph drag: `drop` (below). Any other drag: neither |
+| `dragend` | Pointer released or gesture cancelled while a drag was active | zoom selection: `zoomSelectFactor0`, `zoomSelectFactor1` (its two ends along the time axis, see `xFactor`). Label or graph drag: `drop` (below). A swipe on `handleButtons` (§1): `swipe`, `handleButton`. Any other drag: none of these |
 | `pinch` | Two fingers down, either one moves | `panDeltaX`, `panDeltaY` (centre movement, px), `zoomScaleX`, `centerPixelsX`, `centerPixelsY` — informative only: the time axis gets the pinch through `panX`/`zoomX`, the Y axis is Chart.js's own (§3) |
 | `pinchend` | One finger of a pinch lifts, the other remains down | the payload's point is the *remaining* finger's |
 | `hover` | Pointer moves without any button/finger down | — |
@@ -287,7 +305,8 @@ nowhere at all.
 |---|---|---|
 | `_hecLockIconEl` | 18×18px @ `(15, 5)` | The Y-axis lock padlock SVG. `pointer-events: none` — purely visual, the actual click is handled by the gesture detector (`zone: 'lockAndHandle'`). |
 | `_hecMoveHandleIconEl` | 15×28px @ `(0, 0)` | The `⠿` graph-reorder handle glyph. Also `pointer-events: none`, same reasoning. |
-| `_hecMoveHandleTouchEl` | 33×28px @ `(0, 0)` (0×0 if `moveHandleVisible` is `false`) | The single real touch target covering **both** the lock icon and the move handle as one zone (see below) — `touch-action` toggled dynamically. |
+| `_hecHandleButtonsEl` | The lock+handle zone | `handleButtons` (§1), drawn in place of the padlock and the handle while they're set. `pointer-events: none`, like them. |
+| `_hecMoveHandleTouchEl` | 33×28px @ `(0, 0)` — 18px per button with `handleButtons` — (0×0 if `moveHandleVisible` is `false` and no `handleButtons`) | The single real touch target covering **both** the lock icon and the move handle as one zone (see below) — `touch-action` toggled dynamically. |
 | `_hecYAxisTouchEl`, `_hecRightYAxisTouchEl` | Match the Y axes' label columns (the right one only on a chart with a right axis) | `touch-action` toggled dynamically, following the lock state or a short click-armed window (see the touch workaround below). |
 | `_hecLegendTouchEl` | Tight bounding box of the legend's actual `legendHitBoxes`, +4px margin | Same dynamic `touch-action`, for dragging a curve label. Only exists for `line`/`bar` charts. |
 | `_hecLabelTouchEl` | Full label column height | Same dynamic `touch-action`, for dragging a timeline/arrowline entity label. Only exists for `timeline`/`arrowline` charts. |
@@ -384,7 +403,7 @@ pointing to `deps/chart-hec.js` or to this file:
 | Where | Change |
 |---|---|
 | `Controller.update` | A change of chart type releases the Y axis lock (`_hecYAxisLock`) |
-| `Controller.draw` | After drawing: `_hecUpdateYAxisState`, `_hecUpdateDragTouchOverlays`, `_hecUpdateMoveHandleIcon`, `_hecUpdateLinkMarker` (the overlays follow the layout) |
+| `Controller.draw` | After drawing: `_hecUpdateYAxisState`, `_hecUpdateDragTouchOverlays`, `_hecUpdateMoveHandleIcon`, `_hecUpdateHandleButtons`, `_hecUpdateLinkMarker` (the overlays follow the layout) |
 | `Controller.handleEvent` | Hover hit-test limited to drawn points; a `mouseout` without movement (the browser's, during a scroll) doesn't close the tooltip; every event goes to `_hecGestureHandler`, with the timing constants (`cfg`) |
 | `Tooltip` | Drawn as a floating element (`_hecRenderFloatingTooltip`, §7 utilities) instead of on the canvas |
 | Platform (DOM) | Canvas `touch-action: pan-y` (§3); pointer and wheel listeners not passive (§5) |

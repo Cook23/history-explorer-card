@@ -221,6 +221,91 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // Cursor line — options.plugins.hecCursorLine { show, shared, color }: while the
+  // pointer is over the plot area of a chart whose show is true, a vertical line under it
+  // — on that chart, or with shared on every chart of its dragScope, at the same x
+  Chart.plugins.register({
+    id: 'hecCursorLine',
+    afterInit: function (chart) {
+      chart._hecCursorLine = { x: 0, draw: false };
+    },
+    afterEvent: function (chart, evt, opts) {
+      if (!opts || !opts.show) return;
+      var _a = chart.chartArea;
+      var _line = { x: evt.x, draw: evt.x >= _a.left && evt.x <= _a.right && evt.y >= _a.top && evt.y <= _a.bottom };
+      var _charts = [chart];
+      if (opts.shared && Chart.instances) {
+        _charts = [];
+        for (var _cid in Chart.instances) {
+          var _c = Chart.instances[_cid];
+          if (_c === chart || (_c.canvas && _c.options.dragScope === chart.options.dragScope)) _charts.push(_c);
+        }
+      }
+      _charts.forEach(function (c) { c._hecCursorLine = _line; c.draw(); });
+    },
+    afterDatasetsDraw: function (chart, easing, opts) {
+      var _l = chart._hecCursorLine;
+      if (!_l || !_l.draw) return;
+      var ctx = chart.ctx, _a = chart.chartArea;
+      ctx.save();
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = (opts && opts.color) || 'black';
+      ctx.beginPath();
+      ctx.moveTo(_l.x, _a.bottom);
+      ctx.lineTo(_l.x, _a.top);
+      ctx.stroke();
+      ctx.restore();
+    } });
+
+  // ---------------------------------------------------------------------------
+  // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
+  // points (those that have them, within the plot area), an area shaded in the
+  // dataset's line color, on the dataset's own Y axis
+  // (any CSS color — #rgb, #rrggbb(aa), rgb(a)() — with that alpha; black otherwise)
+  function hecColorWithAlpha(color, alpha) {
+    var m = typeof color === 'string' ? color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/) : null;
+    if (m) return 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + alpha + ')';
+    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/) : null;
+    if (m) return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + alpha + ')';
+    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/) : null;
+    if (m) return 'rgba(' + parseInt(m[1] + m[1], 16) + ',' + parseInt(m[2] + m[2], 16) + ',' + parseInt(m[3] + m[3], 16) + ',' + alpha + ')';
+    return 'rgba(0,0,0,' + alpha + ')';
+  }
+  Chart.plugins.register({
+    id: 'hecMinMaxBand',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx, _a = chart.chartArea;
+      var xScale = chart.scales['x-axis-0'];
+      if (!xScale) return;
+      chart.data.datasets.forEach(function (dataset, di) {
+        if (!dataset.showMinMax) return;
+        var yScale = chart.scales[chart.getDatasetMeta(di).yAxisID];
+        var points = dataset.data;
+        // (a dataset not filled yet holds {}, not a list)
+        if (!yScale || !Array.isArray(points) || points.length < 2) return;
+        var _clampY = function (v) { return Math.max(_a.top, Math.min(_a.bottom, yScale.getPixelForValue(v))); };
+        var band = [];
+        points.forEach(function (pt) {
+          if (pt.yMin == null || pt.yMax == null) return;
+          var px = xScale.getPixelForValue(pt.x);
+          if (px < _a.left - 1 || px > _a.right + 1) return;
+          band.push({ px: px, pyMin: _clampY(pt.yMin), pyMax: _clampY(pt.yMax) });
+        });
+        if (band.length < 2) return;
+        ctx.save();
+        ctx.beginPath();
+        // (yMax from left to right, then yMin back: a closed polygon)
+        ctx.moveTo(band[0].px, band[0].pyMax);
+        for (var i = 1; i < band.length; i++) ctx.lineTo(band[i].px, band[i].pyMax);
+        for (var j = band.length - 1; j >= 0; j--) ctx.lineTo(band[j].px, band[j].pyMin);
+        ctx.closePath();
+        ctx.fillStyle = hecColorWithAlpha(dataset.borderColor, 0.15);
+        ctx.fill();
+        ctx.restore();
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one
@@ -570,10 +655,17 @@
       }
     },
     {
+      // A swipe starting on a button of options.handleButtons (§1): reported at its end,
+      // up or down (dragend's swipe, with that button) — nothing drawn meanwhile
+      name: 'handleSwipe',
+      test: function (c, p) { return !!c.me._hecHandleButtonAt(p.x0, p.y0); },
+      onMove: function () {}
+    },
+    {
       name: 'lockAndHandle',
       test: function (c, p) {
         var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0);
+        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0) && !me._hecHandleButtons();
         if (!_inZone) return false;
         var _gRect = me.canvas.getBoundingClientRect();
         me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
@@ -745,7 +837,7 @@
       // check, same action, no pointerType distinction: it undoes the first
       // press's click, which was the first half of a double-click or of a
       // tap-then-drag, not a toggle.
-      var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
+      var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy) && !me._hecHandleButtons();
       if (_dblInLockAndHandleZone) {
         me._hecToggleYAxisLock();
       }
@@ -776,7 +868,8 @@
         var _bSel = me.options.floatingBoundsSelector;
         Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
       }
-      var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
+      // (with handleButtons shown there instead, a click is for them: payload.handleButton)
+      var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy) && !me._hecHandleButtons();
       if (_clickInLockAndHandleZone) {
         // Grouped lock+handle zone: a click here always toggles the lock.
         // On mouse/pen, that's the whole story — simple, no two-step: click
@@ -890,7 +983,12 @@
     me._hecHideInsertionMarker();
     if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
     var _hName = p.handler && p.handler.name;
-    if (_hName === 'zoomSelect') {
+    if (_hName === 'handleSwipe') {
+      var _hb = me._hecHandleButtonAt(p.x0, p.y0);
+      var _dy = (e && e.y !== undefined && e.y !== null ? e.y : p.y0) - p.y0;
+      fire(c, 'dragend', undefined, undefined, { swipe: Math.abs(_dy) >= 10 ? (_dy < 0 ? 'up' : 'down') : null,
+        handleButton: _hb ? _hb.id : undefined, handleButtonDisabled: _hb ? !!_hb.disabled : undefined });
+    } else if (_hName === 'zoomSelect') {
       me._hecHideZoomSelection();
       fire(c, 'dragend', undefined, undefined, { zoomSelectFactor0: me._hecPlotFactor(p.x0),
         zoomSelectFactor1: p.dragZoomSelectX1 !== undefined ? me._hecPlotFactor(p.dragZoomSelectX1) : undefined });
@@ -1534,7 +1632,7 @@
       _el.style.left = '15px';
       _el.style.top = '5px';
       var _svg = _el.children[0];
-      var _showIcon = !(_forced && !me._hecYAxisLock);
+      var _showIcon = !(_forced && !me._hecYAxisLock) && !me._hecHandleButtons();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
       _el.style.opacity = (me._hecYAxisLock) ? '1.0' : '0.3';
 
@@ -1607,10 +1705,41 @@
     },
 
     // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
-    // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays.
-    // Minus where the chain icon (drawn over it) overlaps its top edge.
+    // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays; 18px
+    // per button when options.handleButtons shows more than one. Minus where the chain
+    // icon (drawn over it) overlaps its top edge.
     _hecInLockAndHandleZone: function (x, y) {
-      return x >= 0 && x <= 33 && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+      return x >= 0 && x <= this._hecLockAndHandleWidth() && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+    },
+
+    _hecLockAndHandleWidth: function () {
+      var b = this._hecHandleButtons();
+      return b ? Math.max(33, b.length * 18) : 33;
+    },
+
+    // The buttons shown in the lock+handle zone instead of the handle and the padlock
+    // (options.handleButtons), or null
+    _hecHandleButtons: function () {
+      var b = this.options.handleButtons;
+      return b && b.length ? b : null;
+    },
+
+    // The button of options.handleButtons at (x, y), or null
+    _hecHandleButtonAt: function (x, y) {
+      var b = this._hecHandleButtons();
+      if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
+      return b[Math.min(b.length - 1, Math.floor(x / (this._hecLockAndHandleWidth() / b.length)))];
+    },
+
+    // Does this chart have a Y axis lock (the padlock)?
+    _hecHasYAxisLock: function () {
+      return this.options.yAxisLockEnabled !== false && this.config.type !== 'timeline' && this.config.type !== 'arrowline' &&
+        !!(this.options.scales && this.options.scales.yAxes && this.options.scales.yAxes.length);
+    },
+
+    // Public (Chart Custom.js.md §1): locks or releases the Y axes, as a click on the padlock
+    hecSetYAxisLocked: function (locked) {
+      if (this._hecHasYAxisLock() && !!this._hecYAxisLock !== !!locked) this._hecToggleYAxisLock();
     },
 
     // Linked-graphs marker (chain icon), shown while options.linkMarkerVisible is
@@ -1703,6 +1832,9 @@
         labelRect: this._hecLabelRect(_legendIdx, _yIdx),
         button: native ? native.button : undefined,
         event: native };
+      var _hb = this._hecHandleButtonAt(x, y);
+      if (_hb) { payload.handleButton = _hb.id; payload.handleButtonDisabled = !!_hb.disabled; }
+      if (this._hecHasYAxisLock()) payload.yAxisLocked = !!this._hecYAxisLock;
       if (extra) { for (var k in extra) payload[k] = extra[k]; }
       return payload;
     },
@@ -1755,7 +1887,49 @@
       me._hecAttachToCanvasParent(_el);
       _el.style.left = me.canvas.offsetLeft + 'px';
       _el.style.top = me.canvas.offsetTop + 'px';
-      _el.style.display = me.options.moveHandleVisible === false ? 'none' : 'flex';
+      _el.style.display = me.options.moveHandleVisible === false || me._hecHandleButtons() ? 'none' : 'flex';
+    },
+
+    // options.handleButtons drawn over the lock+handle zone, in place of the handle and
+    // the padlock: each its text (an icon); a disabled one greyed and struck through in
+    // red. Purely visual (pointer-events:none), like the icons it replaces — a click on
+    // one reaches customEvent with its id (payload.handleButton)
+    _hecUpdateHandleButtons: function () {
+      var me = this;
+      var b = me._hecHandleButtons();
+      var _el = me._hecHandleButtonsEl;
+      if (!b) {
+        if (_el) _el.style.display = 'none';
+        return;
+      }
+      if (!me.canvas) return;
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.style.cssText = 'position:absolute;z-index:10;height:28px;pointer-events:none;user-select:none;';
+        me._hecHandleButtonsEl = _el;
+      }
+      me._hecAttachToCanvasParent(_el);
+      _el.style.left = me.canvas.offsetLeft + 'px';
+      _el.style.top = me.canvas.offsetTop + 'px';
+      _el.style.display = 'flex';
+      // (rebuilt only when they change: called at each draw)
+      var _key = JSON.stringify(b);
+      if (_el._hecKey === _key) return;
+      _el._hecKey = _key;
+      _el.innerHTML = '';
+      var _w = me._hecLockAndHandleWidth() / b.length;
+      b.forEach(function (btn) {
+        var _s = document.createElement('div');
+        _s.style.cssText = 'position:relative;width:' + _w + 'px;height:28px;display:flex;align-items:center;justify-content:center;' +
+          'font-size:14px;color:var(--primary-text-color);' + (btn.disabled ? 'opacity:0.45;' : '');
+        _s.textContent = btn.text;
+        if (btn.disabled) {
+          var _bar = document.createElement('div');
+          _bar.style.cssText = 'position:absolute;inset:4px 2px;background:linear-gradient(to top right,transparent calc(50% - 1px),var(--error-color,#f44336) calc(50% - 1px),var(--error-color,#f44336) calc(50% + 1px),transparent calc(50% + 1px));';
+          _s.appendChild(_bar);
+        }
+        _el.appendChild(_s);
+      });
     },
 
     // Drag ghost — a small floating label that follows the pointer during a
@@ -1952,12 +2126,14 @@
       // workaround (acceptable: with only one graph, there's no handle drag
       // to protect from scroll interference in this zone, only the lock
       // toggle, which doesn't need touch-action changes at all).
-      var _moVisible = me.options.moveHandleVisible !== false;
+      var _moVisible = me.options.moveHandleVisible !== false || !!me._hecHandleButtons();
       var _mo = ensureOverlay('_hecMoveHandleTouchEl');
       _mo.style.left = me.canvas.offsetLeft + 'px';
       _mo.style.top = me.canvas.offsetTop + 'px';
-      _mo.style.width = _moVisible ? '33px' : '0px';
+      _mo.style.width = _moVisible ? me._hecLockAndHandleWidth() + 'px' : '0px';
       _mo.style.height = _moVisible ? '28px' : '0px';
+      // (with handleButtons, a swipe there is theirs, never the page's)
+      if (me._hecHandleButtons()) _mo.style.touchAction = 'none';
     },
 
     /**

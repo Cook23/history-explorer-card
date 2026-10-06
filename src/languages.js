@@ -44,7 +44,11 @@ const lang_en =
             "entity_merge"       : "Merge back",
             "linked_graphs"      : "Linked graphs",
             "linked_graphs_merge": "Double-click to merge",
-            "linked_graphs_split" : "Linked graphs can't be separated"
+            "linked_graphs_split" : "Linked graphs can't be separated",
+            "entity_cut"        : "Cut",
+            "graph_delete"      : "Delete the graph",
+            "ylock"             : "Lock the Y axis",
+            "yunlock"           : "Unlock the Y axis"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -114,7 +118,11 @@ const lang_fr =
             "entity_merge"       : "Regrouper",
             "linked_graphs"      : "Graphiques liés",
             "linked_graphs_merge": "Double-clic pour fusionner",
-            "linked_graphs_split" : "Les graphiques liés ne peuvent pas être séparés"
+            "linked_graphs_split" : "Les graphiques liés ne peuvent pas être séparés",
+            "entity_cut"        : "Couper",
+            "graph_delete"      : "Supprimer le graphique",
+            "ylock"             : "Verrouiller l'axe Y",
+            "yunlock"           : "Déverrouiller l'axe Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -184,7 +192,11 @@ const lang_de =
             "entity_merge"       : "Zusammenführen",
             "linked_graphs"      : "Verknüpfte Diagramme",
             "linked_graphs_merge": "Doppelklick zum Zusammenführen",
-            "linked_graphs_split" : "Verknüpfte Diagramme können nicht getrennt werden"
+            "linked_graphs_split" : "Verknüpfte Diagramme können nicht getrennt werden",
+            "entity_cut"        : "Ausschneiden",
+            "graph_delete"      : "Diagramm löschen",
+            "ylock"             : "Y-Achse sperren",
+            "yunlock"           : "Y-Achse entsperren"
         },
         "ranges" : {
             "l_hour" : "< 1 Std.",
@@ -254,7 +266,11 @@ const lang_es =
             "entity_merge"       : "Reagrupar",
             "linked_graphs"      : "Gráficos vinculados",
             "linked_graphs_merge": "Doble clic para combinar",
-            "linked_graphs_split" : "Los gráficos vinculados no se pueden separar"
+            "linked_graphs_split" : "Los gráficos vinculados no se pueden separar",
+            "entity_cut"        : "Cortar",
+            "graph_delete"      : "Eliminar el gráfico",
+            "ylock"             : "Bloquear el eje Y",
+            "yunlock"           : "Desbloquear el eje Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -324,7 +340,11 @@ const lang_nl =
             "entity_merge"       : "Samenvoegen",
             "linked_graphs"      : "Gekoppelde grafieken",
             "linked_graphs_merge": "Dubbelklik om samen te voegen",
-            "linked_graphs_split" : "Gekoppelde grafieken kunnen niet worden gescheiden"
+            "linked_graphs_split" : "Gekoppelde grafieken kunnen niet worden gescheiden",
+            "entity_cut"        : "Knippen",
+            "graph_delete"      : "Grafiek verwijderen",
+            "ylock"             : "Y-as vergrendelen",
+            "yunlock"           : "Y-as ontgrendelen"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -394,7 +414,11 @@ const lang_pl =
             "entity_merge"       : "Połącz",
             "linked_graphs"      : "Połączone wykresy",
             "linked_graphs_merge": "Kliknij dwukrotnie, aby połączyć",
-            "linked_graphs_split" : "Połączonych wykresów nie można rozdzielić"
+            "linked_graphs_split" : "Połączonych wykresów nie można rozdzielić",
+            "entity_cut"        : "Wytnij",
+            "graph_delete"      : "Usuń wykres",
+            "ylock"             : "Zablokuj oś Y",
+            "yunlock"           : "Odblokuj oś Y"
         },
         "ranges" : {
             "l_hour" : "< 1 godz.",
@@ -464,7 +488,11 @@ const lang_sv =
             "entity_merge"       : "Slå ihop",
             "linked_graphs": "Länkade grafer",
             "linked_graphs_merge": "Dubbelklicka för att slå ihop",
-            "linked_graphs_split" : "Länkade grafer kan inte delas"
+            "linked_graphs_split" : "Länkade grafer kan inte delas",
+            "entity_cut"        : "Klipp ut",
+            "graph_delete"      : "Ta bort grafen",
+            "ylock"             : "Lås Y-axeln",
+            "yunlock"           : "Lås upp Y-axeln"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -534,7 +562,11 @@ const lang_da =
             "entity_merge"       : "Saml",
             "linked_graphs"      : "Sammenkædede grafer",
             "linked_graphs_merge": "Dobbeltklik for at flette",
-            "linked_graphs_split" : "Sammenkædede grafer kan ikke adskilles"
+            "linked_graphs_split" : "Sammenkædede grafer kan ikke adskilles",
+            "entity_cut"        : "Klip",
+            "graph_delete"      : "Slet grafen",
+            "ylock"             : "Lås Y-aksen",
+            "yunlock"           : "Lås Y-aksen op"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -604,7 +636,11 @@ const lang_sk =
             "entity_merge"       : "Zlúčiť",
             "linked_graphs"      : "Prepojené grafy",
             "linked_graphs_merge": "Dvojitým kliknutím zlúčiť",
-            "linked_graphs_split" : "Prepojené grafy nemožno oddeliť"
+            "linked_graphs_split" : "Prepojené grafy nemožno oddeliť",
+            "entity_cut"        : "Vystrihnúť",
+            "graph_delete"      : "Odstrániť graf",
+            "ylock"             : "Uzamknúť os Y",
+            "yunlock"           : "Odomknúť os Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -674,7 +710,11 @@ const lang_ru =
             "entity_merge"       : "Объединить",
             "linked_graphs"      : "Связанные графики",
             "linked_graphs_merge": "Дважды щёлкните, чтобы объединить",
-            "linked_graphs_split" : "Связанные графики нельзя разделить"
+            "linked_graphs_split" : "Связанные графики нельзя разделить",
+            "entity_cut"        : "Вырезать",
+            "graph_delete"      : "Удалить график",
+            "ylock"             : "Заблокировать ось Y",
+            "yunlock"           : "Разблокировать ось Y"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",

@@ -77,7 +77,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Organizing graphs
 
 - **Combining by unit** — with `combineSameUnits`, entities added from the card with compatible units, SI prefixes included (W and kW), share one graph; each value is shown in its own unit. A graph defined in YAML always shows all its entities together, whatever their units, bars and curves included (the curves drawn over the bars). **(1.2)** Two groups of units get a Y axis each, left and right (`yAxis` chooses the side), the curves of the right one marked ▸ in the legend.
-- **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press within half a second.
+- **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press within half a second. **(1.2)** A long-press or a right click on a graph's ⠿ zone opens its menu (the Y axis lock, merge back, cut, delete), and *Cut* — of a graph, or of a curve from its type menu — then shows in every graph's ⠿ zone where it can go: everything a drag does can also be done from the menus.
 
 ### Drawing
 
@@ -220,10 +220,10 @@ Dynamically added entities can be individually removed by clicking the `x` close
 
 An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline.
 
-The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
@@ -306,6 +306,18 @@ Graphs can be reordered by dragging on the ⠿ symbol at the top left of each gr
 Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
 
 When dragging a graph or a curve near the top or bottom edge of the screen, the page scrolls automatically to allow reaching graphs that are not currently visible.
+
+#### The graph menu, cut and paste
+
+**(1.2)** A long-press (or a right click) on the ⠿ zone of a graph opens its menu. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
+- **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock (not on a timeline or arrowline graph, which have no lock);
+- **Layout ▸** — open with the menu: *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
+
+*Cut* is also in the *Layout* submenu of a curve's or a timeline entity's type menu. Once something is cut, the ⠿ zone of every graph shows where it can go, instead of the ⠿ symbol and the padlock:
+- a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any line or bar graph for a curve, saved only when both graphs are);
+- a graph: ↓ 📋 ↑ — ↓ inserts it below that graph, ↑ above it, as a drop below or above its midpoint; a swipe down or up on them does the same (on a touch screen, that swipe doesn't scroll the page); a block of linked graphs moves as a whole, and nothing is inserted inside another block.
+
+A choice that isn't possible is greyed and struck through in red; clicked, it says why, and the cut goes on. ✂ marks the graph it was cut from — clicked, the cut is cancelled. A click anywhere else on the card or the page, or Escape, cancels it too.
 
 #### Timeline and arrowline entity management
 
@@ -619,7 +631,7 @@ Compass arrow graphs use the `arrowline` type and can be used in both dynamicall
 
 By default the min/max scales for the Y axis are adjusted automatically to the data you are currently viewing.
 
-Pressing the axis lock icon will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
+Pressing the axis lock icon — or *Lock the Y axis* in the [graph menu](#the-graph-menu-cut-and-paste) — will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 

@@ -1,8 +1,8 @@
 // What the gestures on the graphs mean (Chart.js detects them and says where they
 // happen — deps/Chart Custom.js.md): clicks, menus, the time window moved and zoomed,
-// curves, rows and graphs dragged, split and merged — and the entity moves these lead to
-// (through the entity store). Part of HistoryCardState (added to it in
-// history-explorer-card.js).
+// curves, rows and graphs dragged, split and merged, or cut and pasted from the menus —
+// and the entity moves these lead to (through the entity store). Part of
+// HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
 const Chart = window.HXLocal_Chart;
@@ -21,6 +21,16 @@ export class CardGestures
     {
         const g = this.graphs?.find(g => g.chart === info.chart);
         if( !g ) return;
+        // (during a cut: a click on a graph's button pastes, any other action cancels it
+        // and goes on as usual — a hover doesn't)
+        if( this._cut ) {
+            if( info.gestureType === 'click' && info.handleButton ) return this._onCutButton(info, g, info.handleButton);
+            // (a swipe on the buttons: up inserts above, down below)
+            if( info.gestureType === 'dragend' && info.handleButton )
+                return info.swipe && this._onCutButton(info, g, info.swipe === 'up' ? 'above' : 'below');
+            if( info.gestureType === 'dragstart' && info.handleButton ) return;
+            if( ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType) ) this._endCut();
+        }
         switch( info.gestureType ) {
             case 'click':         return this._onGraphClick(info, g);
             // (the second press of a double-click or of a tap-then-drag: the first
@@ -73,6 +83,9 @@ export class CardGestures
     // or level with the finger (timeline/arrowline row)
     _onGraphLongPress(info, g)
     {
+        // (the lock+handle zone: the graph's menu)
+        if( info.zone === 'lockAndHandle' )
+            return this.showGraphMenu(0, g, info.clientX, info.clientY, info.yAxisLocked);
         const _r = info.labelRect;
         if( !_r ) return;
         if( info.legendIndex >= 0 && !this._isRowGraph(g) ) {
@@ -313,11 +326,11 @@ export class CardGestures
             this._rebuildGraph(_list, _groupId ?? null, _nextG);
         } else {
             const _sameGroup = this._sameGroup(src, tgt);
-            // Within one group (several linked graphs), each graph is rebuilt right where it
-            // was — the graph-level neighbor, not the next group, or the block's internal
-            // order would change. (Before the entity changes group: the next group is found
-            // from the list's order.)
-            const _srcNext = _sameGroup ? this._nextGraph(src) : this._nextGroup(src);
+            // Each graph is rebuilt right where it was — before its own next graph, not its
+            // next group: inside a block of several linked graphs, the block's order would
+            // change. (Before the entity changes group: the display order is read from the
+            // list's.)
+            const _srcNext = this._nextGraph(src);
             const _entry = this.store.find(_entity.entity);
             const _tgtGroupId = this.store.groupIdOf(tgt.entities[0].entity);
             if( typeof _entry === 'object' && _tgtGroupId !== undefined ) {
@@ -338,7 +351,7 @@ export class CardGestures
             this._detachAndRebuildRemaining(src, srcIdx, _srcNext);
             _entity.siConversionFactor = undefined;
             tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-            const _tgtNext = _sameGroup ? this._nextGraph(tgt) : this._nextGroup(tgt);
+            const _tgtNext = this._nextGraph(tgt);
             this._detachGraph(tgt);
             const _list = [...tgt.entities];
             _list.splice(insertIdx < 0 || insertIdx > _list.length ? _list.length : insertIdx, 0, _entity);
@@ -541,6 +554,80 @@ export class CardGestures
         const _neighbor = _insertBefore ? _sorted[_tgtIdx - 1] : _sorted[_tgtIdx + 1];
         if( !_neighbor || _neighbor === srcG ) return false;
         return _neighbor.groupId === tgtG.groupId;
+    }
+
+    // --------------------------------------------------------------------------------------
+    // Cut and paste — what a drag does, from the menus
+    // --------------------------------------------------------------------------------------
+
+    // Cut: entity idx of graph g (from its type menu), or the whole graph g (idx null, from
+    // its graph menu). Until it's pasted, every graph's lock+handle zone shows its buttons
+    // (_cutButtons): a curve is pasted into a graph (📋), a graph inserted below (↓) or
+    // above (↑) another one; the place it was cut from shows ✂. A click anywhere else, or
+    // Escape, cancels.
+    _startCut(g, idx = null)
+    {
+        this._endCut();
+        this._cut = { g, idx };
+        for( const _g of this.graphs ) {
+            _g.chart.options.handleButtons = this._cutButtons(_g);
+            _g.chart.update();
+        }
+        // (a press outside the graphs, or Escape — after the menu's own click is over)
+        this._cutListeners = {
+            pointerdown: (e) => { if( !this.graphs.some(_g => e.composedPath().includes(this._graphDiv(_g))) ) this._endCut(); },
+            keydown: (e) => { if( e.key === 'Escape' ) this._endCut(); },
+        };
+        setTimeout(() => {
+            if( !this._cut ) return;
+            for( const t in this._cutListeners ) document.addEventListener(t, this._cutListeners[t], true);
+        }, 0);
+    }
+
+    // The buttons of graph g's lock+handle zone during the cut: disabled (struck through)
+    // where a drop would be refused
+    _cutButtons(g)
+    {
+        const { g: src, idx } = this._cut;
+        if( g === src ) return [{ id: 'cancel', text: '✂' }];
+        if( idx !== null )
+            return [{ id: 'paste', text: '📋', disabled: this._dropCompatibility(src, g, src.entities[idx]) !== null }];
+        return [{ id: 'below', text: '↓', disabled: this._wouldSplitGroup(src, g, false) },
+                { id: 'clipboard', text: '📋' },
+                { id: 'above', text: '↑', disabled: this._wouldSplitGroup(src, g, true) }];
+    }
+
+    // Button id of graph g chosen during the cut (clicked, or swiped to): what was cut put
+    // there, as a drop would (a disabled one says why, and the cut goes on)
+    _onCutButton(info, g, id)
+    {
+        const { g: src, idx } = this._cut;
+        const _btn = this._cutButtons(g).find(b => b.id === id);
+        if( !_btn || id === 'clipboard' ) return;
+        // (what was cut no longer shown — its graph deleted meanwhile)
+        if( !this.graphs.includes(src) ) return this._endCut();
+        if( _btn.disabled ) {
+            const _why = idx !== null ? this._dropCompatibility(src, g, src.entities[idx]) : i18n('ui.menu.linked_graphs_split');
+            return this._showLabelTooltip(_why, info.clientX, info.clientY, 'left', g.canvas);
+        }
+        this._endCut();
+        if( id === 'cancel' ) return;
+        if( id === 'paste' ) this._moveEntity(src, idx, g, -1);
+        else this._finalizeGraphMove(info, src, g, { insertBefore: id === 'above' });
+    }
+
+    // The cut over: the graphs' zones back to their handle and padlock
+    _endCut()
+    {
+        if( !this._cut ) return;
+        this._cut = null;
+        for( const t in this._cutListeners ?? {} ) document.removeEventListener(t, this._cutListeners[t], true);
+        this._cutListeners = null;
+        for( const _g of this.graphs ) {
+            if( !_g.chart.options.handleButtons ) continue;
+            _g.chart.options.handleButtons = null;
+            _g.chart.update();
+        }
     }
 
     // A zoom selection, between factor0 and factor1 along the time axis: the time range

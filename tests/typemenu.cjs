@@ -27,6 +27,20 @@ module.exports = async function()
         await select('sensor.power'); const v = await visible(); await close();
         return v === ORDER ? true : v;
     });
+    // The menu's items in bold: the one whose submenu is open
+    const boldItems = () => t.E(`['rep','interp','layout','tests'].filter(k=>el.querySelector('#et_0_'+k)?.style.fontWeight==='bold').join(',')`);
+    await t.step('the item whose submenu is open is in bold, and only it', async () => {
+        await select('sensor.power');
+        const r = { opened: await boldItems() };
+        // (another item shown in this menu — Interpolation and Layout aren't, for an entity being added)
+        const other = await t.E(`['interp','layout','tests'].find(k=>{ const a=el.querySelector('#et_0_'+k); return a && a.style.display!=='none'; })`);
+        await t.E(`el.querySelector('#et_0_${other}').click()`); await t.wait(200);
+        r.other = await boldItems(); r.want = other;
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        r.back = await boldItems();
+        await close();
+        return r.opened === 'rep' && r.other === r.want && r.back === '' ? true : JSON.stringify(r);
+    });
     const PRESELECT = [
         ['sensor.power', 'et_0_6', 'a measurement: a line, smart'],
         ['sensor.tank', 'et_0_6', 'a volume being measured (a tank): a line, smart'],

@@ -35,7 +35,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-graphs.js` | The graphs: each chart created (axes, legend, tooltip), filled with its entities (two Y axes, SI conversion), placed in the display order, linked, merged, removed. |
 | `src/card-datasets.js` | From history data to what the graphs draw: line modes, bars by interval, circular values, timelines. |
 | `src/card-gestures.js` | What the gestures on the graphs mean — and the entity moves they lead to (split, merge, drop, reorder). |
-| `src/card-menus.js` | The entity type menu, the options menu, their keyboard navigation. |
+| `src/card-menus.js` | The entity type menu — the same menu for a graph (its Y axis lock, its layout) — the options menu, their keyboard navigation. |
 | `src/card-selector.js` | The entity selector: the entities listed and filtered, and those it adds (wildcards included) or removes. |
 | `src/card-toolbar.js` | The card's HTML: the toolbars and their menu entries, the interval selector of bar graphs, the layout as the card resizes. |
 | `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML. |

@@ -321,6 +321,9 @@ export class CardHistory
                 }
             }
         }
+        // (asked in parallel with the history: arrived after it, the curves are redrawn with
+        // their band; before it, the history's arrival draws them)
+        if( !this.state.loading ) this.updateHistory();
     }
 
     loaderCallbackWS(result)

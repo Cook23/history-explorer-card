@@ -24,8 +24,9 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch also zooms the time;
 > - **the tooltip** opens on a click or a tap on the curves, then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it;
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
-> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
+> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
 > - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
+> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
@@ -180,10 +181,10 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
-The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge:
+The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
@@ -244,6 +245,14 @@ Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the m
 
 Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
+### The graph menu, cut and paste
+
+A long-press (or a right click) on the ⠿ zone of a graph opens its menu — the same zone where a click toggles the Y axis lock and a drag moves the graph:
+- **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock;
+- **Layout ▸** — *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
+
+After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click anywhere else, or Escape, cancels.
+
 ### Timeline and arrowline graphs
 
 ![image](https://user-images.githubusercontent.com/60828821/198171854-f643a628-25f7-4f5a-ac50-f0914a5e265e.png)
@@ -263,7 +272,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again within half a second and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both.
+The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again within half a second and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both.
 
 To set initial Y axis bounds in YAML:
 ```yaml

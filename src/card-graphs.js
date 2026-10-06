@@ -3,7 +3,6 @@
 // group, merged and removed. Part of HistoryCardState (added to it in
 // history-explorer-card.js).
 
-import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { defaultColors, parseColor, parseColorValue } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
 import { entityIdOf } from "./history-entity-store.js";
@@ -192,17 +191,18 @@ export class CardGraphs
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    vertline: {
+                    // The cursor line (cursor.mode, cursor.types): on this graph, or on
+                    // every graph of the card at once
+                    hecCursorLine: {
+                        show: this.pconfig.cursorMode !== 'hide' &&
+                              ( this.pconfig.cursorTypes.includes('all') || this.pconfig.cursorTypes.includes(graphtype) ),
+                        shared: this.pconfig.cursorMode === 'all',
                         color: this.pconfig.cursorLineColor
                     }
                 }
-            },
-
-            plugins: [vertline_plugin, minmaxfill_plugin]
+            }
 
         });
-
-        chart.callerInstance = this;
 
         return chart;
     }
@@ -616,18 +616,20 @@ export class CardGraphs
     // Adding and removing graphs from the view
     // --------------------------------------------------------------------------------------
 
+    // The close button (×) of a graph added from the card
     removeGraph(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
+        const g = this.graphs.find(g => g.id == id);
+        if( g ) this._removeGraph(g);
+    }
 
-        for( let i = 0; i < this.graphs.length; i++ ) {
-            if( this.graphs[i].id == id ) {
-                this._graphDiv(this.graphs[i]).remove();
-                for( let e of this.graphs[i].entities ) this.store.remove(e.entity, true);
-                this.graphs.splice(i, 1);
-                break;
-            }
-        }
+    // A graph added from the card removed, with its entities
+    _removeGraph(g)
+    {
+        this._graphDiv(g).remove();
+        for( let e of g.entities ) this.store.remove(e.entity, true);
+        this.graphs.splice(this.graphs.indexOf(g), 1);
 
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();

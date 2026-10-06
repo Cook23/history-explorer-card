@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.6] - 2026-10-06
+
+### New — a graph's menu, cut and paste
+- A long-press or a right click on a graph's lock+handle zone opens its menu — the same zone where a click toggles the lock and a drag moves the graph: *Lock the Y axis* / *Unlock the Y axis*, and *Layout ▸* with *Merge back*, *Cut* and *Delete the graph* (a graph added from the card)
+- *Cut* in the *Layout* submenu of a curve's or an entity's type menu, and of a graph's menu: every graph's zone then shows where it can go instead of the handle and the padlock — 📋 for a curve (pasted at the end of the legend), ↓ 📋 ↑ for a graph (inserted below or above — by a click, or a swipe down or up on them); a place refused is struck through in red and says why; ✂ where it was cut from; a click elsewhere, Escape or ✂ cancels. Pasting does exactly what a drop there does
+- `deps/chart-hec.js`: the option `handleButtons` (buttons drawn in the lock+handle zone, a click reaching `customEvent` with `handleButton`), the payload's `yAxisLocked`, the public `hecSetYAxisLocked()`, a swipe on the buttons reported in `dragend` (`swipe`) (`deps/Chart Custom.js.md` §0, §1, §2, §5, §8)
+- Tests: new suite `graphmenu`
+
+### Changed — the type menu shows which submenu is open
+- The item whose submenu is open (*Display*, *Interpolation*, *Layout*, *Tests*) is in bold, and only it; back to the menu, none is
+- Tests: the open submenu's item in bold, another one opened, back to the menu
+
+### Fixed — a curve dropped onto the first graph of a linked block
+- The graph it joined was rebuilt after the whole block instead of in its place: the block's graphs swapped. The graph left by the curve had the same problem
+- Tests: a curve pasted into the first graph of a block (`graphmenu`)
+
+### Fixed — the min/max band shown as soon as its values arrive
+- The min and max of `showMinMax: history` / `states`, asked in parallel with the history, drew nothing when they arrived after it: the band only appeared at the next refresh
+
+### Code — the cursor line and the min/max band in Chart.js
+- The two Chart.js plugins left in the card (`src/history-chart-vline.js`) moved to `deps/chart-hec.js` as `hecCursorLine` and `hecMinMaxBand`, with the other drawing plugins. The cursor line no longer reads the card's configuration nor walks its graphs (`chart.callerInstance`, now gone): the card gives it `show`, `shared` and `color`, and Chart.js finds the charts of the same card by their `dragScope`, as a drag does (`deps/Chart Custom.js.md` §1)
+- The info panel's guard renamed `_hecInfoPanelHooked` (a flag on Home Assistant's element, not a Chart.js private)
+- Tests: the cursor line (`auto`, `all`, `hide`) and the min/max band, which had none
+
 ## [v1.2.5] - 2026-10-06
 
 ### Changed — a curve dropped onto any line or bar graph

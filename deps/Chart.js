@@ -4319,6 +4319,7 @@
             me._hecUpdateYAxisState();
             me._hecUpdateDragTouchOverlays();
             me._hecUpdateMoveHandleIcon();
+            me._hecUpdateHandleButtons();
             me._hecUpdateLinkMarker();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
