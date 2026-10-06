@@ -31,6 +31,8 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
+> If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
+>
 > In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
 >
 > **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, pens, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used — for a pen, the report of *Tests (beta) ▸ Pen events*.
