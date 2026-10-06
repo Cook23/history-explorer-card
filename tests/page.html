@@ -1,0 +1,53 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>history-explorer-card tests</title></head>
+<body style="width:1000px;margin:0"><style>ha-card{display:block}</style><div id=host></div>
+<!-- The card under test (the built history-explorer-card.js) against a mocked Home
+     Assistant (mock-ha.js). The config comes from the test (window.CFG). -->
+<script src="mock-ha.js"></script>
+<script src="../history-explorer-card.js"></script>
+<script>
+const el=document.createElement('history-explorer-card');
+el.setConfig(window.CFG);
+document.getElementById('host').appendChild(el);
+el.hass=mkHass();
+window.el=el;
+window.hassTargets=[el];
+</script>
+<script>
+// Probes used by the tests: client coordinates of the things to press, and a compact view
+// of the card's state.
+const graphAt=(gi)=>el.instance._allGraphsInDisplayOrder()[gi];
+window.state=()=>{ const I=el.instance; return JSON.stringify({range:[I.activeRange.timeRangeHours,I.activeRange.timeRangeMinutes], graphs:I._allGraphsInDisplayOrder().map(g=>g.type[0]+':'+g.entities.map(e=>e.entity.split('.')[1]+(e.type==='bar'?'[B]':'')+(e.hidden?'(h)':'')).join('+')+(g.entities[0].graphKey?'[k]':'')+(g.groupId!=null?'@'+g.groupId:'')), colors:Object.fromEntries(I.graphs.flatMap(g=>g.entities.map(e=>[e.entity.split('.')[1],e.color])))}); };
+window.legendPt=(gi,di)=>{ const g=graphAt(gi); const b=g.chart.legend.legendHitBoxes[di]; const r=g.canvas.getBoundingClientRect(); return {x:r.left+b.left+(b.width/2), y:r.top+b.top+b.height/2}; };
+window.tlPt=(gi,li)=>{ const g=graphAt(gi); const y=g.chart.scales['y-axis-0'].getPixelForValue(null,li,li); const r=g.canvas.getBoundingClientRect(); return {x:r.left+20,y:r.top+y}; };
+// Client position of the point drawn within the plot area at fraction frac of graph gi's first dataset
+window.pointPt=(gi,frac)=>{ const c=graphAt(gi).chart; const A=c.chartArea; const d=c.getDatasetMeta(0).data.filter(p=>!p._view.skip && p._view.x>A.left && p._view.x<A.right && p._view.y>A.top && p._view.y<A.bottom); const v=d[Math.floor(d.length*frac)]._view; const r=c.canvas.getBoundingClientRect(); return {x:r.left+v.x, y:r.top+v.y}; };
+window.graphPtAt=(gi,frac)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height*frac}; };
+// (the chain icon of graph gi: the marker drawn just above it, #gc-<id>)
+window.chainPt=(gi)=>{ const g=graphAt(gi); const m=el.querySelector('#gc-'+g.id+' div'); if(!m) return null; const r=m.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; };
+window.moPt=(gi)=>{ const r=el.querySelector('#mo-'+graphAt(gi).id).getBoundingClientRect(); return {x:r.left+6,y:r.top+r.height/2}; };
+window.lockOf=(gi)=>graphAt(gi).yaxisLock||0;
+window.lockPt=(gi)=>{ const r=el.querySelector('#ca-'+graphAt(gi).id).getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; };
+window.yaPt=(gi,frac)=>{ const g=graphAt(gi); const r=g.canvas.getBoundingClientRect(); const a=g.chart.chartArea; return {x:r.left+a.left/2,y:r.top+a.top+(a.bottom-a.top)*(frac??0.5)}; };
+window.yRange=(gi)=>{ const s=graphAt(gi).chart.scales['y-axis-0']; return [+s.min.toFixed(2),+s.max.toFixed(2)]; };
+window.timeRange=()=>[el.instance.startTime,el.instance.endTime];
+window.chainShown=()=>el.instance._allGraphsInDisplayOrder().map(g=>el.querySelector('#gc-'+g.id)?1:0).join('');
+// The persisted list agrees with the screen: each group's entries contiguous, groups in
+// the order their graphs are shown, every shown entity persisted once — '' when so, else
+// what's wrong
+window.storeProblems=()=>{ const I=el.instance; const list=I.pconfig.entities.filter(e=>typeof e==='object');
+  const seq=[]; for(const e of list){ if(seq[seq.length-1]!==e.groupId) seq.push(e.groupId); }
+  if(new Set(seq).size!==seq.length) return 'group split in the list: '+seq.join(',');
+  const shown=[]; for(const g of I._allGraphsInDisplayOrder()){ if(shown[shown.length-1]!==g.groupId) shown.push(g.groupId); }
+  const listShown=seq.filter(id=>shown.includes(id));
+  if(listShown.join()!==shown.join()) return 'list order '+listShown.join(',')+' vs shown '+shown.join(',');
+  const ids=I.graphs.flatMap(g=>g.entities.map(e=>e.entity)); const dup=ids.find(id=>list.filter(e=>e.entity===id).length!==1);
+  return dup?'not persisted once: '+dup:''; };
+// What each dataset of graph gi holds: its label, point count, first and last time (ms)
+window.datasets=(gi)=>graphAt(gi).chart.data.datasets.map(d=>{ const xs=d.data.map(p=>p&&(p.x??p[0])).filter(x=>x!=null).map(x=>+new Date(x));
+  return { label:d.label, n:d.data.length, x0:xs.length?Math.min(...xs):null, x1:xs.length?Math.max(...xs):null }; });
+// The next file the card saves (FileSaver's saveAs), as text
+window.captureSave=()=>{ window.__saved=null; window.saveAs=(blob,name)=>blob.text().then(t=>{ window.__saved={name,text:t}; }); };
+window.tip=()=>{ const t=el.querySelector('#hec-label-tooltip')||document.getElementById('hec-label-tooltip'); return t?t.textContent:null; };
+window.menuOpen=()=>{ const m=el.querySelector('#et_0'); return m? getComputedStyle(m).display!=='none' && m.style.display!=='none' : null; };
+</script></body></html>

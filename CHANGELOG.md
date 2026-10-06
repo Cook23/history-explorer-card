@@ -4,6 +4,17 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.53] - 2026-10-06
+
+### Fixed — a right or middle click on a curve label leaves the curve as it is
+- A right click (or a middle click) on a curve label hid the curve, or showed it again: the card passed every click on a label to Chart.js as a left click
+
+### Fixed — Alt released, the samples go at once
+- Releasing Alt over a spot with no curve near the pointer left every sample of the curve drawn until the pointer found a curve again; and a graph of curves and bars lost its own hover (the nearest bar and point at the pointer's time) once Alt had been held over it
+
+### Added — the automated tests of the 1.1 line
+- `yarn test` runs the card in a real browser against a simulated Home Assistant, with a mouse and with fingers: gestures, menus, options, saving, the info panel, and the bugs fixed (see `tests/README.md`)
+
 ## [v1.1.52] - 2026-10-06
 
 ### Fixed — a curve dropped onto the first graph of a block of linked graphs

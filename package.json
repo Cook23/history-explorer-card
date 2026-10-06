@@ -1,18 +1,23 @@
 {
   "name": "history-explorer-card",
-  "version": "1.1.52",
+  "version": "1.1.53",
   "description": "A card for Home Assistant Lovelace for exploring the history of your entities interactively and in real time.",
   "main": "src/index.js",
   "repository": "https://github.com/Cook23/history-explorer-card",
   "author": "JC <joshua@coales.co.uk>",
-  "contributors": ["Thierry Couquillou <Cook23@users.noreply.github.com>"],
+  "contributors": [
+    "Thierry Couquillou <Cook23@users.noreply.github.com>"
+  ],
   "license": "MIT",
   "private": false,
   "scripts": {
     "build": "webpack --config webpack.config.js",
+    "test": "node tests/run.cjs",
     "postversion": "sed -i \"s/^const Version = '[^']*';/const Version = '$npm_package_version';/\" src/history-explorer-card.js && yarn build && git add history-explorer-card.js src/history-explorer-card.js"
   },
   "devDependencies": {
+    "acorn": "^8",
+    "playwright": "^1.63.0",
     "webpack": "^5.91.0",
     "webpack-cli": "^5.1.4"
   }
