@@ -1428,7 +1428,7 @@
     // Y-axis lock state — high-level default behavior, on by default (see
     // options.yAxisLockEnabled), fully owned by Chart.js: the lock icon itself,
     // its click (toggle lock on/off), automatic engagement on zoom/pan/longpress/
-    // dblclick (see _hecEngageYAxisLock below), disengaging the forced min/max so
+    // dblclick (see _hecSetYRanges below), disengaging the forced min/max so
     // the axis goes back to auto-computing from the data, AND syncing the
     // dedicated touch overlay's touch-action from that same lock/click-armed
     // state. Icon SVG/positioning matches the card's original

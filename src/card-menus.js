@@ -431,7 +431,7 @@ export class CardMenus
                 this.addGraph(_entity.entity, { color: _pcEntry?.color ?? _entity.color, before: _nextG, interval: _entity.interval, groupId: _origGroupId, entry: _pcEntry ?? _entity });
                 // Sync the freshly-computed fill (correct for the NEW type) back into
                 // pconfig.entities, so persistence stays consistent with what the next
-                // rebuild will read as overrideFill — no need to special-case fill at rebuild time
+                // rebuild will read as its fill — no need to special-case fill at rebuild time
                 if( _pcEntry ) {
                     const _updatedG = this.graphs.find(g => g.entities.some(e => e.entity === _entity.entity));
                     const _updatedEntity = _updatedG?.entities.find(e => e.entity === _entity.entity);

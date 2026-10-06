@@ -392,7 +392,7 @@ export class HistoryCardState {
                     const _saved = this.pconfig.combineSameUnits;
                     if( _isStaticGroup ) this.pconfig.combineSameUnits = true;
                     // _group.entities is sorted by graphIndex above — walk it in that order
-                    // and always pass targetGraph=null: addGraph's own combine logic
+                    // and always pass no `before`: addGraph's own combine logic
                     // (matched by groupId) merges compatible entities regardless, and any
                     // entity that can't combine simply becomes a new graph appended after
                     // whatever's been built so far — correct precisely because we're

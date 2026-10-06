@@ -148,6 +148,17 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── recordedEntitiesOnly: only the entities recorded in the last hour are listed ──
+    t = await openCard(card({ statistics: { enabled: false }, recordedEntitiesOnly: true, graphs: [] }), { mock: { series: true } });
+    await t.wait(800);
+    await t.step('recorded entities only: the last hour asked with its time zone, the entities found listed', async () => {
+        const r = await t.E(`(()=>{ const q=__ws.find(w=>w.type==='history/history_during_period' && !w.end);
+            return { start: q?.start ?? null, ago: q ? Date.now() - Date.parse(q.start) : null, listed: el.querySelectorAll('#es_0 a[data-entity]').length }; })()`);
+        // (an hour ago, give or take the time the card took to start)
+        return /([+-]\d\d:\d\d|Z)$/.test(r.start ?? '') && r.ago > 3500e3 && r.ago < 3700e3 && r.listed > 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {

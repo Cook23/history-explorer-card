@@ -99,5 +99,32 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A curve moved onto another graph where its color is taken ──
+    // (power's and tank's colors are set, power2's is the palette's first: the same one)
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', color: '#3e95cd' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power2' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank', color: '#3e95cd' }] },
+    ] }), { height: 1200, mock: { series: true } });
+    await t.wait(800);
+    const colorOf = id => t.E(`el.instance.graphs.flatMap(g=>g.entities).find(e=>e.entity==='${id}').color`);
+    const graphsOf = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+    const legendPtOf = id => t.E(`(()=>{ const all=el.instance._allGraphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
+        return legendPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
+    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance._allGraphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
+    const dragOnto = async (id, ontoId) => { await t.drag(await legendPtOf(id), await graphPtOf(ontoId)); await t.wait(800); };
+    await t.step('a curve whose color the card picked, dropped where that color is taken: a free color of the palette', async () => {
+        const before = await colorOf('sensor.power2');
+        await dragOnto('sensor.power2', 'sensor.power');
+        const r = { before, layout: await graphsOf(), power: await colorOf('sensor.power'), power2: await colorOf('sensor.power2') };
+        return before === '#3e95cd' && r.layout.startsWith('power+power2') && r.power === '#3e95cd' && r.power2 !== '#3e95cd' ? true : JSON.stringify(r);
+    });
+    await t.step('a curve whose color is set, dropped where that color is taken: it keeps it', async () => {
+        await dragOnto('sensor.tank', 'sensor.power');
+        const r = { layout: await graphsOf(), power: await colorOf('sensor.power'), tank: await colorOf('sensor.tank') };
+        return r.layout.startsWith('power+power2+tank') && r.power === '#3e95cd' && r.tank === '#3e95cd' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

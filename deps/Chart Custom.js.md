@@ -16,7 +16,7 @@ keeps only small changes to stock code, and the hooks calling into the HEC layer
 
 **Chart.js owns every mouse/touch interaction on its own canvas** (gesture
 detection, hit-testing, zones, cursors, `touch-action`, drag ghost, insertion
-markers, Y axis pan/zoom/lock, tooltips). **`history-explorer-card.js` owns
+markers, Y axis pan/zoom/lock, tooltips). **The card (`src/`) owns
 everything that has a meaning** (entities, groups, the shared time window,
 Home Assistant state, persistence, menus). They talk through four channels
 only:
@@ -346,7 +346,7 @@ you don't know yet whether it's a scroll or a chart interaction.
 ## 6. What stays deliberately private
 
 Every `_hec`-prefixed property or method is internal, those listed in §4 and §5
-included. `history-explorer-card.js` never reads or calls any of them: it reacts
+included. The card never reads or calls any of them: it reacts
 to `customEvent`, `panX` and `zoomX` (§1, §2), and writes the `options.*` fields
 of §1. To make a change visible right away (after changing `moveHandleVisible`,
 say), it calls the stock `chart.update()`, never `_hecUpdateDragTouchOverlays`
