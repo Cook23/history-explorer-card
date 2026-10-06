@@ -1,5 +1,5 @@
-// A graph's menu — a long-press or a right click on its lock+handle zone: its Y axis locked
-// or released, merged back, cut, deleted — and cut and paste: a curve or a graph put
+// A graph's menu — a long-press or a right click on its lock+handle zone: the display and
+// interpolation of all its curves, its Y axis locked or released, merged back, cut, deleted — and cut and paste: a curve or a graph put
 // elsewhere from the menus, as a drag would, the graphs' zones showing where it can go
 const { openCard } = require('./lib.cjs');
 
@@ -37,10 +37,10 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: the Y axis, its layout open', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display, interpolation, the Y axis, its layout open', async () => {
         await graphMenu('rain');
         const m = await menu();
-        return m === 'rain || Lock the Y axis | Layout ▸* || Cut' ? true : m;
+        return m === 'rain || Display ▸ | Interpolation ▸ | Lock the Y axis | Layout ▸* || Cut' ? true : m;
     });
     await t.step('Lock the Y axis: locked; the menu then offers to unlock it, which releases it', async () => {
         await click('ylock');
@@ -143,6 +143,74 @@ module.exports = async function()
         const m = await menu(); await click('gdelete');
         const r = { m, layout: await layout(), stored: await t.E(`el.instance.store.has('sensor.wind_rad')`) };
         return r.m.endsWith('Cut | Delete the graph') && !r.layout.includes('wind_rad') && !r.stored ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Display and Interpolation for all the curves of a graph ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'smart' }] },
+        { type: 'line', entities: [{ entity: 'sensor.rain', lineMode: 'smart' }, { entity: 'sensor.tank', lineMode: 'lines' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }, { entity: 'binary_sensor.b' }] }] }), { height: 1400, mock: { series: true } });
+    await t.wait(800);
+    // The graphs in display order: type, then each entity with its line mode and interpolation
+    const shown = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]+(e.lineMode?'/'+e.lineMode:'')+(e.interpolation?'/'+e.interpolation:'')).join('+')).join(' | ')`);
+    // The entries of submenu key shown, the marked one(s) with *
+    const subOf = key => t.E(`[...el.querySelectorAll('#et_0_${key}_sub a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+    const items = () => t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>a.textContent).join(' | ')`);
+    const closeAll = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1390); await t.wait(400); };
+    const pick = async (gIdx, key, id) => { await t.longPress(await t.E(`moPt(${gIdx})`)); await click(key); await click(id); };
+    await t.step('Display on a graph: every type, the one all its curves share marked', async () => {
+        await t.longPress(await t.E('moPt(0)')); await click('rep');
+        const v = await subOf('rep'); await closeAll();
+        return v === 'Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline' ? true : v;
+    });
+    await t.step('its submenus as everywhere: over the menu, right edges aligned, level with their item, the item in bold', async () => {
+        const r = [];
+        for( const k of ['rep', 'interp'] ) {
+            await t.longPress(await t.E('moPt(0)')); await click(k);
+            r.push(await t.E(`(()=>{ const q=s=>el.querySelector(s); const m=q('#et_0').getBoundingClientRect(), i=q('#et_0_${k}').getBoundingClientRect(), s=q('#et_0_${k}_sub').getBoundingClientRect();
+                const bold=[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.fontWeight==='bold').map(a=>a.id).join();
+                return Math.abs(s.right-m.right)<1 && Math.abs(s.top-i.top)<1 && s.left>=m.left && bold==='et_0_${k}' ? 'ok' : JSON.stringify({ m, i, s, bold }); })()`));
+            await closeAll();
+        }
+        return r.every(x => x === 'ok') ? true : r.join(' ; ');
+    });
+    await t.step('curves drawn differently: none marked', async () => {
+        await t.longPress(await t.E('moPt(1)')); await click('rep');
+        const v = await subOf('rep'); await closeAll();
+        return !v.includes('*') ? true : v;
+    });
+    await t.step('Straight: every curve of the graph straight, in its graph, saved with each', async () => {
+        await pick(0, 'rep', '0');
+        const r = { shown: await shown(), saved: await t.E(`['sensor.power','sensor.power2'].map(id=>el.instance.store.entry(id).lineMode).join()`) };
+        return r.shown.startsWith('line:power/lines+power2/lines | ') && r.saved === 'lines,lines' ? true : JSON.stringify(r);
+    });
+    await t.step('Bar: one bar graph of them, in its place', async () => {
+        await pick(0, 'rep', '3');
+        const v = await shown();
+        return /^bar:power[^+|]*\+power2[^|]* \| line:rain/.test(v) ? true : v;
+    });
+    await t.step('Timeline: one timeline of them, in its place', async () => {
+        await pick(0, 'rep', '5');
+        const v = await shown();
+        return /^timeline:power[^+|]*\+power2[^|]* \| line:rain/.test(v) ? true : v;
+    });
+    await t.step('Smart again: one graph of curves again', async () => {
+        await pick(0, 'rep', '6');
+        const v = await shown();
+        return /^line:power\/smart\+power2\/smart \| line:rain/.test(v) ? true : v;
+    });
+    await t.step('Interpolation on a graph: applied to its interpolated curves only, then marked', async () => {
+        await pick(1, 'interp', 'algo_steffen');
+        const v = await shown();
+        await t.longPress(await t.E('moPt(1)')); await click('interp');
+        const m = await subOf('interp'); await closeAll();
+        return / \| line:rain\/smart\/steffen\+tank\/lines \| /.test(v) && m.includes('Steffen*') ? true : v + ' ; ' + m;
+    });
+    await t.step('a graph of states: no Display, no Interpolation', async () => {
+        await t.longPress(await t.E('moPt(2)'));
+        const v = await items(); await closeAll();
+        return !/Display|Interpolation/.test(v) ? true : v;
     });
     done(await t.close());
 

@@ -85,6 +85,17 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A graph's display type, from its menu, kept ──
+    t = await openCard(YAML({ enable_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
+    await t.step('enable_persistence: a graph\'s display type chosen from its menu kept, for each of its entities', async () => {
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.showGraphMenu(0, g, 100, 100); I.entityTypeMenuClicked(0, 'bar', null); })()`);
+        await t.wait(1500);
+        await reload();
+        const b = [await entry('sensor.power'), await entry('sensor.power2')]; const s = [await shown('sensor.power'), await shown('sensor.power2')];
+        return b.every(x => x.type === 'bar') && s.every(x => x.type === 'bar' && x.graphs === 2) ? true : JSON.stringify({ b, s });
+    });
+    done(await t.close());
+
     // ── YAML entities, enable_multidevice_persistence ──
     t = await openCard(YAML({ enable_multidevice_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
     await t.step('enable_multidevice_persistence: another device gets every change', async () => {

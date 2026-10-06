@@ -26,7 +26,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
 > - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
 > - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
-> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
+> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
@@ -248,6 +248,7 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 ### The graph menu, cut and paste
 
 A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` (else the start of its curves' names) — the same zone where a click toggles the Y axis lock and a drag moves the graph:
+- **Display ▸** and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the type all of them share in bold);
 - **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock;
 - **Layout ▸** — *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 
