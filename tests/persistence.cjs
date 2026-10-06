@@ -85,14 +85,52 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── A graph's display type, from its menu, kept ──
-    t = await openCard(YAML({ enable_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
-    await t.step('enable_persistence: a graph\'s display type chosen from its menu kept, for each of its entities', async () => {
-        await t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.showGraphMenu(0, g, 100, 100); I.entityTypeMenuClicked(0, 'bar', null); })()`);
-        await t.wait(1500);
-        await reload();
-        const b = [await entry('sensor.power'), await entry('sensor.power2')]; const s = [await shown('sensor.power'), await shown('sensor.power2')];
-        return b.every(x => x.type === 'bar') && s.every(x => x.type === 'bar' && x.graphs === 2) ? true : JSON.stringify({ b, s });
+    // ── The graph menu: the same as the type menu of each of its entities ──
+    // (on the graph of sensor.power: Steffen for its curves, then bars)
+    const graphMenu = act => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.showGraphMenu(0, g, 100, 100); ${act} })()`);
+    const viaGraphMenu = async () => {
+        await graphMenu(`I.entityInterpolationClicked(0, 'steffen');`); await t.wait(500);
+        await graphMenu(`I.entityTypeMenuClicked(0, 'bar', null);`); await t.wait(1500);
+    };
+    const viaTypeMenus = async () => {
+        for( const id of ['sensor.power', 'sensor.power2'] ) await setInterp(id, 'steffen');
+        for( const id of ['sensor.power', 'sensor.power2'] ) await setType(id, 'bar', null);
+    };
+    const both = async () => [await entry('sensor.power'), await entry('sensor.power2')].map(e => [e.type, e.lineMode, e.interpolation].join('/')).join(' ');
+    // (bars saved with lineMode lines, as the type menu saves them)
+    const asBars = 'bar/lines/steffen bar/lines/steffen';
+    const asYaml = 'line/curves/ line/curves/';
+    for( const [name, extra] of [['no persistence', {}], ['enable_persistence', { enable_persistence: 'entities' }], ['enable_multidevice_persistence', { enable_multidevice_persistence: 'entities' }]] ) {
+        // What the type menus save, on this device and on another one
+        t = await openCard(YAML(extra), { mock: { series: true }, height: 1200 });
+        await viaTypeMenus(); await reload();
+        const typeMenus = { after: await both() };
+        await newDevice(); typeMenus.other = await both();
+        done(await t.close());
+        t = await openCard(YAML(extra), { mock: { series: true }, height: 1200 });
+        await t.step(`${name}: the graph menu changes and saves what the type menu of each of its entities does`, async () => {
+            await viaGraphMenu(); const now = await both(); const g = (await shown('sensor.power')).graphs;
+            await reload(); const after = await both(); const s = [await shown('sensor.power'), await shown('sensor.power2')];
+            await newDevice(); const other = await both();
+            const kept = name !== 'no persistence';
+            const ok = now === asBars && g === 2 && after === typeMenus.after && other === typeMenus.other
+                && after === ( kept ? asBars : asYaml ) && other === ( name === 'enable_multidevice_persistence' ? asBars : asYaml )
+                && ( !kept || s.every(x => x.type === 'bar' && x.interpolation === 'steffen' && x.graphs === 2) );
+            return ok ? true : JSON.stringify({ now, g, after, s, other, typeMenus });
+        });
+        done(await t.close());
+    }
+
+    // ── The graph menu on entities added from the card (combined in one graph): kept, the graph one graph ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true, graphs: [] }, { mock: { series: true }, height: 1200 });
+    await t.step('entities added from the card: a graph made a timeline from its menu, one timeline after a reload and on another device', async () => {
+        await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.power_kw'] ) I._createAndPersistEntity(id, 'line', 'smart'); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+        await t.wait(2000);
+        const look = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+        const before = await look();
+        await graphMenu(`I.entityTypeMenuClicked(0, 'timeline', null);`); await t.wait(1500);
+        const now = await look(); await reload(); const after = await look(); await newDevice(); const other = await look();
+        return before === 'line:power+power_kw' && now === 'timeline:power+power_kw' && after === now && other === now ? true : JSON.stringify({ before, now, after, other });
     });
     done(await t.close());
 
