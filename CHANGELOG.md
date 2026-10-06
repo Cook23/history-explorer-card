@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.7b4] - unreleased
+## [v1.2.7] - 2026-10-06
 
 ### New — an entity's attributes as curves
 - `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named after the entity and the attribute; `unit:` gives it a unit (Home Assistant gives none)
