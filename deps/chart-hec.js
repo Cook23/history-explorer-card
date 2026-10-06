@@ -331,6 +331,9 @@
   // ---------------------------------------------------------------------------
   var hecUi = Chart.hecUi = {
 
+    // How long a floating element takes to fade out (its CSS opacity transition)
+    FADE: 1000,
+
     // How long a message stays up: 1 s, plus 0.5 s per word (isWord; words split on
     // spaces and underscores — entity ids read as words).
     readingTime: function (text) {
@@ -408,21 +411,24 @@
       hecUi.startFade(el, duration);
     },
 
-    // Fades el out after duration, then closes it.
+    // Fades el out after duration — calling el._hecOnFade then, if its owner set one, for
+    // what must go with it — then closes it.
     startFade: function (el, duration) {
       clearTimeout(el._hecFadeTimer);
       clearTimeout(el._hecRemoveTimer);
-      el._hecFadeTimer = setTimeout(function () { el.style.opacity = '0'; }, duration);
-      el._hecRemoveTimer = setTimeout(function () { hecUi.closeFloating(el); }, duration + 1000);
+      el._hecFadeTimer = setTimeout(function () {
+        el.style.opacity = '0';
+        if (typeof el._hecOnFade === 'function') el._hecOnFade();
+      }, duration);
+      el._hecRemoveTimer = setTimeout(function () { hecUi.closeFloating(el); }, duration + hecUi.FADE);
     },
 
-    // Removes el and its observer, then calls el._hecOnClose if its owner set one.
+    // Removes el and its observer.
     closeFloating: function (el) {
       clearTimeout(el._hecFadeTimer);
       clearTimeout(el._hecRemoveTimer);
       if (el._hecObserver) el._hecObserver.disconnect();
       if (el.parentNode) el.remove();
-      if (typeof el._hecOnClose === 'function') el._hecOnClose();
     },
 
     // A short text message near a point — a refused drop, an entity already added, a
@@ -1802,6 +1808,22 @@
       return !!_r && x >= _r.left && x <= _r.left + _r.width && y >= _r.top && y <= _r.top + _r.height;
     },
 
+    // Ends the hover: the highlighted points go back to their normal look, fading as the
+    // tooltip does (Chart.hecUi.FADE), and the tooltip closes — when the tooltip fades out
+    // by itself. A move or a contact on a point opens them again, as before.
+    _hecEndHover: function () {
+      var me = this;
+      if (!me.active || !me.active.length) return;
+      me.updateHoverStyle(me.active, me.options.hover.mode, false);
+      me.active = [];
+      me.lastActive = [];
+      if (me.tooltip) {
+        me.tooltip._active = [];
+        me.tooltip.update(true);
+      }
+      me.render({ duration: Chart.hecUi.FADE, lazy: true });
+    },
+
     // The zone of this chart a canvas-relative point is in — the payload's `zone`
     // (Chart Custom.js.md §2), so the card never reads this chart's layout itself:
     // 'linkMarker', 'lockAndHandle', 'legend' (its band, whole width), 'yAxis' (left of
@@ -2194,29 +2216,32 @@
   // ── The hover tooltip, shown as a floating element (methods added to Chart.Tooltip) ──
 
   helpers.extend(Chart.Tooltip.prototype, {
-    _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onClose) {
+    _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onFade) {
       var me = this;
       var _el = this._hecHoverTooltipEl;
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';
-        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity 1s ease;opacity:0;';
+        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
         this._hecHoverTooltipEl = _el;
       }
-      _el._hecOnClose = onClose;
+      _el._hecOnFade = onFade;
       Chart.hecUi.attachFloating(_el, anchorEl);
       _el.style.background = backgroundColor;
       _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
       _el.style.color = textColor;
       _el.style.padding = '4px 8px';
 
+      // (read before content goes in — a fragment is emptied once appended —, one row
+      // after the other: their texts would run into each other)
+      var _readingTime = Chart.hecUi.readingTime(typeof content === 'string' ? content
+        : content ? Array.prototype.map.call(content.childNodes, function (n) { return n.textContent; }).join(' ') : '');
       _el.innerHTML = '';
       if (typeof content === 'string') {
         _el.appendChild(document.createTextNode(content));
       } else if (content) {
         _el.appendChild(content);
       }
-      var _readingTime = Chart.hecUi.readingTime(typeof content === 'string' ? content : (content ? content.textContent : ''));
 
       if (caret) {
         var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
@@ -2319,14 +2344,8 @@
         _vm.backgroundColor, _vm.borderColor, _vm.bodyFontColor,
         { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth },
         _justMoved,
-        function () {
-          // This tooltip's own early-close side effect: turn off whatever point
-          // is still highlighted as active when the tooltip itself goes away.
-          if (_chart.active && _chart.active.length) {
-            _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
-            _chart.active = [];
-          }
-        }
+        // (as it fades out, the highlighted point fades out with it)
+        function () { _chart._hecEndHover(); }
       );
     }
   });

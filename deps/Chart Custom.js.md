@@ -386,13 +386,14 @@ is passed in).
 
 | Function | Behavior |
 |---|---|
+| `FADE` | How long a floating element takes to fade out — the hover tooltip's, and its highlighted points' with it. |
 | `readingTime(text)` | How long a message stays up: 1 s + 0.5 s per word (`isWord`; words split on spaces and underscores). |
 | `isWord(token)` | Is a piece of text a word: two letters or digits at least — not a single letter, a punctuation mark or a symbol on its own. The card counts words with it too (the graph menu's title). |
 | `clampToViewport(el, boundsEl)` | Nudges an already-positioned element back inside: left/right/top within the most restrictive of `boundsEl` and the viewport, bottom within the viewport only; `boundsEl` null = viewport only. |
 | `attachFloating(el, anchorEl)` | Places `el` against `anchorEl`'s `offsetParent` (absolute), or `document.body` (fixed) when there's none, so it scrolls with its anchor; closes it by itself (`closeFloating`) when the anchor disappears or is hidden. |
 | `armAutoFade(el, duration[, justMoved])` | (Re)shows `el`, fading in, then fades it out after `duration` and closes it. With a third argument, only does so when `justMoved === true` (a render that follows a real pointer gesture, not a data refresh under a still pointer). |
-| `startFade(el, duration)` | Fades `el` out after `duration`, then closes it. |
-| `closeFloating(el)` | Removes `el` and its observer, then calls `el._hecOnClose` if its owner set one. |
+| `startFade(el, duration)` | Fades `el` out after `duration` — calling `el._hecOnFade` then, if its owner set one, for what must go with it —, then closes it. The hover tooltip's owner, its chart, ends the hover there: its highlighted points fade back to their normal look over `FADE`. |
+| `closeFloating(el)` | Removes `el` and its observer. |
 | `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added, truncated label's full text): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`. |
 | `closeMessage(anchorEl)` | Closes the message of `anchorEl`'s document or shadow root. |
 | `outline(el, valid)` / `clearOutline(el[, immediate])` | Outlines a graph's wrapper — solid primary color when valid, dashed error color otherwise (that one fades out when cleared). |

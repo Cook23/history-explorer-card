@@ -4623,7 +4623,7 @@
 
               // We only need to render at this point. Updating will cause scales to be
               // recomputed generating flicker & using more memory than necessary.
-              me.render(me.options.hover.animationDuration, true);
+              me.render(me._hecHoverEnded ? Chart.hecUi.FADE : me.options.hover.animationDuration, true);
             }
 
             me._bufferedRender = false;
@@ -4773,6 +4773,9 @@
             }
 
             changed = !helpers.arrayEquals(me.active, me.lastActive);
+            // (fork) nothing left active: the points fade back to their normal look as
+            // the tooltip fades out (see eventHandler)
+            me._hecHoverEnded = changed && !me.active.length;
 
             // Remember Last Actives
             me.lastActive = me.active;
