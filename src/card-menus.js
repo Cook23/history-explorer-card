@@ -242,7 +242,7 @@ export class CardMenus
 
         const _titleEl = q('title');
         if( _titleEl ) {
-            _titleEl.textContent = graph.entities.map(e => e.name ?? this._hass.states[e.entity]?.attributes?.friendly_name ?? e.entity).join(', ');
+            _titleEl.textContent = this._graphMenuTitle(graph);
             _titleEl.style.border = '';
             _titleEl.style.borderBottom = '1px solid #444';
         }
@@ -251,6 +251,19 @@ export class CardMenus
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
         this.showTypeSubmenu(input_idx, 'layout');
+    }
+
+    // A graph's name at the top of its menu: its title, else the start of its curves' names
+    // — their first two words, '...' when cut — each start once
+    _graphMenuTitle(graph)
+    {
+        const _title = this.pconfig.graphs[graph.groupId]?.title;
+        if( _title ) return _title;
+        const _starts = graph.entities.map(e => {
+            const _words = String(e.name ?? this._hass.states[e.entity]?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
+            return _words.slice(0, 2).join(' ') + ( _words.length > 2 ? '...' : '' );
+        });
+        return [...new Set(_starts)].join(', ');
     }
 
     // The graph menu's Y axis entry: the graph's Y axes locked or released

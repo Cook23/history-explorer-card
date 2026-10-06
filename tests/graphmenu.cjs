@@ -125,6 +125,27 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The menu's title: the graph's title, else the start of its curves' names ──
+    const METEO = 'Météo-France forecast for city Villeveyrac - Languedoc-Roussillon (34) - FR Villeveyrac Temperature';
+    t = await openCard(card({ graphs: [
+        { type: 'line', title: 'Outside', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', entities: [{ entity: 'sensor.rain', name: METEO }, { entity: 'sensor.tank', name: METEO + ' (Filtered)' },
+            { entity: 'sensor.power_kw', name: 'GW2000A-WIFI7FFF Température extérieure (Filtered)' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power2', name: 'Salon' }, { entity: 'sensor.watering_cycle', name: 'Cuisine sud' }] }] }), { height: 1200, mock: { series: true } });
+    await t.wait(800);
+    const title = async i => { await t.longPress(await t.E(`moPt(${i})`)); const v = await t.E(`el.querySelector('#et_0_title').textContent`);
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1190); await t.wait(400); return v; };
+    await t.step('the menu\'s title: the graph\'s title when it has one', async () => {
+        const v = await title(0); return v === 'Outside' ? true : v;
+    });
+    await t.step('else the first two words of each curve\'s name, \'...\' when cut, each start once', async () => {
+        const v = await title(1); return v === 'Météo-France forecast..., GW2000A-WIFI7FFF Température...' ? true : v;
+    });
+    await t.step('short names whole', async () => {
+        const v = await title(2); return v === 'Salon, Cuisine sud' ? true : v;
+    });
+    done(await t.close());
+
     // ── Touch: a long-press on the zone opens the graph's menu ──
     t = await openCard(card({ graphs: GRAPHS }), { touch: true, height: 1600, scrollRoom: 1500, mock: { series: true } });
     await t.wait(800);

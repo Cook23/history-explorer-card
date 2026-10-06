@@ -247,7 +247,7 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 
 ### The graph menu, cut and paste
 
-A long-press (or a right click) on the ⠿ zone of a graph opens its menu — the same zone where a click toggles the Y axis lock and a drag moves the graph:
+A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` (else the start of its curves' names) — the same zone where a click toggles the Y axis lock and a drag moves the graph:
 - **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock;
 - **Layout ▸** — *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 

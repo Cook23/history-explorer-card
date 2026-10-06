@@ -309,7 +309,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 
 #### The graph menu, cut and paste
 
-**(1.2)** A long-press (or a right click) on the ⠿ zone of a graph opens its menu. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
+**(1.2)** A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` — or, without one, with the first two words of each curve's name, each start once. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
 - **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock (not on a timeline or arrowline graph, which have no lock);
 - **Layout ▸** — open with the menu: *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
 

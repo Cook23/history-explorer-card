@@ -4,6 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.7b1] - unreleased
+
+### Changed — a short title for the graph menu
+- The graph menu's title is the graph's `title`; without one, the first two words of each curve's name ('...' when the name goes on), each start once — instead of every curve's full name, which could make it very long
+
 ## [v1.2.6] - 2026-10-06
 
 ### New — a graph's menu, cut and paste
