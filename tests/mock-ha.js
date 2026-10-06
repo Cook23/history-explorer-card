@@ -40,8 +40,15 @@ const STATES={
  'sensor.clim_mode':ent('sensor.clim_mode','clim mode',null,'hot'),
  // attributes shown as curves: a number, a text, and what is never offered (a list, HA's own)
  'climate.salon':ent('climate.salon','salon',null,'heat'),
+ // a weather entity as Home Assistant gives one: its attributes' units in X_unit attributes
+ 'weather.villeveyrac':ent('weather.villeveyrac','Villeveyrac',null,'rainy'),
+ // a light: its brightness from 0 to 255, shown by Home Assistant in %
+ 'light.salon':ent('light.salon','salon light',null,'on'),
 };
-Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, hvac_action: 'heating', humidity: '45 %', led_color: 'green', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, apparent_temperature: 21, hvac_action: 'heating', humidity: '45 %', led_color: 'green', visibility_unit: 'km', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['light.salon'].attributes, { brightness: 128, color_temp_kelvin: 3000, color_mode: 'color_temp', supported_color_modes: ['color_temp'] });
+Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, apparent_temperature: 29, temperature_unit: '°C', humidity: 85, pressure: 1016.4, pressure_unit: 'hPa',
+    wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3 });
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
@@ -95,7 +102,7 @@ function statistics(d){
   return r;
 }
 function mkHass(){ return {
-  states:{...STATES}, config:{version:'2026.7.4'}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...STATES}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   user:{id:'u1',name:'u'}, localize:(k)=>k,
   callWS:(d)=>{

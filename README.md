@@ -139,7 +139,7 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 Clicking an entry in the dropdown adds it directly — no separate button required.
 
-For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value; ← or Escape goes back to the list.
+For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value (an attribute `X_unit`, a unit, isn't listed); ← or Escape goes back to the list.
 
 Right after the selection (click or second Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
@@ -753,7 +753,7 @@ graphs:
         color: black
 ```
 
-An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Home Assistant keeps only its history (no long-term statistics); `unit:` sets its unit when its value doesn't give it:
+An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Its unit: the one its value holds, else the one Home Assistant shows it in (a thermostat's temperatures in your temperature unit, a light's `brightness` in % — converted from 0–255, a weather entity's `wind_gust_speed` in its `wind_speed_unit`), else, for other integrations, an attribute `X_unit` holding the unit of every attribute with `X` in its name — else `unit:`. Home Assistant keeps only its history (no long-term statistics):
 ```yaml
       - entity: climate.salon
         attribute: current_temperature

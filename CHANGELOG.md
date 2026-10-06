@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.10] - 2026-10-06
+
+### New — an attribute's unit, as Home Assistant shows it
+- An attribute is now in the unit Home Assistant shows it in, from its frontend's tables:
+  - on a weather entity: `temperature_unit` for `temperature`, `apparent_temperature`, `dew_point` and `templow`; `wind_speed_unit` for `wind_speed` and `wind_gust_speed`; `pressure_unit`, `visibility_unit` and `precipitation_unit` for their own; `%` for `humidity`, `cloud_coverage` and `precipitation_probability`
+  - on any other entity, the temperatures (`temperature`, `current_temperature`, `target_temp_high`, `target_temp_low`, `min_temp`, `max_temp`…) in the temperature unit of Home Assistant — a thermostat's had none
+  - by domain: a climate's or a humidifier's humidities, a cover's or a valve's position, a fan's `percentage`, a sensor's `battery_level` in %; a light's color temperature in K or mired; the sun's `azimuth` and `elevation` in °
+- A light's `brightness` (0–255) and a media player's `volume_level` (0–1) are converted into %, as Home Assistant shows them: the curve, the selector and the tooltip
+- Otherwise, as some integrations give them, an attribute `X_unit` is the unit of every attribute with `X` in its name, the longest `X` when several match
+- The value's own unit (`45 %`) and `unit:` still win; the entity selector's submenu shows the unit after the value (`Wind gust speed (0 km/h)`)
+- An attribute `X_unit` is a unit: never offered in the submenu, even when no attribute goes with it (`visibility_unit`, `precipitation_unit`); nor are `access_token` and `token`
+- Tests: a weather entity and a light as Home Assistant gives them; a thermostat without a temperature unit
+
 ## [v1.2.9] - 2026-10-06
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
