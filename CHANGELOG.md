@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.10b2] - unreleased
+## [v1.2.10] - 2026-10-06
 
 ### New — an attribute's unit, as Home Assistant shows it
 - An attribute is now in the unit Home Assistant shows it in, from its frontend's tables:
