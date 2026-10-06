@@ -753,7 +753,7 @@ graphs:
         color: black
 ```
 
-An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Its unit: the one its value holds, else the one its entity gives it — on a weather entity, the one Home Assistant shows it in (`wind_speed_unit` for `wind_gust_speed`, `%` for `humidity`); otherwise an attribute `X_unit` is the unit of every attribute with `X` in its name (`temperature_unit` for `temperature` and `apparent_temperature`) — else `unit:`. Home Assistant keeps only its history (no long-term statistics):
+An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Its unit: the one its value holds, else the one Home Assistant shows it in (a thermostat's temperatures in your temperature unit, a light's `brightness` in % — converted from 0–255, a weather entity's `wind_gust_speed` in its `wind_speed_unit`), else, for other integrations, an attribute `X_unit` holding the unit of every attribute with `X` in its name — else `unit:`. Home Assistant keeps only its history (no long-term statistics):
 ```yaml
       - entity: climate.salon
         attribute: current_temperature

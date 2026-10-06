@@ -24,6 +24,8 @@ export const HA_ATTRIBUTES = [
     "state_class",
     "supported_features",
     "unit_of_measurement",
+    "access_token",
+    "token",
 ];
 
 // Series id → { entity, attribute (null for the entity's state) }
@@ -79,17 +81,60 @@ const WEATHER_UNITS = { temperature: 'temperature', apparent_temperature: 'tempe
                         visibility: 'visibility', precipitation: 'precipitation',
                         humidity: { unit: '%' }, cloud_coverage: { unit: '%' }, precipitation_probability: { unit: '%' } };
 
-// The unit entity s gives attribute: for a weather entity, Home Assistant's (WEATHER_UNITS);
-// else the X_unit of the longest X its name contains (see _unitsOf); or undefined — a unit
-// has none
-export function attributeUnitOf(s, attribute)
+// The units Home Assistant knows an entity's attributes are in, by domain (its frontend's
+// DOMAIN_ATTRIBUTES_UNITS) — with the factor turning the value into it when it isn't
+// (a light's brightness, 0 to 255; a media player's volume, 0 to 1)
+const DOMAIN_UNITS = {
+    climate: { humidity: '%', current_humidity: '%', target_humidity_low: '%', target_humidity_high: '%', target_humidity_step: '%', min_humidity: '%', max_humidity: '%' },
+    cover: { current_position: '%', current_tilt_position: '%' },
+    fan: { percentage: '%' },
+    humidifier: { humidity: '%', current_humidity: '%', min_humidity: '%', max_humidity: '%', target_humidity_step: '%' },
+    light: { color_temp: 'mired', max_mireds: 'mired', min_mireds: 'mired', color_temp_kelvin: 'K', min_color_temp_kelvin: 'K', max_color_temp_kelvin: 'K',
+             brightness: { unit: '%', factor: 100 / 255 } },
+    sun: { azimuth: '°', elevation: '°' },
+    valve: { current_position: '%' },
+    sensor: { battery_level: '%' },
+    media_player: { volume_level: { unit: '%', factor: 100 } },
+};
+
+// The attributes Home Assistant shows in its temperature unit, outside a weather entity
+// (its frontend's TEMPERATURE_ATTRIBUTES)
+const TEMPERATURE_ATTRIBUTES = ['temperature', 'current_temperature', 'target_temperature', 'target_temp_temp', 'target_temp_high',
+                                'target_temp_low', 'target_temp_step', 'min_temp', 'max_temp'];
+
+// What Home Assistant knows of attribute of entity (in DOMAIN_UNITS): { unit, factor }, or undefined
+function _domainUnit(entity, attribute)
+{
+    const _u = DOMAIN_UNITS[entity.split('.')[0]]?.[attribute];
+    return typeof _u === 'string' ? { unit: _u, factor: 1 } : _u;
+}
+
+// The unit entity s gives attribute, as Home Assistant shows it: for a weather entity, its
+// weather table (WEATHER_UNITS); else its table by domain (DOMAIN_UNITS), or for a
+// temperature, the temperature unit of hass (its unit system); else, as some integrations
+// give them, the X_unit of the longest X its name contains (see _unitsOf); or undefined —
+// a unit has none
+function attributeUnitOf(hass, s, attribute)
 {
     const _units = _unitsOf(s?.attributes);
     if( attribute.endsWith('_unit') ) return undefined;
-    const _w = s?.entity_id?.startsWith('weather.') ? WEATHER_UNITS[attribute] : undefined;
-    if( _w ) return _w.unit ?? _units[_w];
+    if( s.entity_id.startsWith('weather.') && WEATHER_UNITS[attribute] ) return WEATHER_UNITS[attribute].unit ?? _units[WEATHER_UNITS[attribute]];
+    if( !s.entity_id.startsWith('weather.') ) {
+        const _d = _domainUnit(s.entity_id, attribute);
+        if( _d ) return _d.unit;
+        if( TEMPERATURE_ATTRIBUTES.includes(attribute) && hass?.config?.unit_system?.temperature ) return hass.config.unit_system.temperature;
+    }
     const _x = Object.keys(_units).filter(x => attribute.includes(x)).sort((a, b) => b.length - a.length)[0];
     return _x !== undefined ? _units[_x] : undefined;
+}
+
+// The value of attribute of entity as a series' (see attributeValue), in the unit Home
+// Assistant shows it in (a light's brightness in %: see DOMAIN_UNITS)
+function _seriesValue(entity, attribute, v)
+{
+    const _r = attributeValue(v);
+    const _f = _domainUnit(entity, attribute)?.factor ?? 1;
+    return _f !== 1 && typeof _r.value === 'number' ? { ..._r, value: _r.value * _f } : _r;
 }
 
 // The attributes of state s that can be shown as a series: a number, a text or a yes/no —
@@ -101,20 +146,20 @@ export function seriesAttributes(s)
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:
-// its value as the state (see attributeValue), its entity's last update as its last
-// change, its entity's name and its own as its name ("salon : Current temperature" — the
-// colon tells an attribute from an entity), the unit its value gives, else the one its
-// entity gives it (attributeUnitOf: an X_unit — never the entity's own unit),
-// a number taken as a measurement (shown as a curve, as an entity measuring
-// something); undefined when there's no such entity or attribute
+// its value as the state (see _seriesValue: in the unit Home Assistant shows it in), its
+// entity's last update as its last change, its entity's name and its own as its name
+// ("salon : Current temperature" — the colon tells an attribute from an entity), the unit
+// its value gives, else the one Home Assistant shows it in (attributeUnitOf — never the
+// entity's own unit), a number taken as a measurement (shown as a curve, as an entity
+// measuring something); undefined when there's no such entity or attribute
 export function seriesState(hass, id)
 {
     const { entity, attribute } = seriesOf(id);
     const _s = hass?.states[entity];
     if( !attribute || !_s ) return attribute ? undefined : _s;
     if( !_s.attributes || !( attribute in _s.attributes ) ) return undefined;
-    const { value: _v, unit: _valueUnit } = attributeValue(_s.attributes[attribute]);
-    const _unit = _valueUnit ?? attributeUnitOf(_s, attribute);
+    const { value: _v, unit: _valueUnit } = _seriesValue(entity, attribute, _s.attributes[attribute]);
+    const _unit = _valueUnit ?? attributeUnitOf(hass, _s, attribute);
     return { entity_id: id, state: _v === null ? 'unknown' : String(_v), last_changed: _s.last_updated, last_updated: _s.last_updated,
              attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' : ' + attributeLabel(attribute),
                            ...( _unit ? { unit_of_measurement: _unit } : {} ),
@@ -123,7 +168,7 @@ export function seriesState(hass, id)
 
 // The history of attribute series ids, from their entities' history with its attributes
 // (Home Assistant's compressed rows: s the state, a the attributes, lu the last update) —
-// each series by id, one row per change of its value
+// each series by id, one row per change of its value (see _seriesValue)
 export function attributeHistories(ids, entityHistories)
 {
     const r = {};
@@ -132,7 +177,7 @@ export function attributeHistories(ids, entityHistories)
         const _rows = [];
         for( const x of entityHistories[entity] ?? [] ) {
             if( !x.a || !( attribute in x.a ) ) continue;
-            const _v = attributeValue(x.a[attribute]).value;
+            const _v = _seriesValue(entity, attribute, x.a[attribute]).value;
             if( _rows.length && _rows[_rows.length - 1].s === _v ) continue;
             _rows.push({ s: _v, lu: x.lu });
         }

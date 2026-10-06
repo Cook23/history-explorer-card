@@ -20,7 +20,7 @@ module.exports = async function()
         const v = await shown(t);
         return /^line:climate\.salon\.current_temperature#(\d+)\+climate\.salon\.temperature#\d+ \| timeline:climate\.salon#\d+\+climate\.salon\.hvac_action#\d+$/.test(v) && Number(v.match(/current_temperature#(\d+)/)[1]) > 100 ? true : v;
     });
-    await t.step('named after the entity, a colon and the attribute, with its unit — set, or given by the entity (temperature_unit) — the attribute after the entity id the same', async () => {
+    await t.step('named after the entity, a colon and the attribute, with its unit — set, or the one Home Assistant shows a temperature in (its unit system) — the attribute after the entity id the same', async () => {
         const v = await t.E(`el.instance.graphs[0].chart.data.datasets.map(d=>d.name+' / '+d.unit).join(', ')`);
         return v === 'salon : Current temperature / °C, salon : Temperature / °C' ? true : v;
     });
@@ -34,11 +34,15 @@ module.exports = async function()
     t = await openCard(card({ graphs: [
         { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'humidity' },
             { entity: 'climate.salon', attribute: 'current_temperature', color: { entity: 'climate.salon', attribute: 'hvac_action', heating: 'red', idle: 'blue' } },
-            { entity: 'sensor.power', color: 'climate.salon.led_color' }] }] }), { mock: { series: true }, height: 900 });
+            { entity: 'sensor.power', color: 'climate.salon.led_color' }, { entity: 'light.salon', attribute: 'brightness' }] }] }), { mock: { series: true }, height: 900 });
     await t.wait(1500);
     await t.step('an attribute "45.2 %": the number, in its unit — a curve', async () => {
         const r = await t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0]; return { unit: d.unit, n: d.data.length, y: d.data.slice(0,3).map(p=>typeof p.y) }; })()`);
         return r.unit === '%' && r.n > 100 && r.y.every(x => x === 'number') ? true : JSON.stringify(r);
+    });
+    await t.step('a light\'s brightness, 0 to 255, in % as Home Assistant shows it', async () => {
+        const r = await t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[3]; return { unit: d.unit, y: d.data[d.data.length-1].y }; })()`);
+        return r.unit === '%' && Math.abs(r.y - 128 / 2.55) < 0.01 ? true : JSON.stringify(r);
     });
     await t.step('color from an attribute: thresholds on it (red heating, blue idle along the curve), or the color it holds', async () => {
         const r = await t.E(`(()=>{ const ds=el.instance.graphs[0].chart.data.datasets;
@@ -66,10 +70,10 @@ module.exports = async function()
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };
-    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, nor a unit (X_unit: temperature_unit, of every attribute with temperature in its name; visibility_unit, even with no visibility)', async () => {
+    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, nor a unit (X_unit: visibility_unit, even with no visibility); a temperature in Home Assistant\'s unit system', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
-        return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21 °C) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
+        return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
     });
     await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %), no X_unit offered', async () => {
         await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
