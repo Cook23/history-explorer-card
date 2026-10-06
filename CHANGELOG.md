@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.9] - 2026-10-06
+## [v1.2.8] - unreleased
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
 - `showState`: each curve's value now, in large, in its color, over the graph; `showStats`: its `min`, `average` and `max` over the window shown, the min and max with their time — from its history, the average weighted by time, recomputed as the window moves. At every level (card, entityOptions, graph, entity)
@@ -14,7 +14,6 @@ Changelog for the HA History Explorer Card.
 ### Fixed — a default fill on a curve with its own color
 - A curve given its own `color` ignored the `fill` set on the card, its graph or in entityOptions (it was always left transparent); it takes it now, unless it sets its own
 
-## [v1.2.8] - 2026-10-06
 
 ### New — the same curve in several graphs
 - In the YAML, the same entity (or attribute) in several graphs is a curve in each, each with its own options, saved on its own; twice in one graph, shown once (a warning in the console) — before, it was dropped silently, and a graph left empty disappeared
@@ -26,7 +25,6 @@ Changelog for the HA History Explorer Card.
 - An attribute holding a number followed by a text that isn't one (`45.2 %`) is that number, in that unit
 - `color` can read an attribute: thresholds with `entity` and `attribute`, or an attribute holding the color (`color: climate.salon.led_color`)
 
-## [v1.2.7] - 2026-10-06
 
 ### New — an entity's attributes as curves
 - `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named after the entity and the attribute; `unit:` gives it a unit (Home Assistant gives none)
