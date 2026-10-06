@@ -507,6 +507,15 @@ graphs:
           default: grey                # any other mode (off, fan...)
       - entity: sensor.living_room_temperature
         color: sensor.heating_color    # an entity holding the color itself
+      - entity: climate.salon          # (1.2) an attribute: thresholds on it,
+        attribute: current_temperature
+        color:
+          entity: climate.salon
+          attribute: hvac_action
+          heating: red
+          idle: blue
+      - entity: sensor.salon_humidity
+        color: climate.salon.led_color # or an attribute holding the color itself
 ```
 
 The color held by an entity can be set by a template sensor, for instance from the heating's mode:
