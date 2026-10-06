@@ -16,8 +16,21 @@ module.exports = async function()
                  stats: [...el2.querySelectorAll('.hec-stats')].map(r=>r.dataset.entity.split('.')[1]+':'+[...r.querySelectorAll('.hec-stat')].map(c=>c.dataset.stat+'='+c.children[1].textContent).join(',')) }; })()`);
     const num = (s, k) => Number((s.match(new RegExp(k + '=(-?[\\d.]+)')) || [])[1]);
 
+    // ── The Y labels drawn (by default, beside the plot) ──
+    // (the pixels drawn where the labels go, right beside the plot of graph 0 — not the
+    // unit's title, further left)
+    const labelInk = t => t.E(`(()=>{ const c=el.instance.graphs[0].chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
+        const d=c.ctx.getImageData((a.left-35)*r, a.top*r, 30*r, (a.bottom-a.top)*r).data; let n=0; for(let i=3;i<d.length;i+=4) if(d[i]>0) n++; return n; })()`);
+    let t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('by default the Y labels are drawn beside the plot', async () => {
+        const n = await labelInk(t);
+        return n > 50 ? true : 'pixels drawn in the label area: ' + n;
+    });
+    done(await t.close());
+
     // ── showState, showStats at every level ──
-    let t = await openCard(card({ showState: true, graphs: [
+    t = await openCard(card({ showState: true, graphs: [
         { type: 'line', showStats: ['min', 'max'], entities: [{ entity: 'sensor.rain' }, { entity: 'sensor.power', showStats: true }, { entity: 'sensor.power2', showStats: false, showState: false }] },
         { type: 'line', entities: [{ entity: 'sensor.tank' }] }] }), { mock: { series: true }, height: 1100 });
     await t.wait(1500);

@@ -4,6 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.9b1] - unreleased
+
+### Fixed — the Y axis labels drawn again
+- 1.2.8 drew no Y axis labels (the values beside the plot): the option added for `yLabels: inside` replaced Chart.js' own spacing of the labels even when not inside
+
 ## [v1.2.8] - 2026-10-06
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
