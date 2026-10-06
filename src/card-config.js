@@ -349,6 +349,21 @@ export class CardConfig
                 ..._gopts });
             const _interval = this.parseIntervalConfig(_opts.interval) ?? null;
 
+            // A curve once per graph; in another graph, a second curve of the same series
+            // (its copy number — see keyOf)
+            const _inGraph = new Set();
+            const _addStatic = (id, ent) => {
+                if( _inGraph.has(id) ) {
+                    console.warn(`history-explorer-card: '${id}' is twice in graph '${graph.title ?? graph.type ?? '?'}' — shown once`);
+                    return;
+                }
+                _inGraph.add(id);
+                const _entry = this._makeStaticEntityEntry(id, _groupId, ent, _interval);
+                const _copy = this.store.newCopy(id);
+                if( _copy ) _entry.copy = _copy;
+                this.store.add(_entry);
+            };
+
             for( let e of graph.entities ) {
                 if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
                     console.warn(`history-explorer-card: skipping invalid entity entry in graph '${graph.title ?? graph.type ?? '?'}' (expected an object with a non-empty 'entity' string, got ${JSON.stringify(e)})`);
@@ -374,13 +389,10 @@ export class CardConfig
                         if( regex && regex.test(s) && !testEntityExclusionList(s, regexExcludes) )
                             _matched.push(s);
                     _matched.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-                    for( let s of _matched ) {
-                        const _ent = {...e, 'entity': s};
-                        this.store.add(this._makeStaticEntityEntry(seriesId(s, e.attribute), _groupId, _ent, _interval));
-                    }
+                    for( let s of _matched ) _addStatic(seriesId(s, e.attribute), {...e, 'entity': s});
                 } else {
                     // (attribute: one of the entity's attributes instead of its state)
-                    this.store.add(this._makeStaticEntityEntry(seriesId(e.entity, e.attribute), _groupId, e, _interval));
+                    _addStatic(seriesId(e.entity, e.attribute), e);
                 }
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.

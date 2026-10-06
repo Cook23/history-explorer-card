@@ -46,6 +46,15 @@ export function attributeLabel(attribute)
     return _s.charAt(0).toUpperCase() + _s.slice(1);
 }
 
+// An attribute's value as a series': a number followed by a text that isn't one (12.5 °C,
+// 80 %, 3 days — not a time, a date or a range) is that number, in that unit
+const _NUMBER_UNIT = /^\s*([-+]?\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?)\s*([^\d\s:.,\/+-].*?)\s*$/;
+export function attributeValue(v)
+{
+    const _m = typeof v === 'string' ? _NUMBER_UNIT.exec(v) : null;
+    return _m ? { value: Number(_m[1].replace(',', '.')), unit: _m[2] } : { value: v, unit: undefined };
+}
+
 // The attributes of state s that can be shown as a series: a number, a text or a yes/no —
 // not Home Assistant's own, not a list or an object
 export function seriesAttributes(s)
@@ -55,19 +64,20 @@ export function seriesAttributes(s)
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:
-// its value as the state, its entity's last update as its last change, its entity's name
-// and its own as its name, no unit (the entity's isn't its), a number taken as a
-// measurement (shown as a curve, as an entity measuring something); undefined when
-// there's no such entity or attribute
+// its value as the state (see attributeValue), its entity's last update as its last
+// change, its entity's name and its own as its name, the unit its value gives (never the
+// entity's), a number taken as a measurement (shown as a curve, as an entity measuring
+// something); undefined when there's no such entity or attribute
 export function seriesState(hass, id)
 {
     const { entity, attribute } = seriesOf(id);
     const _s = hass?.states[entity];
     if( !attribute || !_s ) return attribute ? undefined : _s;
     if( !_s.attributes || !( attribute in _s.attributes ) ) return undefined;
-    const _v = _s.attributes[attribute];
+    const { value: _v, unit: _unit } = attributeValue(_s.attributes[attribute]);
     return { entity_id: id, state: _v === null ? 'unknown' : String(_v), last_changed: _s.last_updated, last_updated: _s.last_updated,
              attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' ' + attributeLabel(attribute),
+                           ...( _unit ? { unit_of_measurement: _unit } : {} ),
                            ...( typeof _v === 'number' ? { state_class: 'measurement' } : {} ) } };
 }
 
@@ -82,7 +92,7 @@ export function attributeHistories(ids, entityHistories)
         const _rows = [];
         for( const x of entityHistories[entity] ?? [] ) {
             if( !x.a || !( attribute in x.a ) ) continue;
-            const _v = x.a[attribute];
+            const _v = attributeValue(x.a[attribute]).value;
             if( _rows.length && _rows[_rows.length - 1].s === _v ) continue;
             _rows.push({ s: _v, lu: x.lu });
         }

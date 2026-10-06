@@ -3,18 +3,20 @@
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
+import { seriesId } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
-// The entity an entity's `color` reads, or null: an entity_id (no CSS color has a dot),
-// whose state then holds the color, in any form `color` itself accepts; or the `entity` of
+// The series an entity's `color` reads, or null: an entity_id (no CSS color has a dot) —
+// or one of its attributes, after it (climate.salon.hvac_action) — whose state then holds
+// the color, in any form `color` itself accepts; or the `entity` (and `attribute`) of
 // thresholds, whose value they then compare instead of the value shown
-const _ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
+const _SERIES_ID = /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/;
 export function colorEntityOf(e)
 {
     const c = e?.color;
-    const id = ( typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? c.entity : '' ).trim();
-    return _ENTITY_ID.test(id) ? id : null;
+    const id = ( typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? seriesId(c.entity, c.attribute) : '' ).trim();
+    return _SERIES_ID.test(id) ? id : null;
 }
 
 export class CardDatasets
@@ -52,7 +54,7 @@ export class CardDatasets
     _currentColor(e)
     {
         const _ce = colorEntityOf(e);
-        const _state = id => this._hass?.states[id]?.state;
+        const _state = id => this.stateOf(id)?.state;
         if( _ce && typeof e.color === 'object' ) return colorForValue(parseColorValue(e.color), _state(_ce)) ?? e.paletteColor;
         const _spec = parseColorValue(_ce ? _state(_ce) : e.color);
         return colorForValue(_spec, Number(_state(e.entity))) ?? e.paletteColor;

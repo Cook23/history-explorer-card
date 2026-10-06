@@ -5,6 +5,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { keyOf } from "./history-entity-store.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -63,7 +64,7 @@ export class CardGestures
         meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
         g.chart.update();
         const _hiddenState = meta.hidden !== null ? meta.hidden : g.chart.data.datasets[idx].hidden;
-        const _e = this.store.entry(g.entities[idx].entity);
+        const _e = this.store.entry(keyOf(g.entities[idx]));
         if( _e ) _e.hidden = _hiddenState || undefined;
         this.writeLocalState();
     }
@@ -150,7 +151,7 @@ export class CardGestures
             g.chart.options.dropAllowed = _compatible;
             if( info.zone !== 'legend' ) { this._unfreezeChart(); return; }
         } else {
-            _compatible = this._dropCompatibility(d.g, g) === null;
+            _compatible = this._dropCompatibility(d.g, g, d.g.entities[d.idx]) === null;
             g.chart.options.dropAllowed = _compatible;
             if( !_compatible || info.yAxisIndex < 0 || info.zone !== 'yAxis' ) { this._unfreezeChart(); return; }
         }
@@ -294,7 +295,7 @@ export class CardGestures
     _finalizeTimelineDrop(info, _src, _srcIdx, _tgt, drop)
     {
         if( !_tgt ) return;
-        const _refusal = this._dropCompatibility(_src, _tgt);
+        const _refusal = this._dropCompatibility(_src, _tgt, _src.entities[_srcIdx]);
         if( _refusal !== null ) {
             this._showLabelTooltip(_refusal, info.clientX, info.clientY, 'left', _src.canvas);
             return;
@@ -321,7 +322,7 @@ export class CardGestures
             // (insertIdx counts the moved entity itself)
             const _at = insertIdx > srcIdx ? insertIdx - 1 : insertIdx;
             _list.splice(_at < 0 ? _list.length : _at, 0, _entity);
-            const _groupId = this.store.groupIdOf(_list[0].entity);
+            const _groupId = this.store.find(keyOf(_list[0]))?.groupId;
             if( _groupId !== undefined ) this.store.setGraphOrder(_groupId, _list);
             // Rebuilt right where it was, even inside a block of several linked graphs
             const _nextG = this._nextGraph(src);
@@ -334,8 +335,8 @@ export class CardGestures
             // change. (Before the entity changes group: the display order is read from the
             // list's.)
             const _srcNext = this._nextGraph(src);
-            const _entry = this.store.find(_entity.entity);
-            const _tgtGroupId = this.store.groupIdOf(tgt.entities[0].entity);
+            const _entry = this.store.find(keyOf(_entity));
+            const _tgtGroupId = this.store.find(keyOf(tgt.entities[0]))?.groupId;
             if( typeof _entry === 'object' && _tgtGroupId !== undefined ) {
                 // A drop is saved only when both graphs' placements are (a YAML graph's isn't,
                 // by default): otherwise the entity is saved where it was before
@@ -382,16 +383,19 @@ export class CardGestures
         return a.groupId !== null && a.groupId !== undefined && a.groupId === b.groupId;
     }
 
-    // Can one of src's entities be dropped onto another graph tgt? Returns null if so, or
-    // the short text explaining why not (shown as a tooltip at the drop point). Whenever
-    // the target graph can show it: curves and bars together, a timeline row on a timeline,
+    // Can entity srcEntity of graph src be dropped onto another graph tgt? Returns null if
+    // so, or the short text explaining why not (shown as a tooltip at the drop point) —
+    // never onto a graph already showing its series (a curve once per graph). Otherwise
+    // whenever the target graph can show it: curves and bars together, a timeline row on a timeline,
     // an arrowline row on an arrowline — whatever the units (two groups of units get an
     // axis each, more share one) and whichever graphs, YAML ones included (a drop onto a
     // graph whose placement isn't saved isn't saved either: see _moveEntity).
-    _dropCompatibility(src, tgt, srcEntity = null)
+    _dropCompatibility(src, tgt, srcEntity)
     {
+        // (a curve once per graph: another graph already showing its series refuses it)
+        if( tgt !== src && tgt.entities.some(e => e.entity === srcEntity.entity) ) return i18n('ui.label.already_exists');
         // The dragged entity's own type (a bar graph can also hold line entities)
-        const _srcType = srcEntity?.type ?? src.type;
+        const _srcType = srcEntity.type ?? src.type;
         return this._typesCompatible(_srcType, tgt.type) ? null : `${_srcType} ≠ ${tgt.type}`;
     }
 
@@ -459,7 +463,7 @@ export class CardGestures
     {
         if( groupId === null || groupId === undefined ) return;
         this.store.syncGroupOrder(groupId, this._allGraphsInDisplayOrder().filter(g => g.groupId === groupId)
-            .flatMap(g => g.entities.map(e => e.entity)));
+            .flatMap(g => g.entities.map(keyOf)));
     }
 
     // Something to uncombine: a static graph splits one of its own curves off (needs at
@@ -514,7 +518,7 @@ export class CardGestures
         // Preserve all existing persisted fields (type, lineMode, interval, ...) —
         // only groupId/color/fill change on uncombine, EXCEPT hidden: what the user always
         // wants after taking a curve out is to SEE it, so it's forced visible.
-        const _pcE = this.store.entry(_entity.entity);
+        const _pcE = this.store.entry(keyOf(_entity));
         let _pcExtracted = null;
         if( _pcE ) {
             // Mutated in place: _entity/g.entities[idx] IS this same persisted entry
@@ -727,8 +731,8 @@ export class CardGestures
         // The same move in the persisted list — never derived from this.graphs, only right
         // for the pair just moved. Before the graphIndex calculation below, which reads the
         // list's order.
-        this.store.moveBefore(new Set(_moved.flatMap(g => g.entities.map(e => e.entity))),
-            new Set(_tgtG.entities.map(e => e.entity)), _insertBefore);
+        this.store.moveBefore(new Set(_moved.flatMap(g => g.entities.map(keyOf))),
+            new Set(_tgtG.entities.map(keyOf)), _insertBefore);
 
         // graphIndex: same real-number ordering scheme as addGraph — look at the insertion
         // point (_tgtG, _insertBefore), not at _srcG (looking at _srcG's own neighbors

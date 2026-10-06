@@ -3,6 +3,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { keyOf } from "./history-entity-store.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
@@ -49,6 +50,7 @@ export class CardToolbar
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
                 <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="es_${i}_series" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
+                <div id="es_${i}_choice" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 ${typeMenuHtml(i, true)}
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
@@ -427,7 +429,7 @@ export class CardToolbar
         // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
         // they are, so picking an interval again turns them back into bars.
         for( let en of g.entities ) {
-            const _e = this.store.entry(en.entity);
+            const _e = this.store.entry(keyOf(en));
             if( _e ) _e.interval = _value;
         }
 

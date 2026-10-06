@@ -4,6 +4,7 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { keyOf } from "./history-entity-store.js";
 import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 const Chart = window.HXLocal_Chart;
@@ -506,11 +507,12 @@ export class CardMenus
             return;
         }
 
-        // Update pconfig.entities — persist lineMode and type
-        const _pcEntry = this.store.entry(_entity_id);
-        // The entity's own type before this change (a bar graph can also hold line entities)
+        // Update pconfig.entities — persist lineMode and type (the entity's curve in this graph)
         const _gOld = this.graphs.find(g => g.id === _graph_id);
-        const _oldType = _gOld?.entities.find(e => e.entity === _entity_id)?.type ?? _gOld?.type;
+        const _shownE = _gOld?.entities.find(e => e.entity === _entity_id);
+        const _pcEntry = _shownE && this.store.entry(keyOf(_shownE));
+        // The entity's own type before this change (a bar graph can also hold line entities)
+        const _oldType = _shownE?.type ?? _gOld?.type;
         if( _pcEntry ) {
             _pcEntry.lineMode = lineMode;
             _pcEntry.type     = type;
@@ -549,8 +551,8 @@ export class CardMenus
                 // pconfig.entities, so persistence stays consistent with what the next
                 // rebuild will read as its fill — no need to special-case fill at rebuild time
                 if( _pcEntry ) {
-                    const _updatedG = this.graphs.find(g => g.entities.some(e => e.entity === _entity.entity));
-                    const _updatedEntity = _updatedG?.entities.find(e => e.entity === _entity.entity);
+                    const _updatedG = this.graphs.find(g => g.entities.some(e => keyOf(e) === keyOf(_entity)));
+                    const _updatedEntity = _updatedG?.entities.find(e => keyOf(e) === keyOf(_entity));
                     if( _updatedEntity ) _pcEntry.fill = _updatedEntity.fill;
                 }
                 this._updateMoVisibility();
@@ -581,7 +583,7 @@ export class CardMenus
         if( !g ) return;
         const _sameType = g.entities.every(e => ( e.type ?? g.type ) === type);
         for( const e of g.entities ) {
-            const _entry = this.store.entry(e.entity);
+            const _entry = this.store.entry(keyOf(e));
             if( _entry ) { _entry.type = type; _entry.lineMode = lineMode; }
         }
         if( _sameType ) {
@@ -596,8 +598,8 @@ export class CardMenus
             _entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
             this._rebuildGraph(_entities, g.groupId, _nextG, { fill: null });
             for( const e of _entities ) {
-                const _entry = this.store.entry(e.entity);
-                const _shown = this.graphs.find(_g => _g.entities.some(x => x.entity === e.entity))?.entities.find(x => x.entity === e.entity);
+                const _entry = this.store.entry(keyOf(e));
+                const _shown = this.graphs.find(_g => _g.entities.some(x => keyOf(x) === keyOf(e)))?.entities.find(x => keyOf(x) === keyOf(e));
                 if( _entry && _shown ) _entry.fill = _shown.fill;
             }
             this._updateMoVisibility();
@@ -788,7 +790,7 @@ export class CardMenus
     _deleteEntity(g, idx)
     {
         const _entity = this._detachAndRebuildRemaining(g, idx);
-        this.store.remove(_entity.entity);
+        this.store.remove(_entity);
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
         this.writeLocalState();
@@ -804,6 +806,9 @@ export class CardMenus
         // time here: a duplicate entry, never displayed, used to carry the groupId instead,
         // leaving the displayed one with none (so a type change couldn't link its graphs).
         const _entry = { type, lineMode };
+        // (already shown: a second curve of it, in another graph — see keyOf)
+        const _copy = this.store.newCopy(eid);
+        if( _copy ) _entry.copy = _copy;
         this.addGraph(eid, { entry: _entry });
         const _g = this.graphs.find(g => g.entities.includes(_entry));
         if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {

@@ -30,6 +30,23 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A number followed by a unit; an attribute holding a curve's color ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'humidity' },
+            { entity: 'climate.salon', attribute: 'current_temperature', color: { entity: 'climate.salon', attribute: 'hvac_action', heating: 'red', idle: 'blue' } },
+            { entity: 'sensor.power', color: 'climate.salon.led_color' }] }] }), { mock: { series: true }, height: 900 });
+    await t.wait(1500);
+    await t.step('an attribute "45.2 %": the number, in its unit — a curve', async () => {
+        const r = await t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0]; return { unit: d.unit, n: d.data.length, y: d.data.slice(0,3).map(p=>typeof p.y) }; })()`);
+        return r.unit === '%' && r.n > 100 && r.y.every(x => x === 'number') ? true : JSON.stringify(r);
+    });
+    await t.step('color from an attribute: thresholds on it (red heating, blue idle along the curve), or the color it holds', async () => {
+        const r = await t.E(`(()=>{ const ds=el.instance.graphs[0].chart.data.datasets;
+            return { cols: [...new Set((ds[1].colorSteps ?? []).map(s=>s.borderColor))].sort().join(), led: ds[2].borderColor }; })()`);
+        return r.cols === 'blue,red' && r.led === 'green' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── Long-term statistics: an attribute has none ──
     t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true, period: 'hour' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'climate.salon', attribute: 'current_temperature' }] }] }), { mock: { series: true, historyDays: 2 } });
@@ -52,7 +69,7 @@ module.exports = async function()
     await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list nor Home Assistant\'s own', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
-        return v === 'Value (heat)* | Current temperature (19.5) | Temperature (20) | Hvac action (heating)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
+        return v === 'Value (heat)* | Current temperature (19.5) | Temperature (20) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
     });
     await t.step('like every submenu: over the dropdown, level with the entry, right edges aligned', async () => {
         const r = await t.E(`(()=>{ const q=s=>el.querySelector(s).getBoundingClientRect(); const d=q('#es_0'), e=q('#es_0 a[data-entity="climate.salon"]'), s=q('#es_0_series');

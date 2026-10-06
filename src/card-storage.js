@@ -4,6 +4,7 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { keyOf } from "./history-entity-store.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 
 export class CardStorage
@@ -125,7 +126,8 @@ export class CardStorage
         return { multi: _on(this.pconfig.enableMultidevicePersistence), local: _on(this.pconfig.enablePersistence) };
     }
 
-    // --- Last one to speak wins — entities, resolved per entity ---
+    // --- Last one to speak wins — entities, resolved per entity (per curve: an entity's
+    // second curve in another graph — see keyOf — is resolved on its own) ---
     // YAML source: static entities from pconfig (initialized from YAML before this call).
     //              Always wins for a given entity when changed — never blocked.
     // HA user source: compared to ha_entities mirror in localStorage — may come from
@@ -147,7 +149,7 @@ export class CardStorage
         this._pureYamlEntities = _yamlEntities;
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
-        const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(e => e.entity);
+        const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(keyOf);
 
         // Union of entity ids to resolve: current YAML statics, always. A genuinely dynamic
         // entity (isStatic falsy, known only from localStorage or HA) has no YAML entry to
@@ -166,9 +168,9 @@ export class CardStorage
         const _dynamicOrder = this._cardPersists('order', true);
         const _staticOrder = this._cardPersists('order', _noStaticsDefaultAll);
 
-        const _yamlIds = _yamlEntities.map(e => e.entity);
+        const _yamlIds = _yamlEntities.map(keyOf);
         const _staticIds = this._resolveOrder(
-            _yamlIds, _yamlIds, _yamlMirror.map(e => e.entity),
+            _yamlIds, _yamlIds, _yamlMirror.map(keyOf),
             _ids(_haEntities, true), _ids(_haMirror, true), _ids(_lsEntities, true),
             _staticOrder.multi || _staticOrder.local, _staticOrder.multi
         );
@@ -179,8 +181,8 @@ export class CardStorage
         // Removed on another device (last one to speak): an entity this device had already
         // seen in HA (in its HA mirror) but that's gone from HA now was deleted elsewhere —
         // dropped here too. One missing from both is a local addition not synced yet — kept.
-        const _haIdsNow    = new Set(_haEntities.map(e => e.entity));
-        const _haIdsMirror = new Set(_haMirror.map(e => e.entity));
+        const _haIdsNow    = new Set(_haEntities.map(keyOf));
+        const _haIdsMirror = new Set(_haMirror.map(keyOf));
         const _removedElsewhere = id => _dynamicEntities.multi && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
         const _dynamicCandidates = [...new Set([
             ..._ids(_lsEntities, false).filter(id => !_removedElsewhere(id)),
@@ -197,7 +199,7 @@ export class CardStorage
             ...(( _dynamicEntities.multi || _dynamicEntities.local ) ? _dynamicIds : []),
         ]);
 
-        const _find = (arr, id) => arr.find(e => e.entity === id);
+        const _find = (arr, key) => arr.find(e => keyOf(e) === key);
         this.store.list = [..._entityIds].map(id => this._resolveEntity(
             _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id)));
 
