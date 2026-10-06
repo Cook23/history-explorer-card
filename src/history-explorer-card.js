@@ -4367,25 +4367,26 @@ export class HistoryCardState {
 
             panstate.st1 = this.pixelPositionToTimecode(x1);
 
-        } else if( !this.state.altGraph && event.altKey ) {
+        }
+    }
 
-            // Alt key pressed, show individual samples
+    // Alt held while moving over a graph shows its individual samples (hover mode
+    // 'dataset'), moving without it hides them. A listener of its own, run before Chart.js'
+    // (capture): Chart.js then draws the hover of this same move in the new mode — run
+    // after it, the samples showed (and hid) one move late.
+    altSamplesMove(event)
+    {
+        if( panstate.dragDataset || this.state.drag || ( this.state.selecting && panstate.overlay ) ) return;
 
-            for( let g of this.graphs ) {
-                if( g.canvas === event.target ) {
-                    this.state.altGraph = g;
-                    g.chart.options.hover.mode = 'dataset';
-                    break;
-                }
+        if( !this.state.altGraph && event.altKey ) {
+            const g = this.graphs.find(g => g.canvas === event.target);
+            if( g ) {
+                this.state.altGraph = g;
+                g.chart.options.hover.mode = 'dataset';
             }
-
         } else if( this.state.altGraph && !event.altKey ) {
-
-            // Alt not pressed, hide samples
-
             this.state.altGraph.chart.options.hover.mode = 'nearest';
             this.state.altGraph = null;
-
         }
     }
 
@@ -5907,6 +5908,7 @@ export class HistoryCardState {
 
         canvas.addEventListener('pointerdown', this.pointerDown.bind(this));
         canvas.addEventListener('pointermove', this.pointerMove.bind(this));
+        canvas.addEventListener('pointermove', this.altSamplesMove.bind(this), true);
         canvas.addEventListener('pointerup', this.pointerUp.bind(this));
         canvas.addEventListener('pointercancel', this.pointerCancel.bind(this));
 
