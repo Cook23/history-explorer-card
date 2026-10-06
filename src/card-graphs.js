@@ -616,18 +616,20 @@ export class CardGraphs
     // Adding and removing graphs from the view
     // --------------------------------------------------------------------------------------
 
+    // The close button (×) of a graph added from the card
     removeGraph(event)
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
+        const g = this.graphs.find(g => g.id == id);
+        if( g ) this._removeGraph(g);
+    }
 
-        for( let i = 0; i < this.graphs.length; i++ ) {
-            if( this.graphs[i].id == id ) {
-                this._graphDiv(this.graphs[i]).remove();
-                for( let e of this.graphs[i].entities ) this.store.remove(e.entity, true);
-                this.graphs.splice(i, 1);
-                break;
-            }
-        }
+    // A graph added from the card removed, with its entities
+    _removeGraph(g)
+    {
+        this._graphDiv(g).remove();
+        for( let e of g.entities ) this.store.remove(e.entity, true);
+        this.graphs.splice(this.graphs.indexOf(g), 1);
 
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();

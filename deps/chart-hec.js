@@ -573,7 +573,7 @@
       name: 'lockAndHandle',
       test: function (c, p) {
         var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0);
+        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0) && !me._hecHandleButtons();
         if (!_inZone) return false;
         var _gRect = me.canvas.getBoundingClientRect();
         me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
@@ -745,7 +745,7 @@
       // check, same action, no pointerType distinction: it undoes the first
       // press's click, which was the first half of a double-click or of a
       // tap-then-drag, not a toggle.
-      var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
+      var _dblInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy) && !me._hecHandleButtons();
       if (_dblInLockAndHandleZone) {
         me._hecToggleYAxisLock();
       }
@@ -776,7 +776,8 @@
         var _bSel = me.options.floatingBoundsSelector;
         Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
       }
-      var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy);
+      // (with handleButtons shown there instead, a click is for them: payload.handleButton)
+      var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy) && !me._hecHandleButtons();
       if (_clickInLockAndHandleZone) {
         // Grouped lock+handle zone: a click here always toggles the lock.
         // On mouse/pen, that's the whole story — simple, no two-step: click
@@ -1534,7 +1535,7 @@
       _el.style.left = '15px';
       _el.style.top = '5px';
       var _svg = _el.children[0];
-      var _showIcon = !(_forced && !me._hecYAxisLock);
+      var _showIcon = !(_forced && !me._hecYAxisLock) && !me._hecHandleButtons();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
       _el.style.opacity = (me._hecYAxisLock) ? '1.0' : '0.3';
 
@@ -1607,10 +1608,41 @@
     },
 
     // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
-    // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays.
-    // Minus where the chain icon (drawn over it) overlaps its top edge.
+    // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays; 18px
+    // per button when options.handleButtons shows more than one. Minus where the chain
+    // icon (drawn over it) overlaps its top edge.
     _hecInLockAndHandleZone: function (x, y) {
-      return x >= 0 && x <= 33 && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+      return x >= 0 && x <= this._hecLockAndHandleWidth() && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+    },
+
+    _hecLockAndHandleWidth: function () {
+      var b = this._hecHandleButtons();
+      return b ? Math.max(33, b.length * 18) : 33;
+    },
+
+    // The buttons shown in the lock+handle zone instead of the handle and the padlock
+    // (options.handleButtons), or null
+    _hecHandleButtons: function () {
+      var b = this.options.handleButtons;
+      return b && b.length ? b : null;
+    },
+
+    // The button of options.handleButtons at (x, y), or null
+    _hecHandleButtonAt: function (x, y) {
+      var b = this._hecHandleButtons();
+      if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
+      return b[Math.min(b.length - 1, Math.floor(x / (this._hecLockAndHandleWidth() / b.length)))];
+    },
+
+    // Does this chart have a Y axis lock (the padlock)?
+    _hecHasYAxisLock: function () {
+      return this.options.yAxisLockEnabled !== false && this.config.type !== 'timeline' && this.config.type !== 'arrowline' &&
+        !!(this.options.scales && this.options.scales.yAxes && this.options.scales.yAxes.length);
+    },
+
+    // Public (Chart Custom.js.md §1): locks or releases the Y axes, as a click on the padlock
+    hecSetYAxisLocked: function (locked) {
+      if (this._hecHasYAxisLock() && !!this._hecYAxisLock !== !!locked) this._hecToggleYAxisLock();
     },
 
     // Linked-graphs marker (chain icon), shown while options.linkMarkerVisible is
@@ -1703,6 +1735,9 @@
         labelRect: this._hecLabelRect(_legendIdx, _yIdx),
         button: native ? native.button : undefined,
         event: native };
+      var _hb = this._hecHandleButtonAt(x, y);
+      if (_hb) { payload.handleButton = _hb.id; payload.handleButtonDisabled = !!_hb.disabled; }
+      if (this._hecHasYAxisLock()) payload.yAxisLocked = !!this._hecYAxisLock;
       if (extra) { for (var k in extra) payload[k] = extra[k]; }
       return payload;
     },
@@ -1755,7 +1790,49 @@
       me._hecAttachToCanvasParent(_el);
       _el.style.left = me.canvas.offsetLeft + 'px';
       _el.style.top = me.canvas.offsetTop + 'px';
-      _el.style.display = me.options.moveHandleVisible === false ? 'none' : 'flex';
+      _el.style.display = me.options.moveHandleVisible === false || me._hecHandleButtons() ? 'none' : 'flex';
+    },
+
+    // options.handleButtons drawn over the lock+handle zone, in place of the handle and
+    // the padlock: each its text (an icon); a disabled one greyed and struck through in
+    // red. Purely visual (pointer-events:none), like the icons it replaces — a click on
+    // one reaches customEvent with its id (payload.handleButton)
+    _hecUpdateHandleButtons: function () {
+      var me = this;
+      var b = me._hecHandleButtons();
+      var _el = me._hecHandleButtonsEl;
+      if (!b) {
+        if (_el) _el.style.display = 'none';
+        return;
+      }
+      if (!me.canvas) return;
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.style.cssText = 'position:absolute;z-index:10;height:28px;pointer-events:none;user-select:none;';
+        me._hecHandleButtonsEl = _el;
+      }
+      me._hecAttachToCanvasParent(_el);
+      _el.style.left = me.canvas.offsetLeft + 'px';
+      _el.style.top = me.canvas.offsetTop + 'px';
+      _el.style.display = 'flex';
+      // (rebuilt only when they change: called at each draw)
+      var _key = JSON.stringify(b);
+      if (_el._hecKey === _key) return;
+      _el._hecKey = _key;
+      _el.innerHTML = '';
+      var _w = me._hecLockAndHandleWidth() / b.length;
+      b.forEach(function (btn) {
+        var _s = document.createElement('div');
+        _s.style.cssText = 'position:relative;width:' + _w + 'px;height:28px;display:flex;align-items:center;justify-content:center;' +
+          'font-size:14px;color:var(--primary-text-color);' + (btn.disabled ? 'opacity:0.45;' : '');
+        _s.textContent = btn.text;
+        if (btn.disabled) {
+          var _bar = document.createElement('div');
+          _bar.style.cssText = 'position:absolute;inset:4px 2px;background:linear-gradient(to top right,transparent calc(50% - 1px),var(--error-color,#f44336) calc(50% - 1px),var(--error-color,#f44336) calc(50% + 1px),transparent calc(50% + 1px));';
+          _s.appendChild(_bar);
+        }
+        _el.appendChild(_s);
+      });
     },
 
     // Drag ghost — a small floating label that follows the pointer during a
@@ -1952,11 +2029,11 @@
       // workaround (acceptable: with only one graph, there's no handle drag
       // to protect from scroll interference in this zone, only the lock
       // toggle, which doesn't need touch-action changes at all).
-      var _moVisible = me.options.moveHandleVisible !== false;
+      var _moVisible = me.options.moveHandleVisible !== false || !!me._hecHandleButtons();
       var _mo = ensureOverlay('_hecMoveHandleTouchEl');
       _mo.style.left = me.canvas.offsetLeft + 'px';
       _mo.style.top = me.canvas.offsetTop + 'px';
-      _mo.style.width = _moVisible ? '33px' : '0px';
+      _mo.style.width = _moVisible ? me._hecLockAndHandleWidth() + 'px' : '0px';
       _mo.style.height = _moVisible ? '28px' : '0px';
     },
 

@@ -6,6 +6,16 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.6] - unreleased
 
+### New — a graph's menu, cut and paste
+- A long-press or a right click on a graph's lock+handle zone opens its menu — the same zone where a click toggles the lock and a drag moves the graph: *Lock the Y axis* / *Unlock the Y axis*, and *Layout ▸* with *Merge back*, *Cut* and *Delete the graph* (a graph added from the card)
+- *Cut* in the *Layout* submenu of a curve's or an entity's type menu, and of a graph's menu: every graph's zone then shows where it can go instead of the handle and the padlock — 📋 for a curve (pasted at the end of the legend), ↓ 📋 ↑ for a graph (inserted below or above); a place refused is struck through in red and says why; ✂ where it was cut from; a click elsewhere, Escape or ✂ cancels. Pasting does exactly what a drop there does
+- `deps/chart-hec.js`: the option `handleButtons` (buttons drawn in the lock+handle zone, a click reaching `customEvent` with `handleButton`), the payload's `yAxisLocked`, the public `hecSetYAxisLocked()` (`deps/Chart Custom.js.md` §0, §1, §2, §5, §8)
+- Tests: new suite `graphmenu`
+
+### Fixed — a curve dropped onto the first graph of a linked block
+- The graph it joined was rebuilt after the whole block instead of in its place: the block's graphs swapped. The graph left by the curve had the same problem
+- Tests: a curve pasted into the first graph of a block (`graphmenu`)
+
 ### Changed — the type menu shows which submenu is open
 - The item whose submenu is open (*Display*, *Interpolation*, *Layout*, *Tests*) is in bold, and only it; back to the menu, none is
 - Tests: the open submenu's item in bold, another one opened, back to the menu

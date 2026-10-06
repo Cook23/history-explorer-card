@@ -21,6 +21,7 @@ The suites:
 | `persistence` | Every option that can be changed from the card (interpolation, line mode, display type, hidden, bar interval, split, a drop onto another graph — saved only when both graphs are), and the time range: without persistence, with `enable_persistence`, with `enable_multidevice_persistence` on this device and on a new one; the last one to speak — the YAML, another device — winning |
 | `pen` | A pen (Pointer Events of type `pen`): barrel button held, a drag moves a label at once and a tap opens the type menu; barrel button pressed twice with the tip down splits a curve; the tip taps as a finger; the tooltip opened by a tap, moved by hovering, closed when the pen moves away |
 | `colors` | A curve's or bar's color: a value, thresholds on its own value or on another entity's value or states (with `default`), an entity holding the color; the legend's swatch, the color kept or changed when a curve moves to another graph |
+| `graphmenu` | A graph's menu (long-press, right click, touch): the Y axis locked and released, a graph added from the card deleted; cut and paste: a graph inserted above or below another, a curve pasted into a graph, the places refused struck through and saying why, cancelled by a click elsewhere, Escape or ✂ |
 | `yaxes` | Two Y axes: one per group of units (left, right), `yAxis`, the arrow in the legend, linked graphs aligned, circular labels and stacked bars per axis; dragging each axis, Shift, the pinch and the padlock on both |
 
 They run the built card (`history-explorer-card.js`) in Chromium, in `page.html` (a card)
@@ -33,7 +34,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors or yaxes
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes or graphmenu
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

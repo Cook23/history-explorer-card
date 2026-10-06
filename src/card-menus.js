@@ -31,14 +31,17 @@ export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decora
 const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', layout: 'ui.menu.type_layout', tests: 'ui.menu.type_tests' };
 // The submenus only the card's menu has, not the info panel's
 const _CARD_ONLY_SUBMENUS = ['layout', 'tests'];
-// The layout submenu's entries (et_N_<key>)
-const _LAYOUT_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', delete: 'ui.menu.entity_delete' };
+// The layout submenu's entries (et_N_<key>): for an entity (separate, merge back, cut,
+// delete) or for a graph (merge back, cut, delete the graph)
+const _LAYOUT_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
+                          delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
-// wildcard add, the layout and tests submenus) and the info panel's
+// wildcard add, the layout and tests submenus, and for a graph the Y axis lock) and the
+// info panel's
 export function typeMenuHtml(i, full)
 {
     const a = (id, label, hidden, style = '') => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${style}${hidden ? ';display:none' : ''}">${label}</a>`;
@@ -48,6 +51,7 @@ export function typeMenuHtml(i, full)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            ${full ? a(`et_${i}_ylock`, '', true) : ''}
             ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
@@ -119,6 +123,7 @@ export class CardMenus
         // new single entity) or an array (new entities from a wildcard match)
         _menu._hec_entity_id = entity_id;
         _menu._hec_graph_id  = graph ? graph.id : null;
+        _menu._hec_for_graph = false;
         _menu._hec_anchor    = { clientX: anchorClientX, clientY: anchorClientY };
         this.hideTypeSubmenus(input_idx);
 
@@ -133,7 +138,10 @@ export class CardMenus
         show(q('layout'), _longPress);
         show(q('split'), _longPress && this._canUncombine(graph));
         show(q('merge'), _longPress && this._canMergeLinkedGraph(graph));
+        show(q('cut'), _longPress);
         show(q('delete'), _longPress);
+        show(q('gdelete'), false);
+        show(q('ylock'), false);
         show(q('rep'), true);
         show(q('tests'), true);
 
@@ -199,6 +207,59 @@ export class CardMenus
         }
         this._openMenu(_menu, _top, _left, align);
         this.showTypeSubmenu(input_idx, 'rep');
+    }
+
+    // The same menu for a graph — from a long-press (or a right click) on its lock+handle
+    // zone at (clientX, clientY): its Y axis locked or released (yAxisLocked: its state,
+    // undefined when it has no lock), and its layout — merge back, cut, delete. Opens with
+    // its layout submenu.
+    showGraphMenu(input_idx, graph, clientX, clientY, yAxisLocked)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        const q = id => this._this.querySelector(`#et_${input_idx}_${id}`);
+        // (the info panel's menu has no layout: no graph menu there)
+        if( !_menu || !q('layout') ) return;
+        const show = (el, on) => { if( el ) el.style.display = on ? 'block' : 'none'; };
+
+        _menu._hec_entity_id = null;
+        _menu._hec_graph_id  = graph.id;
+        _menu._hec_for_graph = true;
+        _menu._hec_anchor    = { clientX, clientY };
+        this.hideTypeSubmenus(input_idx);
+
+        for( const k of ['rep', 'interp', 'tests', 'split', 'delete', 'default'] ) show(q(k), false);
+        show(q('layout'), true);
+        show(q('merge'), this._canMergeLinkedGraph(graph));
+        show(q('cut'), true);
+        show(q('gdelete'), !graph.isStatic);
+        const _lock = q('ylock');
+        show(_lock, yAxisLocked !== undefined);
+        if( _lock ) {
+            _lock.textContent = i18n(yAxisLocked ? 'ui.menu.yunlock' : 'ui.menu.ylock');
+            _lock.dataset.hecLocked = yAxisLocked ? '1' : '';
+        }
+
+        const _titleEl = q('title');
+        if( _titleEl ) {
+            _titleEl.textContent = graph.entities.map(e => e.name ?? this._hass.states[e.entity]?.attributes?.friendly_name ?? e.entity).join(', ');
+            _titleEl.style.border = '';
+            _titleEl.style.borderBottom = '1px solid #444';
+        }
+
+        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+        this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
+        this.showTypeSubmenu(input_idx, 'layout');
+    }
+
+    // The graph menu's Y axis entry: the graph's Y axes locked or released
+    graphLockClicked(input_idx)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        const _g = this.graphs.find(g => g.id === _menu?._hec_graph_id);
+        const _locked = !!this._this.querySelector(`#et_${input_idx}_ylock`)?.dataset.hecLocked;
+        this.hideEntityTypeMenu(input_idx);
+        _g?.chart.hecSetYAxisLocked(!_locked);
     }
 
     hideEntityTypeMenu(input_idx)
@@ -268,6 +329,7 @@ export class CardMenus
         _TYPE_MENU_DEFS.forEach((_def, _idx) => _on(_idx, () => this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode)));
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
         for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
+        _on('ylock', () => this.graphLockClicked(_ii));
         for( const k in CARD_TESTS ) _on(`test_${k}`, () => { this.hideEntityTypeMenu(_ii); openCardTest(k); });
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
@@ -325,18 +387,22 @@ export class CardMenus
 
     // Layout: the entity taken out into its own graph (as a double-click on its
     // label), its linked graph merged back into the one above (as a double-click on the
-    // chain icon), or the entity deleted
+    // chain icon), the entity — or, from the graph menu, the graph — cut to be put
+    // elsewhere (as a drag, see _startCut), the entity or the graph deleted
     entityLayoutClicked(input_idx, action)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( !_menu ) return;
         const _g = this.graphs.find(g => g.id === _menu._hec_graph_id);
+        const _forGraph = _menu._hec_for_graph;
         const _idx = _g ? _g.entities.findIndex(e => e.entity === _menu._hec_entity_id) : -1;
         const _anchor = _menu._hec_anchor;
         this.hideEntityTypeMenu(input_idx);
-        if( _idx < 0 ) return;
-        if( action === 'split' ) this._uncombineEntity(_g, _idx);
-        else if( action === 'merge' ) this._mergeLinkedGraph(_g, _anchor);
+        if( !_g || ( !_forGraph && _idx < 0 ) ) return;
+        if( action === 'merge' ) this._mergeLinkedGraph(_g, _anchor);
+        else if( action === 'cut' ) this._startCut(_g, _forGraph ? null : _idx);
+        else if( action === 'gdelete' ) this._removeGraph(_g);
+        else if( action === 'split' ) this._uncombineEntity(_g, _idx);
         else this._deleteEntity(_g, _idx);
     }
 

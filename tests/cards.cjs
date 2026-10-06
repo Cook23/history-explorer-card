@@ -41,13 +41,13 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Interpolation ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
+        return m === 'Display ▸* | Interpolation ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Cut | Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: Display (timeline only), Layout', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Layout ▸ | Tests (beta) ▸ || open: rep || Timeline* || Delete' ? true : m;
+        return m === 'Display ▸* | Layout ▸ | Tests (beta) ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
     });
     done(await t.close());
 
@@ -62,15 +62,15 @@ module.exports = async function()
         else await closeMenu();
         return v;
     };
-    await t.step('Layout on a curve of a YAML graph: separate, delete; separate takes it into a linked graph', async () => {
+    await t.step('Layout on a curve of a YAML graph: separate, cut, delete; separate takes it into a linked graph', async () => {
         const v = await arrange(0, 0, 'split');
         const g = await t.graphs();
-        return v === 'split,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
+        return v === 'split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
     });
-    await t.step('Layout on the curve taken out: merge back (no separate: alone in its graph); merged back', async () => {
+    await t.step('Layout on the curve taken out: merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
         const v = await arrange(1, 0, 'merge');
         const g = await t.graphs();
-        return v === 'merge,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
+        return v === 'merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
     });
     await t.step('Layout, delete: the curve removed', async () => {
         const id = await t.E(`graphAt(0).entities[1].entity`);
