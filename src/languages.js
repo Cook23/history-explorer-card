@@ -48,11 +48,7 @@ const lang_en =
             "entity_cut"        : "Cut",
             "graph_delete"      : "Delete the graph",
             "ylock"             : "Lock the Y axis",
-            "yunlock"           : "Unlock the Y axis",
-            "paste_here"        : "Paste here",
-            "insert_above"      : "Insert above",
-            "insert_below"      : "Insert below",
-            "cut_cancel"        : "Cancel"
+            "yunlock"           : "Unlock the Y axis"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -126,11 +122,7 @@ const lang_fr =
             "entity_cut"        : "Couper",
             "graph_delete"      : "Supprimer le graphique",
             "ylock"             : "Verrouiller l'axe Y",
-            "yunlock"           : "Déverrouiller l'axe Y",
-            "paste_here"        : "Coller ici",
-            "insert_above"      : "Insérer au-dessus",
-            "insert_below"      : "Insérer en dessous",
-            "cut_cancel"        : "Annuler"
+            "yunlock"           : "Déverrouiller l'axe Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -204,11 +196,7 @@ const lang_de =
             "entity_cut"        : "Ausschneiden",
             "graph_delete"      : "Diagramm löschen",
             "ylock"             : "Y-Achse sperren",
-            "yunlock"           : "Y-Achse entsperren",
-            "paste_here"        : "Hier einfügen",
-            "insert_above"      : "Darüber einfügen",
-            "insert_below"      : "Darunter einfügen",
-            "cut_cancel"        : "Abbrechen"
+            "yunlock"           : "Y-Achse entsperren"
         },
         "ranges" : {
             "l_hour" : "< 1 Std.",
@@ -282,11 +270,7 @@ const lang_es =
             "entity_cut"        : "Cortar",
             "graph_delete"      : "Eliminar el gráfico",
             "ylock"             : "Bloquear el eje Y",
-            "yunlock"           : "Desbloquear el eje Y",
-            "paste_here"        : "Pegar aquí",
-            "insert_above"      : "Insertar encima",
-            "insert_below"      : "Insertar debajo",
-            "cut_cancel"        : "Cancelar"
+            "yunlock"           : "Desbloquear el eje Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -360,11 +344,7 @@ const lang_nl =
             "entity_cut"        : "Knippen",
             "graph_delete"      : "Grafiek verwijderen",
             "ylock"             : "Y-as vergrendelen",
-            "yunlock"           : "Y-as ontgrendelen",
-            "paste_here"        : "Hier plakken",
-            "insert_above"      : "Erboven invoegen",
-            "insert_below"      : "Eronder invoegen",
-            "cut_cancel"        : "Annuleren"
+            "yunlock"           : "Y-as ontgrendelen"
         },
         "ranges" : {
             "l_hour" : "< 1 u",
@@ -438,11 +418,7 @@ const lang_pl =
             "entity_cut"        : "Wytnij",
             "graph_delete"      : "Usuń wykres",
             "ylock"             : "Zablokuj oś Y",
-            "yunlock"           : "Odblokuj oś Y",
-            "paste_here"        : "Wklej tutaj",
-            "insert_above"      : "Wstaw powyżej",
-            "insert_below"      : "Wstaw poniżej",
-            "cut_cancel"        : "Anuluj"
+            "yunlock"           : "Odblokuj oś Y"
         },
         "ranges" : {
             "l_hour" : "< 1 godz.",
@@ -516,11 +492,7 @@ const lang_sv =
             "entity_cut"        : "Klipp ut",
             "graph_delete"      : "Ta bort grafen",
             "ylock"             : "Lås Y-axeln",
-            "yunlock"           : "Lås upp Y-axeln",
-            "paste_here"        : "Klistra in här",
-            "insert_above"      : "Infoga ovanför",
-            "insert_below"      : "Infoga nedanför",
-            "cut_cancel"        : "Avbryt"
+            "yunlock"           : "Lås upp Y-axeln"
         },
         "ranges": {
             "l_hour": "< 1 tim",
@@ -594,11 +566,7 @@ const lang_da =
             "entity_cut"        : "Klip",
             "graph_delete"      : "Slet grafen",
             "ylock"             : "Lås Y-aksen",
-            "yunlock"           : "Lås Y-aksen op",
-            "paste_here"        : "Indsæt her",
-            "insert_above"      : "Indsæt ovenfor",
-            "insert_below"      : "Indsæt nedenfor",
-            "cut_cancel"        : "Annuller"
+            "yunlock"           : "Lås Y-aksen op"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -672,11 +640,7 @@ const lang_sk =
             "entity_cut"        : "Vystrihnúť",
             "graph_delete"      : "Odstrániť graf",
             "ylock"             : "Uzamknúť os Y",
-            "yunlock"           : "Odomknúť os Y",
-            "paste_here"        : "Vložiť sem",
-            "insert_above"      : "Vložiť nad",
-            "insert_below"      : "Vložiť pod",
-            "cut_cancel"        : "Zrušiť"
+            "yunlock"           : "Odomknúť os Y"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -750,11 +714,7 @@ const lang_ru =
             "entity_cut"        : "Вырезать",
             "graph_delete"      : "Удалить график",
             "ylock"             : "Заблокировать ось Y",
-            "yunlock"           : "Разблокировать ось Y",
-            "paste_here"        : "Вставить сюда",
-            "insert_above"      : "Вставить выше",
-            "insert_below"      : "Вставить ниже",
-            "cut_cancel"        : "Отмена"
+            "yunlock"           : "Разблокировать ось Y"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",

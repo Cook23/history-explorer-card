@@ -1,8 +1,8 @@
 // What the gestures on the graphs mean (Chart.js detects them and says where they
 // happen — deps/Chart Custom.js.md): clicks, menus, the time window moved and zoomed,
-// curves, rows and graphs dragged, split and merged — and the entity moves these lead to
-// (through the entity store). Part of HistoryCardState (added to it in
-// history-explorer-card.js).
+// curves, rows and graphs dragged, split and merged, or cut and pasted from the menus —
+// and the entity moves these lead to (through the entity store). Part of
+// HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
 const Chart = window.HXLocal_Chart;

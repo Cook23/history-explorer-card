@@ -631,7 +631,7 @@ Compass arrow graphs use the `arrowline` type and can be used in both dynamicall
 
 By default the min/max scales for the Y axis are adjusted automatically to the data you are currently viewing.
 
-Pressing the axis lock icon will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
+Pressing the axis lock icon — or *Lock the Y axis* in the [graph menu](#the-graph-menu-cut-and-paste) — will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 

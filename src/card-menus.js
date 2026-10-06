@@ -1,5 +1,5 @@
-// The card's menus and lists: the entity type menu, the options menu, and the entity
-// selector (its dropdown list, also the compact version for phones). Part of
+// The card's menus: the type menu of an entity — the same menu for a graph (its Y axis
+// lock, its layout) — and the options menu, with their keyboard navigation. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
@@ -63,7 +63,8 @@ export function typeMenuHtml(i, full)
 export class CardMenus
 {
     // --------------------------------------------------------------------------------------
-    // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸, Tests ▸
+    // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸, Tests ▸ — and, for a
+    // graph, its Y axis lock and Layout ▸
     // --------------------------------------------------------------------------------------
 
     // The type menu's names, in the card's language (set once it's known)
