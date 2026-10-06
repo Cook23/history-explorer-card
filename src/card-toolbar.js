@@ -436,9 +436,7 @@ export class CardToolbar
             const _entities = [...g.entities];
             const _groupId = g.groupId;
             this._detachGraph(g);
-            _entities.forEach((en, i) => {
-                this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: _nextG, interval: _value, groupId: _groupId, entry: en });
-            });
+            this._rebuildGraph(_entities, _groupId, _nextG, { interval: _value });
         }
 
         this.updateHistory();

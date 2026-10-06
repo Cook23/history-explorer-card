@@ -50,60 +50,104 @@ export class CardStorage
             await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data });
         } catch(e) {}
     }
+    // The saved state merged with the YAML, by the "last one to speak wins" rules: the
+    // entities (each field, and the display order), the time range, the info panel's switch
     async readLocalState()
     {
-        // Read localStorage (source of truth for change detection — contains all mirrors)
-        const _lsRaw = window.localStorage.getItem('history-explorer_card_' + this.id);
-        const _ls = _lsRaw ? JSON.parse(_lsRaw) : null;
+        const { ls: _ls, haCard: _haCard, haInfoEnabled: _haInfoEnabled } = await this._readSavedSources();
 
-        // Read HA user storage for card state (timeRange, entities — may come from another device)
-        let _haCard = null;
+        // The YAML as last seen — by this device, else (a new device: nothing stored here yet)
+        // by the device that last saved to HA, which stored the same image: without it, a
+        // new device would take the YAML as changed and let it win over everything saved.
+        // Each source is only ever compared with its own image (its mirror): YAML with what
+        // YAML said last time on this device, HA with what this device last knew of HA. On
+        // this device's first load the YAML image is empty, so YAML has spoken here — it
+        // wins, then reaches HA (and the other devices) like any other YAML change.
+        const _yamlImage = _ls ?? _haCard;
+
+        // A card with no static entities at all has nothing fixed to anchor to: its range
+        // and its order default to persisted ('all') instead of the usual 'none' — same
+        // reasoning as dynamic entities defaulting to 'all'
+        const _noStatics = this.store.statics().length === 0;
+
+        this._resolveEntities(_ls, _haCard, _yamlImage, _noStatics);
+        this._resolveTimeRange(_ls, _haCard, _yamlImage, _noStatics);
+        const _infoPanelChanged = this._resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage);
+
+        // Update HA user mirrors for next writeLocalState
+        this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
+        this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
+        this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
+        this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
+
+        await this._registerInfoPanelDefault();
+
+        // Persist updated state (mirrors included) before any potential reload
+        await this.writeLocalState();
+
+        // Apply infoPanel state last, after everything (including writeLocalState) is done
+        if( _infoPanelChanged ) {
+            this.applyInfoPanelState();
+        }
+
+        return false; // interval redraw handled via pconfig.entities in createContent
+    }
+
+    // What was saved: on this device (localStorage — the source of truth for change
+    // detection, it holds all the mirrors), in Home Assistant's user data (may come from
+    // another device), and the info panel's switch there
+    async _readSavedSources()
+    {
+        const _lsRaw = window.localStorage.getItem('history-explorer_card_' + this.id);
+        const ls = _lsRaw ? JSON.parse(_lsRaw) : null;
+
+        let haCard = null;
         try {
             const _result = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer_card_' + this.id });
-            if( _result?.value ) _haCard = _result.value;
+            if( _result?.value ) haCard = _result.value;
         } catch(e) {}
 
-        // Read HA user storage for infoPanelEnabled (may come from another device)
-        let _haInfoEnabled = undefined;
+        let haInfoEnabled = undefined;
         try {
             const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
-            if( _ipe?.value?.enabled !== undefined ) _haInfoEnabled = !!_ipe.value.enabled;
+            if( _ipe?.value?.enabled !== undefined ) haInfoEnabled = !!_ipe.value.enabled;
         } catch(e) {}
 
-        // --- Last one to speak wins — entities, resolved per entity ---
-        // YAML source: static entities from pconfig (initialized from YAML before this call).
-        //              Always wins for a given entity when changed — never blocked.
-        // HA user source: compared to ha_entities mirror in localStorage — may come from
-        //              another device. Blocked per entity via disable_multidevice_persistence
-        //              (entity-level `disable_multidevice_persistence`, falling back to the
-        //              card-level option) — a device then never adopts another device's HA
-        //              value for that entity, though it still keeps writing its own local changes.
-        // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
+        return { ls, haCard, haInfoEnabled };
+    }
+
+    // Is persistence category (range, entities, order) on, by the card's options —
+    // { multi: on every device, local: on this device }, each defaulting to on when
+    // defaultAll and the option isn't set (see _resolvePersistenceDefault)
+    _cardPersists(category, defaultAll)
+    {
+        const _on = raw => this._resolvePersistenceDefault(raw, ['range', 'entities', 'order'], defaultAll).has(category);
+        return { multi: _on(this.pconfig.enableMultidevicePersistence), local: _on(this.pconfig.enablePersistence) };
+    }
+
+    // --- Last one to speak wins — entities, resolved per entity ---
+    // YAML source: static entities from pconfig (initialized from YAML before this call).
+    //              Always wins for a given entity when changed — never blocked.
+    // HA user source: compared to ha_entities mirror in localStorage — may come from
+    //              another device. Blocked per entity via disable_multidevice_persistence
+    //              (entity-level `disable_multidevice_persistence`, falling back to the
+    //              card-level option) — a device then never adopts another device's HA
+    //              value for that entity, though it still keeps writing its own local changes.
+    // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
+    _resolveEntities(_ls, _haCard, _yamlImage, _noStaticsDefaultAll)
+    {
         const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
         const _yamlEntities = this.store.statics();
-        // Shared by range and order below: a card with no static entities at all has nothing
-        // fixed to anchor to, so both default to 'all' (persist by default) instead of the
-        // usual 'none' — same reasoning as dynamic entities defaulting to 'all'.
-        const _noStaticsDefaultAll = _yamlEntities.length === 0;
         // Saved as-is (pure, pre-merge) for writeLocalState — the yaml_entities mirror must
         // reflect only what YAML said, uncontaminated by whichever field values HA/local
         // ended up winning below, or the YAML-changed detection breaks: a field overridden
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         this._pureYamlEntities = _yamlEntities;
-        // Each source is only ever compared with its own image (its mirror): YAML with what
-        // YAML said last time on this device, HA with what this device last knew of HA. On
-        // this device's first load the YAML image is empty, so YAML has spoken here — it
-        // wins, then reaches HA (and the other devices) like any other YAML change.
-        // The YAML as last seen — by this device, else (a new device: nothing stored here yet)
-        // by the device that last saved to HA, which stored the same image: without it, a
-        // new device would take the YAML as changed and let it win over everything saved
-        const _yamlImage    = _ls ?? _haCard;
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
-
-        const _findEntity = (arr, id) => arr.find(e => e.entity === id);
+        const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(e => e.entity);
 
         // Union of entity ids to resolve: current YAML statics, always. A genuinely dynamic
         // entity (isStatic falsy, known only from localStorage or HA) has no YAML entry to
@@ -112,180 +156,132 @@ export class CardStorage
         // pre-1.1.32 behavior; an explicit `enable_multidevice_persistence: none` (or
         // `enable_persistence: none`) opts back out. A static entity removed from YAML is
         // dropped either way — never resurrected from a stale local/HA snapshot.
-        const _dynamicEntitiesAllowed =
-            this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities') ||
-            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], true).has('entities');
+        const _dynamicEntities = this._cardPersists('entities', true);
 
         // Display order (which id comes before which — not a per-entity field, see 'order'
-        // in _resolveOrder above) follows the same last-one-to-speak-wins priority as
-        // anything else, resolved separately for statics (YAML order as the base, default
-        // 'none' unless the card has no statics at all — same rule as range) and dynamics
-        // (no YAML order concept, default 'all' like their own field persistence).
-        const _dynamicOrderMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('order');
-        const _dynamicOrderEnabled =
-            _dynamicOrderMultidevice ||
-            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], true).has('order');
-        const _staticOrderMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('order');
-        const _staticOrderEnabled =
-            _staticOrderMultidevice ||
-            this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('order');
+        // in _resolveOrder) follows the same last-one-to-speak-wins priority as anything
+        // else, resolved separately for statics (YAML order as the base, default 'none'
+        // unless the card has no statics at all — same rule as range) and dynamics (no YAML
+        // order concept, default 'all' like their own field persistence).
+        const _dynamicOrder = this._cardPersists('order', true);
+        const _staticOrder = this._cardPersists('order', _noStaticsDefaultAll);
 
         const _yamlIds = _yamlEntities.map(e => e.entity);
-        const _staticOrder = this._resolveOrder(
+        const _staticIds = this._resolveOrder(
             _yamlIds, _yamlIds, _yamlMirror.map(e => e.entity),
-            _haEntities.filter(e => e.isStatic).map(e => e.entity),
-            (_ls?.ha_entities ?? []).filter(e => e.isStatic).map(e => e.entity),
-            _lsEntities.filter(e => e.isStatic).map(e => e.entity),
-            _staticOrderEnabled, _staticOrderMultidevice
+            _ids(_haEntities, true), _ids(_haMirror, true), _ids(_lsEntities, true),
+            _staticOrder.multi || _staticOrder.local, _staticOrder.multi
         );
 
         // Dynamic entities another device added only reach this device if multi-device
         // persistence covers entities — with enable_persistence alone, this device only
         // ever knows the ones it added itself.
-        const _dynamicMultidevice = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], true).has('entities');
         // Removed on another device (last one to speak): an entity this device had already
         // seen in HA (in its HA mirror) but that's gone from HA now was deleted elsewhere —
         // dropped here too. One missing from both is a local addition not synced yet — kept.
         const _haIdsNow    = new Set(_haEntities.map(e => e.entity));
         const _haIdsMirror = new Set(_haMirror.map(e => e.entity));
-        const _removedElsewhere = id => _dynamicMultidevice && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
+        const _removedElsewhere = id => _dynamicEntities.multi && _haCard !== null && _haIdsMirror.has(id) && !_haIdsNow.has(id);
         const _dynamicCandidates = [...new Set([
-            ..._lsEntities.filter(e => !e.isStatic && !_removedElsewhere(e.entity)).map(e => e.entity),
-            ...( _dynamicMultidevice ? _haEntities.filter(e => !e.isStatic).map(e => e.entity) : [] ),
+            ..._ids(_lsEntities, false).filter(id => !_removedElsewhere(id)),
+            ...( _dynamicEntities.multi ? _ids(_haEntities, false) : [] ),
         ])];
-        const _dynamicOrder = this._resolveOrder(
+        const _dynamicIds = this._resolveOrder(
             _dynamicCandidates, null, null,
-            _haEntities.filter(e => !e.isStatic).map(e => e.entity),
-            (_ls?.ha_entities ?? []).filter(e => !e.isStatic).map(e => e.entity),
-            _lsEntities.filter(e => !e.isStatic).map(e => e.entity),
-            _dynamicOrderEnabled, _dynamicOrderMultidevice
+            _ids(_haEntities, false), _ids(_haMirror, false), _ids(_lsEntities, false),
+            _dynamicOrder.multi || _dynamicOrder.local, _dynamicOrder.multi
         );
 
         const _entityIds = new Set([
-            ..._staticOrder,
-            ...(_dynamicEntitiesAllowed ? _dynamicOrder : []),
+            ..._staticIds,
+            ...(( _dynamicEntities.multi || _dynamicEntities.local ) ? _dynamicIds : []),
         ]);
 
-        this.store.list = [..._entityIds].map(id => {
-            const _yamlE = _findEntity(_yamlEntities, id);
-
-            // YAML front — per entity, always wins on change, unaffected by the enable flags
-            // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
-            // is also the pure YAML mirror saved by writeLocalState)
-            if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_findEntity(_yamlMirror, id) ?? null) )
-                return { ..._yamlE };
-
-            // Resolve which fields have persistence enabled at all — entity-level first,
-            // falling back to the card-level 'entities' switch, itself defaulting to 'all'
-            // for a dynamic entity (no YAML to fall back to) or 'none' for a static one (see
-            // _resolvePersistenceDefault) when the card-level option isn't configured at all.
-            // enable_multidevice_persistence additionally allows the HA/cross-device front to
-            // win for its fields; enable_persistence only allows this device's own local
-            // storage — multidevice always wins over local for whatever it covers, since a
-            // field enabled by either ends up in _enabledFields regardless, while only
-            // _multiFields fields can also be won by the HA front below.
-            const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
-            const _enabledFields = new Set([..._multiFields, ..._localFields]);
-
-            const _haE = _findEntity(_haEntities, id);
-            const _haChanged = _haE && JSON.stringify(_haE) !== JSON.stringify(_findEntity(_haMirror, id) ?? null);
-            const _localE = _findEntity(_lsEntities, id) ?? _yamlE ?? _haE;
-
-            // Base: the YAML value for every field — nothing persists unless explicitly
-            // enabled. Then layer in the local value for fields with some persistence
-            // enabled, then further layer in the HA value for the multidevice-enabled subset
-            // if it actually changed. A dynamic entity has no YAML value; its base is the
-            // local/HA snapshot instead — it only exists here at all because persistence was
-            // enabled for it (see _entityIds above), so there's always something to base on.
-            const _result = _yamlE ? { ..._yamlE } : { ..._localE };
-            // A field missing from a stored entry is a field that was cleared (e.g. hidden
-            // back to visible drops 'hidden' from the saved JSON) — taken over as cleared
-            // too, not skipped: skipping it would silently lose that source's change.
-            const _take = (_src, _f) => {
-                if( _src[_f] === undefined ) delete _result[_f];
-                else _result[_f] = _src[_f];
-            };
-            for( const _f of _enabledFields )
-                if( _localE ) _take(_localE, _f);
-            if( _haChanged )
-                for( const _f of _multiFields )
-                    _take(_haE, _f);
-            // graphKey (which linked graph of its group the entity is shown in — see
-            // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
-            // follows whichever source won groupId above. graphIndex is NOT taken over per
-            // entity: it's a position relative to the other graphs of the block, so taking
-            // it from different sources for different entities would mix two coordinate
-            // systems and shuffle the block. The order inside a block is carried by the
-            // entities' order instead (resolved as a whole, see 'order' — and kept in step
-            // with the display by _syncGroupOrder).
-            const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
-                            ( _enabledFields.has('groupId') ? _localE : null );
-            if( _keySrc ) {
-                if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
-                else delete _result.graphKey;
-            }
-            return _result;
-        });
+        const _find = (arr, id) => arr.find(e => e.entity === id);
+        this.store.list = [..._entityIds].map(id => this._resolveEntity(
+            _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id)));
 
         // Group ids left wrong by older versions repaired; next free dynamic group id set
         this.store.normalizeGroupIds(e => e.type ?? this._detectDefaultType(e.entity).type);
+    }
 
-        // --- Last one to speak wins — timeRange ---
-        // infoPanelEnabled is handled separately below — see the warning comment there,
-        // it deliberately does NOT follow this pattern.
+    // One entity's entry, from its YAML entry and its image, its HA entry and its image, and
+    // its entry on this device
+    _resolveEntity(_yamlE, _yamlImageE, _haE, _haImageE, _lsE)
+    {
+        // YAML front — per entity, always wins on change, unaffected by the enable flags
+        // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
+        // is also the pure YAML mirror saved by writeLocalState)
+        if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_yamlImageE ?? null) )
+            return { ..._yamlE };
 
+        // Resolve which fields have persistence enabled at all — entity-level first,
+        // falling back to the card-level 'entities' switch, itself defaulting to 'all'
+        // for a dynamic entity (no YAML to fall back to) or 'none' for a static one (see
+        // _resolvePersistenceDefault) when the card-level option isn't configured at all.
+        // enable_multidevice_persistence additionally allows the HA/cross-device front to
+        // win for its fields; enable_persistence only allows this device's own local
+        // storage — multidevice always wins over local for whatever it covers, since a
+        // field enabled by either ends up in _enabledFields regardless, while only
+        // _multiFields fields can also be won by the HA front below.
+        const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
+        const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
+        const _haChanged = _haE && JSON.stringify(_haE) !== JSON.stringify(_haImageE ?? null);
+        const _localE = _lsE ?? _yamlE ?? _haE;
+
+        // Base: the YAML value for every field — nothing persists unless explicitly
+        // enabled. Then layer in the local value for fields with some persistence
+        // enabled, then further layer in the HA value for the multidevice-enabled subset
+        // if it actually changed. A dynamic entity has no YAML value; its base is the
+        // local/HA snapshot instead — it only exists here at all because persistence was
+        // enabled for it (see _resolveEntities), so there's always something to base on.
+        const _result = _yamlE ? { ..._yamlE } : { ..._localE };
+        // A field missing from a stored entry is a field that was cleared (e.g. hidden
+        // back to visible drops 'hidden' from the saved JSON) — taken over as cleared
+        // too, not skipped: skipping it would silently lose that source's change.
+        const _take = (_src, _f) => {
+            if( _src[_f] === undefined ) delete _result[_f];
+            else _result[_f] = _src[_f];
+        };
+        for( const _f of _enabledFields )
+            if( _localE ) _take(_localE, _f);
+        if( _haChanged )
+            for( const _f of _multiFields )
+                _take(_haE, _f);
+        // graphKey (which linked graph of its group the entity is shown in — see
+        // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
+        // follows whichever source won groupId above. graphIndex is NOT taken over per
+        // entity: it's a position relative to the other graphs of the block, so taking
+        // it from different sources for different entities would mix two coordinate
+        // systems and shuffle the block. The order inside a block is carried by the
+        // entities' order instead (resolved as a whole, see 'order' — and kept in step
+        // with the display by _syncGroupOrder).
+        const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
+                        ( _enabledFields.has('groupId') ? _localE : null );
+        if( _keySrc ) {
+            if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
+            else delete _result.graphKey;
+        }
+        return _result;
+    }
+
+    // --- Last one to speak wins — the time range ---
+    // Persisted by default only on a card without static entities (noStatics)
+    _resolveTimeRange(_ls, _haCard, _yamlImage, noStatics)
+    {
+        const _range = this._cardPersists('range', noStatics);
         // HA user front (compare HA user value to its mirror in localStorage)
-        // range defaults to 'all' when this card has no static (YAML) entities at all —
-        // a purely dynamic card has nothing fixed to anchor to, so it's treated the same
-        // way dynamic entities are: persist by default. A card with at least one static
-        // entity still defaults to 'none' for range, same as before. See _noStaticsDefaultAll
-        // above (shared with order — same reasoning applies to both).
-        const _multiRange = this._resolvePersistenceDefault(this.pconfig.enableMultidevicePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('range');
-        const _localRange = this._resolvePersistenceDefault(this.pconfig.enablePersistence, ['range', 'entities', 'order'], _noStaticsDefaultAll).has('range');
-        const _haTimeChanged = _multiRange &&
+        const _haTimeChanged = _range.multi &&
             _haCard?.timeRangeHours !== undefined && (
             _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
             _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
         );
-
         // YAML front — compared with the YAML image only
         const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
                                  String(this.pconfig.yamlDefaultTimeRange) !== String(_yamlImage?.yaml_defaultTimeRange);
 
-        // infoPanelEnabled — proper mirror-compared "last one to speak wins", same pattern
-        // as everything else. This was broken as an unrelated side effect of the v1.1.27
-        // storage-format simplification (which dropped `yaml_defaultInfoPanel` from the
-        // persisted payload while unifying the static/dynamic graph pipeline — info panel
-        // was never the target of that refactor and was never re-tested after it), then
-        // "fixed" back to a permanently-true comparison mid-session under the mistaken
-        // belief that the cross-card conflict-detection registry below (in
-        // `history-explorer-infopanel-enabled`.registry) needed it to always fire in order
-        // to keep re-registering and cleaning up stale/removed cards. It doesn't: that
-        // registry block is entirely unconditional already (re-registers with a fresh
-        // timestamp on every load regardless of this comparison, see below) — verified
-        // against the last version with a properly tested info panel (v1.1.19), which used
-        // this exact mirror comparison.
-        const _haInfoChanged = _haInfoEnabled !== undefined &&
-                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _yamlImage?.yaml_defaultInfoPanel;
-
-        // Apply winning value to active variables — YAML wins if both changed simultaneously
-        let _infoPanelChanged = false;
-
-        if( _yamlInfoChanged || _haInfoChanged ) {
-            // YAML wins if both changed
-            const active_infoPanelEnabled = _yamlInfoChanged ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
-            if( active_infoPanelEnabled !== infoPanelEnabled ) {
-                setInfoPanelEnabled(active_infoPanelEnabled);
-                _infoPanelChanged = true;
-            }
-        } else {
-            // No front — infoPanelEnabled already correctly set from localStorage at module load (line 96)
-        }
-
-        if( !_multiRange && !_localRange ) {
+        if( !_range.multi && !_range.local ) {
             // Nothing enabled for range — nothing persists, always the YAML default
             this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
         } else if( _yamlTimeChanged || _haTimeChanged ) {
@@ -314,20 +310,33 @@ export class CardStorage
             g.chart.options.scales.xAxes[0].time.min = this.startTime;
             g.chart.options.scales.xAxes[0].time.max = this.endTime;
         }
+    }
 
-        // Update HA user mirrors for next writeLocalState
-        this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
-        this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
-        this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
-        this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
+    // --- Last one to speak wins — the info panel's switch ---
+    // Its YAML value (defaultInfoPanel) and its HA value each compared with their image,
+    // YAML winning if both changed. Returns whether the switch changed here.
+    _resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage)
+    {
+        const _haInfoChanged = _haInfoEnabled !== undefined &&
+                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
+        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
+                                 this.pconfig.defaultInfoPanel !== _yamlImage?.yaml_defaultInfoPanel;
+        // (neither changed: the switch stays as read from localStorage when the module loaded)
+        if( !_yamlInfoChanged && !_haInfoChanged ) return false;
 
+        const _active = _yamlInfoChanged ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
+        if( _active === infoPanelEnabled ) return false;
+        setInfoPanelEnabled(_active);
+        return true;
+    }
 
-        // Register defaultInfoPanel with HA user key and detect conflicts across cards.
-        // This re-registers with a fresh timestamp on every load, unconditionally — that's
-        // required for cleanup of stale/removed cards to work at all (deleting a card/view
-        // generates no HA event, so only surviving cards reasserting themselves can ever
-        // detect and clean up a stale entry). This is entirely independent of
-        // _yamlInfoChanged/_haInfoChanged above — it never reads them, and never needed to.
+    // Register defaultInfoPanel with HA user key and detect conflicts across cards.
+    // This re-registers with a fresh timestamp on every load, unconditionally — that's
+    // required for cleanup of stale/removed cards to work at all (deleting a card/view
+    // generates no HA event, so only surviving cards reasserting themselves can ever
+    // detect and clean up a stale entry). Independent of _resolveInfoPanel.
+    async _registerInfoPanelDefault()
+    {
         try {
             const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
             const _globalData = _ipe2?.value || {};
@@ -369,16 +378,6 @@ export class CardStorage
                 if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
             }
         } catch(e) {}
-
-        // Persist updated state (mirrors included) before any potential reload
-        await this.writeLocalState();
-
-        // Apply infoPanel state last, after everything (including writeLocalState) is done
-        if( _infoPanelChanged ) {
-            this.applyInfoPanelState();
-        }
-
-        return false; // interval redraw handled via pconfig.entities in createContent
     }
     // The fields of an entity whose value is saved: { multi (on every device), local (on
     // this device) } — the YAML entity's own enable_* options (staticEntry), else the card's

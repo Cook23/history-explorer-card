@@ -460,15 +460,7 @@ export class CardHistory
                 if( !this.statistics.enabled || l0 > this.limitSlot ) {
 
                     // Issue history retrieval call, initiate async cache loading
-                    const d = {
-                        type: "history/history_during_period",
-                        start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-                        end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
-                        minimal_response: true,
-                        no_attributes: true,
-                        entity_ids: l
-                    };
-                    this._hass.callWS(d).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
+                    this._hass.callWS(this.historyRequest(l, t0, t1)).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
 
                     // Parallel statistics query for entities with showMinMax:'history'/'states'
                     const lmm = [];
@@ -479,27 +471,13 @@ export class CardHistory
                                 lmm.push(e.entity);
                         }
                     if( lmm.length ) {
-                        const dmm = {
-                            type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? 'recorder/statistics_during_period' : 'history/statistics_during_period',
-                            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-                            end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
-                            period: this.statistics.period ?? 'hour',
-                            statistic_ids: lmm
-                        };
-                        this._hass.callWS(dmm).then(this.minmaxCallback.bind(this), () => {});
+                        this._hass.callWS(this.statisticsRequest(lmm, t0, t1, this.statistics.period ?? 'hour')).then(this.minmaxCallback.bind(this), () => {});
                     }
 
                 } else {
 
                     // Issue statistics retrieval call
-                    const d = {
-                        type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
-                        start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-                        end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
-                        period: this.statistics.period,
-                        statistic_ids: l
-                    };
-                    this._hass.callWS(d).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
+                    this._hass.callWS(this.statisticsRequest(l, t0, t1, this.statistics.period)).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
 
                 }
 
@@ -555,5 +533,35 @@ export class CardHistory
                 g.chart.update();
             }
         }
+    }
+
+    // --------------------------------------------------------------------------------------
+    // Home Assistant's recorder
+    // --------------------------------------------------------------------------------------
+
+    // The request for the history of entities ids from t0 to t1 (none: until now) — their
+    // states only, unless withAttributes
+    historyRequest(ids, t0, t1 = null, withAttributes = false)
+    {
+        return {
+            type: "history/history_during_period",
+            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+            ...( t1 !== null ? { end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ') } : {} ),
+            minimal_response: !withAttributes,
+            no_attributes: !withAttributes,
+            entity_ids: ids
+        };
+    }
+
+    // The request for the long-term statistics of ids from t0 to t1, by period
+    statisticsRequest(ids, t0, t1, period)
+    {
+        return {
+            type: ( this.version[0] > 2022 || this.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
+            start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
+            end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
+            period,
+            statistic_ids: ids
+        };
     }
 }

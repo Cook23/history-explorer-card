@@ -19,6 +19,16 @@ export function getDeviceClassPure(hass, entity)
     return hass.states[entity]?.attributes?.device_class;
 }
 
+// The type an entity is shown as when nothing sets it (a YAML entity, the info panel): a
+// quantity that only adds up (total_increasing) as bars, no unit and not a measurement as a
+// timeline, anything else as a line (entities added from the card: _detectDefaultType)
+export function baseTypePure(hass, entity)
+{
+    const _attr = hass.states[entity]?.attributes;
+    const uom = _attr?.unit_of_measurement, sc = _attr?.state_class;
+    return ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+}
+
 export function getEntityOptionsPure(hass, entityOptions, entity)
 {
     // Simplified version of HistoryCardState.getEntityOptions: no glob/pattern-list

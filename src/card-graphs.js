@@ -9,6 +9,7 @@ import { i18n } from "./languages.js";
 import { entityIdOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeInterpolation, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { baseTypePure } from "./card-config.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -605,9 +606,7 @@ export class CardGraphs
         const _nextG = this._nextGraph(g);
         this._detachGraph(_upper);
         this._detachGraph(g);
-        _all.forEach((en, i) => {
-            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: _nextG, groupId: _groupId, entry: en });
-        });
+        this._rebuildGraph(_all, _groupId, _nextG);
         this._syncGroupOrder(_groupId);
         this.writeLocalState();
         this.updateHistory();
@@ -654,21 +653,10 @@ export class CardGraphs
 
         if( this._hass.states[entity_id] == undefined ) return;
 
-        var entityOptions = this.getEntityOptions(entity_id);
+        const { graphProps: _graphProps, options: entityOptions } = this._optionsInGraph(entity_id, groupId);
 
-        // Merge graph-level properties before type detection so graph.type from YAML wins
-        const _graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
-        // Only keys the graph actually sets: a plain spread would let every graph-level key
-        // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
-        const _definedGraphProps = Object.fromEntries(Object.entries(_graphProps).filter(([, v]) => v !== undefined));
-        // From the lowest priority to the highest: the card's defaults, entityOptions, the graph
-        entityOptions = { ...this.pconfig.cardGraphDefaults, ...entityOptions, ..._definedGraphProps, groupId };
-
-        const uom = this.getUnitOfMeasure(entity_id);
-        const sc = this.getStateClass(entity_id);
-        const _overrideType = entry?.type ?? entityOptions?.type;
-        // (let: becomes the graph's type below, once combined — see _graphType)
-        let type = _overrideType ? _overrideType : ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+        // (let: becomes the graph's type below, once combined)
+        let type = ( entry?.type ?? entityOptions?.type ) || baseTypePure(this._hass, entity_id);
 
         // The entity's single source of truth: entry is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
@@ -686,98 +674,18 @@ export class CardGraphs
         // drag, type change...) — not only the initial rebuild, which passes isStatic.
         if( _pcEntry.isStatic ) isStatic = true;
 
-        // The entity's own fill (e.g. `fill:` on a YAML graph entity), captured before the
-        // defaults below — an explicit per-entity fill always wins over entityOptions/graph
-        // defaults and over the auto-assigned default color's fill.
-        const _ownFill = _pcEntry.fill;
+        const _ownFill = this._applyEntityDefaults(_pcEntry, type, entityOptions, { color, fill, hidden });
 
         let entities = [_pcEntry];
-        entities[0].color = entities[0].color ?? "#000000";
-        entities[0].fill = entities[0].fill ?? "#00000000";
-
-        // Resolve color/fill for all types — including timeline, whose rendering doesn't use
-        // entities[i].color directly but must still round-trip correctly through drag/uncombine/type-switch
-        if( type == 'line' || type == 'arrowline' || type == 'bar' || type == 'timeline' ) {
-
-            if( color ) {
-                entities[0].color = color;
-                entities[0].fill = fill ?? 'rgba(0,0,0,0)';
-            } else if( entityOptions?.color ) {
-                entities[0].color = entityOptions?.color;
-                entities[0].fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
-                entities[0].colorSet = true;
-            } else if( entities[0].color === "#000000" ) {
-                const c = this.getNextDefaultColor();
-                entities[0].color = c.color;
-                entities[0].fill = _ownFill ?? entityOptions?.fill ?? c.fill;
-            }
-            // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
-            // palette's where none applies (see _currentColor)
-            if( !parseColorValue(entities[0].color)?.color )
-                entities[0].paletteColor = entities[0].paletteColor ?? this.getNextDefaultColor().color;
-
-            entities[0].dashMode   = entities[0].dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
-            entities[0].width     = entities[0].width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
-            entities[0].lineMode  = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
-            // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
-            // the Interpolation submenu — so that changing it on the card, a graph or in
-            // entityOptions still applies to it; see _resolveInterpolation)
-            entities[0].interpolation = normalizeInterpolation(entities[0].interpolation);
-            entities[0].scale     = entities[0].scale       ?? entityOptions?.scale;
-            entities[0].hidden    = hidden !== undefined ? hidden : (entities[0].hidden ?? entityOptions?.hidden);
-            entities[0].netBars   = entities[0].netBars    ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
-            entities[0].showPoints= entities[0].showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
-            entities[0].decimation= entities[0].decimation  ?? entityOptions?.decimation;
-            entities[0].showMinMax= entities[0].showMinMax  ?? entityOptions?.showMinMax ?? this.pconfig.defaultShowMinMax;
-            entities[0].name      = entities[0].name        ?? entityOptions?.name;
-            entities[0].siConversionFactor = entities[0].siConversionFactor ?? entityOptions?.siConversionFactor;
-            entities[0].unit      = entities[0].unit        ?? entityOptions?.unit;
-            entities[0].process   = entities[0].process     ?? entityOptions?.process;
-            entities[0].circular  = entities[0].circular    ?? entityOptions?.circular;
-            entities[0].yAxis     = entities[0].yAxis       ?? entityOptions?.yAxis;
-
-            if( type == 'bar' ) {
-                entities[0].fill = entities[0].color;
-                entities[0].lineMode = this.normalizeLineMode(entities[0].lineMode ?? entityOptions?.lineMode) ?? 'lines';
-            }
-
-        }
-
-        // Find a graph to combine with:
-        // - With an explicit groupId (static YAML graph, or any graph being rebuilt): the
-        //   graph of that same group showing the same sub-graph (graphKey — see
-        //   _uncombineEntity) with the same type. Units are deliberately NOT checked here:
-        //   the entities of one group are shown together by definition (a YAML graph is the
-        //   author's explicit choice; a dynamic group was only ever formed from compatible
-        //   units), so mixed units share one graph and one Y axis. Only the type keeps them
-        //   apart (line/bar/timeline/arrowline can't share one chart) — those become linked
-        //   graphs of the same group instead, re-combinable later.
-        // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
-        //   considered, and its groupId is adopted if type and units are compatible
-        const _graphKey = _pcEntry.graphKey;
-        let _combineIdx = -1;
-        if( !noAutoGroup ) {
-            _combineIdx = (groupId !== null) ?
-                this.graphs.reduce((_last, g, i) => g.groupId === groupId && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === _graphKey && this._sameSavedGraph(g.entities[0], _pcEntry) ? i : _last, -1) :
-                this.graphs.length - 1;
-        }
-
-        let combine = false;
-        let _cand = null;
-        let _adoptedGraphIndex = null;
-        if( _combineIdx >= 0 ) {
-            _cand = this.graphs[_combineIdx];
-            combine = ( groupId !== null ) ? true :
-                      _cand.type === type &&
-                      ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(entity_id, _pcEntry.unit), this.getUnitOfMeasure(_cand.entities[0].entity, _cand.entities[0].unit)) );
-        }
 
         // Captured so the merged graph can be reinserted at the removed graph's DOM position
         // instead of always landing at the end of #graphlist
         let _combineGl = null;
         let _combineInsertBefore = null;
+        let _graphIndex;
 
-        if( combine ) {
+        const _cand = noAutoGroup ? null : this._combineTarget(_pcEntry, type, groupId);
+        if( _cand ) {
 
             // If no groupId provided, adopt the target graph's groupId
             if( groupId === null ) groupId = _cand.groupId;
@@ -787,23 +695,9 @@ export class CardGraphs
             // inserting into a solid block of several linked graphs (the only case where
             // a groupId's members could have different graphIndex values) is forbidden
             // elsewhere, so every entity of _cand already shares one value.
-            _adoptedGraphIndex = _cand.entities[0].graphIndex;
+            _graphIndex = _cand.entities[0].graphIndex ?? 1;
 
-            // Color conflict check now happens here, against the REAL combine target —
-            // works regardless of whether the caller knew about this target in advance
-            // (e.g. a brand-new entity created via the type menu, groupId starting null).
-            // Only for a color the card picked: one the configuration sets (colorSet) is kept,
-            // even when another curve of the graph has it.
-            if( entities[0].color !== undefined && !entities[0].colorSet ) {
-                const _usedColors = _cand.entities.map(e => e.color);
-                if( _usedColors.includes(entities[0].color) ) {
-                    const _free = defaultColors.find(c => !_usedColors.includes(c.color));
-                    if( _free ) {
-                        entities[0].color = _free.color;
-                        entities[0].fill  = _ownFill ?? _free.fill;
-                    }
-                }
-            }
+            this._freeColorIn(_cand, _pcEntry, _ownFill);
 
             // Add the new entity to the previous ones
             entities = _cand.entities.concat(entities);
@@ -817,9 +711,12 @@ export class CardGraphs
 
             // Delete the old graph, will be regenerated below including the new entity
             _candDiv.remove();
-            this.graphs.splice(_combineIdx, 1);
+            this.graphs.splice(this.graphs.indexOf(_cand), 1);
 
+        } else {
+            _graphIndex = this._newGraphIndex(before);
         }
+        for( let e of entities ) e.graphIndex = _graphIndex;
 
         // entityOptions.groupId was frozen before the combine block resolved the final
         // groupId (e.g. adopting the target graph's groupId when it was null) — resync it
@@ -851,60 +748,11 @@ export class CardGraphs
             ?? this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval) ?? 1;
         entityOptions._graphInterval = _graphInterval;
 
-        // graphIndex: a real number giving each graph's display order (1 = topmost page-
-        // wide), tracked per entity (all entities of one displayed graph share the same
-        // value) since there's no separate per-graph persisted structure. Combine already
-        // adopted the target graph's value above (_adoptedGraphIndex). A genuinely new
-        // graph is placed right before `before` (see insertion below) — its index is
-        // the average of `before`'s index and its true on-screen previous neighbor's
-        // (0 if none, i.e. inserting at the very top). `before` null means nothing
-        // follows: index is the last on-screen graph's, rounded up, + 1 (or 1 if there are
-        // no graphs yet).
-        let _graphIndex;
-        if( combine ) {
-            _graphIndex = _adoptedGraphIndex ?? 1;
-        } else if( before?.entities?.[0]?.graphIndex !== undefined ) {
-            const _prevG = this._previousGraph(before);
-            const _beforeIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
-            _graphIndex = (_beforeIdx + before.entities[0].graphIndex) / 2;
-        } else {
-            const _all = this._allGraphsInDisplayOrder();
-            const _lastIdx = _all[_all.length - 1]?.entities?.[0]?.graphIndex;
-            _graphIndex = _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
-        }
-        for( let e of entities ) e.graphIndex = _graphIndex;
-
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
         // (a mixed bar/line graph is sized like a line graph, plus the interval selector)
         const h = _mixed ? this.calcGraphHeight('line', entities.length, _graphHeight) + 24 : this.calcGraphHeight(type, entities.length, _graphHeight);
 
-        let html = '';
-        // Spacing between graphs: a margin-top on this graph's own container unless it's
-        // the very first one on the page — found by comparing its own graphIndex to the
-        // current first graph's (this graph doesn't exist in this.graphs yet, so
-        // _isFirstGraph itself doesn't apply here). Not by this.graphs.length (a transient
-        // count during construction that doesn't reflect final display order — e.g.
-        // rebuilding a graph in the middle of the page still finds this.graphs empty at
-        // that moment). Also skipped if the previous graph has showTimeLabels === false.
-        // A margin (not a <br> sibling) is structurally part of this graph's own div, so
-        // it can never end up misplaced relative to it — same reasoning as the toolbar.
-        const _currentFirst = this._firstGraph();
-        const _isFirstOnPage = !_currentFirst || _graphIndex <= (_currentFirst.entities?.[0]?.graphIndex ?? Infinity);
-        const _prevG = _isFirstOnPage ? null : this._allGraphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < _graphIndex).pop();
-        const _prevShowTimeLabels = _prevG ? (_prevG.showTimeLabels ?? true) : true;
-        const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
-        // Optional title
-        if( _graphProps.title !== undefined ) html += `<div style='text-align:center;'>${_graphProps.title}</div>`;
-        html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
-        html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
-        if( !isStatic )
-            html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
-        if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, _graphInterval, this.ui.optionStyle, 40);
-        html += `</div>`;
-
-        let e = document.createElement('div');
-        e.innerHTML = html;
+        const e = this._graphElement(type, h, _graphIndex, _graphInterval, _graphProps.title, isStatic);
 
         let gl = this._this.querySelector('#graphlist');
         const _tgtDiv = ( before && before.canvas?.parentNode ) ? this._graphDiv(before) : null;
@@ -946,6 +794,167 @@ export class CardGraphs
         // Update mo/ca visibility based on graph count
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
+    }
+
+    // An entity's options in the graph of group groupId: from the lowest priority to the
+    // highest, the card's defaults, entityOptions, the graph's own (YAML) options
+    _optionsInGraph(entity_id, groupId)
+    {
+        const graphProps = (groupId !== null && this.pconfig.graphs[groupId]) ? this.pconfig.graphs[groupId] : {};
+        // Only keys the graph actually sets: a plain spread would let every graph-level key
+        // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
+        const _definedGraphProps = Object.fromEntries(Object.entries(graphProps).filter(([, v]) => v !== undefined));
+        return { graphProps, options: { ...this.pconfig.cardGraphDefaults, ...this.getEntityOptions(entity_id), ..._definedGraphProps, groupId } };
+    }
+
+    // An entry's display settings it doesn't set itself: the color asked for (color, fill),
+    // else the configuration's (colorSet), else the palette's; then each option from
+    // entityOptions or the card's defaults. Returns the entry's own fill, as it was before
+    // (an explicit per-entity fill always wins over the defaults and the palette's fill).
+    _applyEntityDefaults(e, type, entityOptions, { color, fill, hidden })
+    {
+        const _ownFill = e.fill;
+
+        e.color = e.color ?? "#000000";
+        e.fill = e.fill ?? "#00000000";
+
+        // (for every type — a timeline doesn't draw them, but they must round-trip through
+        // drag, uncombine and type changes)
+        if( color ) {
+            e.color = color;
+            e.fill = fill ?? 'rgba(0,0,0,0)';
+        } else if( entityOptions?.color ) {
+            e.color = entityOptions?.color;
+            e.fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
+            e.colorSet = true;
+        } else if( e.color === "#000000" ) {
+            const c = this.getNextDefaultColor();
+            e.color = c.color;
+            e.fill = _ownFill ?? entityOptions?.fill ?? c.fill;
+        }
+        // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
+        // palette's where none applies (see _currentColor)
+        if( !parseColorValue(e.color)?.color )
+            e.paletteColor = e.paletteColor ?? this.getNextDefaultColor().color;
+
+        e.dashMode   = e.dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
+        e.width      = e.width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
+        e.lineMode   = this.normalizeLineMode(e.lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
+        // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
+        // the Interpolation submenu — so that changing it on the card, a graph or in
+        // entityOptions still applies to it; see _resolveInterpolation)
+        e.interpolation = normalizeInterpolation(e.interpolation);
+        e.scale      = e.scale       ?? entityOptions?.scale;
+        e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
+        e.netBars    = e.netBars     ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
+        e.showPoints = e.showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
+        e.decimation = e.decimation  ?? entityOptions?.decimation;
+        e.showMinMax = e.showMinMax  ?? entityOptions?.showMinMax ?? this.pconfig.defaultShowMinMax;
+        e.name       = e.name        ?? entityOptions?.name;
+        e.siConversionFactor = e.siConversionFactor ?? entityOptions?.siConversionFactor;
+        e.unit       = e.unit        ?? entityOptions?.unit;
+        e.process    = e.process     ?? entityOptions?.process;
+        e.circular   = e.circular    ?? entityOptions?.circular;
+        e.yAxis      = e.yAxis       ?? entityOptions?.yAxis;
+
+        if( type == 'bar' ) {
+            e.fill = e.color;
+            e.lineMode = this.normalizeLineMode(e.lineMode ?? entityOptions?.lineMode) ?? 'lines';
+        }
+
+        return _ownFill;
+    }
+
+    // The graph an entry joins, if any:
+    // - With an explicit groupId (static YAML graph, or any graph being rebuilt): the
+    //   graph of that same group showing the same sub-graph (graphKey — see
+    //   _uncombineEntity) with a compatible type. Units are deliberately NOT checked here:
+    //   the entities of one group are shown together by definition (a YAML graph is the
+    //   author's explicit choice, a curve dropped there the user's), on two Y axes or one
+    //   (see _assignYAxes). Only the type keeps them apart (a timeline or an arrowline
+    //   can't share a chart) — those become linked graphs of the same group instead,
+    //   re-combinable later.
+    // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
+    //   considered, joined if it has the same type and, for curves, compatible units
+    //   (combineSameUnits)
+    _combineTarget(e, type, groupId)
+    {
+        if( groupId !== null )
+            return this.graphs.filter(g => g.groupId === groupId && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === e.graphKey && this._sameSavedGraph(g.entities[0], e)).pop() ?? null;
+
+        const _last = this.graphs[this.graphs.length - 1];
+        return _last && _last.type === type &&
+               ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(e.entity, e.unit), this.getUnitOfMeasure(_last.entities[0].entity, _last.entities[0].unit)) )
+            ? _last : null;
+    }
+
+    // An entry joining graph g with a color another of its curves has: a free color of the
+    // palette instead — only for a color the card picked: one the configuration sets
+    // (colorSet) is kept. (Checked against the real target, whether or not the caller knew
+    // it — e.g. a brand-new entity created from the type menu.)
+    _freeColorIn(g, e, ownFill)
+    {
+        if( e.color === undefined || e.colorSet ) return;
+        const _usedColors = g.entities.map(x => x.color);
+        if( !_usedColors.includes(e.color) ) return;
+        const _free = defaultColors.find(c => !_usedColors.includes(c.color));
+        if( _free ) {
+            e.color = _free.color;
+            e.fill  = ownFill ?? _free.fill;
+        }
+    }
+
+    // graphIndex of a new graph: a real number giving each graph's display order (1 =
+    // topmost page-wide), tracked per entity (all entities of one displayed graph share the
+    // same value) since there's no separate per-graph persisted structure. A new graph is
+    // placed right before `before` (see addGraph's insertion) — its index is the average of
+    // `before`'s index and its true on-screen previous neighbor's (0 if none, i.e. inserting
+    // at the very top). `before` null means nothing follows: index is the last on-screen
+    // graph's, rounded up, + 1 (or 1 if there are no graphs yet).
+    _newGraphIndex(before)
+    {
+        if( before?.entities?.[0]?.graphIndex !== undefined ) {
+            const _prevG = this._previousGraph(before);
+            const _beforeIdx = _prevG?.entities?.[0]?.graphIndex ?? 0;
+            return (_beforeIdx + before.entities[0].graphIndex) / 2;
+        }
+        const _all = this._allGraphsInDisplayOrder();
+        const _lastIdx = _all[_all.length - 1]?.entities?.[0]?.graphIndex;
+        return _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
+    }
+
+    // The element of a new graph (its title, canvas, close button, interval selector),
+    // not yet in the page
+    _graphElement(type, h, graphIndex, graphInterval, title, isStatic)
+    {
+        let html = '';
+        // Spacing between graphs: a margin-top on this graph's own container unless it's
+        // the very first one on the page — found by comparing its own graphIndex to the
+        // current first graph's (this graph doesn't exist in this.graphs yet, so
+        // _isFirstGraph itself doesn't apply here). Not by this.graphs.length (a transient
+        // count during construction that doesn't reflect final display order — e.g.
+        // rebuilding a graph in the middle of the page still finds this.graphs empty at
+        // that moment). Also skipped if the previous graph has showTimeLabels === false.
+        // A margin (not a <br> sibling) is structurally part of this graph's own div, so
+        // it can never end up misplaced relative to it — same reasoning as the toolbar.
+        const _currentFirst = this._firstGraph();
+        const _isFirstOnPage = !_currentFirst || graphIndex <= (_currentFirst.entities?.[0]?.graphIndex ?? Infinity);
+        const _prevG = _isFirstOnPage ? null : this._allGraphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < graphIndex).pop();
+        const _prevShowTimeLabels = _prevG ? (_prevG.showTimeLabels ?? true) : true;
+        const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
+        // Optional title
+        if( title !== undefined ) html += `<div style='text-align:center;'>${title}</div>`;
+        html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
+        html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
+        if( !isStatic )
+            html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
+        if( type == 'bar' && !this.ui.hideInterval )
+            html += this.createIntervalSelectorHtml(this.g_id, h, graphInterval, this.ui.optionStyle, 40);
+        html += `</div>`;
+
+        const e = document.createElement('div');
+        e.innerHTML = html;
+        return e;
     }
 
     // The legend keeps clear of the buttons drawn over the graph's top right corner (bar
@@ -1053,5 +1062,24 @@ export class CardGraphs
         const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "showTimeLabels": config?.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
+    }
+
+    // --------------------------------------------------------------------------------------
+    // Rebuilding a graph
+    // --------------------------------------------------------------------------------------
+
+    // Builds one graph of group groupId from entities (in that order), right before graph
+    // nextG (null: at the end) — combined into one graph whatever their units, each with its
+    // persisted entry of that group, its color and fill. options: more addGraph options for
+    // each (e.g. the graph's interval; fill: null to recompute it for a new type)
+    _rebuildGraph(entities, groupId, nextG, options = {})
+    {
+        const _saved = this.pconfig.combineSameUnits;
+        this.pconfig.combineSameUnits = true;
+        entities.forEach((en, i) => {
+            const _pe = this.store.inGroup(en.entity, groupId);
+            this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en, ...options });
+        });
+        this.pconfig.combineSameUnits = _saved;
     }
 }

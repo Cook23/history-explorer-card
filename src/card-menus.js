@@ -421,18 +421,10 @@ export class CardMenus
                 const _origGroupId = _g.groupId;
                 const _nextG = this._nextGroup(_g);
                 this._detachGraph(_g);
-                // Re-add remaining entities — color from pconfig.entities (g.entities' color
-                // is meaningless, always black, coming from a timeline graph); fill recomputed below
-                const _savedCombine = this.pconfig.combineSameUnits;
-                this.pconfig.combineSameUnits = true;
-                _newEntities.forEach((en, i) => {
-                    const _pe = this.store.inGroup(en.entity, _origGroupId);
-                    // fill is not persisted across a type change: it's derived from color+type,
-                    // not a type-independent value. Pass null so addGraph recomputes it correctly
-                    // for the target type (transparent for line/arrowline/timeline, solid for bar).
-                    this.addGraph(en.entity, { noAutoGroup: i === 0, color: _pe?.color ?? en.color, before: _nextG, groupId: _origGroupId, entry: _pe ?? en });
-                });
-                this.pconfig.combineSameUnits = _savedCombine;
+                // Re-add remaining entities. fill is not kept across a type change: it's derived
+                // from color+type, not a type-independent value — null, so addGraph recomputes
+                // it for the target type (transparent for line/arrowline/timeline, solid for bar).
+                this._rebuildGraph(_newEntities, _origGroupId, _nextG, { fill: null });
                 // Re-add extracted entity — color only; fill recomputed for the new type (see
                 // above). Goes right before whatever followed the original graph _g — i.e.
                 // right after the just-rebuilt remaining-entities graph.

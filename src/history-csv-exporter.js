@@ -128,16 +128,8 @@ export class HistoryCSVExporter {
             this.overlay = cardstate.ui.spinOverlay;
             document.body.appendChild(this.overlay);
 
-            // Issue statistics retrieval call
-            let d = { 
-                type: "history/history_during_period",
-                start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-                end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
-                minimal_response: !this.saveAttributes,
-                no_attributes: !this.saveAttributes,
-                entity_ids: l
-            };
-            cardstate._hass.callWS(d).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
+            // Issue history retrieval call
+            cardstate._hass.callWS(cardstate.historyRequest(l, t0, t1, this.saveAttributes)).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
 
         }
     }
@@ -227,14 +219,7 @@ export class StatisticsCSVExporter {
             document.body.appendChild(this.overlay);
 
             // Issue statistics retrieval call
-            let d = { 
-                type: ( cardstate.version[0] > 2022 || cardstate.version[1] >= 11 ) ? "recorder/statistics_during_period" : "history/statistics_during_period",
-                start_time: moment(t0).format('YYYY-MM-DDTHH:mm:ssZ'),
-                end_time: moment(t1).format('YYYY-MM-DDTHH:mm:ssZ'),
-                period: cardstate.pconfig.exportStatsPeriod ?? 'hour',
-                statistic_ids: l
-            };
-            cardstate._hass.callWS(d).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
+            cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod ?? 'hour')).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
 
         }
     }
