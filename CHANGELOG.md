@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.8] - unreleased
+## [v1.2.8] - 2026-10-06
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
 - `showState`: each curve's value now, in large, in its color, over the graph; `showStats`: its `min`, `average` and `max` over the window shown, the min and max with their time — from its history, the average weighted by time, recomputed as the window moves. At every level (card, entityOptions, graph, entity)
