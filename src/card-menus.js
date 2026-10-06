@@ -225,7 +225,7 @@ export class CardMenus
 
     // Opens the type menu's submenu key over the menu, level with its item — the one
     // open before closes — and gives it the keyboard: the first arrow key highlights its
-    // marked entry, Enter takes it right away
+    // marked entry, Enter takes it right away. Its item in the menu is in bold while it's open
     showTypeSubmenu(input_idx, key)
     {
         const _item = this._this.querySelector(`#et_${input_idx}_${key}`);
@@ -233,17 +233,23 @@ export class CardMenus
         if( !_item || !_sub || _item.style.display === 'none' ) return;
         this.hideTypeSubmenus(input_idx);
         if( key === 'interp' ) this._markInterpolationMenu(input_idx);
+        _item.style.fontWeight = 'bold';
         this._openSubmenu(_sub, _item);
         _sub.focus();
     }
 
-    // Closes the type menu's submenus (their keyboard highlight cleared, their marks kept),
-    // and with backToMenu gives the keyboard back to the menu
+    // Closes the type menu's submenus (their keyboard highlight cleared, their marks kept,
+    // their items in the menu no longer in bold), and with backToMenu gives the keyboard
+    // back to the menu
     hideTypeSubmenus(input_idx, backToMenu = false)
     {
         for( const _sub of this._typeSubmenus(input_idx) ) {
             for( let _a of _sub.getElementsByTagName('a') ) _a.style.background = '';
             _sub.style.display = 'none';
+        }
+        for( const k in _TYPE_SUBMENUS ) {
+            const _item = this._this.querySelector(`#et_${input_idx}_${k}`);
+            if( _item ) _item.style.fontWeight = '';
         }
         if( backToMenu ) this._this.querySelector(`#et_${input_idx}`)?.focus();
     }

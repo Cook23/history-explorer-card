@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.6] - unreleased
+
+### Changed — the type menu shows which submenu is open
+- The item whose submenu is open (*Display*, *Interpolation*, *Layout*, *Tests*) is in bold, and only it; back to the menu, none is
+- Tests: the open submenu's item in bold, another one opened, back to the menu
+
 ## [v1.2.5] - 2026-10-06
 
 ### Changed — a curve dropped onto any line or bar graph

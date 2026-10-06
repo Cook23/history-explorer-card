@@ -41,13 +41,13 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸ | Interpolation ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
+        return m === 'Display ▸* | Interpolation ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: Display (timeline only), Layout', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸ | Layout ▸ | Tests (beta) ▸ || open: rep || Timeline* || Delete' ? true : m;
+        return m === 'Display ▸* | Layout ▸ | Tests (beta) ▸ || open: rep || Timeline* || Delete' ? true : m;
     });
     done(await t.close());
 
