@@ -29,8 +29,8 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
-> - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
-> - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; an attribute can also hold or pick a curve's `color`; and **the same curve in several graphs**, each set on its own;
+> - **colors that change**: `color` takes thresholds on curves too, or an entity or one of its attributes — holding the color, or whose value (a mode, a temperature, a thermostat's `hvac_action`) picks it, point by point;
+> - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
 > - **values over a graph**, as mini-graph-card shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
