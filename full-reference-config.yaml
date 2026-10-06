@@ -18,6 +18,12 @@ graphs:
       # $.graphs.options for the same graph
       exclude: null
 
+      # One of the entity's attributes shown instead of its state (its history only: an attribute has
+      # no long-term statistics). A number is shown as a curve, anything else as a timeline. Home
+      # Assistant gives an attribute no unit: set `unit:` to show one. Also written as the entity
+      # followed by the attribute: `entity: climate.salon.current_temperature`
+      attribute: null
+
       # Every option below is optional — shown here with its effective default (or 'null' where
       # there is none). All of them can also be set for dynamically-added entities via `$.entityOptions`,
       # or shared by every entity in this graph via `$.graphs.options` (most specific value always wins)

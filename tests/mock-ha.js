@@ -38,7 +38,10 @@ const STATES={
  'input_text.curve_thresholds':ent('input_text.curve_thresholds','curve thresholds',null,"{0: 'green', 800: 'red'}"),
  'input_text.not_a_color':ent('input_text.not_a_color','not a color',null,'nothing'),
  'sensor.clim_mode':ent('sensor.clim_mode','clim mode',null,'hot'),
+ // attributes shown as curves: a number, a text, and what is never offered (a list, HA's own)
+ 'climate.salon':ent('climate.salon','salon',null,'heat'),
 };
+Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, hvac_action: 'heating', hvac_modes: ['heat', 'off'], supported_features: 17 });
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
@@ -57,16 +60,26 @@ function valueAt(id,t){
   if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
   return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
 }
-// (no end_time: until now, as Home Assistant)
+// The attributes of entity id at time t (s): current_temperature a sine, hvac_action on and
+// off every 2 h, the others as they are now
+function attributesAt(id,t){
+  const a={...STATES[id].attributes};
+  if('current_temperature' in a) a.current_temperature=Number((a.current_temperature*(1+0.1*Math.sin(t/3600))).toFixed(2));
+  if('hvac_action' in a) a.hvac_action=Math.floor(t/7200)%2 ? 'heating' : 'idle';
+  return a;
+}
+// (no end_time: until now, as Home Assistant; with no_attributes false, each row with its
+// attributes — a)
 function history(d){
   const t0=Date.parse(d.start_time)/1000, t1=d.end_time ? Date.parse(d.end_time)/1000 : Date.now()/1000, r={};
   const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
     if(!STATES[e]) continue;
-    if(!MOCK.series){ r[e]=[{s:STATES[e].state,lu:Math.max(t0,kept)}]; continue; }
+    if(!MOCK.series){ const lu=Math.max(t0,kept); r[e]=[{s:STATES[e].state,lu,...(d.no_attributes?{}:{a:attributesAt(e,lu)})}]; continue; }
     const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/600)*600; t<t1; t+=600) pts.push({s:valueAt(e,t),lu:t});
     // (a state the test set is the history from its time on)
     const tSet=STATES[e].setAt; if(tSet>=t0 && tSet<t1){ while(pts.length && pts[pts.length-1].lu>=tSet) pts.pop(); pts.push({s:STATES[e].state,lu:tSet}); }
+    if(!d.no_attributes) for(const p of pts) p.a=attributesAt(e,p.lu);
     if(pts.length) r[e]=pts;
   }
   return r;
@@ -85,7 +98,7 @@ function mkHass(){ return {
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   user:{id:'u1',name:'u'}, localize:(k)=>k,
   callWS:(d)=>{
-    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids});
+    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
     if(d.type==='history/history_during_period') return Promise.resolve(history(d));
     if(d.type==='recorder/statistics_during_period') return Promise.resolve(statistics(d));

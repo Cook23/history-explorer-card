@@ -507,7 +507,7 @@ export class HistoryCardState {
         for( let g of this.graphs ) {
             let i = 0;
             for( let e of g.entities ) {
-                const lc = this._hass.states[e.entity].last_changed;
+                const lc = this.stateOf(e.entity)?.last_changed;
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
                     if( this.pconfig.showCurrentValues && g !== this._frozenChart ) {
                         let d = g.chart.data.datasets[i];
@@ -521,7 +521,7 @@ export class HistoryCardState {
         }
         // (an entity giving a shown entity its color: that curve changes too)
         for( const id of this.colorEntityIds() ) {
-            const lc = this._hass.states[id]?.last_changed;
+            const lc = this.stateOf(id)?.last_changed;
             if( this.stateMap.has(id) && lc != this.stateMap.get(id) ) changed = true;
             this.stateMap.set(id, lc);
         }

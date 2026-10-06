@@ -26,7 +26,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
 > - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
 > - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
-> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
+> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
@@ -135,6 +135,8 @@ The entity selector shows friendly names and filters on both friendly name and e
 - **Escape** — close the dropdown and clear the input field
 
 Clicking an entry in the dropdown adds it directly — no separate button required.
+
+For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value; ← or Escape goes back to the list.
 
 Right after the selection (click or second Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
@@ -247,11 +249,12 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 
 ### The graph menu, cut and paste
 
-A long-press (or a right click) on the ⠿ zone of a graph opens its menu — the same zone where a click toggles the Y axis lock and a drag moves the graph:
+A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` (else the start of its curves' names) — the same zone where a click toggles the Y axis lock and a drag moves the graph:
+- **Display ▸** and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the type all of them share in bold);
 - **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock;
 - **Layout ▸** — *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 
-After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click anywhere else, or Escape, cancels.
+After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click just beside a button counts as on it, about halfway between two does nothing; a click anywhere else, or Escape, cancels.
 
 ### Timeline and arrowline graphs
 
@@ -702,6 +705,13 @@ graphs:
     entities:
       - entity: sensor.wind_bearing
         color: black
+```
+
+An entity's attribute is shown with `attribute:` — a number as a curve, anything else as a timeline. Home Assistant gives an attribute no unit, and only its history (no long-term statistics):
+```yaml
+      - entity: climate.salon
+        attribute: current_temperature
+        unit: °C
 ```
 
 > For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs)

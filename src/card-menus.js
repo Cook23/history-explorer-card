@@ -1,6 +1,7 @@
-// The card's menus: the type menu of an entity — the same menu for a graph (its Y axis
-// lock, its layout) — and the options menu, with their keyboard navigation. Part of
-// HistoryCardState (added to it in history-explorer-card.js).
+// The card's menus: the type menu of an entity — the same menu for a graph (the display
+// and interpolation of all its curves, its Y axis lock, its layout) — and the options
+// menu, with their keyboard navigation. Part of HistoryCardState (added to it in
+// history-explorer-card.js).
 
 import { i18n } from "./languages.js";
 import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
@@ -51,8 +52,7 @@ export function typeMenuHtml(i, full)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-            ${full ? a(`et_${i}_ylock`, '', true) : ''}
-            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
+            ${keys.map(k => ( k === 'layout' ? a(`et_${i}_ylock`, '', true) : '' ) + a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
@@ -64,7 +64,8 @@ export class CardMenus
 {
     // --------------------------------------------------------------------------------------
     // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸, Tests ▸ — and, for a
-    // graph, its Y axis lock and Layout ▸
+    // graph, Representation ▸ and Interpolation ▸ of all its curves, its Y axis lock and
+    // Layout ▸
     // --------------------------------------------------------------------------------------
 
     // The type menu's names, in the card's language (set once it's known)
@@ -94,12 +95,44 @@ export class CardMenus
         });
     }
 
-    // Marks (bold, hecSelected) the interpolation algorithm in use for the menu's entity
-    _markInterpolationMenu(input_idx)
+    // The entities the menu acts on — the graph's (a graph's menu), or the one entity — and
+    // their graph
+    _menuTargets(input_idx)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
-        const _g = this.graphs.find(g => g.id === _menu?._hec_graph_id);
-        const _cur = this._resolveInterpolation(_g?.entities.find(e => e.entity === _menu?._hec_entity_id));
+        const g = this.graphs.find(g => g.id === _menu?._hec_graph_id);
+        if( !g ) return { g: null, entities: [] };
+        return { g, entities: _menu._hec_for_graph ? g.entities : g.entities.filter(e => e.entity === _menu._hec_entity_id) };
+    }
+
+    // The line mode an entity is drawn with
+    _lineModeOf(e)
+    {
+        return this.normalizeLineMode(e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+    }
+
+    // Is entity e of graph g shown as the type menu's entry def? (its own type — a bar
+    // graph can also hold line entities)
+    _isShownAs(e, g, def)
+    {
+        return ( e.type ?? g.type ) === def.type && ( def.lineMode === null || this._lineModeOf(e) === def.lineMode );
+    }
+
+    // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only
+    // modes interpolation applies to)?
+    _isInterpolated(e, g)
+    {
+        const _mode = this._lineModeOf(e);
+        return ( e.type ?? g.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
+    }
+
+    // Marks (bold, hecSelected) the interpolation algorithm in use for the menu's entity —
+    // for a graph, the one all its interpolated curves share, if they do
+    _markInterpolationMenu(input_idx)
+    {
+        const { g, entities } = this._menuTargets(input_idx);
+        const _algos = new Set(entities.filter(e => this._isInterpolated(e, g)).map(e => this._resolveInterpolation(e)));
+        const _cur = _algos.size === 1 ? [..._algos][0] : null;
         INTERPOLATIONS.forEach(k => {
             const _el = this._this.querySelector(`#et_${input_idx}_algo_${k}`);
             if( !_el ) return;
@@ -130,10 +163,8 @@ export class CardMenus
 
         const _isWildcard = Array.isArray(entity_id);
         const _e = graph?.entities.find(e => e.entity === entity_id);
-        // Interpolation: for an entity already shown as a curve in curves or smart mode —
-        // the only modes it applies to
-        const _mode = this.normalizeLineMode(_e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
-        show(q('interp'), !!_e && ( _e.type ?? graph.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' ));
+        // Interpolation: for an entity already shown as an interpolated curve
+        show(q('interp'), !!_e && this._isInterpolated(_e, graph));
         // Layout: an entity already in a graph, from a long-press on its own label
         const _longPress = !!graph && anchorClientX !== null && anchorClientY !== null;
         show(q('layout'), _longPress);
@@ -164,9 +195,7 @@ export class CardMenus
         if( graph ) {
             // Existing entity — change type. Non-numeric entity (only ever timeline): the
             // only choice is timeline itself.
-            // (the entity's own type — a bar graph can also hold line entities)
-            const _curType = _e?.type ?? graph.type;
-            this._markTypeMenu(input_idx, this._isNumericEntity(entity_id), d => d.type === _curType && (d.lineMode === null || d.lineMode === _mode));
+            this._markTypeMenu(input_idx, this._isNumericEntity(entity_id), d => !!_e && this._isShownAs(_e, graph, d));
         } else if( _isWildcard ) {
             // Brand-new entities from a wildcard match: "Default" (each entity's own
             // auto-detected type) offered and pre-selected — unless none of them is
@@ -211,9 +240,11 @@ export class CardMenus
     }
 
     // The same menu for a graph — from a long-press (or a right click) on its lock+handle
-    // zone at (clientX, clientY): its Y axis locked or released (yAxisLocked: its state,
-    // undefined when it has no lock), and its layout — merge back, cut, delete. Opens with
-    // its layout submenu.
+    // zone at (clientX, clientY): what all its entities are shown as (the types that fit
+    // every one of them, the one they share marked), how all its interpolated curves are
+    // interpolated, its Y axis locked or released (yAxisLocked: its state, undefined when
+    // it has no lock), and its layout — merge back, cut, delete. Opens with its layout
+    // submenu.
     showGraphMenu(input_idx, graph, clientX, clientY, yAxisLocked)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
@@ -228,7 +259,12 @@ export class CardMenus
         _menu._hec_anchor    = { clientX, clientY };
         this.hideTypeSubmenus(input_idx);
 
-        for( const k of ['rep', 'interp', 'tests', 'split', 'delete', 'default'] ) show(q(k), false);
+        for( const k of ['tests', 'split', 'delete', 'default'] ) show(q(k), false);
+        // (entities not all numeric: timeline the only choice — nothing to choose)
+        const _numeric = graph.entities.every(e => this._isNumericEntity(e.entity));
+        show(q('rep'), _numeric);
+        this._markTypeMenu(input_idx, _numeric, d => graph.entities.every(e => this._isShownAs(e, graph, d)));
+        show(q('interp'), graph.entities.some(e => this._isInterpolated(e, graph)));
         show(q('layout'), true);
         show(q('merge'), this._canMergeLinkedGraph(graph));
         show(q('cut'), true);
@@ -242,7 +278,7 @@ export class CardMenus
 
         const _titleEl = q('title');
         if( _titleEl ) {
-            _titleEl.textContent = graph.entities.map(e => e.name ?? this._hass.states[e.entity]?.attributes?.friendly_name ?? e.entity).join(', ');
+            _titleEl.textContent = this._graphMenuTitle(graph);
             _titleEl.style.border = '';
             _titleEl.style.borderBottom = '1px solid #444';
         }
@@ -251,6 +287,19 @@ export class CardMenus
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
         this.showTypeSubmenu(input_idx, 'layout');
+    }
+
+    // A graph's name at the top of its menu: its title, else the start of its curves' names
+    // — their first two words, '...' when cut — each start once
+    _graphMenuTitle(graph)
+    {
+        const _title = this.pconfig.graphs[graph.groupId]?.title;
+        if( _title ) return _title;
+        const _starts = graph.entities.map(e => {
+            const _words = String(e.name ?? this.stateOf(e.entity)?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
+            return _words.slice(0, 2).join(' ') + ( _words.length > 2 ? '...' : '' );
+        });
+        return [...new Set(_starts)].join(', ');
     }
 
     // The graph menu's Y axis entry: the graph's Y axes locked or released
@@ -368,21 +417,21 @@ export class CardMenus
         for( const _box of [_etMenu, ..._subs] ) _box.addEventListener('focusout', _closeIfLeft);
     }
 
+    // The interpolation algo for the menu's entity — for a graph, for all its interpolated
+    // curves
     entityInterpolationClicked(input_idx, algo)
     {
-        const _menu = this._this.querySelector(`#et_${input_idx}`);
-        if( !_menu ) return;
-        const _entity_id = _menu._hec_entity_id;
-        const _graph_id  = _menu._hec_graph_id;
+        const { g, entities } = this._menuTargets(input_idx);
         this.hideEntityTypeMenu(input_idx);
-        const _g = this.graphs.find(g => g.id === _graph_id);
-        if( !_g ) return;
-        const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
-        if( _entIdx < 0 ) return;
-        // (g.entities[i] is the entity's entry in the store itself: saved with it)
-        _g.entities[_entIdx].interpolation = algo;
-        if( _g.chart.data.datasets[_entIdx] ) _g.chart.data.datasets[_entIdx].hecInterpolation = algo;
-        _g.chart.update();
+        if( !g ) return;
+        for( const e of entities ) {
+            if( !this._isInterpolated(e, g) ) continue;
+            // (g.entities[i] is the entity's entry in the store itself: saved with it)
+            e.interpolation = algo;
+            const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
+            if( _ds ) _ds.hecInterpolation = algo;
+        }
+        g.chart.update();
         this.writeLocalState();
     }
 
@@ -413,8 +462,10 @@ export class CardMenus
         if( !_menu ) return;
         const _entity_id = _menu._hec_entity_id;
         const _graph_id  = _menu._hec_graph_id;
+        const _forGraph  = _menu._hec_for_graph;
         this.hideEntityTypeMenu(input_idx);
 
+        if( _forGraph ) return this._setGraphType(this.graphs.find(g => g.id === _graph_id), type, lineMode);
         if( !_entity_id ) return;
 
         if( _graph_id === null ) {
@@ -469,15 +520,7 @@ export class CardMenus
         if( _g ) {
             if( _oldType === type ) {
                 // Same type — update lineMode on the specific entity's dataset only
-                const _mode = this.normalizeLineMode(lineMode);
-                const _entIdx = _g.entities.findIndex(e => e.entity === _entity_id);
-                if( _entIdx >= 0 && _g.chart.data.datasets[_entIdx] ) {
-                    _g.chart.data.datasets[_entIdx].steppedLine = _mode === 'stepped';
-                    _g.chart.data.datasets[_entIdx].lineTension = (_mode === 'lines' || _mode === 'stepped') ? 0 : 0.1;
-                }
-                // Update in-memory entity so pre-selection is correct next time
-                const _ent = _g.entities[_entIdx];
-                if( _ent ) _ent.lineMode = _mode;
+                this._setLineMode(_g, _g.entities.findIndex(e => e.entity === _entity_id), lineMode);
                 _g.chart.update();
                 this.updateHistory();
             } else {
@@ -514,6 +557,52 @@ export class CardMenus
                 this._updateGroupLinkMarkers();
                 this.updateHistoryWithClearCache();
             }
+        }
+        this.writeLocalState();
+    }
+
+    // Entity idx of graph g drawn in lineMode, its type unchanged
+    _setLineMode(g, idx, lineMode)
+    {
+        const _mode = this.normalizeLineMode(lineMode);
+        const _ds = g.chart.data.datasets[idx];
+        if( _ds ) {
+            _ds.steppedLine = _mode === 'stepped';
+            _ds.lineTension = (_mode === 'lines' || _mode === 'stepped') ? 0 : 0.1;
+        }
+        // (in memory too, so the menu marks it next time)
+        if( g.entities[idx] ) g.entities[idx].lineMode = _mode;
+    }
+
+    // From a graph's menu: every entity of graph g shown as type (lineMode), saved with
+    // each — the graph rebuilt once, in its place, when their types change
+    _setGraphType(g, type, lineMode)
+    {
+        if( !g ) return;
+        const _sameType = g.entities.every(e => ( e.type ?? g.type ) === type);
+        for( const e of g.entities ) {
+            const _entry = this.store.entry(e.entity);
+            if( _entry ) { _entry.type = type; _entry.lineMode = lineMode; }
+        }
+        if( _sameType ) {
+            g.entities.forEach((e, i) => this._setLineMode(g, i, lineMode));
+            g.chart.update();
+            this.updateHistory();
+        } else {
+            const _entities = g.entities;
+            const _nextG = this._nextGraph(g);
+            this._detachGraph(g);
+            // (fill recomputed for the new type, as for one entity — see entityTypeMenuClicked)
+            _entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
+            this._rebuildGraph(_entities, g.groupId, _nextG, { fill: null });
+            for( const e of _entities ) {
+                const _entry = this.store.entry(e.entity);
+                const _shown = this.graphs.find(_g => _g.entities.some(x => x.entity === e.entity))?.entities.find(x => x.entity === e.entity);
+                if( _entry && _shown ) _entry.fill = _shown.fill;
+            }
+            this._updateMoVisibility();
+            this._updateGroupLinkMarkers();
+            this.updateHistoryWithClearCache();
         }
         this.writeLocalState();
     }
@@ -723,6 +812,6 @@ export class CardMenus
             _g.groupId = _gid;
             _g.entities.forEach(e => { e.groupId = _gid; });
         }
-        return this._hass.states[eid]?.attributes?.friendly_name || eid;
+        return this.stateOf(eid)?.attributes?.friendly_name || eid;
     }
 }
