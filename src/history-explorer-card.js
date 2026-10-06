@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.52';
+const Version = '1.1.53';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -3452,6 +3452,8 @@ export class HistoryCardState {
                 }
             }
             // Otherwise forward to canvas (Chart.js legend click: hide/show, double-click uncombine)
+            // — the main button only: a right or middle click leaves the curve as it is
+            if( event.button > 0 ) return;
             _p.g.canvas.dispatchEvent(new MouseEvent('click', {
                 bubbles: true, cancelable: true,
                 clientX: event.clientX, clientY: event.clientY
@@ -4373,7 +4375,9 @@ export class HistoryCardState {
     // Alt held while moving over a graph shows its individual samples (hover mode
     // 'dataset'), moving without it hides them. A listener of its own, run before Chart.js'
     // (capture): Chart.js then draws the hover of this same move in the new mode — run
-    // after it, the samples showed (and hid) one move late.
+    // after it, the samples showed (and hid) one move late. Alt released, the graph's own
+    // hover mode is back, and the samples go: this move's hover is only what it finds (a
+    // move that finds nothing keeps the previous hover — the samples would stay).
     altSamplesMove(event)
     {
         if( panstate.dragDataset || this.state.drag || ( this.state.selecting && panstate.overlay ) ) return;
@@ -4381,11 +4385,13 @@ export class HistoryCardState {
         if( !this.state.altGraph && event.altKey ) {
             const g = this.graphs.find(g => g.canvas === event.target);
             if( g ) {
-                this.state.altGraph = g;
+                this.state.altGraph = { g, mode: g.chart.options.hover.mode };
                 g.chart.options.hover.mode = 'dataset';
             }
         } else if( this.state.altGraph && !event.altKey ) {
-            this.state.altGraph.chart.options.hover.mode = 'nearest';
+            const { g, mode } = this.state.altGraph;
+            g.chart.options.hover.mode = mode;
+            g.chart.active = [];
             this.state.altGraph = null;
         }
     }
