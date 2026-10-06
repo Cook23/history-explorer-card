@@ -57,6 +57,47 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── yAxis on a graph and on the card: one axis, an entity choosing its own side ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] },
+        { type: 'line', options: { yAxis: 'left' }, entities: [{ entity: 'sensor.power2' }, { entity: 'sensor.tank', yAxis: 'right' }] },
+        { type: 'line', entities: [{ entity: 'sensor.days_to_watering' }, { entity: 'sensor.wind' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power_kw' }] },
+    ] }), { height: 1500, mock: { series: true } });
+    await t.wait(800);
+    let gs = await graphs(t);
+    await t.step('yAxis: left on a graph: every curve on one axis, whatever their units', async () => {
+        const x = gs[0];
+        return x.axes === 'y-axis-0:' && x.curves.every(c => c.startsWith('y-axis-0|') && !c.endsWith('▸')) ? true : JSON.stringify(x);
+    });
+    await t.step('yAxis under the graph\'s options: the same; an entity\'s own yAxis wins over it', async () => {
+        const x = gs[1];
+        return x.curves[0].startsWith('y-axis-0|') && x.curves[1].startsWith('y-axis-1|') ? true : JSON.stringify(x);
+    });
+    await t.step('a graph without yAxis: an axis per group of units, as by default', async () => {
+        const x = gs[2];
+        return x.curves[0].startsWith('y-axis-0|') && x.curves[1].startsWith('y-axis-1|') ? true : JSON.stringify(x);
+    });
+    await t.step('a curve dragged out of a graph set to left: it takes the graph it lands in\'s axes', async () => {
+        // (rain, in mm, onto a graph of kW only: two groups of units, rain on the right)
+        await t.drag(await t.E('legendPt(0, 1)'), await t.E('graphPtAt(3, 0.15)')); await t.wait(800);
+        const x = (await graphs(t)).find(g => g.curves.some(c => c.includes('rain')));
+        return x.curves.length === 2 && x.curves[0].startsWith('y-axis-0|') && x.curves[1].startsWith('y-axis-1|') ? true : JSON.stringify(x);
+    });
+    done(await t.close());
+
+    t = await openCard(card({ yAxis: 'left', graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power2' }, { entity: 'sensor.wind', yAxis: 'auto' }] },
+    ] }), { height: 1000, mock: { series: true } });
+    await t.wait(800);
+    gs = await graphs(t);
+    await t.step('yAxis: left on the card: one axis on every graph; an entity\'s yAxis: auto, by its unit', async () => {
+        return gs[0].axes === 'y-axis-0:' && gs[1].curves[0].startsWith('y-axis-0|') && gs[1].curves[1].startsWith('y-axis-1|')
+            ? true : JSON.stringify(gs.map(x => x.curves));
+    });
+    done(await t.close());
+
     // ── Circular labels and stacked bars, per axis ──
     t = await openCard(card({ graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.wind' }] },

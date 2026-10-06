@@ -52,6 +52,10 @@ graphs:
       # If true, hide this entity from the graph
       hidden: False
 
+      # (line and bar entities) The Y axis of this curve: left, right, or auto — by its unit: the second group
+      # of units of a graph goes on the right. Wins over the graph's, $.entityOptions' and the card's
+      yAxis: auto
+
       # Can be used to scale this entity's value by the given factor
       # Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the real value.
       # With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value.
@@ -162,6 +166,10 @@ graphs:
     # For bar charts, this can be set to True to enable stacking the values
     stacked: False
 
+    # The Y axis of this graph's curves, unless an entity sets its own: left (one axis, whatever their units),
+    # right, or auto — see $.yAxis
+    yAxis: null
+
     # Minimum value of the Y-axis (initial bound — automatically calculated by default)
     ymin: null
 
@@ -228,6 +236,9 @@ entityOptions:
 
     # (curves and smart modes) Interpolation algorithm — see $.interpolation
     interpolation: null
+
+    # (line and bar entities) The Y axis of the matching entities: left, right or auto — see $.yAxis
+    yAxis: null
 
     # Can be used to scale a specified entity's value by the given factor
     # Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the real value.
@@ -322,6 +333,11 @@ interpolation: "monotone"
 
 # Line width for lines in line graphs. `width` is also accepted as an alias
 lineWidth: 2.0
+
+# The Y axis of every curve of the card: auto (the default — a line or bar graph with two groups of units shows
+# the second one on a Y axis on the right), left (one axis on every graph, whatever the units) or right.
+# A graph, $.entityOptions or an entity can set its own
+yAxis: auto
 
 # The options of every graph can also be set here, for every graph of the card (a graph, $.entityOptions or
 # an entity can still set their own): fill, ymin, ymax, ystepSize, ylock, stacked, showTimeLabels — and height,

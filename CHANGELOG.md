@@ -6,6 +6,11 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.5] - unreleased
 
+### New — `yAxis` on a graph and on the card
+- `yAxis` (`left`, `right`, or `auto`: by unit, the default) can be set on the card, on a graph (directly or under `options:`), in `entityOptions` and on an entity — the most specific winning. `yAxis: left` on a graph keeps all its curves on one Y axis, whatever their units; on the card, every graph; an entity's `yAxis: auto` brings back the choice by unit
+- Resolved when the graph is drawn, never copied onto the entity (`_resolveYAxis`): a curve dropped onto another graph takes that graph's setting
+- Tests: `yAxis` on a graph, under its options, on the card, an entity's own winning, `auto`, a curve dropped out of a graph set to `left`
+
 ### Fixed — `recordedEntitiesOnly` in any time zone
 - The entity selector limited to recorded entities asked Home Assistant for the last hour without its time zone, read as UTC: ahead of UTC, it asked for an hour still to come
 
