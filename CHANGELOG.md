@@ -4,6 +4,20 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.52] - 2026-10-06
+
+### Fixed — a curve dropped onto the first graph of a block of linked graphs
+- The graph it joined was rebuilt after the whole block instead of in its place: the block's graphs swapped (a line graph above its timeline ended up below it). The graph left by the curve had the same problem; a timeline row dropped the same way too
+
+### Fixed — the min/max band shown as soon as its values arrive
+- The min and max of `showMinMax: history` / `states`, asked in parallel with the history, drew nothing when they arrived after it: the band only appeared at the next refresh
+
+### Fixed — Alt shows the samples right away
+- Holding Alt while moving over a graph showed its samples one move late, and releasing it hid them one move late: the card changed the hover mode after Chart.js had already drawn that move
+
+### Fixed — `recordedEntitiesOnly` in any time zone
+- The entity selector limited to recorded entities asked Home Assistant for the last hour without its time zone, read as UTC: ahead of UTC, it asked for an hour still to come, and listed few entities or none
+
 ## [v1.1.51] - 2026-10-04
 
 ### Changed — the Interpolation submenu drawn over the type menu

@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.51';
+const Version = '1.1.52';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -1420,6 +1420,9 @@ export class HistoryCardState {
                 }
             }
         }
+        // (asked in parallel with the history: arrived after it, the curves are redrawn with
+        // their band; before it, the history's arrival draws them)
+        if( !this.state.loading ) this.updateHistory();
     }
 
     loaderCallbackWS(result)
@@ -2996,9 +2999,10 @@ export class HistoryCardState {
                     // Update groupId in pconfig.entities
                     const _tgtGroupId = this._pcGroupIdOf(_tgt.entities[0].entity);
                     const _eIdx = this._pcEntryIndex(_entity.entity);
-                    // The graph after the source, found before the entry moves: the search
-                    // follows pconfig.entities' order
-                    const _srcNextG = _sameGroup ? this._nextGraph(_src) : this._nextGroup(_src);
+                    // The graph after the source, found before the entry moves (the display
+                    // order follows pconfig.entities'): rebuilt before it, right where it was —
+                    // not before the next group, or a block of linked graphs would change order
+                    const _srcNextG = this._nextGraph(_src);
                     if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
                         // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
                         // only groupId/color/fill change on a cross-graph move.
@@ -3021,15 +3025,15 @@ export class HistoryCardState {
                         else this.pconfig.entities.push(_pcE);
                     }
                     // Rebuild source graph without the moved entity (removes the source
-                    // graph entirely if it becomes empty). Within one group (several linked
-                    // graphs), each graph is rebuilt right where it was — graph-level
-                    // neighbor, not the next group, or the block's internal order would change.
+                    // graph entirely if it becomes empty). Each graph is rebuilt right where it
+                    // was — before its own next graph, not its next group, or a block of
+                    // linked graphs would change order.
                     const _tgtOrigGroupId = _tgt.groupId;
                     this._detachAndRebuildRemaining(_src, _srcIdx, _srcNextG);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtNextG = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+                    const _tgtNextG = this._nextGraph(_tgt);
                     this._detachGraph(_tgt);
                     const _allTgtEntities = [..._tgt.entities];
                     if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
@@ -3861,9 +3865,9 @@ export class HistoryCardState {
         }
 
         const _srcOrigGroupId = _src.groupId;
-        // Graph-level neighbor when staying within one group (same graph, or linked graphs
-        // of one group): each graph is rebuilt right where it was inside the block
-        const _srcNextG0 = ( _isSameGraph || _sameGroup ) ? this._nextGraph(_src) : this._nextGroup(_src);
+        // Each graph is rebuilt right where it was — before its own next graph, not its next
+        // group, or a block of linked graphs would change order
+        const _srcNextG0 = this._nextGraph(_src);
         this._detachGraph(_src);
 
         const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
@@ -3886,7 +3890,7 @@ export class HistoryCardState {
                         });
                 this.pconfig.combineSameUnits = _saved;
             }
-            const _tgtNextG0 = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+            const _tgtNextG0 = this._nextGraph(_tgt);
             this._detachGraph(_tgt);
             const _newTgtEntities = [..._tgt.entities];
             _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
@@ -4363,25 +4367,26 @@ export class HistoryCardState {
 
             panstate.st1 = this.pixelPositionToTimecode(x1);
 
-        } else if( !this.state.altGraph && event.altKey ) {
+        }
+    }
 
-            // Alt key pressed, show individual samples
+    // Alt held while moving over a graph shows its individual samples (hover mode
+    // 'dataset'), moving without it hides them. A listener of its own, run before Chart.js'
+    // (capture): Chart.js then draws the hover of this same move in the new mode — run
+    // after it, the samples showed (and hid) one move late.
+    altSamplesMove(event)
+    {
+        if( panstate.dragDataset || this.state.drag || ( this.state.selecting && panstate.overlay ) ) return;
 
-            for( let g of this.graphs ) {
-                if( g.canvas === event.target ) {
-                    this.state.altGraph = g;
-                    g.chart.options.hover.mode = 'dataset';
-                    break;
-                }
+        if( !this.state.altGraph && event.altKey ) {
+            const g = this.graphs.find(g => g.canvas === event.target);
+            if( g ) {
+                this.state.altGraph = g;
+                g.chart.options.hover.mode = 'dataset';
             }
-
         } else if( this.state.altGraph && !event.altKey ) {
-
-            // Alt not pressed, hide samples
-
             this.state.altGraph.chart.options.hover.mode = 'nearest';
             this.state.altGraph = null;
-
         }
     }
 
@@ -5903,6 +5908,7 @@ export class HistoryCardState {
 
         canvas.addEventListener('pointerdown', this.pointerDown.bind(this));
         canvas.addEventListener('pointermove', this.pointerMove.bind(this));
+        canvas.addEventListener('pointermove', this.altSamplesMove.bind(this), true);
         canvas.addEventListener('pointerup', this.pointerUp.bind(this));
         canvas.addEventListener('pointercancel', this.pointerCancel.bind(this));
 
@@ -7347,7 +7353,8 @@ export class HistoryCardState {
             for( let i of this.ui.inputField )
                 if( i ) i.placeholder = i18n("ui.label.loading");
 
-            const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ss');
+            // (with its time zone: without one, Home Assistant reads it as UTC)
+            const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ssZ');
 
             const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
             const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
