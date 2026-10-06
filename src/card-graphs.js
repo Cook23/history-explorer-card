@@ -35,7 +35,7 @@ export class CardGraphs
     {
         let label = name;
         const p = 10 ** this.pconfig.roundingPrecision;
-        const v = Math.round(this._hass.states[entity].state * shownScale * p) / p;
+        const v = Math.round(this.stateOf(entity)?.state * shownScale * p) / p;
         if( !isNaN(v) ) {
             label += ' (' + v + (unit ? ' ' + unit : '') + ')';
         }
@@ -653,7 +653,7 @@ export class CardGraphs
         //   groupId      the group the entity belongs to
         //   entry        its entry of the entity list (pconfig.entities), when it has one
 
-        if( this._hass.states[entity_id] == undefined ) return;
+        if( this.stateOf(entity_id) == undefined ) return;
 
         const { graphProps: _graphProps, options: entityOptions } = this._optionsInGraph(entity_id, groupId);
 
@@ -997,7 +997,7 @@ export class CardGraphs
         if( !_units.length || !_units.every(u => areSICompatible(u, _units[0])) || _units.every(u => u === _units[0]) ) return;
         const { unit: _refUnit, targetFactor: _targetFactor } = chooseSIUnit(list.map(d => ({
             unit: d.unit,
-            maxVal: Math.abs(parseFloat(this._hass.states[d.entity_id]?.state) || 0)
+            maxVal: Math.abs(parseFloat(this.stateOf(d.entity_id)?.state) || 0)
         })));
         list.forEach((d, i) => {
             d.siConversionFactor = getSIFactor(d.unit).factor / _targetFactor;
@@ -1018,7 +1018,7 @@ export class CardGraphs
             const _kind = this._entityKind({ type, interval }, d);
             datasets.push({
                 "kind": _kind,
-                "name": ( d.name === undefined ) ? this._hass.states[d.entity]?.attributes?.friendly_name : d.name,
+                "name": ( d.name === undefined ) ? this.stateOf(d.entity)?.attributes?.friendly_name : d.name,
                 "bColor": this._currentColor(d),
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar is filled with its own color)

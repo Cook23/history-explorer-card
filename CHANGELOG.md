@@ -4,7 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.7b3] - unreleased
+## [v1.2.7b4] - unreleased
+
+### New — an entity's attributes as curves
+- `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named after the entity and the attribute; `unit:` gives it a unit (Home Assistant gives none)
+- The entity selector: an entity with attributes that can be shown opens a submenu first, as the type menu's submenus — *Value* (its state) pre-selected, then each attribute with its current value
+- The history of an attribute is asked with every change of its entity's attributes, only for the entities with an attribute shown; an attribute has no long-term statistics (its curve covers what the history keeps)
 
 ### New — Display and Interpolation in the graph menu
 - The graph menu offers *Display ▸* and *Interpolation ▸*, as the type menu does, for all the graph's curves at once — the same actions at every level, as for the YAML options. *Display* lists the types that fit every entity of the graph, the one they all share in bold; chosen, each entity is shown that way and saved with it, and the graph stays one graph in its place. *Interpolation* applies to the curves in *Curve* or *Smart* mode

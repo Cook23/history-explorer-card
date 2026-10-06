@@ -3,6 +3,7 @@
 // menu — or removes. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { seriesAttributes, seriesId, attributeLabel } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
 export class CardSelector
@@ -81,9 +82,23 @@ export class CardSelector
     {
         if( !event.target ) return;
         const idx = event.target.id.substr(3) * 1;
+        this._closeSelectorIfLeft(idx);
+    }
+
+    // The dropdown of selector idx (and its series submenu) closed, unless the focus is
+    // still in it, in the submenu or in the input field — checked once the focus has moved
+    _closeSelectorIfLeft(idx)
+    {
         const dropdown = this._this.querySelector(`#es_${idx}`);
+        const _sub = this._this.querySelector(`#es_${idx}_series`);
+        const _input = this._this.querySelector(`#b7_${idx}`);
         setTimeout(() => {
-            if( !dropdown.contains(document.activeElement) ) {
+            // (the focused element as seen from the dropdown's own tree: inside Home
+            // Assistant's shadow roots, document.activeElement is only their host)
+            const _a = dropdown.getRootNode()?.activeElement;
+            const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
+            if( ![dropdown, _sub, _input].some(_in) ) {
+                this.hideSeriesMenu(idx);
                 this.setDropdownVisibility(idx, false);
             }
         }, 150);
@@ -160,20 +175,87 @@ export class CardSelector
 
     entitySelectorEntryClicked(event)
     {
-        const idx = event.target.href.slice(-1);
-        let input = this._this.querySelector(`#b7_${idx}`);
-        let dropdown = this._this.querySelector(`#es_${idx}`);
+        const idx = event.target.href.slice(-1) * 1;
         const entity_id = event.target.dataset.entity;
-        const friendly = event.target.textContent;
-        input.value = friendly;
-        input.dataset.entityId = entity_id;
-        if( !this._entitySelected ) this._entitySelected = [false, false];
-        this._entitySelected[idx * 1] = true;
-        dropdown.style.display = 'none';
+        // (an entity with attributes that can be shown: which one — its value or one of
+        // them — chosen first)
+        if( seriesAttributes(this._hass.states[entity_id]).length ) return this.showSeriesMenu(idx, event.target);
+        this._selectSeries(idx, entity_id, event.target.textContent);
+    }
 
-        // Pointer selection of a specific entry is unambiguous (unlike keyboard entry, which
-        // may still be a wildcard pattern needing a preview step) — add immediately.
-        this.addEntitySelected(idx * 1);
+    // Series id chosen in selector idx (an entity, or one of its attributes), shown as
+    // label in its input field: added, through the type menu. A choice in the dropdown is
+    // unambiguous (unlike a keyboard entry, which may still be a wildcard pattern needing a
+    // preview step) — added at once.
+    _selectSeries(idx, id, label)
+    {
+        const input = this._this.querySelector(`#b7_${idx}`);
+        input.value = label;
+        input.dataset.entityId = id;
+        if( !this._entitySelected ) this._entitySelected = [false, false];
+        this._entitySelected[idx] = true;
+        this.hideSeriesMenu(idx);
+        this._this.querySelector(`#es_${idx}`).style.display = 'none';
+        this.addEntitySelected(idx);
+    }
+
+    // The series submenu of selector idx, for the entity of dropdown entry entryEl: its
+    // value first — marked and pre-selected, Enter takes it — then its attributes, each with
+    // its current value. Like the type menu's submenus: over the dropdown, level with the
+    // entry, right edges aligned, the entry in bold while it's open; ← or Escape back to the
+    // dropdown.
+    showSeriesMenu(idx, entryEl)
+    {
+        const _sub = this._this.querySelector(`#es_${idx}_series`);
+        if( !_sub ) return;
+        const entity_id = entryEl.dataset.entity;
+        const _state = this._hass.states[entity_id];
+        const _friendly = _state?.attributes?.friendly_name || entity_id;
+        _sub.innerHTML = '';
+        const _item = (id, label, value, label0) => {
+            const _a = document.createElement('a');
+            _a.href = '#es';
+            _a.dataset.series = id;
+            _a.style = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;white-space:nowrap';
+            _a.textContent = value ? `${label} (${value})` : label;
+            _a.addEventListener('click', (e) => { e.preventDefault(); this._selectSeries(idx, id, label0); }, true);
+            _sub.appendChild(_a);
+            return _a;
+        };
+        const _value = _item(entity_id, i18n('ui.menu.series_value'), this._valueText(_state), _friendly);
+        _value.style.fontWeight = 'bold';
+        _value.dataset.hecSelected = '1';
+        for( const k of seriesAttributes(_state) ) {
+            const _id = seriesId(entity_id, k);
+            _item(_id, attributeLabel(k), this._valueText(this.stateOf(_id)), this.stateOf(_id).attributes.friendly_name);
+        }
+        this.hideSeriesMenu(idx);
+        entryEl.style.fontWeight = 'bold';
+        _sub._hecEntry = entryEl;
+        this._openSubmenu(_sub, entryEl);
+        _sub.focus();
+        if( !_sub._hecListening ) {
+            _sub._hecListening = true;
+            _sub.addEventListener('keydown', (e) => {
+                if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.hideSeriesMenu(idx);
+                    this._this.querySelector(`#b7_${idx}`)?.focus();
+                    return;
+                }
+                this._menuKeyDown(e, _sub);
+            });
+            _sub.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
+        }
+    }
+
+    hideSeriesMenu(idx)
+    {
+        const _sub = this._this.querySelector(`#es_${idx}_series`);
+        if( !_sub ) return;
+        _sub.style.display = 'none';
+        if( _sub._hecEntry ) { _sub._hecEntry.style.fontWeight = ''; _sub._hecEntry = null; }
     }
 
     // --------------------------------------------------------------------------------------
@@ -265,8 +347,8 @@ export class CardSelector
         entities.sort((a, b) => {
             const da = a.split('.')[0], db = b.split('.')[0];
             if( da !== db ) return da.localeCompare(db);
-            const fa = this._hass.states[a]?.attributes?.friendly_name || a;
-            const fb = this._hass.states[b]?.attributes?.friendly_name || b;
+            const fa = this.stateOf(a)?.attributes?.friendly_name || a;
+            const fb = this.stateOf(b)?.attributes?.friendly_name || b;
             if( fa !== fb ) return fa.localeCompare(fb);
             return a.localeCompare(b);
         });
@@ -279,26 +361,8 @@ export class CardSelector
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
 
             for( let entity of entities ) {
-                const friendly = this._hass.states[entity]?.attributes?.friendly_name || entity;
-                const _state = this._hass.states[entity];
-                const _stateVal = _state?.state;
-                const _unit = _state?.attributes?.unit_of_measurement;
-                // Format value like legend labels: rounded to roundingPrecision
-                let _valStr = '';
-                try {
-                    if( _stateVal !== undefined && _stateVal !== 'unavailable' && _stateVal !== 'unknown' ) {
-                        const _p = 10 ** this.pconfig.roundingPrecision;
-                        const _numVal = Number(_stateVal);
-                        const _v = Math.round(_numVal * _p) / _p;
-                        if( isNaN(_numVal) ) {
-                            // Try to parse as date and show HH:MM
-                            const _d = new Date(_stateVal);
-                            _valStr = isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
-                        } else {
-                            _valStr = _v + (_unit ? ' ' + _unit : '');
-                        }
-                    }
-                } catch(e) { _valStr = ''; }
+                const friendly = this.stateOf(entity)?.attributes?.friendly_name || entity;
+                const _valStr = this._valueText(this.stateOf(entity));
                 const _label = _valStr ? `${friendly} (${_valStr})` : friendly;
                 const o = document.createElement('a');
                 o.href = `#s_${i}`;
@@ -314,6 +378,21 @@ export class CardSelector
 
         for( let i of this.ui.inputField )
             if( i ) i.placeholder = i18n("ui.label.type_to_search");
+    }
+
+    // The value of a state as the selector shows it: like the legend's labels, rounded to
+    // roundingPrecision, with its unit; a date as HH:MM; '' when there's none
+    _valueText(state)
+    {
+        const _stateVal = state?.state;
+        const _unit = state?.attributes?.unit_of_measurement;
+        if( _stateVal === undefined || _stateVal === 'unavailable' || _stateVal === 'unknown' ) return '';
+        const _p = 10 ** this.pconfig.roundingPrecision;
+        const _numVal = Number(_stateVal);
+        if( !isNaN(_numVal) ) return Math.round(_numVal * _p) / _p + (_unit ? ' ' + _unit : '');
+        // Try to parse as date and show HH:MM
+        const _d = new Date(_stateVal);
+        return isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
     }
 
     requestEntityCollection()
@@ -380,7 +459,7 @@ export class CardSelector
     // resolved entity_ids reach this, one per dropdown entry).
     _previewEntityTooltip(entity_id, ii)
     {
-        if( this._hass.states[entity_id] === undefined ) return;
+        if( this.stateOf(entity_id) === undefined ) return;
         const _exists = this.store.has(entity_id);
         const _existingG = _exists ? this.graphs.find(g => g.entities.some(e => e.entity === entity_id)) : null;
         this._selectorTooltip(ii, (_exists ? i18n('ui.label.already_exists') : i18n('ui.label.add')) + ': ' + entity_id, _existingG);
@@ -427,7 +506,7 @@ export class CardSelector
             const _duplicateGraphs = new Set();
             const _newIds = [];
             for( let eid of ids ) {
-                if( this._hass.states[eid] === undefined ) continue;
+                if( this.stateOf(eid) === undefined ) continue;
                 if( this.store.has(eid) ) {
                     _duplicates.push(eid);
                     const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === eid));
@@ -484,7 +563,7 @@ export class CardSelector
             for( let e of Array.from(datalist.children) ) {
                 const _eid = e.dataset.entity;
                 if( !regex.test(_eid) ) continue;
-                if( this._hass.states[_eid] == undefined ) continue;
+                if( this.stateOf(_eid) == undefined ) continue;
                 if( this.store.has(_eid) ) continue;
                 _matchedIds.push(_eid);
             }
@@ -498,7 +577,7 @@ export class CardSelector
 
         } else {
 
-            if( this._hass.states[entity_id] == undefined ) return;
+            if( this.stateOf(entity_id) == undefined ) return;
             if( this.store.has(entity_id) ) {
                 // Entity already exists — show tooltip and highlight containing graph
                 const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === entity_id));

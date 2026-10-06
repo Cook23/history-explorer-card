@@ -3,6 +3,7 @@
 // state process function. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { colorEntityOf } from "./card-datasets.js";
+import { seriesOf, attributeHistories } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
 export class CardHistory
@@ -463,14 +464,15 @@ export class CardHistory
                 if( !this.statistics.enabled || l0 > this.limitSlot ) {
 
                     // Issue history retrieval call, initiate async cache loading
-                    this._hass.callWS(this.historyRequest(l, t0, t1)).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
+                    this.historyCall(l, t0, t1).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
 
                     // Parallel statistics query for entities with showMinMax:'history'/'states'
                     const lmm = [];
                     for( const g of this.graphs )
                         for( const e of g.entities ) {
                             const v = e.showMinMax;
-                            if( v === 'history' || v === 'states' || v === true || v === 'statistics' )
+                            // (an attribute has no statistics)
+                            if( ( v === 'history' || v === 'states' || v === true || v === 'statistics' ) && !seriesOf(e.entity).attribute )
                                 lmm.push(e.entity);
                         }
                     if( lmm.length ) {
@@ -479,8 +481,8 @@ export class CardHistory
 
                 } else {
 
-                    // Issue statistics retrieval call
-                    this._hass.callWS(this.statisticsRequest(l, t0, t1, this.statistics.period)).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
+                    // Issue statistics retrieval call (an attribute has none: no curve there)
+                    this._hass.callWS(this.statisticsRequest(l.filter(id => !seriesOf(id).attribute), t0, t1, this.statistics.period)).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
 
                 }
 
@@ -554,6 +556,23 @@ export class CardHistory
             no_attributes: !withAttributes,
             entity_ids: ids
         };
+    }
+
+    // The history of series ids (entities' states, or attributes — see history-series.js)
+    // from t0 to t1 (none: until now), as Home Assistant gives the states' (by id, its
+    // compressed rows): the states asked as usual; the attributes from their entities'
+    // history with its attributes, every change included (an attribute changing alone is
+    // no significant change for Home Assistant)
+    historyCall(ids, t0, t1 = null)
+    {
+        const _states = ids.filter(id => !seriesOf(id).attribute);
+        const _attrs = ids.filter(id => seriesOf(id).attribute);
+        const _entities = [...new Set(_attrs.map(id => seriesOf(id).entity))];
+        const _ask = (l, attributes) => l.length
+            ? this._hass.callWS({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) })
+            : Promise.resolve({});
+        return Promise.all([_ask(_states, false), _ask(_entities, true)])
+            .then(([r, ra]) => ({ ...r, ...attributeHistories(_attrs, ra) }));
     }
 
     // The request for the long-term statistics of ids from t0 to t1, by period

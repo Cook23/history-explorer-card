@@ -296,7 +296,7 @@ export class CardMenus
         const _title = this.pconfig.graphs[graph.groupId]?.title;
         if( _title ) return _title;
         const _starts = graph.entities.map(e => {
-            const _words = String(e.name ?? this._hass.states[e.entity]?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
+            const _words = String(e.name ?? this.stateOf(e.entity)?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
             return _words.slice(0, 2).join(' ') + ( _words.length > 2 ? '...' : '' );
         });
         return [...new Set(_starts)].join(', ');
@@ -812,6 +812,6 @@ export class CardMenus
             _g.groupId = _gid;
             _g.entities.forEach(e => { e.groupId = _gid; });
         }
-        return this._hass.states[eid]?.attributes?.friendly_name || eid;
+        return this.stateOf(eid)?.attributes?.friendly_name || eid;
     }
 }

@@ -72,6 +72,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 
 - **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry adds it. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined. `excludeFilterEntities` removes entities from what `filterEntities` lets through.
 - **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*), sent as a report.
+- **Attributes (1.2)** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes).
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
 
 ### Organizing graphs
@@ -187,6 +188,8 @@ The entity selector shows friendly names and filters on both friendly name and e
 - **Escape** — close the dropdown and clear the input field
 
 Clicking an entry in the dropdown adds it directly — there is no separate `+` button to press afterwards.
+
+**(1.2)** An entity can also be shown through one of its attributes (a thermostat's measured temperature, its setpoint, what it's doing…). Selecting an entity with attributes that can be shown opens a submenu first, over the list, level with the entity, which stays in bold while it's open — the same as the type menu's submenus: *Value* (the entity's own state) first, pre-selected — Enter takes it at once — then each attribute with its current value. Arrows move through it, Enter or a click chooses, ← or Escape goes back to the list. The attributes offered are those holding a number, a text or a yes/no — not a list, not Home Assistant's own (name, unit, icon, classes…). An entity without such attributes goes straight to the type menu. A wildcard pattern adds entities' states only.
 
 Selecting an entity (by click, or by the second Enter) doesn't add it right away: the display type menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. The menu always opens, even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, the only way to show it, and lets you check before adding. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
 
@@ -1456,6 +1459,27 @@ graphs:
         name: Heater
       - entity: person.alex
 
+```
+
+**(1.2)** `attribute:` shows one of an entity's attributes instead of its state — the same entity can be shown several times, its state and some of its attributes. A number is shown as a curve, anything else as a timeline; the curve is named after the entity and the attribute (`name:` to change it). Home Assistant gives an attribute no unit — set `unit:` — and no long-term statistics: an attribute's curve only covers what the history keeps. Its history is asked with every change of the entity's attributes (Home Assistant otherwise leaves out the changes of an attribute alone), only for the entities that have an attribute shown. Writing the attribute after the entity id is the same: `entity: climate.salon.current_temperature`.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    title: Salon
+    entities:
+      - entity: climate.salon
+        attribute: current_temperature
+        unit: °C
+      - entity: climate.salon
+        attribute: temperature          # the setpoint
+        unit: °C
+  - type: timeline
+    entities:
+      - entity: climate.salon           # its state: heat, off…
+      - entity: climate.salon
+        attribute: hvac_action          # heating, idle…
 ```
 
 Use wildcards to automatically add multiple entities. Matches are added in natural alphabetical order (e.g. `sensor.power_2` before `sensor.power_10`) rather than Home Assistant's entity creation order. The following snippet will add all sensors with `temperature` in their name to a line graph, except for entities with `fridge` in their name and the `cpu_temperature` sensor:

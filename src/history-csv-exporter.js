@@ -1,6 +1,7 @@
 
 import "../deps/moment.js";
 import "../deps/FileSaver.js";
+import { HA_ATTRIBUTES, seriesOf } from "./history-series.js";
 
 var moment = window.HXLocal_moment;
 
@@ -63,7 +64,7 @@ export class HistoryCSVExporter {
                 if( this._hass.states[entity] ) {
                     v += `${this.separator}State`;
                     for( let a in this._hass.states[entity].attributes ) {
-                        if( !_STATE_ATTRIBUTES.includes(a) ) {
+                        if( !HA_ATTRIBUTES.includes(a) ) {
                             attributes.push(a);
                             v += `${this.separator}${a}`;
                         }
@@ -115,10 +116,12 @@ export class HistoryCSVExporter {
 
         let t0 = cardstate.startTime.replace('+', '%2b');
         let t1 = cardstate.endTime.replace('+', '%2b');
+        // (an attribute's curve: its entity exported, with its attributes when asked)
         let l = [];
         for( let g of cardstate.graphs ) {
             for( let e of g.entities ) {
-                l.push(e.entity);
+                const _id = seriesOf(e.entity).entity;
+                if( !l.includes(_id) ) l.push(_id);
                 n++;
             }
         }
@@ -205,10 +208,12 @@ export class StatisticsCSVExporter {
 
         let t0 = cardstate.startTime.replace('+', '%2b');
         let t1 = cardstate.endTime.replace('+', '%2b');
+        // (an attribute's curve: its entity exported, with its attributes when asked)
         let l = [];
         for( let g of cardstate.graphs ) {
             for( let e of g.entities ) {
-                l.push(e.entity);
+                const _id = seriesOf(e.entity).entity;
+                if( !l.includes(_id) ) l.push(_id);
                 n++;
             }
         }
@@ -225,31 +230,3 @@ export class StatisticsCSVExporter {
     }
 
 }
-
-
-// --------------------------------------------------------------------------------------
-// HA core built-in state attributes
-// --------------------------------------------------------------------------------------
-
-var _STATE_ATTRIBUTES = [
-    "entity_id",
-    "assumed_state",
-    "attribution",
-    "custom_ui_more_info",
-    "custom_ui_state_card",
-    "device_class",
-    "editable",
-    "emulated_hue_name",
-    "emulated_hue",
-    "entity_picture",
-    "friendly_name",
-    "haaska_hidden",
-    "haaska_name",
-    "icon",
-    "initial_state",
-    "last_reset",
-    "restored",
-    "state_class",
-    "supported_features",
-    "unit_of_measurement",
-];

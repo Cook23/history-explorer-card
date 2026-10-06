@@ -136,6 +136,8 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 Clicking an entry in the dropdown adds it directly — no separate button required.
 
+For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value; ← or Escape goes back to the list.
+
 Right after the selection (click or second Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
 The entity selector accepts `*` wildcards:
@@ -703,6 +705,13 @@ graphs:
     entities:
       - entity: sensor.wind_bearing
         color: black
+```
+
+An entity's attribute is shown with `attribute:` — a number as a curve, anything else as a timeline. Home Assistant gives an attribute no unit, and only its history (no long-term statistics):
+```yaml
+      - entity: climate.salon
+        attribute: current_temperature
+        unit: °C
 ```
 
 > For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs)

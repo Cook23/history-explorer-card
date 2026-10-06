@@ -3,6 +3,7 @@
 // from the YAML. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColor } from "./history-default-colors.js";
+import { seriesState, seriesId } from "./history-series.js";
 import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -16,7 +17,7 @@ export function getDomainForEntityPure(entity)
 
 export function getDeviceClassPure(hass, entity)
 {
-    return hass.states[entity]?.attributes?.device_class;
+    return seriesState(hass, entity)?.attributes?.device_class;
 }
 
 // The type an entity is shown as when nothing sets it (a YAML entity, the info panel): a
@@ -24,7 +25,7 @@ export function getDeviceClassPure(hass, entity)
 // timeline, anything else as a line (entities added from the card: _detectDefaultType)
 export function baseTypePure(hass, entity)
 {
-    const _attr = hass.states[entity]?.attributes;
+    const _attr = seriesState(hass, entity)?.attributes;
     const uom = _attr?.unit_of_measurement, sc = _attr?.state_class;
     return ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 }
@@ -143,6 +144,12 @@ export class CardConfig
         return getDomainForEntityPure(entity);
     }
 
+    // The state of a series (an entity's, or one of its attributes', see history-series.js)
+    stateOf(id)
+    {
+        return seriesState(this._hass, id);
+    }
+
     getDeviceClass(entity)
     {
         return getDeviceClassPure(this._hass, entity);
@@ -150,12 +157,12 @@ export class CardConfig
 
     getUnitOfMeasure(entity, manualUnit)
     {
-        return ( manualUnit === undefined ) ? this._hass.states[entity]?.attributes?.unit_of_measurement : manualUnit;
+        return ( manualUnit === undefined ) ? this.stateOf(entity)?.attributes?.unit_of_measurement : manualUnit;
     }
 
     getStateClass(entity)
     {
-        return this._hass.states[entity]?.attributes?.state_class;
+        return this.stateOf(entity)?.attributes?.state_class;
     }
 
     getEntityOptions(entity)
@@ -233,7 +240,7 @@ export class CardConfig
         // entities whose current state can be treated as a number. Non-numeric states
         // (on/off, text) can only ever be represented as a timeline — the menu is still
         // shown for these (see showEntityTypeMenu), just reduced to timeline only.
-        const state = this._hass.states[entity_id]?.state;
+        const state = this.stateOf(entity_id)?.state;
         return state !== undefined && state !== null && !isNaN(Number(state));
     }
 
@@ -369,10 +376,11 @@ export class CardConfig
                     _matched.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
                     for( let s of _matched ) {
                         const _ent = {...e, 'entity': s};
-                        this.store.add(this._makeStaticEntityEntry(s, _groupId, _ent, _interval));
+                        this.store.add(this._makeStaticEntityEntry(seriesId(s, e.attribute), _groupId, _ent, _interval));
                     }
                 } else {
-                    this.store.add(this._makeStaticEntityEntry(e.entity, _groupId, e, _interval));
+                    // (attribute: one of the entity's attributes instead of its state)
+                    this.store.add(this._makeStaticEntityEntry(seriesId(e.entity, e.attribute), _groupId, e, _interval));
                 }
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.
