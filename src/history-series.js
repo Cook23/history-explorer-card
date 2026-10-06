@@ -55,19 +55,57 @@ export function attributeValue(v)
     return _m ? { value: Number(_m[1].replace(',', '.')), unit: _m[2] } : { value: v, unit: undefined };
 }
 
+// The units an entity gives its attributes, as weather entities do: an attribute X_unit is
+// the unit of every other attribute whose name contains X (temperature_unit: of
+// temperature and apparent_temperature) — { X: unit }
+function _unitsOf(attributes)
+{
+    const r = {};
+    for( const [k, u] of Object.entries(attributes ?? {}) )
+        if( _isUnit(k, u) ) r[k.slice(0, -5)] = u;
+    return r;
+}
+
+// Is attribute k, of value u, a unit: an X_unit holding a text?
+function _isUnit(k, u)
+{
+    return k.endsWith('_unit') && k.length > 5 && typeof u === 'string' && u !== '';
+}
+
+// The units of a weather entity's attributes, as Home Assistant shows them (its frontend's
+// getWeatherUnit): the X of the X_unit giving it, or the unit itself ('%')
+const WEATHER_UNITS = { temperature: 'temperature', apparent_temperature: 'temperature', dew_point: 'temperature', templow: 'temperature',
+                        pressure: 'pressure', wind_speed: 'wind_speed', wind_gust_speed: 'wind_speed',
+                        visibility: 'visibility', precipitation: 'precipitation',
+                        humidity: { unit: '%' }, cloud_coverage: { unit: '%' }, precipitation_probability: { unit: '%' } };
+
+// The unit entity s gives attribute: for a weather entity, Home Assistant's (WEATHER_UNITS);
+// else the X_unit of the longest X its name contains (see _unitsOf); or undefined — a unit
+// has none
+export function attributeUnitOf(s, attribute)
+{
+    const _units = _unitsOf(s?.attributes);
+    if( attribute.endsWith('_unit') ) return undefined;
+    const _w = s?.entity_id?.startsWith('weather.') ? WEATHER_UNITS[attribute] : undefined;
+    if( _w ) return _w.unit ?? _units[_w];
+    const _x = Object.keys(_units).filter(x => attribute.includes(x)).sort((a, b) => b.length - a.length)[0];
+    return _x !== undefined ? _units[_x] : undefined;
+}
+
 // The attributes of state s that can be shown as a series: a number, a text or a yes/no —
-// not Home Assistant's own, not a list or an object
+// not Home Assistant's own, not a list or an object, not a unit (X_unit)
 export function seriesAttributes(s)
 {
     const _a = s?.attributes ?? {};
-    return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]));
+    return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]) && !_isUnit(k, _a[k]));
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:
 // its value as the state (see attributeValue), its entity's last update as its last
 // change, its entity's name and its own as its name ("salon : Current temperature" — the
-// colon tells an attribute from an entity), the unit its value gives (never the
-// entity's), a number taken as a measurement (shown as a curve, as an entity measuring
+// colon tells an attribute from an entity), the unit its value gives, else the one its
+// entity gives it (attributeUnitOf: an X_unit — never the entity's own unit),
+// a number taken as a measurement (shown as a curve, as an entity measuring
 // something); undefined when there's no such entity or attribute
 export function seriesState(hass, id)
 {
@@ -75,7 +113,8 @@ export function seriesState(hass, id)
     const _s = hass?.states[entity];
     if( !attribute || !_s ) return attribute ? undefined : _s;
     if( !_s.attributes || !( attribute in _s.attributes ) ) return undefined;
-    const { value: _v, unit: _unit } = attributeValue(_s.attributes[attribute]);
+    const { value: _v, unit: _valueUnit } = attributeValue(_s.attributes[attribute]);
+    const _unit = _valueUnit ?? attributeUnitOf(_s, attribute);
     return { entity_id: id, state: _v === null ? 'unknown' : String(_v), last_changed: _s.last_updated, last_updated: _s.last_updated,
              attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' : ' + attributeLabel(attribute),
                            ...( _unit ? { unit_of_measurement: _unit } : {} ),

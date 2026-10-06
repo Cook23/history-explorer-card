@@ -40,8 +40,12 @@ const STATES={
  'sensor.clim_mode':ent('sensor.clim_mode','clim mode',null,'hot'),
  // attributes shown as curves: a number, a text, and what is never offered (a list, HA's own)
  'climate.salon':ent('climate.salon','salon',null,'heat'),
+ // a weather entity as Home Assistant gives one: its attributes' units in X_unit attributes
+ 'weather.villeveyrac':ent('weather.villeveyrac','Villeveyrac',null,'rainy'),
 };
-Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, hvac_action: 'heating', humidity: '45 %', led_color: 'green', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, apparent_temperature: 21, hvac_action: 'heating', humidity: '45 %', led_color: 'green', temperature_unit: '°C', visibility_unit: 'km', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, apparent_temperature: 29, temperature_unit: '°C', humidity: 85, pressure: 1016.4, pressure_unit: 'hPa',
+    wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3 });
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];

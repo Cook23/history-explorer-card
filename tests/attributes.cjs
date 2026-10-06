@@ -13,14 +13,14 @@ module.exports = async function()
 
     // ── In the YAML ──
     let t = await openCard(card({ graphs: [
-        { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'current_temperature', unit: '°C' }, { entity: 'climate.salon.temperature', unit: '°C' }] },
+        { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'current_temperature', unit: '°C' }, { entity: 'climate.salon.temperature' }] },
         { type: 'timeline', entities: [{ entity: 'climate.salon' }, { entity: 'climate.salon', attribute: 'hvac_action' }] }] }), { mock: { series: true }, height: 900 });
     await t.wait(1500);
     await t.step('attribute: curves of an entity\'s attributes, beside its own state, each with its history', async () => {
         const v = await shown(t);
         return /^line:climate\.salon\.current_temperature#(\d+)\+climate\.salon\.temperature#\d+ \| timeline:climate\.salon#\d+\+climate\.salon\.hvac_action#\d+$/.test(v) && Number(v.match(/current_temperature#(\d+)/)[1]) > 100 ? true : v;
     });
-    await t.step('named after the entity, a colon and the attribute, with the unit set (the attribute after the entity id the same)', async () => {
+    await t.step('named after the entity, a colon and the attribute, with its unit — set, or given by the entity (temperature_unit) — the attribute after the entity id the same', async () => {
         const v = await t.E(`el.instance.graphs[0].chart.data.datasets.map(d=>d.name+' / '+d.unit).join(', ')`);
         return v === 'salon : Current temperature / °C, salon : Temperature / °C' ? true : v;
     });
@@ -66,11 +66,17 @@ module.exports = async function()
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };
-    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list nor Home Assistant\'s own', async () => {
+    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, nor a unit (X_unit: temperature_unit, of every attribute with temperature in its name; visibility_unit, even with no visibility)', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
-        return v === 'Value (heat)* | Current temperature (19.5) | Temperature (20) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
+        return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21 °C) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
     });
+    await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %), no X_unit offered', async () => {
+        await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
+        const v = await sub(); await closeAll();
+        return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h)' ? true : v;
+    });
+    await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
     await t.step('like every submenu: over the dropdown, level with the entry, right edges aligned', async () => {
         const r = await t.E(`(()=>{ const q=s=>el.querySelector(s).getBoundingClientRect(); const d=q('#es_0'), e=q('#es_0 a[data-entity="climate.salon"]'), s=q('#es_0_series');
             return Math.abs(s.right-d.right)<1 && Math.abs(s.top-e.top)<1 ? 'ok' : JSON.stringify({ d, e, s }); })()`);

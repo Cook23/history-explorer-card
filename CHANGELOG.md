@@ -4,6 +4,15 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.10b1] - unreleased
+
+### New — an attribute's unit given by its entity
+- On a weather entity, each attribute is in the unit Home Assistant shows it in (its frontend's table): `temperature_unit` for `temperature`, `apparent_temperature`, `dew_point` and `templow`; `wind_speed_unit` for `wind_speed` and `wind_gust_speed`; `pressure_unit`, `visibility_unit` and `precipitation_unit` for their own; `%` for `humidity`, `cloud_coverage` and `precipitation_probability`
+- On any other entity, an attribute `X_unit` is the unit of every attribute with `X` in its name (`temperature_unit` of `temperature` and `apparent_temperature`), the longest `X` when several match
+- The curves are shown in it, unless the value holds its own unit or `unit:` sets one; the entity selector's submenu shows it after the value (`Wind gust speed (0 km/h)`)
+- An attribute `X_unit` is a unit: never offered in the submenu, even when no attribute goes with it (`visibility_unit`, `precipitation_unit`)
+- Tests: a weather entity as Home Assistant gives one
+
 ## [v1.2.9] - 2026-10-06
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
