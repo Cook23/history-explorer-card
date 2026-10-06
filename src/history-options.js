@@ -48,7 +48,7 @@ export function normalizeOptionSynonyms(o)
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
 export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', ...Object.values(OPTION_SYNONYMS).flat()];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'yAxis', ...Object.values(OPTION_SYNONYMS).flat()];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)

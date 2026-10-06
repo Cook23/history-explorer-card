@@ -514,13 +514,13 @@ export class CardGraphs
     {
         // Removes a graph's wrapper div from the DOM and from this.graphs. Callers capture
         // the graph right after g in this.graphs BEFORE calling this, to use as addGraph's
-        // targetGraph (insertBefore semantics) for whatever gets rebuilt in its place.
+        // `before` (insertBefore semantics) for whatever gets rebuilt in its place.
         this._graphDiv(g).remove();
         this.graphs.splice(this.graphs.indexOf(g), 1);
     }
 
     // Removes g.entities[idx] and detaches g. If any entities remain, rebuilds g's
-    // replacement in the same spot (targetGraph = whatever graph followed g) with the same
+    // replacement in the same spot (right before whatever graph followed g) with the same
     // groupId — same "remove one entity from a combined graph" shared by _uncombineEntity,
     // the cross-graph legend drag (source side), and entity removal. Callers still handle
     // whatever they do with the removed entity afterward (recreate it elsewhere, drop it,
@@ -558,7 +558,7 @@ export class CardGraphs
     // drag gesture. Called after anything that can change graph composition or order.
     // Takes no vertical space (height:0 wrapper, icon floated up over it) and is always
     // re-inserted at its correct DOM position even if it already existed, as a cheap safety
-    // net — addGraph now inserts each graph div directly at its final spot via targetGraph.
+    // net — addGraph now inserts each graph div directly at its final spot via `before`.
     // Chain icon between two linked graphs (same group, one right below the other): shown
     // by Chart.js on the lower one (linkMarkerVisible); a double-click on it reaches
     // customEvent with linkMarkerZone (see newGraph) and merges them (_mergeLinkedGraph).
@@ -855,7 +855,6 @@ export class CardGraphs
         e.unit       = e.unit        ?? entityOptions?.unit;
         e.process    = e.process     ?? entityOptions?.process;
         e.circular   = e.circular    ?? entityOptions?.circular;
-        e.yAxis      = e.yAxis       ?? entityOptions?.yAxis;
 
         if( type == 'bar' ) {
             e.fill = e.color;
@@ -973,14 +972,15 @@ export class CardGraphs
 
     // Each curve's Y axis (line and bar graphs): one per group of compatible units, at most
     // two — the first group on the left, the second on the right; beyond two, every curve
-    // on one shared axis without a unit. An entity's `yAxis` (left, right) puts it on that
-    // side whatever its unit.
+    // on one shared axis without a unit. `yAxis` (left, right — on the entity, its graph,
+    // entityOptions or the card, see _resolveYAxis) puts a curve on that side whatever its
+    // unit: `left` on a whole graph keeps it on one axis.
     _assignYAxes(datasets, entities)
     {
         const _groups = [];
         for( const d of datasets ) if( !_groups.some(u => areSICompatible(u, d.unit)) ) _groups.push(d.unit);
         datasets.forEach((d, i) => {
-            const _side = entities[i].yAxis;
+            const _side = this._resolveYAxis(entities[i]);
             const _right = ( _side === 'right' || _side === 'left' ) ? _side === 'right' : _groups.length === 2 && !areSICompatible(d.unit, _groups[0]);
             d.yAxisID = _right ? RIGHT_Y_AXIS : LEFT_Y_AXIS;
         });

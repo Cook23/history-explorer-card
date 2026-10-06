@@ -92,6 +92,7 @@ export class CardConfig
         P.defaultInterval =        c.interval;
         P.defaultShowMinMax =      c.showMinMax;
         P.defaultShowPoints =      c.showPoints;
+        P.defaultYAxis =           c.yAxis;
         P.cardGraphDefaults =      Object.fromEntries(
             ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
@@ -198,6 +199,19 @@ export class CardConfig
             ?? normalizeInterpolation(this.pconfig.graphs[e?.groupId]?.interpolation)
             ?? normalizeInterpolation(this.getEntityOptions(e?.entity)?.interpolation)
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
+    }
+
+    // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
+    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
+    // Resolved when drawn, never copied onto the entity: a curve moved to another graph
+    // takes that graph's.
+    _resolveYAxis(e)
+    {
+        const _valid = v => ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
+        return _valid(e?.yAxis)
+            ?? _valid(this.pconfig.graphs[e?.groupId]?.yAxis)
+            ?? _valid(this.getEntityOptions(e?.entity)?.yAxis)
+            ?? _valid(this.pconfig.defaultYAxis) ?? 'auto';
     }
 
     _matchGlob(str, pattern)
@@ -388,6 +402,7 @@ export class CardConfig
                 showPoints     : _opts.showPoints,
                 decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
+                yAxis          : _opts.yAxis,
             };
         }
     }

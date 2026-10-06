@@ -291,7 +291,7 @@ function hecHookInfoPanel()
         const i = 0;
 
         // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
-        // !! Keep in sync with addUIHtml() in history-explorer-card.js !!
+        // !! Keep in sync with addUIHtml() in card-toolbar.js !!
         if( tools ) {
 
             return html`

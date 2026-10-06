@@ -4,24 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.5] - unreleased
-
-### Fixed — `recordedEntitiesOnly` in any time zone
-- The entity selector limited to recorded entities asked Home Assistant for the last hour without its time zone, read as UTC: ahead of UTC, it asked for an hour still to come
-
-### Code — long functions split
-- `addGraph`: the entity's options in its graph (`_optionsInGraph`), its display defaults (`_applyEntityDefaults`), the graph it joins (`_combineTarget`), a free color there (`_freeColorIn`), a new graph's place (`_newGraphIndex`) and element (`_graphElement`)
-- `readLocalState`: the saved sources read (`_readSavedSources`), then the last one to speak resolved for the entities (`_resolveEntities`, `_resolveEntity`), the time range (`_resolveTimeRange`), the info panel's switch (`_resolveInfoPanel`, `_registerInfoPanelDefault`); the card-level persistence of a category in one place (`_cardPersists`)
-- `buildChartData`: a curve's points (`_lineSamples`, its min/max band in one place: `_withMinMax`), a bar entity's bars (`_barSamples`), a timeline's rows (`_timelineRows`); how an entity is drawn and its circular values moved from `card-gestures.js` to `card-datasets.js`
-- One rule for the type an entity is shown as when nothing sets it (`baseTypePure`: a YAML entity, the info panel), written three times; the requests to Home Assistant's recorder built in one place (`historyRequest`, `statisticsRequest`), written five times in three files
-- One way to rebuild a graph from its entities (`_rebuildGraph`, moved to `card-graphs.js`): used by the merge of linked graphs, the bars ↔ raw curves switch and the type change, which each had a copy; the entity selector's messages placed in one place (`_selectorTooltip`, five copies); the theme (dark or light, labels, grid, cursor line) applied in one place for the card and the info panel (`applyTheme`)
-- `deps/chart-hec.js`: a long-press under way called off in one place (`cancelLongPress`, six copies); the info panel's injection code reindented
-
-### Code — the card's state split by role
-- `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated
-- `addGraph` takes its options by name (`{ color, before, groupId, entry, ... }`) instead of nine positional arguments; `newGraph` builds the chart from `_chartData` (`_curveDataset`), `_chartYAxis` and `_chartTooltips`
-- A curve dropped without saving is saved back at its exact place, even when the curve before it has been removed since (right after the nearest one before it still in its group); the fields the card keeps on an entry (`colorSet`, `paletteColor`, `unsavedFrom`) are described in `history-entity-store.js`
-- Tests: the new modules are linted; the place a curve dropped without saving is saved at (store)
+## [v1.2.5] - 2026-10-06
 
 ### Changed — a curve dropped onto any line or bar graph
 - A curve's label dropped onto another line or bar graph is moved there whatever its unit: lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs. Only the display type refuses a drop (a curve onto a timeline or arrowline graph, a timeline entity onto a line or bar graph). Adding an entity is unchanged: `combineSameUnits` only joins compatible units
@@ -30,11 +13,35 @@ Changelog for the HA History Explorer Card.
 - Removed: the unused translation `ui.menu.type_static`
 - Tests: a curve dropped onto a YAML graph of another unit, then back; dropped onto a graph below then merged with one above; reloads after a drop from a dynamic graph onto a YAML one, from a YAML graph onto a dynamic one (no duplicate), between two dynamic graphs (saved)
 
+### New — `yAxis` on a graph and on the card
+- `yAxis` (`left`, `right`, or `auto`: by unit, the default) can be set on the card, on a graph (directly or under `options:`), in `entityOptions` and on an entity — the most specific winning. `yAxis: left` on a graph keeps all its curves on one Y axis, whatever their units; on the card, every graph; an entity's `yAxis: auto` brings back the choice by unit
+- Resolved when the graph is drawn, never copied onto the entity (`_resolveYAxis`): a curve dropped onto another graph takes that graph's setting
+- Tests: `yAxis` on a graph, under its options, on the card, an entity's own winning, `auto`, a curve dropped out of a graph set to `left`
+
 ### Fixed — Alt and Shift + drag, as in 1.1
 - Alt (Option on Mac) held while moving over a graph shows every sample of its curves again; moving without it, or leaving the graph, hides them. Lost in the 1.2 rewrite
 - Shift + drag moves the graph both ways again — the time and the Y axis together; it only moved the Y axis
 - `deps/chart-hec.js`: the samples shown by the plugin `hecShowSamples` (`_hecSetShowSamples`); the Shift drag also goes to `panX` (`deps/Chart Custom.js.md` §3)
 - Tests: Alt shows and hides the samples, Shift + drag moves the time and the Y axis
+
+### Fixed — `recordedEntitiesOnly` in any time zone
+- The entity selector limited to recorded entities asked Home Assistant for the last hour without its time zone, read as UTC: ahead of UTC, it asked for an hour still to come
+
+### Code — the card's state split by role
+- `src/history-explorer-card.js` keeps the card, its life cycle and content; the state's methods move, unchanged, to modules of their own: `card-config.js` (options applied, entity queries, graphs from the YAML), `card-timerange.js` (the time window and the time axis), `card-graphs.js` (charts created, axes, display order, linked graphs), `card-toolbar.js` (the toolbars' HTML and layout), `card-selector.js` (the entity selector, taken out of `card-menus.js`); the history update goes to `card-history.js`, the persistence scopes to `card-storage.js`. `ARCHITECTURE.md` updated
+- `addGraph` takes its options by name (`{ color, before, groupId, entry, ... }`) instead of nine positional arguments; `newGraph` builds the chart from `_chartData` (`_curveDataset`), `_chartYAxis` and `_chartTooltips`
+- A curve dropped without saving is saved back at its exact place, even when the curve before it has been removed since (right after the nearest one before it still in its group); the fields the card keeps on an entry (`colorSet`, `paletteColor`, `unsavedFrom`) are described in `history-entity-store.js`
+- Tests: the new modules are linted; the place a curve dropped without saving is saved at (store)
+
+### Code — long functions split
+- `addGraph`: the entity's options in its graph (`_optionsInGraph`), its display defaults (`_applyEntityDefaults`), the graph it joins (`_combineTarget`), a free color there (`_freeColorIn`), a new graph's place (`_newGraphIndex`) and element (`_graphElement`)
+- `readLocalState`: the saved sources read (`_readSavedSources`), then the last one to speak resolved for the entities (`_resolveEntities`, `_resolveEntity`), the time range (`_resolveTimeRange`), the info panel's switch (`_resolveInfoPanel`, `_registerInfoPanelDefault`); the card-level persistence of a category in one place (`_cardPersists`)
+- `buildChartData`: a curve's points (`_lineSamples`, its min/max band in one place: `_withMinMax`), a bar entity's bars (`_barSamples`), a timeline's rows (`_timelineRows`); how an entity is drawn and its circular values moved from `card-gestures.js` to `card-datasets.js`
+- One rule for the type an entity is shown as when nothing sets it (`baseTypePure`: a YAML entity, the info panel), written three times; the requests to Home Assistant's recorder built in one place (`historyRequest`, `statisticsRequest`), written five times in three files
+- One way to rebuild a graph from its entities (`_rebuildGraph`, moved to `card-graphs.js`): used by the merge of linked graphs, the bars ↔ raw curves switch and the type change, which each had a copy; the entity selector's messages placed in one place (`_selectorTooltip`, five copies); the theme (dark or light, labels, grid, cursor line) applied in one place for the card and the info panel (`applyTheme`)
+- `deps/chart-hec.js`: a long-press under way called off in one place (`cancelLongPress`, six copies); the info panel's injection code reindented
+- Comments naming functions or parameters that no longer exist brought up to date; the contract (`deps/Chart Custom.js.md`) speaks of the card's modules, no longer of one file; `tests/README.md` lists the `colors` and `yaxes` suites; the feature overviews (`FORK_DESCRIPTION*.md`) brought up to 1.2: the drop rules, the two Y axes, colors held by entities, the info panel on every page, touch, pen and tooltip, the type menu's submenus and right click, Alt and Shift
+- Tests: a curve dropped where its color is taken — a free color when the card picked it, kept when it is set; `recordedEntitiesOnly` asks for the last hour with its time zone and lists what it finds (the mock answers a request without an end, until now, as Home Assistant)
 
 ## [v1.2.4] - 2026-10-05
 

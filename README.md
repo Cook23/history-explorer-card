@@ -31,6 +31,8 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
+> If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
+>
 > In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
 >
 > **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, pens, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used — for a pen, the report of *Tests (beta) ▸ Pen events*.
@@ -228,7 +230,7 @@ A drop is saved only when both graphs are: a graph defined in YAML saves nothing
 
 ### Linked graphs
 
-A graph defined in YAML always shows all its entities together, whatever their units. With two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+A graph defined in YAML always shows all its entities together, whatever their units. With two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side, and `yAxis: left` on the graph (or the card) keeps all its curves on one axis. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back
@@ -401,7 +403,7 @@ showUnavailable: true
 
 Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between 10 min, hourly, daily and monthly bars (hourly by default), or *Raw line*.
 
-A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a drag within a group of linked graphs): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a curve dropped onto it): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
 ```yaml
 entityOptions:
@@ -552,7 +554,7 @@ graphs:
 | `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
 | `scale` | | | ✓ | Multiply values by this factor before drawing — see *6 |
-| `yAxis` | | | ✓ | `left` or `right`: the Y axis of the curve (by default, the second group of units goes on the right) |
+| `yAxis` | ✓ | ✓ | ✓ | `auto`, `left` or `right`: the Y axis of the curves (`auto`, the default: the second group of units goes on the right; `left` keeps one axis) |
 | `unit` | | | ✓ | Unit shown instead of the entity's own — see *6 |
 | `hidden` | | | ✓ | Hide by default in legend |
 | `process` | | | ✓ | JS expression to transform values before display |

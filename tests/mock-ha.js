@@ -57,8 +57,9 @@ function valueAt(id,t){
   if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
   return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
 }
+// (no end_time: until now, as Home Assistant)
 function history(d){
-  const t0=Date.parse(d.start_time)/1000, t1=Date.parse(d.end_time)/1000, r={};
+  const t0=Date.parse(d.start_time)/1000, t1=d.end_time ? Date.parse(d.end_time)/1000 : Date.now()/1000, r={};
   const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
     if(!STATES[e]) continue;
