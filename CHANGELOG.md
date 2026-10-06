@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.11b1] - unreleased
+
+### Fixed — a curve's tooltip: its reading time, and its point fading out with it
+- The tooltip of the curves closed after about 1 s, whatever its text: its words were counted once it was shown, when there was nothing left to count. It now stays 1 s plus 0.5 s per word of its rows, as the other messages
+- The point it showed stayed highlighted once the tooltip had gone, until a click elsewhere. It now fades out with the tooltip — when the tooltip's time is up, and when the pointer leaves the curves
+- Tests: left still, the tooltip stays its reading time, then fades out with its point
+
 ## [v1.2.10] - 2026-10-06
 
 ### New — an attribute's unit, as Home Assistant shows it

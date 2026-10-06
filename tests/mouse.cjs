@@ -37,6 +37,19 @@ module.exports = async function()
         const t2 = await tip();
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
+    await t.step('left still, the tooltip stays its reading time (1 s, plus 0.5 s a word), then fades out with the highlighted point', async () => {
+        const p1 = await E('pointPt(0,0.4)');
+        await t.page.mouse.click(p1.x, p1.y); await t.wait(300);
+        const r0 = await E(`(()=>{ const c=graphAt(0).chart, el=c.active[0]; window.__hp=el;
+            return { text: c.tooltip._hecHoverTooltipEl.textContent, r: el && el._view.radius }; })()`);
+        const ms = await E(`graphAt(0).chart.constructor.hecUi.readingTime(${JSON.stringify(r0.text)})`);
+        await t.wait(ms - 800);
+        const shown = await tip();
+        await t.wait(800 + 1000 + 500);
+        const r1 = await E(`(()=>{ const c=graphAt(0).chart; return { active: c.active.length, r: window.__hp._view.radius }; })()`);
+        const gone = await tip();
+        return ms >= 3000 && shown && gone === null && r1.active === 0 && r1.r < r0.r ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
+    });
     await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
         const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);
             const a0=b[0], a1=b[1], gap=a1.left-(a0.left+a0.width), my=a0.top+a0.height/2;
