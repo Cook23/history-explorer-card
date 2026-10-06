@@ -94,12 +94,19 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
 
+### Plugin options (`options.plugins`)
+
+| Option | Type | Default | Effect |
+|---|---|---|---|
+| `hecCursorLine` | `{ show, shared, color }` | none | A vertical line under the pointer while it's over the plot area (plugin `hecCursorLine`): drawn when `show`; with `shared`, on every chart of the same `dragScope` at once (the card's `cursor.mode: all`); `color` its stroke. |
+
 ### Dataset options
 
 | Option | Type | Default | Effect |
 |---|---|---|---|
 | `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
+| `showMinMax` | `boolean` | `false` | A line dataset whose points carry `yMin` / `yMax`: the area between them shaded in the dataset's line color (alpha 0.15), on its own Y axis (plugin `hecMinMaxBand`). |
 
 ---
 

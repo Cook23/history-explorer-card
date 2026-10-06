@@ -221,6 +221,91 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // Cursor line — options.plugins.hecCursorLine { show, shared, color }: while the
+  // pointer is over the plot area of a chart whose show is true, a vertical line under it
+  // — on that chart, or with shared on every chart of its dragScope, at the same x
+  Chart.plugins.register({
+    id: 'hecCursorLine',
+    afterInit: function (chart) {
+      chart._hecCursorLine = { x: 0, draw: false };
+    },
+    afterEvent: function (chart, evt, opts) {
+      if (!opts || !opts.show) return;
+      var _a = chart.chartArea;
+      var _line = { x: evt.x, draw: evt.x >= _a.left && evt.x <= _a.right && evt.y >= _a.top && evt.y <= _a.bottom };
+      var _charts = [chart];
+      if (opts.shared && Chart.instances) {
+        _charts = [];
+        for (var _cid in Chart.instances) {
+          var _c = Chart.instances[_cid];
+          if (_c === chart || (_c.canvas && _c.options.dragScope === chart.options.dragScope)) _charts.push(_c);
+        }
+      }
+      _charts.forEach(function (c) { c._hecCursorLine = _line; c.draw(); });
+    },
+    afterDatasetsDraw: function (chart, easing, opts) {
+      var _l = chart._hecCursorLine;
+      if (!_l || !_l.draw) return;
+      var ctx = chart.ctx, _a = chart.chartArea;
+      ctx.save();
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = (opts && opts.color) || 'black';
+      ctx.beginPath();
+      ctx.moveTo(_l.x, _a.bottom);
+      ctx.lineTo(_l.x, _a.top);
+      ctx.stroke();
+      ctx.restore();
+    } });
+
+  // ---------------------------------------------------------------------------
+  // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
+  // points (those that have them, within the plot area), an area shaded in the
+  // dataset's line color, on the dataset's own Y axis
+  // (any CSS color — #rgb, #rrggbb(aa), rgb(a)() — with that alpha; black otherwise)
+  function hecColorWithAlpha(color, alpha) {
+    var m = typeof color === 'string' ? color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/) : null;
+    if (m) return 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + alpha + ')';
+    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/) : null;
+    if (m) return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + alpha + ')';
+    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/) : null;
+    if (m) return 'rgba(' + parseInt(m[1] + m[1], 16) + ',' + parseInt(m[2] + m[2], 16) + ',' + parseInt(m[3] + m[3], 16) + ',' + alpha + ')';
+    return 'rgba(0,0,0,' + alpha + ')';
+  }
+  Chart.plugins.register({
+    id: 'hecMinMaxBand',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx, _a = chart.chartArea;
+      var xScale = chart.scales['x-axis-0'];
+      if (!xScale) return;
+      chart.data.datasets.forEach(function (dataset, di) {
+        if (!dataset.showMinMax) return;
+        var yScale = chart.scales[chart.getDatasetMeta(di).yAxisID];
+        var points = dataset.data;
+        // (a dataset not filled yet holds {}, not a list)
+        if (!yScale || !Array.isArray(points) || points.length < 2) return;
+        var _clampY = function (v) { return Math.max(_a.top, Math.min(_a.bottom, yScale.getPixelForValue(v))); };
+        var band = [];
+        points.forEach(function (pt) {
+          if (pt.yMin == null || pt.yMax == null) return;
+          var px = xScale.getPixelForValue(pt.x);
+          if (px < _a.left - 1 || px > _a.right + 1) return;
+          band.push({ px: px, pyMin: _clampY(pt.yMin), pyMax: _clampY(pt.yMax) });
+        });
+        if (band.length < 2) return;
+        ctx.save();
+        ctx.beginPath();
+        // (yMax from left to right, then yMin back: a closed polygon)
+        ctx.moveTo(band[0].px, band[0].pyMax);
+        for (var i = 1; i < band.length; i++) ctx.lineTo(band[i].px, band[i].pyMax);
+        for (var j = band.length - 1; j >= 0; j--) ctx.lineTo(band[j].px, band[j].pyMin);
+        ctx.closePath();
+        ctx.fillStyle = hecColorWithAlpha(dataset.borderColor, 0.15);
+        ctx.fill();
+        ctx.restore();
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one

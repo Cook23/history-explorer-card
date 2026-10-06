@@ -3,7 +3,6 @@
 // group, merged and removed. Part of HistoryCardState (added to it in
 // history-explorer-card.js).
 
-import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
 import { defaultColors, parseColor, parseColorValue } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
 import { entityIdOf } from "./history-entity-store.js";
@@ -192,17 +191,18 @@ export class CardGraphs
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    vertline: {
+                    // The cursor line (cursor.mode, cursor.types): on this graph, or on
+                    // every graph of the card at once
+                    hecCursorLine: {
+                        show: this.pconfig.cursorMode !== 'hide' &&
+                              ( this.pconfig.cursorTypes.includes('all') || this.pconfig.cursorTypes.includes(graphtype) ),
+                        shared: this.pconfig.cursorMode === 'all',
                         color: this.pconfig.cursorLineColor
                     }
                 }
-            },
-
-            plugins: [vertline_plugin, minmaxfill_plugin]
+            }
 
         });
-
-        chart.callerInstance = this;
 
         return chart;
     }

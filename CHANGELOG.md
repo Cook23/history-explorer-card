@@ -6,6 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.6] - unreleased
 
+### Code — the cursor line and the min/max band in Chart.js
+- The two Chart.js plugins left in the card (`src/history-chart-vline.js`) moved to `deps/chart-hec.js` as `hecCursorLine` and `hecMinMaxBand`, with the other drawing plugins. The cursor line no longer reads the card's configuration nor walks its graphs (`chart.callerInstance`, now gone): the card gives it `show`, `shared` and `color`, and Chart.js finds the charts of the same card by their `dragScope`, as a drag does (`deps/Chart Custom.js.md` §1)
+- The info panel's guard renamed `_hecInfoPanelHooked` (a flag on Home Assistant's element, not a Chart.js private)
+- Tests: the cursor line (`auto`, `all`, `hide`) and the min/max band, which had none
+
+### Fixed — the min/max band shown as soon as its values arrive
+- The min and max of `showMinMax: history` / `states`, asked in parallel with the history, drew nothing when they arrived after it: the band only appeared at the next refresh
+
 ### New — a graph's menu, cut and paste
 - A long-press or a right click on a graph's lock+handle zone opens its menu — the same zone where a click toggles the lock and a drag moves the graph: *Lock the Y axis* / *Unlock the Y axis*, and *Layout ▸* with *Merge back*, *Cut* and *Delete the graph* (a graph added from the card)
 - *Cut* in the *Layout* submenu of a curve's or an entity's type menu, and of a graph's menu: every graph's zone then shows where it can go instead of the handle and the padlock — 📋 for a curve (pasted at the end of the legend), ↓ 📋 ↑ for a graph (inserted below or above — by a click, or a swipe down or up on them); a place refused is struck through in red and says why; ✂ where it was cut from; a click elsewhere, Escape or ✂ cancels. Pasting does exactly what a drop there does

@@ -67,8 +67,8 @@ function hecHookInfoPanel()
     let __fn = customElements.get("ha-more-info-history");
     // (hooked once: another copy of this file — loaded from another URL — leaves it as it is;
     // hooking it twice would make _oldUpdated call itself)
-    if( !__fn || __fn.prototype._hecHooked ) return;
-    __fn.prototype._hecHooked = true;
+    if( !__fn || __fn.prototype._hecInfoPanelHooked ) return;
+    __fn.prototype._hecInfoPanelHooked = true;
 
     __fn.prototype._databaseCallback = function(valid)
     {

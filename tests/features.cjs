@@ -159,6 +159,36 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The cursor line (cursor.mode, cursor.types), the min/max band (showMinMax) ──
+    const cursorCard = mode => card({ statistics: { enabled: false }, cursor: { mode, types: ['line'] }, graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', showMinMax: 'history' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] });
+    // Over graph 0's curves: which graphs draw the cursor line
+    const cursorDrawn = async () => { const c = await t.E('graphPtAt(0, 0.5)'); await t.page.mouse.move(c.x, c.y); await t.page.mouse.move(c.x + 5, c.y); await t.wait(300);
+        return t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.chart._hecCursorLine?.draw?1:0).join('')`); };
+    t = await openCard(cursorCard('auto'), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('cursor auto: the line drawn on the graph under the pointer only', async () => {
+        const d = await cursorDrawn(); return d === '100' ? true : d;
+    });
+    await t.step('min/max band: drawn between the points\' min and max (showMinMax: history)', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0]; const withMM=ds.data.filter(p=>p.yMin!=null).length;
+            const count=()=>{ let n=0; const f=c.ctx.fill; c.ctx.fill=function(){ n++; return f.apply(this,arguments); }; c.draw(); c.ctx.fill=f; return n; };
+            const on=count(); ds.showMinMax=false; const off=count(); ds.showMinMax=true; return { withMM, on, off }; })()`);
+        return r.withMM > 1 && r.on > r.off ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard(cursorCard('all'), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('cursor all: the line drawn on every graph of the card at once', async () => {
+        const d = await cursorDrawn(); return d === '111' ? true : d;
+    });
+    done(await t.close());
+    t = await openCard(cursorCard('hide'), { height: 1200, mock: { series: true } }); await t.wait(800);
+    await t.step('cursor hide: no line', async () => {
+        const d = await cursorDrawn(); return d === '000' ? true : d;
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {

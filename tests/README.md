@@ -12,7 +12,7 @@ The suites:
 | `store` | The entity store (`src/history-entity-store.js`) on its own (no browser), the place a curve dropped without saving is saved at included |
 | `mouse`, `touch` | Every gesture on the graphs, with a mouse and with fingers |
 | `cards` | Two cards on one page, menus, graphs added from the UI, linked graphs |
-| `features` | History and long-term statistics, CSV export, refresh, current values, the entity selector, dark theme, another language |
+| `features` | History and long-term statistics, CSV export, refresh, current values, the entity selector, dark theme, another language, the cursor line, the min/max band |
 | `panel` | The info panel in Home Assistant's entity dialog |
 | `typemenu` | The type menu: its order, the type pre-selected for a new entity, the keyboard |
 | `arrowline` | Arrowline arrows turn by value / the entity's circular period (360 by default) |

@@ -23,7 +23,6 @@ const FILES = [
     ['src/card-storage.js', 'module'],
     ['src/history-info-panel.js', 'module'],
     ['src/history-csv-exporter.js', 'module'],
-    ['src/history-chart-vline.js', 'module'],
     ['deps/chart-hec.js', 'script'],
 ];
 
