@@ -1420,6 +1420,9 @@ export class HistoryCardState {
                 }
             }
         }
+        // (asked in parallel with the history: arrived after it, the curves are redrawn with
+        // their band; before it, the history's arrival draws them)
+        if( !this.state.loading ) this.updateHistory();
     }
 
     loaderCallbackWS(result)
@@ -2996,9 +2999,10 @@ export class HistoryCardState {
                     // Update groupId in pconfig.entities
                     const _tgtGroupId = this._pcGroupIdOf(_tgt.entities[0].entity);
                     const _eIdx = this._pcEntryIndex(_entity.entity);
-                    // The graph after the source, found before the entry moves: the search
-                    // follows pconfig.entities' order
-                    const _srcNextG = _sameGroup ? this._nextGraph(_src) : this._nextGroup(_src);
+                    // The graph after the source, found before the entry moves (the display
+                    // order follows pconfig.entities'): rebuilt before it, right where it was —
+                    // not before the next group, or a block of linked graphs would change order
+                    const _srcNextG = this._nextGraph(_src);
                     if( _eIdx >= 0 && _tgtGroupId !== undefined ) {
                         // Preserve all existing persisted fields (type, lineMode, hidden, ...) —
                         // only groupId/color/fill change on a cross-graph move.
@@ -3021,15 +3025,15 @@ export class HistoryCardState {
                         else this.pconfig.entities.push(_pcE);
                     }
                     // Rebuild source graph without the moved entity (removes the source
-                    // graph entirely if it becomes empty). Within one group (several linked
-                    // graphs), each graph is rebuilt right where it was — graph-level
-                    // neighbor, not the next group, or the block's internal order would change.
+                    // graph entirely if it becomes empty). Each graph is rebuilt right where it
+                    // was — before its own next graph, not its next group, or a block of
+                    // linked graphs would change order.
                     const _tgtOrigGroupId = _tgt.groupId;
                     this._detachAndRebuildRemaining(_src, _srcIdx, _srcNextG);
                     // Rebuild target graph with added entity
                     _entity.siConversionFactor = undefined;
                     _tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
-                    const _tgtNextG = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+                    const _tgtNextG = this._nextGraph(_tgt);
                     this._detachGraph(_tgt);
                     const _allTgtEntities = [..._tgt.entities];
                     if( _tgtLabelInsertIdx >= 0 && _tgtLabelInsertIdx <= _allTgtEntities.length )
@@ -3861,9 +3865,9 @@ export class HistoryCardState {
         }
 
         const _srcOrigGroupId = _src.groupId;
-        // Graph-level neighbor when staying within one group (same graph, or linked graphs
-        // of one group): each graph is rebuilt right where it was inside the block
-        const _srcNextG0 = ( _isSameGraph || _sameGroup ) ? this._nextGraph(_src) : this._nextGroup(_src);
+        // Each graph is rebuilt right where it was — before its own next graph, not its next
+        // group, or a block of linked graphs would change order
+        const _srcNextG0 = this._nextGraph(_src);
         this._detachGraph(_src);
 
         const _srcRemaining = _src.entities.filter((_, i) => i !== _srcIdx);
@@ -3886,7 +3890,7 @@ export class HistoryCardState {
                         });
                 this.pconfig.combineSameUnits = _saved;
             }
-            const _tgtNextG0 = _sameGroup ? this._nextGraph(_tgt) : this._nextGroup(_tgt);
+            const _tgtNextG0 = this._nextGraph(_tgt);
             this._detachGraph(_tgt);
             const _newTgtEntities = [..._tgt.entities];
             _newTgtEntities.splice(_tgtInsertIdx < 0 ? _newTgtEntities.length : _tgtInsertIdx, 0, _entity);
@@ -7347,7 +7351,8 @@ export class HistoryCardState {
             for( let i of this.ui.inputField )
                 if( i ) i.placeholder = i18n("ui.label.loading");
 
-            const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ss');
+            // (with its time zone: without one, Home Assistant reads it as UTC)
+            const t0 = moment().subtract(1, "hour").format('YYYY-MM-DDTHH:mm:ssZ');
 
             const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
             const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
