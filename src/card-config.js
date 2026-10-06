@@ -92,6 +92,8 @@ export class CardConfig
         P.defaultNetBars =         c.netBars;
         P.defaultInterval =        c.interval;
         P.defaultShowMinMax =      c.showMinMax;
+        // (the values over a graph — see card-values.js)
+        P.cardShow =               { showState: c.showState, showStats: c.showStats };
         P.defaultShowPoints =      c.showPoints;
         P.defaultYAxis =           c.yAxis;
         P.cardGraphDefaults =      Object.fromEntries(
@@ -303,8 +305,12 @@ export class CardConfig
             stacked           : ent.stacked,
             height            : ent.height,
             showTimeLabels    : ent.showTimeLabels,
+            showGrid          : ent.showGrid,
+            yLabels           : ent.yLabels,
             showPoints        : ent.showPoints,
             showMinMax        : ent.showMinMax,
+            showState         : ent.showState,
+            showStats         : ent.showStats,
             unit              : ent.unit,
             process           : ent.process,
             netBars           : ent.netBars,
@@ -407,6 +413,8 @@ export class CardConfig
                 type           : graph.type,
                 title          : graph.title,
                 showTimeLabels : _opts.showTimeLabels,
+                showGrid       : _opts.showGrid,
+                yLabels        : _opts.yLabels,
                 height         : _opts.height,
                 stacked        : _opts.stacked,
                 ylock          : _opts.ylock,
@@ -415,6 +423,8 @@ export class CardConfig
                 ystepSize      : _opts.ystepSize,
                 fill           : _opts.fill,
                 showMinMax     : _opts.showMinMax,
+                showState      : _opts.showState,
+                showStats      : _opts.showStats,
                 dashMode       : _opts.dashMode,
                 lineMode       : _opts.lineMode,
                 interpolation  : _opts.interpolation,

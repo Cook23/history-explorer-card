@@ -41,6 +41,8 @@ This card offers a highly interactive and configurable way to view the history o
   - [Unavailable data](#line-graphs-and-unavailable-data)
   - [Custom data processing](#custom-data-processing-functions)
 - [Long term statistics](#long-term-statistics)
+- [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)
+  - [Replacing mini-graph-card](#replacing-mini-graph-card)
 - [Display defaults](#default-view-and-time-ranges)
   - [Time range and offset](#default-view-and-time-ranges)
   - [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
@@ -85,7 +87,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 - **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among four algorithms. Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
 - **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` (`circular` option); arrowlines turn by the same period.
 - **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
-- **Display options** — `showMinMax` (min/max band from long-term statistics, or over the whole graph), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array.
+- **Display options** — `showMinMax` (min/max band from long-term statistics, or over the whole graph), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. **(1.2)** Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
 - **Colors (1.2)** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
 
@@ -926,6 +928,82 @@ entityOptions:
 
 ---
 
+## Values over a graph, a compact look
+
+**(1.2)** A graph can show, over its plot:
+- **`showState: true`** — each curve's value now, in large, in its color and unit (the first one on the left, the last one on the right), updated with the entity;
+- **`showStats`** — each curve's statistics over the time window shown: `min`, `average`, `max` (a name or a list; `true`: all three), on a row — the minimum and the maximum with their time (the hour on a window of a day or less, else the date and the hour). Taken from the curve's history (never from the points drawn, which may be decimated), between the start of the window and its end (or now); the average is weighted by time — each value counts for as long as it lasted. Recomputed as the window moves or zooms, and when new values arrive. With several curves showing them, each row is named after its curve. For curves (lines) only.
+
+A curve hidden from its legend shows neither. Both are set at every level — card, `entityOptions`, graph, entity (`showStats: false` on one curve of a graph that shows them turns them off for it).
+
+Three more options shape the graph itself:
+- **`showGrid: false`** — no grid lines;
+- **`yLabels: inside`** — the Y labels drawn inside the plot, which then takes the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch);
+- **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
+
+**`look: mini`** sets, for the whole card, what mini-graph-card shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+
+```yaml
+type: custom:history-explorer-card
+look: mini
+defaultTimeRange: 24h
+graphs:
+  - title: Rain
+    entities:
+      - entity: sensor.rain_rate
+        name: Rate
+        color: orange
+      - entity: sensor.rain_total
+        name: Total
+        showStats: false        # its value now only
+```
+
+### Replacing mini-graph-card
+
+One mini-graph-card is one graph of a card with `look: mini` — several of them can be graphs of one card, or cards of their own. Its options translate as follows:
+
+| mini-graph-card | history-explorer-card |
+|---|---|
+| `entities: [sensor.x]` | `graphs: [{ entities: [{ entity: sensor.x }] }]` |
+| `name` | the graph's `title` |
+| `icon`, `icon_image`, `tap_action`, `group`, `font_size`, `font_size_header`, `align_header`, `align_icon`, `align_state`, `animate`, `hour24`, `cache`, `loading_indicator` | — (the card's own layout and gestures) |
+| `hours_to_show` | `defaultTimeRange` (`24h`, `7d`…) |
+| `points_per_hour` | `decimation` (curves) |
+| `aggregate_func`, `group_by` | bars: their `interval` (and long-term statistics); curves: — |
+| `update_interval` | automatic refresh (on by default: each change, at most every 2 s) |
+| `height` | `height` |
+| `line_width` | `lineWidth` |
+| `line_color`, entity `color` | `color` |
+| `color_thresholds` | `color` with thresholds (`{ 0: blue, 20: red }`), on the value or on another entity's |
+| `color_thresholds_transition: hard` | the default (a curve changes color on a point) |
+| `decimals` | `rounding` |
+| `unit`, entity `unit` | `unit` |
+| `lower_bound`, `upper_bound` | `ymin`, `ymax` (`ylock: true` for fixed bounds) |
+| `lower_bound_secondary`, `upper_bound_secondary` | the right axis' bounds: `ymin`, `ymax` on its curves — see [Y axis scaling](#y-axis-scaling) |
+| `min_bound_range` | — |
+| `smoothing: true` / `false` | `lineMode: smart` (or `curves`) / `lines` |
+| `logarithmic` | — |
+| `state_map` | a timeline (`type: timeline`) and its `stateColors` |
+| `value_factor` | `scale` (with `unit` for a conversion) |
+| `show.name` | the graph's `title` |
+| `show.state` | `showState` |
+| `show.graph: line` / `bar` | `type: line` / `bar` |
+| `show.fill: true` / `fade` / `false` | `fill` (a color) / `fill: fade` / `fill: rgba(0,0,0,0)` |
+| `show.points` | `showPoints` |
+| `show.legend` | `legendVisible` |
+| `show.extrema` | `showStats: [min, max]` |
+| `show.average` | `showStats: [average]` (with the others: `[min, average, max]`) |
+| `show.labels`, `show.labels_secondary` | `yLabels: inside` (`showTimeLabels` for the time axis) |
+| entity `attribute` | `attribute` |
+| entity `name` | `name` |
+| entity `y_axis: secondary` | `yAxis: right` |
+| entity `show_state` | `showState` on the entity |
+| entity `show_legend_state` | `showCurrentValues` (the value in the legend) |
+| entity `show_graph: false` | `hidden: true` (shown again from the legend) |
+| entity `show_fill`, `show_points` | `fill`, `showPoints` on the entity |
+| entity `smoothing` | `lineMode` on the entity |
+| entity `fixed_value`, `show_indicator`, `show_line`, `state_adaptive_color` | — |
+
 ## Default view and time ranges
 
 When the dashboard is opened, the card will show the last 24 hours by default. You can select a different default time range in the YAML. Use m, h, d, and w to denote minutes, hours, days and weeks respectively. For longer time scale, o and y denote months and year. Currently the maximum range is one year. If no postfix is given, hours are assumed.
@@ -1134,13 +1212,17 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `process` | string | Javascript expression to transform state values before display |
 | `showMinMax` | string or boolean | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
 | `showTimeLabels` | boolean | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
+| `showState` | boolean | **(1.2)** The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `showStats` | boolean, string or list | **(1.2)** The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
+| `showGrid` | boolean | **(1.2)** `false`: no grid lines on the graph |
+| `yLabels` | string | **(1.2)** `inside`: the Y labels inside the plot, which takes the whole width |
 | `exclude` | string, list, or `{entity: ...}` | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
 
 #### The same options at every level
 
 Every option above, except the ones that only make sense for a single entity (`type`, `color`, `name`, `hidden`, `scale`, `unit`, `process`, `circular`), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
-The options of the graph itself — `ymin`, `ymax`, `ystepSize`, `ylock`, `stacked`, `height`, `showTimeLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
+The options of the graph itself — `ymin`, `ymax`, `ystepSize`, `ylock`, `stacked`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
 An option is spelled the same at every level, and its synonyms are accepted everywhere: `width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`. A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 
@@ -1159,7 +1241,7 @@ graphs:
         interpolation: steffen # this curve only
 ```
 
-`fill`, `showMinMax`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
+`fill`, `showMinMax`, `showState`, `showStats`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
 
 ```yaml
 type: custom:history-explorer-card

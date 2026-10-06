@@ -58,6 +58,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 - [Timeline charts](#timeline-charts)
 - [Compass arrow graphs](#compass-arrow-graphs)
 - [Long term statistics](#long-term-statistics)
+- [Values over a graph, a compact look — replacing mini-graph-card](#values-over-a-graph-a-compact-look--replacing-mini-graph-card)
 - [Entity options](#entity-options)
 - [Card, graph, and entity-level options](#card-graph-and-entity-level-options)
 - [CSV export](#csv-export)
@@ -511,6 +512,31 @@ statistics:
 
 ---
 
+## Values over a graph, a compact look — replacing mini-graph-card
+
+A graph can show, over its plot, each curve's value now (`showState`) and its minimum, average and maximum over the time window shown (`showStats`, the minimum and maximum with their time) — recomputed as the window moves: unlike mini-graph-card, the time can still be panned and zoomed. `look: mini` gives the look of mini-graph-card at once; any option set on the card still wins:
+
+```yaml
+type: custom:history-explorer-card
+look: mini
+defaultTimeRange: 24h
+graphs:
+  - title: Rain
+    entities:
+      - entity: sensor.rain_rate
+        name: Rate
+        color: orange
+      - entity: sensor.rain_total
+        name: Total
+        showStats: false
+```
+
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, which takes the whole width); `fill: fade` (each curve's color fading out downwards); `height: 150`.
+
+> How each mini-graph-card option translates → [README_Full.md — Replacing mini-graph-card](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#replacing-mini-graph-card)
+
+---
+
 ## Entity options
 
 All display options can be applied globally via `entityOptions`, keyed by entity id, device class, or domain. A list form with glob patterns is also supported:
@@ -557,7 +583,9 @@ graphs:
 |---|:-:|:-:|:-:|---|
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
 | `color` | | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
-| `fill` | ✓ | ✓ | ✓ | Fill color under the line |
+| `fill` | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards |
+| `showState` | ✓ | ✓ | ✓ | The curve's value now, in large, over the graph |
+| `showStats` | ✓ | ✓ | ✓ | Its `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
 | `interpolation` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` |
@@ -579,6 +607,9 @@ graphs:
 | `stacked` | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
 | `showTimeLabels` | ✓ | ✓ | ✓ | Show/hide time axis labels on timeline/arrowline graphs (default `true`) — see *7 |
 | `height` | ✓ | ✓ | ✓ | Graph height in pixels — see *2 and *7 |
+| `showGrid` | ✓ | ✓ | ✓ | `false`: no grid lines — see *7 |
+| `yLabels` | ✓ | ✓ | ✓ | `inside`: the Y labels inside the plot, which takes the whole width — see *7 |
+| `look` | ✓ | | | `mini`: a set of options at once — see [Values over a graph](#values-over-a-graph-a-compact-look--replacing-mini-graph-card) |
 | `entityOptions` | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
 | `filterEntities` / `excludeFilterEntities` | ✓ | | | Limit which entities appear in the entity picker — see *4 |
 | `exclude` | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
@@ -595,7 +626,7 @@ graphs:
 
 *6 — `scale` without `unit` only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W.
 
-*7 — an option of the graph itself (its Y axis, its stacking, its height, its time labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
+*7 — an option of the graph itself (its Y axis, its stacking, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
 Every option is spelled the same at every level where it's accepted, and its synonyms are accepted everywhere (`width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 

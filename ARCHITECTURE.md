@@ -40,6 +40,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-toolbar.js` | The card's HTML: the toolbars and their menu entries, the interval selector of bar graphs, the layout as the card resizes. |
 | `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
+| `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id (`climate.salon.current_temperature`), its state as Home Assistant would give an entity's (`stateOf`), its history from its entity's. |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |

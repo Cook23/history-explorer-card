@@ -66,6 +66,7 @@ export class CardGestures
         const _hiddenState = meta.hidden !== null ? meta.hidden : g.chart.data.datasets[idx].hidden;
         const _e = this.store.entry(keyOf(g.entities[idx]));
         if( _e ) _e.hidden = _hiddenState || undefined;
+        this._showValues(g);
         this.writeLocalState();
     }
 

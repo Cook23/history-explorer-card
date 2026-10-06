@@ -21,6 +21,8 @@ const FILES = [
     ['src/card-gestures.js', 'module'],
     ['src/card-menus.js', 'module'],
     ['src/card-storage.js', 'module'],
+    ['src/card-values.js', 'module'],
+    ['src/history-series.js', 'module'],
     ['src/history-info-panel.js', 'module'],
     ['src/history-csv-exporter.js', 'module'],
     ['deps/chart-hec.js', 'script'],

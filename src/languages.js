@@ -53,6 +53,11 @@ const lang_en =
             "ylock"             : "Lock the Y axis",
             "yunlock"           : "Unlock the Y axis"
         },
+        "values" : {
+            "min" : "Min",
+            "average" : "Average",
+            "max" : "Max"
+        },
         "ranges" : {
             "l_hour" : "< 1 H",
             "hour" : "1 H",
@@ -129,6 +134,11 @@ const lang_fr =
             "graph_delete"      : "Supprimer le graphique",
             "ylock"             : "Verrouiller l'axe Y",
             "yunlock"           : "Déverrouiller l'axe Y"
+        },
+        "values" : {
+            "min" : "Min",
+            "average" : "Moyenne",
+            "max" : "Max"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -207,6 +217,11 @@ const lang_de =
             "ylock"             : "Y-Achse sperren",
             "yunlock"           : "Y-Achse entsperren"
         },
+        "values" : {
+            "min" : "Min",
+            "average" : "Mittel",
+            "max" : "Max"
+        },
         "ranges" : {
             "l_hour" : "< 1 Std.",
             "hour" : "1 Stunde",
@@ -283,6 +298,11 @@ const lang_es =
             "graph_delete"      : "Eliminar el gráfico",
             "ylock"             : "Bloquear el eje Y",
             "yunlock"           : "Desbloquear el eje Y"
+        },
+        "values" : {
+            "min" : "Mín",
+            "average" : "Media",
+            "max" : "Máx"
         },
         "ranges" : {
             "l_hour" : "< 1 H",
@@ -361,6 +381,11 @@ const lang_nl =
             "ylock"             : "Y-as vergrendelen",
             "yunlock"           : "Y-as ontgrendelen"
         },
+        "values" : {
+            "min" : "Min",
+            "average" : "Gemiddeld",
+            "max" : "Max"
+        },
         "ranges" : {
             "l_hour" : "< 1 u",
             "hour" : "1 u",
@@ -437,6 +462,11 @@ const lang_pl =
             "graph_delete"      : "Usuń wykres",
             "ylock"             : "Zablokuj oś Y",
             "yunlock"           : "Odblokuj oś Y"
+        },
+        "values" : {
+            "min" : "Min",
+            "average" : "Średnia",
+            "max" : "Maks"
         },
         "ranges" : {
             "l_hour" : "< 1 godz.",
@@ -515,6 +545,11 @@ const lang_sv =
             "ylock"             : "Lås Y-axeln",
             "yunlock"           : "Lås upp Y-axeln"
         },
+        "values" : {
+            "min" : "Min",
+            "average" : "Medel",
+            "max" : "Max"
+        },
         "ranges": {
             "l_hour": "< 1 tim",
             "hour": "1 tim",
@@ -591,6 +626,11 @@ const lang_da =
             "graph_delete"      : "Slet grafen",
             "ylock"             : "Lås Y-aksen",
             "yunlock"           : "Lås Y-aksen op"
+        },
+        "values" : {
+            "min" : "Min",
+            "average" : "Gennemsnit",
+            "max" : "Maks"
         },
         "ranges" : {
             "l_hour" : "< 1 T",
@@ -669,6 +709,11 @@ const lang_sk =
             "ylock"             : "Uzamknúť os Y",
             "yunlock"           : "Odomknúť os Y"
         },
+        "values" : {
+            "min" : "Min",
+            "average" : "Priemer",
+            "max" : "Max"
+        },
         "ranges" : {
             "l_hour" : "< 1 H",
             "hour" : "1 H",
@@ -745,6 +790,11 @@ const lang_ru =
             "graph_delete"      : "Удалить график",
             "ylock"             : "Заблокировать ось Y",
             "yunlock"           : "Разблокировать ось Y"
+        },
+        "values" : {
+            "min" : "Мин",
+            "average" : "Среднее",
+            "max" : "Макс"
         },
         "ranges" : {
             "l_hour" : "< 1 Ч",

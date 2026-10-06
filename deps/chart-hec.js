@@ -265,15 +265,10 @@
   // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
   // points (those that have them, within the plot area), an area shaded in the
   // dataset's line color, on the dataset's own Y axis
-  // (any CSS color — #rgb, #rrggbb(aa), rgb(a)() — with that alpha; black otherwise)
+  // (any CSS color — a name, #rgb, #rrggbb(aa), rgb(a)(), hsl(a)() — with that alpha; black otherwise)
   function hecColorWithAlpha(color, alpha) {
-    var m = typeof color === 'string' ? color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/) : null;
-    if (m) return 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',' + alpha + ')';
-    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/) : null;
-    if (m) return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + alpha + ')';
-    m = typeof color === 'string' ? color.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/) : null;
-    if (m) return 'rgba(' + parseInt(m[1] + m[1], 16) + ',' + parseInt(m[2] + m[2], 16) + ',' + parseInt(m[3] + m[3], 16) + ',' + alpha + ')';
-    return 'rgba(0,0,0,' + alpha + ')';
+    var c = typeof color === 'string' ? helpers.color(color) : null;
+    return c && c.valid ? c.alpha(alpha).rgbString() : 'rgba(0,0,0,' + alpha + ')';
   }
   Chart.plugins.register({
     id: 'hecMinMaxBand',
@@ -306,6 +301,23 @@
         ctx.fillStyle = hecColorWithAlpha(dataset.borderColor, 0.15);
         ctx.fill();
         ctx.restore();
+      });
+    } });
+
+  // The area under a curve filled with its own color fading out downwards (dataset option
+  // hecFillFade): a gradient over the plot area, made once its size is known (after the
+  // layout, before the datasets take their colors)
+  Chart.plugins.register({
+    id: 'hecFillFade',
+    afterLayout: function (chart) {
+      var _a = chart.chartArea;
+      if (!_a || !(_a.bottom > _a.top)) return;
+      chart.data.datasets.forEach(function (dataset) {
+        if (!dataset.hecFillFade) return;
+        var g = chart.ctx.createLinearGradient(0, _a.top, 0, _a.bottom);
+        g.addColorStop(0, hecColorWithAlpha(dataset.borderColor, 0.4));
+        g.addColorStop(1, hecColorWithAlpha(dataset.borderColor, 0));
+        dataset.backgroundColor = g;
       });
     } });
 
