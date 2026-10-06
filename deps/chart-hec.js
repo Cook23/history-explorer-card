@@ -16,12 +16,15 @@
 
   // ── Geometry primitives (no chart instance involved) ──
 
-  // Picking a label under a pointer: the one the pointer is on; else the nearest one, if
-  // it's near enough (within PICK_MARGIN px) and clearly nearer than the next one (by more
-  // than PICK_AMBIGUITY px) — a point clearly beside every label, or about halfway between
-  // two, picks none. Simpler to hit, without picking what wasn't aimed at.
+  // Picking what's under a pointer (a label, a button): the one the pointer is on; else the
+  // nearest one, if it's near enough (within PICK_MARGIN px) and clearly nearer than the
+  // next one (by more than PICK_AMBIGUITY px). A point clearly beside every candidate picks
+  // none (-1); about halfway between two near ones, none either, but told apart
+  // (PICK_BETWEEN): aimed at one of them, without saying which. Simpler to hit, without
+  // picking what wasn't aimed at.
   var PICK_MARGIN = 12;
   var PICK_AMBIGUITY = 4;
+  var PICK_BETWEEN = -2;
   function _hecPick(px, py, rects) {
     var best = -1, d1 = Infinity, d2 = Infinity;
     for (var i = 0; i < rects.length; i++) {
@@ -32,7 +35,8 @@
       if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
     }
     if (best < 0 || d1 === 0) return best;
-    return d1 <= PICK_MARGIN && d2 - d1 > PICK_AMBIGUITY ? best : -1;
+    if (d1 > PICK_MARGIN) return -1;
+    return d2 - d1 > PICK_AMBIGUITY ? best : PICK_BETWEEN;
   }
 
   // ---------------------------------------------------------------------------
@@ -984,10 +988,10 @@
     if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
     var _hName = p.handler && p.handler.name;
     if (_hName === 'handleSwipe') {
-      var _hb = me._hecHandleButtonAt(p.x0, p.y0);
       var _dy = (e && e.y !== undefined && e.y !== null ? e.y : p.y0) - p.y0;
-      fire(c, 'dragend', undefined, undefined, { swipe: Math.abs(_dy) >= 10 ? (_dy < 0 ? 'up' : 'down') : null,
-        handleButton: _hb ? _hb.id : undefined, handleButtonDisabled: _hb ? !!_hb.disabled : undefined });
+      var _sw = me._hecHandleButtonFields(p.x0, p.y0);
+      _sw.swipe = Math.abs(_dy) >= 10 ? (_dy < 0 ? 'up' : 'down') : null;
+      fire(c, 'dragend', undefined, undefined, _sw);
     } else if (_hName === 'zoomSelect') {
       me._hecHideZoomSelection();
       fire(c, 'dragend', undefined, undefined, { zoomSelectFactor0: me._hecPlotFactor(p.x0),
@@ -1358,7 +1362,7 @@
       var rects = [];
       for (var i = 0; i < lh.length; i++) rects.push({ x: lh[i].left, y: lh[i].top, width: lh[i].width, height: lh[i].height });
       if (y < legend.top || y > legend.bottom || this._hecOnControl(x, y)) return -1;
-      return _hecPick(x, y, rects);
+      return Math.max(_hecPick(x, y, rects), -1);
     },
 
     // Y-axis category label hit-test (timeline/arrowline row under a point) — the row
@@ -1378,7 +1382,7 @@
         rects.push({ x: 0, y: py - _rowH / 2, width: _colWidth, height: _rowH });
       }
       if (x < 0 || x > _colWidth || this._hecOnControl(x, y)) return -1;
-      return _hecPick(x, y, rects);
+      return Math.max(_hecPick(x, y, rects), -1);
     },
 
     // Where a timeline/arrowline row dropped at canvas-relative y lands: the row it's
@@ -1724,11 +1728,29 @@
       return b && b.length ? b : null;
     },
 
-    // The button of options.handleButtons at (x, y), or null
+    // The button of options.handleButtons picked at (x, y) (_hecPick, on each one's icon):
+    // the button, PICK_BETWEEN about halfway between two, or null — clearly beside them, on
+    // a legend label or on the chain icon
     _hecHandleButtonAt: function (x, y) {
       var b = this._hecHandleButtons();
-      if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
-      return b[Math.min(b.length - 1, Math.floor(x / (this._hecLockAndHandleWidth() / b.length)))];
+      if (!b || this._hecInLinkMarkerZone(x, y)) return null;
+      var lh = this.legend && this.legend.legendHitBoxes;
+      for (var i = 0; lh && i < lh.length; i++) {
+        if (x >= lh[i].left && x <= lh[i].left + lh[i].width && y >= lh[i].top && y <= lh[i].top + lh[i].height) return null;
+      }
+      // (each icon: its slot of the zone, less 3px on each side and 4px above and below)
+      var _w = this._hecLockAndHandleWidth() / b.length;
+      var rects = b.map(function (btn, k) { return { x: k * _w + 3, y: 4, width: _w - 6, height: 20 }; });
+      var _i = _hecPick(x, y, rects);
+      return _i === PICK_BETWEEN ? PICK_BETWEEN : _i >= 0 ? b[_i] : null;
+    },
+
+    // The payload fields of the handleButtons button picked at (x, y): handleButton and
+    // handleButtonDisabled, or handleButtonBetween about halfway between two
+    _hecHandleButtonFields: function (x, y) {
+      var _hb = this._hecHandleButtonAt(x, y);
+      if (_hb === PICK_BETWEEN) return { handleButtonBetween: true };
+      return _hb ? { handleButton: _hb.id, handleButtonDisabled: !!_hb.disabled } : {};
     },
 
     // Does this chart have a Y axis lock (the padlock)?
@@ -1832,8 +1854,8 @@
         labelRect: this._hecLabelRect(_legendIdx, _yIdx),
         button: native ? native.button : undefined,
         event: native };
-      var _hb = this._hecHandleButtonAt(x, y);
-      if (_hb) { payload.handleButton = _hb.id; payload.handleButtonDisabled = !!_hb.disabled; }
+      var _hb = this._hecHandleButtonFields(x, y);
+      for (var hk in _hb) payload[hk] = _hb[hk];
       if (this._hecHasYAxisLock()) payload.yAxisLocked = !!this._hecYAxisLock;
       if (extra) { for (var k in extra) payload[k] = extra[k]; }
       return payload;

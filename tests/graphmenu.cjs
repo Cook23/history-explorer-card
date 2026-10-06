@@ -75,6 +75,27 @@ module.exports = async function()
         const l = await layout();
         return l === 'power+power_kw | a | rain | tank' ? true : l;
     });
+    // A point of graph i's zone: x px from its left, y px from its top
+    const zonePt = (i, x, y) => t.E(`(()=>{ const r=el.instance._allGraphsInDisplayOrder()[${i}].canvas.getBoundingClientRect(); return {x:r.left+${x}, y:r.top+${y}}; })()`);
+    const clickAt = async p => { await t.page.mouse.click(p.x, p.y); await t.wait(900); };
+    await t.step('just beside a button (under ↓): that button', async () => {
+        await graphMenu('tank'); await click('cut');
+        await clickAt(await zonePt(await gi('rain'), 9, 32));
+        const l = await layout();
+        return l === 'power+power_kw | a | rain | tank' ? true : l;
+    });
+    await t.step('about halfway between two buttons: nothing, the cut goes on', async () => {
+        await graphMenu('tank'); await click('cut');
+        await clickAt(await zonePt(await gi('rain'), 18, 14));
+        const r = { b: await buttons(), layout: await layout() };
+        return r.b.includes('cancel') && r.layout === 'power+power_kw | a | rain | tank' ? true : JSON.stringify(r);
+    });
+    await t.step('clearly away from the buttons, on a graph: the cut cancelled', async () => {
+        await clickAt(await t.E(`graphPtAt(${await gi('rain')},0.6)`));
+        const b = await buttons();
+        await graphMenu('tank'); await click('cut'); await pressButton(await gi('rain'), 0);   // (back as it was)
+        return b === ' |  |  | ' && (await layout()) === L0 ? true : b + ' / ' + (await layout());
+    });
     const swipeOn = async (i, dy) => { const a = await buttonPt(i, 1); await t.drag(a, { x: a.x, y: a.y + dy }); await t.wait(900); };
     await t.step('a swipe up on a graph\'s buttons inserts above it, a swipe down below it', async () => {
         await graphMenu('tank'); await click('cut');

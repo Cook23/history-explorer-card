@@ -4,10 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.7b1] - unreleased
+## [v1.2.7b2] - unreleased
 
 ### Changed — a short title for the graph menu
 - The graph menu's title is the graph's `title`; without one, the first two words of each curve's name ('...' when the name goes on), each start once — instead of every curve's full name, which could make it very long
+
+### Changed — the cut and paste buttons picked as the labels are
+- A click just beside one of a graph's buttons during a cut (📋, ↓, ↑) counts as on it; about halfway between two, nothing happens and the cut goes on — it was taken as a click elsewhere, which cancelled it. A click clearly away from them still cancels. The same picking rule as the labels, shared by both
 
 ## [v1.2.6] - 2026-10-06
 

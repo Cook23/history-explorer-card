@@ -21,15 +21,18 @@ export class CardGestures
     {
         const g = this.graphs?.find(g => g.chart === info.chart);
         if( !g ) return;
-        // (during a cut: a click on a graph's button pastes, any other action cancels it
-        // and goes on as usual — a hover doesn't)
+        // (during a cut: a click on a graph's button pastes; about halfway between two
+        // buttons, nothing happens — aimed at one of them, the cut goes on; any other action
+        // cancels it and goes on as usual — a hover doesn't)
         if( this._cut ) {
-            if( info.gestureType === 'click' && info.handleButton ) return this._onCutButton(info, g, info.handleButton);
-            // (a swipe on the buttons: up inserts above, down below)
-            if( info.gestureType === 'dragend' && info.handleButton )
-                return info.swipe && this._onCutButton(info, g, info.swipe === 'up' ? 'above' : 'below');
-            if( info.gestureType === 'dragstart' && info.handleButton ) return;
-            if( ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType) ) this._endCut();
+            const _action = ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType);
+            if( info.handleButton || info.handleButtonBetween ) {
+                if( info.gestureType === 'click' ) return info.handleButton && this._onCutButton(info, g, info.handleButton);
+                // (a swipe on the buttons, whichever: up inserts above, down below)
+                if( info.gestureType === 'dragend' ) return info.swipe && this._onCutButton(info, g, info.swipe === 'up' ? 'above' : 'below');
+                if( _action ) return;
+            }
+            else if( _action ) this._endCut();
         }
         switch( info.gestureType ) {
             case 'click':         return this._onGraphClick(info, g);
