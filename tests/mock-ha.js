@@ -41,7 +41,7 @@ const STATES={
  // attributes shown as curves: a number, a text, and what is never offered (a list, HA's own)
  'climate.salon':ent('climate.salon','salon',null,'heat'),
 };
-Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, hvac_action: 'heating', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, hvac_action: 'heating', humidity: '45 %', led_color: 'green', hvac_modes: ['heat', 'off'], supported_features: 17 });
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
@@ -60,11 +60,12 @@ function valueAt(id,t){
   if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
   return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
 }
-// The attributes of entity id at time t (s): current_temperature a sine, hvac_action on and
-// off every 2 h, the others as they are now
+// The attributes of entity id at time t (s): current_temperature a sine, humidity a sine
+// with its unit in its text, hvac_action on and off every 2 h, the others as they are now
 function attributesAt(id,t){
   const a={...STATES[id].attributes};
   if('current_temperature' in a) a.current_temperature=Number((a.current_temperature*(1+0.1*Math.sin(t/3600))).toFixed(2));
+  if('humidity' in a) a.humidity=(45*(1+0.1*Math.sin(t/3600))).toFixed(1)+' %';
   if('hvac_action' in a) a.hvac_action=Math.floor(t/7200)%2 ? 'heating' : 'idle';
   return a;
 }

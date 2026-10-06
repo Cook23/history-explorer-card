@@ -22,7 +22,8 @@ The suites:
 | `pen` | A pen (Pointer Events of type `pen`): barrel button held, a drag moves a label at once and a tap opens the type menu; barrel button pressed twice with the tip down splits a curve; the tip taps as a finger; the tooltip opened by a tap, moved by hovering, closed when the pen moves away |
 | `colors` | A curve's or bar's color: a value, thresholds on its own value or on another entity's value or states (with `default`), an entity holding the color; the legend's swatch, the color kept or changed when a curve moves to another graph |
 | `graphmenu` | A graph's menu (long-press, right click, touch): its title, *Display* and *Interpolation* for all its curves, its submenus placed as everywhere, the Y axis locked and released, a graph added from the card deleted; cut and paste: a graph inserted above or below another (by a click, or a swipe up or down, mouse and touch), a curve pasted into a graph, the places refused struck through and saying why, cancelled by a click elsewhere, Escape or ✂, a click just beside a button counting as on it, halfway between two doing nothing |
-| `attributes` | An entity's attributes as curves: `attribute:` in the YAML (and after the entity id), their history asked with the attributes, never their statistics; the entity selector's submenu (*Value* first, then the attributes), keyboard and mouse, kept after a reload |
+| `copies` | The same curve in several graphs: in the YAML, from the selector after a choice (cancel or a second curve), each its own and saved on its own, refused twice in one graph, kept on another device |
+| `attributes` | An entity's attributes as curves (a number followed by its unit, colors read from an attribute): `attribute:` in the YAML (and after the entity id), their history asked with the attributes, never their statistics; the entity selector's submenu (*Value* first, then the attributes), keyboard and mouse, kept after a reload |
 | `yaxes` | Two Y axes: one per group of units (left, right), `yAxis`, the arrow in the legend, linked graphs aligned, circular labels and stacked bars per axis; dragging each axis, Shift, the pinch and the padlock on both |
 
 They run the built card (`history-explorer-card.js`) in Chromium, in `page.html` (a card)
@@ -35,7 +36,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu or attributes
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes or copies
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

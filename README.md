@@ -179,7 +179,9 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 
 - right after selecting an entity to add in the dropdown (see [Adding entities](#adding-entities)) — always, even when *Timeline* is the only choice, so you can check before it's added;
 - on a long-press (or a right click) of a legend label (line/bar graphs) or of a timeline/arrowline label;
-- when selecting an entity that's already shown, to change its type.
+- after choosing *Create a second curve* for an entity that's already shown (see below).
+
+Selecting an entity (or attribute) that's already shown says so and outlines its graph, then offers *Cancel* (pre-selected) or *Create a second curve*: the same curve can be shown in several graphs, each one set on its own — never twice in one graph. In the YAML, the same entity in several graphs is a curve in each.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -554,7 +556,7 @@ graphs:
 | Option | Card | Graph | Entity | Description |
 |---|:-:|:-:|:-:|---|
 | `type` | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
-| `color` | | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either |
+| `color` | | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
 | `fill` | ✓ | ✓ | ✓ | Fill color under the line |
 | `lineWidth` | ✓ | ✓ | ✓ | Line width in pixels — see *1 |
 | `lineMode` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
@@ -707,7 +709,7 @@ graphs:
         color: black
 ```
 
-An entity's attribute is shown with `attribute:` — a number as a curve, anything else as a timeline. Home Assistant gives an attribute no unit, and only its history (no long-term statistics):
+An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Home Assistant keeps only its history (no long-term statistics); `unit:` sets its unit when its value doesn't give it:
 ```yaml
       - entity: climate.salon
         attribute: current_temperature

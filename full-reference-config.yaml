@@ -19,9 +19,10 @@ graphs:
       exclude: null
 
       # One of the entity's attributes shown instead of its state (its history only: an attribute has
-      # no long-term statistics). A number is shown as a curve, anything else as a timeline. Home
-      # Assistant gives an attribute no unit: set `unit:` to show one. Also written as the entity
-      # followed by the attribute: `entity: climate.salon.current_temperature`
+      # no long-term statistics). A number is shown as a curve, anything else as a timeline; a number
+      # followed by a unit ('45.2 %') as that number in that unit — else set `unit:`. Also written as
+      # the entity followed by the attribute: `entity: climate.salon.current_temperature`. The same
+      # entity (or attribute) can be in several graphs: a curve in each
       attribute: null
 
       # Every option below is optional — shown here with its effective default (or 'null' where
@@ -36,7 +37,8 @@ graphs:
       name: null
 
       # Colour of the line/bar in the graph, defaults to automatically assigning a colour:
-      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` on that entity's value), or an entity holding either
+      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` — and `attribute:` — on that
+      # entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
       color: null
 
       # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color'

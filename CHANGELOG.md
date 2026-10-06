@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.8] - 2026-10-06
+
+### New — the same curve in several graphs
+- In the YAML, the same entity (or attribute) in several graphs is a curve in each, each with its own options, saved on its own; twice in one graph, shown once (a warning in the console) — before, it was dropped silently, and a graph left empty disappeared
+- From the entity selector, an entity already shown is still said and its graphs outlined, then a choice: *Cancel* (pre-selected) or *Create a second curve*, through the type menu, in a graph of its own
+- A curve dropped or pasted onto a graph already showing it is refused, saying so
+- Each curve has a key (`keyOf`: its series, then `#2`… for a second one) — the entity store, the persistence and the menus go by it; saved cards read as before
+
+### New — attributes: units and colors
+- An attribute holding a number followed by a text that isn't one (`45.2 %`) is that number, in that unit
+- `color` can read an attribute: thresholds with `entity` and `attribute`, or an attribute holding the color (`color: climate.salon.led_color`)
+
 ## [v1.2.7] - 2026-10-06
 
 ### New — an entity's attributes as curves

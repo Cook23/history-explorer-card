@@ -8,7 +8,7 @@ const load = () => import('data:text/javascript;base64,' +
 
 module.exports = async function()
 {
-    const { EntityStore } = await load();
+    const { EntityStore, keyOf } = await load();
     let passed = 0, failed = 0;
     const step = (name, fn) => {
         let res;
@@ -30,7 +30,7 @@ module.exports = async function()
     step('lookups', () => {
         const st = mk('a@1', 'b@1', 'c@2');
         st.list.push('d');
-        return st.indexOf('c') === 2 && st.has('d') && !st.has('x') && st.groupIdOf('b') === 1 && st.groupSize(1) === 2 &&
+        return st.indexOf('c') === 2 && st.has('d') && !st.has('x') && st.find('b').groupId === 1 && st.groupSize(1) === 2 &&
             st.inGroup('a', 1)?.entity === 'a' && st.inGroup('a', 2) === undefined ? true : 'wrong lookup';
     });
     step('a legacy string entry becomes an object when it is changed', () => {
@@ -45,8 +45,24 @@ module.exports = async function()
     });
     step('remove, and dynamicOnly keeps a YAML entry', () => {
         const st = mk('!a@0', 'b@1001', 'c@1001');
-        st.remove('a', true); st.remove('b');
+        st.remove(st.find('a'), true); st.remove(st.find('b'));
         return expect(show(st), 'a@0 c@1001');
+    });
+    step('a second curve of a series: its own copy number, its own key; the first one free reused', () => {
+        const st = mk('a@1', 'b@1');
+        const c1 = st.add({ entity: 'a', groupId: 2, copy: st.newCopy('a') });
+        const c2 = st.add({ entity: 'a', groupId: 3, copy: st.newCopy('a') });
+        st.remove(c1);
+        const free = st.newCopy('a'), none = st.newCopy('z');
+        return expect([c1.copy, c2.copy, keyOf(c2), st.find('a#2') === c2, st.curvesOf('a').length, free, none].join(), '1,2,a#2,true,2,1,0');
+    });
+    step('copies kept apart: by key, in a group\'s order and in a move', () => {
+        const st = mk('a@1', 'b@1', 'x@2');
+        st.add({ entity: 'a', groupId: 2, copy: 1 });
+        st.syncGroupOrder(2, ['a#1', 'x']);
+        const order = show(st);
+        st.moveBefore(new Set(['x', 'a#1']), new Set(['a', 'b']), true);
+        return expect(order + ' / ' + show(st), 'a@1 b@1 a@2 x@2 / a@2 x@2 a@1 b@1');
     });
     step('removeAllDynamic keeps the YAML entries', () => {
         const st = mk('!a@0', 'b@1001', '!c@1');
@@ -126,12 +142,12 @@ module.exports = async function()
     });
     step('savedList: the entry before it gone, after the one before that', () => {
         const st = mk('a@1', 'b@1', 'c@1', 'd@1', 'e@2');
-        moved(st, 'c', 2); st.remove('b');
+        moved(st, 'c', 2); st.remove(st.find('b'));
         return expect(showSaved(st), 'a@1 c@1 d@1 e@2');
     });
     step('savedList: every entry before it in its group gone, first of its group', () => {
         const st = mk('x@0', 'a@1', 'b@1', 'c@1', 'e@2');
-        moved(st, 'b', 2); st.remove('a');
+        moved(st, 'b', 2); st.remove(st.find('a'));
         return expect(showSaved(st), 'x@0 b@1 c@1 e@2');
     });
     step('savedList: its group gone, after the nearest entry before it', () => {

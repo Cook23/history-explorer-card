@@ -5,7 +5,7 @@
 
 import { defaultColors, parseColor, parseColorValue } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
-import { entityIdOf } from "./history-entity-store.js";
+import { keyOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeInterpolation, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import { baseTypePure } from "./card-config.js";
@@ -445,7 +445,7 @@ export class CardGraphs
         };
         for( let en of this.store.list ) {
             if( typeof en !== 'object' ) continue;
-            const _g = this.graphs.find(gr => gr.entities.some(e => e.entity === en.entity));
+            const _g = this.graphs.find(gr => gr.entities.some(e => keyOf(e) === keyOf(en)));
             if( !_g || _seen.has(_g) ) continue;
             if( en.groupId !== _blockGroupId ) { _flushBlock(); _blockGroupId = en.groupId; }
             _seen.add(_g);
@@ -494,13 +494,12 @@ export class CardGraphs
     {
         const _lastEntity = g.entities[g.entities.length - 1];
         const _list = this.store.list;
-        const _startIdx = this.store.indexOf(_lastEntity.entity);
+        const _startIdx = this.store.indexOf(keyOf(_lastEntity));
         if( _startIdx < 0 ) return null;
         for( let i = _startIdx + 1; i < _list.length; i++ ) {
             const _e = _list[i];
             if( typeof _e !== 'object' || _e.groupId === g.groupId ) continue;
-            const _eid = entityIdOf(_e);
-            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => en.entity === _eid));
+            const _candidateG = this.graphs.find(gr => gr !== g && gr.entities.some(en => keyOf(en) === keyOf(_e)));
             if( _candidateG ) return _candidateG;
         }
         return null;
@@ -628,7 +627,7 @@ export class CardGraphs
     _removeGraph(g)
     {
         this._graphDiv(g).remove();
-        for( let e of g.entities ) this.store.remove(e.entity, true);
+        for( let e of g.entities ) this.store.remove(e, true);
         this.graphs.splice(this.graphs.indexOf(g), 1);
 
         this._updateMoVisibility();
@@ -878,13 +877,15 @@ export class CardGraphs
     // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
     //   considered, joined if it has the same type and, for curves, compatible units
     //   (combineSameUnits)
+    // Never a graph already showing its series (a curve once per graph)
     _combineTarget(e, type, groupId)
     {
+        const _free = g => !g.entities.some(x => x.entity === e.entity);
         if( groupId !== null )
-            return this.graphs.filter(g => g.groupId === groupId && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === e.graphKey && this._sameSavedGraph(g.entities[0], e)).pop() ?? null;
+            return this.graphs.filter(g => g.groupId === groupId && _free(g) && this._typesCompatible(g.type, type) && g.entities[0]?.graphKey === e.graphKey && this._sameSavedGraph(g.entities[0], e)).pop() ?? null;
 
         const _last = this.graphs[this.graphs.length - 1];
-        return _last && _last.type === type &&
+        return _last && _free(_last) && _last.type === type &&
                ( type == 'timeline' || this.pconfig.combineSameUnits && areSICompatible(this.getUnitOfMeasure(e.entity, e.unit), this.getUnitOfMeasure(_last.entities[0].entity, _last.entities[0].unit)) )
             ? _last : null;
     }
@@ -1079,7 +1080,7 @@ export class CardGraphs
         const _saved = this.pconfig.combineSameUnits;
         this.pconfig.combineSameUnits = true;
         entities.forEach((en, i) => {
-            const _pe = this.store.inGroup(en.entity, groupId);
+            const _pe = this.store.inGroup(keyOf(en), groupId);
             this.addGraph(en.entity, { noAutoGroup: i === 0, color: en.color, fill: en.fill, before: nextG, groupId, entry: _pe ?? en, ...options });
         });
         this.pconfig.combineSameUnits = _saved;

@@ -91,14 +91,16 @@ export class CardSelector
     {
         const dropdown = this._this.querySelector(`#es_${idx}`);
         const _sub = this._this.querySelector(`#es_${idx}_series`);
+        const _choice = this._this.querySelector(`#es_${idx}_choice`);
         const _input = this._this.querySelector(`#b7_${idx}`);
         setTimeout(() => {
             // (the focused element as seen from the dropdown's own tree: inside Home
             // Assistant's shadow roots, document.activeElement is only their host)
             const _a = dropdown.getRootNode()?.activeElement;
             const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
-            if( ![dropdown, _sub, _input].some(_in) ) {
+            if( ![dropdown, _sub, _choice, _input].some(_in) ) {
                 this.hideSeriesMenu(idx);
+                if( _choice ) _choice.style.display = 'none';
                 this.setDropdownVisibility(idx, false);
             }
         }, 150);
@@ -199,6 +201,38 @@ export class CardSelector
         this.addEntitySelected(idx);
     }
 
+    // A menu of the selector (its series submenu, its duplicate choice) filled with items
+    // { label, series, marked, choose }: the marked one in bold and pre-selected (Enter
+    // takes it, the first arrow highlights it); listened to once — the arrows, Enter, and ←
+    // or Escape calling back(); closed with the selector when the focus leaves them
+    _fillSelectorMenu(idx, menuEl, items, back)
+    {
+        menuEl.innerHTML = '';
+        for( const it of items ) {
+            const _a = document.createElement('a');
+            _a.href = '#es';
+            if( it.series ) _a.dataset.series = it.series;
+            _a.style = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;white-space:nowrap';
+            _a.textContent = it.label;
+            if( it.marked ) { _a.style.fontWeight = 'bold'; _a.dataset.hecSelected = '1'; }
+            _a.addEventListener('click', (e) => { e.preventDefault(); it.choose(); }, true);
+            menuEl.appendChild(_a);
+        }
+        menuEl._hecBack = back;
+        if( menuEl._hecListening ) return;
+        menuEl._hecListening = true;
+        menuEl.addEventListener('keydown', (e) => {
+            if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
+                e.preventDefault();
+                e.stopPropagation();
+                menuEl._hecBack();
+                return;
+            }
+            this._menuKeyDown(e, menuEl);
+        });
+        menuEl.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
+    }
+
     // The series submenu of selector idx, for the entity of dropdown entry entryEl: its
     // value first — marked and pre-selected, Enter takes it — then its attributes, each with
     // its current value. Like the type menu's submenus: over the dropdown, level with the
@@ -210,44 +244,17 @@ export class CardSelector
         if( !_sub ) return;
         const entity_id = entryEl.dataset.entity;
         const _state = this._hass.states[entity_id];
-        const _friendly = _state?.attributes?.friendly_name || entity_id;
-        _sub.innerHTML = '';
-        const _item = (id, label, value, label0) => {
-            const _a = document.createElement('a');
-            _a.href = '#es';
-            _a.dataset.series = id;
-            _a.style = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;white-space:nowrap';
-            _a.textContent = value ? `${label} (${value})` : label;
-            _a.addEventListener('click', (e) => { e.preventDefault(); this._selectSeries(idx, id, label0); }, true);
-            _sub.appendChild(_a);
-            return _a;
-        };
-        const _value = _item(entity_id, i18n('ui.menu.series_value'), this._valueText(_state), _friendly);
-        _value.style.fontWeight = 'bold';
-        _value.dataset.hecSelected = '1';
-        for( const k of seriesAttributes(_state) ) {
-            const _id = seriesId(entity_id, k);
-            _item(_id, attributeLabel(k), this._valueText(this.stateOf(_id)), this.stateOf(_id).attributes.friendly_name);
-        }
+        const _label = (name, state) => { const v = this._valueText(state); return v ? `${name} (${v})` : name; };
+        const _item = (id, name) => ({ label: _label(name, this.stateOf(id)), series: id,
+            choose: () => this._selectSeries(idx, id, this.stateOf(id)?.attributes?.friendly_name || id) });
+        const _items = [{ ..._item(entity_id, i18n('ui.menu.series_value')), marked: true },
+                        ...seriesAttributes(_state).map(k => _item(seriesId(entity_id, k), attributeLabel(k)))];
         this.hideSeriesMenu(idx);
+        this._fillSelectorMenu(idx, _sub, _items, () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); });
         entryEl.style.fontWeight = 'bold';
         _sub._hecEntry = entryEl;
         this._openSubmenu(_sub, entryEl);
         _sub.focus();
-        if( !_sub._hecListening ) {
-            _sub._hecListening = true;
-            _sub.addEventListener('keydown', (e) => {
-                if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.hideSeriesMenu(idx);
-                    this._this.querySelector(`#b7_${idx}`)?.focus();
-                    return;
-                }
-                this._menuKeyDown(e, _sub);
-            });
-            _sub.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
-        }
     }
 
     hideSeriesMenu(idx)
@@ -256,6 +263,27 @@ export class CardSelector
         if( !_sub ) return;
         _sub.style.display = 'none';
         if( _sub._hecEntry ) { _sub._hecEntry.style.fontWeight = ''; _sub._hecEntry = null; }
+    }
+
+    // Series id already shown (its graphs flagged, its message given): a choice under the
+    // input field — cancel, pre-selected (Enter takes it, as Escape), or a second curve of
+    // it, in another graph, through the type menu
+    showDuplicateChoice(idx, id)
+    {
+        const _menu = this._this.querySelector(`#es_${idx}_choice`);
+        const _input = this.ui.inputField[idx];
+        if( !_menu || !_input ) return;
+        const _cancel = () => { _menu.style.display = 'none'; this._resetEntityInput(_input); };
+        this._fillSelectorMenu(idx, _menu, [
+            { label: i18n('ui.menu.duplicate_cancel'), marked: true, choose: _cancel },
+            { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null); } },
+        ], _cancel);
+        // (under the input field, as the type menu)
+        const _tb = this._this.querySelector(`#tb_${idx}`);
+        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+        const _r = _input.getBoundingClientRect();
+        this._openMenu(_menu, (_r.bottom - _parentRect.top) + 'px', (_r.left + 30 - _parentRect.left) + 'px');
+        _menu.focus();
     }
 
     // --------------------------------------------------------------------------------------
@@ -460,7 +488,7 @@ export class CardSelector
     _previewEntityTooltip(entity_id, ii)
     {
         if( this.stateOf(entity_id) === undefined ) return;
-        const _exists = this.store.has(entity_id);
+        const _exists = this.store.curvesOf(entity_id).length > 0;
         const _existingG = _exists ? this.graphs.find(g => g.entities.some(e => e.entity === entity_id)) : null;
         this._selectorTooltip(ii, (_exists ? i18n('ui.label.already_exists') : i18n('ui.label.add')) + ': ' + entity_id, _existingG);
     }
@@ -507,7 +535,7 @@ export class CardSelector
             const _newIds = [];
             for( let eid of ids ) {
                 if( this.stateOf(eid) === undefined ) continue;
-                if( this.store.has(eid) ) {
+                if( this.store.curvesOf(eid).length ) {
                     _duplicates.push(eid);
                     const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === eid));
                     if( _existingG ) _duplicateGraphs.add(_existingG);
@@ -564,7 +592,7 @@ export class CardSelector
                 const _eid = e.dataset.entity;
                 if( !regex.test(_eid) ) continue;
                 if( this.stateOf(_eid) == undefined ) continue;
-                if( this.store.has(_eid) ) continue;
+                if( this.store.curvesOf(_eid).length ) continue;
                 _matchedIds.push(_eid);
             }
 
@@ -578,14 +606,13 @@ export class CardSelector
         } else {
 
             if( this.stateOf(entity_id) == undefined ) return;
-            if( this.store.has(entity_id) ) {
-                // Entity already exists — show tooltip and highlight containing graph
-                const _existingG = this.graphs.find(g => g.entities.some(e => e.entity === entity_id));
-                if( _existingG ) {
-                    this._selectorTooltip(ii, i18n('ui.label.already_exists') + ': ' + entity_id, _existingG);
-                    this.showEntityTypeMenu(ii, entity_id, _existingG);
-                    this._flagGraphs([_existingG]);
-                }
+            const _existingGs = this.graphs.filter(g => g.entities.some(e => e.entity === entity_id));
+            if( _existingGs.length ) {
+                // Already shown — said so, its graphs outlined; then cancel, or a second curve
+                // of it in another graph
+                this._selectorTooltip(ii, i18n('ui.label.already_exists') + ': ' + entity_id, _existingGs[0]);
+                this._flagGraphs(_existingGs);
+                this.showDuplicateChoice(ii, entity_id);
                 return;
             }
 

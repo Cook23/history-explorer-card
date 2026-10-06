@@ -288,7 +288,7 @@ export function parseColorValue(v)
         const spec = { thresholds: [], states: {}, default: undefined };
         for( const [k, c0] of Object.entries(v) ) {
             const c = parseColor(c0);
-            if( k === 'entity' || !_isColor(c) ) continue;
+            if( k === 'entity' || k === 'attribute' || !_isColor(c) ) continue;
             if( k === 'default' ) spec.default = c;
             else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
             else spec.states[k] = c;
