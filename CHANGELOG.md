@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.11b1] - unreleased
+## [v1.2.11] - 2026-10-06
 
 ### Fixed — a curve's tooltip: its reading time, and its point fading out with it
 - The tooltip of the curves closed after about 1 s, whatever its text: its words were counted once it was shown, when there was nothing left to count. It now stays 1 s plus 0.5 s per word of its rows, as the other messages
