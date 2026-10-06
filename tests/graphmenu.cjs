@@ -75,6 +75,23 @@ module.exports = async function()
         const l = await layout();
         return l === 'power+power_kw | a | rain | tank' ? true : l;
     });
+    const swipeOn = async (i, dy) => { const a = await buttonPt(i, 1); await t.drag(a, { x: a.x, y: a.y + dy }); await t.wait(900); };
+    await t.step('a swipe up on a graph\'s buttons inserts above it, a swipe down below it', async () => {
+        await graphMenu('tank'); await click('cut');
+        await swipeOn(await gi('rain'), -40);
+        const r = { up: await layout() };
+        await graphMenu('tank'); await click('cut');
+        await swipeOn(await gi('rain'), 40);
+        r.down = await layout();
+        return r.up === 'power+power_kw | a | tank | rain' && r.down === L0 ? true : JSON.stringify(r);
+    });
+    await t.step('a swipe where insertion is refused (inside the linked block): says why, the cut goes on', async () => {
+        await graphMenu('tank'); await click('cut');
+        await swipeOn(await gi('a'), -40);
+        const r = { msg: await t.E(`el.instance.graphs[0].canvas.getRootNode()._hecMessageEl?.textContent ?? ''`), b: await buttons(), layout: await layout() };
+        await t.page.keyboard.press('Escape'); await t.wait(400);
+        return /separated/.test(r.msg) && r.b.includes('cancel') && r.layout === L0 ? true : JSON.stringify(r);
+    });
     await t.step('a click outside the graphs cancels the cut, Escape too, ✂ too', async () => {
         await graphMenu('tank'); await click('cut');
         await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -109,12 +126,19 @@ module.exports = async function()
     done(await t.close());
 
     // ── Touch: a long-press on the zone opens the graph's menu ──
-    t = await openCard(card({ graphs: GRAPHS }), { touch: true, height: 1600, mock: { series: true } });
+    t = await openCard(card({ graphs: GRAPHS }), { touch: true, height: 1600, scrollRoom: 1500, mock: { series: true } });
     await t.wait(800);
     await t.step('touch: a long-press on a graph\'s zone opens its menu', async () => {
         await t.touchLongPress(await t.E(`moPt(${await gi('tank')})`));
         const m = await menu();
         return m.startsWith('tank || ') ? true : m;
+    });
+    await t.step('touch: cut a graph, a swipe up on another graph\'s buttons inserts it above (the page doesn\'t scroll)', async () => {
+        await click('cut');
+        const a = await buttonPt(await gi('rain'), 1);
+        await t.swipe(a, { x: a.x, y: a.y - 60 });
+        const r = { layout: await layout(), y: await t.scrollY() };
+        return r.layout === 'power+power_kw | a | tank | rain' && r.y === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

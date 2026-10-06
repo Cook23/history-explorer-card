@@ -24,7 +24,11 @@ export class CardGestures
         // (during a cut: a click on a graph's button pastes, any other action cancels it
         // and goes on as usual — a hover doesn't)
         if( this._cut ) {
-            if( info.gestureType === 'click' && info.handleButton ) return this._onCutButton(info, g);
+            if( info.gestureType === 'click' && info.handleButton ) return this._onCutButton(info, g, info.handleButton);
+            // (a swipe on the buttons: up inserts above, down below)
+            if( info.gestureType === 'dragend' && info.handleButton )
+                return info.swipe && this._onCutButton(info, g, info.swipe === 'up' ? 'above' : 'below');
+            if( info.gestureType === 'dragstart' && info.handleButton ) return;
             if( ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType) ) this._endCut();
         }
         switch( info.gestureType ) {
@@ -593,22 +597,23 @@ export class CardGestures
                 { id: 'above', text: '↑', disabled: this._wouldSplitGroup(src, g, true) }];
     }
 
-    // A button of graph g clicked during the cut: what was cut put there, as a drop would
-    // (a disabled one says why, and the cut goes on)
-    _onCutButton(info, g)
+    // Button id of graph g chosen during the cut (clicked, or swiped to): what was cut put
+    // there, as a drop would (a disabled one says why, and the cut goes on)
+    _onCutButton(info, g, id)
     {
         const { g: src, idx } = this._cut;
-        const _id = info.handleButton;
-        if( _id === 'clipboard' ) return;
+        const _btn = this._cutButtons(g).find(b => b.id === id);
+        if( !_btn || id === 'clipboard' ) return;
         // (what was cut no longer shown — its graph deleted meanwhile)
         if( !this.graphs.includes(src) ) return this._endCut();
-        if( info.handleButtonDisabled ) {
+        if( _btn.disabled ) {
             const _why = idx !== null ? this._dropCompatibility(src, g, src.entities[idx]) : i18n('ui.menu.linked_graphs_split');
             return this._showLabelTooltip(_why, info.clientX, info.clientY, 'left', g.canvas);
         }
         this._endCut();
-        if( _id === 'paste' ) this._moveEntity(src, idx, g, -1);
-        else if( _id === 'above' || _id === 'below' ) this._finalizeGraphMove(info, src, g, { insertBefore: _id === 'above' });
+        if( id === 'cancel' ) return;
+        if( id === 'paste' ) this._moveEntity(src, idx, g, -1);
+        else this._finalizeGraphMove(info, src, g, { insertBefore: id === 'above' });
     }
 
     // The cut over: the graphs' zones back to their handle and padlock

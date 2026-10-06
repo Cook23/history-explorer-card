@@ -570,6 +570,13 @@
       }
     },
     {
+      // A swipe starting on a button of options.handleButtons (§1): reported at its end,
+      // up or down (dragend's swipe, with that button) — nothing drawn meanwhile
+      name: 'handleSwipe',
+      test: function (c, p) { return !!c.me._hecHandleButtonAt(p.x0, p.y0); },
+      onMove: function () {}
+    },
+    {
       name: 'lockAndHandle',
       test: function (c, p) {
         var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
@@ -891,7 +898,12 @@
     me._hecHideInsertionMarker();
     if (p.dragOverTarget) { p.dragOverTarget._hecClearDropHighlight(); p.dragOverTarget._hecHideInsertionMarker(); }
     var _hName = p.handler && p.handler.name;
-    if (_hName === 'zoomSelect') {
+    if (_hName === 'handleSwipe') {
+      var _hb = me._hecHandleButtonAt(p.x0, p.y0);
+      var _dy = (e && e.y !== undefined && e.y !== null ? e.y : p.y0) - p.y0;
+      fire(c, 'dragend', undefined, undefined, { swipe: Math.abs(_dy) >= 10 ? (_dy < 0 ? 'up' : 'down') : null,
+        handleButton: _hb ? _hb.id : undefined, handleButtonDisabled: _hb ? !!_hb.disabled : undefined });
+    } else if (_hName === 'zoomSelect') {
       me._hecHideZoomSelection();
       fire(c, 'dragend', undefined, undefined, { zoomSelectFactor0: me._hecPlotFactor(p.x0),
         zoomSelectFactor1: p.dragZoomSelectX1 !== undefined ? me._hecPlotFactor(p.dragZoomSelectX1) : undefined });
@@ -2035,6 +2047,8 @@
       _mo.style.top = me.canvas.offsetTop + 'px';
       _mo.style.width = _moVisible ? me._hecLockAndHandleWidth() + 'px' : '0px';
       _mo.style.height = _moVisible ? '28px' : '0px';
+      // (with handleButtons, a swipe there is theirs, never the page's)
+      if (me._hecHandleButtons()) _mo.style.touchAction = 'none';
     },
 
     /**

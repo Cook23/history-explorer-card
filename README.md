@@ -251,7 +251,7 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu — th
 - **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock;
 - **Layout ▸** — *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 
-After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click anywhere else, or Escape, cancels.
+After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click anywhere else, or Escape, cancels.
 
 ### Timeline and arrowline graphs
 
