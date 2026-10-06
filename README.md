@@ -24,11 +24,14 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch also zooms the time;
 > - **the tooltip** opens on a click or a tap on the curves, then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it;
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
-> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
+> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
 > - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
+> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
 > - **colors that change**: `color` takes thresholds on curves too, or an entity — holding the color, or whose value (a mode, a temperature) picks it, point by point;
+> - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
+> - **values over a graph**, as mini-graph-card shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
 > In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
