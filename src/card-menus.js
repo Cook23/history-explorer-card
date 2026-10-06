@@ -291,14 +291,18 @@ export class CardMenus
     }
 
     // A graph's name at the top of its menu: its title, else the start of its curves' names
-    // — their first two words, '...' when cut — each start once
+    // — up to their second word (Chart.hecUi.isWord), '...' when cut — each start once
     _graphMenuTitle(graph)
     {
         const _title = this.pconfig.graphs[graph.groupId]?.title;
         if( _title ) return _title;
         const _starts = graph.entities.map(e => {
+            // (words as Chart.hecUi.isWord counts them: an attribute's ':' between its
+            // entity's name and its own is kept, not counted — "salon : Current...")
             const _words = String(e.name ?? this.stateOf(e.entity)?.attributes?.friendly_name ?? e.entity).trim().split(/\s+/);
-            return _words.slice(0, 2).join(' ') + ( _words.length > 2 ? '...' : '' );
+            const _counted = _words.map((w, i) => _words.slice(0, i + 1).filter(Chart.hecUi.isWord).length);
+            const _n = _counted.indexOf(2) + 1 || _words.length;
+            return _words.slice(0, _n).join(' ') + ( _n < _words.length ? '...' : '' );
         });
         return [...new Set(_starts)].join(', ');
     }

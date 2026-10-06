@@ -321,8 +321,8 @@ export class CardGraphs
                 forceMax: config?.ymax ?? undefined,
                 stepSize: config?.ystepSize ?? undefined,
                 period: _period,
-                mirror: _inside,
-                padding: _inside ? -6 : undefined
+                // (only inside: an option given, even undefined, replaces Chart.js' default)
+                ...( _inside ? { mirror: true, padding: -6 } : {} )
             },
             gridLines: {
                 color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',

@@ -220,7 +220,8 @@ module.exports = async function()
         { type: 'line', title: 'Outside', entities: [{ entity: 'sensor.power' }] },
         { type: 'line', entities: [{ entity: 'sensor.rain', name: METEO }, { entity: 'sensor.tank', name: METEO + ' (Filtered)' },
             { entity: 'sensor.power_kw', name: 'GW2000A-WIFI7FFF Température extérieure (Filtered)' }] },
-        { type: 'line', entities: [{ entity: 'sensor.power2', name: 'Salon' }, { entity: 'sensor.watering_cycle', name: 'Cuisine sud' }] }] }), { height: 1200, mock: { series: true } });
+        { type: 'line', entities: [{ entity: 'sensor.power2', name: 'Salon' }, { entity: 'sensor.watering_cycle', name: 'Cuisine sud' }] },
+        { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'current_temperature' }] }] }), { height: 1400, mock: { series: true } });
     await t.wait(800);
     const title = async i => { await t.longPress(await t.E(`moPt(${i})`)); const v = await t.E(`el.querySelector('#et_0_title').textContent`);
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1190); await t.wait(400); return v; };
@@ -232,6 +233,9 @@ module.exports = async function()
     });
     await t.step('short names whole', async () => {
         const v = await title(2); return v === 'Salon, Cuisine sud' ? true : v;
+    });
+    await t.step('an attribute\'s curve: the entity\'s name, its colon, the attribute\'s first word', async () => {
+        const v = await title(3); return v === 'salon : Current...' ? true : v;
     });
     done(await t.close());
 

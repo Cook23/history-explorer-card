@@ -386,7 +386,8 @@ is passed in).
 
 | Function | Behavior |
 |---|---|
-| `readingTime(text)` | How long a message stays up: 1 s + 0.5 s per word (2+ letters or digits; words split on spaces and underscores). |
+| `readingTime(text)` | How long a message stays up: 1 s + 0.5 s per word (`isWord`; words split on spaces and underscores). |
+| `isWord(token)` | Is a piece of text a word: two letters or digits at least — not a single letter, a punctuation mark or a symbol on its own. The card counts words with it too (the graph menu's title). |
 | `clampToViewport(el, boundsEl)` | Nudges an already-positioned element back inside: left/right/top within the most restrictive of `boundsEl` and the viewport, bottom within the viewport only; `boundsEl` null = viewport only. |
 | `attachFloating(el, anchorEl)` | Places `el` against `anchorEl`'s `offsetParent` (absolute), or `document.body` (fixed) when there's none, so it scrolls with its anchor; closes it by itself (`closeFloating`) when the anchor disappears or is hidden. |
 | `armAutoFade(el, duration[, justMoved])` | (Re)shows `el`, fading in, then fades it out after `duration` and closes it. With a third argument, only does so when `justMoved === true` (a render that follows a real pointer gesture, not a data refresh under a still pointer). |

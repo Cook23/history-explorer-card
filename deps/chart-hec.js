@@ -331,11 +331,17 @@
   // ---------------------------------------------------------------------------
   var hecUi = Chart.hecUi = {
 
-    // How long a message stays up: 1 s, plus 0.5 s per word (a word: 2+ letters or
-    // digits, words split on spaces and underscores — entity ids read as words).
+    // How long a message stays up: 1 s, plus 0.5 s per word (isWord; words split on
+    // spaces and underscores — entity ids read as words).
     readingTime: function (text) {
-      var _words = String(text || '').split(/[\s_]+/).filter(function (w) { return (w.match(/[a-zA-Z0-9]/g) || []).length >= 2; }).length;
+      var _words = String(text || '').split(/[\s_]+/).filter(hecUi.isWord).length;
       return 1000 + 500 * _words;
+    },
+
+    // Is a piece of text (no space in it) a word? Two letters or digits at least — not a
+    // single letter, a punctuation mark or a symbol on its own. Wherever words are counted.
+    isWord: function (token) {
+      return (String(token).match(/[a-zA-Z0-9]/g) || []).length >= 2;
     },
 
     // Nudges an already-positioned, already-visible floating element (menu, tooltip)

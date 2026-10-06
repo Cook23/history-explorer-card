@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.8] - 2026-10-06
+## [v1.2.9] - 2026-10-06
 
 ### New — values over a graph, a compact look: replacing mini-graph-card
 - `showState`: each curve's value now, in large, in its color, over the graph; `showStats`: its `min`, `average` and `max` over the window shown, the min and max with their time — from its history, the average weighted by time, recomputed as the window moves. At every level (card, entityOptions, graph, entity)
@@ -27,7 +27,7 @@ Changelog for the HA History Explorer Card.
 
 
 ### New — an entity's attributes as curves
-- `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named after the entity and the attribute; `unit:` gives it a unit (Home Assistant gives none)
+- `attribute:` on a YAML entity shows that attribute instead of the entity's state (also written `entity: climate.salon.current_temperature`); the same entity can be shown several times. A number is a curve, anything else a timeline, named `entity : attribute` (the colon tells an attribute from an entity); `unit:` gives it a unit (Home Assistant gives none)
 - The entity selector: an entity with attributes that can be shown opens a submenu first, as the type menu's submenus — *Value* (its state) pre-selected, then each attribute with its current value
 - The history of an attribute is asked with every change of its entity's attributes, only for the entities with an attribute shown; an attribute has no long-term statistics (its curve covers what the history keeps)
 
@@ -35,7 +35,7 @@ Changelog for the HA History Explorer Card.
 - The graph menu offers *Display ▸* and *Interpolation ▸*, as the type menu does, for all the graph's curves at once — the same actions at every level, as for the YAML options. *Display* lists the types that fit every entity of the graph, the one they all share in bold; chosen, each entity is shown that way and saved with it, and the graph stays one graph in its place. *Interpolation* applies to the curves in *Curve* or *Smart* mode
 
 ### Changed — a short title for the graph menu
-- The graph menu's title is the graph's `title`; without one, the first two words of each curve's name ('...' when the name goes on), each start once — instead of every curve's full name, which could make it very long
+- The graph menu's title is the graph's `title`; without one, the first two words of each curve's name (a word: two letters or digits at least, as for a message's reading time; '...' when the name goes on), each start once — instead of every curve's full name, which could make it very long
 
 ### Changed — the cut and paste buttons picked as the labels are
 - A click just beside one of a graph's buttons during a cut (📋, ↓, ↑) counts as on it; about halfway between two, nothing happens and the cut goes on — it was taken as a click elsewhere, which cancelled it. A click clearly away from them still cancels. The same picking rule as the labels, shared by both
