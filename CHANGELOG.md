@@ -7,7 +7,7 @@ Changelog for the HA History Explorer Card.
 ## [v1.2.9b1] - unreleased
 
 ### Fixed — the Y axis labels drawn again
-- 1.2.8 drew no Y axis labels (the values beside the plot): the option added for `yLabels: inside` replaced Chart.js' own spacing of the labels even when not inside
+- 1.2.8 drew no Y axis labels — the values beside a line or bar graph, the names of a timeline's or an arrowline's rows: the option added for `yLabels: inside` replaced Chart.js' own spacing of the labels even when not inside
 
 ## [v1.2.8] - 2026-10-06
 

@@ -29,6 +29,17 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // (a timeline's and an arrowline's names, in their label column)
+    t = await openCard(card({ graphs: [{ type: 'timeline', entities: [{ entity: 'binary_sensor.a' }, { entity: 'binary_sensor.b' }] },
+        { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('the names of a timeline\'s and an arrowline\'s rows drawn beside them', async () => {
+        const n = await t.E(`el.instance._allGraphsInDisplayOrder().map(g=>{ const c=g.chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
+            const d=c.ctx.getImageData(0, a.top*r, Math.max(1,(a.left-4)*r), (a.bottom-a.top)*r).data; let k=0; for(let i=3;i<d.length;i+=4) if(d[i]>0) k++; return g.type+':'+k; })`);
+        return n.every(x => Number(x.split(':')[1]) > 100) ? true : n.join(' ');
+    });
+    done(await t.close());
+
     // ── showState, showStats at every level ──
     t = await openCard(card({ showState: true, graphs: [
         { type: 'line', showStats: ['min', 'max'], entities: [{ entity: 'sensor.rain' }, { entity: 'sensor.power', showStats: true }, { entity: 'sensor.power2', showStats: false, showState: false }] },
