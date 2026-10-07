@@ -8806,8 +8806,25 @@
             var _chart = me._chart;
             clearTimeout(_el._hecFadeTimer);
             clearTimeout(_el._hecRemoveTimer);
-            _el._hecFadeTimer = setTimeout(function () { _el.style.opacity = '0'; }, duration);
+            _el._hecFadeTimer = setTimeout(function () {
+              _el.style.opacity = '0';
+              me._hecEndHover(_chart);
+            }, duration);
             _el._hecRemoveTimer = setTimeout(function () { me._hecKillFloatingTooltip(_el, _chart); }, duration + 1000);
+          },
+
+          // As the tooltip fades out, its highlighted points go back to their normal look,
+          // fading with it (the same 1 s), and the chart is redrawn — without the redraw,
+          // the point stayed highlighted until the next one. A move or a contact on a
+          // point highlights it again, as before.
+          _hecEndHover: function (_chart) {
+            if (!_chart || !_chart.active || !_chart.active.length) return;
+            _chart.updateHoverStyle(_chart.active, _chart.options.hover.mode, false);
+            _chart.active = [];
+            _chart.lastActive = [];
+            this._active = [];
+            this.update(true);
+            _chart.render({ duration: 1000, lazy: true });
           },
 
           // _chart is passed uniformly by both callers (the timer path above, and the

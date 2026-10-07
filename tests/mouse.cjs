@@ -21,6 +21,16 @@ module.exports = async function()
         const g2 = (await t.graphs())[0];
         return !/\(h\)/.test(g1 + g2) ? true : `${g1} / ${g2}`;
     });
+    await t.step('left still over a curve, the tooltip fades out after its reading time, and the highlighted point with it', async () => {
+        const p1 = await E('pointPt(0,0.4)');
+        await t.page.mouse.move(p1.x - 30, p1.y); await t.page.mouse.move(p1.x, p1.y, { steps: 5 }); await t.wait(400);
+        // (the graph redrawn once the tooltip goes: without it, the point stays on screen)
+        const r0 = await E(`(()=>{ const c=graphAt(0).chart; window.__draws=0; const d=c.draw; c.draw=function(){ window.__draws++; return d.apply(c, arguments); };
+            return { n: c.active.length }; })()`);
+        await t.wait(9000);
+        const r1 = await E(`(()=>{ const c=graphAt(0).chart, el=c.tooltip._hecTooltipEl; return { n: c.active.length, draws: __draws, tip: !!(el && el.isConnected) }; })()`);
+        return r0.n > 0 && r1.n === 0 && r1.draws > 0 && !r1.tip ? true : JSON.stringify({ r0, r1 });
+    });
     await t.step('legend click hides then shows a curve', async () => {
         const pt = await E('legendPt(0,1)');
         await t.page.mouse.click(pt.x, pt.y); await t.wait(700); const a = (await t.graphs())[0];
