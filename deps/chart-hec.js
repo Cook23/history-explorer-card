@@ -1167,8 +1167,10 @@
   function hecPointerMove(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; gs.pointers[pid].moved = true; }
-    // Alt (Option) held while the pointer moves over the chart: every sample shown
-    me._hecSetShowSamples(!!(e.native && e.native.altKey));
+    // Alt (Option) held while the pointer moves over the chart: every sample shown (the
+    // hover and its tooltip stay on the point under the pointer) — unless
+    // altSampleModeEnabled is false
+    if (me.options.altSampleModeEnabled !== false) me._hecSetShowSamples(!!(e.native && e.native.altKey));
 
     if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
       HEC_DRAG_HANDLERS[0].onMove(c, null, e);
@@ -1209,25 +1211,6 @@
           var _draggable = (_hLegendIdx >= 0 && (me.config.type === 'line' || me.config.type === 'bar')) ||
                             (_hYIdx >= 0 && (me.config.type === 'timeline' || me.config.type === 'arrowline'));
           me.canvas.style.cursor = _draggable ? 'move' : '';
-        }
-        // High-level default behavior, on by default (see
-        // options.altSampleModeEnabled) — matches the card's original
-        // altGraph mechanism: holding Alt while hovering a graph switches
-        // its hover.mode to 'dataset' (show every sample instead of just
-        // the nearest point), reverting to 'nearest' once Alt is released
-        // or the pointer leaves. me.options.hover.mode is a native
-        // Chart.js option already read internally elsewhere — this only
-        // decides which value it holds.
-        if (me.options.altSampleModeEnabled !== false && me.options.hover) {
-          var _altHeld = !!(e.native && e.native.altKey);
-          var _wantMode = _altHeld ? 'dataset' : (me._hecDefaultHoverMode || 'nearest');
-          if (me._hecDefaultHoverMode === undefined) {
-            me._hecDefaultHoverMode = me.options.hover.mode;
-            _wantMode = _altHeld ? 'dataset' : me._hecDefaultHoverMode;
-          }
-          if (me.options.hover.mode !== _wantMode) {
-            me.options.hover.mode = _wantMode;
-          }
         }
         fire(c, 'hover', undefined, undefined, { legendIndex: _hLegendIdx, yAxisIndex: _hYIdx });
       }
