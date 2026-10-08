@@ -5,7 +5,7 @@ import "../deps/timeline.js";
 import "../deps/md5.js"
 import "../deps/FileSaver.js"
 
-import { vertline_plugin, minmaxfill_plugin } from "./history-chart-vline.js";
+import { vertline_plugin, minmaxfill_plugin, samples_plugin } from "./history-chart-vline.js";
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
 import { stateColors, stateColorsDark, defaultColors, parseColor, parseColorRange } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
@@ -2252,7 +2252,7 @@ export class HistoryCardState {
                 }
             },
 
-            plugins: [vertline_plugin, minmaxfill_plugin, {
+            plugins: [vertline_plugin, minmaxfill_plugin, samples_plugin, {
                 afterUpdate: (chartInstance) => {
                     const _gid = chartInstance.canvas?.id?.replace('graph', '');
                     if( _gid === undefined ) return;
@@ -4372,12 +4372,10 @@ export class HistoryCardState {
         }
     }
 
-    // Alt held while moving over a graph shows its individual samples (hover mode
-    // 'dataset'), moving without it hides them. A listener of its own, run before Chart.js'
-    // (capture): Chart.js then draws the hover of this same move in the new mode — run
-    // after it, the samples showed (and hid) one move late. Alt released, the graph's own
-    // hover mode is back, and the samples go: this move's hover is only what it finds (a
-    // move that finds nothing keeps the previous hover — the samples would stay).
+    // Alt held while moving over a graph shows its individual samples (samples_plugin),
+    // moving without it hides them — the hover and its tooltip stay on the point under the
+    // pointer. A listener of its own, run before Chart.js' (capture): the graph is redrawn
+    // with its samples on this same move.
     altSamplesMove(event)
     {
         if( panstate.dragDataset || this.state.drag || ( this.state.selecting && panstate.overlay ) ) return;
@@ -4385,13 +4383,15 @@ export class HistoryCardState {
         if( !this.state.altGraph && event.altKey ) {
             const g = this.graphs.find(g => g.canvas === event.target);
             if( g ) {
-                this.state.altGraph = { g, mode: g.chart.options.hover.mode };
-                g.chart.options.hover.mode = 'dataset';
+                this.state.altGraph = g;
+                g.chart.showSamples = true;
+                g.chart.update();
             }
         } else if( this.state.altGraph && !event.altKey ) {
-            const { g, mode } = this.state.altGraph;
-            g.chart.options.hover.mode = mode;
-            g.chart.active = [];
+            const g = this.state.altGraph;
+            g.chart.showSamples = false;
+            // (unless the graph went meanwhile)
+            if( g.chart.canvas ) g.chart.update();
             this.state.altGraph = null;
         }
     }

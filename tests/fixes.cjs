@@ -52,13 +52,29 @@ module.exports = async function()
     // ── 1.1.53: Alt released, a graph of curves and bars gets its own hover mode back ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.energy', type: 'bar' }] }] }), { height: 700, mock: { series: true } });
     await t.wait(800);
-    await t.step('Alt pressed then released on curves and bars: their hover mode back', async () => {
+    await t.step('Alt pressed then released on curves and bars: their hover mode kept', async () => {
         const mode = () => t.E(`el.instance.graphs[0].chart.options.hover.mode`);
         const m0 = await mode(); const a = await t.E('graphPtAt(0,0.5)');
         await t.page.mouse.move(a.x, a.y); await t.wait(300);
         await t.page.keyboard.down('Alt'); await t.page.mouse.move(a.x + 20, a.y); await t.wait(300); const m1 = await mode();
         await t.page.keyboard.up('Alt'); await t.page.mouse.move(a.x + 40, a.y); await t.wait(300); const m2 = await mode();
-        return m0 === 'hecMixed' && m1 === 'dataset' && m2 === m0 ? true : [m0, m1, m2].join(' -> ');
+        return m0 === 'hecMixed' && m1 === m0 && m2 === m0 ? true : [m0, m1, m2].join(' -> ');
+    });
+    done(await t.close());
+
+    // ── Unreleased: Alt held, the tooltip shows the point under the pointer, not the whole curve ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { height: 700, mock: { series: true } });
+    await t.wait(800);
+    await t.step('Alt held over a curve: its samples shown, the tooltip on the one point under the pointer', async () => {
+        const a = await t.E('pointPt(0,0.5)');
+        await t.page.mouse.move(a.x - 30, a.y); await t.page.mouse.move(a.x, a.y, { steps: 5 }); await t.wait(300);
+        await t.page.keyboard.down('Alt'); await t.page.mouse.move(a.x + 25, a.y, { steps: 5 }); await t.wait(500);
+        const r = await t.E(`(()=>{ const c=el.instance.graphs[0].chart, tip=c.tooltip._hecTooltipEl;
+            return { active: c.active.length, rows: tip && tip.isConnected ? [...tip.children].filter(x=>x.textContent).length : 0,
+                     dots: c.getDatasetMeta(0).data.filter(p=>p._model.radius>0).length }; })()`);
+        await t.page.keyboard.up('Alt'); await t.page.mouse.move(a.x + 40, a.y); await t.wait(300);
+        // (one point: the time and its value)
+        return r.active === 1 && r.rows === 2 && r.dots > 10 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

@@ -139,3 +139,24 @@ function _colorWithAlpha(color, alpha) {
     return `rgba(0,0,0,${alpha})`;
 }
 
+
+// --------------------------------------------------------------------------------------
+// Chartjs samples plugin
+// While chart.showSamples is set (Alt held over the graph, see altSamplesMove), each
+// sample of a curve is drawn as a dot — the ones its dataset already shows keeping their
+// own size; a point that only shapes the curve (hecVirtual) stays hidden.
+// --------------------------------------------------------------------------------------
+
+const SAMPLE_RADIUS = 3;
+
+export const samples_plugin = {
+
+    id: 'samples',
+
+    afterDatasetUpdate: (chart, args) => {
+        if( !chart.showSamples || !args.meta.dataset ) return;
+        const data = chart.data.datasets[args.index].data || [];
+        for( const [i, pt] of (args.meta.data || []).entries() )
+            if( pt._model && !(pt._model.radius > 0) && !data[i]?.hecVirtual ) pt._model.radius = SAMPLE_RADIUS;
+    }
+};
