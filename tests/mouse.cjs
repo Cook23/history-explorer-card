@@ -192,6 +192,18 @@ module.exports = async function()
         // (at most the point under the pointer shown before and after: its hover style)
         return n0 <= 1 && n1 > total / 2 && n2 <= 1 ? true : JSON.stringify({ n0, n1, n2, total });
     });
+    await t.step('Alt held with the tooltip open: the samples shown, the tooltip on the one point under the pointer', async () => {
+        const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
+        const a = await E(`pointPt(${li},0.5)`);
+        await t.page.mouse.click(a.x, a.y); await t.wait(300);
+        await t.page.keyboard.down('Alt'); await t.page.mouse.move(a.x + 25, a.y, { steps: 5 }); await t.wait(300);
+        const r = await E(`(()=>{ const c=graphAt(${li}).chart, el=c.tooltip._hecHoverTooltipEl;
+            return { active: c.active.length, rows: el && el.isConnected ? [...el.children].filter(x=>x.textContent).length : 0, dots: c.getDatasetMeta(0).data.filter(p=>p._model.radius>0).length }; })()`);
+        await t.page.keyboard.up('Alt'); await t.page.mouse.move(a.x + 40, a.y); await t.wait(200);
+        await t.page.mouse.move(5, 5); await t.wait(1500);
+        // (one point: the time and its value)
+        return r.active === 1 && r.rows === 2 && r.dots > 10 ? true : JSON.stringify(r);
+    });
     await t.step('Shift + drag on a graph moves it both ways: the time and the Y axis', async () => {
         const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
         const st = async () => [await E('el.instance.startTime'), await E(`yRange(${li})`)];
