@@ -4,9 +4,9 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.12b1] - unreleased
+## [v1.2.12] - 2026-10-08
 
-### Fixed — Alt held: the tooltip shows the point under the pointer, not the whole curve
+### Fixed — Alt held: the tooltip shows the point under the pointer, not the whole curve ([#113](https://github.com/Cook23/history-explorer-card/issues/113))
 - With Alt held over a curve, the tooltip listed every value of the curve at once, as many rows as samples. Holding Alt also switched the graph's hover to the whole curve — what the original card used to show the samples; they are now drawn on their own, and the hover and its tooltip stay on the point under the pointer
 - Tests: Alt held with the tooltip open, the samples are shown and the tooltip shows one point
 
