@@ -50,3 +50,14 @@ Differences (keep them in mind before calling the two "identical"):
 - **Cap.** lowpass_dt also caps the limit at its `tau` (`max(min(raw, tau), 1)`), because it
   drives the injection of synthetic samples. The card has no `tau`.
 - lowpass_dt's end-of-silence marker and `silence` option have no equivalent in the card.
+
+Review of the silence detection (October 2026), decided by the user:
+- After a Home Assistant restart, lowpass_dt already keeps the downtime out of the EMA: on
+  restore, `sensor.py` sets `source_just_resumed`, so the first sample counts as the limit
+  (same as after a silence). Not an issue, nothing to do.
+- The +0.1 s margin is absolute: a very regular source (σ close to 0) can get a false
+  silence from a delay of a few tenths of a second. In lowpass_dt that only means an extra
+  injected sample, maybe published; in the card, an invisible plateau. Left as is. A
+  relative margin (e.g. `max(0.1 s, 5 % of the mean)`) would have to change on both sides.
+- `state_reported` is not listened to: a sensor repeating the same value is most likely
+  dead, and treating it as silent is right.
