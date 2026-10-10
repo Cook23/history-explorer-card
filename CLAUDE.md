@@ -62,3 +62,21 @@ Review of the silence detection (October 2026), decided by the user:
   relative margin (e.g. `max(0.1 s, 5 % of the mean)`) would have to change on both sides.
 - `state_reported` is not listened to: a sensor repeating the same value is most likely
   dead, and treating it as silent is right.
+
+### 3. Attribute units and angles (1.2 only: `src/history-series.js`, `src/card-datasets.js`)
+
+| card 1.2 | lowpass_dt |
+|---|---|
+| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `_circularPeriod` | `attributes.py` |
+
+- An attribute's unit: the one its value holds (`45 %`), else Home Assistant frontend's tables
+  (weather units, units by domain, temperatures in the system unit; a light's `brightness`
+  and a media player's `volume_level` converted into %), else an `X_unit` attribute for every
+  attribute with `X` in its name; `X_unit` attributes are units, never series.
+- A weather entity's `wind_bearing` is in `°` (Home Assistant gives no unit).
+- Automatic `circular` for an attribute: `measurement_angle`, or a unit of `°` only when the
+  attribute's name is a direction (`bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir`);
+  the sun's `elevation` is not circular. An entity's own state keeps rule 1.
+- lowpass_dt also derives a device class and a state class for its attribute sources; the
+  card doesn't need them.
+
