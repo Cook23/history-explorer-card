@@ -45,8 +45,9 @@ in the EMA, not as its real length.
 Differences (keep them in mind before calling the two "identical"):
 - **Seed.** The card has the whole history, so it starts the EMA from the median of the
   intervals, with σ from their median absolute deviation × 1.4826. lowpass_dt runs online
-  and starts from the first interval, with σ = 0. README_Full.md says "the same rules as the
-  lowpass_dt integration … started from their median": the median part is card-only.
+  and starts from the first interval, with σ = 0. README_Full.md says so ("the rules of the
+  lowpass_dt integration", the card starting from the median, lowpass_dt from the first
+  interval).
 - **Cap.** lowpass_dt also caps the limit at its `tau` (`max(min(raw, tau), 1)`), because it
   drives the injection of synthetic samples. The card has no `tau`.
 - lowpass_dt's end-of-silence marker and `silence` option have no equivalent in the card.
