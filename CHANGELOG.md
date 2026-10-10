@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.13b1] - unreleased
+
+### Fixed — angles among the attributes: the wind direction is one, the sun's elevation isn't
+- A weather entity's `wind_bearing` had no unit (Home Assistant gives none), so it wasn't seen as an angle: a wind around the north was drawn through 180°. It is now in `°`, circular, and offered as direction arrows
+- An attribute in `°` was always taken as an angle that goes round, the sun's `elevation` (from -90 to 90) included: around the horizon, -5° was drawn as 355°, and it was offered as arrows. An attribute in `°` is now circular only when its name says it's a direction (`bearing`, `direction`, `azimuth`, `heading`, `yaw`, `wind_dir`), as lowpass_dt does for its attribute sources; `measurement_angle` still suffices. An entity's own state is unchanged
+- Tests: `wind_bearing` and the sun's `azimuth` circular and offered as arrows, the sun's `elevation` a curve
+
 ## [v1.2.12] - 2026-10-08
 
 ### Fixed — Alt held: the tooltip shows the point under the pointer, not the whole curve ([#113](https://github.com/Cook23/history-explorer-card/issues/113))

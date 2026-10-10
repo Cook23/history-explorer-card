@@ -75,12 +75,17 @@ module.exports = async function()
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
         return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
     });
-    await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %), no X_unit offered', async () => {
+    await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %, wind_bearing in °), no X_unit offered', async () => {
         await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
         const v = await sub(); await closeAll();
-        return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h)' ? true : v;
+        return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130 °) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h)' ? true : v;
     });
     await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
+    await t.step('an attribute in ° is circular — and pre-selected as arrowline — only when it is a direction: wind_bearing, the sun\'s azimuth; not the sun\'s elevation', async () => {
+        const r = await t.E(`(()=>{ const i=el.instance; const ids=['weather.villeveyrac.wind_bearing','sun.sun.azimuth','sun.sun.elevation'];
+            return ids.map(id => id.split('.').pop()+':'+i._circularPeriod({ entity: id })+':'+i._detectDefaultType(id).type).join(' '); })()`);
+        return r === 'wind_bearing:360:arrowline azimuth:360:arrowline elevation:null:line' ? true : r;
+    });
     await t.step('like every submenu: over the dropdown, level with the entry, right edges aligned', async () => {
         const r = await t.E(`(()=>{ const q=s=>el.querySelector(s).getBoundingClientRect(); const d=q('#es_0'), e=q('#es_0 a[data-entity="climate.salon"]'), s=q('#es_0_series');
             return Math.abs(s.right-d.right)<1 && Math.abs(s.top-e.top)<1 ? 'ok' : JSON.stringify({ d, e, s }); })()`);
