@@ -22,7 +22,7 @@ The tooltip opens on a click or a tap on the curves, then follows the mouse unti
 
 Curves can be drawn between their values by four interpolation algorithms — `monotone` (the default), `steffen`, `makima` or `catmullrom` — set with the `interpolation` option or from the type menu.
 
-The *smart* line mode draws a curve while a sensor reports at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a long spline or diagonal suggesting a gradual change that never happened (same silence detection as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration).
+The *smart* line mode draws a curve while a sensor reports at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a long spline or diagonal suggesting a gradual change that never happened (the silence detection of the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration).
 
 Angles — a wind direction, for example — are drawn without jumping across the whole graph at each crossing of 0/360: they're drawn as a continuous curve around their average direction, while the tooltip and the Y axis keep showing the real values. Automatic for entities in `°` or with state class `measurement_angle`, adjustable per entity with `circular` (another period, `2pi`, or off).
 

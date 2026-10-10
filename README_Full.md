@@ -746,8 +746,8 @@ graphs:
 
 It's also available in the [display type menu](#choosing-an-entitys-display-type) as *Smart*, and like the other modes in `entityOptions` or as the card-wide `lineMode`.
 
-How a silence is detected — the same rules as the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
-- the sensor's usual interval between values is a running average (EMA) of the intervals, started from their median;
+How a silence is detected — the rules of the [lowpass_dt](https://github.com/Cook23/lowpass_dt) integration, computed in the browser on each curve's recorded values:
+- the sensor's usual interval between values is a running average (EMA) of the intervals. The card has the whole history at once, so it starts from their median; lowpass_dt, which receives the values one by one, starts from the first interval;
 - an interval longer than that average plus 3 standard deviations (and at least 1 second) is a silence;
 - the curve resumes one average interval before the value that ends the silence.
 
