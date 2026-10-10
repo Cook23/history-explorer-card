@@ -16,7 +16,7 @@ Un simple clic sur une courbe ou une étiquette d'entité l'affiche ou la masque
 
 Les courbes peuvent être tracées entre leurs valeurs par quatre algorithmes d'interpolation — `monotone` (par défaut), `steffen`, `makima` ou `catmullrom` — choisis avec l'option `interpolation` ou depuis le menu de type.
 
-Le mode de ligne *intelligent* (`smart`) trace une courbe tant que le capteur envoie des valeurs à son rythme habituel, et une ligne plate en pointillé — la dernière valeur connue maintenue — pendant chaque silence, au lieu d'une longue courbe ou diagonale suggérant une évolution progressive qui n'a jamais eu lieu (même détection des silences que l'intégration [lowpass_dt](https://github.com/Cook23/lowpass_dt)).
+Le mode de ligne *intelligent* (`smart`) trace une courbe tant que le capteur envoie des valeurs à son rythme habituel, et une ligne plate en pointillé — la dernière valeur connue maintenue — pendant chaque silence, au lieu d'une longue courbe ou diagonale suggérant une évolution progressive qui n'a jamais eu lieu (la détection des silences de l'intégration [lowpass_dt](https://github.com/Cook23/lowpass_dt)).
 
 Les angles — une direction de vent, par exemple — ne sautent pas d'un bord à l'autre du graphe à chaque passage par 0/360 : ils sont tracés comme une courbe continue autour de leur direction moyenne, tandis que l'infobulle et l'axe Y affichent toujours les valeurs réelles. Automatique pour les entités en `°` ou de classe d'état `measurement_angle`, réglable par entité avec `circular` (autre période, `2pi`, ou désactivé).
 
