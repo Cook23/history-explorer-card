@@ -75,11 +75,22 @@ function _isUnit(k, u)
 }
 
 // The units of a weather entity's attributes, as Home Assistant shows them (its frontend's
-// getWeatherUnit): the X of the X_unit giving it, or the unit itself ('%')
+// getWeatherUnit): the X of the X_unit giving it, or the unit itself ('%') — and the wind
+// direction in degrees, which Home Assistant gives without a unit (an angle, see
+// isDirectionAttribute)
 const WEATHER_UNITS = { temperature: 'temperature', apparent_temperature: 'temperature', dew_point: 'temperature', templow: 'temperature',
                         pressure: 'pressure', wind_speed: 'wind_speed', wind_gust_speed: 'wind_speed',
                         visibility: 'visibility', precipitation: 'precipitation',
-                        humidity: { unit: '%' }, cloud_coverage: { unit: '%' }, precipitation_probability: { unit: '%' } };
+                        humidity: { unit: '%' }, cloud_coverage: { unit: '%' }, precipitation_probability: { unit: '%' },
+                        wind_bearing: { unit: '°' } };
+
+// Is attribute a direction — an angle that goes round (0 and 360 the same), by its name: a
+// bearing, an azimuth, a heading… An attribute in ° that isn't one (the sun's elevation,
+// from -90 to 90) is not circular. Same rule as lowpass_dt's attribute sources.
+export function isDirectionAttribute(attribute)
+{
+    return /bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir/.test(attribute);
+}
 
 // The units Home Assistant knows an entity's attributes are in, by domain (its frontend's
 // DOMAIN_ATTRIBUTES_UNITS) — with the factor turning the value into it when it isn't

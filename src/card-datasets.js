@@ -3,7 +3,7 @@
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
-import { seriesId } from "./history-series.js";
+import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -501,7 +501,8 @@ export class CardDatasets
 
     // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
     // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
-    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360), false
+    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360; for an
+    // attribute, the unit ° only when its name says it's a direction: see isDirectionAttribute), false
     // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
     // period <= 0, disables it with a warning.
     _circularPeriod(e)
@@ -510,7 +511,9 @@ export class CardDatasets
         if( c === false ) return null;
         if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
             if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
-            return ( this.getUnitOfMeasure(e.entity, e.unit) === '°' ) ? 360 : null;
+            if( this.getUnitOfMeasure(e.entity, e.unit) !== '°' ) return null;
+            const { attribute } = seriesOf(e.entity);
+            return ( !attribute || isDirectionAttribute(attribute) ) ? 360 : null;
         }
         let P = NaN;
         if( typeof c === 'number' ) P = c;

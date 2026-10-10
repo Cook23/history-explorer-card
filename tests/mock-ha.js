@@ -42,10 +42,13 @@ const STATES={
  'climate.salon':ent('climate.salon','salon',null,'heat'),
  // a weather entity as Home Assistant gives one: its attributes' units in X_unit attributes
  'weather.villeveyrac':ent('weather.villeveyrac','Villeveyrac',null,'rainy'),
+ // the sun: its azimuth goes round (a direction), its elevation, from -90 to 90, doesn't
+ 'sun.sun':ent('sun.sun','Sun',null,'above_horizon'),
  // a light: its brightness from 0 to 255, shown by Home Assistant in %
  'light.salon':ent('light.salon','salon light',null,'on'),
 };
 Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, apparent_temperature: 21, hvac_action: 'heating', humidity: '45 %', led_color: 'green', visibility_unit: 'km', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['sun.sun'].attributes, { azimuth: 200.5, elevation: 30.2, rising: false });
 Object.assign(STATES['light.salon'].attributes, { brightness: 128, color_temp_kelvin: 3000, color_mode: 'color_temp', supported_color_modes: ['color_temp'] });
 Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, apparent_temperature: 29, temperature_unit: '°C', humidity: 85, pressure: 1016.4, pressure_unit: 'hPa',
     wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3 });
