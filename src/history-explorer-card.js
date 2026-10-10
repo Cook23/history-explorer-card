@@ -826,8 +826,13 @@ export class HistoryCardState {
                     this.graphs[i].yaxisLock = 0;
                     const _ya = this._this.querySelector(`#ya-${this.graphs[i].id}`);
                     if( _ya ) _ya.style.touchAction = '';
-                } else
+                } else {
+                    // (locked: the Y axis keeps the range it shows now, whatever the data —
+                    // panning or zooming the time no longer rescales it)
                     this.graphs[i].yaxisLock = 1;
+                    const _s = c.scales['y-axis-0'], _t = c.options.scales.yAxes[0].ticks;
+                    if( _s ) { _t.min = _s.min; _t.max = _s.max; _t.removeEdgeTicks = true; }
+                }
 
                 this.updateScaleLockState(this.graphs[i], false);
 
