@@ -12,6 +12,11 @@ either piece here must be mirrored there (and vice versa), or the docs on both s
 wrong. lowpass_dt is worked on in its own Claude session and has a matching `CLAUDE.md`;
 tell the user when a change here needs a matching change there.
 
+Rule set by the user: each session manages its own repository's code. A session may write
+`.md` files in the other repository only with the user's explicit approval, and never
+modifies the other repository's code. A code change needed on the other side is passed to
+that session (or to the user), not made from here.
+
 ### 1. `circular` option values — must stay identical
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
@@ -26,7 +31,7 @@ tell the user when a change here needs a matching change there.
 
 Introduced in card v1.1.46 / lowpass_dt v1.3.17.
 
-### 2. Silence detection (`lineMode: smart`) — same rule, with known differences
+### 2. Silence detection (`lineMode: smart`) — same rule, with known, deliberate differences
 
 | card (same files as above) | lowpass_dt |
 |---|---|
