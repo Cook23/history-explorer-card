@@ -4,7 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.13b1] - unreleased
+## [v1.2.13b2] - unreleased
+
+### Fixed — the padlock keeps the Y axis where it is
+- A click on the padlock lit it, but didn't lock anything: the Y axis kept following the data, so panning or zooming the time rescaled it. Locked, each Y axis now keeps the range it shows; released, it gets its own back. (A Y axis moved or zoomed by hand was already kept)
+- `ylock: true` in the YAML no longer stopped the Y axis from being moved or zoomed by hand (a drag on the Y labels, a two-finger pinch, Shift + drag or wheel): it is applied again. The padlock still works
+- Tests: the padlock clicked, the Y range kept when the data changes, followed again once released; `ylock` refusing a drag on the Y axis
+- All the card's, graphs' and entities' options checked: each one read is used — `ylock` was the only one lost on the way
 
 ### Fixed — angles among the attributes: the wind direction is one, the sun's elevation isn't
 - A weather entity's `wind_bearing` had no unit (Home Assistant gives none), so it wasn't seen as an angle: a wind around the north was drawn through 180°. It is now in `°`, circular, and offered as direction arrows

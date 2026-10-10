@@ -1606,7 +1606,8 @@
       me._hecYAxisLock = 0;
     },
 
-    // Toggles the Y-axis lock on/off — factored out so it can be called from
+    // Toggles the Y-axis lock on/off: locked, each Y axis keeps the range it shows; released,
+    // it gets its own back (_hecReleaseYAxes) — factored out so it can be called from
     // the unified custClick handler on the grouped lock+handle zone below, not
     // just from a native button click anymore.
     _hecToggleYAxisLock: function () {
@@ -1614,11 +1615,15 @@
       if (!me.options.scales || !me.options.scales.yAxes || !me.options.scales.yAxes.length) return;
       if (me._hecYAxisLock) {
         me._hecReleaseYAxes();
+        me._hecUpdateYAxisState();
+        me.update();
       } else {
+        // (locked: each Y axis keeps the range it shows now, whatever the data — panning
+        // or zooming the time no longer rescales it)
         me._hecYAxisLock = 1;
+        me._hecUpdateYAxisState();
+        me._hecSetYRanges(me._hecYRanges());
       }
-      me._hecUpdateYAxisState();
-      me.update();
     },
 
     _hecUpdateYAxisState: function () {

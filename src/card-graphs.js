@@ -100,6 +100,9 @@ export class CardGraphs
                 zoomX: (info) => this._onTimeZoom(info),
                 zoomSelectMode: this.state.zoomMode,
                 legendClickEnabled: false,
+                // ylock: the Y axis can't be moved nor zoomed by hand (the padlock still works)
+                yAxisPanEnabled: !config?.ylock,
+                zoomYEnabled: !config?.ylock,
                 customEvent: (info) => this._onGesture(info),
                 scales: {
                     xAxes: [{

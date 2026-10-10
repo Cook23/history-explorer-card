@@ -214,5 +214,26 @@ module.exports = async function()
         return s1[0] !== s0[0] && s1[1].join() !== s0[1].join() ? true : JSON.stringify({ s0, s1 });
     });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
-    return t.close();
+    const r = await t.close();
+
+    // ── The padlock: what it keeps when the data changes ──
+    const t2 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, refresh: { automatic: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }, { mock: { series: true } });
+    const E2 = x => t2.E(x);
+    await t2.wait(800);
+    await t2.step('padlock clicked: the Y scale shown is kept when the data changes (the time panned, a new value); released, it follows the data again', async () => {
+        // (a value far above the others, as new data brought by a pan or a refresh)
+        const spike = () => E2(`(()=>{ const c=graphAt(0).chart, d=c.data.datasets[0].data; d.push({ x: d[d.length-1].x, y: 5000 }); c.update(); })()`);
+        const unspike = () => E2(`(()=>{ const c=graphAt(0).chart; c.data.datasets[0].data.pop(); c.update(); })()`);
+        const lk = await E2('lockPt(0)');
+        const free0 = await E2('yRange(0)'); await spike(); const free1 = await E2('yRange(0)'); await unspike();
+        await t2.page.mouse.click(lk.x, lk.y); await t2.wait(600);
+        const l0 = await E2('yRange(0)'); await spike(); const l1 = await E2('yRange(0)'), locked = await E2('lockOf(0)');
+        await t2.page.mouse.click(lk.x, lk.y); await t2.wait(600);
+        const back = await E2('lockOf(0)'), b1 = await E2('yRange(0)');
+        return free0.join() !== free1.join() && locked && l0.join() === l1.join() && !back && b1.join() !== l1.join() ? true
+            : JSON.stringify({ free0, free1, l0, l1, locked, back, b1 });
+    });
+    const r2 = await t2.close();
+    return { passed: r.passed + r2.passed, failed: r.failed + r2.failed };
 };
