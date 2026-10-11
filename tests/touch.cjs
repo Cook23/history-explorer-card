@@ -101,6 +101,21 @@ module.exports = async function()
         const r1 = await E(`yRange(${li})`); const y = await t.scrollY();
         return r0.join() !== r1.join() && y === 0 ? true : `y ${r0} -> ${r1} scrollY=${y}`;
     });
+    await step('a pinch whose first finger lands on a curve is no tap: no tooltip once the second is down, the tooltip mode ended; a tap after it opens one again', async () => {
+        const gi = await lineGraph();
+        const st = () => E(`(()=>{ const c=graphAt(${gi}).chart, el=c.tooltip._hecHoverTooltipEl;
+            return { mode: !!c._hecTooltipMode, active: c.active.length, tip: !!(el && el.isConnected && el.style.opacity !== '0') }; })()`);
+        const p = await E(`pointPt(${gi},0.5)`), a2 = { x: p.x + 80, y: p.y + 30 };
+        await t.touch('touchStart', [p]); await t.wait(120);
+        await t.touch('touchStart', [p, a2]); await t.wait(80);
+        for( let i = 1; i <= 6; i++ ) { await t.touch('touchMove', [{ x: p.x - 8 * i, y: p.y }, { x: a2.x + 8 * i, y: a2.y }]); await t.wait(40); }
+        const during = await st();
+        await t.touch('touchEnd', []); await t.wait(1200);
+        const after = await st();
+        const q = await E(`pointPt(${gi},0.3)`); await t.tap(q); await t.wait(500);
+        const tapped = await st();
+        return !during.mode && !during.tip && !after.mode && !after.tip && tapped.tip ? true : JSON.stringify({ during, after, tapped });
+    });
     await step('pinch: fingers apart horizontally zoom the time in (by zoom steps)', async () => {
         const t0 = await E('timeRange()');
         await t.pinch(await E(`graphPtAt(${await lineGraph()},0.6)`), { x: -10, y: 0 }, { x: 10, y: 0 });

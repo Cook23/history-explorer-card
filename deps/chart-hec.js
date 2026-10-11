@@ -1168,6 +1168,12 @@
       gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
       gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
       gs.pinch.startFactors = pinchFactors(me, gs.pinch);
+      // Two fingers: a pinch, not a tap — the tooltip the first one opened goes, and the
+      // tooltip mode ends (a contact on the curves opens it again)
+      me._hecTooltipMode = false;
+      me._hecLastHitXY = undefined;
+      me._hecEndHover();
+      if (me.tooltip) me.tooltip._hecCloseTooltip();
       panX(c, 'start', 0, 'pinch', { pointerFactors: gs.pinch.startFactors });
       // The Y ranges tracked from pinch start — needed for the direct Y zoom, which
       // must accumulate scale changes across the whole gesture, not

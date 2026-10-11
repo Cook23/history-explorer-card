@@ -4,7 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.14b1] - unreleased
+## [v1.2.14b2] - unreleased
+
+### Fixed — a pinch doesn't open the tooltip
+- The first finger of a pinch, landing on a curve, opened the tooltip as a tap would, and the tooltip mode stayed on after the pinch. Once the second finger is down, it's a pinch: the tooltip goes and the tooltip mode ends; a tap on the curves opens it again
+- Tests: a pinch started on a curve, no tooltip during or after it, a tap after it opening one
 
 ### Changed — zooming in real time keeps the present on the right
 - In real time (the present shown, the window following it), the time range selector and the + / − buttons now keep the present on the right: the window zooms from its end, and keeps following the present. Looking at the history, they keep the middle of the window, whatever the duration — before, up to 24 h they kept the middle even in real time (the present went out on the right), and beyond 24 h they kept the end even looking at the history
