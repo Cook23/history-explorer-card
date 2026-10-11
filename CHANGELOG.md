@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.14b2] - unreleased
+## [v1.2.14] - 2026-10-11
 
 ### Fixed — a pinch doesn't open the tooltip
 - The first finger of a pinch, landing on a curve, opened the tooltip as a tap would, and the tooltip mode stayed on after the pinch. Once the second finger is down, it's a pinch: the tooltip goes and the tooltip mode ends; a tap on the curves opens it again
