@@ -182,9 +182,10 @@ stateColors:
   door.on: blue
 
 
-# Overrides options of entities globlly, especially useful for entities added by the user through the UI view
+# Overrides options of entities globally, especially useful for entities added by the user through the UI view
 entityOptions:
-  # Keys in this dictionary should be the name (or device class, or domain) of whichever entity is being configured, for example "humidity"
+  # Keys in this dictionary should be the entity id (or device class, or domain) of whichever entity is being configured, for example "humidity".
+  # Also accepted as a list of entries, each with `match:` (a glob pattern on the entity id, or a list of them) or `entity:`
   humidity:
     # Which type of graph an entity matching this key should be displayed as when added. See $.graphs.type —
     # same options, applied here instead by entity/device-class/domain match. By default, determined from the
@@ -242,10 +243,10 @@ entityOptions:
     # (bar graph only) If true, specifies that an entity should be considered to be net-metering for bar charts, and that the value can go down as well as up (rather than being interpreted as the state being reset)
     netBars: False
     
-    # Height of the graph created when a user adds this entity. See $graphs.options.height
+    # Height of the graph created when a user adds this entity. See $.graphs.options.height
     height: null
     
-    # Default interval of the graph created when a user adds this entity. See $graphs.options.interval
+    # Default interval of the graph created when a user adds this entity. See $.graphs.options.interval
     interval: "hourly"
 
     # Overrides $.decimation for this entity specifically
@@ -264,7 +265,7 @@ legendVisible: True
 cursor:
   # Whether to show the vertical line on all graphs in the card (all), just the hovered graph (auto), or hide it on all graphs (hide). Possible options: auto, all, or hide
   mode: auto
-  # Which types of graph should a vertical line. Defaults to just timeline charts, but bar, line, and arrowline graphs can be specified here.
+  # Which types of graph show the vertical line. Defaults to just timeline charts, but bar, line, and arrowline graphs can be specified here.
   types: ['timeline']
 
 # Configuration related to the tooltip displaying
@@ -406,8 +407,8 @@ timeTicks:
   # An override of the time tick density to set the density without adjusting tick density for the screen size.
   # Has the same options as $.timeTicks.density: low, medium, high, higher, highest
   densityOverride: undefined
-  # Whether to use full date format, or short date formats. Specify "short" for short date formats.
-  dateFormat: 'full'
+  # Whether to use the normal date format, or short date formats. Specify "short" for short date formats.
+  dateFormat: 'normal'
 
 # Height of the line graphs in the card. 
 lineGraphHeight: 250
@@ -458,7 +459,7 @@ statistics:
 # Settings related to the colours of the UI
 uiColors:
   # Which colour should the close button be, at the top of user-added graphs
-  closeButton: '#000000001f'
+  closeButton: '#0000001f'
   # Color of the buttons. Page's '--primary-color' at 1f transparency
   buttons: '#03a9f41f'
   # Background colour of the entity selector
