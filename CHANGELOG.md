@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.14] - 2026-10-11
+
+### Fixed — a pinch doesn't open the tooltip
+- The first finger of a pinch, landing on a curve, opened the tooltip as a tap would, and the tooltip mode stayed on after the pinch. Once the second finger is down, it's a pinch: the tooltip goes and the tooltip mode ends; a tap on the curves opens it again
+- Tests: a pinch started on a curve, no tooltip during or after it, a tap after it opening one
+
+### Changed — zooming in real time keeps the present on the right
+- In real time (the present shown, the window following it), the time range selector and the + / − buttons now keep the present on the right: the window zooms from its end, and keeps following the present. Looking at the history, they keep the middle of the window, whatever the duration — before, up to 24 h they kept the middle even in real time (the present went out on the right), and beyond 24 h they kept the end even looking at the history
+- The mouse wheel (Ctrl) keeps the present on the right in real time when the pointer is in the right 10 % of the plot area; a pinch, when a finger is in its right 20 % at its start or at its end. Elsewhere they zoom around the pointer or the fingers, and the window stops following the present
+- A zoom that takes the present out of the window now stops following it (it went on following it after a wheel zoom)
+- Chart.js: `zoomX` and `panX` say where the gesture comes from (`source`: wheel, drag or pinch) and where its pointer or fingers are, at its start and now (`pointerFactors`, `startFactors`)
+- Tests: the buttons and the selector in real time and in the history (48 h as 3 h), the wheel and a pinch on the right and elsewhere
+
 ## [v1.2.13] - 2026-10-11
 
 ### Fixed — the padlock keeps the Y axis where it is
