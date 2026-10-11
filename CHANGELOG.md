@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [Unreleased]
+## [v1.1.55] - 2026-10-11
 
 ### Fixed — the padlock keeps the Y axis where it is
 - A click on the padlock lit it, but didn't lock anything: the Y axis kept following the data, so panning or zooming the time rescaled it. Locked, the Y axis now keeps the range it shows; released, it gets its own back. (A Y axis moved or zoomed by hand was already kept)
