@@ -883,6 +883,7 @@
     var _yIdx = yAxisIndexAt(c, _hx, _hy);
     var _truncated = truncatedYAxisLabelAt(c, _yIdx);
     if (gestureType === 'click') {
+      me._hecTap(e);
       if (typeof me.options.onClick === 'function') {
         me.options.onClick.call(me, e.native, me.active);
       }
@@ -1168,12 +1169,6 @@
       gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
       gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
       gs.pinch.startFactors = pinchFactors(me, gs.pinch);
-      // Two fingers: a pinch, not a tap — the tooltip the first one opened goes, and the
-      // tooltip mode ends (a contact on the curves opens it again)
-      me._hecTooltipMode = false;
-      me._hecLastHitXY = undefined;
-      me._hecEndHover();
-      if (me.tooltip) me.tooltip._hecCloseTooltip();
       panX(c, 'start', 0, 'pinch', { pointerFactors: gs.pinch.startFactors });
       // The Y ranges tracked from pinch start — needed for the direct Y zoom, which
       // must accumulate scale changes across the whole gesture, not
@@ -1313,6 +1308,14 @@
     // swipe it scrolls): the gesture ends. One with no move before it (a long press
     // the browser turns into its context menu) leaves the gesture to finish as it was.
     var _pt = gs.pointers[pid];
+    // A pen's tap the browser takes over (some apps cancel a pen contact that moved a
+    // little, where a touch would be a scroll): released within the tap distance, alone,
+    // without a long press — a tap for the tooltip (_hecTap), at its start point
+    var _pu = gs.pending;
+    if (_pt && _pt.moved && pointerType === 'pen' && gs.count === 1 && _pu && _pu.pid === pid &&
+        !_pu.dragging && !_pu.longPressFired && !_pu.barrel && !_pu.barrelPressed) {
+      me._hecTap({ type: e.type, x: _pu.x0, y: _pu.y0, native: e.native });
+    }
     if (_pt && _pt.moved) {
       cancelLongPress(gs);
       if (gs.pending && gs.pending.pid === pid && gs.pending.dragging) {
@@ -1815,6 +1818,32 @@
     _hecInLinkMarkerZone: function (x, y) {
       var _r = this._hecLinkMarkerRect();
       return !!_r && x >= _r.left && x <= _r.left + _r.width && y >= _r.top && y <= _r.top + _r.height;
+    },
+
+    // A click or a tap — released without a drag, a pinch or a long press; never a press
+    // alone, a swipe (a scroll or a move of the time) or a pinch — on the plot area opens
+    // the tooltip mode on the points under it (hover.activateOnContact), or closes the
+    // tooltip when there are none; anywhere else it ends the mode. Without contact mode,
+    // it shows the points under it. Applied by Controller.handleEvent, right after.
+    _hecTap: function (e) {
+      var me = this, ho = me.options.hover;
+      var _at = e.x !== null && e.y !== null;
+      me._hecTooltipMode = ho.activateOnContact !== true || (_at && me._hecZoneAt(e.x, e.y) === 'plot');
+      me.active = me._hecTooltipMode ? me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho)) : [];
+      me._hecLastHitXY = _at ? { x: e.x, y: e.y } : undefined;
+      me._hecTapped = true;
+    },
+
+    // The elements of a hit-test drawn on the plot area (not skipped, not clipped out)
+    _hecOnlyDrawnPoints: function (elements) {
+      var me = this;
+      if (!elements.length || !me.chartArea) return elements;
+      return elements.filter(function (el) {
+        var v = el._view;
+        if (!v || v.skip) return false;
+        return v.x >= me.chartArea.left && v.x <= me.chartArea.right &&
+               v.y >= me.chartArea.top && v.y <= me.chartArea.bottom;
+      });
     },
 
     // Ends the hover: the highlighted points go back to their normal look, fading as the

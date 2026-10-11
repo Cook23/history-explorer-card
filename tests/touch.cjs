@@ -116,6 +116,26 @@ module.exports = async function()
         const tapped = await st();
         return !during.mode && !during.tip && !after.mode && !after.tip && tapped.tip ? true : JSON.stringify({ during, after, tapped });
     });
+    await step('a swipe starting on a curve is no tap: no tooltip, horizontal (the time moved) or vertical (the page scrolled)', async () => {
+        const gi = await lineGraph();
+        const st = () => E(`(()=>{ const c=graphAt(${gi}).chart, el=c.tooltip._hecHoverTooltipEl;
+            return { mode: !!c._hecTooltipMode, active: c.active.length, tip: !!(el && el.isConnected && el.style.opacity !== '0') }; })()`);
+        const swipe = async (dx, dy) => {
+            const p = await E(`pointPt(${gi},0.5)`);
+            await t.touch('touchStart', [p]); await t.wait(120);
+            const pressed = await st();
+            for( let i = 1; i <= 8; i++ ) { await t.touch('touchMove', [{ x: p.x + dx * i, y: p.y + dy * i }]); await t.wait(30); }
+            const during = await st();
+            await t.touch('touchEnd', []); await t.wait(800);
+            return { pressed, during, after: await st() };
+        };
+        await t.tap(await E(`yaPt(${gi},0.5)`)); await t.wait(1300);   // (the tooltip a tap opened before: closed)
+        const h = await swipe(-20, 0);
+        const v = await swipe(0, -20);
+        await t.page.evaluate(() => window.scrollTo(0, 0)); await t.wait(300);
+        const none = r => !r.pressed.mode && !r.pressed.tip && !r.during.mode && !r.during.tip && !r.after.mode && !r.after.tip;
+        return none(h) && none(v) ? true : JSON.stringify({ h, v });
+    });
     await step('pinch: fingers apart horizontally zoom the time in (by zoom steps)', async () => {
         const t0 = await E('timeRange()');
         await t.pinch(await E(`graphPtAt(${await lineGraph()},0.6)`), { x: -10, y: 0 }, { x: 10, y: 0 });

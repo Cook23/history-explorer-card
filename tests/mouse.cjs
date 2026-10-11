@@ -37,6 +37,15 @@ module.exports = async function()
         const t2 = await tip();
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
+    await t.step('a press on the curves opens nothing until released; a drag from them opens none', async () => {
+        const mode = () => E('graphAt(0).chart._hecTooltipMode');
+        const p = await E('pointPt(0,0.5)');
+        await t.page.mouse.move(p.x, p.y); await t.page.mouse.down(); await t.wait(300);
+        const pressed = { tip: await tip(), mode: await mode() };
+        await t.page.mouse.move(p.x - 120, p.y, { steps: 10 }); await t.page.mouse.up(); await t.wait(600);
+        const dragged = { tip: await tip(), mode: await mode() };
+        return pressed.tip === null && !pressed.mode && dragged.tip === null && !dragged.mode ? true : JSON.stringify({ pressed, dragged });
+    });
     await t.step('left still, the tooltip stays its reading time (1 s, plus 0.5 s a word), then fades out with the highlighted point', async () => {
         const p1 = await E('pointPt(0,0.4)');
         await t.page.mouse.click(p1.x, p1.y); await t.wait(300);
