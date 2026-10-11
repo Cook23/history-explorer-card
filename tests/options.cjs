@@ -30,6 +30,12 @@ module.exports = async function()
         return v === 'true:300:false:- | false:200:true:- | true:222:false:45' ? true : v;
     });
     await t.step('automatic refresh is on by default', async () => (await t.E('el.instance.pconfig.refreshEnabled')) === true || 'off');
+    await t.step('ylock: a drag on the Y axis changes nothing on a graph with ylock, it pans the one without', async () => {
+        const drag = async gi => { const y0 = await t.E(`yRange(${gi})`); const p = await t.E(`yaPt(${gi},0.5)`);
+            await t.drag(p, { x: p.x, y: p.y + 60 }); await t.wait(300); return y0.join() === (await t.E(`yRange(${gi})`)).join(); };
+        const r = [await drag(0), await drag(1)];
+        return r[0] === true && r[1] === false ? true : JSON.stringify({ lockedUnchanged: r[0], freeUnchanged: r[1] });
+    });
     done(await t.close());
 
     // ── The Interpolation submenu ──
