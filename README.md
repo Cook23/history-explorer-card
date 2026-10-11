@@ -118,12 +118,12 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 **Keyboard navigation:**
 - **ArrowUp / ArrowDown** — navigate the dropdown list
-- **Enter** — select the highlighted entry; second Enter adds it to the graph
+- **Enter** — choose the highlighted entry (with a `*` pattern, the first Enter selects every match, a second one adds them)
 - **Escape** — close the dropdown and clear the input field
 
-Clicking an entry in the dropdown adds it directly — no separate button required.
+Clicking an entry chooses it, as Enter does — no separate button required.
 
-Right after the selection (click or second Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
+Right after the choice (click or Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
 The entity selector accepts `*` wildcards:
 ```
@@ -132,7 +132,7 @@ person.*        all person domain entities
 *               all available entities
 ```
 
-When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter (or clicking an entry) opens the type menu for the whole batch, with an extra "Default" option to apply each entity's own natural type instead of a single chosen type for all of them. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
+When a wildcard pattern is entered, matching entries are shown in bold in the dropdown. The first Enter selects all matching entities; the second Enter opens the type menu for the whole batch, with an extra "Default" option to apply each entity's own natural type instead of a single chosen type for all of them. Duplicates are detected and listed in a tooltip, with all affected graphs highlighted.
 
 The same `*` wildcards work in YAML `graphs:` (see [YAML graph configuration](#yaml-graph-configuration) below); matches are added in natural alphabetical order.
 
@@ -365,7 +365,7 @@ entityOptions:
 entities:
   - entity: sensor.outside_temperature
     showMinMax: statistics   # band on long-term statistics portion only
-    showMinMax: history      # band on full graph including recent history
+                             # or: history — band on full graph including recent history
 ```
 
 ### Unavailable data
@@ -416,8 +416,8 @@ entityOptions:
 State text display:
 ```yaml
 stateTextMode: raw    # raw HA state names
-stateTextMode: auto   # translated device class dependent names (default)
-stateTextMode: hide   # no state labels
+                      # or: auto — translated device class dependent names (default)
+                      # or: hide — no state labels
 ```
 
 State colors can be customized by entity, device class, domain or globally:
@@ -617,7 +617,7 @@ stateColorSeed: 137       # seed for automatic state colors
 timeTicks:
   density: high           # base density: low, medium, high, higher, highest
   densityOverride: higher # skip auto-density and force this level
-  dateFormat: short       # normal or short
+  dateFormat: short       # normal (default) or short
 
 statistics:
   enabled: true
