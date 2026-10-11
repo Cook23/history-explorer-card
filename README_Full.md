@@ -105,7 +105,7 @@ Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a
 
 ### Options
 
-Every display option can be set on the card, in `entityOptions`, on a graph and on an entity, the most specific one winning; the options of a graph (its Y axis, height, stacking, time labels) can be set on its entities too. Every spelling of an option is accepted at every level. `entityOptions` also takes a list form, matching entities by pattern, entity ID, device class or domain. The automatic refresh is on by default, and reloads the recent history at most once every 2 seconds.
+Every display option can be set on the card, in `entityOptions`, on a graph and on an entity, the most specific one winning; the options of a graph (its Y axis, height, stacking, time labels) can be set on its entities too. Every spelling of an option is accepted at every level. `entityOptions` also takes a list form, matching entities by a pattern on their entity ID. The automatic refresh is on by default, and reloads the recent history at most once every 2 seconds.
 
 ### Persistence
 
