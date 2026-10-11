@@ -43,6 +43,10 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id (`climate.salon.current_temperature`), its state as Home Assistant would give an entity's (`stateOf`), its history from its entity's. |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
+| `src/card-tests.js` | *Tests (beta)* at the end of the type menu: what a browser reports of a pen, shown and sent as a report. |
+| `src/history-csv-exporter.js` | The CSV export. |
+| `src/history-default-colors.js` | The default colors: the palette of the curves, the colors of the timeline states. |
+| `src/languages.js` | The card's texts in each language. |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
 | `deps/chart-hec.js` | **The interaction layer**: everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, `Chart.hecUi`. |
 | `deps/Chart.js` | Chart.js 2.7.1, with small changes and the hooks calling into `chart-hec.js`. |
@@ -88,10 +92,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 - **lint** — every identifier is declared, no import is assigned (catches what moving
   code between files leaves behind);
 - **store** — the entity store on its own, no browser;
-- **mouse**, **touch**, **cards**, **features**, **panel** — the built card in Chromium against a mocked Home
-  Assistant: every gesture with a mouse and with fingers (real touch: `touch-action` and
-  page scrolling apply), linked graphs, menus, two cards on one page, history and
-  statistics, CSV export, refresh, the entity selector, the info panel, the type menu,
-  arrowlines, `scale`, the options at every level and the Interpolation submenu, persistence and the
-  last one to speak, the pen, the colors (a value, thresholds, an entity holding them), the two Y axes; after each scenario,
-  the persisted entities must match what is shown.
+- the other suites — the built card in Chromium against a mocked Home Assistant: every
+  gesture with a mouse and with fingers (real touch: `touch-action` and page scrolling
+  apply), and each feature in a suite of its own (the list is in `tests/README.md`);
+  after each scenario, the persisted entities must match what is shown.

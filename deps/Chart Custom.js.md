@@ -247,13 +247,11 @@ value needs to come back from the card:
   same as the Y-axis drag: the content follows the fingers.
 - **Y-axis lock** (the padlock icon) — a lock state (`0`=off, `1`=manually
   locked, `2`=auto-engaged by a gesture) lives entirely as
-  `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. The
-  card never reads or writes this value directly (see §6 for why that
-  matters) — it can only see it change by receiving the resulting
-  `customEvent`s (e.g. a `click` or `dblclickdown` with `zone: 'lockAndHandle'`).
-- **Alt-key sample mode** — `options.hover.mode` (already a native 2.7.1
-  option) is switched between its normal value and `'dataset'` while Alt
-  is held, purely by Chart.js watching `hover` gestures.
+  `chart._hecYAxisLock`, drawn and toggled entirely within Chart.js. Locked,
+  each Y axis keeps the range it shows (`_hecSetYRanges(_hecYRanges())`), so new
+  data or a time move no longer rescales it; released, it gets its own range back.
+  The card never reads or writes `_hecYAxisLock` (see §6 for why that matters): it
+  reads the payload's `yAxisLocked` (§2) and sets it with `hecSetYAxisLocked()` (§1).
 - **Cursor** — `canvas.style.cursor` changes to `move`/`ns-resize`/etc. on
   hover over a draggable zone, entirely computed from `_hecLegendIndexAt`/
   `_hecYAxisIndexAt` (see §4), no card involvement.
