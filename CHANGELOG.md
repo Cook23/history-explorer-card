@@ -6,9 +6,10 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.14] - 2026-10-11
 
-### Fixed — a pinch doesn't open the tooltip
-- The first finger of a pinch, landing on a curve, opened the tooltip as a tap would, and the tooltip mode stayed on after the pinch. Once the second finger is down, it's a pinch: the tooltip goes and the tooltip mode ends; a tap on the curves opens it again
-- Tests: a pinch started on a curve, no tooltip during or after it, a tap after it opening one
+### Fixed — only a click or a tap opens the tooltip
+- The tooltip opened as soon as a finger or the mouse button went down on a curve: the start of a pinch, of a swipe moving the time or scrolling the page, of a drag with the mouse opened it, and the tooltip mode stayed on after. It now opens on a click or a tap only — released without a drag, a pinch or a long press
+- Chart.js: the tooltip mode is set by the click the gesture detector resolves (`_hecTap`), no longer at the press — and by a pen's tap the browser takes over (cancelled within the tap distance, alone, without a long press), as some apps do
+- Tests: a press on the curves opening nothing until released, a drag from them none (mouse); a pinch and a horizontal or vertical swipe started on a curve, no tooltip during or after them, a tap after a pinch opening one
 
 ### Changed — zooming in real time keeps the present on the right
 - In real time (the present shown, the window following it), the time range selector and the + / − buttons now keep the present on the right: the window zooms from its end, and keeps following the present. Looking at the history, they keep the middle of the window, whatever the duration — before, up to 24 h they kept the middle even in real time (the present went out on the right), and beyond 24 h they kept the end even looking at the history

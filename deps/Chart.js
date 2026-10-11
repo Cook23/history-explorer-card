@@ -4650,29 +4650,21 @@
 
             // Find Active Elements for hover and tooltips.
             //
-            // The hit-test below only ever runs in response to a genuine pointer event —
+            // The hit-test only ever runs in response to a genuine pointer gesture —
             // never as a side effect of the chart's data being refreshed while the pointer
             // sits still. Two things can trigger it:
-            //   - a real contact (mousedown, translated from pointerdown/touchstart/click
-            //     by EVENT_TYPES) — always searches, regardless of hoverEnabled;
+            //   - a click or a tap, as the gesture detector below resolves it (released
+            //     without a drag, a pinch or a long press: _hecTap) — always searches,
+            //     regardless of hoverEnabled. A press alone searches nothing;
             //   - a pointer move (mousemove, translated from pointermove/touchmove) that
             //     travelled at least 4px since the position that produced the current
             //     active element — only searches when hoverOptions.hoverEnabled is true.
             // A move under that threshold, or any move at all when hover is disabled,
             // changes nothing: active stays exactly what it was.
-            function _hecOnlyDrawnPoints(_elements) {
-              if (!_elements.length || !me.chartArea) return _elements;
-              return _elements.filter(function (_el) {
-                var _v = _el._view;
-                if (!_v || _v.skip) return false;
-                return _v.x >= me.chartArea.left && _v.x <= me.chartArea.right &&
-                       _v.y >= me.chartArea.top && _v.y <= me.chartArea.bottom;
-              });
-            }
 
             // (fork) hover.activateOnContact: a hover move only moves a tooltip that a
-            // contact on the plot area opened — the tooltip "mode" — and leaving the plot
-            // area, or the canvas (a pen moved out of hover range), ends that mode
+            // click or a tap on the plot area opened — the tooltip "mode" — and leaving the
+            // plot area, or the canvas (a pen moved out of hover range), ends that mode
             var _contactMode = hoverOptions.activateOnContact === true;
             var _inPlot = e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
 
@@ -4706,13 +4698,6 @@
               me._hecHasMoved = false;
             } else if (e.type === 'mousedown') {
               me._hecHasMoved = false;
-              // (contact mode: a contact outside the plot area opens nothing — it ends the
-              // mode, like leaving the plot area)
-              me._hecTooltipMode = !_contactMode || _inPlot;
-              me.active = me._hecTooltipMode ? _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions)) : [];
-              if (e.x !== null && e.y !== null) {
-                me._hecLastHitXY = { x: e.x, y: e.y };
-              }
             } else if (e.type === 'mousemove') {
               // (only a move without contact — a hover — can carry the pointer out: the
               // pointerout a browser sends when it takes a contact over, or when a pen
@@ -4741,7 +4726,7 @@
                 // tooltip. A move past the threshold that lands on empty space must leave
                 // active exactly as it was; only overwrite it when the search actually
                 // found something to jump to (point 3).
-                var _found = _hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
+                var _found = me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
                 if (_found.length) {
                   me.active = _found;
                 }
@@ -4750,49 +4735,6 @@
                 }
               }
               // else: below threshold (or hover disabled) — leave me.active untouched
-            }
-
-            // Invoke onHover hook
-            // Need to call with native event here to not break backwards compatibility
-            helpers.callback(options.onHover || options.hover.onHover, [e.native, me.active], me);
-
-            // options.onClick used to fire here, directly on mousedown, independently
-            // from any other click detection. It's now invoked from fire('click') in
-            // _hecGestureHandler below — the single detector this and legend.onClick
-            // and customEvent all share, on an actual resolved click (mouseup without
-            // drag), not on the initial press.
-
-            // Remove styling for last active (even if it may still be active)
-            if (me.lastActive.length) {
-              me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
-            }
-
-            // Built in hover styling
-            if (me.active.length && hoverOptions.mode) {
-              me.updateHoverStyle(me.active, hoverOptions.mode, true);
-            }
-
-            changed = !helpers.arrayEquals(me.active, me.lastActive);
-            // (fork) nothing left active: the points fade back to their normal look as
-            // the tooltip fades out (see eventHandler)
-            me._hecHoverEnded = changed && !me.active.length;
-
-            // Remember Last Actives
-            me.lastActive = me.active;
-
-            // The tooltip is driven by this SAME decision, in this SAME function, right
-            // here — not by a separate Tooltip.handleEvent computing its own verdict on
-            // whether something is active. Two independent decisions for the same gesture
-            // is exactly what let them disagree in practice (confirmed via traced logs:
-            // the point lit up while the tooltip stayed closed for the same contact,
-            // because each ran its own search with its own mode/intersect). There is now
-            // only one search (above) and only one place that acts on its result for both.
-            var tooltip = me.tooltip;
-            if (tooltip && changed && (tooltip._options.enabled || tooltip._options.custom)) {
-              tooltip._active = me.active;
-              var _justMoved = e.type === 'mousedown' || e.type === 'mousemove';
-              tooltip.update(true, _justMoved);
-              tooltip.pivot();
             }
 
             // ── Generic gesture detection (customEvent hook + panX/zoomX) ─
@@ -4833,6 +4775,52 @@
                 wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS,
                 contextMenuAfterMs: _HEC_CONTEXTMENU_AFTER_MS });
             }
+
+            // (the gesture detector runs before the active elements are applied below: a
+            // click or a tap it resolves sets them — _hecTap)
+            // Invoke onHover hook
+            // Need to call with native event here to not break backwards compatibility
+            helpers.callback(options.onHover || options.hover.onHover, [e.native, me.active], me);
+
+            // options.onClick used to fire here, directly on mousedown, independently
+            // from any other click detection. It's now invoked from fire('click') in
+            // _hecGestureHandler above — the single detector this and legend.onClick
+            // and customEvent all share, on an actual resolved click (mouseup without
+            // drag), not on the initial press.
+
+            // Remove styling for last active (even if it may still be active)
+            if (me.lastActive.length) {
+              me.updateHoverStyle(me.lastActive, hoverOptions.mode, false);
+            }
+
+            // Built in hover styling
+            if (me.active.length && hoverOptions.mode) {
+              me.updateHoverStyle(me.active, hoverOptions.mode, true);
+            }
+
+            changed = !helpers.arrayEquals(me.active, me.lastActive);
+            // (fork) nothing left active: the points fade back to their normal look as
+            // the tooltip fades out (see eventHandler)
+            me._hecHoverEnded = changed && !me.active.length;
+
+            // Remember Last Actives
+            me.lastActive = me.active;
+
+            // The tooltip is driven by this SAME decision, in this SAME function, right
+            // here — not by a separate Tooltip.handleEvent computing its own verdict on
+            // whether something is active. Two independent decisions for the same gesture
+            // is exactly what let them disagree in practice (confirmed via traced logs:
+            // the point lit up while the tooltip stayed closed for the same contact,
+            // because each ran its own search with its own mode/intersect). There is now
+            // only one search (above) and only one place that acts on its result for both.
+            var tooltip = me.tooltip;
+            if (tooltip && changed && (tooltip._options.enabled || tooltip._options.custom)) {
+              tooltip._active = me.active;
+              var _justMoved = e.type === 'mousemove' || me._hecTapped;
+              tooltip.update(true, _justMoved);
+              tooltip.pivot();
+            }
+            me._hecTapped = false;
 
             return changed;
           },
