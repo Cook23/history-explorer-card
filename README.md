@@ -89,7 +89,7 @@ Add this repository as a custom repository in HACS: `https://github.com/Cook23/h
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
 - **Pan**: click and drag left or right on any graph
-- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region
+- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region. In real time (the present shown), the selector and the + / − buttons keep the present on the right, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; looking at the history, the window keeps its middle
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to today; double-click to also reset zoom
 - **Tooltip**: click or tap the curves to see the values or state details under the pointer; the tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves
 - **Right click** on a label: opens its type menu, as a long-press does

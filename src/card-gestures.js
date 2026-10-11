@@ -182,6 +182,8 @@ export class CardGestures
     // panX: a drag (or the fingers of a pinch) moves the time window — phase 'start', 'move'
     // (deltaFactor: in widths of the time axis, > 0 rightward, so towards the past) or 'end'.
     // While it moves, only the graph being dragged is redrawn, unless lockAllGraphs.
+    // A pinch that starts in real time stays there when a finger starts or ends it on the
+    // right of the plot area (see _keepsPresent): its end puts the present back on the right.
     _onTimePan(info)
     {
         if( info.phase === 'start' ) {
@@ -189,6 +191,7 @@ export class CardGestures
             this.state.drag = true;
             this.state.updateCanvas = ( this.pconfig.lockAllGraphs || !g ) ? null : g.canvas;
             this._panRestMs = 0;
+            this._pinchLive = info.source === 'pinch' && this._isLive();
         } else if( !this.state.drag ) {
             return;
         } else if( info.phase === 'move' ) {
@@ -200,18 +203,35 @@ export class CardGestures
         } else {
             this.state.drag = false;
             this.state.updateCanvas = null;
-            this.updateHistory();
-            this.state.autoScroll = moment() <= moment(this.endTime);
+            if( info.source === 'pinch' && this._pinchLive && this._keepsPresent(info) ) {
+                this.today();
+            } else {
+                this.updateHistory();
+                this.state.autoScroll = moment() <= moment(this.endTime);
+            }
+            this._pinchLive = false;
         }
+    }
+
+    // Does a zoom gesture keep the present on the right — in real time, with the pointer in
+    // the right 10 % of the plot area (the wheel), or a finger in its right 20 % at the start
+    // or now (a pinch)? Otherwise it zooms around its own point, and leaves real time.
+    _keepsPresent(info)
+    {
+        const _edge = info.source === 'wheel' ? 0.9 : 0.8;
+        return [...( info.startFactors ?? [] ), ...( info.pointerFactors ?? [] )].some(f => f >= _edge);
     }
 
     // zoomX: Ctrl+wheel or the spread of a pinch — one zoom step (+1 in, -1 out), like the
     // zoom buttons, around the time at centerFactor along the time axis
+    // In real time, a wheel or a pinch that keeps the present (_keepsPresent) zooms keeping
+    // the window's end; otherwise around its own point.
     _onTimeZoom(info)
     {
         if( this.state.loading || info.centerFactor === undefined ) return;
-        const tc = this.factorToTimecode(info.centerFactor);
-        if( info.step > 0 ) this.incZoomStep(tc, info.centerFactor); else this.decZoomStep(tc, info.centerFactor);
+        const _live = info.source === 'pinch' ? this._pinchLive : this._isLive();
+        const [tc, tp] = ( _live && this._keepsPresent(info) ) ? [this.endTime, 1.0] : [this.factorToTimecode(info.centerFactor), info.centerFactor];
+        if( info.step > 0 ) this.incZoomStep(tc, tp); else this.decZoomStep(tc, tp);
     }
 
     // Length of the time window, in seconds

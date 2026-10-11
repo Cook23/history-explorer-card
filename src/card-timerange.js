@@ -103,22 +103,38 @@ export class CardTimeRange
             if( g.chart ) g.chart.options.zoomSelectMode = this.state.zoomMode;
     }
 
+    // The zoom buttons and the duration menu: in real time (the present shown, see _isLive)
+    // the window keeps its end — the present stays on the right; looking at the history, it
+    // keeps its middle
     decZoom()
     {
-        this.decZoomStep();
+        this.decZoomStep(...this._zoomAnchor());
         this.writeLocalState();
     }
 
     incZoom()
     {
-        this.incZoomStep();
+        this.incZoomStep(...this._zoomAnchor());
         this.writeLocalState();
     }
 
     timeRangeSelected(event)
     {
-        this.setTimeRange(event.target.value, true);
+        this.setTimeRange(event.target.value, true, ...this._zoomAnchor());
         this.writeLocalState();
+    }
+
+    // Is the window showing the present, following it (real time) — rather than the history?
+    _isLive()
+    {
+        return !!this.state.autoScroll && moment() >= moment(this.startTime);
+    }
+
+    // Where a zoom without a point of its own keeps the window: [time, position along it] —
+    // its end in real time, its middle (null) otherwise
+    _zoomAnchor()
+    {
+        return this._isLive() ? [this.endTime, 1.0] : [null, 0.5];
     }
 
     // --------------------------------------------------------------------------------------
@@ -267,16 +283,11 @@ export class CardTimeRange
 
         if( update ) {
 
+            const _end0 = this.endTime;
+
             if( t_center ) {
 
                 let t1 = moment(t_center).add(this.activeRange.timeRangeHours * (1.0 - t_position), "hour");
-                let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
-                this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-
-            } else if( this.activeRange.timeRangeHours > 24 ) {
-
-                let t1 = moment(this.endTime);
                 let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
                 this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
                 this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
@@ -290,6 +301,9 @@ export class CardTimeRange
                 this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
 
             }
+
+            // (a window whose end moved follows the present only if it shows it)
+            if( this.endTime !== _end0 ) this.state.autoScroll = moment() <= moment(this.endTime);
 
             this._applyTimeAxes();
 
@@ -339,6 +353,8 @@ export class CardTimeRange
 
         if( update ) {
 
+            const _end0 = this.endTime;
+
             if( !t_center )
                 t_center = (moment(this.startTime) + moment(this.endTime)) / 2;
 
@@ -346,6 +362,9 @@ export class CardTimeRange
             let t0 = moment(t1).subtract(this.activeRange.timeRangeMinutes, "minute");
             this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
             this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+
+            // (a window whose end moved follows the present only if it shows it)
+            if( this.endTime !== _end0 ) this.state.autoScroll = moment() <= moment(this.endTime);
 
             this._applyTimeAxes();
 

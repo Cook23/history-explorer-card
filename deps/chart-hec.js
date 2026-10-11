@@ -556,11 +556,11 @@
         // Time axis (the card's): the fingers' common horizontal movement pans it;
         // their horizontal spread zooms it by steps, one each time the spread
         // accumulated since the last step reaches x1.5 either way
-        if (panDX !== 0) panX(c, 'move', panDX);
+        if (panDX !== 0) panX(c, 'move', panDX, 'pinch');
         if (_zoomXActive) {
           pinch.zoomAcc = (pinch.zoomAcc || 1) * _zoomScaleX;
           var _zStep = pinch.zoomAcc < 2 / 3 ? 1 : pinch.zoomAcc > 1.5 ? -1 : 0;
-          if (_zStep) { pinch.zoomAcc = 1; zoomX(c, _zStep, newCenterX); }
+          if (_zStep) { pinch.zoomAcc = 1; zoomX(c, _zStep, newCenterX, 'pinch', pinchFactors(me, pinch), pinch.startFactors); }
         }
         // Y pan by the vertical movement of the fingers' centre — the content follows
         // the fingers, as with the one-finger Y axis pan (yAxisPan) — and Y zoom by
@@ -948,20 +948,32 @@
 
   // Calls options.panX (the card's time axis) — phase 'start', 'move' (deltaFactor:
   // the movement since the last call, in plot area widths, > 0 rightward) or 'end'
-  function panX(c, phase, deltaPixels) {
+  // (source: 'drag' or 'pinch'; at a pinch's start and end, pointerFactors: where its
+  // fingers are along the plot area, and at its end startFactors: where they were at its start)
+  function panX(c, phase, deltaPixels, source, fingers) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     if (me.options.panEnabled === false || typeof me.options.panX !== 'function') return;
     var _a = me.chartArea;
     var _w = _a ? _a.right - _a.left : 0;
-    me.options.panX.call(me, { chart: me, phase: phase, deltaFactor: (phase === 'move' && _w > 0) ? deltaPixels / _w : 0, event: e.native });
+    var _info = { chart: me, phase: phase, deltaFactor: (phase === 'move' && _w > 0) ? deltaPixels / _w : 0, source: source || 'drag', event: e.native };
+    if (fingers) { _info.pointerFactors = fingers.pointerFactors; if (fingers.startFactors) _info.startFactors = fingers.startFactors; }
+    me.options.panX.call(me, _info);
+  }
+
+  // Where a pinch's fingers are along the plot area (0 at its left edge, 1 at its right edge)
+  function pinchFactors(me, pinch) {
+    return [me._hecPlotFactor(pinch.p1.x), me._hecPlotFactor(pinch.p2.x)];
   }
 
   // Calls options.zoomX (the card's time axis): step +1 zooms in, -1 out, around
-  // centerFactor (where along the plot area, 0 to 1)
-  function zoomX(c, step, centerX) {
+  // centerFactor (where along the plot area, 0 to 1) — source 'wheel' or 'pinch', with
+  // pointerFactors (the pointer, or the fingers now) and startFactors (where the fingers
+  // were at the pinch's start; for the wheel, the pointer)
+  function zoomX(c, step, centerX, source, pointerFactors, startFactors) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     if (me.options.zoomEnabled === false || typeof me.options.zoomX !== 'function') return;
-    me.options.zoomX.call(me, { chart: me, step: step, centerFactor: me._hecPlotFactor(centerX), event: e.native });
+    me.options.zoomX.call(me, { chart: me, step: step, centerFactor: me._hecPlotFactor(centerX), source: source,
+      pointerFactors: pointerFactors, startFactors: startFactors || pointerFactors, event: e.native });
   }
 
   // A drag from this chart is over another one, of its dragScope: that one's
@@ -1155,7 +1167,8 @@
         p2: { x: gs.pointers[_p2id].x, y: gs.pointers[_p2id].y } };
       gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
       gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
-      panX(c, 'start');
+      gs.pinch.startFactors = pinchFactors(me, gs.pinch);
+      panX(c, 'start', 0, 'pinch', { pointerFactors: gs.pinch.startFactors });
       // The Y ranges tracked from pinch start — needed for the direct Y zoom, which
       // must accumulate scale changes across the whole gesture, not
       // recompute from the live (already-changing) scales each frame.
@@ -1234,8 +1247,9 @@
       // restart tracking from once this returns to a single pointer.
       var _remainingId = (pid == gs.pinch.p1id) ? gs.pinch.p2id : gs.pinch.p1id;
       var _remainingPt = gs.pointers[_remainingId];
+      var _ended = gs.pinch;
       gs.pinch = null;
-      panX(c, 'end');
+      panX(c, 'end', 0, 'pinch', { pointerFactors: pinchFactors(me, _ended), startFactors: _ended.startFactors });
       if (_remainingPt) {
         // Re-arm gs.pending for the remaining finger — it was never
         // created for this pointer (gs.pending is only set at
@@ -1299,8 +1313,9 @@
         _hecEndDrag(c, gs.pending);
       }
       if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
+        var _endedPinch = gs.pinch;
         gs.pinch = null;
-        panX(c, 'end');
+        panX(c, 'end', 0, 'pinch', { pointerFactors: pinchFactors(me, _endedPinch), startFactors: _endedPinch.startFactors });
       }
       gs.pending = null;
     }
@@ -1335,7 +1350,7 @@
     // options.wheelZoomEnabled / options.zoomYEnabled below).
     if (me.options.wheelZoomEnabled !== false) {
       if (_ctrlZoom) {
-        if (_native.deltaY) zoomX(c, _native.deltaY < 0 ? 1 : -1, e.x);
+        if (_native.deltaY) zoomX(c, _native.deltaY < 0 ? 1 : -1, e.x, 'wheel', [me._hecPlotFactor(e.x)]);
       }
       if (_native.shiftKey && me.options.zoomYEnabled !== false) {
         var _wd = Math.abs(_native.deltaX) > Math.abs(_native.deltaY) ? _native.deltaX : _native.deltaY;
