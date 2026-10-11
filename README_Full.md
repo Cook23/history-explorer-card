@@ -7,7 +7,7 @@
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant. it is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54. The first version of this fork is 1.1.0 — see [Differences from upstream](#differences-from-upstream).
+> **This is a custom history card for Home Assistant. It is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54. The first version of this fork is 1.1.0 — see [Differences from upstream](#differences-from-upstream).
 
 > For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md).
 
@@ -72,7 +72,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 
 ### Adding entities
 
-- **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry adds it. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined — **(1.2)** then cancelled, or added as a second curve in another graph (the same entity in several YAML graphs too). `excludeFilterEntities` removes entities from what `filterEntities` lets through.
+- **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry chooses it, as Enter does. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined — **(1.2)** then cancelled, or added as a second curve in another graph (the same entity in several YAML graphs too). `excludeFilterEntities` removes entities from what `filterEntities` lets through.
 - **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*), sent as a report.
 - **Attributes (1.2)** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes); a number followed by a unit read as that number in that unit; an attribute can also hold or pick a curve's `color`.
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
@@ -85,7 +85,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Drawing
 
 - **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among four algorithms. Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
-- **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` (`circular` option); arrowlines turn by the same period.
+- **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — **(1.2)** for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
 - **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
 - **Display options** — `showMinMax` (min/max band from long-term statistics, or over the whole graph), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. **(1.2)** Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
@@ -149,7 +149,7 @@ To see a list of all possible configuration options, check the [Full reference c
 
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
-When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. Your can use the right side time range selector (dropdown or plus / minus buttons) to zoom into or out of the history. You can also use the interactive zoom mode (magnifying glass icon) to select a region on a graph to zoom into. Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
+When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown or plus / minus buttons) to zoom into or out of the history. You can also use the interactive zoom mode (magnifying glass icon) to select a region on a graph to zoom into. Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
 
 **(1.2)** Where a zoom keeps the time window depends on what you're doing:
 - **In real time** — the present shown, the window following it: the time range selector and the plus / minus buttons keep the present on the right. The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
@@ -159,7 +159,7 @@ Click or tap on a graph and drag left or right to slide it through time. The car
 
 Once you release the mouse button after dragging (or release your finger from the chart), the card will automatically readjust the y axes on all charts to better reflect the new data. The card will also synchronize all other charts in the history to the same point in time. That way you will always see the same time range on all your data and everything will be aligned.
 
-Clicking the date selector will bring you back to the current date and time without changing your zoom level. A double click on the date selector will bring your back and also reset your zoom to the configured default range.
+Clicking the date selector will bring you back to the current date and time without changing your zoom level. A double click on the date selector will bring you back and also reset your zoom to the configured default range.
 
 Click or tap a chart line or a state timeline to get a tooltip of the selected values or state.
 
@@ -190,16 +190,16 @@ recordedEntitiesOnly: true
 The entity selector shows friendly names and filters on both friendly name and entity ID simultaneously. The entity ID is shown in a tooltip on selection. Keyboard navigation is fully supported:
 
 - **ArrowUp / ArrowDown** — navigate the dropdown list
-- **Enter** — select the highlighted entry; second Enter adds it to the graph
+- **Enter** — choose the highlighted entry (with a `*` pattern, the first Enter selects every match, a second one adds them)
 - **Escape** — close the dropdown and clear the input field
 
-Clicking an entry in the dropdown adds it directly — there is no separate `+` button to press afterwards.
+Clicking an entry chooses it, as Enter does — there is no separate `+` button to press afterwards.
 
 **(1.2)** An entity can also be shown through one of its attributes (a thermostat's measured temperature, its setpoint, what it's doing…). Selecting an entity with attributes that can be shown opens a submenu first, over the list, level with the entity, which stays in bold while it's open — the same as the type menu's submenus: *Value* (the entity's own state) first, pre-selected — Enter takes it at once — then each attribute with its current value. Arrows move through it, Enter or a click chooses, ← or Escape goes back to the list. The attributes offered are those holding a number, a text or a yes/no — not a list, not Home Assistant's own (name, unit, icon, classes…), not a unit: an attribute `X_unit`, as weather entities give them (`temperature_unit`, `pressure_unit`, `visibility_unit`…), is never offered — the attributes are shown in it (see `attribute:` below). An entity without such attributes goes straight to the type menu. A wildcard pattern adds entities' states only.
 
-Selecting an entity (by click, or by the second Enter) doesn't add it right away: the display type menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. The menu always opens, even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, the only way to show it, and lets you check before adding. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
+Choosing an entity (by click, or Enter) doesn't add it right away: the display type menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. The menu always opens, even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, the only way to show it, and lets you check before adding. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
 
-The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. When a wildcard is entered, matching entries appear in bold in the dropdown. The first Enter selects all matching entities; the second Enter (or clicking an entry) opens the display type menu for the whole matched batch — see below. Some examples:
+The entity entry field accepts the `*` wildcard and can automatically add multiple entities that match the provided pattern. When a wildcard is entered, matching entries appear in bold in the dropdown. The first Enter selects all matching entities; the second Enter opens the display type menu for the whole matched batch — see below. Some examples:
 ```
 person.*      - Add all entities from the person domain
 *door*        - Add all entities that contain the term 'door' in the name, regardless of domain
@@ -239,7 +239,7 @@ Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
 The type menu opens:
 
-- **Right after selecting a brand-new entity** from the dropdown (click, or second Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold in *Display* — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
+- **Right after selecting a brand-new entity** from the dropdown (click, or Enter) — always, even when *Timeline* is the only choice, so you can check before it's added. Nothing is added to the graph or to persisted configuration until a type is picked — the choice both defines the type and performs the creation in the same action. The most fitting type is pre-selected in bold in *Display* — Enter right away adds it, the arrow keys first highlight it and then move through the other choices:
   - a state that isn't a number (on/off, text…) — timeline, the only possible display (the menu offers nothing else);
   - the entity's own `entityOptions` `type` / `lineMode`, when set;
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — direction arrows;
@@ -497,7 +497,7 @@ entityOptions:
   energy:           # apply this color coding to all sensors of the energy device class (also works for domains or individual entities)
     type: bar
     color:
-      '0.0': blue   # Bar is blue between below and up to 1.0 kWh
+      '0.0': blue   # Bar is blue below 1.0 kWh
       '1.0': green  # Bar is green between 1.0 - 1.5 kWh
       '1.5': red    # Bar is red at 1.5 kWh and above
 graphs:
@@ -575,13 +575,13 @@ By default the state texts shown in a timeline chart represent the raw underlyin
 ```yaml
 type: custom:history-explorer-card
 stateTextMode: raw    # Show the raw untranslated state names
-stateTextMode: auto   # Show the automatically translated device class dependent state names. This is the default.
-stateTextMode: hide   # Hide all state text labels
+                      # or: auto — the automatically translated device class dependent state names (the default)
+                      # or: hide — hide all state text labels
 ```
 
 #### Customizing state colors
 
-The default colors used for the states shown on timeline graphs can be customized in many different ways. Customizing is done by adding the statesColor key to the card YAML. Colors act on individual entities, entire device classes, domains or global states. You can, for example, have distinct colors for the on and off states of your motion sensors and your door sensors, even if they're both binary sensors.
+The default colors used for the states shown on timeline graphs can be customized in many different ways. Customizing is done by adding the `stateColors` key to the card YAML. Colors act on individual entities, entire device classes, domains or global states. You can, for example, have distinct colors for the on and off states of your motion sensors and your door sensors, even if they're both binary sensors.
 
 The card accepts all normal HTML color definition strings as well as CSS variables. The latter need to be provided as-is (for example `--primary-color`, without the CSS var function).
 
@@ -619,7 +619,7 @@ stateColors:
   sensor.Wet: green
 ```
 
-A general default color can be set per domain, device class or entity. If present, it will serve as a fallback to all states in that domain, device class or entity that were not explicitely defined. In the following example, the states of the input_text.air_quality entity are defined. The *bad* state will be red, the *good* state will be green. All other states of that entity, regardless of what they are, will be yellow due to the catch-all key.
+A general default color can be set per domain, device class or entity. If present, it will serve as a fallback to all states in that domain, device class or entity that were not explicitly defined. In the following example, the states of the input_text.air_quality entity are defined. The *bad* state will be red, the *good* state will be green. All other states of that entity, regardless of what they are, will be yellow due to the catch-all key.
 ```yaml
 type: custom:history-explorer-card
 stateColors:
@@ -830,15 +830,14 @@ type: custom:history-explorer-card
 entityOptions:
   humidity:
     showSamples: true    # always show sample dots for humidity graphs (radius 4px)
-    showSamples: 6       # or specify the dot radius in pixels
+                         # or a number: the dot radius in pixels (showSamples: 6)
 graphs:
   - type: line
     options:
       showSamples: true  # show samples for this entire manually defined graph
     entities:
       - entity: sensor.outside_temperature
-        showPoints: true  # show dots on this entity only (radius 4px)
-        showPoints: 3     # or specify a custom radius in pixels
+        showPoints: 3     # show dots on this entity only, radius 3px (true: 4px)
 ```
 
 The `showPoints` option is also available in `entityOptions` (see below), making it easy to apply uniformly across entity families.
@@ -856,9 +855,9 @@ showUnavailable: true
 
 The card supports user defined Javascript expressions modifying the data right before display through the `process` option. This can be used to filter or shape data, apply non-linear scaling or transform data from one graph type to another. The supplied JS expression is provided with the original input `state` value (can be a string or a number, depending on the graph and data source). The expression must evaluate to the desired new state. Complex custom processing functions can degrade rendering performance. 
 
-Custom processing functions works for dyanmically added entities, manually defined YAML graphs and graphs in the more info panel.
+Custom processing functions work for dynamically added entities, manually defined YAML graphs and graphs in the more info panel.
 
-Example showing a humidity numerical entity as a timeline graph, where humidity below 30% appears as state `dry`, above 70% as `wet` and everything inbetween as `normal`:
+Example showing a humidity numerical entity as a timeline graph, where humidity below 30% appears as state `dry`, above 70% as `wet` and everything in between as `normal`:
 ```yaml
 type: custom:history-explorer-card
 graphs:
@@ -932,8 +931,8 @@ graphs:
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
-  - match: "temperature"
-    showMinMax: statistics   # LTS band for all temperature sensors
+  - match: "sensor.*temperature*"
+    showMinMax: statistics   # LTS band for every sensor with temperature in its id
   - match: "sensor.*_power"
     showMinMax: history      # full band for all power sensors
     lineMode: lines
@@ -1026,11 +1025,7 @@ When the dashboard is opened, the card will show the last 24 hours by default. Y
 ```yaml
 type: custom:history-explorer-card
 defaultTimeRange: 4h     # show the last 4 hours when opening the card
-defaultTimeRange: 2d     # or 2 days...
-defaultTimeRange: 15m    # or 15 minutes...
-defaultTimeRange: 3w     # or 3 weeks
-defaultTimeRange: 6o     # or 6 months
-defaultTimeRange: 1y     # or 1 year
+                         # or: 15m (15 minutes), 2d (2 days), 3w (3 weeks), 6o (6 months), 1y (1 year)
 ```
 
 By default the card will open the graphs with the current date and time aligned to the right of the chart. You can define a custom time offset using the `defaultTimeOffset` setting which will be applied when you open the card or click the date button. Both relative time offsets (denoted by lower case time identifiers such as `h,d,w,o,y`) and offsets snapped to the current hour, day, month or year are supported. The latter will use upper case time identifiers `H,D,O,Y`. For example:
@@ -1038,9 +1033,9 @@ By default the card will open the graphs with the current date and time aligned 
 ```yaml
 type: custom:history-explorer-card
 defaultTimeOffset: 1h       # Add 1 hour of empty space after the current time
-defaultTimeOffset: -1d      # Show the previous days' data
-defaultTimeOffset: 1D       # Show the current day from midnight to midnight
-defaultTimeOffset: 1O       # Show the entire current month, starting at the 1st
+                            # or: -1d — show the previous day's data
+                            # or: 1D — show the current day from midnight to midnight
+                            # or: 1O — show the entire current month, starting at the 1st
 ```
 
 ### Enabling persistence (`enable_persistence` / `enable_multidevice_persistence`)
@@ -1138,9 +1133,9 @@ This feature can be turned off in the options if you want, either globally or by
 
 ```yaml
 type: custom:history-explorer-card
-decimation: false       # Disable decimation, the raw sensor data will be used at all scales (very slow).
 decimation: fast        # Fast approximate decimation, good balance between speed and accuracy. The default.
-decimation: accurate    # Accurate minmax preserving at all scales.
+                        # or: accurate — accurate minmax preserving at all scales
+                        # or: false — no decimation, the raw sensor data at all scales (very slow)
 ```
 
 ![image](https://user-images.githubusercontent.com/60828821/203882385-461d3376-58e1-4344-861f-852c150bd01a.png)
@@ -1220,6 +1215,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `height` | number | Graph height in pixels (overrides global height settings) |
 | `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
 | `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `circular` | `null`, `false`, number or `2pi` | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | Enable net metering mode for bar graphs |
 | `stacked` | boolean | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
 | `process` | string | Javascript expression to transform state values before display |
@@ -1312,12 +1308,11 @@ The `match` field accepts a single glob pattern string or a list of patterns. `*
 
 #### Priority rules
 
-When multiple sources provide options for the same entity, they are applied in this order (highest priority first):
+`entityOptions` is either a dict or a list, not both:
+- **dict form** — the entry of the entity id if there is one, else the entry of its device class, else the entry of its domain (one entry only, never merged);
+- **list form** — every entry whose `match` (or `entity`) matches the entity id applies: the first one wins for each option, the later ones fill in the options it doesn't set. Device classes and domains aren't matched in this form — use a pattern (`sensor.*temperature*`).
 
-1. `entityOptions` list — first matching entry wins per property; subsequent matching entries fill in any remaining unset properties
-2. `entityOptions` dict — keyed by exact entity id, then device class, then domain
-
-Options from a higher-priority source always override those from a lower-priority source.
+Either way, an option set on a graph or on the entity itself wins over `entityOptions` (see [The same options at every level](#the-same-options-at-every-level)).
 
 ---
 
@@ -1329,13 +1324,13 @@ The default *History Explorer* header can be changed or removed using the header
 ```yaml
 type: custom:history-explorer-card
 header: 'My sample history'
-header: ' '   # Using a single space will remove the header and leave some padding space
-header: hide  # The hide option will remove the header entirely
+              # or: ' ' — a single space removes the header and leaves some padding space
+              # or: hide — removes the header entirely
 ```
 
 ### Dark mode
 
-The card will try to adapt its UI colors to the currently active theme. But for best results, it will have to know if you're running a dark or a light theme. By default the card asks HA for this information. If you're using the default Lovelace theme, or another modern theme that properly sets the dark mode flag, then you should be all with the default settings. If you are using an older theme that uses the legacy format and doesn't properly set the dark mode flag, the card may end up in the wrong mode. You can override the mode by adding this YAML to the global card settings (see below) to force either dark or light mode:
+The card will try to adapt its UI colors to the currently active theme. But for best results, it will have to know if you're running a dark or a light theme. By default the card asks HA for this information. If you're using the default Lovelace theme, or another modern theme that properly sets the dark mode flag, then you should be all set with the default settings. If you are using an older theme that uses the legacy format and doesn't properly set the dark mode flag, the card may end up in the wrong mode. You can override the mode by adding this YAML to the global card settings (see below) to force either dark or light mode:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1419,7 +1414,7 @@ graphs:
 
 ### Configuring the tooltip popup
 
-The tooltip popups used in timelines and arrowlines support three different sizes: full, compact and slim. By default, the size is selected automatically depending on the available space around the graph. The size can be overidden manually:
+The tooltip popups used in timelines and arrowlines support three different sizes: full, compact and slim. By default, the size is selected automatically depending on the available space around the graph. The size can be overridden manually:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1458,7 +1453,7 @@ tooltip:
 
 ### Changing the horizontal time tick density
 
-By default, time tick density is automatic and adjusts to the width of your screen. That's always a compromise between looking good (no clipping), being readable at all screensizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
+By default, time tick density is automatic and adjusts to the width of your screen. That's always a compromise between looking good (no clipping), being readable at all screen sizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
 
 ```yaml
 timeTicks:
@@ -1481,7 +1476,7 @@ Using `densityOverride` at `higher`, leaving the date format at normal:
 
 ![image](https://github.com/alexarch21/history-explorer-card/assets/60828821/5a68ec53-ed86-467f-a3b8-71b15c9d8c2b)
 
-And same as above but settings the dateFormat to short:
+And same as above but setting the dateFormat to short:
 
 ![image](https://github.com/alexarch21/history-explorer-card/assets/60828821/3d85757a-c87d-46aa-9915-fa4df7ae62bd)
 
@@ -1515,15 +1510,15 @@ csv:
   separator: ';'            # Use a semicolon as a separator, the default is a comma
   timeFormat: 'DD/MM/YYYY'  # Customize the date/time format used in the CSV. The default is 'YYYY-MM-DD HH:mm:ss'.
   statisticsPeriod: hour    # Period used for statistics export. Hour, day or month is supported. Default is hour.
-  exportAttributes: true    # Export all entity attributes along with their state, in separate columns. Default if off (no attrbutes).
-  numberLocale: 'en-US'     # Format numbers using the given locale. If this settings is not defined, the raw DB values will be written (no formatting).
+  exportAttributes: true    # Export all entity attributes along with their state, in separate columns. Default is off (no attributes).
+  numberLocale: 'en-US'     # Format numbers using the given locale. If this setting is not defined, the raw DB values will be written (no formatting).
 ```
 
 ---
 
 ## YAML configuration for preconfigured graphs
 
-YAML configuration is optional. And while the interactive configuration is preferrable, it can sometimes be useful to keep a set of predefined entities.
+YAML configuration is optional. And while the interactive configuration is preferable, it can sometimes be useful to keep a set of predefined entities.
 
 Here's a basic example configuration:
 
