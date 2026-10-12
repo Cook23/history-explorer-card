@@ -155,6 +155,17 @@ module.exports = async function()
         const r = [await at('center', 'top', w - 20, 300), await at('center', 'bottom', w - 20, 300), await at('left', 'center', 300, h - 20), await at('center', 'top', 200, 300)];
         return r.every(x => x.moved && x.off <= 1) ? true : JSON.stringify(r);
     });
+    await t.step('a tooltip wider than a narrow card (168 px): within the screen, not pushed out on the card\'s other side', async () => {
+        await t.E(`(()=>{ document.body.style.width='168px'; document.getElementById('host').style.width='168px'; })()`); await t.wait(1500);
+        const r = [];
+        for( const f of [0.1, 0.5, 0.9] ) {
+            const p = await t.E(`pointPt(0,${f})`); await t.page.mouse.click(p.x, p.y); await t.wait(400);
+            r.push(await t.E(`(()=>{ const e=document.getElementById('hec-tooltip-hover'); if( !e || getComputedStyle(e).opacity==='0' ) return null; const b=e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right), innerWidth]; })()`));
+            await t.page.mouse.move(5, 5); for( let i = 0; i < 40 && await tip(0) !== null; i++ ) await t.wait(200);
+        }
+        await t.E(`(()=>{ document.body.style.width=''; document.getElementById('host').style.width=''; })()`); await t.wait(1500);
+        return r.every(x => x && x[0] >= 0 && x[1] <= x[2]) ? true : JSON.stringify(r);
+    });
     await t.step('a menu opened while a curve\'s tooltip shows (the options menu, the entity selector): the tooltip closes, its mode ends', async () => {
         const open = async how => {
             const p = await t.E('pointPt(0,0.4)'); await t.page.mouse.click(p.x, p.y); await t.wait(400);

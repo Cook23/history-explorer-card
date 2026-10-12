@@ -65,7 +65,7 @@ module.exports = async function()
         r.layout = await readable('#et_0', '#et_0_layout_sub', false); await closeMenus();
         return Object.values(r).every(v => v === '') ? true : JSON.stringify(r);
     });
-    await t.step('a card too narrow for a menu and a submenu beside its lines: the menu opens alone; a submenu opened leaves 48 px and three characters of its lines', async () => {
+    await t.step('a card too narrow for a menu and a submenu beside its lines: the menu opens alone; a submenu opened leaves 48 px and three characters of its lines; Escape or a click beside closes it', async () => {
         await t.E(`(()=>{ document.body.style.width='230px'; document.getElementById('host').style.width='230px'; })()`); await t.wait(1200);
         await hold(800); await t.wait(400);
         const r = await t.E(`(()=>{ const m=el.querySelector('#et_0'); return { cramped: m.dataset.hecCramped, open: [...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(s=>s.style.display!=='none').map(s=>s.id) }; })()`);
@@ -75,8 +75,12 @@ module.exports = async function()
             const cut=lines.filter(a=>{ const t=document.createTreeWalker(a,NodeFilter.SHOW_TEXT).nextNode(); const g=document.createRange(); g.setStart(t,0); g.setEnd(t,Math.min(3,t.length)); return g.getBoundingClientRect().right > s.left; }).map(a=>a.textContent);
             return { left: Math.round(s.left - mr.left), cut, within: s.right <= mr.right + 0.5 }; })()`);
         await closeMenus();
+        // (opened alone, it has the keyboard: Escape closes it, and so does a click beside it)
+        const isOpen = () => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
+        await hold(800); await t.wait(300); await t.page.keyboard.press('Escape'); await t.wait(300); const afterEscape = await isOpen();
+        await hold(800); await t.wait(300); await t.page.mouse.click(5, 5); await t.wait(400); const afterClick = await isOpen();
         await t.E(`(()=>{ document.body.style.width='1000px'; document.getElementById('host').style.width=''; })()`); await t.wait(1200);
-        return r.cramped === '1' && !r.open.length && strip.left >= 48 && !strip.cut.length && strip.within ? true : JSON.stringify({ r, strip });
+        return r.cramped === '1' && !r.open.length && strip.left >= 48 && !strip.cut.length && strip.within && !afterEscape && !afterClick ? true : JSON.stringify({ r, strip, afterEscape, afterClick });
     });
     await t.step('a value entered is kept within its bounds, and given to Chart.js for every chart', async () => {
         await openAll(); await enter('longPress', 99999); await enter('precision', 1);

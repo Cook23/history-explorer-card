@@ -16,6 +16,7 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — the tooltip: closed when a menu opens, its arrow on its point
 - A curve's tooltip still shown (its reading time) stayed over a menu opened then — the options menu, the entity selector's list. Opening any menu of the card now closes it at once and ends its mode (Chart.js `hecEndTooltip`), as an entity's menu already did
+- A tooltip wider than its card (a narrow card) was kept within the card, so pushed out of the screen on its other side; it is now kept within the screen, at most as wide as it (its lines wrapped then)
 - A tooltip moved to stay within the card or the screen kept its arrow where it was in it, beside the point (20 px on a phone); the arrow now stays on the point (never in the tooltip's rounded corners)
 - Tests: the options menu and the selector opened over a tooltip; the arrow on the point, the tooltip moved to the right edge and to the bottom
 
@@ -25,7 +26,7 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — a menu stays readable under its submenus
 - The options menu was narrower than its submenus: *Export ▸* covered every line of the menu, so another submenu couldn't be picked. A menu is now wider than each of its submenus by its widest line, so its lines show beside the submenu open — the last line's submenu aside, which hides no line below it: as wide as the menu at most. One rule for every menu with submenus (`_fitMenuToSubmenus`, when the menu opens); a submenu's lines never wrap
-- On a card or a screen too narrow for that, the menu takes the room there is and opens without any submenu (the default one, or the one it had open 10 s ago): its lines are read first, a click more opens one. A submenu opened then leaves at least 48 px and the first three characters of the menu's lines, so another one can still be picked; its own lines are cut ('…') if they don't fit
+- On a card or a screen too narrow for that, the menu takes the room there is (its border included) and opens without any submenu, with the keyboard — Escape, or a click beside it, closes it (the default one, or the one it had open 10 s ago): its lines are read first, a click more opens one. A submenu opened then leaves at least 48 px and the first three characters of the menu's lines, so another one can still be picked; its own lines are cut ('…') if they don't fit
 - Tests: each submenu of the options menu and of an entity's menu open, the menu's lines clear of it; a narrow card: the menu alone, then a submenu leaving the start of its lines
 
 ### Changed — the options menu: Card ▸ Default graphs, Default display, each confirmed; Global ▸

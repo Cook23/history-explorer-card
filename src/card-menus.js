@@ -382,8 +382,10 @@ export class CardMenus
     // remembered submenu this menu doesn't show: def)
     _openRememberedSubmenu(input_idx, def)
     {
-        // (no room for the menu and a submenu beside its lines: the menu alone, read first)
-        if( this._this.querySelector(`#et_${input_idx}`)?.dataset.hecCramped ) return;
+        // (no room for the menu and a submenu beside its lines: the menu alone, read first —
+        // with the keyboard, so that Escape, or the focus leaving it, closes it)
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        if( _menu?.dataset.hecCramped ) { _menu.focus(); return; }
         const _key = this._submenuToOpen(this._typeMenuKind(input_idx), def);
         this.showTypeSubmenu(input_idx, _key);
         if( _key !== def && this._this.querySelector(`#et_${input_idx}_${_key}_sub`)?.style.display === 'none' )
@@ -968,6 +970,8 @@ export class CardMenus
         const _hasSubs = this._menuLines(menuEl).some(a => this._submenuOf(a));
         if( !_hasSubs && !menuEl.dataset.hecRoom ) return;
         menuEl.dataset.hecMinWidth ??= parseFloat(menuEl.style.minWidth) || 0;
+        // (its widths with its border: never wider than the room, border included)
+        menuEl.style.boxSizing = 'border-box';
         const _room = Math.min(this._menuRoom(), +menuEl.dataset.hecRoom || Infinity);
         const _need = Math.max(+menuEl.dataset.hecMinWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
         menuEl.style.maxWidth = Math.floor(_room) + 'px';

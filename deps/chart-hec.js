@@ -476,11 +476,14 @@
     // boundsEl null: viewport only.
     clampToViewport: function (el, boundsEl) {
       var _bR = boundsEl ? boundsEl.getBoundingClientRect() : null;
+      var _r = el.getBoundingClientRect();
+      // (an element wider than the bounds — a tooltip on a narrow card — kept within the
+      // screen only: kept within the bounds, it would be pushed out on their other side)
+      if (_bR && _r.width > Math.min(_bR.right, window.innerWidth) - Math.max(_bR.left, 0)) _bR = null;
       var _bounds = _bR
         ? { left: Math.max(_bR.left, 0), right: Math.min(_bR.right, window.innerWidth),
             top: Math.max(_bR.top, 0), bottom: window.innerHeight }
         : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-      var _r = el.getBoundingClientRect();
       var _dx = 0, _dy = 0;
       if (_r.right > _bounds.right) _dx = _bounds.right - _r.right;
       else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
@@ -2578,7 +2581,7 @@
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';
-        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
+        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);width:max-content;max-width:calc(100vw - 8px);transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
         this._hecHoverTooltipEl = _el;
       }
       _el._hecOnFade = onFade;
