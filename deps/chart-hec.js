@@ -16,41 +16,47 @@
 
   // ── Geometry primitives (no chart instance involved) ──
 
-  // Picking what's under a pointer (a label, a button): the one the pointer is on; else the
-  // nearest one, if it's near enough (within PICK_MARGIN px) and clearly nearer than the
-  // next one (by more than PICK_AMBIGUITY px). A point clearly beside every candidate picks
-  // none (-1); about halfway between two near ones, none either, but told apart
-  // (PICK_BETWEEN): aimed at one of them, without saying which. Simpler to hit, without
-  // picking what wasn't aimed at.
+  // Picking what's under a pointer (a label, a button, a curve, a bar): the one the pointer
+  // is on; else the nearest one, if it's near enough (within PICK_MARGIN px), and not about
+  // halfway between it and the next one — in the middle third between the two (the dead
+  // zone: a third of the distance between them), where which one was aimed at can't be
+  // told. A point clearly beside every candidate picks none (-1); in the dead zone, none
+  // either, but told apart (PICK_BETWEEN). From above or below two close candidates, the
+  // one on that side is picked, however close they are; two on top of each other (on the
+  // same pixel) are one place: the first one — for curves, the one drawn over the other.
   var PICK_MARGIN = 12;
-  var PICK_AMBIGUITY = 4;
   var PICK_BETWEEN = -2;
   function _hecPick(px, py, rects) {
     return _hecPickNearest(rects.map(function (r) {
-      var dx = Math.max(r.x - px, 0, px - (r.x + r.width));
-      var dy = Math.max(r.y - py, 0, py - (r.y + r.height));
-      return Math.sqrt(dx * dx + dy * dy);
+      var cx = Math.max(r.x, Math.min(px, r.x + r.width)), cy = Math.max(r.y, Math.min(py, r.y + r.height));
+      return { d: Math.sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py)), x: cx, y: cy };
     }));
   }
-  // The same rule, from each candidate's distance to the point (Infinity: not a candidate);
-  // within onDist of one, the point is on it (the nearest one, should several overlap)
-  function _hecPickNearest(dists, onDist) {
-    var best = -1, d1 = Infinity, d2 = Infinity;
-    for (var i = 0; i < dists.length; i++) {
-      var d = dists[i];
-      if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
+  // The same rule, from each candidate's point nearest the pointer: { d (its distance to
+  // the pointer), x, y }, or null (not a candidate)
+  function _hecPickNearest(cands) {
+    var best = -1, second = -1;
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      if (!c) continue;
+      if (best < 0 || c.d < cands[best].d) { second = best; best = i; }
+      else if (second < 0 || c.d < cands[second].d) { second = i; }
     }
-    if (best < 0 || d1 <= (onDist || 0)) return best;
-    if (d1 > PICK_MARGIN) return -1;
-    return d2 - d1 > PICK_AMBIGUITY ? best : PICK_BETWEEN;
+    if (best < 0) return -1;
+    var c1 = cands[best], c2 = second >= 0 ? cands[second] : null;
+    var _gap = c2 ? Math.sqrt((c2.x - c1.x) * (c2.x - c1.x) + (c2.y - c1.y) * (c2.y - c1.y)) : Infinity;
+    if (c1.d > PICK_MARGIN) return -1;
+    // (on the same pixel — within half of one: one place, the first one)
+    if (_gap < 0.5) return Math.min(best, second);
+    return !c2 || c2.d - c1.d >= _gap / 3 ? best : PICK_BETWEEN;
   }
 
-  // Distance from (px, py) to the segment (ax, ay)-(bx, by)
-  function _hecSegmentDistance(px, py, ax, ay, bx, by) {
+  // The point of the segment (ax, ay)-(bx, by) nearest (px, py): { d, x, y }
+  function _hecSegmentNearest(px, py, ax, ay, bx, by) {
     var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
     var t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
-    var cx = ax + t * dx - px, cy = ay + t * dy - py;
-    return Math.sqrt(cx * cx + cy * cy);
+    var cx = ax + t * dx, cy = ay + t * dy;
+    return { d: Math.sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py)), x: cx, y: cy };
   }
 
   // ---------------------------------------------------------------------------
@@ -344,6 +350,21 @@
   // they keep is stored on the element they're given. They know nothing about the
   // card; the area a floating element must stay in is passed in by the caller.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // The two thresholds every gesture is told apart by, for a mouse or a pen and for a
+  // finger (Chart.defaults.global.gestures — the same for every chart on the page):
+  //   longPressMs — a press held this long is a long press; a second press within this
+  //                 long of a release is a double-click, or a tap-then-drag; a tap keeps
+  //                 the page from scrolling over a draggable zone this long after it;
+  //   slop        — a pointer that moved more than this (px, x + y) is dragging; a second
+  //                 press of a double-click lands within it of the first one.
+  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 10 }, touch: { longPressMs: 500, slop: 10 } };
+  // The thresholds of a pointer type ('mouse', 'pen' — a mouse's —, 'touch')
+  Chart.hecGestures = function (pointerType) {
+    var g = Chart.defaults.global.gestures || {};
+    return (pointerType === 'touch' ? g.touch : g.mouse) || { longPressMs: 500, slop: 10 };
+  };
+
   var hecUi = Chart.hecUi = {
 
     // How long a floating element takes to fade out (its CSS opacity transition)
@@ -936,7 +957,7 @@
         me._hecYAxisClickArmedTimer = setTimeout(function () {
           me._hecYAxisClickArmed = false;
           me._hecUpdateYAxisState();
-        }, 500);
+        }, c.cfg.longPressMs);
       }
       // Same click-armed mechanism, for the legend/timeline label drag
       // workaround: a click ANYWHERE on the canvas arms this temporary
@@ -949,7 +970,7 @@
       me._hecLabelClickArmedTimer = setTimeout(function () {
         me._hecLabelClickArmed = false;
         me._hecUpdateDragTouchOverlays();
-      }, 500);
+      }, c.cfg.longPressMs);
     }
     if (!customEventTarget(c)) return;
     var el = me.getElementAtEvent ? me.getElementAtEvent(e) : null;
@@ -1042,7 +1063,7 @@
     if (_hName === 'handleSwipe') {
       var _dy = (e && e.y !== undefined && e.y !== null ? e.y : p.y0) - p.y0;
       var _sw = me._hecHandleButtonFields(p.x0, p.y0);
-      _sw.swipe = Math.abs(_dy) >= 10 ? (_dy < 0 ? 'up' : 'down') : null;
+      _sw.swipe = Math.abs(_dy) > cfg.dragSlop ? (_dy < 0 ? 'up' : 'down') : null;
       fire(c, 'dragend', undefined, undefined, _sw);
     } else if (_hName === 'zoomSelect') {
       me._hecHideZoomSelection();
@@ -1075,7 +1096,7 @@
     if (_down && !p.barrelDown) {
       cancelLongPress(gs);
       var _now = Date.now();
-      if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.dblClickMs) {
+      if (p.barrelPressedAt && _now - p.barrelPressedAt < c.cfg.longPressMs) {
         fire(c, 'dblclick', p.x0, p.y0);
         p.barrelPressedAt = 0;
       } else {
@@ -1147,11 +1168,15 @@
       // counts as half of a double-click.
       var _barrel = penBarrel(c);
       var _downNow = Date.now();
-      var _isDblClick = !_barrel && gs.lastMouseDown && _downNow - gs.lastMouseDown < cfg.dblClickMs;
+      // (the second press of a double-click, or of a tap-then-drag: within the long-press
+      // duration of the first one's release, and the immobility distance of where it was)
+      var _lr = gs.lastRelease;
+      var _isDblClick = !_barrel && !!_lr && _downNow - _lr.t < cfg.longPressMs &&
+                        Math.abs(e.x - _lr.x) + Math.abs(e.y - _lr.y) <= cfg.dragSlop;
+      gs.lastRelease = null;
       if (_isDblClick) {
         fire(c, 'dblclickdown', e.x, e.y);
       }
-      gs.lastMouseDown = _barrel ? 0 : _downNow;
 
       var _pending = { x0: e.x, y0: e.y, pid: pid, dragging: false, pointerType: pointerType, native: e.native,
         // Marks that THIS press is the second one of a double-click — checked
@@ -1306,8 +1331,9 @@
         fire(c, 'dblclick', undefined, undefined);
       } else {
         // click: released without moving, before the long-press timer
-        // fired (< 600ms), and this press wasn't itself a dblclick's
-        // second press — per Thierry's spec.
+        // fired, and this press wasn't itself a dblclick's second press —
+        // per Thierry's spec. Its release may start a double-click.
+        gs.lastRelease = { t: Date.now(), x: pu.x0, y: pu.y0 };
         fire(c, 'click', undefined, undefined);
       }
     } else {
@@ -1396,20 +1422,38 @@
 
   helpers.extend(Chart.prototype, {
 
-    // Legend hit-test — the label picked (_hecPick) within the legend's band only, never
-    // from the plot area under it nor from a control (_hecOnControl). Cross-graph drag&drop
-    // (Controller._hecGestureHandler's dragovergraph) calls THIS on OTHER
-    // chart instances too, including ones just created and never yet
-    // touched — must exist unconditionally, same as any native Chart.js method.
-    _hecLegendIndexAt: function (x, y) {
-      var legend = this.legend;
-      if (!legend || !legend.legendHitBoxes) return -1;
-      var lh = legend.legendHitBoxes;
-      var rects = [];
-      for (var i = 0; i < lh.length; i++) rects.push({ x: lh[i].left, y: lh[i].top, width: lh[i].width, height: lh[i].height });
-      if (y < legend.top || y > legend.bottom || this._hecOnControl(x, y)) return -1;
-      return Math.max(_hecPick(x, y, rects), -1);
+    // The small targets above the plot area — the chain icon, the lock+handle zone, the
+    // legend's labels (within the legend's band) — picked together (_hecPick): the one
+    // under the point, else the nearest one if near enough and clearly nearer than the
+    // next. → 'linkMarker', 'lockAndHandle', a legend label's index, -1 or PICK_BETWEEN.
+    // Never from the plot area or the Y axis column (y below the plot area's top).
+    _hecTopTargetAt: function (x, y) {
+      var me = this, _a = me.chartArea;
+      if (_a && y >= _a.top) return -1;
+      var rects = [], ids = [];
+      var _lm = me._hecLinkMarkerRect();
+      if (_lm) { rects.push({ x: _lm.left, y: _lm.top, width: _lm.width, height: _lm.height }); ids.push('linkMarker'); }
+      rects.push({ x: 0, y: 0, width: me._hecLockAndHandleWidth(), height: 28 }); ids.push('lockAndHandle');
+      var legend = me.legend;
+      if (legend && legend.legendHitBoxes && y >= legend.top && y <= legend.bottom) {
+        legend.legendHitBoxes.forEach(function (b, i) {
+          rects.push({ x: b.left, y: b.top, width: b.width, height: b.height }); ids.push(i);
+        });
+      }
+      var _i = _hecPick(x, y, rects);
+      return _i >= 0 ? ids[_i] : _i;
     },
+
+    // Legend hit-test — the label picked among the small targets above the plot area
+    // (_hecTopTargetAt), never from the plot area under it nor from a control.
+    // Cross-graph drag&drop (Controller._hecGestureHandler's dragovergraph) calls THIS on
+    // OTHER chart instances too, including ones just created and never yet touched — must
+    // exist unconditionally, same as any native Chart.js method.
+    _hecLegendIndexAt: function (x, y) {
+      var _t = this._hecTopTargetAt(x, y);
+      return typeof _t === 'number' && _t >= 0 ? _t : -1;
+    },
+
 
     // Y-axis category label hit-test (timeline/arrowline row under a point) — the row
     // picked (_hecPick) within the label column only (0 to chartArea.left), never from
@@ -1761,10 +1805,11 @@
 
     // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
     // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays; 18px
-    // per button when options.handleButtons shows more than one. Minus where the chain
-    // icon (drawn over it) overlaps its top edge.
+    // per button when options.handleButtons shows more than one — picked among the small
+    // targets above the plot area (_hecTopTargetAt): on it, or just beside it. The chain
+    // icon, drawn over its top edge, wins where they overlap.
     _hecInLockAndHandleZone: function (x, y) {
-      return x >= 0 && x <= this._hecLockAndHandleWidth() && y >= 0 && y <= 28 && !this._hecInLinkMarkerZone(x, y);
+      return this._hecTopTargetAt(x, y) === 'lockAndHandle';
     },
 
     _hecLockAndHandleWidth: function () {
@@ -1825,14 +1870,15 @@
     },
 
     // On one of the controls drawn over the graph's top left corner (lock+handle, chain
-    // icon): never a label's, even within a label's picking margin
+    // icon), as picked (_hecTopTargetAt): never a label's
     _hecOnControl: function (x, y) {
-      return this._hecInLockAndHandleZone(x, y) || this._hecInLinkMarkerZone(x, y);
+      var _t = this._hecTopTargetAt(x, y);
+      return _t === 'lockAndHandle' || _t === 'linkMarker';
     },
 
+    // The chain icon: on it, or just beside it (_hecTopTargetAt)
     _hecInLinkMarkerZone: function (x, y) {
-      var _r = this._hecLinkMarkerRect();
-      return !!_r && x >= _r.left && x <= _r.left + _r.width && y >= _r.top && y <= _r.top + _r.height;
+      return this._hecTopTargetAt(x, y) === 'linkMarker';
     },
 
     // A click or a tap — released without a drag, a pinch or a long press; never a press
@@ -1868,8 +1914,30 @@
         if (_curves.length || !me._hecHasOtherElements()) return;
       }
       me._hecTooltipMode = true;
-      me.active = me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho));
+      var _el = _at ? me._hecElementAt(e.x, e.y) : null;
+      me.active = _el ? [_el] : [];
       me._hecLastHitXY = _at ? { x: e.x, y: e.y } : undefined;
+    },
+
+    // The element other than a curve's — a bar, a timeline's or an arrowline's segment —
+    // at this point, by the picking rule (_hecPickNearest, on each element's rectangle):
+    // the one under it, else the nearest one if near enough and clearly nearer than the
+    // next; else null
+    _hecElementAt: function (x, y) {
+      var me = this, els = [];
+      (me.data.datasets || []).forEach(function (ds, i) {
+        var meta = me.getDatasetMeta(i);
+        if (meta.dataset || !me.isDatasetVisible(i)) return;
+        (meta.data || []).forEach(function (el) { if (el._view && !el._view.skip) els.push(el); });
+      });
+      var _i = _hecPickNearest(els.map(function (el) {
+        var v = el._view, b = v.height !== undefined
+          ? { l: v.x, r: v.x + v.width, t: v.y, b: v.y + v.height }                      // (a timeline's segment)
+          : { l: v.x - v.width / 2, r: v.x + v.width / 2, t: Math.min(v.y, v.base), b: Math.max(v.y, v.base) };   // (a bar)
+        var cx = Math.max(b.l, Math.min(x, b.r)), cy = Math.max(b.t, Math.min(y, b.b));
+        return { d: Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y)), x: cx, y: cy };
+      }));
+      return _i >= 0 ? els[_i] : null;
     },
 
     // The tooltip mode ends: no curve in it any more
@@ -1905,19 +1973,17 @@
     },
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
-    // each shown line's distance to the point, along its drawn path — its points joined
-    // straight, or in steps for a stepped line — the point on it within half its width
-    // + 1 px; -1, or PICK_BETWEEN about halfway between two
+    // each shown line's point nearest it, along its drawn path — its points joined
+    // straight, or in steps for a stepped line; -1, or PICK_BETWEEN about halfway between
+    // two. Two curves drawn on top of each other there: the one drawn over (the first)
     _hecCurveAt: function (px, py) {
       var me = this;
-      var _on = [];
-      var _dists = (me.data.datasets || []).map(function (ds, i) {
+      var _cands = (me.data.datasets || []).map(function (ds, i) {
         var meta = me.getDatasetMeta(i);
-        if (!meta.dataset || !me.isDatasetVisible(i)) return Infinity;
+        if (!meta.dataset || !me.isDatasetVisible(i)) return null;
         var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
           .map(function (p) { return p._view; });
-        var st = ds.steppedLine, best = Infinity;
-        _on.push((+ds.borderWidth || 0) / 2 + 1);
+        var st = ds.steppedLine, best = null;
         for (var k = 1; k < pts.length; k++) {
           var a = pts[k - 1], b = pts[k];
           // (only the segments around the point can be near it)
@@ -1926,12 +1992,14 @@
             : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
             : st === 'after' ? [a, { x: a.x, y: b.y }, b]
             : [a, { x: b.x, y: a.y }, b];
-          for (var j = 1; j < path.length; j++)
-            best = Math.min(best, _hecSegmentDistance(px, py, path[j - 1].x, path[j - 1].y, path[j].x, path[j].y));
+          for (var j = 1; j < path.length; j++) {
+            var n = _hecSegmentNearest(px, py, path[j - 1].x, path[j - 1].y, path[j].x, path[j].y);
+            if (!best || n.d < best.d) best = n;
+          }
         }
         return best;
       });
-      return _hecPickNearest(_dists, Math.max.apply(null, _on.concat(0)));
+      return _hecPickNearest(_cands);
     },
 
     // The elements of a hit-test drawn on the plot area (not skipped, not clipped out)
@@ -2348,12 +2416,18 @@
         * options.panX/zoomX. See the comment block in handleEvent above
         * for provenance of the timing constants and structure.
         */
+    // (cfg: the detector's fixed constants; the long-press duration and the immobility
+    // distance are the pointer type's — Chart.defaults.global.gestures, see
+    // Chart.hecGestures)
     _hecGestureHandler: function (e, cfg) {
       var h = GESTURE_EVENTS[e.type];
       if (!h) return;
-      h({ me: this, e: e, gs: this._hecGesture, cfg: cfg,
+      var _pt = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
+      var _g = Chart.hecGestures(_pt);
+      h({ me: this, e: e, gs: this._hecGesture,
+        cfg: helpers.extend({}, cfg, { longPressMs: _g.longPressMs, dragSlop: _g.slop }),
         pid: e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0,
-        pointerType: e.native && e.native.pointerType ? e.native.pointerType : 'mouse' });
+        pointerType: _pt });
     }
   });
 

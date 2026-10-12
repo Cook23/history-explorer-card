@@ -9,7 +9,10 @@ const card = () => ({ type: 'custom:history-explorer-card', defaultTimeRange: '2
     graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
              { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.rain' }, { entity: 'sensor.tank' }] },
              // (two curves close to each other: rain drawn 180 times larger)
-             { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.rain', scale: 180 }, { entity: 'sensor.tank' }] }] });
+             { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.rain', scale: 180 }, { entity: 'sensor.tank' }] },
+             // (two curves exactly on top of each other: power (400 W) and rain (4 mm) drawn
+             // 100 times larger, both following the same sine, on one axis)
+             { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain', scale: 100 }] }] });
 const near = (a, b) => Math.abs(a - b) < 0.01;
 
 module.exports = async function()
@@ -61,6 +64,26 @@ module.exports = async function()
         if( !p ) return 'no place where the two curves are 6 to 20 px apart';
         await t.longPress(p); const a = await dots(t, 2, 0), b = await dots(t, 2, 1);
         return a.r === 0 && b.r === 0 ? true : JSON.stringify({ a, b });
+    });
+    await t.step('between two curves: the dead zone is the middle third of the gap — 0.3 of it from one curve picks it, 0.45 none', async () => {
+        const at = f => t.E(`(()=>{ const c=graphAt(2).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+            const vs=d=>c.getDatasetMeta(d).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+20&&v.x<A.right-20);
+            const rain=vs(0), near=x=>rain.reduce((b,v)=>Math.abs(v.x-x)<Math.abs(b.x-x)?v:b), tank=vs(1);
+            // (where both curves are nearly flat — so the gap is vertical — 15 to 30 px apart)
+            const k=tank.findIndex((v,i)=>i>0&&i<tank.length-1&&Math.abs(tank[i+1].y-tank[i-1].y)<1.5&&Math.abs(v.y-near(v.x).y)>15&&Math.abs(v.y-near(v.x).y)<30);
+            if( k<0 ) return null; const v=tank[k], w=near(v.x);
+            return {x:r.left+v.x, y:r.top+v.y+(w.y-v.y)*${f}}; })()`);
+        const p1 = await at(0.3), p2 = await at(0.45);
+        if( !p1 ) return 'no place where both curves are flat and 15 to 30 px apart';
+        await t.longPress(p1); const a = await dots(t, 2, 1); await t.longPress(p1);
+        await t.longPress(p2); const b = [await dots(t, 2, 0), await dots(t, 2, 1)];
+        return shown(a) && b[0].r === 0 && b[1].r === 0 ? true : JSON.stringify({ a, b });
+    });
+    await t.step('two curves exactly on top of each other: the one drawn over', async () => {
+        const p = await t.E(`(()=>{ const c=graphAt(3).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+            const v=c.getDatasetMeta(1).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40)[10]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+        await t.longPress(p); const a = await dots(t, 3, 0), b = await dots(t, 3, 1); await t.longPress(p);
+        return shown(a) && b.r === 0 ? true : JSON.stringify({ a, b });
     });
     await t.step('clearly beside the curves, nothing', async () => {
         await t.longPress(await beside(t, 0)); const d = await dots(t, 0); const menu = await menuOpen(t);

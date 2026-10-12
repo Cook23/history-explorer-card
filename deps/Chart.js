@@ -4755,9 +4755,8 @@
             // mouseup — see EVENT_TYPES above), same as the hover/tooltip code just above
             // uses — except 'pointercancel' and 'wheel', which EVENT_TYPES does not
             // translate and so arrive under their native names.
-            var _HEC_LONGPRESS_MS = 600;
-            var _HEC_DBLCLICK_MS = 400;
-            var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
+            // (the long-press duration and the immobility distance are the pointer
+            // type's: Chart.defaults.global.gestures, see deps/chart-hec.js)
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
             var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a contact released from its long press is that one's
@@ -4769,9 +4768,6 @@
             {
               me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
               me._hecGestureHandler(e, {
-                longPressMs: _HEC_LONGPRESS_MS,
-                dblClickMs: _HEC_DBLCLICK_MS,
-                dragSlop: _HEC_DRAG_SLOP,
                 pinchMinDist: _HEC_PINCH_MIN_DIST,
                 wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS,
                 contextMenuAfterMs: _HEC_CONTEXTMENU_AFTER_MS });
