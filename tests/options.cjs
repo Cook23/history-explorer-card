@@ -1,6 +1,7 @@
 // The options at every level (card, entityOptions, graph, entity) with their synonyms, the
 // curve interpolation (interpolation) and its Interpolation submenu (keyboard, mouse, touch,
-// screen edges, shadow root), automatic refresh (on by default, at most one request every 2 s)
+// screen edges, shadow root), automatic refresh (on by default, at most one request every 2 s),
+// rounding (0 too)
 const { openCard } = require('./lib.cjs');
 
 const card = (o) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, ...o });
@@ -31,6 +32,16 @@ module.exports = async function()
     });
     await t.step('automatic refresh is on by default', async () => (await t.E('el.instance.pconfig.refreshEnabled')) === true || 'off');
     done(await t.close());
+
+    // ── rounding: the digits of a value (its legend label), 0 too ──
+    for( const [r, want] of [[undefined, '1.57'], [1, '1.6'], [0, '2']] ) {
+        t = await openCard(card({ rounding: r, graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind_rad' }] }] }));
+        await t.step(`rounding: ${r ?? 'absent'} — the value in the legend has ${want.split('.')[1]?.length ?? 0} decimals`, async () => {
+            const v = await t.E(`el.instance.graphs[0].chart.legend.legendItems[0].text`);
+            return v.includes(`(${want} rad)`) ? true : v;
+        });
+        done(await t.close());
+    }
 
     // ── The Interpolation submenu ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'lines' }] }] }), { height: 900 });

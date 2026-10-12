@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.56b1] - 2026-10-12
+
+### Fixed — `rounding: 0` shows no decimals
+- `rounding: 0` was taken as no `rounding` at all: values kept 2 decimals, in the tooltip and in the legend. It now shows them rounded to the unit
+- Tests: the value in the legend with no `rounding`, `rounding: 1` and `rounding: 0`
+
 ## [v1.1.55] - 2026-10-11
 
 ### Fixed — the padlock keeps the Y axis where it is
