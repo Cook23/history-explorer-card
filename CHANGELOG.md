@@ -6,6 +6,13 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.16b1] - 2026-10-12
 
+### Fixed — a menu stays readable under its submenus
+- The options menu was narrower than its submenus: *Export ▸* covered every line of the menu, so another submenu couldn't be picked. A menu is now wider than each of its submenus by its widest line, so its lines show beside the submenu open — the last line's submenu aside, which hides no line below it: as wide as the menu at most. One rule for every menu with submenus (`_fitMenuToSubmenus`, when the menu opens); a submenu's lines never wrap
+- Tests: each submenu of the options menu and of an entity's menu open, the menu's lines clear of it
+
+### Changed — the export submenu says what it exports
+- *Export ▸ History* (the history of the entities shown, over the time window shown) and *Export ▸ Statistics* (their long-term statistics), rather than *Export as CSV* and *Export statistics as CSV*: the format is in the documentation
+
 ### Fixed — the point hovered as large as a point shown
 - Hovering a value of a curve whose points aren't shown drew its point smaller than a point shown: filled only, without the border a point has. It is now drawn as a point shown — its style, its border — so there are two sizes only: the points, and the one the tooltip shows
 - Tests: the point hovered covers as many pixels as the same point shown

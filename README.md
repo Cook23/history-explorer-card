@@ -130,7 +130,7 @@ The `?hacstag=…` part isn't required — the file works without it — but wit
 ## The options menu and the gesture settings
 
 The ▾ button beside the entity selector opens the options menu:
-- **Export ▸** — *Export as CSV*, *Export statistics as CSV*;
+- **Export ▸** — *History*, *Statistics* (as CSV files);
 - **This card ▸** — *Remove all added graphs*;
 - **All cards ▸** — what applies to every card and every device: the info panel on or off, and the gesture settings, entered right there.
 
@@ -675,7 +675,7 @@ Every option is spelled the same at every level where it's accepted, and its syn
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 
-Open the options menu (▾ beside the entity selector) and select **Export ▸ Export as CSV**. Not available in the HA Companion app.
+Open the options menu (▾ beside the entity selector) and select **Export ▸ History** (or **Statistics**). Not available in the HA Companion app.
 
 ```yaml
 csv:

@@ -20,8 +20,8 @@ const lang_en =
             "disable_panel" : "Disable the history info panel of the entities?"
         },
         "menu" : {  
-            "export_csv" : "Export as CSV",
-            "export_stats" : "Export statistics as CSV",
+            "export_csv" : "History",
+            "export_stats" : "Statistics",
             "remove_all" : "Remove all added graphs",
             "enable_panel" : "Enable history info panel",
             "disable_panel" : "Disable history info panel",
@@ -111,8 +111,8 @@ const lang_fr =
             "disable_panel" : "Désactiver le panneau d'historique des entités ?"
         },
         "menu" : {  
-            "export_csv" : "Exporter en CSV",
-            "export_stats" : "Exporter les statistiques en CSV",
+            "export_csv" : "Historique",
+            "export_stats" : "Statistiques",
             "remove_all" : "Supprimer les graphiques ajoutés",
             "enable_panel" : "Activer le panneau d'historique",
             "disable_panel" : "Désactiver le panneau d'historique",
@@ -202,8 +202,8 @@ const lang_de =
             "disable_panel" : "Verlaufsinfo der Entitäten deaktivieren?"
         },
         "menu" : {  
-            "export_csv" : "Als CSV exportieren",
-            "export_stats" : "Statistik als CSV exportieren",
+            "export_csv" : "Verlauf",
+            "export_stats" : "Statistiken",
             "remove_all" : "Hinzugefügte Diagramme entfernen",
             "enable_panel" : "Verlaufsinfo aktivieren",
             "disable_panel" : "Verlaufsinfo deaktivieren",
@@ -293,8 +293,8 @@ const lang_es =
             "disable_panel" : "¿Desactivar el panel de historial de las entidades?"
         },
         "menu" : {  
-            "export_csv" : "Exportar como CSV",
-            "export_stats" : "Exportar estadísticas como CSV",
+            "export_csv" : "Historial",
+            "export_stats" : "Estadísticas",
             "remove_all" : "Eliminar los gráficos añadidos",
             "enable_panel" : "Activar el panel de historial",
             "disable_panel" : "Desactivar el panel de historial",
@@ -384,8 +384,8 @@ const lang_nl =
             "disable_panel" : "Geschiedenispaneel van de entiteiten uitschakelen?"
         },
         "menu" : {  
-            "export_csv" : "Exporteren als CSV",
-            "export_stats" : "Exporteer statistieken als CSV",
+            "export_csv" : "Geschiedenis",
+            "export_stats" : "Statistieken",
             "remove_all" : "Toegevoegde grafieken verwijderen",
             "enable_panel" : "Geschiedenispaneel inschakelen",
             "disable_panel" : "Geschiedenispaneel uitschakelen",
@@ -475,8 +475,8 @@ const lang_pl =
             "disable_panel" : "Wyłączyć panel historii encji?"
         },
         "menu" : {  
-            "export_csv" : "Eksportuj w CSV",
-            "export_stats" : "Eksportuj statystyki w CSV",
+            "export_csv" : "Historia",
+            "export_stats" : "Statystyki",
             "remove_all" : "Usuń dodane wykresy",
             "enable_panel" : "Włącz panel historii",
             "disable_panel" : "Wyłącz panel historii",
@@ -566,8 +566,8 @@ const lang_sv =
             "disable_panel": "Inaktivera panelen för enhetens historikinformation?"
         },
         "menu": {
-            "export_csv": "Exportera som CSV",
-            "export_stats": "Exportera statistik som CSV",
+            "export_csv": "Historik",
+            "export_stats": "Statistik",
             "remove_all": "Ta bort tillagda grafer",
             "enable_panel": "Aktivera historikinfo-panelen",
             "disable_panel": "Inaktivera historikinfo-panelen",
@@ -657,8 +657,8 @@ const lang_da =
             "disable_panel" : "Deaktivér historikpanelet for entiteter?"
         },
         "menu" : {  
-            "export_csv" : "Eksporter som CSV",
-            "export_stats" : "Eksporter statistik som CSV",
+            "export_csv" : "Historik",
+            "export_stats" : "Statistik",
             "remove_all" : "Fjern tilføjede grafer",
             "enable_panel" : "Aktivér historikpanelet",
             "disable_panel" : "Deaktivér historikpanelet",
@@ -748,8 +748,8 @@ const lang_sk =
             "disable_panel" : "Zakázať informačný panel histórie entít?"
         },
         "menu" : {  
-            "export_csv" : "Export ako CSV",
-            "export_stats" : "Export štatistiky ako CSV",
+            "export_csv" : "História",
+            "export_stats" : "Štatistiky",
             "remove_all" : "Odstrániť pridané grafy",
             "enable_panel" : "Povoliť informačný panel histórie",
             "disable_panel" : "Zakázať informačný panel histórie",
@@ -839,8 +839,8 @@ const lang_ru =
             "disable_panel" : "Выключить панель истории объектов?"
         },
         "menu" : {  
-            "export_csv" : "Экспортировать как CSV",
-            "export_stats" : "Экспортировать статистику как CSV",
+            "export_csv" : "История",
+            "export_stats" : "Статистика",
             "remove_all" : "Удалить добавленные графики",
             "enable_panel" : "Включить панель истории",
             "disable_panel" : "Выключить панель истории",

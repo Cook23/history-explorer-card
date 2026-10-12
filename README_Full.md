@@ -1323,7 +1323,7 @@ Either way, an option set on a graph or on the entity itself wins over `entityOp
 ### The options menu
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
-- **Export ▸** — *Export as CSV*, *Export statistics as CSV* (with long-term statistics on);
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
 - **This card ▸** — *Remove all added graphs*;
 - **All cards ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`), and the gesture settings below, entered right in the submenu.
 
@@ -1529,7 +1529,7 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ Export as CSV*. Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History* (*Export ▸ Statistics* for the long-term statistics). Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 

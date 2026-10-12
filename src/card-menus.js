@@ -43,6 +43,9 @@ const _LAYOUT_ENTRIES = { points: 'ui.menu.points_show', ylock: 'ui.menu.ylock',
                           delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
+// A submenu's lines on one line each, whatever the room beside its menu (it opens over it,
+// right-aligned on it: see _openSubmenu)
+const _SUBMENU_STYLE = 'white-space:nowrap';
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
@@ -50,7 +53,7 @@ const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1
 export function typeMenuHtml(i, full)
 {
     const a = (id, label, hidden, style = '') => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${style}${hidden ? ';display:none' : ''}">${label}</a>`;
-    const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
+    const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
     const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k));
     // (the tests set apart from what concerns the entity)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
@@ -75,7 +78,7 @@ const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.opt
 export function optionsMenuHtml(i, statistics)
 {
     const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
-    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
+    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
     const input = k => { const s = GESTURE_SETTINGS[k];
         return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}">${i18n(s.label)}</span>` +
                `<input id="eo_${i}_g_${k}" type="number" min="${s.min}" max="${s.max}" step="${s.step}" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`; };
@@ -896,7 +899,37 @@ export class CardMenus
         if( left !== undefined ) menuEl.style.left = left;
         menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
         for( let _a of menuEl.getElementsByTagName('a') ) _a.style.background = '';
+        this._fitMenuToSubmenus(menuEl);
         Chart.hecUi.clampToViewport(menuEl, this._this?.querySelector('#maincard'));
+    }
+
+    // A menu stays readable under its submenus (each opened over it, right-aligned on it,
+    // level with its line, see _openSubmenu): wider than each of them by its widest line's
+    // text, so that its lines show beside the submenu open and another one can be picked —
+    // the last line's submenu aside, which hides no line below it: as wide as the menu at
+    // most. Set when the menu opens (with what it shows then), so it keeps its width; a
+    // menu's lines open the submenus `${line id}_sub`, its siblings
+    _fitMenuToSubmenus(menuEl)
+    {
+        const _lines = [...menuEl.children].filter(a => a.tagName === 'A' && a.style.display !== 'none');
+        const _subOf = a => menuEl.parentNode?.querySelector(`#${a.id}_sub`);
+        const _withSub = _lines.filter(_subOf);
+        if( !_withSub.length ) return;
+        menuEl.dataset.hecMinWidth ??= parseFloat(menuEl.style.minWidth) || 0;
+        // (a line's text, its left padding and a gap; a submenu's own width, laid out on its own)
+        const _range = document.createRange();
+        const _textWidth = a => { _range.selectNodeContents(a); return _range.getBoundingClientRect().width + ( parseFloat(getComputedStyle(a).paddingLeft) || 0 ) + 8; };
+        const _subWidth = sub => {
+            const _shown = sub.style.display !== 'none', _saved = [sub.style.visibility, sub.style.left, sub.style.transform];
+            if( !_shown ) Object.assign(sub.style, { visibility: 'hidden', display: 'block', left: '0px', transform: '' });
+            const _w = sub.offsetWidth;
+            if( !_shown ) Object.assign(sub.style, { display: 'none', visibility: _saved[0], left: _saved[1], transform: _saved[2] });
+            return _w;
+        };
+        const _readable = Math.max(..._lines.map(_textWidth));
+        const _last = _lines[_lines.length - 1];
+        const _need = Math.max(+menuEl.dataset.hecMinWidth, ..._withSub.map(a => _subWidth(_subOf(a)) + ( a === _last ? 0 : _readable )));
+        menuEl.style.minWidth = Math.ceil(_need) + 'px';
     }
 
     // Opens a submenu over its menu, level with the item that opens it, its right edge on the

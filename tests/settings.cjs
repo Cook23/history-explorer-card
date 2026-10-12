@@ -40,9 +40,30 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Export ▸ | This card ▸ | All cards ▸' && /CSV/.test(r.ex) && r.exportClosed
+        return r.m === 'Export ▸ | This card ▸ | All cards ▸' && r.ex === 'History' && r.exportClosed
             && /panel/i.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12 }) ? true : JSON.stringify(r);
+    });
+    // With submenu sub of menu open: '' when the menu's lines are readable beside it (its
+    // text clear of the submenu) — the last line's submenu: no wider than the menu —, else
+    // what's wrong
+    const readable = (menu, sub, last) => t.E(`(()=>{ const m=el.querySelector('${menu}').getBoundingClientRect(), s=el.querySelector('${sub}').getBoundingClientRect();
+        if( ${last} ) return s.width <= m.width + 0.5 ? '' : 'last submenu wider than the menu: '+s.width+' > '+m.width;
+        const r=document.createRange(); const bad=[...el.querySelector('${menu}').children].filter(a=>a.tagName==='A'&&a.style.display!=='none')
+            .filter(a=>{ r.selectNodeContents(a); return r.getBoundingClientRect().right > s.left; }).map(a=>a.textContent.trim());
+        return bad.length ? 'hidden by the submenu: '+bad.join(', ') : ''; })()`);
+    await t.step('a menu is wider than its submenus: its lines readable beside each — the last line\'s submenu, the menu\'s width at most', async () => {
+        const r = {};
+        for( const [k, last] of [['export', false], ['card', false], ['all', true]] ) {
+            await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#eo_0_${k}').click()`); await t.wait(300);
+            r[k] = await readable('#eo_0', `#eo_0_${k}_sub`, last); await closeMenus();
+        }
+        await hold(800); await t.wait(400);
+        r.rep = await readable('#et_0', '#et_0_rep_sub', false);
+        await t.E(`el.querySelector('#et_0_layout').click()`); await t.wait(300);
+        r.layout = await readable('#et_0', '#et_0_layout_sub', false); await closeMenus();
+        return Object.values(r).every(v => v === '') ? true : JSON.stringify(r);
     });
     await t.step('a value entered is kept within its bounds, and given to Chart.js for every chart', async () => {
         await openAll(); await enter('longPress', 99999); await enter('precision', 1);
