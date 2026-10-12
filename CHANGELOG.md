@@ -6,6 +6,22 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.16b1] - 2026-10-12
 
+### Fixed — a narrow card (a grid, a horizontal stack) readable
+- The toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its full name) and the entity search each on a line of their own, centered — they wrapped over up to 7 lines, the range's name cut, the search and ▾ out of the card. The search field is never wider than the card
+- The Y labels inside the plot on a card narrower than 300 px (as `yLabels: inside`), so that the plot keeps its width — it was down to 85 px, 38 with two axes, on a 168 px card; `yLabels: outside` keeps them beside it. Inside, each label is drawn just above its grid line, clear of the time labels
+- The time labels that would overlap skipped (Chart.js `autoSkip`): a narrow plot drew them over each other; at full width they are all drawn, as before
+- A legend too narrow for its labels shortens the names, every curve of the graph at the same step — the first at which they all fit — each value kept (`src/legend-names.js`, Chart.js `legend.labels.hecShortNames`): a qualifier in parentheses that many entities carry as its initials (`(Filtered)` → `(F)`); the entity's device name removed (Home Assistant's device registry), abbreviated instead where two curves would then read the same (`Météo-France Villeveyrac` → `M-F V…`); the articles of the language removed; then '…' before the value, and before a final qualifier kept when there's room. The labels were cut by the card's edges, on both sides
+- Tests: a 168 px card — the toolbar's lines, nothing out of the card, the Y labels inside (`outside` kept), the time labels apart; the legend at 1000, 374 and 168 px; suite `legend` (the shorter forms)
+
+### Fixed — the tooltip: closed when a menu opens, its arrow on its point
+- A curve's tooltip still shown (its reading time) stayed over a menu opened then — the options menu, the entity selector's list. Opening any menu of the card now closes it at once and ends its mode (Chart.js `hecEndTooltip`), as an entity's menu already did
+- A tooltip moved to stay within the card or the screen kept its arrow where it was in it, beside the point (20 px on a phone); the arrow now stays on the point (never in the tooltip's rounded corners)
+- Tests: the options menu and the selector opened over a tooltip; the arrow on the point, the tooltip moved to the right edge and to the bottom
+
+### Fixed — the entity selector in the theme's colors
+- The search field was the browser's own, white on a dark theme; it now takes the card's colors (`uiColors.selector` still wins)
+- Tests: the selector's background on a dark theme
+
 ### Fixed — a menu stays readable under its submenus
 - The options menu was narrower than its submenus: *Export ▸* covered every line of the menu, so another submenu couldn't be picked. A menu is now wider than each of its submenus by its widest line, so its lines show beside the submenu open — the last line's submenu aside, which hides no line below it: as wide as the menu at most. One rule for every menu with submenus (`_fitMenuToSubmenus`, when the menu opens); a submenu's lines never wrap
 - On a card or a screen too narrow for that, the menu takes the room there is and opens without any submenu (the default one, or the one it had open 10 s ago): its lines are read first, a click more opens one. A submenu opened then leaves at least 48 px and the first three characters of the menu's lines, so another one can still be picked; its own lines are cut ('…') if they don't fit

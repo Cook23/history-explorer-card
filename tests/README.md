@@ -9,6 +9,7 @@ The suites:
 | Suite | What it checks |
 |---|---|
 | `lint` | Every identifier declared, no import assigned (static, no browser) |
+| `legend` | The shorter forms of curve names for a narrow legend (`src/legend-names.js`), no browser: a frequent qualifier, the device removed or abbreviated, the articles, never two curves the same |
 | `store` | The entity store (`src/history-entity-store.js`) on its own (no browser), the place a curve dropped without saving is saved at included |
 | `mouse`, `touch` | Every gesture on the graphs, with a mouse and with fingers |
 | `cards` | Two cards on one page, menus, graphs added from the UI, linked graphs |
@@ -40,7 +41,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes, copies, values, realtime, points or settings
+yarn test touch        # one suite: lint, store, legend, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes, copies, values, realtime, points or settings
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

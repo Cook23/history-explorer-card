@@ -18,6 +18,9 @@ const moment = window.HXLocal_moment;
 // right for a second group of units (see _assignYAxes)
 export const LEFT_Y_AXIS = 'y-axis-0';
 export const RIGHT_Y_AXIS = 'y-axis-1';
+// A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
+// _yLabelsInside)
+export const NARROW_CARD_PX = 300;
 
 export class CardGraphs
 {
@@ -370,13 +373,16 @@ export class CardGraphs
         const _p0 = _list[0]?.circular;
         const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
         const _right = id === RIGHT_Y_AXIS;
-        // (yLabels: inside — the labels drawn inside the plot, which then takes the whole width)
-        const _inside = config?.yLabels === 'inside';
+        // (the labels drawn inside the plot, which then takes the whole width: yLabels: inside,
+        // or a narrow card — see _yLabelsInside; hecYLabels, hecUnit: what _placeYLabels reads)
+        const _inside = this._yLabelsInside(config?.yLabels, graphtype);
         return {
             id,
             position: _right ? 'right' : 'left',
+            hecYLabels: config?.yLabels,
+            hecUnit: _unit,
             afterFit: (scaleInstance) => {
-                scaleInstance.width = _inside ? 0 : this.pconfig.labelAreaWidth;
+                scaleInstance.width = scaleInstance.options.ticks.mirror ? 0 : this.pconfig.labelAreaWidth;
             },
             afterDataLimits: (me) => {
                 const epsilon = 0.0001;
@@ -391,8 +397,7 @@ export class CardGraphs
                 forceMax: config?.ymax ?? undefined,
                 stepSize: config?.ystepSize ?? undefined,
                 period: _period,
-                // (only inside: an option given, even undefined, replaces Chart.js' default)
-                ...( _inside ? { mirror: true, padding: -6 } : {} )
+                ...this._yLabelTicks(_inside)
             },
             gridLines: {
                 color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
@@ -406,6 +411,40 @@ export class CardGraphs
             barThickness: this.pconfig.timelineBarHeight - 4,
             stacked: config?.stacked
         };
+    }
+
+    // Whether a graph's Y labels are drawn inside its plot: yLabels: inside; on a card
+    // narrower than NARROW_CARD_PX too — the plot keeps its width there — unless yLabels:
+    // outside. A curve's or a bar's axis only (a timeline's labels are its rows' names)
+    _yLabelsInside(yLabels, graphtype)
+    {
+        if( yLabels === 'inside' ) return true;
+        if( yLabels === 'outside' || !( graphtype == 'line' || graphtype == 'bar' ) ) return false;
+        return ( this._this?.querySelector('#maincard')?.clientWidth || Infinity ) < NARROW_CARD_PX;
+    }
+
+    // The Y labels' ticks options, inside the plot — just above their grid line, so that the
+    // lowest one keeps clear of the time labels — or beside it
+    _yLabelTicks(inside)
+    {
+        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0 };
+    }
+
+    // The Y labels of each graph placed as the card's width now says (_yLabelsInside) —
+    // when the card crosses NARROW_CARD_PX
+    _placeYLabels()
+    {
+        for( const g of this.graphs ) {
+            let _changed = false;
+            for( const ax of g.chart.options.scales?.yAxes ?? [] ) {
+                const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
+                if( !!ax.ticks.mirror === _inside ) continue;
+                Object.assign(ax.ticks, this._yLabelTicks(_inside));
+                ax.scaleLabel.display = !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '';
+                _changed = true;
+            }
+            if( _changed ) g.chart.update(0);
+        }
     }
 
     // The tooltip of a chart: a curve's value in its unit (circular ones in [0, period)), a

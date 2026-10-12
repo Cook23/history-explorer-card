@@ -15,7 +15,7 @@ export class CardToolbar
     // HTML generation
     // --------------------------------------------------------------------------------------
 
-    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
+    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
     // !! Keep in sync with _hec_render() in history-info-panel.js !!
     addUIHtml(tools, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
     {
@@ -202,6 +202,8 @@ export class CardToolbar
             const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
+            // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot)
+            this._placeYLabels();
             const _tbEl = this._this.querySelector('#tb_0');
             if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }
@@ -276,11 +278,24 @@ export class CardToolbar
             const dlFrNow = Math.round(dlwNow / totNow * 100);
             const drFrNow = 100 - dlFrNow;
 
+            // (a narrow card — even the compact date and range don't fit side by side: each on
+            // a line of its own, centered, never wrapped — layout D below)
+            const narrow = dlwShort + drwShort > tbwNow - 10;
+            // (the range on a line of its own: its whole name)
+            if( narrow && byEl ) byEl.style.maxWidth = '83px';
+            for( const [el, side] of [[dl, 'start'], [dr, 'end']] ) if( el ) {
+                el.style.justifySelf = narrow ? 'center' : side;
+                el.style.whiteSpace = narrow ? 'nowrap' : '';
+            }
+            // (the entity selector's input: up to 500 px, at least 150 — less on a card
+            // narrower than that, so it never overflows the card)
+            const _inputW = room => Math.max(Math.min(150, room), Math.min(500, room));
+
             // Layout C : no selector, just dl and dr
             if( !input || !sl ) {
                 if( tb && (dl || dr) ) {
-                    tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
-                    tb.style.gridTemplateAreas = "'dl dr'";
+                    tb.style.gridTemplateColumns = narrow ? '1fr' : `${dlFrNow}fr ${drFrNow}fr`;
+                    tb.style.gridTemplateAreas = narrow ? "'dl' 'dr'" : "'dl dr'";
                 }
                 continue;
             }
@@ -294,7 +309,7 @@ export class CardToolbar
                 sl.style.display = 'flex';
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
-                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
                 sl.style.display = 'flex';
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
@@ -336,13 +351,21 @@ export class CardToolbar
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
                 input.style.width = inputWA + 'px';
-            } else {
+            } else if( !narrow ) {
                 // Layout B : dl | dr on line 1, sl centered on line 2
                 if( tb ) {
                     tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
                     tb.style.gridTemplateAreas = "'dl dr' 'sl sl'";
                 }
-                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
+            } else {
+                // Layout D (a narrow card) : dl, dr and sl each on a line, the input as wide
+                // as the card leaves beside the options button
+                if( tb ) {
+                    tb.style.gridTemplateColumns = '1fr';
+                    tb.style.gridTemplateAreas = "'dl' 'dr' 'sl'";
+                }
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - slBtnsW - 16) + 'px';
             }
         }
     }

@@ -207,6 +207,25 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A narrow card (under 300 px): the toolbar on lines of its own, the Y labels inside ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', yLabels: 'outside', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true, language: 'fr' } });
+    const narrowAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const card=el.querySelector('#maincard').getBoundingClientRect();
+            const els=[...el.querySelectorAll('#tb_0 button, #tb_0 select, #tb_0 input')].filter(b=>b.offsetParent);
+            const out=els.filter(b=>{ const r=b.getBoundingClientRect(); return r.left<card.left-1||r.right>card.right+1; }).map(b=>b.id);
+            const rows=new Set(els.filter(b=>b.id!=='b7_0'&&b.id!=='bo_0').map(b=>Math.round(b.getBoundingClientRect().top/10))).size;
+            return { out, rows, inside: graphAt(0).chart.options.scales.yAxes[0].ticks.mirror, outsideKept: !graphAt(1).chart.options.scales.yAxes[0].ticks.mirror,
+                     plotLeft: Math.round(graphAt(0).chart.chartArea.left) }; })()`);
+    };
+    await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside (yLabels: outside kept); wide again: as before', async () => {
+        const wide = await narrowAt(1000), narrow = await narrowAt(168), back = await narrowAt(1000);
+        return !wide.inside && wide.rows === 1 && !narrow.out.length && narrow.rows === 2 && narrow.inside && narrow.outsideKept && narrow.plotLeft < 20
+            && !back.inside && back.rows === 1 ? true : JSON.stringify({ wide, narrow, back });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {

@@ -116,7 +116,7 @@ What is changed from the card is saved in your Home Assistant user account and s
 
 ### Interface
 
-The toolbar adapts its layout to the card's width; menus and tooltips stay within the card and the screen; the graph tooltip is an HTML element, readable at any size.
+The toolbar adapts its layout to the card's width — on a narrow card (a grid or a horizontal stack), the date, the range and the entity search each on a line of their own; menus and tooltips stay within the card and the screen, a tooltip's arrow on its point; the graph tooltip is an HTML element, readable at any size, closed as soon as a menu opens. **(1.2)** A legend too narrow for its labels shortens the names, all of a graph's alike, and keeps each value: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the entity's device name removed (abbreviated — `M-F V…` — where two curves would then read the same), the articles removed, then '…' before the value; the full name stays in the tooltip. The time labels that wouldn't fit side by side are skipped.
 
 ### Info panel
 
@@ -952,7 +952,7 @@ A curve hidden from its legend shows neither. Both are set at every level — ca
 
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
-- **`yLabels: inside`** — the Y labels drawn inside the plot, which then takes the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch);
+- **`yLabels: inside`** — the Y labels drawn inside the plot, just above their grid line, the plot then taking the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch). A card narrower than 300 px draws them so by itself; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
 **`look: mini`** sets, for the whole card, what mini-graph-card shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
