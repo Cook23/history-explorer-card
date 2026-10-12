@@ -46,8 +46,8 @@
     var c1 = cands[best], c2 = second >= 0 ? cands[second] : null;
     var _gap = c2 ? Math.sqrt((c2.x - c1.x) * (c2.x - c1.x) + (c2.y - c1.y) * (c2.y - c1.y)) : Infinity;
     if (c1.d > PICK_MARGIN) return -1;
-    // (on the same pixel — within half of one: one place, the first one)
-    if (_gap < 0.5) return Math.min(best, second);
+    // (on the same pixel — less than one apart: one place, the first one)
+    if (_gap < 1) return Math.min(best, second);
     return !c2 || c2.d - c1.d >= _gap / 3 ? best : PICK_BETWEEN;
   }
 
@@ -375,6 +375,16 @@
     readingTime: function (text) {
       var _words = String(text || '').split(/[\s_]+/).filter(hecUi.isWord).length;
       return 1000 + 500 * _words;
+    },
+
+    // The picking rule (_hecPick) on page elements — small buttons: of `elements`, the one
+    // at client point (clientX, clientY), else the nearest one if near enough and not in
+    // the dead zone between two; → its index, -1, or -2 (between two)
+    pick: function (clientX, clientY, elements) {
+      return _hecPick(clientX, clientY, elements.map(function (el) {
+        var r = el.getBoundingClientRect();
+        return { x: r.left, y: r.top, width: r.width, height: r.height };
+      }));
     },
 
     // Is a piece of text (no space in it) a word? Two letters or digits at least — not a

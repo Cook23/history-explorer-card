@@ -7,6 +7,7 @@ import { keyOf } from "./history-entity-store.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
+const Chart = window.HXLocal_Chart;
 
 export class CardToolbar
 {
@@ -122,6 +123,14 @@ export class CardToolbar
         this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
         this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
+        // A click on the toolbar beside its small buttons — none under it: the one picked
+        // (Chart.hecUi.pick: the nearest, unless about halfway between two)
+        this._this.querySelector(`#tb_${i}`)?.addEventListener('click', (e) => {
+            if( ![`tb_${i}`, `dl_${i}`, `dr_${i}`].includes(e.target.id) ) return;
+            const _buttons = [...this._this.querySelectorAll(`#dl_${i} button, #dr_${i} button`)].filter(b => b.offsetParent);
+            const _k = Chart.hecUi.pick(e.clientX, e.clientY, _buttons);
+            if( _k >= 0 ) _buttons[_k].click();
+        }, false);
         // Close on focusout — same as es_N/et_N. eo_N needs a tabIndex to be
         // focusable at all (unlike et_N, it isn't focusable by default in the HTML
         // template), and menuSetVisibility() must call .focus() when opening it, or
