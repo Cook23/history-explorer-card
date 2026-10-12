@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.16b1] - 2026-10-12
+
+### Fixed — the point hovered as large as a point shown
+- Hovering a value of a curve whose points aren't shown drew its point smaller than a point shown: filled only, without the border a point has. It is now drawn as a point shown — its style, its border — so there are two sizes only: the points, and the one the tooltip shows
+- Tests: the point hovered covers as many pixels as the same point shown
+
+### Fixed — the tooltip as far from its point on the left as on the right
+- On the left of its point, the tooltip stood too near (its arrow on the point) or too far, depending on the font: it was placed by the width Chart.js measured for its own drawing, not by its real one. It is now placed by its real size, as far from the point on either side
+- Tests: the gap between the point and the tooltip, on its right and on its left
+
 ## [v1.2.15] - 2026-10-12
 
 ### New — the point hovered

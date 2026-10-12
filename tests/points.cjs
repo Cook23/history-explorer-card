@@ -125,6 +125,18 @@ module.exports = async function()
         const r = { kept, gone: await tip(1), curves: await t.E('graphAt(1).chart._hecTooltipCurves') };
         return /tank/.test(kept || '') && /rain/.test(kept || '') && r.gone === null && !r.curves ? true : JSON.stringify(r);
     });
+    await t.step('the tooltip stands as far from the point on its left as on its right', async () => {
+        const gap = async f => {
+            const p = await t.E(`pointPt(0,${f})`); await t.page.mouse.click(p.x, p.y); await t.wait(400);
+            const r = await t.E(`(()=>{ const b=document.getElementById('hec-tooltip-hover').getBoundingClientRect(), c=graphAt(0).chart, v=c.tooltip._view;
+                const x=c.canvas.getBoundingClientRect().left+v.caretX; return { side: v.xAlign, gap: Math.round(v.xAlign==='left' ? b.left-x : x-b.right) }; })()`);
+            // (until it has faded out, its reading time over)
+            await t.page.mouse.move(5, 5); for( let i = 0; i < 40 && await tip(0) !== null; i++ ) await t.wait(200);
+            return r;
+        };
+        const right = await gap(0.15), left = await gap(0.95);
+        return right.side === 'left' && left.side === 'right' && right.gap > 0 && Math.abs(right.gap - left.gap) <= 1 ? true : JSON.stringify({ right, left });
+    });
     // The value whose dot a hover shows on graph gi: [dataset, index], or null
     const hoverDot = gi => t.E(`(()=>{ const d=graphAt(${gi}).chart._hecHoverDot; return d ? [d._datasetIndex, d._index] : null; })()`);
     await t.step('a hover (no click) on a value of a curve without points shows its dot only — no tooltip; beside it, none', async () => {
@@ -136,6 +148,20 @@ module.exports = async function()
         const b = await beside(t, 0); await t.page.mouse.move(b.x, b.y, { steps: 5 }); await t.wait(300);
         const off = await hoverDot(0);
         return on && on[0] === 0 && tooltip === null && off === null ? true : JSON.stringify({ on, tooltip, off });
+    });
+    await t.step('the hover dot is drawn as a point shown: the same size, its border too', async () => {
+        await t.page.mouse.move(5, 5); await t.wait(300);
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+            const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30)[4]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+        // (the pixels drawn — not the background — within 8 px of the value, on the canvas)
+        const inked = () => t.E(`(()=>{ const c=graphAt(0).chart, r=c.canvas.getBoundingClientRect(), k=c.canvas.width/r.width;
+            const d=c.ctx.getImageData(Math.round((${p.x}-r.left)*k)-8, Math.round((${p.y}-r.top)*k)-8, 17, 17).data;
+            let n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]>40 && d[i]+d[i+1]+d[i+2]<600) n++; return n; })()`);
+        await t.page.mouse.move(p.x - 30, p.y, { steps: 3 }); await t.page.mouse.move(p.x + 1, p.y + 1, { steps: 5 }); await t.wait(300);
+        const dot = await hoverDot(0), hovered = await inked();
+        await t.longPress(p); const b = await beside(t, 0); await t.page.mouse.move(b.x, b.y, { steps: 5 }); await t.wait(1300);
+        const shownPt = await inked(); await t.longPress(p); await t.page.mouse.move(b.x, b.y, { steps: 3 }); await t.wait(1300);
+        return dot && Math.abs(hovered - shownPt) <= 3 ? true : JSON.stringify({ dot, hovered, shownPt });
     });
     await t.step('no hover dot in the tooltip mode, nor on a curve showing its points', async () => {
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();

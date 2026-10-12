@@ -243,7 +243,12 @@
   Chart.hecSampleRadius = function (chart, pt, radius) {
     if (radius > 0 || !chart._hecShowSamples || !chart.getDatasetMeta(pt._datasetIndex).dataset) return radius;
     var _ds = chart.data.datasets[pt._datasetIndex] || {}, _d = (_ds.data || [])[pt._index];
-    return _d && _d.hecVirtual ? radius : ((+_ds.borderWidth || 0) + 2) / 2;
+    return _d && _d.hecVirtual ? radius : Chart.hecDotRadius(_ds);
+  };
+  // The radius of a dot shown by default on a curve (Alt's, the one hovered): a diameter of
+  // its line width + 2 px
+  Chart.hecDotRadius = function (ds) {
+    return ((+ds.borderWidth || 0) + 2) / 2;
   };
   Chart.plugins.register({
     id: 'hecShowSamples',
@@ -256,19 +261,18 @@
 
   // ---------------------------------------------------------------------------
   // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
-  // over the curves, of a diameter of its line's width + 2 px, in its point's color
+  // over the curves as its point would be if shown — its own style and border — at the size
+  // of a dot shown by default
   Chart.plugins.register({
     id: 'hecHoverDot',
     afterDatasetsDraw: function (chart) {
       var el = chart._hecHoverDot;
       if (!el || !el._view) return;
-      var ds = chart.data.datasets[el._datasetIndex] || {}, v = el._view, ctx = chart.ctx;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(v.x, v.y, ((+ds.borderWidth || 0) + 2) / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = v.backgroundColor || ds.pointBackgroundColor || ds.borderColor;
-      ctx.fill();
-      ctx.restore();
+      var ds = chart.data.datasets[el._datasetIndex] || {};
+      chart.ctx.save();
+      Chart.elements.Point.prototype.draw.call({ _chart: chart, _model: el._model,
+        _view: Chart.helpers.extend({}, el._view, { radius: Chart.hecDotRadius(ds) }) });
+      chart.ctx.restore();
     } });
 
   // ---------------------------------------------------------------------------
@@ -2556,6 +2560,13 @@
       }
 
       _el.style.display = 'block';
+      // (beside the point it shows — caret.x, caret.y —, as Chart.js places its own: by the
+      // element's real size, not the one Chart.js measured for its own drawing, which
+      // differs, so that it stands as far from the point on either side)
+      if (caret && caret.x !== undefined) {
+        var _at = backgroundPoint(caret, _el.offsetWidth, _el.offsetHeight);
+        x = _at.x; y = _at.y;
+      }
       var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
       _el.style.left = (x - _origin.left) + 'px';
       _el.style.top = (y - _origin.top) + 'px';
@@ -2565,6 +2576,16 @@
       Chart.hecUi.armAutoFade(_el, _readingTime, justMoved);
 
       function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
+      // The top-left corner of a box w × h beside the point (c.x, c.y), on the side its
+      // alignment says — Chart.js's own rule (getBackgroundPoint in deps/Chart.js)
+      function backgroundPoint(c, w, h) {
+        var _x = c.x, _y = c.y, _ps = c.size + c.padding, _rp = c.cornerRadius + c.padding;
+        if (c.xAlign === 'right') _x -= w; else if (c.xAlign === 'center') _x -= w / 2;
+        if (c.yAlign === 'top') _y += _ps; else if (c.yAlign === 'bottom') _y -= h + _ps; else _y -= h / 2;
+        if (c.yAlign === 'center') { if (c.xAlign === 'left') _x += _ps; else if (c.xAlign === 'right') _x -= _ps; }
+        else if (c.xAlign === 'left') _x -= _rp; else if (c.xAlign === 'right') _x += _rp;
+        return { x: _x, y: _y };
+      }
     },
 
     // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
@@ -2635,7 +2656,8 @@
         _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
         this._chart.canvas,
         _vm.backgroundColor, _vm.borderColor, _vm.bodyFontColor,
-        { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth },
+        { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth,
+          padding: _vm.caretPadding, x: _canvasRect.left + _vm.caretX, y: _canvasRect.top + _vm.caretY },
         _justMoved,
         // (as it fades out, the highlighted point fades out with it)
         function () { _chart._hecEndHover(); }
