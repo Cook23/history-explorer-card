@@ -9,6 +9,8 @@ import { keyOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeInterpolation, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import { baseTypePure } from "./card-config.js";
+import { shortNames } from "./legend-names.js";
+import { seriesOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -29,6 +31,28 @@ export class CardGraphs
     {
         const _label = this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name;
         return d.yAxisID === RIGHT_Y_AXIS ? _label + ' ▸' : _label;
+    }
+
+    // The shorter forms of the names of a chart's curves, for a legend too narrow for them
+    // (legend-names.js), from what Home Assistant knows: each entity's device, and how
+    // many entities carry a qualifier
+    _legendShortNames(chart)
+    {
+        const _hass = this._hass;
+        const _device = id => {
+            const _did = _hass?.entities?.[seriesOf(id ?? '').entity]?.device_id;
+            const _d = _did ? _hass?.devices?.[_did] : null;
+            return _d ? ( _d.name_by_user || _d.name || null ) : null;
+        };
+        // (a qualifier carried by 3 entities or more, counted once per states object)
+        if( this._qualifierCount?.states !== _hass?.states ) this._qualifierCount = { states: _hass?.states, n: new Map() };
+        const _frequent = q => {
+            const _n = this._qualifierCount.n;
+            if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
+            return _n.get(q) >= 3;
+        };
+        return shortNames(chart.data.datasets.map(d => ({ name: d.name, device: _device(d.entity_id) })),
+                          { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 
     getFormattedLabelName(name, entity, unit, shownScale = 1)
@@ -180,7 +204,9 @@ export class CardGraphs
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
-                        boxWidth: 0
+                        boxWidth: 0,
+                        // (a label wider than the legend: shortened, its value kept)
+                        hecShortNames: chart => this._legendShortNames(chart)
                     },
                 },
                 elements: {

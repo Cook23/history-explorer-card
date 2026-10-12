@@ -189,6 +189,24 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A legend too narrow for its labels: shortened, the value kept ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
+        { entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] }] }),
+        { mock: { series: true, language: 'fr' } });
+    const legendAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
+            return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
+    };
+    await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value; full width: as it is', async () => {
+        const wide = await legendAt(1000), mid = await legendAt(374), narrow = await legendAt(168);
+        await legendAt(1000);
+        return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
+            && mid.texts[0] === 'Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)'
+            && narrow.texts.every((x, i) => /…/.test(x) && x.endsWith(i ? '(300 W)' : '(400 W)')) && narrow.within ? true : JSON.stringify({ wide, mid, narrow });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {

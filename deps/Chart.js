@@ -11965,6 +11965,17 @@
                 ctx.textBaseline = 'top';
 
                 var _computedLineCount = 1;
+                // (fork) a label wider than a whole line: shortened — labels.hecShortNames
+                // (Chart.hecFitLegendText)
+                if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
+                  var _shortNames = labelOpts.hecShortNames(me.chart) || [];
+                  var _lineRoom = me.width - me.leftMargin - me.rightMargin - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
+                  var _fitted = Chart.hecFitLegendTexts(ctx, me.legendItems.map(function (it) {
+                    var _ds = me.chart.data.datasets[it.datasetIndex] || {};
+                    return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
+                  }), _lineRoom);
+                  me.legendItems.forEach(function (it, k) { it.text = _fitted[k]; });
+                }
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
                   var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;

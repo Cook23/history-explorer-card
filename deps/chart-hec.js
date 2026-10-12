@@ -260,6 +260,46 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // A chart's legend labels fitted to room px each (legend.labels.hecShortNames, see the
+  // legend's fit) — items: [{ text, name, forms }], text the label, name the dataset's name
+  // at its start, forms its shorter forms (least shortened first). As they are when they
+  // all fit; else every name at the same step — the first one at which they all fit —
+  // what follows the name (the value, the right axis' arrow) kept; else, at the last step,
+  // the names that still don't fit cut, '…' before what follows — and before a qualifier
+  // in parentheses at their end ('(F)'), kept when there's room for it: it often is what
+  // tells two curves apart
+  Chart.hecFitLegendTexts = function (ctx, items, room) {
+    var fits = function (t) { return ctx.measureText(t).width <= room; };
+    var parts = items.map(function (it) {
+      var _named = typeof it.name === 'string' && it.name && it.text.indexOf(it.name) === 0;
+      return { text: it.text, rest: _named ? it.text.slice(it.name.length) : '',
+               steps: _named ? [it.name].concat(it.forms || []) : [it.text] };
+    });
+    var at = function (p, k) { return p.steps[Math.min(k, p.steps.length - 1)] + p.rest; };
+    var _last = Math.max.apply(null, parts.map(function (p) { return p.steps.length - 1; }));
+    for (var k = 0; k <= _last; k++) {
+      if (parts.every(function (p) { return fits(at(p, k)); })) return parts.map(function (p) { return at(p, k); });
+    }
+    // (the longest start of base that fits with '…' then tail, or null)
+    var cut = function (base, tail) {
+      if (!fits(base.slice(0, 1) + '…' + tail)) return null;
+      var lo = 1, hi = base.length - 1, best = 1;
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        if (fits(base.slice(0, mid).trimEnd() + '…' + tail)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+      }
+      return base.slice(0, best).trimEnd() + '…' + tail;
+    };
+    return parts.map(function (p) {
+      if (fits(at(p, _last))) return at(p, _last);
+      var _base = p.steps[p.steps.length - 1];
+      var _q = /\s*(\([^()]*\))$/.exec(_base);
+      var _withQualifier = _q && _q.index > 0 ? cut(_base.slice(0, _q.index), ' ' + _q[1] + p.rest) : null;
+      return _withQualifier || cut(_base, p.rest) || _base.slice(0, 1) + '…' + p.rest;
+    });
+  };
+
+  // ---------------------------------------------------------------------------
   // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
   // over the curves as its point would be if shown — its own style and border — at the size
   // of a dot shown by default
