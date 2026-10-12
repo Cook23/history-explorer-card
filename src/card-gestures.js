@@ -91,6 +91,10 @@ export class CardGestures
         // (the lock+handle zone: the graph's menu)
         if( info.zone === 'lockAndHandle' )
             return this.showGraphMenu(0, g, info.clientX, info.clientY, info.yAxisLocked);
+        // (on a curve: its samples' dots shown or hidden — about halfway between two curves,
+        // or clearly beside them, nothing)
+        if( info.zone === 'plot' )
+            return info.curveIndex >= 0 && !this._isRowGraph(g) ? this._toggleCurvePoints(g, [g.entities[info.curveIndex]]) : undefined;
         const _r = info.labelRect;
         if( !_r ) return;
         if( info.legendIndex >= 0 && !this._isRowGraph(g) ) {

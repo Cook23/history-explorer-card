@@ -26,17 +26,30 @@
   var PICK_AMBIGUITY = 4;
   var PICK_BETWEEN = -2;
   function _hecPick(px, py, rects) {
-    var best = -1, d1 = Infinity, d2 = Infinity;
-    for (var i = 0; i < rects.length; i++) {
-      var r = rects[i];
+    return _hecPickNearest(rects.map(function (r) {
       var dx = Math.max(r.x - px, 0, px - (r.x + r.width));
       var dy = Math.max(r.y - py, 0, py - (r.y + r.height));
-      var d = Math.sqrt(dx * dx + dy * dy);
+      return Math.sqrt(dx * dx + dy * dy);
+    }));
+  }
+  // The same rule, from each candidate's distance to the point (Infinity: not a candidate)
+  function _hecPickNearest(dists) {
+    var best = -1, d1 = Infinity, d2 = Infinity;
+    for (var i = 0; i < dists.length; i++) {
+      var d = dists[i];
       if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
     }
     if (best < 0 || d1 === 0) return best;
     if (d1 > PICK_MARGIN) return -1;
     return d2 - d1 > PICK_AMBIGUITY ? best : PICK_BETWEEN;
+  }
+
+  // Distance from (px, py) to the segment (ax, ay)-(bx, by)
+  function _hecSegmentDistance(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    var t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+    var cx = ax + t * dx - px, cy = ay + t * dy - py;
+    return Math.sqrt(cx * cx + cy * cy);
   }
 
   // ---------------------------------------------------------------------------
@@ -210,17 +223,18 @@
 
   // ---------------------------------------------------------------------------
   // Samples shown — while _hecShowSamples is set (Alt held over the chart, see
-  // _hecSetShowSamples), each sample of a curve is drawn as a dot, the ones its dataset
-  // already shows keeping their own size; a point that only shapes the curve (hecVirtual)
-  // stays hidden
-  var HEC_SAMPLE_RADIUS = 3;
+  // _hecSetShowSamples), each sample of a curve is drawn as a dot of a diameter of the line
+  // width + 2 px, the ones its dataset already shows keeping their own size; a point that
+  // only shapes the curve (hecVirtual) stays hidden
   Chart.plugins.register({
     id: 'hecShowSamples',
     afterDatasetUpdate: function (chart, args) {
       if (!chart._hecShowSamples || !args.meta.dataset) return;
-      var _data = chart.data.datasets[args.index].data || [];
+      var _ds = chart.data.datasets[args.index];
+      var _data = _ds.data || [];
+      var _radius = ((+_ds.borderWidth || 0) + 2) / 2;
       (args.meta.data || []).forEach(function (pt, i) {
-        if (pt._model && !(pt._model.radius > 0) && !(_data[i] && _data[i].hecVirtual)) pt._model.radius = HEC_SAMPLE_RADIUS;
+        if (pt._model && !(pt._model.radius > 0) && !(_data[i] && _data[i].hecVirtual)) pt._model.radius = _radius;
       });
     } });
 
@@ -1834,6 +1848,34 @@
       me._hecTapped = true;
     },
 
+    // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
+    // each shown line's distance to the point, along its drawn path — its points joined
+    // straight, or in steps for a stepped line; -1, or PICK_BETWEEN about halfway
+    // between two
+    _hecCurveAt: function (px, py) {
+      var me = this;
+      var _dists = (me.data.datasets || []).map(function (ds, i) {
+        var meta = me.getDatasetMeta(i);
+        if (!meta.dataset || !me.isDatasetVisible(i)) return Infinity;
+        var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
+          .map(function (p) { return p._view; });
+        var st = ds.steppedLine, best = Infinity;
+        for (var k = 1; k < pts.length; k++) {
+          var a = pts[k - 1], b = pts[k];
+          // (only the segments around the point can be near it)
+          if (Math.max(a.x, b.x) < px - PICK_MARGIN || Math.min(a.x, b.x) > px + PICK_MARGIN) continue;
+          var path = !st ? [a, b]
+            : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
+            : st === 'after' ? [a, { x: a.x, y: b.y }, b]
+            : [a, { x: b.x, y: a.y }, b];
+          for (var j = 1; j < path.length; j++)
+            best = Math.min(best, _hecSegmentDistance(px, py, path[j - 1].x, path[j - 1].y, path[j].x, path[j].y));
+        }
+        return best;
+      });
+      return _hecPickNearest(_dists);
+    },
+
     // The elements of a hit-test drawn on the plot area (not skipped, not clipped out)
     _hecOnlyDrawnPoints: function (elements) {
       var me = this;
@@ -1934,6 +1976,12 @@
         event: native };
       var _hb = this._hecHandleButtonFields(x, y);
       for (var hk in _hb) payload[hk] = _hb[hk];
+      // (a contact on the plot area: the curve it's on, by the picking rule)
+      if (payload.zone === 'plot' && (gestureType === 'click' || gestureType === 'dblclick' || gestureType === 'longpress')) {
+        var _ci = this._hecCurveAt(x, y);
+        payload.curveIndex = _ci >= 0 ? _ci : -1;
+        if (_ci === PICK_BETWEEN) payload.curveBetween = true;
+      }
       if (this._hecHasYAxisLock()) payload.yAxisLocked = !!this._hecYAxisLock;
       if (extra) { for (var k in extra) payload[k] = extra[k]; }
       return payload;

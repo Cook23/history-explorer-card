@@ -233,15 +233,45 @@ export class CardGraphs
         };
     }
 
+    // The samples' dots of a curve of line width `width`: the entity's showPoints, else the
+    // graph's — true: a diameter of the line width + 2 px, as every dot shown by default
+    // (Alt's too, see deps/chart-hec.js); a number: that radius. The hovered dot — the one
+    // the tooltip shows — 2 px wider than the dots shown (than the default ones when none is)
+    _pointRadii(own, graph, width)
+    {
+        const _v = own !== undefined ? own : graph;
+        const _default = ( (+width || 0) + 2 ) / 2;
+        const _radius = ( _v === undefined || _v === null || _v === false || _v === 0 ) ? 0 : _v === true ? _default : +_v;
+        return { pointRadius: _radius, pointHoverRadius: ( _radius || _default ) + 1 };
+    }
+
+    // The samples' dots of curves of graph g (its entities, its own entries in the store)
+    // shown — or hidden when all of them show theirs; saved as their showPoints
+    _toggleCurvePoints(g, entities)
+    {
+        const _ds = e => g.chart.data.datasets[g.entities.indexOf(e)];
+        const _curves = this._isRowGraph(g) ? [] : entities.filter(e => _ds(e) && g.chart.getDatasetMeta(g.entities.indexOf(e)).dataset);
+        if( !_curves.length ) return;
+        const _show = !_curves.every(e => _ds(e).pointRadius > 0);
+        for( const e of _curves ) {
+            e.showPoints = _show;
+            Object.assign(_ds(e), this._pointRadii(_show, undefined, _ds(e).borderWidth));
+        }
+        g.chart.update();
+        this.writeLocalState();
+    }
+
+    // Whether every curve of graph g shows its samples' dots (none: undefined)
+    _curvesShowPoints(g)
+    {
+        if( this._isRowGraph(g) ) return undefined;
+        const _idx = g.entities.map((e, i) => i).filter(i => g.chart.getDatasetMeta(i).dataset);
+        return _idx.length ? _idx.every(i => g.chart.data.datasets[i].pointRadius > 0) : undefined;
+    }
+
     _curveDataset(d, graphtype, config)
     {
-        // The samples' dots: the entity's showPoints, else the graph's (a radius, true: 4);
-        // a hovered one 2px larger (5 when none is shown)
-        const _radius = v => v === true ? 4 : +v;
-        const _own = d.showPoints, _graph = config?.showPoints;
-        const _ownOn = _own !== undefined && _own !== false && _own !== 0;
-        const _pointRadius = _own !== undefined ? ( _ownOn ? _radius(_own) : 0 ) : ( _graph ? _radius(_graph) : 0 );
-        const _pointHoverRadius = _ownOn ? _radius(_own) + 2 : _graph ? _radius(_graph) + 2 : 5;
+        const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(d.showPoints, config?.showPoints, d.width);
         const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
         return {
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked

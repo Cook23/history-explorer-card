@@ -37,15 +37,15 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display, interpolation, the Y axis, its layout open', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display, interpolation, its layout open (the points, the Y axis)', async () => {
         await graphMenu('rain');
         const m = await menu();
-        return m === 'rain || Display ▸ | Interpolation ▸ | Lock the Y axis | Layout ▸* || Cut' ? true : m;
+        return m === 'rain || Display ▸ | Interpolation ▸ | Layout ▸* || Show the points | Lock the Y axis | Cut' ? true : m;
     });
     await t.step('Lock the Y axis: locked; the menu then offers to unlock it, which releases it', async () => {
-        await click('ylock');
+        await click('layout'); await click('ylock');
         const r = { locked: await t.E(`lockOf(${await gi('rain')})`) };
-        await graphMenu('rain'); r.menu = await menu(); await click('ylock');
+        await graphMenu('rain'); r.menu = await menu(); await click('layout'); await click('ylock');
         r.released = await t.E(`lockOf(${await gi('rain')})`);
         return r.locked === 1 && r.menu.includes('Unlock the Y axis') && r.released === 0 ? true : JSON.stringify(r);
     });

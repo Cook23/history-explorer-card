@@ -51,7 +51,9 @@ const lang_en =
             "entity_cut"        : "Cut",
             "graph_delete"      : "Delete the graph",
             "ylock"             : "Lock the Y axis",
-            "yunlock"           : "Unlock the Y axis"
+            "yunlock"           : "Unlock the Y axis",
+            "points_show"       : "Show the points",
+            "points_hide"       : "Hide the points"
         },
         "values" : {
             "min" : "Min",
@@ -133,7 +135,9 @@ const lang_fr =
             "entity_cut"        : "Couper",
             "graph_delete"      : "Supprimer le graphique",
             "ylock"             : "Verrouiller l'axe Y",
-            "yunlock"           : "Déverrouiller l'axe Y"
+            "yunlock"           : "Déverrouiller l'axe Y",
+            "points_show"       : "Afficher les points",
+            "points_hide"       : "Masquer les points"
         },
         "values" : {
             "min" : "Min",
@@ -215,7 +219,9 @@ const lang_de =
             "entity_cut"        : "Ausschneiden",
             "graph_delete"      : "Diagramm löschen",
             "ylock"             : "Y-Achse sperren",
-            "yunlock"           : "Y-Achse entsperren"
+            "yunlock"           : "Y-Achse entsperren",
+            "points_show"       : "Punkte anzeigen",
+            "points_hide"       : "Punkte ausblenden"
         },
         "values" : {
             "min" : "Min",
@@ -297,7 +303,9 @@ const lang_es =
             "entity_cut"        : "Cortar",
             "graph_delete"      : "Eliminar el gráfico",
             "ylock"             : "Bloquear el eje Y",
-            "yunlock"           : "Desbloquear el eje Y"
+            "yunlock"           : "Desbloquear el eje Y",
+            "points_show"       : "Mostrar los puntos",
+            "points_hide"       : "Ocultar los puntos"
         },
         "values" : {
             "min" : "Mín",
@@ -379,7 +387,9 @@ const lang_nl =
             "entity_cut"        : "Knippen",
             "graph_delete"      : "Grafiek verwijderen",
             "ylock"             : "Y-as vergrendelen",
-            "yunlock"           : "Y-as ontgrendelen"
+            "yunlock"           : "Y-as ontgrendelen",
+            "points_show"       : "Punten tonen",
+            "points_hide"       : "Punten verbergen"
         },
         "values" : {
             "min" : "Min",
@@ -461,7 +471,9 @@ const lang_pl =
             "entity_cut"        : "Wytnij",
             "graph_delete"      : "Usuń wykres",
             "ylock"             : "Zablokuj oś Y",
-            "yunlock"           : "Odblokuj oś Y"
+            "yunlock"           : "Odblokuj oś Y",
+            "points_show"       : "Pokaż punkty",
+            "points_hide"       : "Ukryj punkty"
         },
         "values" : {
             "min" : "Min",
@@ -543,7 +555,9 @@ const lang_sv =
             "entity_cut"        : "Klipp ut",
             "graph_delete"      : "Ta bort grafen",
             "ylock"             : "Lås Y-axeln",
-            "yunlock"           : "Lås upp Y-axeln"
+            "yunlock"           : "Lås upp Y-axeln",
+            "points_show"       : "Visa punkterna",
+            "points_hide"       : "Dölj punkterna"
         },
         "values" : {
             "min" : "Min",
@@ -625,7 +639,9 @@ const lang_da =
             "entity_cut"        : "Klip",
             "graph_delete"      : "Slet grafen",
             "ylock"             : "Lås Y-aksen",
-            "yunlock"           : "Lås Y-aksen op"
+            "yunlock"           : "Lås Y-aksen op",
+            "points_show"       : "Vis punkterne",
+            "points_hide"       : "Skjul punkterne"
         },
         "values" : {
             "min" : "Min",
@@ -707,7 +723,9 @@ const lang_sk =
             "entity_cut"        : "Vystrihnúť",
             "graph_delete"      : "Odstrániť graf",
             "ylock"             : "Uzamknúť os Y",
-            "yunlock"           : "Odomknúť os Y"
+            "yunlock"           : "Odomknúť os Y",
+            "points_show"       : "Zobraziť body",
+            "points_hide"       : "Skryť body"
         },
         "values" : {
             "min" : "Min",
@@ -789,7 +807,9 @@ const lang_ru =
             "entity_cut"        : "Вырезать",
             "graph_delete"      : "Удалить график",
             "ylock"             : "Заблокировать ось Y",
-            "yunlock"           : "Разблокировать ось Y"
+            "yunlock"           : "Разблокировать ось Y",
+            "points_show"       : "Показать точки",
+            "points_hide"       : "Скрыть точки"
         },
         "values" : {
             "min" : "Мин",
