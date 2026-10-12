@@ -24,6 +24,8 @@ The suites:
 | `graphmenu` | A graph's menu (long-press, right click, touch): its title, *Display* and *Interpolation* for all its curves, its submenus placed as everywhere, the Y axis locked and released, a graph added from the card deleted; cut and paste: a graph inserted above or below another (by a click, or a swipe up or down, mouse and touch), a curve pasted into a graph, the places refused struck through and saying why, cancelled by a click elsewhere, Escape or ✂, a click just beside a button counting as on it, halfway between two doing nothing |
 | `values` | Over a graph: each curve's value now and its statistics over the window shown (`showState`, `showStats` at every level, a hidden curve, the window moved), `showGrid`, `yLabels: inside`, `fill: fade`, `look: mini` (the card's own options winning) |
 | `realtime` | Zooming the time in real time (the present kept on the right by the + / − buttons, the time range selector, the wheel from the right 10 %, a pinch with a finger in the right 20 %) and in the history (the middle kept, whatever the duration) |
+| `points` | A gesture on a curve, picked as a label is: a click puts it in the tooltip mode (one curve, then two; beside them, leaving them), a long-press or a right click shows or hides its points (mouse and finger); of two curves the one under the pointer, the dead zone between two, two on top of each other; *Show the points* in the Layout submenus; Alt's points as wide as the line + 2 px |
+| `settings` | The options menu in submenus; the gesture settings: kept within bounds, a long-press and a drag by the values set, saved on every device, the YAML and the menu (last one to speak), another device; the info panel's switch on a new device |
 | `copies` | The same curve in several graphs: in the YAML, from the selector after a choice (cancel or a second curve), each its own and saved on its own, refused twice in one graph, kept on another device |
 | `attributes` | An entity's attributes as curves (a number followed by its unit, colors read from an attribute): `attribute:` in the YAML (and after the entity id), their history asked with the attributes, never their statistics; the entity selector's submenu (*Value* first, then the attributes), keyboard and mouse, kept after a reload |
 | `yaxes` | Two Y axes: one per group of units (left, right), `yAxis`, the arrow in the legend, linked graphs aligned, circular labels and stacked bars per axis; dragging each axis, Shift, the pinch and the padlock on both |
@@ -38,7 +40,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes, copies, values or realtime
+yarn test touch        # one suite: lint, store, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes, copies, values, realtime, points or settings
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

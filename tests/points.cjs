@@ -81,7 +81,7 @@ module.exports = async function()
     });
     await t.step('two curves exactly on top of each other: the one drawn over', async () => {
         const p = await t.E(`(()=>{ const c=graphAt(3).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
-            const v=c.getDatasetMeta(1).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40)[10]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+            const v=c.getDatasetMeta(1).data.map(p=>p._view).find(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30); return {x:r.left+v.x, y:r.top+v.y}; })()`);
         await t.longPress(p); const a = await dots(t, 3, 0), b = await dots(t, 3, 1); await t.longPress(p);
         return shown(a) && b.r === 0 ? true : JSON.stringify({ a, b });
     });

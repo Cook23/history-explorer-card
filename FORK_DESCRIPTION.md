@@ -14,9 +14,9 @@ A single click on a curve or entity label shows or hides it. A double-click extr
 
 ## Touch, pen and mouse
 
-On a phone or a tablet, a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag. Two fingers zoom and pan the time and the Y axis. A label is picked when touched just beside it, never when the touch is about halfway between two.
+On a phone or a tablet, a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away and drag. Two fingers zoom and pan the time and the Y axis.
 
-The tooltip opens on a click or a tap on the curves, then follows the mouse until the pointer leaves them — hovering alone doesn't open it. A pen's tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it; *Tests (beta) ▸ Pen events*, at the end of the type menu, shows what a browser or app reports of a pen, and sends it as a report.
+The tooltip opens on a click or a tap near a curve, for that curve — several can show theirs — then follows the mouse until the pointer leaves them — hovering alone doesn't open it; a long-press near a curve shows or hides its points. A label, a button or a curve is picked when touched just beside it, never about halfway between two. How long a long-press lasts and how far a pointer moves before it drags can be set, for a mouse or a pen and for a finger — for a less steady hand. A pen's tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it; *Tests (beta) ▸ Pen events*, at the end of the type menu, shows what a browser or app reports of a pen, and sends it as a report.
 
 ## Line appearance and statistics
 

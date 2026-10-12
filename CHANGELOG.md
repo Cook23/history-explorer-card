@@ -4,7 +4,34 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.14] - 2026-10-11
+## [v1.2.14] - 2026-10-12
+
+### New — the tooltip of the curve clicked; its points shown by a long-press
+- A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip mode: its value nearest the pointer is shown, and follows the pointer. A click near another curve adds it: several curves show their values together. Leaving the curves, or a click outside them, ends it; a click beside the curves changes nothing. On bars and timelines, the bar or the state clicked (or just beside it)
+- A long-press (or a right click) near a curve shows all its points, or hides them — saved with the curve, as its `showPoints`. Also *Show the points* / *Hide the points* in the *Layout* submenu of a curve's menu, and of a graph's (all its curves)
+- *Lock the Y axis* moved into the *Layout* submenu of a graph's menu: no option of its own in the menu itself
+- The points: as wide as the line plus 2 px (Alt's, and `showPoints: true`); the one the tooltip shows, 2 px wider than the points shown (a number in `showPoints` is still their radius)
+- Chart.js: the payload's `curveIndex` / `curveBetween` (contact gestures on the plot area); `_hecCurveAt`, `_hecElementAt`; the tooltip mode a list of curves
+- Tests: suite `points` — a long-press and a right click on a curve, of two curves the one under the pointer, the dead zone between two, two curves on top of each other, the Layout submenus, Alt's points, a finger; the tooltip of one curve then of two, beside the curves, leaving them
+
+### New — one picking rule, for every small target
+- A label, a button, a curve, a bar, a state: picked when touched just beside it (within 12 px), never in the middle third between two (the dead zone grows with the gap between them — it was 4 px whatever the gap). From above or below two close curves, the one on that side is picked; two on the same pixel are one place, the one drawn on top
+- The chain icon, the ⠿ / padlock zone and the legend's labels are picked together, as one set of small targets; the toolbar's small buttons (`<`, `>`, −, +, the magnifying glass) too — a click just beside one is on it
+- Tests: a click beside a toolbar button
+
+### New — gesture settings, for every card
+- How long a long-press lasts, and how far a pointer moves before it drags — for a mouse or a pen, and for a finger: `gestures:` (`longPress`, `longPressTouch` in ms, 200 to 2000, default 500; `drag`, `dragTouch` in px, 2 to 40, default 10), or *All cards ▸* in the options menu, entered right there and kept within bounds. For a less steady or slower hand
+- One duration and one distance used everywhere: the long-press (it was 600 ms), the delay between a release and a second press for a double-click or a tap-then-drag (it was 400 ms between the two presses), the time the page doesn't scroll after a tap on a draggable zone (it was 500 ms); the distance for every drag and every "same place"
+- Like the info panel's switch: for every card and info panel of the page, the last one to speak — a card's YAML, the menu on any device — winning, always kept on every device whatever the card's persistence options (the info panel's switch already was: now tested)
+- Chart.js: `Chart.defaults.global.gestures` (`{ mouse, touch }`, each `{ longPressMs, slop }`)
+- Tests: suite `settings` — the menu, the bounds, a long-press and a drag by the values set, kept after a reload and on a new device, the YAML then the menu speaking, another device changing them, the info panel's switch on a new device
+
+### Changed — the options menu in submenus
+- *Export ▸* (CSV, statistics), *This card ▸* (remove the added graphs), *All cards ▸* (the info panel, the gesture settings); arrows, Enter or → to open, ← or Escape to go back
+
+### Changed — the entity selector marks the entities with attributes
+- An entity whose attributes can be shown — a click opens their submenu — is marked ▸, as every menu line opening a submenu
+- Tests: ▸ on an entity with attributes, not on one without
 
 ### Fixed — only a click or a tap opens the tooltip
 - The tooltip opened as soon as a finger or the mouse button went down on a curve: the start of a pinch, of a swipe moving the time or scrolling the page, of a drag with the mouse opened it, and the tooltip mode stayed on after. It now opens on a click or a tap only — released without a drag, a pinch or a long press

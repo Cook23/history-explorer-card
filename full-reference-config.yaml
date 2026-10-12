@@ -89,7 +89,8 @@ graphs:
       # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
       showMinMax: False
 
-      # (line graph only) If true, show permanent dots at each measurement point making up the line
+      # (line graph only) If true, show permanent dots at each measurement point making up the line — the line
+      # width + 2 px wide (a number: their radius in px). A long-press near the curve shows or hides them
       showPoints: False
 
       # (bar graph only) If true, this entity is treated as net-metering — its value can go down as
@@ -423,6 +424,21 @@ defaultTimeRange: '24'
 
 # By default, the right side of the graph will be the current time. Use this to offset the time range the graph should display. Using lower case suffices for relative offsets, and using upper case units to display the current hour, day, month or year.
 defaultTimeOffset: undefined
+
+# The gesture thresholds — for every card and info panel of the page, and every device (the last one to speak,
+# this YAML or the options menu's All cards submenu, wins). Each kept within its bounds
+gestures:
+  # A press held this long (ms) is a long-press; a second press this soon after a release is a double-click
+  # or a tap-then-drag; after a tap on a draggable zone, the page doesn't scroll from there for that long.
+  # Mouse and pen (200 to 2000)
+  longPress: 500
+  # The same, for a finger
+  longPressTouch: 500
+  # A pointer that moved further than this (px) is dragging; a second press within it of the first is at the
+  # same place. Mouse and pen (2 to 40)
+  drag: 10
+  # The same, for a finger
+  dragTouch: 10
 
 # Whether the info panel (see $.infoPanel below) is enabled by default, replacing HA's native more-info
 # history for every entity — a super-global setting shared by every History Explorer card on the page/HA
