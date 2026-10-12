@@ -11952,6 +11952,14 @@
                 // the legend's lines, for what the card draws there)
                 me.leftMargin = me.options.leftMargin !== undefined ? me.options.leftMargin : 50;
                 me.rightMargin = me.options.rightMargin !== undefined ? me.options.rightMargin : 25;
+                // (fork) the margins of a line: the first one's, for what the card draws at both
+                // ends of the legend's top; below it, on a chart narrower than
+                // legend.hecFullWidthBelow, 4 px — the whole width for the labels
+                var _fullBelow = me.options.hecFullWidthBelow;
+                var _narrow = !!_fullBelow && me.width < _fullBelow;
+                me._hecMarginsOf = function (line) {
+                  return line > 0 && _narrow ? { l: 4, r: 4 } : { l: me.leftMargin, r: me.rightMargin };
+                };
                 var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
                 if (me._ratchetBaseKey !== _baseKey) {
                     me._ratchetBaseKey = _baseKey;
@@ -11969,7 +11977,8 @@
                 // (Chart.hecFitLegendText)
                 if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
                   var _shortNames = labelOpts.hecShortNames(me.chart) || [];
-                  var _lineRoom = me.width - me.leftMargin - me.rightMargin - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
+                  var _widest = _narrow ? me._hecMarginsOf(1) : me._hecMarginsOf(0);
+                  var _lineRoom = me.width - _widest.l - _widest.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
                   var _fitted = Chart.hecFitLegendTexts(ctx, me.legendItems.map(function (it) {
                     var _ds = me.chart.data.datasets[it.datasetIndex] || {};
                     return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
@@ -11980,7 +11989,8 @@
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
                   var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
 
-                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - me.leftMargin - me.rightMargin) {
+                  var _m = me._hecMarginsOf(lineWidths.length - 1);
+                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - _m.l - _m.r) {
                     totalHeight += fontSize + labelOpts.padding;
                     lineWidths[lineWidths.length] = me.left;
                     _computedLineCount++;
@@ -12172,10 +12182,12 @@
                 var y = cursor.y;
 
                 if (isHorizontal) {
-                  if (x + width >= legendWidth - me.rightMargin) {
+                  var _mNow = me._hecMarginsOf ? me._hecMarginsOf(cursor.line) : { l: me.leftMargin, r: me.rightMargin };
+                  if (x + width >= legendWidth - _mNow.r) {
                     y = cursor.y += itemHeight;
                     cursor.line++;
-                    x = cursor.x = me.left + me.leftMargin + (legendWidth - me.leftMargin - me.rightMargin - lineWidths[cursor.line]) / 2;
+                    var _mNext = me._hecMarginsOf ? me._hecMarginsOf(cursor.line) : _mNow;
+                    x = cursor.x = me.left + _mNext.l + (legendWidth - _mNext.l - _mNext.r - lineWidths[cursor.line]) / 2;
                   }
                 } else if (y + itemHeight > me.bottom) {
                   x = cursor.x = x + me.columnWidths[cursor.line] + labelOpts.padding;

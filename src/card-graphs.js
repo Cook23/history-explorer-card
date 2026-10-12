@@ -204,6 +204,8 @@ export class CardGraphs
                 },
                 legend: {
                     display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true,
+                    // (a narrow card: below the first line, the labels take the whole width)
+                    hecFullWidthBelow: NARROW_CARD_PX,
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
