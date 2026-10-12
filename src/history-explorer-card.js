@@ -360,66 +360,9 @@ export class HistoryCardState {
 
             this.pconfig.nextDefaultColor = 0;
 
-            // Rebuild all graphs (static and dynamic) from pconfig.entities
-            if( this.store.list ) {
-                // Group by groupId, preserving first-occurrence order
-                const _groupMap = new Map();
-                const _groupOrder = [];
-                for( let e of this.store.list ) {
-                    const _groupId = typeof e === 'object' ? e.groupId : undefined;
-                    const _key = _groupId ?? Symbol();
-                    if( !_groupMap.has(_key) ) {
-                        _groupMap.set(_key, { groupId: _groupId, entities: [] });
-                        _groupOrder.push(_key);
-                    }
-                    _groupMap.get(_key).entities.push(e);
-                }
-                // Sort each group's entities by their initial graphIndex — captured here,
-                // before any recomputation — so a solid block of several linked graphs
-                // (same groupId, different graphIndex) gets rebuilt in the order it was
-                // actually displayed in, not pconfig.entities' array order (which must stay
-                // untouched below for re-combine to keep working when a type becomes
-                // compatible again). Stable sort: entities that already share one
-                // graphIndex (one graph) keep their relative order.
-                for( let _group of _groupMap.values() )
-                    _group.entities.sort((a, b) => (a.graphIndex ?? 0) - (b.graphIndex ?? 0));
-                // Physically regroup the persisted list the same way — never interleaved
-                // again, so its order stays the single source of truth for display order
-                // everywhere else (neighbor lookups, graphIndex averaging).
-                this.store.regroup();
-
-                // Rebuild: call addGraph one entity at a time
-                // For statics: force combineSameUnits (YAML author responsible for grouping)
-                // For dynamics: combine logic in addGraph handles groupId + compatibility
-                // The graphIndex each entity had when last saved, captured before addGraph
-                // recomputes it: within a group, only entities that were shown in the same
-                // graph are combined again (see addGraph). Statics never persist graphIndex,
-                // so for them this is always undefined === undefined — graphKey decides.
-                this._rebuildGraphIndex = new Map(this.store.list.map(e => [e, e.graphIndex]));
-                for( let _key of _groupOrder ) {
-                    const _group = _groupMap.get(_key);
-                    const _isStaticGroup = _group.entities.some(e => e.isStatic);
-                    const _saved = this.pconfig.combineSameUnits;
-                    if( _isStaticGroup ) this.pconfig.combineSameUnits = true;
-                    // _group.entities is sorted by graphIndex above — walk it in that order
-                    // and always pass no `before`: addGraph's own combine logic
-                    // (matched by groupId) merges compatible entities regardless, and any
-                    // entity that can't combine simply becomes a new graph appended after
-                    // whatever's been built so far — correct precisely because we're
-                    // walking the group in its true display order already.
-                    _group.entities.forEach((_e) => {
-                        const _eid = entityIdOf(_e);
-                        this.addGraph(_eid, { color: _e.color, fill: _e.fill, hidden: _e.hidden, isStatic: _e.isStatic, interval: _e.interval, groupId: _group.groupId, entry: _e });
-                    });
-                    if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
-                }
-                this._rebuildGraphIndex = null;
-                // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
-                // from scratch — persist that result now rather than leaving storage stale
-                // until some unrelated later action happens to call writeLocalState.
-                this.writeLocalState();
-            } else
-                this.store.list = [];
+            // Every graph (static and dynamic) built from the entity list
+            if( this.store.list ) this._buildGraphsFromStore();
+            else this.store.list = [];
 
             this.today(false);
 
@@ -440,6 +383,69 @@ export class HistoryCardState {
                 setInterval(this.refresh.bind(this), this.pconfig.refreshInterval * 1000);
 
         }
+    }
+
+    // Builds every graph (static and dynamic) from the entity list (pconfig.entities), in
+    // its order, then saves the result — at first display, and when the card goes back to
+    // the YAML (_resetToYaml)
+    _buildGraphsFromStore()
+    {
+        // Group by groupId, preserving first-occurrence order
+        const _groupMap = new Map();
+        const _groupOrder = [];
+        for( let e of this.store.list ) {
+            const _groupId = typeof e === 'object' ? e.groupId : undefined;
+            const _key = _groupId ?? Symbol();
+            if( !_groupMap.has(_key) ) {
+                _groupMap.set(_key, { groupId: _groupId, entities: [] });
+                _groupOrder.push(_key);
+            }
+            _groupMap.get(_key).entities.push(e);
+        }
+        // Sort each group's entities by their initial graphIndex — captured here,
+        // before any recomputation — so a solid block of several linked graphs
+        // (same groupId, different graphIndex) gets rebuilt in the order it was
+        // actually displayed in, not pconfig.entities' array order (which must stay
+        // untouched below for re-combine to keep working when a type becomes
+        // compatible again). Stable sort: entities that already share one
+        // graphIndex (one graph) keep their relative order.
+        for( let _group of _groupMap.values() )
+            _group.entities.sort((a, b) => (a.graphIndex ?? 0) - (b.graphIndex ?? 0));
+        // Physically regroup the persisted list the same way — never interleaved
+        // again, so its order stays the single source of truth for display order
+        // everywhere else (neighbor lookups, graphIndex averaging).
+        this.store.regroup();
+
+        // Rebuild: call addGraph one entity at a time
+        // For statics: force combineSameUnits (YAML author responsible for grouping)
+        // For dynamics: combine logic in addGraph handles groupId + compatibility
+        // The graphIndex each entity had when last saved, captured before addGraph
+        // recomputes it: within a group, only entities that were shown in the same
+        // graph are combined again (see addGraph). Statics never persist graphIndex,
+        // so for them this is always undefined === undefined — graphKey decides.
+        this._rebuildGraphIndex = new Map(this.store.list.map(e => [e, e.graphIndex]));
+        for( let _key of _groupOrder ) {
+            const _group = _groupMap.get(_key);
+            const _isStaticGroup = _group.entities.some(e => e.isStatic);
+            const _saved = this.pconfig.combineSameUnits;
+            if( _isStaticGroup ) this.pconfig.combineSameUnits = true;
+            // _group.entities is sorted by graphIndex above — walk it in that order
+            // and always pass no `before`: addGraph's own combine logic
+            // (matched by groupId) merges compatible entities regardless, and any
+            // entity that can't combine simply becomes a new graph appended after
+            // whatever's been built so far — correct precisely because we're
+            // walking the group in its true display order already.
+            _group.entities.forEach((_e) => {
+                const _eid = entityIdOf(_e);
+                this.addGraph(_eid, { color: _e.color, fill: _e.fill, hidden: _e.hidden, isStatic: _e.isStatic, interval: _e.interval, groupId: _group.groupId, entry: _e });
+            });
+            if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
+        }
+        this._rebuildGraphIndex = null;
+        // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
+        // from scratch — persist that result now rather than leaving storage stale
+        // until some unrelated later action happens to call writeLocalState.
+        this.writeLocalState();
     }
 
     refresh()

@@ -113,7 +113,6 @@ export class CardToolbar
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
         this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
         this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
-        this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
         this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
         // A click on the toolbar beside its small buttons — none under it: the one picked
@@ -164,7 +163,6 @@ export class CardToolbar
         this.relabelTypeMenu(i);
         this.relabelOptionsMenu(i);
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
-        let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {

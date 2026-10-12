@@ -238,7 +238,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*).
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
 The type menu opens:
 
@@ -1324,7 +1324,7 @@ Either way, an option set on a graph or on the entity itself wins over `entityOp
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
 - **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
-- **This card ▸** — *Remove all added graphs*;
+- **This card ▸** — *Default graphs*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu (*Confirm* / *Cancel*, Cancel marked: Enter or Escape changes nothing). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
 - **All cards ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`), and the gesture settings below, entered right in the submenu.
 
 Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.

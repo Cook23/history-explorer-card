@@ -25,7 +25,7 @@ export const _TYPE_MENU_DEFS = [
 // Display order of the type menu's entries (indices in _TYPE_MENU_DEFS), and their style —
 // shared by the card's menu and the info panel's
 export const _TYPE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
-export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit';
+export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis';
 
 // The type menu's items, each opening its submenu over the menu, right-aligned, level with
 // it: what the entity is shown as (open when the menu opens), how its curve is
@@ -75,18 +75,26 @@ const SUBMENU_MEMORY_MS = 10000;
 // it), and what concerns every card of the page and every device (the info panel, the
 // gesture thresholds — entered in the submenu itself, kept within their bounds)
 const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
+// The actions of This card ▸ (eo_N_<key>), each confirmed in a submenu of its own over it
+// (eo_N_<key>_sub: Confirm / Cancel — Cancel marked, so that Enter destroys nothing): the
+// graphs added from the card removed (defaultGraphs), and everything back to the YAML
+// (defaultDisplay)
+const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
+                        defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
 export function optionsMenuHtml(i, statistics)
 {
     const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
     const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
     const input = k => { const s = GESTURE_SETTINGS[k];
-        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}">${i18n(s.label)}</span>` +
+        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}" style="overflow:hidden;text-overflow:ellipsis;min-width:0">${i18n(s.label)}</span>` +
                `<input id="eo_${i}_g_${k}" type="number" min="${s.min}" max="${s.max}" step="${s.step}" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`; };
     return `<div id="eo_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:1">
             ${Object.keys(_OPTIONS_SUBMENUS).map(k => a(`eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]) + ' ▸')).join('')}
         </div>
         ${sub('export', [a(`ef_${i}`), statistics ? a(`eh_${i}`) : ''])}
-        ${sub('card', [a(`eg_${i}`)])}
+        ${sub('card', Object.keys(_CARD_ACTIONS).map(k => a(`eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label))))}
+        ${Object.keys(_CARD_ACTIONS).map(k => `<div id="eo_${i}_${k}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};z-index:4">` +
+            a(`eo_${i}_${k}_ok`, i18n('ui.menu.confirm_ok')) + a(`eo_${i}_${k}_cancel`, i18n('ui.menu.confirm_cancel')) + `</div>`).join('')}
         ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}`;
 }
 
@@ -369,6 +377,8 @@ export class CardMenus
     // remembered submenu this menu doesn't show: def)
     _openRememberedSubmenu(input_idx, def)
     {
+        // (no room for the menu and a submenu beside its lines: the menu alone, read first)
+        if( this._this.querySelector(`#et_${input_idx}`)?.dataset.hecCramped ) return;
         const _key = this._submenuToOpen(this._typeMenuKind(input_idx), def);
         this.showTypeSubmenu(input_idx, _key);
         if( _key !== def && this._this.querySelector(`#et_${input_idx}_${_key}_sub`)?.style.display === 'none' )
@@ -702,15 +712,36 @@ export class CardMenus
     // The options menu (eo_N, see optionsMenuHtml)
     // --------------------------------------------------------------------------------------
 
+    // The options menu's submenus, the confirmations of This card's actions included
     _optionsSubmenus(i)
     {
-        return Object.keys(_OPTIONS_SUBMENUS).map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+        return [...Object.keys(_OPTIONS_SUBMENUS), ...Object.keys(_CARD_ACTIONS)].map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+    }
+
+    // Asks for the confirmation of This card's action key, over This card ▸ (Cancel marked)
+    _confirmCardAction(i, key)
+    {
+        const _item = this._this.querySelector(`#eo_${i}_${key}`);
+        const _sub  = this._this.querySelector(`#eo_${i}_${key}_sub`);
+        if( !_item || !_sub ) return;
+        for( const k in _CARD_ACTIONS ) if( k !== key ) this._this.querySelector(`#eo_${i}_${k}_sub`).style.display = 'none';
+        this._openSubmenu(_sub, _item);
+        const _cancel = this._this.querySelector(`#eo_${i}_${key}_cancel`);
+        delete this._this.querySelector(`#eo_${i}_${key}_ok`).dataset.hecSelected;
+        _cancel.dataset.hecSelected = '1';
+        _sub.focus();
     }
 
     // The options menu's names, in the card's language
     relabelOptionsMenu(i)
     {
         for( const k in _OPTIONS_SUBMENUS ) { const _el = this._this.querySelector(`#eo_${i}_${k}`); if( _el ) _el.textContent = i18n(_OPTIONS_SUBMENUS[k]) + ' ▸'; }
+        const set = (id, text) => { const _el = this._this.querySelector(`#${id}`); if( _el ) _el.textContent = text; };
+        for( const k in _CARD_ACTIONS ) {
+            set(`eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label));
+            set(`eo_${i}_${k}_ok`, i18n('ui.menu.confirm_ok'));
+            set(`eo_${i}_${k}_cancel`, i18n('ui.menu.confirm_cancel'));
+        }
         for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
     }
 
@@ -737,6 +768,14 @@ export class CardMenus
         const _subs = this._optionsSubmenus(i);
         for( const k in _OPTIONS_SUBMENUS )
             this._this.querySelector(`#eo_${i}_${k}`)?.addEventListener('click', (e) => { e.preventDefault(); this.showOptionsSubmenu(i, k); }, true);
+        // This card's actions: confirmed first — Confirm runs it, the menu closed; Cancel
+        // goes back to This card ▸
+        for( const k in _CARD_ACTIONS ) {
+            const _on = (id, fn) => this._this.querySelector(`#eo_${i}_${id}`)?.addEventListener('click', (e) => { e.preventDefault(); fn(); }, true);
+            _on(k, () => this._confirmCardAction(i, k));
+            _on(`${k}_ok`, () => { this.menuSetVisibility(i, false); this[_CARD_ACTIONS[k].run](); });
+            _on(`${k}_cancel`, () => { this._this.querySelector(`#eo_${i}_${k}_sub`).style.display = 'none'; this._this.querySelector(`#eo_${i}_card_sub`)?.focus(); });
+        }
         // A gesture threshold entered: kept within its bounds, then set for every card
         for( const k in GESTURE_SETTINGS ) {
             const _in = this._this.querySelector(`#eo_${i}_g_${k}`);
@@ -752,13 +791,16 @@ export class CardMenus
             if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
             this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
         });
+        // (a confirmation goes back to This card ▸, a submenu to the menu)
+        const _cardSub = this._this.querySelector(`#eo_${i}_card_sub`);
+        const _parentOf = sub => Object.keys(_CARD_ACTIONS).some(k => sub.id === `eo_${i}_${k}_sub`) ? _cardSub : _menu;
         for( const _sub of _subs ) _sub.addEventListener('keydown', (e) => {
             const _inInput = e.target.tagName === 'INPUT';
             if( e.key === 'Escape' || ( e.key === 'ArrowLeft' && !_inInput ) ) {
                 e.preventDefault();
                 e.stopPropagation();
                 _sub.style.display = 'none';
-                _menu.focus();
+                _parentOf(_sub).focus();
                 return;
             }
             if( !_inInput ) this._menuKeyDown(e, _sub);
@@ -797,8 +839,9 @@ export class CardMenus
             this._openMenu(dropdown, _top, _left);
             dropdown.focus();
             // (reopened soon after it was closed: with the submenu it had open)
+            // (no room for the menu and a submenu beside its lines: the menu alone, read first)
             const _key = this._submenuToOpen('options', null);
-            if( _key ) this.showOptionsSubmenu(idx, _key);
+            if( _key && !dropdown.dataset.hecCramped ) this.showOptionsSubmenu(idx, _key);
         } else
             dropdown.style.display = 'none';
     }
@@ -907,40 +950,97 @@ export class CardMenus
     // level with its line, see _openSubmenu): wider than each of them by its widest line's
     // text, so that its lines show beside the submenu open and another one can be picked —
     // the last line's submenu aside, which hides no line below it: as wide as the menu at
-    // most. Set when the menu opens (with what it shows then), so it keeps its width; a
-    // menu's lines open the submenus `${line id}_sub`, its siblings
+    // most. Set when the menu opens (with what it shows then), so it keeps its width. With
+    // no room for that (a small card or screen: menuEl.dataset.hecCramped), the menu takes
+    // the room there is, opens with no submenu (its lines read first), and a submenu opened
+    // leaves a strip of its lines (_menuStrip). A menu's lines open the submenus
+    // `${line id}_sub`, its siblings
     _fitMenuToSubmenus(menuEl)
     {
-        const _lines = [...menuEl.children].filter(a => a.tagName === 'A' && a.style.display !== 'none');
-        const _subOf = a => menuEl.parentNode?.querySelector(`#${a.id}_sub`);
-        const _withSub = _lines.filter(_subOf);
-        if( !_withSub.length ) return;
+        // (a menu without submenus, not one itself: as built)
+        const _hasSubs = this._menuLines(menuEl).some(a => this._submenuOf(a));
+        if( !_hasSubs && !menuEl.dataset.hecRoom ) return;
         menuEl.dataset.hecMinWidth ??= parseFloat(menuEl.style.minWidth) || 0;
-        // (a line's text, its left padding and a gap; a submenu's own width, laid out on its own)
+        const _room = Math.min(this._menuRoom(), +menuEl.dataset.hecRoom || Infinity);
+        const _need = Math.max(+menuEl.dataset.hecMinWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
+        menuEl.style.maxWidth = Math.floor(_room) + 'px';
+        menuEl.style.minWidth = Math.floor(Math.min(_need, _room)) + 'px';
+        menuEl.dataset.hecCramped = _need > _room ? '1' : '';
+    }
+
+    // The room a menu has: the card's width, within the screen's
+    _menuRoom()
+    {
+        const _card = this._this?.querySelector('#maincard');
+        return Math.min(_card?.clientWidth || Infinity, document.documentElement.clientWidth || Infinity);
+    }
+
+    // The width menuEl needs to stay readable under its submenus (its own, without any)
+    _menuNeed(menuEl)
+    {
+        return this._laidOut(menuEl, () => {
+            const _lines = this._menuLines(menuEl);
+            const _withSub = _lines.filter(a => this._submenuOf(a));
+            if( !_withSub.length ) return menuEl.offsetWidth;
+            const _readable = Math.max(..._lines.map(a => this._lineTextWidth(a)));
+            const _last = _lines[_lines.length - 1];
+            return Math.max(menuEl.offsetWidth, ..._withSub.map(a => this._menuNeed(this._submenuOf(a)) + ( a === _last ? 0 : _readable )));
+        });
+    }
+
+    // What a submenu leaves of its menu's lines, at least: their first three characters, and
+    // 48 px — what a finger can still pick
+    _menuStrip(menuEl)
+    {
+        return Math.max(48, ...this._menuLines(menuEl).map(a => this._lineTextWidth(a, 3)));
+    }
+
+    // A menu's lines shown, and the submenu a line opens
+    _menuLines(menuEl)
+    {
+        return [...menuEl.children].filter(a => a.tagName === 'A' && a.style.display !== 'none');
+    }
+    _submenuOf(line)
+    {
+        return line.id ? line.parentNode?.parentNode?.querySelector(`#${line.id}_sub`) : null;
+    }
+
+    // A line's text width (its first n characters), with its left padding and a gap
+    _lineTextWidth(line, n = Infinity)
+    {
+        const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
+        if( !_text ) return 0;
         const _range = document.createRange();
-        const _textWidth = a => { _range.selectNodeContents(a); return _range.getBoundingClientRect().width + ( parseFloat(getComputedStyle(a).paddingLeft) || 0 ) + 8; };
-        const _subWidth = sub => {
-            const _shown = sub.style.display !== 'none', _saved = [sub.style.visibility, sub.style.left, sub.style.transform];
-            if( !_shown ) Object.assign(sub.style, { visibility: 'hidden', display: 'block', left: '0px', transform: '' });
-            const _w = sub.offsetWidth;
-            if( !_shown ) Object.assign(sub.style, { display: 'none', visibility: _saved[0], left: _saved[1], transform: _saved[2] });
-            return _w;
-        };
-        const _readable = Math.max(..._lines.map(_textWidth));
-        const _last = _lines[_lines.length - 1];
-        const _need = Math.max(+menuEl.dataset.hecMinWidth, ..._withSub.map(a => _subWidth(_subOf(a)) + ( a === _last ? 0 : _readable )));
-        menuEl.style.minWidth = Math.ceil(_need) + 'px';
+        _range.setStart(_text, 0);
+        _range.setEnd(_text, Math.min(n, _text.length));
+        return _range.getBoundingClientRect().width + ( parseFloat(getComputedStyle(line).paddingLeft) || 0 ) + 8;
+    }
+
+    // fn() run with el laid out at its own width — shown (hidden from sight) if it isn't,
+    // its own minimum width (as built) rather than the one a fit gave it — then put back
+    _laidOut(el, fn)
+    {
+        const _s = el.style;
+        el.dataset.hecMinWidth ??= parseFloat(_s.minWidth) || 0;
+        const _saved = { display: _s.display, visibility: _s.visibility, left: _s.left, transform: _s.transform, minWidth: _s.minWidth, maxWidth: _s.maxWidth };
+        if( _s.display === 'none' ) Object.assign(_s, { visibility: 'hidden', display: 'block', left: '0px', transform: '' });
+        Object.assign(_s, { minWidth: el.dataset.hecMinWidth + 'px', maxWidth: '' });
+        try { return fn(); } finally { Object.assign(_s, _saved); }
     }
 
     // Opens a submenu over its menu, level with the item that opens it, its right edge on the
     // menu's right edge — so it takes no room beside the menu — and, like every menu
     // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
     // positioned parent (both are its children).
+    // At most as wide as the menu less the strip of its lines it must leave (_menuStrip) —
+    // the last line's submenu: as wide as the menu —, its lines cut ('…') if they don't fit
     _openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
+        const _lines = this._menuLines(_menu);
+        subEl.dataset.hecRoom = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
         this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 

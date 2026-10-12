@@ -131,7 +131,7 @@ The `?hacstag=…` part isn't required — the file works without it — but wit
 
 The ▾ button beside the entity selector opens the options menu:
 - **Export ▸** — *History*, *Statistics* (as CSV files);
-- **This card ▸** — *Remove all added graphs*;
+- **This card ▸** — *Default graphs* (the graphs added from the card removed, the YAML's kept as you changed them), *Default display* (back to the YAML: every change made from the card forgotten, the time range too), each confirmed in a submenu (*Confirm* / *Cancel*);
 - **All cards ▸** — what applies to every card and every device: the info panel on or off, and the gesture settings, entered right there.
 
 The gesture settings tell a click from a long-press, and a tap from a drag — for a mouse or a pen, and for a finger. Raise them if your hand is less steady, or slower:
@@ -217,7 +217,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*).
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than its submenus, so its lines stay readable beside the one open; on a card too narrow for that, it opens without any submenu, and a submenu opened leaves at least the start of its lines.
 
 In *Display*, the type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
 - *Timeline* for a state that isn't a number;

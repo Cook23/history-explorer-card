@@ -15,14 +15,16 @@ const lang_en =
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
         "popup" : {
-            "remove_all" : "Remove all the graphs added from the card?",
             "enable_panel" : "Enable the history info panel of the entities?",
             "disable_panel" : "Disable the history info panel of the entities?"
         },
         "menu" : {  
             "export_csv" : "History",
             "export_stats" : "Statistics",
-            "remove_all" : "Remove all added graphs",
+            "default_graphs" : "Default graphs",
+            "default_display" : "Default display",
+            "confirm_ok" : "Confirm",
+            "confirm_cancel" : "Cancel",
             "enable_panel" : "Enable history info panel",
             "disable_panel" : "Disable history info panel",
             "type_line_straight" : "Straight",
@@ -106,14 +108,16 @@ const lang_fr =
             "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
         }, 
         "popup" : {
-            "remove_all" : "Supprimer tous les graphiques ajoutés depuis la carte ?",
             "enable_panel" : "Activer le panneau d'historique des entités ?",
             "disable_panel" : "Désactiver le panneau d'historique des entités ?"
         },
         "menu" : {  
             "export_csv" : "Historique",
             "export_stats" : "Statistiques",
-            "remove_all" : "Supprimer les graphiques ajoutés",
+            "default_graphs" : "Graphes par défaut",
+            "default_display" : "Affichage par défaut",
+            "confirm_ok" : "Valider",
+            "confirm_cancel" : "Annuler",
             "enable_panel" : "Activer le panneau d'historique",
             "disable_panel" : "Désactiver le panneau d'historique",
             "type_line_straight" : "Droite",
@@ -197,14 +201,16 @@ const lang_de =
             "infopanel_conflict" : "Konflikt beim YAML-Parameter infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "Alle über die Karte hinzugefügten Diagramme entfernen?",
             "enable_panel" : "Verlaufsinfo der Entitäten aktivieren?",
             "disable_panel" : "Verlaufsinfo der Entitäten deaktivieren?"
         },
         "menu" : {  
             "export_csv" : "Verlauf",
             "export_stats" : "Statistiken",
-            "remove_all" : "Hinzugefügte Diagramme entfernen",
+            "default_graphs" : "Standarddiagramme",
+            "default_display" : "Standardanzeige",
+            "confirm_ok" : "Bestätigen",
+            "confirm_cancel" : "Abbrechen",
             "enable_panel" : "Verlaufsinfo aktivieren",
             "disable_panel" : "Verlaufsinfo deaktivieren",
             "type_line_straight" : "Gerade",
@@ -288,14 +294,16 @@ const lang_es =
             "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "¿Eliminar todos los gráficos añadidos desde la tarjeta?",
             "enable_panel" : "¿Activar el panel de historial de las entidades?",
             "disable_panel" : "¿Desactivar el panel de historial de las entidades?"
         },
         "menu" : {  
             "export_csv" : "Historial",
             "export_stats" : "Estadísticas",
-            "remove_all" : "Eliminar los gráficos añadidos",
+            "default_graphs" : "Gráficos predeterminados",
+            "default_display" : "Vista predeterminada",
+            "confirm_ok" : "Confirmar",
+            "confirm_cancel" : "Cancelar",
             "enable_panel" : "Activar el panel de historial",
             "disable_panel" : "Desactivar el panel de historial",
             "type_line_straight" : "Recta",
@@ -379,14 +387,16 @@ const lang_nl =
             "infopanel_conflict" : "Conflict met de YAML-parameter infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "Alle via de kaart toegevoegde grafieken verwijderen?",
             "enable_panel" : "Geschiedenispaneel van de entiteiten inschakelen?",
             "disable_panel" : "Geschiedenispaneel van de entiteiten uitschakelen?"
         },
         "menu" : {  
             "export_csv" : "Geschiedenis",
             "export_stats" : "Statistieken",
-            "remove_all" : "Toegevoegde grafieken verwijderen",
+            "default_graphs" : "Standaardgrafieken",
+            "default_display" : "Standaardweergave",
+            "confirm_ok" : "Bevestigen",
+            "confirm_cancel" : "Annuleren",
             "enable_panel" : "Geschiedenispaneel inschakelen",
             "disable_panel" : "Geschiedenispaneel uitschakelen",
             "type_line_straight" : "Recht",
@@ -470,14 +480,16 @@ const lang_pl =
             "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "Usunąć wszystkie wykresy dodane z karty?",
             "enable_panel" : "Włączyć panel historii encji?",
             "disable_panel" : "Wyłączyć panel historii encji?"
         },
         "menu" : {  
             "export_csv" : "Historia",
             "export_stats" : "Statystyki",
-            "remove_all" : "Usuń dodane wykresy",
+            "default_graphs" : "Domyślne wykresy",
+            "default_display" : "Domyślny widok",
+            "confirm_ok" : "Zatwierdź",
+            "confirm_cancel" : "Anuluj",
             "enable_panel" : "Włącz panel historii",
             "disable_panel" : "Wyłącz panel historii",
             "type_line_straight" : "Prosta",
@@ -561,14 +573,16 @@ const lang_sv =
             "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
         },
         "popup": {
-            "remove_all": "Ta bort alla grafer som lagts till från kortet?",
             "enable_panel": "Aktivera panelen för enhetens historikinformation?",
             "disable_panel": "Inaktivera panelen för enhetens historikinformation?"
         },
         "menu": {
             "export_csv": "Historik",
             "export_stats": "Statistik",
-            "remove_all": "Ta bort tillagda grafer",
+            "default_graphs" : "Standardgrafer",
+            "default_display" : "Standardvisning",
+            "confirm_ok" : "Bekräfta",
+            "confirm_cancel" : "Avbryt",
             "enable_panel": "Aktivera historikinfo-panelen",
             "disable_panel": "Inaktivera historikinfo-panelen",
             "type_line_straight" : "Rak",
@@ -652,14 +666,16 @@ const lang_da =
             "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
         }, 
         "popup" : {
-            "remove_all" : "Fjern alle grafer tilføjet fra kortet?",
             "enable_panel" : "Aktivér historikpanelet for entiteter?",
             "disable_panel" : "Deaktivér historikpanelet for entiteter?"
         },
         "menu" : {  
             "export_csv" : "Historik",
             "export_stats" : "Statistik",
-            "remove_all" : "Fjern tilføjede grafer",
+            "default_graphs" : "Standardgrafer",
+            "default_display" : "Standardvisning",
+            "confirm_ok" : "Bekræft",
+            "confirm_cancel" : "Annuller",
             "enable_panel" : "Aktivér historikpanelet",
             "disable_panel" : "Deaktivér historikpanelet",
             "type_line_straight" : "Ret",
@@ -743,14 +759,16 @@ const lang_sk =
             "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "Odstrániť všetky grafy pridané z karty?",
             "enable_panel" : "Povoliť informačný panel histórie entít?",
             "disable_panel" : "Zakázať informačný panel histórie entít?"
         },
         "menu" : {  
             "export_csv" : "História",
             "export_stats" : "Štatistiky",
-            "remove_all" : "Odstrániť pridané grafy",
+            "default_graphs" : "Predvolené grafy",
+            "default_display" : "Predvolené zobrazenie",
+            "confirm_ok" : "Potvrdiť",
+            "confirm_cancel" : "Zrušiť",
             "enable_panel" : "Povoliť informačný panel histórie",
             "disable_panel" : "Zakázať informačný panel histórie",
             "type_line_straight" : "Priamka",
@@ -834,14 +852,16 @@ const lang_ru =
             "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
         }, 
         "popup" : {
-            "remove_all" : "Удалить все графики, добавленные из карточки?",
             "enable_panel" : "Включить панель истории объектов?",
             "disable_panel" : "Выключить панель истории объектов?"
         },
         "menu" : {  
             "export_csv" : "История",
             "export_stats" : "Статистика",
-            "remove_all" : "Удалить добавленные графики",
+            "default_graphs" : "Графики по умолчанию",
+            "default_display" : "Вид по умолчанию",
+            "confirm_ok" : "Подтвердить",
+            "confirm_cancel" : "Отмена",
             "enable_panel" : "Включить панель истории",
             "disable_panel" : "Выключить панель истории",
             "type_line_straight" : "Прямая",
