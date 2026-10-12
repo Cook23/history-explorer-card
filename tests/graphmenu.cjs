@@ -37,13 +37,22 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display, interpolation, its layout open (the points, the Y axis)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display (open), interpolation, layout (the points, the Y axis)', async () => {
         await graphMenu('rain');
-        const m = await menu();
-        return m === 'rain || Display ▸ | Interpolation ▸ | Layout ▸* || Show the points | Lock the Y axis | Cut' ? true : m;
+        const m = await menu(); await click('layout'); const l = await menu();
+        return m === 'rain || Display ▸* | Interpolation ▸ | Layout ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
+            && l === 'rain || Display ▸ | Interpolation ▸ | Layout ▸* || Show the points | Lock the Y axis | Cut' ? true : `${m} / ${l}`;
+    });
+    await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
+        await graphMenu('rain'); const soon = await menu();
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
+        await graphMenu('rain'); const late = await menu();
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
+        return /Layout ▸\* \|\| Show the points/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
     await t.step('Lock the Y axis: locked; the menu then offers to unlock it, which releases it', async () => {
-        await click('layout'); await click('ylock');
+        await graphMenu('rain'); await click('layout'); await click('ylock');
         const r = { locked: await t.E(`lockOf(${await gi('rain')})`) };
         await graphMenu('rain'); r.menu = await menu(); await click('layout'); await click('ylock');
         r.released = await t.E(`lockOf(${await gi('rain')})`);
@@ -139,7 +148,7 @@ module.exports = async function()
     await t.step('a graph added from the card: its menu can delete it', async () => {
         await t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('sensor.wind_rad'); I._createAndPersistEntity('sensor.wind_rad', d.type, d.lineMode); I.updateHistoryWithClearCache(); })()`);
         await t.wait(1200);
-        await graphMenu('wind_rad');
+        await graphMenu('wind_rad'); await click('layout');
         const m = await menu(); await click('gdelete');
         const r = { m, layout: await layout(), stored: await t.E(`el.instance.store.has('sensor.wind_rad')`) };
         return r.m.endsWith('Cut | Delete the graph') && !r.layout.includes('wind_rad') && !r.stored ? true : JSON.stringify(r);

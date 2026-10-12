@@ -353,6 +353,11 @@ export class HistoryCardState {
 
             const _needsIntervalRedraw = await this.readLocalState();
 
+            // (the time window known before the graphs are built: their time axis has it
+            // from the first drawing — without it, it spans the data, ticked for the
+            // window's range: thousands of labels over each other until the window is set)
+            this._setPresentWindow();
+
             this.pconfig.nextDefaultColor = 0;
 
             // Rebuild all graphs (static and dynamic) from pconfig.entities

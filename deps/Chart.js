@@ -3088,6 +3088,9 @@
             }
 
             model.radius = custom.radius || helpers.valueAtIndexOrDefault(dataset.pointRadius, index, me.chart.options.elements.point.radius);
+            // (fork) a point no longer hovered goes back to the size of the points shown —
+            // Alt's too (deps/chart-hec.js, hecSampleRadius), not to none
+            model.radius = Chart.hecSampleRadius(me.chart, point, model.radius);
             model.backgroundColor = me.getPointBackgroundColor(point, index);
             model.borderColor = me.getPointBorderColor(point, index);
             model.borderWidth = me.getPointBorderWidth(point, index);
@@ -4669,7 +4672,11 @@
             var _contactMode = hoverOptions.activateOnContact === true;
             var _inPlot = e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
 
-            if (e.type === 'mouseout') {
+            // (fork) a pointer going from the canvas into one of the graph's relay zones (§5 of
+            // Chart Custom.js.md: the Y axis column, the legend…) hasn't left the graph
+            if (e.type === 'mouseout' && e.native && me._hecInGraph(e.native.relatedTarget)) {
+              // nothing: the zone forwards the pointer's moves, and its own leaving
+            } else if (e.type === 'mouseout') {
               // A genuine mouseout (the pointer actually left the canvas) is always
               // preceded by a hover move (no contact) — that's what carried it across the
               // boundary. The one a browser fires right after a mouseup (a non-hover device,
@@ -4686,6 +4693,7 @@
                 me.active = [];
                 me._hecLastHitXY = undefined;
                 me._hecEndTooltipMode();
+                me._hecUpdateHoverDot(null);
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -4736,6 +4744,9 @@
                 }
               }
               // else: below threshold (or hover disabled) — leave me.active untouched
+              // (fork) hover.dotOnHover: a hover outside the tooltip mode shows the dot of
+              // the value it's on (_hecUpdateHoverDot)
+              if (hoverOptions.dotOnHover) me._hecUpdateHoverDot(!me._hecTooltipMode && _inPlot && !(e.native && e.native.buttons) ? e : null);
             }
 
             // ── Generic gesture detection (customEvent hook + panX/zoomX) ─

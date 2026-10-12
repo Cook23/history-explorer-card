@@ -4,7 +4,33 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.14] - 2026-10-12
+## [v1.2.15] - 2026-10-12
+
+### New — the point hovered
+- Outside the tooltip, hovering a curve's value — with a mouse, or a pen above the screen — shows its point alone (a diameter of the line width + 2 px), when the curve's points aren't shown; picked as everything else (the nearest, unless about halfway between two). No tooltip opens
+- Chart.js: `hover.dotOnHover` (plugin `hecHoverDot`)
+- Tests: a hover on a value shows its point, beside it none; none in the tooltip mode, nor on a curve showing its points
+
+### Changed — a graph's menu opens on Display; a menu reopened soon opens where it was
+- A graph's menu opens with its *Display* submenu open, as an entity's does (it opened on *Layout*)
+- A menu reopened less than 10 s after it was closed opens the submenu it had open, rather than its default one — an entity's type menu, a graph's, the options menu. A new entity's type menu always opens on its display types
+- Handy to try the interpolations one after the other: a long-press on a curve's label, an algorithm picked, a long-press again — *Interpolation* is open
+- Tests: a graph's menu opened on Display; reopened at once, on the submenu it had open; 10 s later, on Display; an interpolation picked, the menu reopened on Interpolation
+
+### Fixed — points shown: the point clicked small again after the tooltip, Alt's points gone with the pointer
+- With the points shown — by `showPoints`, a long-press or Alt — the point the tooltip showed vanished once the tooltip's reading time was over; it now goes back to the size of the other points
+- With Alt held, leaving a graph from its legend, its Y axis or its ⠿ zone straight onto another graph left its points shown: those zones didn't tell the graph the pointer had left. They do now — and going from the graph into one of them isn't leaving it
+- Tests: the point clicked small again once the reading time is over (the YAML, a long-press, Alt); Alt's points over the Y axis and the legend, gone once the pointer leaves the graph, from its legend straight onto another one too
+
+### Changed — a curve hidden, and its points shown, kept on this device only
+- A curve hidden from its legend (`hidden`) and a curve's points shown or not (`showPoints`, set by the YAML or a long-press) are kept on this device only, as its persistence options say — never taken from another device, even with `enable_multidevice_persistence`: what you hide or show to read a graph belongs to the screen you read it on. The YAML or the device, the last one to speak still wins; everything else (types, colours, the time range…) stays synced
+- `src/card-storage.js`: one table, `ENTITY_FIELD_SCOPE`, says for each field whether it follows the devices or stays local
+- Tests: a long-press's points and a hidden curve kept after a reload, not on another device
+
+### Fixed — no more hundreds of labels on the time axis at first display
+- When the card was displayed, for a moment the time axis of every graph spanned a whole day, ticked for the window shown — every few minutes for a window under an hour: hundreds of labels over each other, until the window was set. The graphs were built before the time window was known; it is now known before, and their time axis has it from the first drawing
+- Tests: from the first drawing, the time axis shows the window (30 min), with a few dozen labels at most
+
 
 ### New — the tooltip of the curve clicked; its points shown by a long-press
 - A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip mode: its value nearest the pointer is shown, and follows the pointer. A click near another curve adds it: several curves show their values together. Leaving the curves, or a click outside them, ends it; a click beside the curves changes nothing. On bars and timelines, the bar or the state clicked (or just beside it)
@@ -34,9 +60,15 @@ Changelog for the HA History Explorer Card.
 - Tests: ▸ on an entity with attributes, not on one without
 
 ### Fixed — only a click or a tap opens the tooltip
-- The tooltip opened as soon as a finger or the mouse button went down on a curve: the start of a pinch, of a swipe moving the time or scrolling the page, of a drag with the mouse opened it, and the tooltip mode stayed on after. It now opens on a click or a tap only — released without a drag, a pinch or a long press
+- The tooltip opened as soon as a finger or the mouse button went down on a curve: the start of a swipe moving the time or scrolling the page, of a drag with the mouse opened it (1.2.14 only closed it once a pinch's second finger was down), and the tooltip mode stayed on after. It now opens on a click or a tap only — released without a drag, a pinch or a long press; 1.2.14's closing at the second finger is gone
 - Chart.js: the tooltip mode is set by the click the gesture detector resolves (`_hecTap`), no longer at the press — and by a pen's tap the browser takes over (cancelled within the tap distance, alone, without a long press), as some apps do
 - Tests: a press on the curves opening nothing until released, a drag from them none (mouse); a pinch and a horizontal or vertical swipe started on a curve, no tooltip during or after them, a tap after a pinch opening one
+
+## [v1.2.14] - 2026-10-11
+
+### Fixed — a pinch doesn't open the tooltip
+- The first finger of a pinch, landing on a curve, opened the tooltip as a tap would, and the tooltip mode stayed on after the pinch. Once the second finger is down, it's a pinch: the tooltip goes and the tooltip mode ends; a tap on the curves opens it again
+- Tests: a pinch started on a curve, no tooltip during or after it, a tap after it opening one
 
 ### Changed — zooming in real time keeps the present on the right
 - In real time (the present shown, the window following it), the time range selector and the + / − buttons now keep the present on the right: the window zooms from its end, and keeps following the present. Looking at the history, they keep the middle of the window, whatever the duration — before, up to 24 h they kept the middle even in real time (the present went out on the right), and beyond 24 h they kept the end even looking at the history

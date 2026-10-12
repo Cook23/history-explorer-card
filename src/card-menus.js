@@ -64,6 +64,9 @@ export function typeMenuHtml(i, full)
         ${full ? sub('tests', Object.keys(CARD_TESTS).map(k => a(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label)))) : ''}`;
 }
 
+// How long a closed menu remembers the submenu it had open (see _submenuToOpen)
+const SUBMENU_MEMORY_MS = 10000;
+
 // The options menu eo_N (the card's toolbar): its items, each opening its submenu
 // eo_N_<key>_sub — what the card exports, what concerns this card (the entities added from
 // it), and what concerns every card of the page and every device (the info panel, the
@@ -266,7 +269,7 @@ export class CardMenus
             _left = (_anchorX - _parentRect.left) + 'px';
         }
         this._openMenu(_menu, _top, _left, align);
-        this.showTypeSubmenu(input_idx, 'rep');
+        this._openRememberedSubmenu(input_idx, 'rep');
     }
 
     // The same menu for a graph — from a long-press (or a right click) on its lock+handle
@@ -319,7 +322,54 @@ export class CardMenus
         const _tb = this._this.querySelector(`#tb_${input_idx}`);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
-        this.showTypeSubmenu(input_idx, 'layout');
+        this._openRememberedSubmenu(input_idx, _numeric ? 'rep' : 'layout');
+    }
+
+    // --------------------------------------------------------------------------------------
+    // A menu reopened soon after it was closed opens the submenu it had open, rather than
+    // its default one: each kind of menu (an entity's type menu, a graph's, the options
+    // menu) remembers its last open submenu, for SUBMENU_MEMORY_MS once closed. A new
+    // entity's type menu always opens on its display types: it's there to pick one
+    // --------------------------------------------------------------------------------------
+
+    // The kind of type menu input_idx is showing now
+    _typeMenuKind(input_idx)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        return _menu?._hec_for_graph ? 'graph' : _menu?._hec_graph_id === null ? 'add' : 'entity';
+    }
+
+    // The submenu a menu of this kind should open with: the one it had open, if it was
+    // closed less than SUBMENU_MEMORY_MS ago, else def
+    _submenuToOpen(kind, def)
+    {
+        if( kind === 'add' ) return def;
+        const _m = this._menuMemory?.[kind];
+        return _m?.key && _m.closedAt && Date.now() - _m.closedAt < SUBMENU_MEMORY_MS ? _m.key : def;
+    }
+
+    _rememberSubmenu(kind, key)
+    {
+        this._menuMemory ??= {};
+        this._menuMemory[kind] = { key, closedAt: null };
+    }
+
+    // (a menu closed: from then on, its open submenu is remembered for SUBMENU_MEMORY_MS —
+    // called again once closed, it changes nothing)
+    _menuClosed(kind)
+    {
+        const _m = this._menuMemory?.[kind];
+        if( _m && !_m.closedAt ) _m.closedAt = Date.now();
+    }
+
+    // Opens the type menu's remembered submenu — else def — once the menu is open (a
+    // remembered submenu this menu doesn't show: def)
+    _openRememberedSubmenu(input_idx, def)
+    {
+        const _key = this._submenuToOpen(this._typeMenuKind(input_idx), def);
+        this.showTypeSubmenu(input_idx, _key);
+        if( _key !== def && this._this.querySelector(`#et_${input_idx}_${_key}_sub`)?.style.display === 'none' )
+            this.showTypeSubmenu(input_idx, def);
     }
 
     // A graph's name at the top of its menu: its title, else the start of its curves' names
@@ -343,6 +393,7 @@ export class CardMenus
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( !_menu ) return;
+        this._menuClosed(this._typeMenuKind(input_idx));
         this.hideTypeSubmenus(input_idx);
         // Clear highlight and marks, the submenus' included
         for( const _box of [_menu, ...this._typeSubmenus(input_idx)] )
@@ -371,6 +422,7 @@ export class CardMenus
         if( !_item || !_sub || _item.style.display === 'none' ) return;
         this.hideTypeSubmenus(input_idx);
         if( key === 'interp' ) this._markInterpolationMenu(input_idx);
+        this._rememberSubmenu(this._typeMenuKind(input_idx), key);
         _item.style.fontWeight = 'bold';
         this._openSubmenu(_sub, _item);
         _sub.focus();
@@ -416,7 +468,7 @@ export class CardMenus
                 return;
             }
             this._menuKeyDown(e, _etMenu, {
-                onClose: () => { this.hideTypeSubmenus(_ii); this._resetEntityInput(this.ui.inputField[_ii]); },
+                onClose: () => { this._menuClosed(this._typeMenuKind(_ii)); this.hideTypeSubmenus(_ii); this._resetEntityInput(this.ui.inputField[_ii]); },
             });
         });
         // A submenu: same navigation; Escape or ← goes back to the menu
@@ -667,6 +719,7 @@ export class CardMenus
         const _sub  = this._this.querySelector(`#eo_${i}_${key}_sub`);
         if( !_item || !_sub ) return;
         for( const _s of this._optionsSubmenus(i) ) _s.style.display = 'none';
+        this._rememberSubmenu('options', key);
         const _v = gestureValues();
         for( const k in GESTURE_SETTINGS ) { const _in = this._this.querySelector(`#eo_${i}_g_${k}`); if( _in ) _in.value = _v[k]; }
         this._openSubmenu(_sub, _item);
@@ -720,6 +773,7 @@ export class CardMenus
     {
         const dropdown = this._this.querySelector(`#eo_${idx}`);
         if( !dropdown ) return;
+        if( !show ) this._menuClosed('options');
         for( const _s of this._optionsSubmenus(idx) ) _s.style.display = 'none';
 
         this._this.querySelector(`#bo_${idx}`).style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
@@ -739,6 +793,9 @@ export class CardMenus
             const _left = (_boRect.left   - _parentRect.left - 30) + 'px';
             this._openMenu(dropdown, _top, _left);
             dropdown.focus();
+            // (reopened soon after it was closed: with the submenu it had open)
+            const _key = this._submenuToOpen('options', null);
+            if( _key ) this.showOptionsSubmenu(idx, _key);
         } else
             dropdown.style.display = 'none';
     }

@@ -69,5 +69,18 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── From the first drawing ──
+    // (the first layout of each chart: its time axis' span, in hours)
+    const INIT = `(()=>{ let C; window.__first = {}; Object.defineProperty(window, 'HXLocal_Chart', { configurable: true,
+        get(){ return C; }, set(v){ C = v; v.plugins.register({ afterLayout(c){ const s = c.scales && c.scales['x-axis-0'];
+            if( s && !(c.id in window.__first) ) window.__first[c.id] = { h: (s.max - s.min) / 3600e3, ticks: s.ticks.length }; } }); } }); })();`;
+    t = await openCard(card({ defaultTimeRange: '30m' }), { mock: { series: true }, init: INIT });
+    await t.wait(800);
+    await t.step('from the first drawing, the time axis shows the window (30 min) — not a whole day ticked every few minutes, hundreds of labels over each other', async () => {
+        const f = Object.values(await t.E('window.__first'));
+        return f.length && f.every(x => Math.abs(x.h - 0.5) < 0.02 && x.ticks <= 40) ? true : JSON.stringify(f);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

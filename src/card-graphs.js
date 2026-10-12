@@ -110,6 +110,11 @@ export class CardGraphs
                         // (half a bar of margin at both ends only when there are bars to show)
                         offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
                         time: {
+                            // (the time window from the start: without it, the axis would
+                            // span the data first, ticked every few minutes — thousands of
+                            // labels over each other until the window is set)
+                            min: this.startTime,
+                            max: this.endTime,
                             unit: this.activeRange.tickStepUnit,
                             stepSize: this.activeRange.tickStepSize,
                             displayFormats: { 'minute': this.i18n.styleTimeTicks, 'hour': this.i18n.styleTimeTicks, 'day': this.i18n.styleDateTicks, 'month': 'MMM' },
@@ -157,6 +162,8 @@ export class CardGraphs
                     // chart's own data refreshing under a still pointer.
                     hoverEnabled: true,
                     activateOnContact: true,
+                    // (outside the tooltip mode, a hover on a value shows its dot)
+                    dotOnHover: true,
                     // Default is 400ms — was likely relied on as a rough anti-flicker delay
                     // before handleEvent's own move-threshold existed; that threshold is now
                     // what actually prevents flicker, so this generic delay is just latency

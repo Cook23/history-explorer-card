@@ -125,6 +125,28 @@ module.exports = async function()
         const r = { kept, gone: await tip(1), curves: await t.E('graphAt(1).chart._hecTooltipCurves') };
         return /tank/.test(kept || '') && /rain/.test(kept || '') && r.gone === null && !r.curves ? true : JSON.stringify(r);
     });
+    // The value whose dot a hover shows on graph gi: [dataset, index], or null
+    const hoverDot = gi => t.E(`(()=>{ const d=graphAt(${gi}).chart._hecHoverDot; return d ? [d._datasetIndex, d._index] : null; })()`);
+    await t.step('a hover (no click) on a value of a curve without points shows its dot only — no tooltip; beside it, none', async () => {
+        await t.page.mouse.move(5, 5); await t.wait(300);
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+            const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30)[3]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+        await t.page.mouse.move(p.x - 30, p.y, { steps: 3 }); await t.page.mouse.move(p.x + 1, p.y + 1, { steps: 5 }); await t.wait(300);
+        const on = await hoverDot(0), tooltip = await tip(0);
+        const b = await beside(t, 0); await t.page.mouse.move(b.x, b.y, { steps: 5 }); await t.wait(300);
+        const off = await hoverDot(0);
+        return on && on[0] === 0 && tooltip === null && off === null ? true : JSON.stringify({ on, tooltip, off });
+    });
+    await t.step('no hover dot in the tooltip mode, nor on a curve showing its points', async () => {
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+            const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30)[6]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(300); await t.page.mouse.move(p.x + 1, p.y, { steps: 3 }); await t.wait(300);
+        const inMode = await hoverDot(0);
+        const y = await t.E('yaPt(0,0.5)'); await t.page.mouse.move(y.x, y.y, { steps: 5 }); await t.wait(1300);
+        await t.longPress(p); await t.page.mouse.move(p.x + 1, p.y, { steps: 3 }); await t.wait(300);
+        const withPoints = await hoverDot(0); await t.longPress(p);
+        return inMode === null && withPoints === null ? true : JSON.stringify({ inMode, withPoints });
+    });
     await t.step('Alt held: the samples drawn with a diameter of the line width + 2 px', async () => {
         const p = await t.E('graphPtAt(0,0.5)');
         await t.page.keyboard.down('Alt'); await t.page.mouse.move(p.x, p.y, { steps: 5 }); await t.wait(400);
@@ -132,6 +154,94 @@ module.exports = async function()
         const r = await t.E(`(()=>{ const c=graphAt(0).chart; return c.getDatasetMeta(0).data.map(p=>p._model.radius).filter(x=>x>0); })()`);
         await t.page.keyboard.up('Alt'); await t.page.mouse.move(p.x, p.y + 3); await t.wait(300);
         return r.length && r.every(x => near(x, R)) ? true : JSON.stringify(r.slice(0, 5));
+    });
+    // A value of curve 0 of graph gi, in the middle of the plot's height: its point
+    const valuePt = (gi, k) => t.E(`(()=>{ const c=graphAt(${gi}).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+        const ps=c.getDatasetMeta(0).data.filter(p=>!p._view.skip&&p._view.x>A.left+40&&p._view.y>A.top+30&&p._view.y<A.bottom-30); const p=ps[${k}];
+        return {x:r.left+p._view.x, y:r.top+p._view.y, i:p._index}; })()`);
+    // The radius of value i of curve 0 of graph gi, and the radius of the points shown
+    const radius = (gi, i) => t.E(`(()=>{ const c=graphAt(${gi}).chart, d=c.data.datasets[0]; return { r: c.getDatasetMeta(0).data[${i}]._model.radius, R: (d.borderWidth+2)/2 }; })()`);
+    // Clicked, then left still until the tooltip's reading time is over: the point clicked
+    const afterReading = async (gi, k) => {
+        const p = await valuePt(gi, k); await t.page.mouse.click(p.x, p.y); await t.wait(300);
+        const hovered = await radius(gi, p.i);
+        const ms = await t.E(`graphAt(${gi}).chart.constructor.hecUi.readingTime(graphAt(${gi}).chart.tooltip._hecHoverTooltipEl.textContent)`);
+        await t.wait(ms + 1500);
+        return { hovered, after: await radius(gi, p.i) };
+    };
+    const small = r => r.after.r === r.after.R && r.hovered.r === r.hovered.R + 1;
+    await t.step('points shown — by a long-press, or Alt: once the tooltip\'s reading time is over, the point clicked is small again, not gone', async () => {
+        const y = await t.E('yaPt(0,0.5)'); await t.page.mouse.move(y.x, y.y, { steps: 5 }); await t.wait(1300);
+        const p = await valuePt(0, 2); await t.longPress(p);
+        const long = await afterReading(0, 4);
+        await t.page.mouse.move(y.x, y.y, { steps: 5 }); await t.wait(1300); await t.longPress(p);
+        await t.page.keyboard.down('Alt'); const alt = await afterReading(0, 6); await t.page.keyboard.up('Alt');
+        await t.page.mouse.move(y.x, y.y, { steps: 5 }); await t.wait(1300);
+        return small(long) && small(alt) ? true : JSON.stringify({ long, alt });
+    });
+    await t.step('Alt held: the points stay over the Y axis and the legend, go once the pointer leaves the graph', async () => {
+        const shownN = () => t.E(`graphAt(0).chart.getDatasetMeta(0).data.filter(p=>p._model.radius>0).length`);
+        const p = await valuePt(0, 3), y = await t.E('yaPt(0,0.5)'), l = await t.E('legendPt(0,0)');
+        await t.page.keyboard.down('Alt');
+        await t.page.mouse.move(p.x + 30, p.y + 30, { steps: 5 }); await t.wait(200); const inPlot = await shownN();
+        await t.page.mouse.move(y.x, y.y, { steps: 8 }); await t.wait(200); const onAxis = await shownN();
+        await t.page.mouse.move(l.x, l.y, { steps: 8 }); await t.wait(200); const onLegend = await shownN();
+        const out = await t.E(`(()=>{ const r=graphAt(0).canvas.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.bottom + 40 }; })()`);
+        await t.page.mouse.move(out.x, out.y, { steps: 8 }); await t.wait(300); const outside = await shownN();
+        await t.page.keyboard.up('Alt');
+        return inPlot > 10 && onAxis === inPlot && onLegend === inPlot && outside === 0 ? true : JSON.stringify({ inPlot, onAxis, onLegend, outside });
+    });
+    await t.step('Alt held, from a graph to the one above, leaving it from its legend: the points leave the graph left', async () => {
+        // (graph 1's points are shown already, from its menu: Alt's own showing is what's looked at)
+        const n = gi => t.E(`graphAt(${gi}).chart._hecShowSamples ? 1 : 0`);
+        const p1 = await t.E('graphPtAt(1,0.6)'), l1 = await t.E('legendPt(1,0)'), p0 = await t.E('graphPtAt(0,0.6)');
+        await t.page.keyboard.down('Alt');
+        await t.page.mouse.move(p1.x, p1.y, { steps: 5 }); await t.wait(200); const below = await n(1);
+        await t.page.mouse.move(l1.x, l1.y, { steps: 8 }); await t.wait(200);
+        // (in one move, as a quick hand does: from the legend straight out of the graph)
+        await t.page.mouse.move(p0.x, p0.y, { steps: 1 }); await t.wait(300); const r = { below, left: await n(1), above: await n(0) };
+        await t.page.keyboard.up('Alt');
+        return r.below === 1 && r.left === 0 && r.above === 1 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Points shown from the YAML ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: true }] }] }, { mock: { series: true } });
+    await t.wait(800);
+    await t.step('points shown by the YAML: once the tooltip\'s reading time is over, the point clicked is small again', async () => {
+        const r = await afterReading(0, 4);
+        return small(r) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The YAML and the long-press: the last one to speak wins ──
+    const yamlCard = sp => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, enable_persistence: 'entities',
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: sp }] }] });
+    t = await openCard(yamlCard(true), { mock: { series: true } });
+    await t.wait(800);
+    await t.step('showPoints: true in the YAML, hidden by a long-press: still hidden after a reload; the YAML changed (showPoints: 4): shown, radius 4', async () => {
+        const p = await valuePt(0, 3); await t.longPress(p);
+        const hidden = (await dots(t, 0)).r;
+        await t.page.reload(); await t.wait(3500); const reloaded = (await dots(t, 0)).r;
+        const name = await t.E('window.CFG.cardName');
+        await t.page.addInitScript(c => { window.CFG = c; }, { ...yamlCard(4), cardName: name });
+        await t.page.reload(); await t.wait(3500); const yaml = (await dots(t, 0)).r;
+        return hidden === 0 && reloaded === 0 && yaml === 4 ? true : JSON.stringify({ hidden, reloaded, yaml });
+    });
+    done(await t.close());
+
+    // ── Saved on this device only ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false } }, { mock: { series: true } });
+    await t.wait(800);
+    await t.step('a curve added from the card, its points shown by a long-press: kept after a reload, not on another device', async () => {
+        await t.E(`(()=>{ const I=el.instance; I._createAndPersistEntity('sensor.power', 'line', 'curves'); I.updateHistoryWithClearCache(); })()`); await t.wait(1500);
+        const p = await valuePt(0, 3); await t.longPress(p);
+        const shown = (await dots(t, 0)).r > 0;
+        await t.page.reload(); await t.wait(3500); const reloaded = (await dots(t, 0)).r > 0;
+        await t.E('localStorage.clear()'); await t.page.reload(); await t.wait(3500);
+        const other = await dots(t, 0);
+        return shown && reloaded && other.r === 0 ? true : JSON.stringify({ shown, reloaded, other });
     });
     done(await t.close());
 

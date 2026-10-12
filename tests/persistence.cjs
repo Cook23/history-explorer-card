@@ -49,6 +49,9 @@ module.exports = async function()
         await split('sensor.power');
     };
     const snapshot = async () => ({ power: await entry('sensor.power'), power2: await entry('sensor.power2'), energy: await entry('sensor.energy') });
+    // A snapshot without what stays on its device (a curve hidden: card-storage.js,
+    // ENTITY_FIELD_SCOPE)
+    const devicesPart = s => JSON.stringify(Object.fromEntries(Object.entries(s).map(([k, e]) => [k, e && { ...e, hidden: undefined }])));
     const changed = s => s.power.interpolation === 'makima' && s.power2.lineMode === 'stepped' && s.power2.hidden === true && s.energy.interval === 2;
     const yamlLike = s => s.power.interpolation === null && s.power2.lineMode === 'curves' && !s.power2.hidden && s.energy.interval !== 2;
 
@@ -136,12 +139,12 @@ module.exports = async function()
 
     // ── YAML entities, enable_multidevice_persistence ──
     t = await openCard(YAML({ enable_multidevice_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
-    await t.step('enable_multidevice_persistence: another device gets every change', async () => {
+    await t.step('enable_multidevice_persistence: another device gets every change — a curve hidden aside, kept on its device', async () => {
         await changeAll();
         const a = await snapshot();
         await newDevice();
         const b = await snapshot(); const s = await shown('sensor.power');
-        return changed(b) && JSON.stringify(a) === JSON.stringify(b) && s.interpolation === 'makima' ? true : JSON.stringify({ a, b, s });
+        return a.power2.hidden === true && !b.power2.hidden && devicesPart(a) === devicesPart(b) && s.interpolation === 'makima' ? true : JSON.stringify({ a, b, s });
     });
     await t.step('last one to speak: a change made on another device wins over this device\'s own state', async () => {
         const mine = await t.E(`localStorage.getItem('history-explorer_card_' + el.instance.id)`);
@@ -190,7 +193,7 @@ module.exports = async function()
 
     // ── Entities added from the card: always kept, and on every device ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [] }, { mock: { series: true }, height: 1200 });
-    await t.step('entities added from the card: every change kept on another device', async () => {
+    await t.step('entities added from the card: every change kept on another device — a curve hidden aside', async () => {
         await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.power2','sensor.energy'] ) { const d=I._detectDefaultType(id); I._createAndPersistEntity(id, d.type, d.lineMode); } I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
         await t.wait(2000);
         await setInterp('sensor.power', 'makima');
@@ -201,7 +204,7 @@ module.exports = async function()
         await newDevice();
         const b = await snapshot(); const s = await shown('sensor.power');
         return a.power.interpolation === 'makima' && a.power2.lineMode === 'stepped' && a.power2.hidden && a.energy.interval === 2 &&
-            JSON.stringify(a) === JSON.stringify(b) && s.interpolation === 'makima' ? true : JSON.stringify({ a, b, s });
+            !b.power2.hidden && devicesPart(a) === devicesPart(b) && s.interpolation === 'makima' ? true : JSON.stringify({ a, b, s });
     });
     await t.step('entities added from the card: a type change kept (curve to bars)', async () => {
         await setType('sensor.power2', 'bar', null);
