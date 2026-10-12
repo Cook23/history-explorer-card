@@ -94,7 +94,7 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region. In real time (the present shown), the selector and the + / − buttons keep the present on the right, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; looking at the history, the selector and the buttons keep the middle of the window. The wheel and a pinch elsewhere zoom around the pointer or the fingers, and leave real time
 - **Date navigation**: use the `<` `>` buttons top left. Click the date to return to the present (real time again); double-click to also reset zoom
 - **Tooltip**: click or tap near a curve — not necessarily on one of its values — to see its value under the pointer; click near another one to see both. The tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves, or a click outside them. On bars and timelines, click or tap a bar or a state
-- **Points**: a long-press (or a right click) near a curve shows all its points, or hides them
+- **Points**: a long-press (or a right click) near a curve shows all its points, or hides them; hovering a curve's value (mouse, or a pen above the screen) shows its point alone
 - **Right click** on a label: opens its type menu, as a long-press does
 - **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
 - **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again right away (within the long-press duration) and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis
@@ -217,7 +217,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*).
 
 In *Display*, the type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
 - *Timeline* for a state that isn't a number;
@@ -278,7 +278,7 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 ### The graph menu, cut and paste
 
 A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` (else the start of its curves' names) — the same zone where a click toggles the Y axis lock and a drag moves the graph:
-- **Display ▸** and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the type all of them share in bold);
+- **Display ▸** (open with the menu) and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the type all of them share in bold);
 - **Layout ▸** — *Show the points* / *Hide the points* (of all its curves), *Lock the Y axis* / *Unlock the Y axis* (as a click on the padlock), *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 
 After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click just beside a button counts as on it, about halfway between two does nothing; a click anywhere else, or Escape, cancels.

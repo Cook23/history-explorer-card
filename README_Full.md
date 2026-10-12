@@ -164,7 +164,7 @@ Once you release the mouse button after dragging (or release your finger from th
 
 Clicking the date selector will bring you back to the current date and time without changing your zoom level. A double click on the date selector will bring you back and also reset your zoom to the configured default range.
 
-Click or tap a chart line or a state timeline to get a tooltip of the selected values or state. **(1.2)** A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip: its value nearest the pointer is shown, and follows the pointer; a click near another curve adds it, so several curves can show their values together. Leaving the curves, or a click outside them, closes it; a click beside the curves changes nothing. On bars and timelines, the bar or the state under the click (or just beside it). A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`.
+Click or tap a chart line or a state timeline to get a tooltip of the selected values or state. **(1.2)** A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip: its value nearest the pointer is shown, and follows the pointer; a click near another curve adds it, so several curves can show their values together. Leaving the curves, or a click outside them, closes it; a click beside the curves changes nothing. On bars and timelines, the bar or the state under the click (or just beside it). A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`: the YAML's value or the long-press, the last one to speak winning, kept on this device only (as the card's persistence options say for its fields — never synced across devices). Alt shows every point of the graph hovered on top of that, until it's released or the pointer leaves the graph. Outside the tooltip, hovering a curve's value (a mouse, or a pen above the screen) shows its point alone, when the curve's points aren't shown.
 
 The tooltip then follows the mouse — or a pen held above the screen, in the browsers that report it — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
 
@@ -238,7 +238,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*).
 
 The type menu opens:
 
@@ -322,9 +322,9 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 #### The graph menu, cut and paste
 
 **(1.2)** A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` — or, without one, with the first two words of each curve's name (a word: two letters or digits at least — the `:` of an attribute's curve, `salon : Current…`, is kept but not counted), each start once. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
-- **Display ▸** — the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
+- **Display ▸** — open with the menu (*Layout* for a graph of timelines): the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
-- **Layout ▸** — open with the menu: *Show the points* / *Hide the points* (of all its curves), *Lock the Y axis* / *Unlock the Y axis* (as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
+- **Layout ▸** — *Show the points* / *Hide the points* (of all its curves), *Lock the Y axis* / *Unlock the Y axis* (as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
 
 *Cut* is also in the *Layout* submenu of a curve's or a timeline entity's type menu. Once something is cut, the ⠿ zone of every graph shows where it can go, instead of the ⠿ symbol and the padlock:
 - a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any line or bar graph for a curve, saved only when both graphs are);
@@ -345,7 +345,7 @@ All drag operations show a ghost element and horizontal insertion marker for pre
 
 ### Legend / entity labels
 
-You can hide an entity in a graph by clicking its label on the top. Click it a second time to make the entity visible again. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced YAML example at the end of this readme).
+You can hide an entity in a graph by clicking its label on the top. Click it a second time to make the entity visible again. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced YAML example at the end of this readme). **(1.2)** A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
 
 **Double-clicking** a label extracts the corresponding curve into its own graph (see the *Ungrouping a curve* section above).
 
@@ -1711,7 +1711,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `hidden` and `showPoints` are never synced across devices: `enable_multidevice_persistence` keeps them on this device only, as `enable_persistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 

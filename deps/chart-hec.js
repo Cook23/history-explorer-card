@@ -237,16 +237,38 @@
   // _hecSetShowSamples), each sample of a curve is drawn as a dot of a diameter of the line
   // width + 2 px, the ones its dataset already shows keeping their own size; a point that
   // only shapes the curve (hecVirtual) stays hidden
+  // The radius of a point not hovered: its own (radius, from the dataset), else — Alt held —
+  // a sample's; one rule for every point shown, whether by Alt or by the dataset, also when
+  // a point hovered goes back (the line controller's removeHoverStyle)
+  Chart.hecSampleRadius = function (chart, pt, radius) {
+    if (radius > 0 || !chart._hecShowSamples || !chart.getDatasetMeta(pt._datasetIndex).dataset) return radius;
+    var _ds = chart.data.datasets[pt._datasetIndex] || {}, _d = (_ds.data || [])[pt._index];
+    return _d && _d.hecVirtual ? radius : ((+_ds.borderWidth || 0) + 2) / 2;
+  };
   Chart.plugins.register({
     id: 'hecShowSamples',
     afterDatasetUpdate: function (chart, args) {
       if (!chart._hecShowSamples || !args.meta.dataset) return;
-      var _ds = chart.data.datasets[args.index];
-      var _data = _ds.data || [];
-      var _radius = ((+_ds.borderWidth || 0) + 2) / 2;
-      (args.meta.data || []).forEach(function (pt, i) {
-        if (pt._model && !(pt._model.radius > 0) && !(_data[i] && _data[i].hecVirtual)) pt._model.radius = _radius;
+      (args.meta.data || []).forEach(function (pt) {
+        if (pt._model) pt._model.radius = Chart.hecSampleRadius(chart, pt, pt._model.radius);
       });
+    } });
+
+  // ---------------------------------------------------------------------------
+  // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
+  // over the curves, of a diameter of its line's width + 2 px, in its point's color
+  Chart.plugins.register({
+    id: 'hecHoverDot',
+    afterDatasetsDraw: function (chart) {
+      var el = chart._hecHoverDot;
+      if (!el || !el._view) return;
+      var ds = chart.data.datasets[el._datasetIndex] || {}, v = el._view, ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(v.x, v.y, ((+ds.borderWidth || 0) + 2) / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = v.backgroundColor || ds.pointBackgroundColor || ds.borderColor;
+      ctx.fill();
+      ctx.restore();
     } });
 
   // ---------------------------------------------------------------------------
@@ -1808,15 +1830,24 @@
           // away from the type menu it just opened, closing it). Scrolling isn't one of
           // these: on touch it's only ever governed by touch-action.
           if (ev.type === 'pointerdown' || ev.type === 'contextmenu') ev.preventDefault();
+          // (leaving it for the canvas or another of its zones isn't leaving the graph)
+          if (ev.type === 'pointerout' && me._hecInGraph(ev.relatedTarget)) return;
           me.canvas.dispatchEvent(new PointerEvent(ev.type, ev));
         };
-        ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'contextmenu'].forEach(function (t) {
+        ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerout', 'contextmenu'].forEach(function (t) {
           _el.addEventListener(t, _forward);
         });
+        _el._hecChart = me;
         me[key] = _el;
       }
       me._hecAttachToCanvasParent(_el);
       return _el;
+    },
+
+    // Is a page element part of this graph — its canvas, or one of its relay zones? (the
+    // pointer going from one to another hasn't left the graph)
+    _hecInGraph: function (el) {
+      return !!el && (el === this.canvas || el._hecChart === this);
     },
 
     // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
@@ -1921,6 +1952,7 @@
           if (_curves.indexOf(_ci) < 0) _curves.push(_ci);
           me._hecTooltipCurves = _curves;
           me._hecTooltipMode = true;
+          me._hecUpdateHoverDot(null);
           me.active = me._hecHoverElements(e);
           me._hecLastHitXY = { x: e.x, y: e.y };
           return;
@@ -1954,6 +1986,31 @@
         return { d: Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y)), x: cx, y: cy };
       }));
       return _i >= 0 ? els[_i] : null;
+    },
+
+    // The value a hover is on, among the curves whose points aren't shown (by the picking
+    // rule, on each value drawn); null when there's none. Its dot is drawn (hecHoverDot) —
+    // e null: none
+    _hecUpdateHoverDot: function (e) {
+      var me = this, el = null;
+      if (e && e.x !== null && e.y !== null && !me._hecShowSamples) {
+        var _m = Chart.hecGestures(pickPointerType).slop, els = [];
+        (me.data.datasets || []).forEach(function (ds, i) {
+          var meta = me.getDatasetMeta(i);
+          if (!meta.dataset || !me.isDatasetVisible(i) || ds.pointRadius > 0) return;
+          me._hecOnlyDrawnPoints(meta.data || []).forEach(function (p) {
+            if (!p._view.hecVirtual && Math.abs(p._view.x - e.x) <= _m) els.push(p);
+          });
+        });
+        var _i = _hecPickNearest(els.map(function (p) {
+          var dx = p._view.x - e.x, dy = p._view.y - e.y;
+          return { d: Math.sqrt(dx * dx + dy * dy), x: p._view.x, y: p._view.y };
+        }));
+        el = _i >= 0 ? els[_i] : null;
+      }
+      if (el === (me._hecHoverDot || null)) return;
+      me._hecHoverDot = el;
+      me.render({ duration: 0, lazy: true });
     },
 
     // The tooltip mode ends: no curve in it any more

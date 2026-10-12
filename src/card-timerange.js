@@ -22,32 +22,39 @@ export class CardTimeRange
             if( resetRange )
                 this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
 
-            let endTime = moment();
-            if( this.pconfig.defaultTimeOffset ) {
-                const s = this.pconfig.defaultTimeOffset.slice(0, -1);
-                switch( this.pconfig.defaultTimeOffset.slice(-1)[0] ) {
-                    case 'm': endTime = endTime.add(s, 'minute'); break;
-                    case 'h': endTime = endTime.add(s, 'hour'); break;
-                    case 'd': endTime = endTime.add(s, 'day'); break;
-                    case 'w': endTime = endTime.add(s, 'week'); break;
-                    case 'o': endTime = endTime.add(s, 'month'); break;
-                    case 'y': endTime = endTime.add(s, 'year'); break;
-                    case 'H': endTime = moment(endTime.format('YYYY-MM-DDTHH:00:00')).add(s, 'hour'); break;
-                    case 'D': endTime = moment(endTime.format('YYYY-MM-DDT00:00:00')).add(s, 'day'); break;
-                    case 'O': endTime = moment(endTime.format('YYYY-MM-01T00:00:00')).add(s, 'month'); break;
-                    case 'Y': endTime = moment(endTime.format('YYYY-01-01T00:00:00')).add(s, 'year'); break;
-                }
-            }
-
-            this.endTime = endTime.format('YYYY-MM-DDTHH:mm:ss');
-            this.startTime = moment(this.endTime).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute").format('YYYY-MM-DDTHH:mm:ss');
-
+            this._setPresentWindow();
             this.updateHistory();
 
         }
 
         // Allow auto scroll if auto refresh is enabled
         this.state.autoScroll = true;
+    }
+
+    // The time window ending at the present (moved by defaultTimeOffset), over the active
+    // range — set before the graphs are first built, so their time axis has it from the
+    // start
+    _setPresentWindow()
+    {
+        let endTime = moment();
+        if( this.pconfig.defaultTimeOffset ) {
+            const s = this.pconfig.defaultTimeOffset.slice(0, -1);
+            switch( this.pconfig.defaultTimeOffset.slice(-1)[0] ) {
+                case 'm': endTime = endTime.add(s, 'minute'); break;
+                case 'h': endTime = endTime.add(s, 'hour'); break;
+                case 'd': endTime = endTime.add(s, 'day'); break;
+                case 'w': endTime = endTime.add(s, 'week'); break;
+                case 'o': endTime = endTime.add(s, 'month'); break;
+                case 'y': endTime = endTime.add(s, 'year'); break;
+                case 'H': endTime = moment(endTime.format('YYYY-MM-DDTHH:00:00')).add(s, 'hour'); break;
+                case 'D': endTime = moment(endTime.format('YYYY-MM-DDT00:00:00')).add(s, 'day'); break;
+                case 'O': endTime = moment(endTime.format('YYYY-MM-01T00:00:00')).add(s, 'month'); break;
+                case 'Y': endTime = moment(endTime.format('YYYY-01-01T00:00:00')).add(s, 'year'); break;
+            }
+        }
+
+        this.endTime = endTime.format('YYYY-MM-DDTHH:mm:ss');
+        this.startTime = moment(this.endTime).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute").format('YYYY-MM-DDTHH:mm:ss');
     }
 
     todayNoReset()

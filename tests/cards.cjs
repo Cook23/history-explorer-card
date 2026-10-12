@@ -78,8 +78,16 @@ module.exports = async function()
         const g = await t.graphs();
         return g.length === 1 && !g[0].split(/[:+@]/).includes(id.split('.')[1]) ? true : id + ' -> ' + g.join(' | ');
     });
-    await t.step('the menu is wide enough for its items beside an open submenu', async () => {
+    await t.step('testing interpolations: an algorithm picked, a long-press on the label again within 10 s reopens Interpolation', async () => {
+        await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_algo_makima').click()`); await t.wait(500);
         await t.longPress(await t.E('legendPt(0,0)'));
+        const open = await t.E(`['rep','interp','layout','tests'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; })`);
+        await t.E(`el.querySelector('#et_0_algo_monotone').click()`); await t.wait(500);
+        return open.join() === 'interp' ? true : JSON.stringify(open);
+    });
+    await t.step('the menu is wide enough for its items beside an open submenu', async () => {
+        await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_rep').click()`); await t.wait(200);
         const r = await t.E(`(()=>{ const m=el.querySelector('#et_0').getBoundingClientRect(), s=el.querySelector('#et_0_rep_sub').getBoundingClientRect();
             const w=Math.max(...[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>{ const g=document.createRange(); g.selectNodeContents(a); return g.getBoundingClientRect().right; }));
             return { free: s.left - w, right: Math.abs(s.right - m.right) }; })()`);

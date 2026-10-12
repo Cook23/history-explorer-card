@@ -8,6 +8,41 @@ import { keyOf } from "./history-entity-store.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 import { GESTURE_SETTINGS, HA_GESTURES_KEY, gestureValues, setGestureValues } from "./gesture-settings.js";
 
+// --------------------------------------------------------------------------------------
+// Where each field of an entity that can be saved goes — the one place to change it:
+//   'devices' — the user finds it on every device (Home Assistant's user data: one user,
+//               so the last one to speak wins, with no conflict between people);
+//   'local'   — on this device only: a viewing comfort that suits one screen and clutters
+//               another (every point of a curve, a verbose curve hidden — fine on a large
+//               screen, unreadable or needed on a small one).
+// Whether a field is saved at all is set by the persistence options (enable_persistence,
+// enable_multidevice_persistence); this only says how far it goes once saved: a 'local'
+// field is never taken from another device, whatever enable_multidevice_persistence says.
+// --------------------------------------------------------------------------------------
+const ENTITY_FIELD_SCOPE = {
+    type          : 'devices',
+    color         : 'devices',
+    fill          : 'devices',
+    hidden        : 'local',
+    interval      : 'devices',
+    name          : 'devices',
+    scale         : 'devices',
+    siConversionFactor : 'devices',
+    dashMode      : 'devices',
+    lineMode      : 'devices',
+    interpolation : 'devices',
+    width         : 'devices',
+    showPoints    : 'local',
+    showMinMax    : 'devices',
+    unit          : 'devices',
+    process       : 'devices',
+    netBars       : 'devices',
+    decimation    : 'devices',
+    circular      : 'devices',
+    groupId       : 'devices',
+};
+const LOCAL_ONLY_FIELDS = Object.keys(ENTITY_FIELD_SCOPE).filter(f => ENTITY_FIELD_SCOPE[f] === 'local');
+
 export class CardStorage
 {
     // --------------------------------------------------------------------------------------
@@ -271,6 +306,13 @@ export class CardStorage
         // systems and shuffle the block. The order inside a block is carried by the
         // entities' order instead (resolved as a whole, see 'order' — and kept in step
         // with the display by _syncGroupOrder).
+        // A field kept on this device only: this device's own value when saved here, else
+        // the YAML's — never one that came from another device
+        for( const _f of LOCAL_ONLY_FIELDS ) {
+            if( _lsE && _localFields.has(_f) ) continue;
+            if( _yamlE?.[_f] !== undefined ) _result[_f] = _yamlE[_f];
+            else delete _result[_f];
+        }
         const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                         ( _enabledFields.has('groupId') ? _localE : null );
         if( _keySrc ) {
@@ -430,8 +472,11 @@ export class CardStorage
             const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities', 'order'], !staticEntry);
             return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
         };
-        return { multi: _resolve(staticEntry?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence),
-                 local: _resolve(staticEntry?.enablePersistence, this.pconfig.enablePersistence) };
+        // (a field kept on this device only — see ENTITY_FIELD_SCOPE: never taken from
+        // another device, whatever the options)
+        const _multi = new Set(_resolve(staticEntry?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence));
+        for( const _f of LOCAL_ONLY_FIELDS ) _multi.delete(_f);
+        return { multi: _multi, local: _resolve(staticEntry?.enablePersistence, this.pconfig.enablePersistence) };
     }
 
     // Is what graph g holds — its entities' group — saved? A YAML graph's (one holding a
@@ -493,9 +538,7 @@ export class CardStorage
     // individually cover via a per-entity field list.
     _entityPersistenceFields()
     {
-        return ['type', 'color', 'fill', 'hidden', 'interval', 'name', 'scale', 'siConversionFactor',
-                'dashMode', 'lineMode', 'interpolation', 'width', 'showPoints', 'showMinMax', 'unit', 'process',
-                'netBars', 'decimation', 'circular', 'groupId'];
+        return Object.keys(ENTITY_FIELD_SCOPE);
     }
 
     // Entity-scope persistence option: a list of specific field names, or 'entities'/'all' as
