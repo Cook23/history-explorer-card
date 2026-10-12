@@ -1,5 +1,6 @@
-// A curve's samples' dots: shown or hidden by a long-press (a right click) on the curve — the
-// nearest one, picked as a label is — or from the Layout submenu of its menu or of its
+// A gesture on a curve — the nearest one, picked as a label is: a click or a tap puts it in the
+// tooltip mode (several curves can be), a long-press (a right click) shows or hides its
+// samples' dots, as the Layout submenu of its menu or of its
 // graph's; every dot shown by default of a diameter of the line width + 2 px (Alt's too), the
 // hovered one 2 px wider
 const { openCard } = require('./lib.cjs');
@@ -78,6 +79,28 @@ module.exports = async function()
         await t.E(`el.querySelector('#et_0_points').click()`); await t.wait(400);
         const a = await dots(t, 1, 0), b = await dots(t, 1, 1);
         return shown(a) && shown(b) && a.saved && b.saved ? true : JSON.stringify({ a, b });
+    });
+    // The tooltip of graph gi: its text, else null
+    const tip = gi => t.E(`(()=>{ const el=graphAt(${gi}).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
+    // A point of curve k of graph 1 far from the other one, 3 px above the curve between two values
+    const nearCurve = k => t.E(`(()=>{ const c=graphAt(1).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+        const vs=d=>c.getDatasetMeta(d).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.x<A.right-40);
+        const o=vs(1-${k}), yOf=x=>o.reduce((b,v)=>Math.abs(v.x-x)<Math.abs(b.x-x)?v:b).y, m=vs(${k});
+        const i=m.findIndex((v,i)=>i&&Math.abs(v.y-yOf(v.x))>30); const a=m[i-1], b=m[i];
+        return {x:r.left+(a.x+b.x)/2, y:r.top+(a.y+b.y)/2-3}; })()`);
+    await t.step('a click near a curve, not on a value: its tooltip only; near the other one: both', async () => {
+        await t.page.mouse.click(...Object.values(await nearCurve(1))); await t.wait(400);
+        const one = await tip(1);
+        await t.page.mouse.click(...Object.values(await nearCurve(0))); await t.wait(400);
+        const two = await tip(1);
+        return /tank/.test(one || '') && !/rain/.test(one || '') && /tank/.test(two || '') && /rain/.test(two || '') ? true : `${one} / ${two}`;
+    });
+    await t.step('a click beside the curves changes nothing; leaving the plot area ends the tooltip mode', async () => {
+        await t.page.mouse.click(...Object.values(await beside(t, 1))); await t.wait(400);
+        const kept = await tip(1);
+        const y = await t.E('yaPt(1,0.5)'); await t.page.mouse.move(y.x, y.y, { steps: 10 }); await t.wait(1300);
+        const r = { kept, gone: await tip(1), curves: await t.E('graphAt(1).chart._hecTooltipCurves') };
+        return /tank/.test(kept || '') && /rain/.test(kept || '') && r.gone === null && !r.curves ? true : JSON.stringify(r);
     });
     await t.step('Alt held: the samples drawn with a diameter of the line width + 2 px', async () => {
         const p = await t.E('graphPtAt(0,0.5)');

@@ -32,14 +32,15 @@
       return Math.sqrt(dx * dx + dy * dy);
     }));
   }
-  // The same rule, from each candidate's distance to the point (Infinity: not a candidate)
-  function _hecPickNearest(dists) {
+  // The same rule, from each candidate's distance to the point (Infinity: not a candidate);
+  // within onDist of one, the point is on it (the nearest one, should several overlap)
+  function _hecPickNearest(dists, onDist) {
     var best = -1, d1 = Infinity, d2 = Infinity;
     for (var i = 0; i < dists.length; i++) {
       var d = dists[i];
       if (d < d1) { d2 = d1; d1 = d; best = i; } else if (d < d2) { d2 = d; }
     }
-    if (best < 0 || d1 === 0) return best;
+    if (best < 0 || d1 <= (onDist || 0)) return best;
     if (d1 > PICK_MARGIN) return -1;
     return d2 - d1 > PICK_AMBIGUITY ? best : PICK_BETWEEN;
   }
@@ -1835,31 +1836,88 @@
     },
 
     // A click or a tap — released without a drag, a pinch or a long press; never a press
-    // alone, a swipe (a scroll or a move of the time) or a pinch — on the plot area opens
-    // the tooltip mode on the points under it (hover.activateOnContact), or closes the
-    // tooltip when there are none; anywhere else it ends the mode. Without contact mode,
-    // it shows the points under it. Applied by Controller.handleEvent, right after.
+    // alone, a swipe (a scroll or a move of the time) or a pinch. With hover.activateOnContact:
+    // on a curve — the nearest one, by the picking rule (_hecCurveAt), not necessarily on
+    // one of its points — that curve joins the tooltip mode (several curves can be in it);
+    // on the plot area of a chart without curves, or on a bar, the tooltip mode opens on
+    // the elements under it (hover.mode), as without contact mode; beside or between the
+    // curves, nothing changes; anywhere else, the mode ends. Applied by
+    // Controller.handleEvent, right after.
     _hecTap: function (e) {
       var me = this, ho = me.options.hover;
       var _at = e.x !== null && e.y !== null;
-      me._hecTooltipMode = ho.activateOnContact !== true || (_at && me._hecZoneAt(e.x, e.y) === 'plot');
-      me.active = me._hecTooltipMode ? me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho)) : [];
-      me._hecLastHitXY = _at ? { x: e.x, y: e.y } : undefined;
       me._hecTapped = true;
+      if (ho.activateOnContact === true) {
+        if (!_at || me._hecZoneAt(e.x, e.y) !== 'plot') {
+          me._hecEndTooltipMode();
+          me.active = [];
+          return;
+        }
+        var _ci = me._hecCurveAt(e.x, e.y);
+        var _curves = me._hecTooltipCurves || [];
+        if (_ci >= 0) {
+          if (_curves.indexOf(_ci) < 0) _curves.push(_ci);
+          me._hecTooltipCurves = _curves;
+          me._hecTooltipMode = true;
+          me.active = me._hecHoverElements(e);
+          me._hecLastHitXY = { x: e.x, y: e.y };
+          return;
+        }
+        // (beside or between the curves; or no curve in the tooltip mode on a chart with
+        // other elements — bars, a timeline — which then work as without contact mode)
+        if (_curves.length || !me._hecHasOtherElements()) return;
+      }
+      me._hecTooltipMode = true;
+      me.active = me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho));
+      me._hecLastHitXY = _at ? { x: e.x, y: e.y } : undefined;
+    },
+
+    // The tooltip mode ends: no curve in it any more
+    _hecEndTooltipMode: function () {
+      this._hecTooltipMode = false;
+      this._hecTooltipCurves = null;
+    },
+
+    // Whether this chart shows anything else than curves (bars, a timeline, arrows)
+    _hecHasOtherElements: function () {
+      var me = this;
+      return (me.data.datasets || []).some(function (ds, i) {
+        return me.isDatasetVisible(i) && !me.getDatasetMeta(i).dataset;
+      });
+    },
+
+    // The elements the tooltip shows at this point: with curves in the tooltip mode, the
+    // value of each of them nearest the point along the time axis; else those under it
+    // (hover.mode) — only values drawn on the plot area, never a curve-shaping point
+    _hecHoverElements: function (e) {
+      var me = this, ho = me.options.hover;
+      var _curves = (me._hecTooltipCurves || []).filter(function (i) { return me.isDatasetVisible(i); });
+      if (!_curves.length) return me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho));
+      return _curves.map(function (i) {
+        var _best = null, _d = Infinity;
+        me._hecOnlyDrawnPoints(me.getDatasetMeta(i).data || []).forEach(function (el) {
+          if (el._view.hecVirtual) return;
+          var d = Math.abs(el._view.x - e.x);
+          if (d < _d) { _d = d; _best = el; }
+        });
+        return _best;
+      }).filter(function (el) { return el; });
     },
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
     // each shown line's distance to the point, along its drawn path — its points joined
-    // straight, or in steps for a stepped line; -1, or PICK_BETWEEN about halfway
-    // between two
+    // straight, or in steps for a stepped line — the point on it within half its width
+    // + 1 px; -1, or PICK_BETWEEN about halfway between two
     _hecCurveAt: function (px, py) {
       var me = this;
+      var _on = [];
       var _dists = (me.data.datasets || []).map(function (ds, i) {
         var meta = me.getDatasetMeta(i);
         if (!meta.dataset || !me.isDatasetVisible(i)) return Infinity;
         var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
           .map(function (p) { return p._view; });
         var st = ds.steppedLine, best = Infinity;
+        _on.push((+ds.borderWidth || 0) / 2 + 1);
         for (var k = 1; k < pts.length; k++) {
           var a = pts[k - 1], b = pts[k];
           // (only the segments around the point can be near it)
@@ -1873,7 +1931,7 @@
         }
         return best;
       });
-      return _hecPickNearest(_dists);
+      return _hecPickNearest(_dists, Math.max.apply(null, _on.concat(0)));
     },
 
     // The elements of a hit-test drawn on the plot area (not skipped, not clipped out)
