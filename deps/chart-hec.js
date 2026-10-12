@@ -2092,6 +2092,25 @@
       });
     },
 
+    // The tooltip closed at once and its mode ended, the point it showed back to its normal
+    // look, no hover dot — a menu opens over the card: nothing of the tooltip stays over it
+    hecEndTooltip: function () {
+      var me = this;
+      me._hecEndTooltipMode();
+      me._hecUpdateHoverDot(null);
+      if (me.active && me.active.length) me.updateHoverStyle(me.active, me.options.hover.mode, false);
+      me.active = [];
+      me.lastActive = [];
+      me._hecLastHitXY = undefined;
+      if (me.tooltip) {
+        me.tooltip._active = [];
+        me.tooltip.update(true);
+        // (removed at once, not faded out: nothing of it over the menu)
+        if (me.tooltip._hecHoverTooltipEl) Chart.hecUi.closeFloating(me.tooltip._hecHoverTooltipEl);
+      }
+      me.render({ duration: 0, lazy: true });
+    },
+
     // Ends the hover: the highlighted points go back to their normal look, fading as the
     // tooltip does (Chart.hecUi.FADE), and the tooltip closes — when the tooltip fades out
     // by itself. A move or a contact on a point opens them again, as before.
@@ -2540,9 +2559,10 @@
         _el.appendChild(content);
       }
 
+      var _caretEl = null;
       if (caret) {
         var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
-        var _caretEl = document.createElement('div');
+        _caretEl = document.createElement('div');
         _caretEl.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
         if (caret.yAlign === 'center') {
           _caretEl.style.top = '50%';
@@ -2573,6 +2593,20 @@
       // (the area to stay in: the card's, if it says which — floatingBoundsSelector)
       var _boundsSel = me._chart && me._chart.options.floatingBoundsSelector;
       Chart.hecUi.clampToViewport(_el, _boundsSel && anchorEl && anchorEl.closest ? anchorEl.closest(_boundsSel) : null);
+      // (moved to stay within the card and the screen: its arrow still on the point, within
+      // its rounded corners)
+      if (_caretEl && caret.x !== undefined) {
+        var _box = _el.getBoundingClientRect(), _half = caret.size, _in = caret.cornerRadius + _half;
+        var _clampIn = function (v, len) { return Math.max(_in, Math.min(v, len - _in)); };
+        if (caret.yAlign === 'center') {
+          _caretEl.style.top = (_clampIn(caret.y - _box.top, _box.height) - caret.borderWidth - _half) + 'px';
+          _caretEl.style.marginTop = '0px';
+        } else {
+          _caretEl.style.left = (_clampIn(caret.x - _box.left, _box.width) - caret.borderWidth - _half) + 'px';
+          _caretEl.style.right = 'auto';
+          _caretEl.style.marginLeft = '0px';
+        }
+      }
       Chart.hecUi.armAutoFade(_el, _readingTime, justMoved);
 
       function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }

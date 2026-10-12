@@ -690,7 +690,10 @@ class HistoryExplorerCard extends HTMLElement
         const invertZoom = config.uiLayout?.invertZoom === true;
 
         const optionStyle = `style="color:var(--primary-text-color);background-color:var(--card-background-color)"`;
-        const inputStyle = config.uiColors?.selector ? `style="color:var(--primary-text-color);background-color:${config.uiColors.selector};border:1px solid black;"` : '';
+        // (the entity selector in the theme's colors — the browser's own white field glared on
+        // a dark theme — or in uiColors.selector)
+        const inputStyle = config.uiColors?.selector ? `style="color:var(--primary-text-color);background-color:${config.uiColors.selector};border:1px solid black;"`
+                         : `style="color:var(--primary-text-color);background-color:var(--card-background-color);border:1px solid var(--secondary-text-color,#888);border-radius:2px"`;
 
         this.instance.ui.optionStyle = optionStyle;
         this.instance.ui.hideHeader = header === 'hide';

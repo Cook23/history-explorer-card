@@ -195,6 +195,10 @@ module.exports = async function()
         const c = await t.E(`[el.instance.ui.darkMode, graphAt(0).chart.options.scales.yAxes[0].ticks.fontColor]`);
         return !!c[0] && /9b9b9b|155, ?155, ?155/i.test(String(c[1])) ? true : JSON.stringify(c);
     });
+    await t.step('dark theme: the entity selector in the theme\'s colors, not the browser\'s white field', async () => {
+        const c = await t.E(`(()=>{ const s=getComputedStyle(el.querySelector('#b7_0')); return [s.backgroundColor, s.color]; })()`);
+        return !/255, ?255, ?255/.test(c[0]) ? true : JSON.stringify(c);
+    });
     await t.step('French: the menus are in French', async () => {
         const txt = await t.E(`el.querySelector('#ef_0')?.textContent`);
         return txt === 'Historique' ? true : JSON.stringify(txt);

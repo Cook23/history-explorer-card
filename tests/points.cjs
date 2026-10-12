@@ -134,8 +134,40 @@ module.exports = async function()
             await t.page.mouse.move(5, 5); for( let i = 0; i < 40 && await tip(0) !== null; i++ ) await t.wait(200);
             return r;
         };
-        const right = await gap(0.15), left = await gap(0.95);
+        // (a point whose tooltip stands beside it, on either side — above or below a peak it
+        // stands under or over it, the data following the time of day)
+        const beside = async (fs, side) => { let r; for( const f of fs ) { r = await gap(f); if( r.side === side ) break; } return r; };
+        const right = await beside([0.15, 0.2, 0.25, 0.3, 0.1], 'left'), left = await beside([0.95, 0.9, 0.85, 0.97, 0.8], 'right');
         return right.side === 'left' && left.side === 'right' && right.gap > 0 && Math.abs(right.gap - left.gap) <= 1 ? true : JSON.stringify({ right, left });
+    });
+    await t.step('the tooltip\'s arrow points at the point, also when the tooltip is moved to stay within the screen', async () => {
+        // (a tooltip centered under or over a point 20 px from the screen's right edge, or
+        // beside one 20 px from its bottom: moved back inside — the arrow never in its
+        // rounded corners)
+        const at = (xAlign, yAlign, x, y) => t.E(`(()=>{ const c=graphAt(0).chart, tt=c.tooltip;
+            tt._hecShowTooltip('a long enough text for the tooltip to be moved', 0, 0, c.canvas, '#333', null, '#fff',
+                { size: 5, xAlign: '${xAlign}', yAlign: '${yAlign}', cornerRadius: 6, borderWidth: 0, padding: 8, x: ${x}, y: ${y} }, true, null);
+            const e=document.getElementById('hec-tooltip-hover'), a=[...e.children].pop().getBoundingClientRect(), b=e.getBoundingClientRect();
+            const r={ moved: '${yAlign}'==='center' ? b.bottom <= innerHeight + 1 : b.right <= innerWidth + 1,
+                      off: Math.round('${yAlign}'==='center' ? Math.abs(a.top+a.height/2-${y}) : Math.abs(a.left+a.width/2-${x})) };
+            tt._hecCloseTooltip(); return r; })()`);
+        const h = await t.E('innerHeight'), w = await t.E('innerWidth');
+        const r = [await at('center', 'top', w - 20, 300), await at('center', 'bottom', w - 20, 300), await at('left', 'center', 300, h - 20), await at('center', 'top', 200, 300)];
+        return r.every(x => x.moved && x.off <= 1) ? true : JSON.stringify(r);
+    });
+    await t.step('a menu opened while a curve\'s tooltip shows (the options menu, the entity selector): the tooltip closes, its mode ends', async () => {
+        const open = async how => {
+            const p = await t.E('pointPt(0,0.4)'); await t.page.mouse.click(p.x, p.y); await t.wait(400);
+            const before = await tip(0);
+            await t.E(how); await t.wait(400);
+            const r = { before: !!before, after: await tip(0), mode: await t.E('!!graphAt(0).chart._hecTooltipMode') };
+            await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400);
+            return r;
+        };
+        const options = await open(`el.querySelector('#bo_0').click()`);
+        const selector = await open(`(()=>{ const i=el.querySelector('#b7_0'); i.focus(); i.value='sensor'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+        const ok = r => r.before && r.after === null && !r.mode;
+        return ok(options) && ok(selector) ? true : JSON.stringify({ options, selector });
     });
     // The value whose dot a hover shows on graph gi: [dataset, index], or null
     const hoverDot = gi => t.E(`(()=>{ const d=graphAt(${gi}).chart._hecHoverDot; return d ? [d._datasetIndex, d._index] : null; })()`);

@@ -942,6 +942,8 @@ export class CardMenus
     //           CSS transform, same mechanism already used for _showLabelTooltip, so there's
     //           no need to measure the menu's rendered width and recompute afterward.
     _openMenu(menuEl, top, left, align = 'left') {
+        // (a curve's tooltip closes: a menu opened is never under it)
+        for( const g of this.graphs ?? [] ) g.chart?.hecEndTooltip();
         menuEl.style.display = 'block';
         if( top  !== undefined ) menuEl.style.top  = top;
         if( left !== undefined ) menuEl.style.left = left;

@@ -116,11 +116,15 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 
 ---
 
-### Public method
+### Public methods
 
 `chart.hecSetYAxisLocked(locked)` locks (`true`) or releases (`false`) the chart's Y axes, as
 a click on the padlock does — for a menu entry that does the same. Nothing on a chart
 without a lock (`yAxisLockEnabled: false`, a timeline or arrowline).
+
+`chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
+its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls
+it on every chart when one of its menus opens, so nothing of a tooltip stays over the menu.
 
 ## 2. The `customEvent` gesture system
 
