@@ -1084,8 +1084,12 @@ export class CardGraphs
         const _isStatic = g.isStatic;
         const _legend = g.chart.options.legend;
         if( g.type === 'bar' ) {
+            // (from where the interval selector actually is: its left edge, a gap before it —
+            // it isn't against the graph's right edge)
             const bd = this._this.querySelector(`#bd-${g.id}`);
-            if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
+            const _bdR = bd?.getBoundingClientRect(), _cR = g.canvas.getBoundingClientRect();
+            if( bd && _bdR.width ) _legend.rightMargin = Math.max(_cR.right - _bdR.left + 8, _isStatic ? 25 : 45);
+            else if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
         } else {
             _legend.rightMargin = _isStatic ? 25 : 45;
         }

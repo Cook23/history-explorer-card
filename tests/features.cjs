@@ -216,6 +216,20 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A bar graph's legend clear of its interval selector ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'bar', entities: [{ entity: 'sensor.energy', name: 'Énergie consommée maison' }] }] }),
+        { mock: { series: true, language: 'fr' } });
+    await t.step('a bar graph: its legend labels never under its interval selector — 1000, 374 and 230 px', async () => {
+        const r = [];
+        for( const w of [1000, 374, 230] ) {
+            await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+            r.push(await t.E(`(()=>{ const g=el.instance.graphs[0], c=g.chart, cr=c.canvas.getBoundingClientRect(), bd=el.querySelector('#bd-'+g.id).getBoundingClientRect();
+                return c.legend.legendHitBoxes.some(h => cr.left+h.left+h.width > bd.left && cr.left+h.left < bd.right && cr.top+h.top < bd.bottom && cr.top+h.top+h.height > bd.top) ? '${w}: under' : ''; })()`));
+        }
+        return r.every(x => x === '') ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── A narrow card (under 300 px): the toolbar on lines of its own, the Y labels inside ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
         { type: 'line', yLabels: 'outside', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true, language: 'fr' } });
