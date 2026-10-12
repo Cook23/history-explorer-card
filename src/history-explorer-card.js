@@ -14,7 +14,7 @@ import "./history-info-panel.js"
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
 
-const Version = '1.1.55';
+const Version = '1.1.56b1';
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
 export const _TYPE_MENU_DEFS = [
@@ -7904,7 +7904,7 @@ export class HistoryCardState {
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
         P.decimation =             c.decimation;
-        P.roundingPrecision =      c.rounding || 2;
+        P.roundingPrecision =      c.rounding ?? 2;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
         P.defaultLineMode =        this.normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
