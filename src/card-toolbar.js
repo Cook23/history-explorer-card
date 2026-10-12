@@ -4,7 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
-import { typeMenuHtml } from "./card-menus.js";
+import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
@@ -37,8 +37,6 @@ export class CardToolbar
 
         if( tools || selector ) html += `<div id="tb_${i}" style="position:relative;margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
 
-        const eh = `<a id="eh_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>`;
-
         if( tools ) html += `
             <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
                 <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
@@ -54,12 +52,7 @@ export class CardToolbar
                 <div id="es_${i}_choice" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 ${typeMenuHtml(i, true)}
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
-                <div id="eo_${i}" style="display:none;position:absolute;text-align:left;min-width:150px;overflow:auto;border:1px solid #ddd;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none">
-                    <a id="ef_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                    ${this.statistics.enabled ? eh : ''}
-                    <a id="eg_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                    <a id="ei_${i}" href="#" style="display:block;padding:5px 5px;text-decoration:none;color:inherit"></a>
-                </div>
+                ${optionsMenuHtml(i, this.statistics.enabled)}
             </div>`;
 
         if( tools ) html += `
@@ -131,25 +124,7 @@ export class CardToolbar
             const _k = Chart.hecUi.pick(e.clientX, e.clientY, _buttons);
             if( _k >= 0 ) _buttons[_k].click();
         }, false);
-        // Close on focusout — same as es_N/et_N. eo_N needs a tabIndex to be
-        // focusable at all (unlike et_N, it isn't focusable by default in the HTML
-        // template), and menuSetVisibility() must call .focus() when opening it, or
-        // this listener would never fire in the first place.
-        const _eoMenu = this._this.querySelector(`#eo_${i}`);
-        if( _eoMenu ) {
-            _eoMenu.tabIndex = 0;
-            _eoMenu.addEventListener('focusout', () => {
-                setTimeout(() => {
-                    if( !_eoMenu.contains(document.activeElement) ) this.menuSetVisibility(i, false);
-                }, 150);
-            });
-            // Keyboard navigation — same as es_N/et_N. menuSetVisibility(i,false) as
-            // onClose (rather than duplicating display:none here) also resets the
-            // toggle button's caret icon back to its closed-state arrow.
-            _eoMenu.addEventListener('keydown', (e) => {
-                this._menuKeyDown(e, _eoMenu, { onClose: () => this.menuSetVisibility(i, false) });
-            });
-        }
+        this._initOptionsMenu(i);
 
         this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
         this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
@@ -187,6 +162,7 @@ export class CardToolbar
         let ef = this._this.querySelector(`#ef_${i}`); if( ef ) ef.innerHTML = i18n('ui.menu.export_csv');
         // Entity type menu labels — updated here so language is already set
         this.relabelTypeMenu(i);
+        this.relabelOptionsMenu(i);
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
         let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');

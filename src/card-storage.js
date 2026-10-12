@@ -6,6 +6,7 @@
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
+import { GESTURE_SETTINGS, HA_GESTURES_KEY, gestureValues, setGestureValues } from "./gesture-settings.js";
 
 export class CardStorage
 {
@@ -32,12 +33,14 @@ export class CardStorage
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
             yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
+            yaml_gestures          : this.pconfig.gestures,
             yaml_entities          : this._pureYamlEntities ?? this.store.statics(),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
             ha_timeRangeMinutes : this._lastHaTimeRangeMinutes,
             ha_infoPanelEnabled : this._lastHaInfoEnabled,
+            ha_gestures         : this._lastHaGestures,
         };
         const _json = JSON.stringify(data);
 
@@ -52,10 +55,11 @@ export class CardStorage
         } catch(e) {}
     }
     // The saved state merged with the YAML, by the "last one to speak wins" rules: the
-    // entities (each field, and the display order), the time range, the info panel's switch
+    // entities (each field, and the display order), the time range, the info panel's
+    // switch, the gesture thresholds
     async readLocalState()
     {
-        const { ls: _ls, haCard: _haCard, haInfoEnabled: _haInfoEnabled } = await this._readSavedSources();
+        const { ls: _ls, haCard: _haCard, haInfoEnabled: _haInfoEnabled, haGestures: _haGestures } = await this._readSavedSources();
 
         // The YAML as last seen — by this device, else (a new device: nothing stored here yet)
         // by the device that last saved to HA, which stored the same image: without it, a
@@ -74,12 +78,14 @@ export class CardStorage
         this._resolveEntities(_ls, _haCard, _yamlImage, _noStatics);
         this._resolveTimeRange(_ls, _haCard, _yamlImage, _noStatics);
         const _infoPanelChanged = this._resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage);
+        this._resolveGestures(_ls, _haGestures, _yamlImage);
 
         // Update HA user mirrors for next writeLocalState
         this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
         this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
         this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
         this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
+        this._lastHaGestures         = _haGestures               ?? _ls?.ha_gestures        ?? null;
 
         await this._registerInfoPanelDefault();
 
@@ -114,7 +120,13 @@ export class CardStorage
             if( _ipe?.value?.enabled !== undefined ) haInfoEnabled = !!_ipe.value.enabled;
         } catch(e) {}
 
-        return { ls, haCard, haInfoEnabled };
+        let haGestures = undefined;
+        try {
+            const _g = await this._hass.callWS({ type: 'frontend/get_user_data', key: HA_GESTURES_KEY });
+            if( _g?.value ) haGestures = _g.value;
+        } catch(e) {}
+
+        return { ls, haCard, haInfoEnabled, haGestures };
     }
 
     // Is persistence category (range, entities, order) on, by the card's options —
@@ -330,6 +342,32 @@ export class CardStorage
         if( _active === infoPanelEnabled ) return false;
         setInfoPanelEnabled(_active);
         return true;
+    }
+
+    // --- Last one to speak wins — the gesture thresholds (super-global) ---
+    // Each of them on its own: its YAML value (gestures:) and its HA value (set from the
+    // options menu, on any device, by any card) each compared with their image, YAML
+    // winning if both changed; else it stays as this device has it
+    _resolveGestures(_ls, _haGestures, _yamlImage)
+    {
+        const _set = {};
+        for( const k in GESTURE_SETTINGS ) {
+            const _yaml = this.pconfig.gestures?.[k];
+            const _yamlChanged = _yaml !== undefined && _yaml !== _yamlImage?.yaml_gestures?.[k];
+            const _ha = _haGestures?.[k];
+            const _haChanged = _ha !== undefined && _ha !== _ls?.ha_gestures?.[k];
+            if( _yamlChanged ) _set[k] = _yaml;
+            else if( _haChanged ) _set[k] = _ha;
+        }
+        setGestureValues(_set);
+    }
+
+    // A gesture threshold set from the options menu: on this device, and in Home
+    // Assistant's user data for every other device (and card)
+    setGesture(name, value)
+    {
+        setGestureValues({ [name]: value });
+        this._hass.callWS({ type: 'frontend/set_user_data', key: HA_GESTURES_KEY, value: gestureValues() }).catch(() => {});
     }
 
     // Register defaultInfoPanel with HA user key and detect conflicts across cards.

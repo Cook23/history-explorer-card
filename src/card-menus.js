@@ -7,6 +7,7 @@ import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
+import { GESTURE_SETTINGS, gestureValues } from "./gesture-settings.js";
 const Chart = window.HXLocal_Chart;
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
@@ -61,6 +62,26 @@ export function typeMenuHtml(i, full)
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
         ${full ? sub('layout', Object.keys(_LAYOUT_ENTRIES).map(k => a(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]), true))) : ''}
         ${full ? sub('tests', Object.keys(CARD_TESTS).map(k => a(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label)))) : ''}`;
+}
+
+// The options menu eo_N (the card's toolbar): its items, each opening its submenu
+// eo_N_<key>_sub — what the card exports, what concerns this card (the entities added from
+// it), and what concerns every card of the page and every device (the info panel, the
+// gesture thresholds — entered in the submenu itself, kept within their bounds)
+const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
+export function optionsMenuHtml(i, statistics)
+{
+    const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
+    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
+    const input = k => { const s = GESTURE_SETTINGS[k];
+        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}">${i18n(s.label)}</span>` +
+               `<input id="eo_${i}_g_${k}" type="number" min="${s.min}" max="${s.max}" step="${s.step}" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`; };
+    return `<div id="eo_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:1">
+            ${Object.keys(_OPTIONS_SUBMENUS).map(k => a(`eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]) + ' ▸')).join('')}
+        </div>
+        ${sub('export', [a(`ef_${i}`), statistics ? a(`eh_${i}`) : ''])}
+        ${sub('card', [a(`eg_${i}`)])}
+        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}`;
 }
 
 export class CardMenus
@@ -622,10 +643,84 @@ export class CardMenus
     // Entity option dropdown menu
     // --------------------------------------------------------------------------------------
 
+    // --------------------------------------------------------------------------------------
+    // The options menu (eo_N, see optionsMenuHtml)
+    // --------------------------------------------------------------------------------------
+
+    _optionsSubmenus(i)
+    {
+        return Object.keys(_OPTIONS_SUBMENUS).map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+    }
+
+    // The options menu's names, in the card's language
+    relabelOptionsMenu(i)
+    {
+        for( const k in _OPTIONS_SUBMENUS ) { const _el = this._this.querySelector(`#eo_${i}_${k}`); if( _el ) _el.textContent = i18n(_OPTIONS_SUBMENUS[k]) + ' ▸'; }
+        for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
+    }
+
+    // Opens the options menu's submenu key over the menu, level with its item (the
+    // gesture thresholds shown as they are now)
+    showOptionsSubmenu(i, key)
+    {
+        const _item = this._this.querySelector(`#eo_${i}_${key}`);
+        const _sub  = this._this.querySelector(`#eo_${i}_${key}_sub`);
+        if( !_item || !_sub ) return;
+        for( const _s of this._optionsSubmenus(i) ) _s.style.display = 'none';
+        const _v = gestureValues();
+        for( const k in GESTURE_SETTINGS ) { const _in = this._this.querySelector(`#eo_${i}_g_${k}`); if( _in ) _in.value = _v[k]; }
+        this._openSubmenu(_sub, _item);
+        _sub.focus();
+    }
+
+    // Listeners of the options menu and its submenus
+    _initOptionsMenu(i)
+    {
+        const _menu = this._this.querySelector(`#eo_${i}`);
+        if( !_menu ) return;
+        const _subs = this._optionsSubmenus(i);
+        for( const k in _OPTIONS_SUBMENUS )
+            this._this.querySelector(`#eo_${i}_${k}`)?.addEventListener('click', (e) => { e.preventDefault(); this.showOptionsSubmenu(i, k); }, true);
+        // A gesture threshold entered: kept within its bounds, then set for every card
+        for( const k in GESTURE_SETTINGS ) {
+            const _in = this._this.querySelector(`#eo_${i}_g_${k}`);
+            _in?.addEventListener('change', () => {
+                this.setGesture(k, _in.value);
+                _in.value = gestureValues()[k];
+            });
+        }
+        // Keyboard: Enter or → on an item opens its submenu; in a submenu, ← or Escape goes
+        // back to the menu (an input keeps its own keys, Escape aside)
+        _menu.addEventListener('keydown', (e) => {
+            const _sel = _menu.querySelector('a[data-hec-selected]');
+            if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
+            this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
+        });
+        for( const _sub of _subs ) _sub.addEventListener('keydown', (e) => {
+            const _inInput = e.target.tagName === 'INPUT';
+            if( e.key === 'Escape' || ( e.key === 'ArrowLeft' && !_inInput ) ) {
+                e.preventDefault();
+                e.stopPropagation();
+                _sub.style.display = 'none';
+                _menu.focus();
+                return;
+            }
+            if( !_inInput ) this._menuKeyDown(e, _sub);
+        });
+        // Closed once the focus has left the menu and its submenus
+        const _closeIfLeft = () => setTimeout(() => {
+            const _a = _menu.getRootNode()?.activeElement;
+            const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
+            if( ![_menu, ..._subs].some(_in) ) this.menuSetVisibility(i, false);
+        }, 150);
+        for( const _box of [_menu, ..._subs] ) _box.addEventListener('focusout', _closeIfLeft);
+    }
+
     menuSetVisibility(idx, show)
     {
         const dropdown = this._this.querySelector(`#eo_${idx}`);
         if( !dropdown ) return;
+        for( const _s of this._optionsSubmenus(idx) ) _s.style.display = 'none';
 
         this._this.querySelector(`#bo_${idx}`).style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
 

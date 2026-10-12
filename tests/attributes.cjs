@@ -70,6 +70,12 @@ module.exports = async function()
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };
+    await t.step('in the list, an entity with attributes is marked ▸, as every menu line opening a submenu; one without, not', async () => {
+        const list = () => t.E(`[...el.querySelectorAll('#es_0 a')].filter(a=>a.style.display!=='none').map(a=>a.dataset.entity+'='+a.textContent.endsWith(' ▸'))`);
+        await search('salon'); const r = await list(); await closeAll();
+        await search('power'); r.push(...await list()); await closeAll();
+        return r.includes('climate.salon=true') && r.some(x => /^sensor\..*=false$/.test(x)) ? true : JSON.stringify(r);
+    });
     await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, nor a unit (X_unit: visibility_unit, even with no visibility); a temperature in Home Assistant\'s unit system', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();

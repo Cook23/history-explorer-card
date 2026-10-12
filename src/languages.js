@@ -53,7 +53,14 @@ const lang_en =
             "ylock"             : "Lock the Y axis",
             "yunlock"           : "Unlock the Y axis",
             "points_show"       : "Show the points",
-            "points_hide"       : "Hide the points"
+            "points_hide"       : "Hide the points",
+            "options_export"    : "Export",
+            "options_card"      : "This card",
+            "options_all"       : "All cards",
+            "gesture_long_press" : "Long press, mouse and pen (ms)",
+            "gesture_long_press_touch" : "Long press, finger (ms)",
+            "gesture_drag"      : "Drag from, mouse and pen (px)",
+            "gesture_drag_touch" : "Drag from, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -137,7 +144,14 @@ const lang_fr =
             "ylock"             : "Verrouiller l'axe Y",
             "yunlock"           : "Déverrouiller l'axe Y",
             "points_show"       : "Afficher les points",
-            "points_hide"       : "Masquer les points"
+            "points_hide"       : "Masquer les points",
+            "options_export"    : "Exporter",
+            "options_card"      : "Cette carte",
+            "options_all"       : "Toutes les cartes",
+            "gesture_long_press" : "Appui long, souris et stylet (ms)",
+            "gesture_long_press_touch" : "Appui long, doigt (ms)",
+            "gesture_drag"      : "Glisser à partir de, souris et stylet (px)",
+            "gesture_drag_touch" : "Glisser à partir de, doigt (px)"
         },
         "values" : {
             "min" : "Min",
@@ -221,7 +235,14 @@ const lang_de =
             "ylock"             : "Y-Achse sperren",
             "yunlock"           : "Y-Achse entsperren",
             "points_show"       : "Punkte anzeigen",
-            "points_hide"       : "Punkte ausblenden"
+            "points_hide"       : "Punkte ausblenden",
+            "options_export"    : "Exportieren",
+            "options_card"      : "Diese Karte",
+            "options_all"       : "Alle Karten",
+            "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
+            "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
+            "gesture_drag"      : "Ziehen ab, Maus und Stift (px)",
+            "gesture_drag_touch" : "Ziehen ab, Finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -305,7 +326,14 @@ const lang_es =
             "ylock"             : "Bloquear el eje Y",
             "yunlock"           : "Desbloquear el eje Y",
             "points_show"       : "Mostrar los puntos",
-            "points_hide"       : "Ocultar los puntos"
+            "points_hide"       : "Ocultar los puntos",
+            "options_export"    : "Exportar",
+            "options_card"      : "Esta tarjeta",
+            "options_all"       : "Todas las tarjetas",
+            "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
+            "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
+            "gesture_drag"      : "Arrastrar desde, ratón y lápiz (px)",
+            "gesture_drag_touch" : "Arrastrar desde, dedo (px)"
         },
         "values" : {
             "min" : "Mín",
@@ -389,7 +417,14 @@ const lang_nl =
             "ylock"             : "Y-as vergrendelen",
             "yunlock"           : "Y-as ontgrendelen",
             "points_show"       : "Punten tonen",
-            "points_hide"       : "Punten verbergen"
+            "points_hide"       : "Punten verbergen",
+            "options_export"    : "Exporteren",
+            "options_card"      : "Deze kaart",
+            "options_all"       : "Alle kaarten",
+            "gesture_long_press" : "Lang drukken, muis en pen (ms)",
+            "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
+            "gesture_drag"      : "Slepen vanaf, muis en pen (px)",
+            "gesture_drag_touch" : "Slepen vanaf, vinger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -473,7 +508,14 @@ const lang_pl =
             "ylock"             : "Zablokuj oś Y",
             "yunlock"           : "Odblokuj oś Y",
             "points_show"       : "Pokaż punkty",
-            "points_hide"       : "Ukryj punkty"
+            "points_hide"       : "Ukryj punkty",
+            "options_export"    : "Eksportuj",
+            "options_card"      : "Ta karta",
+            "options_all"       : "Wszystkie karty",
+            "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
+            "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
+            "gesture_drag"      : "Przeciąganie od, mysz i pióro (px)",
+            "gesture_drag_touch" : "Przeciąganie od, palec (px)"
         },
         "values" : {
             "min" : "Min",
@@ -557,7 +599,14 @@ const lang_sv =
             "ylock"             : "Lås Y-axeln",
             "yunlock"           : "Lås upp Y-axeln",
             "points_show"       : "Visa punkterna",
-            "points_hide"       : "Dölj punkterna"
+            "points_hide"       : "Dölj punkterna",
+            "options_export"    : "Exportera",
+            "options_card"      : "Det här kortet",
+            "options_all"       : "Alla kort",
+            "gesture_long_press" : "Långt tryck, mus och penna (ms)",
+            "gesture_long_press_touch" : "Långt tryck, finger (ms)",
+            "gesture_drag"      : "Dra från, mus och penna (px)",
+            "gesture_drag_touch" : "Dra från, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -641,7 +690,14 @@ const lang_da =
             "ylock"             : "Lås Y-aksen",
             "yunlock"           : "Lås Y-aksen op",
             "points_show"       : "Vis punkterne",
-            "points_hide"       : "Skjul punkterne"
+            "points_hide"       : "Skjul punkterne",
+            "options_export"    : "Eksportér",
+            "options_card"      : "Dette kort",
+            "options_all"       : "Alle kort",
+            "gesture_long_press" : "Langt tryk, mus og pen (ms)",
+            "gesture_long_press_touch" : "Langt tryk, finger (ms)",
+            "gesture_drag"      : "Træk fra, mus og pen (px)",
+            "gesture_drag_touch" : "Træk fra, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -725,7 +781,14 @@ const lang_sk =
             "ylock"             : "Uzamknúť os Y",
             "yunlock"           : "Odomknúť os Y",
             "points_show"       : "Zobraziť body",
-            "points_hide"       : "Skryť body"
+            "points_hide"       : "Skryť body",
+            "options_export"    : "Exportovať",
+            "options_card"      : "Táto karta",
+            "options_all"       : "Všetky karty",
+            "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
+            "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
+            "gesture_drag"      : "Ťahanie od, myš a pero (px)",
+            "gesture_drag_touch" : "Ťahanie od, prst (px)"
         },
         "values" : {
             "min" : "Min",
@@ -809,7 +872,14 @@ const lang_ru =
             "ylock"             : "Заблокировать ось Y",
             "yunlock"           : "Разблокировать ось Y",
             "points_show"       : "Показать точки",
-            "points_hide"       : "Скрыть точки"
+            "points_hide"       : "Скрыть точки",
+            "options_export"    : "Экспорт",
+            "options_card"      : "Эта карточка",
+            "options_all"       : "Все карточки",
+            "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
+            "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
+            "gesture_drag"      : "Перетаскивание от, мышь и перо (пикс.)",
+            "gesture_drag_touch" : "Перетаскивание от, палец (пикс.)"
         },
         "values" : {
             "min" : "Мин",
