@@ -131,8 +131,8 @@ The `?hacstag=…` part isn't required — the file works without it — but wit
 
 The ▾ button beside the entity selector opens the options menu:
 - **Export ▸** — *History*, *Statistics* (as CSV files);
-- **This card ▸** — *Default graphs* (the graphs added from the card removed, the YAML's kept as you changed them), *Default display* (back to the YAML: every change made from the card forgotten, the time range too), each confirmed in a submenu (*Confirm* / *Cancel*);
-- **All cards ▸** — what applies to every card and every device: the info panel on or off, and the gesture settings, entered right there.
+- **Card ▸** — *Default graphs* (the graphs added from the card removed, the YAML's kept as you changed them), *Default display* (back to the YAML: every change made from the card forgotten, the time range too), each confirmed in a submenu (*Confirm* / *Cancel*);
+- **Global ▸** — what applies to every card and every device: the info panel on or off (confirmed as above), and the gesture settings, entered right there.
 
 The gesture settings tell a click from a long-press, and a tap from a drag — for a mouse or a pen, and for a finger. Raise them if your hand is less steady, or slower:
 

@@ -1324,8 +1324,8 @@ Either way, an option set on a graph or on the entity itself wins over `entityOp
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
 - **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
-- **This card ▸** — *Default graphs*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu (*Confirm* / *Cancel*, Cancel marked: Enter or Escape changes nothing). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
-- **All cards ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`), and the gesture settings below, entered right in the submenu.
+- **Card ▸** — *Default graphs*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu (*Confirm* / *Cancel*, Cancel marked: Enter or Escape changes nothing). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
+- **Global ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`; confirmed as above), and the gesture settings below, entered right in the submenu.
 
 Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
@@ -1335,7 +1335,7 @@ Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 - **the long-press duration** — a press held this long is a long-press; a second press this soon after a release, at the same place, is a double-click (or a tap-then-drag); after a tap on a label, a graph's ⠿ zone or the Y axis, the page doesn't scroll from there for that long, so that a drag can follow;
 - **the precision** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
 
-Raise them for a less steady or slower hand. In the YAML (any card), or in *All cards ▸* of the options menu:
+Raise them for a less steady or slower hand. In the YAML (any card), or in *Global ▸* of the options menu:
 
 ```yaml
 type: custom:history-explorer-card

@@ -11,10 +11,11 @@ Changelog for the HA History Explorer Card.
 - On a card or a screen too narrow for that, the menu takes the room there is and opens without any submenu (the default one, or the one it had open 10 s ago): its lines are read first, a click more opens one. A submenu opened then leaves at least 48 px and the first three characters of the menu's lines, so another one can still be picked; its own lines are cut ('…') if they don't fit
 - Tests: each submenu of the options menu and of an entity's menu open, the menu's lines clear of it; a narrow card: the menu alone, then a submenu leaving the start of its lines
 
-### Changed — This card ▸ Default graphs, Default display, each confirmed
+### Changed — the options menu: Card ▸ Default graphs, Default display, each confirmed; Global ▸
 - *Remove all added graphs* is now *Default graphs*: the graphs added from the card removed, the YAML's kept as they were changed
 - New *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Saved as any change: the last one to speak, it reaches the other devices for what they share — a hidden curve and its points stay each device's own
-- Each is confirmed in a submenu over *This card ▸*, right-aligned on it: *Confirm* / *Cancel* — Cancel marked, so that Enter or Escape changes nothing — rather than the browser's dialog
+- *This card ▸* is now *Card ▸*, *All cards ▸* now *Global ▸*
+- Each is confirmed in a submenu over *Card ▸*, right-aligned on it: *Confirm* / *Cancel* — Cancel marked, so that Enter or Escape changes nothing — rather than the browser's dialog; the info panel switched on or off in *Global ▸* too
 - The graphs are built from the entity list by one function, at first display and on going back to the YAML (`_buildGraphsFromStore`)
 - Tests: Cancel, Enter, then Confirm; the graphs added gone, the YAML's changes kept (Default graphs) or forgotten with the time range (Default display), here, after a reload and on another device
 

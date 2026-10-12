@@ -14,10 +14,6 @@ const lang_en =
             "add" : "Add",
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
-        "popup" : {
-            "enable_panel" : "Enable the history info panel of the entities?",
-            "disable_panel" : "Disable the history info panel of the entities?"
-        },
         "menu" : {  
             "export_csv" : "History",
             "export_stats" : "Statistics",
@@ -57,8 +53,8 @@ const lang_en =
             "points_show"       : "Show the points",
             "points_hide"       : "Hide the points",
             "options_export"    : "Export",
-            "options_card"      : "This card",
-            "options_all"       : "All cards",
+            "options_card"      : "Card",
+            "options_all"       : "Global",
             "gesture_long_press" : "Long press, mouse and pen (ms)",
             "gesture_long_press_touch" : "Long press, finger (ms)",
             "gesture_precision" : "Precision, mouse and pen (px)",
@@ -107,10 +103,6 @@ const lang_fr =
             "add" : "Ajouter",
             "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
         }, 
-        "popup" : {
-            "enable_panel" : "Activer le panneau d'historique des entités ?",
-            "disable_panel" : "Désactiver le panneau d'historique des entités ?"
-        },
         "menu" : {  
             "export_csv" : "Historique",
             "export_stats" : "Statistiques",
@@ -150,8 +142,8 @@ const lang_fr =
             "points_show"       : "Afficher les points",
             "points_hide"       : "Masquer les points",
             "options_export"    : "Exporter",
-            "options_card"      : "Cette carte",
-            "options_all"       : "Toutes les cartes",
+            "options_card"      : "Carte",
+            "options_all"       : "Global",
             "gesture_long_press" : "Appui long, souris et stylet (ms)",
             "gesture_long_press_touch" : "Appui long, doigt (ms)",
             "gesture_precision" : "Précision, souris et stylet (px)",
@@ -200,10 +192,6 @@ const lang_de =
             "add" : "Hinzufügen",
             "infopanel_conflict" : "Konflikt beim YAML-Parameter infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "Verlaufsinfo der Entitäten aktivieren?",
-            "disable_panel" : "Verlaufsinfo der Entitäten deaktivieren?"
-        },
         "menu" : {  
             "export_csv" : "Verlauf",
             "export_stats" : "Statistiken",
@@ -243,8 +231,8 @@ const lang_de =
             "points_show"       : "Punkte anzeigen",
             "points_hide"       : "Punkte ausblenden",
             "options_export"    : "Exportieren",
-            "options_card"      : "Diese Karte",
-            "options_all"       : "Alle Karten",
+            "options_card"      : "Karte",
+            "options_all"       : "Global",
             "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
             "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
             "gesture_precision" : "Genauigkeit, Maus und Stift (px)",
@@ -293,10 +281,6 @@ const lang_es =
             "add" : "Añadir",
             "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "¿Activar el panel de historial de las entidades?",
-            "disable_panel" : "¿Desactivar el panel de historial de las entidades?"
-        },
         "menu" : {  
             "export_csv" : "Historial",
             "export_stats" : "Estadísticas",
@@ -336,8 +320,8 @@ const lang_es =
             "points_show"       : "Mostrar los puntos",
             "points_hide"       : "Ocultar los puntos",
             "options_export"    : "Exportar",
-            "options_card"      : "Esta tarjeta",
-            "options_all"       : "Todas las tarjetas",
+            "options_card"      : "Tarjeta",
+            "options_all"       : "Global",
             "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
             "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
             "gesture_precision" : "Precisión, ratón y lápiz (px)",
@@ -386,10 +370,6 @@ const lang_nl =
             "add" : "Toevoegen",
             "infopanel_conflict" : "Conflict met de YAML-parameter infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "Geschiedenispaneel van de entiteiten inschakelen?",
-            "disable_panel" : "Geschiedenispaneel van de entiteiten uitschakelen?"
-        },
         "menu" : {  
             "export_csv" : "Geschiedenis",
             "export_stats" : "Statistieken",
@@ -429,8 +409,8 @@ const lang_nl =
             "points_show"       : "Punten tonen",
             "points_hide"       : "Punten verbergen",
             "options_export"    : "Exporteren",
-            "options_card"      : "Deze kaart",
-            "options_all"       : "Alle kaarten",
+            "options_card"      : "Kaart",
+            "options_all"       : "Globaal",
             "gesture_long_press" : "Lang drukken, muis en pen (ms)",
             "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
             "gesture_precision" : "Precisie, muis en pen (px)",
@@ -479,10 +459,6 @@ const lang_pl =
             "add" : "Dodaj",
             "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "Włączyć panel historii encji?",
-            "disable_panel" : "Wyłączyć panel historii encji?"
-        },
         "menu" : {  
             "export_csv" : "Historia",
             "export_stats" : "Statystyki",
@@ -522,8 +498,8 @@ const lang_pl =
             "points_show"       : "Pokaż punkty",
             "points_hide"       : "Ukryj punkty",
             "options_export"    : "Eksportuj",
-            "options_card"      : "Ta karta",
-            "options_all"       : "Wszystkie karty",
+            "options_card"      : "Karta",
+            "options_all"       : "Globalne",
             "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
             "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
             "gesture_precision" : "Precyzja, mysz i pióro (px)",
@@ -572,10 +548,6 @@ const lang_sv =
             "add" : "Lägg till",
             "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
         },
-        "popup": {
-            "enable_panel": "Aktivera panelen för enhetens historikinformation?",
-            "disable_panel": "Inaktivera panelen för enhetens historikinformation?"
-        },
         "menu": {
             "export_csv": "Historik",
             "export_stats": "Statistik",
@@ -615,8 +587,8 @@ const lang_sv =
             "points_show"       : "Visa punkterna",
             "points_hide"       : "Dölj punkterna",
             "options_export"    : "Exportera",
-            "options_card"      : "Det här kortet",
-            "options_all"       : "Alla kort",
+            "options_card"      : "Kort",
+            "options_all"       : "Globalt",
             "gesture_long_press" : "Långt tryck, mus och penna (ms)",
             "gesture_long_press_touch" : "Långt tryck, finger (ms)",
             "gesture_precision" : "Precision, mus och penna (px)",
@@ -665,10 +637,6 @@ const lang_da =
             "add" : "Tilføj",
             "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
         }, 
-        "popup" : {
-            "enable_panel" : "Aktivér historikpanelet for entiteter?",
-            "disable_panel" : "Deaktivér historikpanelet for entiteter?"
-        },
         "menu" : {  
             "export_csv" : "Historik",
             "export_stats" : "Statistik",
@@ -708,8 +676,8 @@ const lang_da =
             "points_show"       : "Vis punkterne",
             "points_hide"       : "Skjul punkterne",
             "options_export"    : "Eksportér",
-            "options_card"      : "Dette kort",
-            "options_all"       : "Alle kort",
+            "options_card"      : "Kort",
+            "options_all"       : "Globalt",
             "gesture_long_press" : "Langt tryk, mus og pen (ms)",
             "gesture_long_press_touch" : "Langt tryk, finger (ms)",
             "gesture_precision" : "Præcision, mus og pen (px)",
@@ -758,10 +726,6 @@ const lang_sk =
             "add" : "Pridať",
             "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "Povoliť informačný panel histórie entít?",
-            "disable_panel" : "Zakázať informačný panel histórie entít?"
-        },
         "menu" : {  
             "export_csv" : "História",
             "export_stats" : "Štatistiky",
@@ -801,8 +765,8 @@ const lang_sk =
             "points_show"       : "Zobraziť body",
             "points_hide"       : "Skryť body",
             "options_export"    : "Exportovať",
-            "options_card"      : "Táto karta",
-            "options_all"       : "Všetky karty",
+            "options_card"      : "Karta",
+            "options_all"       : "Globálne",
             "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
             "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
             "gesture_precision" : "Presnosť, myš a pero (px)",
@@ -851,10 +815,6 @@ const lang_ru =
             "add" : "Добавить",
             "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "enable_panel" : "Включить панель истории объектов?",
-            "disable_panel" : "Выключить панель истории объектов?"
-        },
         "menu" : {  
             "export_csv" : "История",
             "export_stats" : "Статистика",
@@ -894,8 +854,8 @@ const lang_ru =
             "points_show"       : "Показать точки",
             "points_hide"       : "Скрыть точки",
             "options_export"    : "Экспорт",
-            "options_card"      : "Эта карточка",
-            "options_all"       : "Все карточки",
+            "options_card"      : "Карточка",
+            "options_all"       : "Глобально",
             "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
             "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
             "gesture_precision" : "Точность, мышь и перо (пикс.)",

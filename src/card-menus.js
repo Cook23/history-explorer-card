@@ -75,12 +75,17 @@ const SUBMENU_MEMORY_MS = 10000;
 // it), and what concerns every card of the page and every device (the info panel, the
 // gesture thresholds — entered in the submenu itself, kept within their bounds)
 const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
-// The actions of This card ▸ (eo_N_<key>), each confirmed in a submenu of its own over it
-// (eo_N_<key>_sub: Confirm / Cancel — Cancel marked, so that Enter destroys nothing): the
-// graphs added from the card removed (defaultGraphs), and everything back to the YAML
-// (defaultDisplay)
+// The options menu's actions confirmed first, each in a submenu of its own over the
+// submenu its line is in (`${line}_sub`: Confirm / Cancel — Cancel marked, so that Enter
+// changes nothing): in Card ▸, the graphs added from the card removed (defaultGraphs) and
+// everything back to the YAML (defaultDisplay); in Global ▸, the info panel switched
+// (toggleInfoPanel). line: the line's id; label: its name (none: named by its owner)
 const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
                         defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
+const _CONFIRMED = i => [
+    ...Object.keys(_CARD_ACTIONS).map(k => ({ line: `eo_${i}_${k}`, in: 'card', ..._CARD_ACTIONS[k] })),
+    { line: `ei_${i}`, in: 'all', run: 'toggleInfoPanel' },
+];
 export function optionsMenuHtml(i, statistics)
 {
     const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
@@ -93,9 +98,9 @@ export function optionsMenuHtml(i, statistics)
         </div>
         ${sub('export', [a(`ef_${i}`), statistics ? a(`eh_${i}`) : ''])}
         ${sub('card', Object.keys(_CARD_ACTIONS).map(k => a(`eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label))))}
-        ${Object.keys(_CARD_ACTIONS).map(k => `<div id="eo_${i}_${k}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};z-index:4">` +
-            a(`eo_${i}_${k}_ok`, i18n('ui.menu.confirm_ok')) + a(`eo_${i}_${k}_cancel`, i18n('ui.menu.confirm_cancel')) + `</div>`).join('')}
-        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}`;
+        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}
+        ${_CONFIRMED(i).map(c => `<div id="${c.line}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};z-index:4">` +
+            a(`${c.line}_ok`, i18n('ui.menu.confirm_ok')) + a(`${c.line}_cancel`, i18n('ui.menu.confirm_cancel')) + `</div>`).join('')}`;
 }
 
 export class CardMenus
@@ -712,23 +717,23 @@ export class CardMenus
     // The options menu (eo_N, see optionsMenuHtml)
     // --------------------------------------------------------------------------------------
 
-    // The options menu's submenus, the confirmations of This card's actions included
+    // The options menu's submenus, the confirmations included
     _optionsSubmenus(i)
     {
-        return [...Object.keys(_OPTIONS_SUBMENUS), ...Object.keys(_CARD_ACTIONS)].map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+        return [...Object.keys(_OPTIONS_SUBMENUS).map(k => `eo_${i}_${k}_sub`), ..._CONFIRMED(i).map(c => `${c.line}_sub`)]
+            .map(id => this._this.querySelector(`#${id}`)).filter(s => s);
     }
 
-    // Asks for the confirmation of This card's action key, over This card ▸ (Cancel marked)
-    _confirmCardAction(i, key)
+    // Asks for the confirmation of action c over the submenu its line is in (Cancel marked)
+    _confirmAction(i, c)
     {
-        const _item = this._this.querySelector(`#eo_${i}_${key}`);
-        const _sub  = this._this.querySelector(`#eo_${i}_${key}_sub`);
+        const _item = this._this.querySelector(`#${c.line}`);
+        const _sub  = this._this.querySelector(`#${c.line}_sub`);
         if( !_item || !_sub ) return;
-        for( const k in _CARD_ACTIONS ) if( k !== key ) this._this.querySelector(`#eo_${i}_${k}_sub`).style.display = 'none';
+        for( const o of _CONFIRMED(i) ) if( o !== c ) this._this.querySelector(`#${o.line}_sub`).style.display = 'none';
         this._openSubmenu(_sub, _item);
-        const _cancel = this._this.querySelector(`#eo_${i}_${key}_cancel`);
-        delete this._this.querySelector(`#eo_${i}_${key}_ok`).dataset.hecSelected;
-        _cancel.dataset.hecSelected = '1';
+        delete this._this.querySelector(`#${c.line}_ok`).dataset.hecSelected;
+        this._this.querySelector(`#${c.line}_cancel`).dataset.hecSelected = '1';
         _sub.focus();
     }
 
@@ -737,10 +742,10 @@ export class CardMenus
     {
         for( const k in _OPTIONS_SUBMENUS ) { const _el = this._this.querySelector(`#eo_${i}_${k}`); if( _el ) _el.textContent = i18n(_OPTIONS_SUBMENUS[k]) + ' ▸'; }
         const set = (id, text) => { const _el = this._this.querySelector(`#${id}`); if( _el ) _el.textContent = text; };
-        for( const k in _CARD_ACTIONS ) {
-            set(`eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label));
-            set(`eo_${i}_${k}_ok`, i18n('ui.menu.confirm_ok'));
-            set(`eo_${i}_${k}_cancel`, i18n('ui.menu.confirm_cancel'));
+        for( const c of _CONFIRMED(i) ) {
+            if( c.label ) set(c.line, i18n(c.label));
+            set(`${c.line}_ok`, i18n('ui.menu.confirm_ok'));
+            set(`${c.line}_cancel`, i18n('ui.menu.confirm_cancel'));
         }
         for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
     }
@@ -768,13 +773,13 @@ export class CardMenus
         const _subs = this._optionsSubmenus(i);
         for( const k in _OPTIONS_SUBMENUS )
             this._this.querySelector(`#eo_${i}_${k}`)?.addEventListener('click', (e) => { e.preventDefault(); this.showOptionsSubmenu(i, k); }, true);
-        // This card's actions: confirmed first — Confirm runs it, the menu closed; Cancel
-        // goes back to This card ▸
-        for( const k in _CARD_ACTIONS ) {
-            const _on = (id, fn) => this._this.querySelector(`#eo_${i}_${id}`)?.addEventListener('click', (e) => { e.preventDefault(); fn(); }, true);
-            _on(k, () => this._confirmCardAction(i, k));
-            _on(`${k}_ok`, () => { this.menuSetVisibility(i, false); this[_CARD_ACTIONS[k].run](); });
-            _on(`${k}_cancel`, () => { this._this.querySelector(`#eo_${i}_${k}_sub`).style.display = 'none'; this._this.querySelector(`#eo_${i}_card_sub`)?.focus(); });
+        // The actions confirmed first — Confirm runs it, the menu closed; Cancel goes back
+        // to the submenu its line is in
+        for( const c of _CONFIRMED(i) ) {
+            const _on = (id, fn) => this._this.querySelector(`#${id}`)?.addEventListener('click', (e) => { e.preventDefault(); fn(); }, true);
+            _on(c.line, () => this._confirmAction(i, c));
+            _on(`${c.line}_ok`, () => { this.menuSetVisibility(i, false); this[c.run](); });
+            _on(`${c.line}_cancel`, () => { this._this.querySelector(`#${c.line}_sub`).style.display = 'none'; this._this.querySelector(`#eo_${i}_${c.in}_sub`)?.focus(); });
         }
         // A gesture threshold entered: kept within its bounds, then set for every card
         for( const k in GESTURE_SETTINGS ) {
@@ -791,9 +796,9 @@ export class CardMenus
             if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
             this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
         });
-        // (a confirmation goes back to This card ▸, a submenu to the menu)
-        const _cardSub = this._this.querySelector(`#eo_${i}_card_sub`);
-        const _parentOf = sub => Object.keys(_CARD_ACTIONS).some(k => sub.id === `eo_${i}_${k}_sub`) ? _cardSub : _menu;
+        // (a confirmation goes back to the submenu its line is in, a submenu to the menu)
+        const _parentOf = sub => { const c = _CONFIRMED(i).find(c => sub.id === `${c.line}_sub`);
+                                   return c ? this._this.querySelector(`#eo_${i}_${c.in}_sub`) : _menu; };
         for( const _sub of _subs ) _sub.addEventListener('keydown', (e) => {
             const _inInput = e.target.tagName === 'INPUT';
             if( e.key === 'Escape' || ( e.key === 'ArrowLeft' && !_inInput ) ) {

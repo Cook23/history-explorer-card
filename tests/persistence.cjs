@@ -240,7 +240,7 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── This card ▸ Default graphs / Default display, each confirmed in a submenu ──
+    // ── Card ▸ Default graphs / Default display, each confirmed in a submenu ──
     t = await openCard(YAML({ enable_multidevice_persistence: 'all' }), { mock: { series: true }, height: 1400 });
     const add2 = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
     const ids = () => t.E(`el.instance.graphs.flatMap(g=>g.entities.map(e=>e.entity.split('.')[1])).sort().join(',')`);
@@ -252,7 +252,7 @@ module.exports = async function()
     };
     await add2('sensor.rain'); await t.wait(1200);
     await setInterp('sensor.power', 'makima');
-    await t.step('This card ▸ Default graphs: confirmed in a submenu over This card ▸, right-aligned, Cancel marked; Cancel, or Enter: nothing changes', async () => {
+    await t.step('Card ▸ Default graphs: confirmed in a submenu over Card ▸, right-aligned, Cancel marked; Cancel, or Enter: nothing changes', async () => {
         const i0 = await ids();
         await cardAction('defgraphs');
         const r = await t.E(`(()=>{ const c=el.querySelector('#eo_0_defgraphs_sub'), s=el.querySelector('#eo_0_card_sub');

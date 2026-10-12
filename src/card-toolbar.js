@@ -113,7 +113,6 @@ export class CardToolbar
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
         this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
         this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
-        this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
         // A click on the toolbar beside its small buttons — none under it: the one picked
         // (Chart.hecUi.pick: the nearest, unless about halfway between two)
@@ -368,17 +367,13 @@ export class CardToolbar
         this.statsExporter.exportFile(this);
     }
 
+    // The info panel switched on or off (confirmed in the options menu, see _CONFIRMED)
     toggleInfoPanel()
     {
-        this.menuSetVisibility(0, false);
-        this.menuSetVisibility(1, false);
-
-        if( confirm(infoPanelEnabled ? i18n('ui.popup.disable_panel') : i18n('ui.popup.enable_panel')) ) {
-            setInfoPanelEnabled(!infoPanelEnabled);
-            // Persist in dedicated global HA user key (background)
-            this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
-            this.applyInfoPanelState();
-        }
+        setInfoPanelEnabled(!infoPanelEnabled);
+        // Persist in dedicated global HA user key (background)
+        this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
+        this.applyInfoPanelState();
     }
 
     // The panel switched on or off (here, or on another device): saved where the panel reads

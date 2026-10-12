@@ -32,7 +32,7 @@ module.exports = async function()
 
     t = await openCard(YAML(), { mock: { series: true } });
     await t.wait(800);
-    await t.step('the options menu: Export ▸, This card ▸, All cards ▸; All cards: the info panel and the four thresholds, as they are', async () => {
+    await t.step('the options menu: Export ▸, Card ▸, Global ▸; Global: the info panel and the four thresholds, as they are', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         const m = await items('#eo_0');
         await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
@@ -40,7 +40,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Export ▸ | This card ▸ | All cards ▸' && r.ex === 'History' && r.exportClosed
+        return r.m === 'Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
             && /panel/i.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12 }) ? true : JSON.stringify(r);
     });
@@ -123,10 +123,15 @@ module.exports = async function()
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const v = await inputs(); await closeMenus();
         return JSON.stringify(v) === JSON.stringify({ longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20 }) ? true : JSON.stringify(v);
     });
-    await t.step('the info panel switch: saved on every device without any persistence option', async () => {
-        t.page.once('dialog', d => d.accept());
-        await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(800);
+    await t.step('the info panel switch: confirmed in a submenu (Cancel: unchanged); saved on every device without any persistence option', async () => {
+        await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
+        const asked = { shown: await shown('#ei_0_sub'), marked: await t.E(`el.querySelector('#ei_0_cancel').dataset.hecSelected`) };
+        await t.E(`el.querySelector('#ei_0_cancel').click()`); await t.wait(500);
+        const kept = await t.E(`el.querySelector('#ei_0').textContent`);
+        await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#ei_0_ok').click()`); await t.wait(800);
         const on = await t.E(`el.querySelector('#ei_0').textContent`);
+        if( !asked.shown || asked.marked !== '1' || !/enable/i.test(kept) ) return JSON.stringify({ asked, kept });
         await newDevice(YAML({ gestures: { longPress: 800 } })); await openAll();
         const after = await t.E(`el.querySelector('#ei_0').textContent`); await closeMenus();
         return /disable/i.test(on) && /disable/i.test(after) ? true : JSON.stringify({ on, after });
