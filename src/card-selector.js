@@ -48,7 +48,7 @@ export class CardSelector
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
             for( let i of dropdown.getElementsByTagName('a') ) {
-                const friendly = i.textContent.toLowerCase();
+                const friendly = i.dataset.label.toLowerCase();
                 const entity   = i.dataset.entity?.toLowerCase() || '';
                 let match;
                 if( !filter ) {
@@ -160,7 +160,7 @@ export class CardSelector
                 if( input.value.indexOf('*') >= 0 ) {
                     const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
                     const ids   = visible.map(a => a.dataset.entity);
-                    const names = visible.map(a => a.textContent);
+                    const names = visible.map(a => a.dataset.label);
                     input.value = names.join('; ');
                     input.dataset.entityId = ids.join(';');
                     this._entitySelected[idx] = true;
@@ -182,7 +182,7 @@ export class CardSelector
         // (an entity with attributes that can be shown: which one — its value or one of
         // them — chosen first)
         if( seriesAttributes(this._hass.states[entity_id]).length ) return this.showSeriesMenu(idx, event.target);
-        this._selectSeries(idx, entity_id, event.target.textContent);
+        this._selectSeries(idx, entity_id, event.target.dataset.label);
     }
 
     // Series id chosen in selector idx (an entity, or one of its attributes), shown as
@@ -397,7 +397,10 @@ export class CardSelector
                 o.id = entity;
                 o.dataset.entity = entity;
                 o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden";
-                o.innerHTML = _label;
+                // (an entity with attributes that can be shown opens their submenu: marked ▸,
+                // as every menu line opening a submenu)
+                o.dataset.label = _label;
+                o.textContent = _label + ( seriesAttributes(this.stateOf(entity)).length ? ' ▸' : '' );
                 o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }

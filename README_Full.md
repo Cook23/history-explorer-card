@@ -54,6 +54,8 @@ This card offers a highly interactive and configurable way to view the history o
   - [Pattern-based options](#pattern-based-entity-options)
   - [Complete property list](#complete-list-of-entityoptions-properties)
 - [UI configuration](#configuring-the-ui)
+  - [The options menu](#the-options-menu)
+  - [Gesture settings](#gesture-settings)
   - [Header, dark mode, colors, layout](#configuring-the-ui)
   - [Graph sizes](#configuring-the-ui)
   - [Tooltip](#configuring-the-tooltip-popup)
@@ -80,7 +82,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Organizing graphs
 
 - **Combining by unit** — with `combineSameUnits`, entities added from the card with compatible units, SI prefixes included (W and kW), share one graph; each value is shown in its own unit. A graph defined in YAML always shows all its entities together, whatever their units, bars and curves included (the curves drawn over the bars). **(1.2)** Two groups of units get a Y axis each, left and right (`yAxis` chooses the side), the curves of the right one marked ▸ in the legend.
-- **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press within half a second. **(1.2)** A long-press or a right click on a graph's ⠿ zone opens its menu (the Y axis lock, merge back, cut, delete), and *Cut* — of a graph, or of a curve from its type menu — then shows in every graph's ⠿ zone where it can go: everything a drag does can also be done from the menus.
+- **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press right away (within the long-press duration). **(1.2)** A long-press or a right click on a graph's ⠿ zone opens its menu (the Y axis lock, merge back, cut, delete), and *Cut* — of a graph, or of a curve from its type menu — then shows in every graph's ⠿ zone where it can go: everything a drag does can also be done from the menus.
 
 ### Drawing
 
@@ -97,11 +99,12 @@ Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a
 
 ### Touch, pen and mouse (1.2)
 
-- **Touch** — a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again within half a second and drag; a pinch zooms the time and the Y axis, and pans both.
-- **Tooltip** — it opens on a click or a tap on the curves, then follows the mouse (or a pen held above the screen) until the pointer leaves the curves; hovering alone no longer opens it.
+- **Touch** — a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away (within the long-press duration) and drag; a pinch zooms the time and the Y axis, and pans both.
+- **Tooltip** — a click or a tap near a curve opens it for that curve (several curves can show theirs), then it follows the mouse (or a pen held above the screen) until the pointer leaves the curves, or a click outside them; hovering alone no longer opens it. A long-press (or a right click) near a curve shows or hides its points.
+- **Gesture settings** — for every card and every device: the long-press duration and the distance a pointer moves before it drags, for a mouse or a pen and for a finger (`gestures:`, or the options menu).
 - **Pen** — the tip works as a finger; where the browser passes its button on (Chrome, the Home Assistant app), a tap with it held on a label opens the type menu.
 - **Right click** on a label opens its type menu, as a long-press does; the browser's own menu never opens on a graph.
-- **Labels** are picked when touched just beside them, never when the touch is about halfway between two.
+- **Picking** — a label, a button, a curve, a bar or a state is picked when touched just beside it (within the pointer's precision, see [Gesture settings](#gesture-settings)), never when the touch is about halfway between two (in the middle third of the gap between them); two on the same pixel are one place, the one drawn on top.
 
 ### Options
 
@@ -161,7 +164,7 @@ Once you release the mouse button after dragging (or release your finger from th
 
 Clicking the date selector will bring you back to the current date and time without changing your zoom level. A double click on the date selector will bring you back and also reset your zoom to the configured default range.
 
-Click or tap a chart line or a state timeline to get a tooltip of the selected values or state.
+Click or tap a chart line or a state timeline to get a tooltip of the selected values or state. **(1.2)** A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip: its value nearest the pointer is shown, and follows the pointer; a click near another curve adds it, so several curves can show their values together. Leaving the curves, or a click outside them, closes it; a click beside the curves changes nothing. On bars and timelines, the bar or the state under the click (or just beside it). A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`.
 
 The tooltip then follows the mouse — or a pen held above the screen, in the browsers that report it — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
 
@@ -232,7 +235,7 @@ An entity whose current state can be read as a number can be shown as a line (*S
 The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
@@ -300,7 +303,7 @@ Within a group, curves can always be shown together again, as long as their disp
 
 #### Moving curves between graphs
 
-A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. **(1.2)** Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see *Y axis*). Only the display type limits a drop: a curve can't go onto a timeline or arrowline graph, nor a timeline entity onto a line or bar graph — the drop is refused with a brief tooltip (e.g. `line ≠ timeline`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again within half a second and drag.
+A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. **(1.2)** Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see *Y axis*). Only the display type limits a drop: a curve can't go onto a timeline or arrowline graph, nor a timeline entity onto a line or bar graph — the drop is refused with a brief tooltip (e.g. `line ≠ timeline`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again right away and drag.
 
 **(1.2)** A drop is saved only when the placement of both graphs is (the `entities` persistence of their entities, see *Persistence*). A graph defined in YAML saves nothing by default: a curve dropped onto it, or taken out of it, is saved where it was before the drop, so a reload brings both graphs back as they were — nothing duplicated, nothing lost. Dropped back into its own graph, the curve is saved there again.
 
@@ -310,7 +313,7 @@ Curve labels in the legend can be dragged left or right to change their display 
 
 #### Reordering graphs
 
-Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area toggles the Y axis lock. The new order is synchronized with your HA user account. On a touch screen, tap the ⠿ symbol, then press it again within half a second and drag.
+Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area toggles the Y axis lock. The new order is synchronized with your HA user account. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
 
 Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
 
@@ -321,8 +324,7 @@ When dragging a graph or a curve near the top or bottom edge of the screen, the 
 **(1.2)** A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` — or, without one, with the first two words of each curve's name (a word: two letters or digits at least — the `:` of an attribute's curve, `salon : Current…`, is kept but not counted), each start once. It is one zone: a click there toggles the Y axis lock, a drag moves the graph, a long-press opens the menu — so that what a gesture does there is also in a menu:
 - **Display ▸** — the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
-- **Lock the Y axis** / **Unlock the Y axis** — as a click on the padlock (not on a timeline or arrowline graph, which have no lock);
-- **Layout ▸** — open with the menu: *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
+- **Layout ▸** — open with the menu: *Show the points* / *Hide the points* (of all its curves), *Lock the Y axis* / *Unlock the Y axis* (as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
 
 *Cut* is also in the *Layout* submenu of a curve's or a timeline entity's type menu. Once something is cut, the ⠿ zone of every graph shows where it can go, instead of the ⠿ symbol and the padlock:
 - a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any line or bar graph for a curve, saved only when both graphs are);
@@ -336,7 +338,7 @@ Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
 - **Long-press** (or right click) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
 - Drag an entity label to move it to another graph of the same type
-- Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again within half a second and drag)
+- Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again right away and drag)
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
 
 All drag operations show a ghost element and horizontal insertion marker for precise positioning. All changes are synchronized with your HA user account.
@@ -661,7 +663,7 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle, so the curves keep their positions relative to each other; the padlock locks and releases both.
 
-**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again within half a second and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
+**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
 
@@ -819,17 +821,17 @@ Custom pattern: an array of pixel lengths `[on, off, on, off, ...]` following th
 
 ### Displaying individual samples
 
-Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again:
+Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. **(1.2)** A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints`; so does *Show the points* in the *Layout* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-To show them permanently, use `showPoints` (or its synonym `showSamples`) — on the card, in `entityOptions`, on a graph or on an entity. It accepts a boolean or a numeric radius in pixels:
+To show them permanently, use `showPoints` (or its synonym `showSamples`) — on the card, in `entityOptions`, on a graph or on an entity. It accepts a boolean (`true`: the line width + 2 px wide) or a radius in pixels:
 
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
   humidity:
-    showSamples: true    # always show sample dots for humidity graphs (radius 4px)
+    showSamples: true    # always show sample dots for humidity graphs
                          # or a number: the dot radius in pixels (showSamples: 6)
 graphs:
   - type: line
@@ -837,7 +839,7 @@ graphs:
       showSamples: true  # show samples for this entire manually defined graph
     entities:
       - entity: sensor.outside_temperature
-        showPoints: 3     # show dots on this entity only, radius 3px (true: 4px)
+        showPoints: 3     # show dots on this entity only, radius 3px
 ```
 
 The `showPoints` option is also available in `entityOptions` (see below), making it easy to apply uniformly across entity families.
@@ -1203,7 +1205,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `interpolation` | string | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
 | `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
-| `showPoints` | boolean or number | Show a dot at each measurement point. `true` = radius 4px, or specify a numeric radius. `showSamples` is a synonym |
+| `showPoints` | boolean or number | Show a dot at each measurement point. `true`: the line width + 2 px wide, or a radius in px. `showSamples` is a synonym |
 | `yAxis` | string | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
 | `unit` | string | Unit shown instead of the entity's own (see `scale`) |
@@ -1317,6 +1319,34 @@ Either way, an option set on a graph or on the entity itself wins over `entityOp
 ---
 
 ## Configuring the UI
+
+### The options menu
+
+The ▾ button beside the entity selector opens the options menu, in submenus:
+- **Export ▸** — *Export as CSV*, *Export statistics as CSV* (with long-term statistics on);
+- **This card ▸** — *Remove all added graphs*;
+- **All cards ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`), and the gesture settings below, entered right in the submenu.
+
+Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
+
+### Gesture settings
+
+**(1.2)** Every gesture is told apart by two thresholds, one pair for a mouse or a pen, one for a finger:
+- **the long-press duration** — a press held this long is a long-press; a second press this soon after a release, at the same place, is a double-click (or a tap-then-drag); after a tap on a label, a graph's ⠿ zone or the Y axis, the page doesn't scroll from there for that long, so that a drag can follow;
+- **the precision** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
+
+Raise them for a less steady or slower hand. In the YAML (any card), or in *All cards ▸* of the options menu:
+
+```yaml
+type: custom:history-explorer-card
+gestures:
+  longPress: 500        # ms, mouse and pen (200 to 2000; default 500)
+  longPressTouch: 500   # ms, finger
+  precision: 8          # px, mouse and pen (2 to 40; default 8)
+  precisionTouch: 12    # px, finger (default 12)
+```
+
+A value out of bounds is brought within them. They apply to every card and info panel of the page: whether set in a card's YAML or in the menu, the last one to speak wins, and they are kept on every device, whatever the card's persistence options — as the info panel's switch.
 
 ### Header text
 
@@ -1499,7 +1529,7 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the entity options and selecting Export as CSV. Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ Export as CSV*. Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 

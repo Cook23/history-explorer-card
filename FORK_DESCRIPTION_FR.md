@@ -14,9 +14,9 @@ Un simple clic sur une courbe ou une étiquette d'entité l'affiche ou la masque
 
 ## Tactile, stylet et souris
 
-Sur un téléphone ou une tablette, un balayage sur un graphe fait toujours défiler la page, où qu'il commence ; pour glisser une étiquette, un graphe ou l'axe Y, on le touche, puis on appuie à nouveau dans la demi-seconde et on glisse. Deux doigts zooment et déplacent le temps et l'axe Y. Une étiquette est choisie quand on la touche juste à côté, jamais quand le toucher tombe à peu près entre deux.
+Sur un téléphone ou une tablette, un balayage sur un graphe fait toujours défiler la page, où qu'il commence ; pour glisser une étiquette, un graphe ou l'axe Y, on le touche, puis on appuie à nouveau aussitôt et on glisse. Deux doigts zooment et déplacent le temps et l'axe Y.
 
-L'infobulle s'ouvre sur un clic ou un toucher sur les courbes, puis suit la souris jusqu'à ce que le pointeur les quitte — le simple survol ne l'ouvre pas. La pointe d'un stylet fonctionne comme un doigt, et l'infobulle suit le stylet tenu au-dessus de l'écran, dans les navigateurs qui le signalent ; *Tests (bêta) ▸ Événements stylet*, en fin de menu de type, montre ce qu'un navigateur ou une application signale d'un stylet, et l'envoie en rapport.
+L'infobulle s'ouvre sur un clic ou un toucher près d'une courbe, pour cette courbe — plusieurs peuvent afficher la leur — puis suit la souris jusqu'à ce que le pointeur les quitte — le simple survol ne l'ouvre pas ; un appui long près d'une courbe affiche ou masque ses points. Une étiquette, un bouton ou une courbe est choisi quand on le touche juste à côté, jamais à peu près entre deux. La durée d'un appui long et la précision d'un pointeur (la distance à partir de laquelle il glisse, et à laquelle il atteint une cible) se règlent, pour la souris ou le stylet et pour le doigt — pour une main moins sûre. La pointe d'un stylet fonctionne comme un doigt, et l'infobulle suit le stylet tenu au-dessus de l'écran, dans les navigateurs qui le signalent ; *Tests (bêta) ▸ Événements stylet*, en fin de menu de type, montre ce qu'un navigateur ou une application signale d'un stylet, et l'envoie en rapport.
 
 ## Apparence des lignes et statistiques
 

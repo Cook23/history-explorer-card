@@ -42,6 +42,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
 | `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id (`climate.salon.current_temperature`), its state as Home Assistant would give an entity's (`stateOf`), its history from its entity's. |
+| `src/gesture-settings.js` | The gesture settings of every card (long-press duration, drag distance, for a mouse or a pen and for a finger): their bounds, this device's values, given to Chart.js (`Chart.defaults.global.gestures`). |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
 | `src/card-tests.js` | *Tests (beta)* at the end of the type menu: what a browser reports of a pen, shown and sent as a report. |
 | `src/history-csv-exporter.js` | The CSV export. |

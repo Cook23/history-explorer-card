@@ -51,7 +51,16 @@ const lang_en =
             "entity_cut"        : "Cut",
             "graph_delete"      : "Delete the graph",
             "ylock"             : "Lock the Y axis",
-            "yunlock"           : "Unlock the Y axis"
+            "yunlock"           : "Unlock the Y axis",
+            "points_show"       : "Show the points",
+            "points_hide"       : "Hide the points",
+            "options_export"    : "Export",
+            "options_card"      : "This card",
+            "options_all"       : "All cards",
+            "gesture_long_press" : "Long press, mouse and pen (ms)",
+            "gesture_long_press_touch" : "Long press, finger (ms)",
+            "gesture_precision" : "Precision, mouse and pen (px)",
+            "gesture_precision_touch" : "Precision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -133,7 +142,16 @@ const lang_fr =
             "entity_cut"        : "Couper",
             "graph_delete"      : "Supprimer le graphique",
             "ylock"             : "Verrouiller l'axe Y",
-            "yunlock"           : "Déverrouiller l'axe Y"
+            "yunlock"           : "Déverrouiller l'axe Y",
+            "points_show"       : "Afficher les points",
+            "points_hide"       : "Masquer les points",
+            "options_export"    : "Exporter",
+            "options_card"      : "Cette carte",
+            "options_all"       : "Toutes les cartes",
+            "gesture_long_press" : "Appui long, souris et stylet (ms)",
+            "gesture_long_press_touch" : "Appui long, doigt (ms)",
+            "gesture_precision" : "Précision, souris et stylet (px)",
+            "gesture_precision_touch" : "Précision, doigt (px)"
         },
         "values" : {
             "min" : "Min",
@@ -215,7 +233,16 @@ const lang_de =
             "entity_cut"        : "Ausschneiden",
             "graph_delete"      : "Diagramm löschen",
             "ylock"             : "Y-Achse sperren",
-            "yunlock"           : "Y-Achse entsperren"
+            "yunlock"           : "Y-Achse entsperren",
+            "points_show"       : "Punkte anzeigen",
+            "points_hide"       : "Punkte ausblenden",
+            "options_export"    : "Exportieren",
+            "options_card"      : "Diese Karte",
+            "options_all"       : "Alle Karten",
+            "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
+            "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
+            "gesture_precision" : "Genauigkeit, Maus und Stift (px)",
+            "gesture_precision_touch" : "Genauigkeit, Finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -297,7 +324,16 @@ const lang_es =
             "entity_cut"        : "Cortar",
             "graph_delete"      : "Eliminar el gráfico",
             "ylock"             : "Bloquear el eje Y",
-            "yunlock"           : "Desbloquear el eje Y"
+            "yunlock"           : "Desbloquear el eje Y",
+            "points_show"       : "Mostrar los puntos",
+            "points_hide"       : "Ocultar los puntos",
+            "options_export"    : "Exportar",
+            "options_card"      : "Esta tarjeta",
+            "options_all"       : "Todas las tarjetas",
+            "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
+            "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
+            "gesture_precision" : "Precisión, ratón y lápiz (px)",
+            "gesture_precision_touch" : "Precisión, dedo (px)"
         },
         "values" : {
             "min" : "Mín",
@@ -379,7 +415,16 @@ const lang_nl =
             "entity_cut"        : "Knippen",
             "graph_delete"      : "Grafiek verwijderen",
             "ylock"             : "Y-as vergrendelen",
-            "yunlock"           : "Y-as ontgrendelen"
+            "yunlock"           : "Y-as ontgrendelen",
+            "points_show"       : "Punten tonen",
+            "points_hide"       : "Punten verbergen",
+            "options_export"    : "Exporteren",
+            "options_card"      : "Deze kaart",
+            "options_all"       : "Alle kaarten",
+            "gesture_long_press" : "Lang drukken, muis en pen (ms)",
+            "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
+            "gesture_precision" : "Precisie, muis en pen (px)",
+            "gesture_precision_touch" : "Precisie, vinger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -461,7 +506,16 @@ const lang_pl =
             "entity_cut"        : "Wytnij",
             "graph_delete"      : "Usuń wykres",
             "ylock"             : "Zablokuj oś Y",
-            "yunlock"           : "Odblokuj oś Y"
+            "yunlock"           : "Odblokuj oś Y",
+            "points_show"       : "Pokaż punkty",
+            "points_hide"       : "Ukryj punkty",
+            "options_export"    : "Eksportuj",
+            "options_card"      : "Ta karta",
+            "options_all"       : "Wszystkie karty",
+            "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
+            "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
+            "gesture_precision" : "Precyzja, mysz i pióro (px)",
+            "gesture_precision_touch" : "Precyzja, palec (px)"
         },
         "values" : {
             "min" : "Min",
@@ -543,7 +597,16 @@ const lang_sv =
             "entity_cut"        : "Klipp ut",
             "graph_delete"      : "Ta bort grafen",
             "ylock"             : "Lås Y-axeln",
-            "yunlock"           : "Lås upp Y-axeln"
+            "yunlock"           : "Lås upp Y-axeln",
+            "points_show"       : "Visa punkterna",
+            "points_hide"       : "Dölj punkterna",
+            "options_export"    : "Exportera",
+            "options_card"      : "Det här kortet",
+            "options_all"       : "Alla kort",
+            "gesture_long_press" : "Långt tryck, mus och penna (ms)",
+            "gesture_long_press_touch" : "Långt tryck, finger (ms)",
+            "gesture_precision" : "Precision, mus och penna (px)",
+            "gesture_precision_touch" : "Precision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -625,7 +688,16 @@ const lang_da =
             "entity_cut"        : "Klip",
             "graph_delete"      : "Slet grafen",
             "ylock"             : "Lås Y-aksen",
-            "yunlock"           : "Lås Y-aksen op"
+            "yunlock"           : "Lås Y-aksen op",
+            "points_show"       : "Vis punkterne",
+            "points_hide"       : "Skjul punkterne",
+            "options_export"    : "Eksportér",
+            "options_card"      : "Dette kort",
+            "options_all"       : "Alle kort",
+            "gesture_long_press" : "Langt tryk, mus og pen (ms)",
+            "gesture_long_press_touch" : "Langt tryk, finger (ms)",
+            "gesture_precision" : "Præcision, mus og pen (px)",
+            "gesture_precision_touch" : "Præcision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -707,7 +779,16 @@ const lang_sk =
             "entity_cut"        : "Vystrihnúť",
             "graph_delete"      : "Odstrániť graf",
             "ylock"             : "Uzamknúť os Y",
-            "yunlock"           : "Odomknúť os Y"
+            "yunlock"           : "Odomknúť os Y",
+            "points_show"       : "Zobraziť body",
+            "points_hide"       : "Skryť body",
+            "options_export"    : "Exportovať",
+            "options_card"      : "Táto karta",
+            "options_all"       : "Všetky karty",
+            "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
+            "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
+            "gesture_precision" : "Presnosť, myš a pero (px)",
+            "gesture_precision_touch" : "Presnosť, prst (px)"
         },
         "values" : {
             "min" : "Min",
@@ -789,7 +870,16 @@ const lang_ru =
             "entity_cut"        : "Вырезать",
             "graph_delete"      : "Удалить график",
             "ylock"             : "Заблокировать ось Y",
-            "yunlock"           : "Разблокировать ось Y"
+            "yunlock"           : "Разблокировать ось Y",
+            "points_show"       : "Показать точки",
+            "points_hide"       : "Скрыть точки",
+            "options_export"    : "Экспорт",
+            "options_card"      : "Эта карточка",
+            "options_all"       : "Все карточки",
+            "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
+            "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
+            "gesture_precision" : "Точность, мышь и перо (пикс.)",
+            "gesture_precision_touch" : "Точность, палец (пикс.)"
         },
         "values" : {
             "min" : "Мин",

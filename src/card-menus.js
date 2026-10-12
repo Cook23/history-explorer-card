@@ -7,6 +7,7 @@ import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
+import { GESTURE_SETTINGS, gestureValues } from "./gesture-settings.js";
 const Chart = window.HXLocal_Chart;
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
@@ -33,17 +34,19 @@ export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decora
 const _TYPE_SUBMENUS = { rep: 'ui.menu.type_representation', interp: 'ui.menu.type_interpolation', layout: 'ui.menu.type_layout', tests: 'ui.menu.type_tests' };
 // The submenus only the card's menu has, not the info panel's
 const _CARD_ONLY_SUBMENUS = ['layout', 'tests'];
-// The layout submenu's entries (et_N_<key>): for an entity (separate, merge back, cut,
-// delete) or for a graph (merge back, cut, delete the graph)
-const _LAYOUT_ENTRIES = { split: 'ui.menu.entity_split', merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
+// The layout submenu's entries (et_N_<key>): for an entity (its samples' dots shown or
+// hidden, separate, merge back, cut, delete) or for a graph (its curves' dots, its Y axis
+// locked or released, merge back, cut, delete the graph). The dots and the lock are named
+// by what a click does (shown: their label for now)
+const _LAYOUT_ENTRIES = { points: 'ui.menu.points_show', ylock: 'ui.menu.ylock', split: 'ui.menu.entity_split',
+                          merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
                           delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
-// wildcard add, the layout and tests submenus, and for a graph the Y axis lock) and the
-// info panel's
+// wildcard add, the layout and tests submenus) and the info panel's
 export function typeMenuHtml(i, full)
 {
     const a = (id, label, hidden, style = '') => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${style}${hidden ? ';display:none' : ''}">${label}</a>`;
@@ -53,7 +56,7 @@ export function typeMenuHtml(i, full)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-            ${keys.map(k => ( k === 'layout' ? a(`et_${i}_ylock`, '', true) : '' ) + a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
+            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
@@ -61,12 +64,32 @@ export function typeMenuHtml(i, full)
         ${full ? sub('tests', Object.keys(CARD_TESTS).map(k => a(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label)))) : ''}`;
 }
 
+// The options menu eo_N (the card's toolbar): its items, each opening its submenu
+// eo_N_<key>_sub — what the card exports, what concerns this card (the entities added from
+// it), and what concerns every card of the page and every device (the info panel, the
+// gesture thresholds — entered in the submenu itself, kept within their bounds)
+const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
+export function optionsMenuHtml(i, statistics)
+{
+    const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
+    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
+    const input = k => { const s = GESTURE_SETTINGS[k];
+        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}">${i18n(s.label)}</span>` +
+               `<input id="eo_${i}_g_${k}" type="number" min="${s.min}" max="${s.max}" step="${s.step}" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`; };
+    return `<div id="eo_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:1">
+            ${Object.keys(_OPTIONS_SUBMENUS).map(k => a(`eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]) + ' ▸')).join('')}
+        </div>
+        ${sub('export', [a(`ef_${i}`), statistics ? a(`eh_${i}`) : ''])}
+        ${sub('card', [a(`eg_${i}`)])}
+        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}`;
+}
+
 export class CardMenus
 {
     // --------------------------------------------------------------------------------------
     // Entity type menu: Representation ▸, Interpolation ▸, Layout ▸, Tests ▸ — and, for a
-    // graph, Representation ▸ and Interpolation ▸ of all its curves, its Y axis lock and
-    // Layout ▸
+    // graph, Representation ▸ and Interpolation ▸ of all its curves, and Layout ▸ (its
+    // curves' dots, its Y axis lock)
     // --------------------------------------------------------------------------------------
 
     // The type menu's names, in the card's language (set once it's known)
@@ -175,6 +198,12 @@ export class CardMenus
         show(q('delete'), _longPress);
         show(q('gdelete'), false);
         show(q('ylock'), false);
+        // (a curve: its samples' dots)
+        const _points = q('points');
+        const _isCurve = _longPress && !!_e && !this._isRowGraph(graph) && !!graph.chart.getDatasetMeta(graph.entities.indexOf(_e)).dataset;
+        show(_points, _isCurve);
+        if( _points && _isCurve )
+            _points.textContent = i18n(graph.chart.data.datasets[graph.entities.indexOf(_e)].pointRadius > 0 ? 'ui.menu.points_hide' : 'ui.menu.points_show');
         show(q('rep'), true);
         show(q('tests'), true);
 
@@ -243,9 +272,9 @@ export class CardMenus
     // The same menu for a graph — from a long-press (or a right click) on its lock+handle
     // zone at (clientX, clientY): what all its entities are shown as (the types that fit
     // every one of them, the one they share marked), how all its interpolated curves are
-    // interpolated, its Y axis locked or released (yAxisLocked: its state, undefined when
-    // it has no lock), and its layout — merge back, cut, delete. Opens with its layout
-    // submenu.
+    // interpolated, and its layout — its curves' dots shown or hidden, its Y axis locked or
+    // released (yAxisLocked: its state, undefined when it has no lock), merge back, cut,
+    // delete. Opens with its layout submenu.
     showGraphMenu(input_idx, graph, clientX, clientY, yAxisLocked)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
@@ -270,6 +299,9 @@ export class CardMenus
         show(q('merge'), this._canMergeLinkedGraph(graph));
         show(q('cut'), true);
         show(q('gdelete'), !graph.isStatic);
+        const _points = q('points'), _shown = this._curvesShowPoints(graph);
+        show(_points, _shown !== undefined);
+        if( _points ) _points.textContent = i18n(_shown ? 'ui.menu.points_hide' : 'ui.menu.points_show');
         const _lock = q('ylock');
         show(_lock, yAxisLocked !== undefined);
         if( _lock ) {
@@ -305,16 +337,6 @@ export class CardMenus
             return _words.slice(0, _n).join(' ') + ( _n < _words.length ? '...' : '' );
         });
         return [...new Set(_starts)].join(', ');
-    }
-
-    // The graph menu's Y axis entry: the graph's Y axes locked or released
-    graphLockClicked(input_idx)
-    {
-        const _menu = this._this.querySelector(`#et_${input_idx}`);
-        const _g = this.graphs.find(g => g.id === _menu?._hec_graph_id);
-        const _locked = !!this._this.querySelector(`#et_${input_idx}_ylock`)?.dataset.hecLocked;
-        this.hideEntityTypeMenu(input_idx);
-        _g?.chart.hecSetYAxisLocked(!_locked);
     }
 
     hideEntityTypeMenu(input_idx)
@@ -384,7 +406,6 @@ export class CardMenus
         _TYPE_MENU_DEFS.forEach((_def, _idx) => _on(_idx, () => this.entityTypeMenuClicked(_ii, _def.type, _def.lineMode)));
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
         for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
-        _on('ylock', () => this.graphLockClicked(_ii));
         for( const k in CARD_TESTS ) _on(`test_${k}`, () => { this.hideEntityTypeMenu(_ii); openCardTest(k); });
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
@@ -440,10 +461,12 @@ export class CardMenus
         this.writeLocalState();
     }
 
-    // Layout: the entity taken out into its own graph (as a double-click on its
-    // label), its linked graph merged back into the one above (as a double-click on the
-    // chain icon), the entity — or, from the graph menu, the graph — cut to be put
-    // elsewhere (as a drag, see _startCut), the entity or the graph deleted
+    // Layout: the entity's samples' dots — or, from the graph menu, its curves' — shown or
+    // hidden (as a long-press on a curve), the graph's Y axes locked or released (as a
+    // click on the padlock), the entity taken out into its own graph (as a double-click on
+    // its label), its linked graph merged back into the one above (as a double-click on the
+    // chain icon), the entity — or the graph — cut to be put elsewhere (as a drag, see
+    // _startCut), the entity or the graph deleted
     entityLayoutClicked(input_idx, action)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
@@ -452,9 +475,12 @@ export class CardMenus
         const _forGraph = _menu._hec_for_graph;
         const _idx = _g ? _g.entities.findIndex(e => e.entity === _menu._hec_entity_id) : -1;
         const _anchor = _menu._hec_anchor;
+        const _locked = !!this._this.querySelector(`#et_${input_idx}_ylock`)?.dataset.hecLocked;
         this.hideEntityTypeMenu(input_idx);
         if( !_g || ( !_forGraph && _idx < 0 ) ) return;
-        if( action === 'merge' ) this._mergeLinkedGraph(_g, _anchor);
+        if( action === 'points' ) this._toggleCurvePoints(_g, _forGraph ? _g.entities : [_g.entities[_idx]]);
+        else if( action === 'ylock' ) _g.chart.hecSetYAxisLocked(!_locked);
+        else if( action === 'merge' ) this._mergeLinkedGraph(_g, _anchor);
         else if( action === 'cut' ) this._startCut(_g, _forGraph ? null : _idx);
         else if( action === 'gdelete' ) this._removeGraph(_g);
         else if( action === 'split' ) this._uncombineEntity(_g, _idx);
@@ -617,10 +643,84 @@ export class CardMenus
     // Entity option dropdown menu
     // --------------------------------------------------------------------------------------
 
+    // --------------------------------------------------------------------------------------
+    // The options menu (eo_N, see optionsMenuHtml)
+    // --------------------------------------------------------------------------------------
+
+    _optionsSubmenus(i)
+    {
+        return Object.keys(_OPTIONS_SUBMENUS).map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+    }
+
+    // The options menu's names, in the card's language
+    relabelOptionsMenu(i)
+    {
+        for( const k in _OPTIONS_SUBMENUS ) { const _el = this._this.querySelector(`#eo_${i}_${k}`); if( _el ) _el.textContent = i18n(_OPTIONS_SUBMENUS[k]) + ' ▸'; }
+        for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
+    }
+
+    // Opens the options menu's submenu key over the menu, level with its item (the
+    // gesture thresholds shown as they are now)
+    showOptionsSubmenu(i, key)
+    {
+        const _item = this._this.querySelector(`#eo_${i}_${key}`);
+        const _sub  = this._this.querySelector(`#eo_${i}_${key}_sub`);
+        if( !_item || !_sub ) return;
+        for( const _s of this._optionsSubmenus(i) ) _s.style.display = 'none';
+        const _v = gestureValues();
+        for( const k in GESTURE_SETTINGS ) { const _in = this._this.querySelector(`#eo_${i}_g_${k}`); if( _in ) _in.value = _v[k]; }
+        this._openSubmenu(_sub, _item);
+        _sub.focus();
+    }
+
+    // Listeners of the options menu and its submenus
+    _initOptionsMenu(i)
+    {
+        const _menu = this._this.querySelector(`#eo_${i}`);
+        if( !_menu ) return;
+        const _subs = this._optionsSubmenus(i);
+        for( const k in _OPTIONS_SUBMENUS )
+            this._this.querySelector(`#eo_${i}_${k}`)?.addEventListener('click', (e) => { e.preventDefault(); this.showOptionsSubmenu(i, k); }, true);
+        // A gesture threshold entered: kept within its bounds, then set for every card
+        for( const k in GESTURE_SETTINGS ) {
+            const _in = this._this.querySelector(`#eo_${i}_g_${k}`);
+            _in?.addEventListener('change', () => {
+                this.setGesture(k, _in.value);
+                _in.value = gestureValues()[k];
+            });
+        }
+        // Keyboard: Enter or → on an item opens its submenu; in a submenu, ← or Escape goes
+        // back to the menu (an input keeps its own keys, Escape aside)
+        _menu.addEventListener('keydown', (e) => {
+            const _sel = _menu.querySelector('a[data-hec-selected]');
+            if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
+            this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
+        });
+        for( const _sub of _subs ) _sub.addEventListener('keydown', (e) => {
+            const _inInput = e.target.tagName === 'INPUT';
+            if( e.key === 'Escape' || ( e.key === 'ArrowLeft' && !_inInput ) ) {
+                e.preventDefault();
+                e.stopPropagation();
+                _sub.style.display = 'none';
+                _menu.focus();
+                return;
+            }
+            if( !_inInput ) this._menuKeyDown(e, _sub);
+        });
+        // Closed once the focus has left the menu and its submenus
+        const _closeIfLeft = () => setTimeout(() => {
+            const _a = _menu.getRootNode()?.activeElement;
+            const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
+            if( ![_menu, ..._subs].some(_in) ) this.menuSetVisibility(i, false);
+        }, 150);
+        for( const _box of [_menu, ..._subs] ) _box.addEventListener('focusout', _closeIfLeft);
+    }
+
     menuSetVisibility(idx, show)
     {
         const dropdown = this._this.querySelector(`#eo_${idx}`);
         if( !dropdown ) return;
+        for( const _s of this._optionsSubmenus(idx) ) _s.style.display = 'none';
 
         this._this.querySelector(`#bo_${idx}`).style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
 

@@ -222,6 +222,16 @@ module.exports = async function()
         const p = await E(`lockPt(${li})`); await t.page.mouse.click(p.x, p.y); await t.wait(400);   // (the Y axis released)
         return s1[0] !== s0[0] && s1[1].join() !== s0[1].join() ? true : JSON.stringify({ s0, s1 });
     });
+    await t.step('a click on the toolbar just beside a small button is on it: < one day back', async () => {
+        const st = () => E('Date.parse(el.instance.startTime)');
+        const r = await E(`(()=>{ const a=el.querySelector('#b1_0').getBoundingClientRect(), d=el.querySelector('#dl_0').getBoundingClientRect();
+            return { x: (d.left+a.left)/2, y: a.top+a.height/2 }; })()`);
+        // (a click on the button first: the first one also aligns the window on a day)
+        const b = await E(`(()=>{ const a=el.querySelector('#b1_0').getBoundingClientRect(); return { x: a.left+a.width/2, y: a.top+a.height/2 }; })()`);
+        const s0 = await st(); await t.page.mouse.click(b.x, b.y); await t.wait(900);
+        const s1 = await st(); await t.page.mouse.click(r.x, r.y); await t.wait(900); const s2 = await st();
+        return s1 < s0 && s1 - s2 === 24 * 3600e3 ? true : JSON.stringify({ r, on: (s0 - s1) / 3600e3, beside: (s1 - s2) / 3600e3 });
+    });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     const r = await t.close();
 

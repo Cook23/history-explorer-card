@@ -4663,8 +4663,9 @@
             // changes nothing: active stays exactly what it was.
 
             // (fork) hover.activateOnContact: a hover move only moves a tooltip that a
-            // click or a tap on the plot area opened — the tooltip "mode" — and leaving the
-            // plot area, or the canvas (a pen moved out of hover range), ends that mode
+            // click or a tap on the plot area opened — the tooltip "mode", of the curves
+            // clicked (_hecTap) — and leaving the plot area, or the canvas (a pen moved out
+            // of hover range), ends that mode
             var _contactMode = hoverOptions.activateOnContact === true;
             var _inPlot = e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
 
@@ -4684,7 +4685,7 @@
               if (me._hecHasMoved) {
                 me.active = [];
                 me._hecLastHitXY = undefined;
-                me._hecTooltipMode = false;
+                me._hecEndTooltipMode();
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -4706,7 +4707,7 @@
               var _searched = false;
               if (_contactMode && me._hecTooltipMode && !_inPlot) {
                 // Left the plot area: the tooltip mode ends, the tooltip closes
-                me._hecTooltipMode = false;
+                me._hecEndTooltipMode();
                 me.active = [];
                 me._hecLastHitXY = undefined;
               } else if (hoverOptions.hoverEnabled && (!_contactMode || me._hecTooltipMode)) {
@@ -4726,7 +4727,7 @@
                 // tooltip. A move past the threshold that lands on empty space must leave
                 // active exactly as it was; only overwrite it when the search actually
                 // found something to jump to (point 3).
-                var _found = me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, hoverOptions.mode, hoverOptions));
+                var _found = me._hecHoverElements(e);
                 if (_found.length) {
                   me.active = _found;
                 }
@@ -4754,9 +4755,8 @@
             // mouseup — see EVENT_TYPES above), same as the hover/tooltip code just above
             // uses — except 'pointercancel' and 'wheel', which EVENT_TYPES does not
             // translate and so arrive under their native names.
-            var _HEC_LONGPRESS_MS = 600;
-            var _HEC_DBLCLICK_MS = 400;
-            var _HEC_DRAG_SLOP = 10; // px, cumulative — same TOUCH_SLOP value as the card
+            // (the long-press duration and the immobility distance are the pointer
+            // type's: Chart.defaults.global.gestures, see deps/chart-hec.js)
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
             var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a contact released from its long press is that one's
@@ -4768,9 +4768,6 @@
             {
               me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
               me._hecGestureHandler(e, {
-                longPressMs: _HEC_LONGPRESS_MS,
-                dblClickMs: _HEC_DBLCLICK_MS,
-                dragSlop: _HEC_DRAG_SLOP,
                 pinchMinDist: _HEC_PINCH_MIN_DIST,
                 wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS,
                 contextMenuAfterMs: _HEC_CONTEXTMENU_AFTER_MS });

@@ -22,6 +22,7 @@ import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
 import { withLook } from "./history-options.js";
+import { GESTURE_SETTINGS, clampGesture } from "./gesture-settings.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
 
@@ -139,6 +140,7 @@ export class HistoryCardState {
         this.store                        = new EntityStore(this.pconfig);
         this.pconfig.infoPanelConfig      = null;
         this.pconfig.defaultInfoPanel     = undefined;
+        this.pconfig.gestures             = {};
 
         this.loader = {};
         this.loader.startTime    = 0;
@@ -655,6 +657,9 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance.pconfig.infoPanelConfig = config.infoPanel;
         this.instance.pconfig.defaultInfoPanel = config.defaultInfoPanel;
+        // (the gesture thresholds: super-global, see gesture-settings.js)
+        this.instance.pconfig.gestures = Object.fromEntries(Object.keys(GESTURE_SETTINGS)
+            .map(k => [k, clampGesture(k, config.gestures?.[k])]).filter(([k, v]) => v !== undefined));
 
         this.instance.id = config.cardName ?? "default";
         this.instance.cid = gcid++;
