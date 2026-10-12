@@ -129,7 +129,11 @@ export class CardGraphs
                                 unitStepSize: 1,
                                 displayFormats: { 'day': this.i18n.styleDateTicks },
                             },
-                            maxRotation: 0
+                            maxRotation: 0,
+                            // (labels that don't fit side by side — a narrow plot — skipped,
+                            // never drawn over each other)
+                            autoSkip: true,
+                            autoSkipPadding: 8
                         },
                         gridLines: {
                             color: ( config?.showGrid === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphGridColor

@@ -82,5 +82,21 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A narrow card: the time labels that don't fit skipped ──
+    t = await openCard(card(), { mock: { series: true } });
+    await t.wait(800);
+    // (each graph's time labels drawn: [their number, whether two of them overlap])
+    const labels = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>{ const s=g.chart.scales['x-axis-0'], ctx=g.chart.ctx;
+        const shown=s.getTicks().map((k,i)=>({ x:s.getPixelForTick(i), l:k.label })).filter(k=>k.l!==undefined&&k.l!==null&&k.l!=='');
+        ctx.save(); ctx.font='12px sans-serif'; const w=shown.map(k=>ctx.measureText(String(k.l)).width); ctx.restore();
+        return [shown.length, shown.some((k,i)=>i>0 && k.x-shown[i-1].x < (w[i]+w[i-1])/2)]; })`);
+    await t.step('a narrow card (168 px): the time labels that would overlap skipped — at full width, all of them', async () => {
+        const wide = await labels();
+        await t.E(`(()=>{ document.body.style.width='168px'; document.getElementById('host').style.width='168px'; })()`); await t.wait(1500);
+        const narrow = await labels();
+        return wide.every(([n, o]) => n >= 4 && !o) && narrow.every(([n, o]) => n >= 1 && !o) && narrow.some(([n], i) => n < wide[i][0]) ? true : JSON.stringify({ wide, narrow });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
