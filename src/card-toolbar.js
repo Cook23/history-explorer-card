@@ -121,7 +121,7 @@ export class CardToolbar
         this._this.querySelector(`#tb_${i}`)?.addEventListener('click', (e) => {
             if( ![`tb_${i}`, `dl_${i}`, `dr_${i}`].includes(e.target.id) ) return;
             const _buttons = [...this._this.querySelectorAll(`#dl_${i} button, #dr_${i} button`)].filter(b => b.offsetParent);
-            const _k = Chart.hecUi.pick(e.clientX, e.clientY, _buttons);
+            const _k = Chart.hecUi.pick(e.clientX, e.clientY, _buttons, e.pointerType || 'mouse');
             if( _k >= 0 ) _buttons[_k].click();
         }, false);
         this._initOptionsMenu(i);

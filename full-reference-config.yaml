@@ -434,11 +434,12 @@ gestures:
   longPress: 500
   # The same, for a finger
   longPressTouch: 500
-  # A pointer that moved further than this (px) is dragging; a second press within it of the first is at the
-  # same place. Mouse and pen (2 to 40)
-  drag: 10
+  # The pointer's precision (px): a pointer that moved further than this is dragging; a second press within
+  # it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
+  # Mouse and pen (2 to 40)
+  precision: 8
   # The same, for a finger
-  dragTouch: 10
+  precisionTouch: 12
 
 # Whether the info panel (see $.infoPanel below) is enabled by default, replacing HA's native more-info
 # history for every entity — a super-global setting shared by every History Explorer card on the page/HA

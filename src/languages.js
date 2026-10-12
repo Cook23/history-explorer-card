@@ -59,8 +59,8 @@ const lang_en =
             "options_all"       : "All cards",
             "gesture_long_press" : "Long press, mouse and pen (ms)",
             "gesture_long_press_touch" : "Long press, finger (ms)",
-            "gesture_drag"      : "Drag from, mouse and pen (px)",
-            "gesture_drag_touch" : "Drag from, finger (px)"
+            "gesture_precision" : "Precision, mouse and pen (px)",
+            "gesture_precision_touch" : "Precision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -150,8 +150,8 @@ const lang_fr =
             "options_all"       : "Toutes les cartes",
             "gesture_long_press" : "Appui long, souris et stylet (ms)",
             "gesture_long_press_touch" : "Appui long, doigt (ms)",
-            "gesture_drag"      : "Glisser à partir de, souris et stylet (px)",
-            "gesture_drag_touch" : "Glisser à partir de, doigt (px)"
+            "gesture_precision" : "Précision, souris et stylet (px)",
+            "gesture_precision_touch" : "Précision, doigt (px)"
         },
         "values" : {
             "min" : "Min",
@@ -241,8 +241,8 @@ const lang_de =
             "options_all"       : "Alle Karten",
             "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
             "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
-            "gesture_drag"      : "Ziehen ab, Maus und Stift (px)",
-            "gesture_drag_touch" : "Ziehen ab, Finger (px)"
+            "gesture_precision" : "Genauigkeit, Maus und Stift (px)",
+            "gesture_precision_touch" : "Genauigkeit, Finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -332,8 +332,8 @@ const lang_es =
             "options_all"       : "Todas las tarjetas",
             "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
             "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
-            "gesture_drag"      : "Arrastrar desde, ratón y lápiz (px)",
-            "gesture_drag_touch" : "Arrastrar desde, dedo (px)"
+            "gesture_precision" : "Precisión, ratón y lápiz (px)",
+            "gesture_precision_touch" : "Precisión, dedo (px)"
         },
         "values" : {
             "min" : "Mín",
@@ -423,8 +423,8 @@ const lang_nl =
             "options_all"       : "Alle kaarten",
             "gesture_long_press" : "Lang drukken, muis en pen (ms)",
             "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
-            "gesture_drag"      : "Slepen vanaf, muis en pen (px)",
-            "gesture_drag_touch" : "Slepen vanaf, vinger (px)"
+            "gesture_precision" : "Precisie, muis en pen (px)",
+            "gesture_precision_touch" : "Precisie, vinger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -514,8 +514,8 @@ const lang_pl =
             "options_all"       : "Wszystkie karty",
             "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
             "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
-            "gesture_drag"      : "Przeciąganie od, mysz i pióro (px)",
-            "gesture_drag_touch" : "Przeciąganie od, palec (px)"
+            "gesture_precision" : "Precyzja, mysz i pióro (px)",
+            "gesture_precision_touch" : "Precyzja, palec (px)"
         },
         "values" : {
             "min" : "Min",
@@ -605,8 +605,8 @@ const lang_sv =
             "options_all"       : "Alla kort",
             "gesture_long_press" : "Långt tryck, mus och penna (ms)",
             "gesture_long_press_touch" : "Långt tryck, finger (ms)",
-            "gesture_drag"      : "Dra från, mus och penna (px)",
-            "gesture_drag_touch" : "Dra från, finger (px)"
+            "gesture_precision" : "Precision, mus och penna (px)",
+            "gesture_precision_touch" : "Precision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -696,8 +696,8 @@ const lang_da =
             "options_all"       : "Alle kort",
             "gesture_long_press" : "Langt tryk, mus og pen (ms)",
             "gesture_long_press_touch" : "Langt tryk, finger (ms)",
-            "gesture_drag"      : "Træk fra, mus og pen (px)",
-            "gesture_drag_touch" : "Træk fra, finger (px)"
+            "gesture_precision" : "Præcision, mus og pen (px)",
+            "gesture_precision_touch" : "Præcision, finger (px)"
         },
         "values" : {
             "min" : "Min",
@@ -787,8 +787,8 @@ const lang_sk =
             "options_all"       : "Všetky karty",
             "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
             "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
-            "gesture_drag"      : "Ťahanie od, myš a pero (px)",
-            "gesture_drag_touch" : "Ťahanie od, prst (px)"
+            "gesture_precision" : "Presnosť, myš a pero (px)",
+            "gesture_precision_touch" : "Presnosť, prst (px)"
         },
         "values" : {
             "min" : "Min",
@@ -878,8 +878,8 @@ const lang_ru =
             "options_all"       : "Все карточки",
             "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
             "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
-            "gesture_drag"      : "Перетаскивание от, мышь и перо (пикс.)",
-            "gesture_drag_touch" : "Перетаскивание от, палец (пикс.)"
+            "gesture_precision" : "Точность, мышь и перо (пикс.)",
+            "gesture_precision_touch" : "Точность, палец (пикс.)"
         },
         "values" : {
             "min" : "Мин",

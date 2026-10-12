@@ -104,7 +104,7 @@ Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a
 - **Gesture settings** — for every card and every device: the long-press duration and the distance a pointer moves before it drags, for a mouse or a pen and for a finger (`gestures:`, or the options menu).
 - **Pen** — the tip works as a finger; where the browser passes its button on (Chrome, the Home Assistant app), a tap with it held on a label opens the type menu.
 - **Right click** on a label opens its type menu, as a long-press does; the browser's own menu never opens on a graph.
-- **Picking** — a label, a button, a curve, a bar or a state is picked when touched just beside it (within 12 px), never when the touch is about halfway between two (in the middle third of the gap between them); two on the same pixel are one place, the one drawn on top.
+- **Picking** — a label, a button, a curve, a bar or a state is picked when touched just beside it (within the pointer's precision, see [Gesture settings](#gesture-settings)), never when the touch is about halfway between two (in the middle third of the gap between them); two on the same pixel are one place, the one drawn on top.
 
 ### Options
 
@@ -1333,7 +1333,7 @@ Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
 **(1.2)** Every gesture is told apart by two thresholds, one pair for a mouse or a pen, one for a finger:
 - **the long-press duration** — a press held this long is a long-press; a second press this soon after a release, at the same place, is a double-click (or a tap-then-drag); after a tap on a label, a graph's ⠿ zone or the Y axis, the page doesn't scroll from there for that long, so that a drag can follow;
-- **the drag distance** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place.
+- **the precision** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
 
 Raise them for a less steady or slower hand. In the YAML (any card), or in *All cards ▸* of the options menu:
 
@@ -1342,8 +1342,8 @@ type: custom:history-explorer-card
 gestures:
   longPress: 500        # ms, mouse and pen (200 to 2000; default 500)
   longPressTouch: 500   # ms, finger
-  drag: 10              # px, mouse and pen (2 to 40; default 10)
-  dragTouch: 10         # px, finger
+  precision: 8          # px, mouse and pen (2 to 40; default 8)
+  precisionTouch: 12    # px, finger (default 12)
 ```
 
 A value out of bounds is brought within them. They apply to every card and info panel of the page: whether set in a card's YAML or in the menu, the last one to speak wins, and they are kept on every device, whatever the card's persistence options — as the info panel's switch.

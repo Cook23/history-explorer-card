@@ -5,16 +5,18 @@
 //   longPress (mouse and pen), longPressTouch (finger) — ms: a press held this long is a
 //     long press; a second press within this long of a release is a double-click or a
 //     tap-then-drag; a tap keeps the page from scrolling over a draggable zone this long;
-//   drag (mouse and pen), dragTouch (finger) — px: a pointer that moved more than this
-//     is dragging; a second press of a double-click lands within it of the first one.
+//   precision (mouse and pen), precisionTouch (finger) — px: the pointer's precision. A pointer that
+//     moved more than this is dragging; a second press of a double-click lands within it of
+//     the first one; a target (a label, a button, a curve) within it of the pointer can be
+//     picked.
 
 const Chart = window.HXLocal_Chart;
 
 export const GESTURE_SETTINGS = {
     longPress      : { pointer: 'mouse', key: 'longPressMs', def: 500, min: 200, max: 2000, step: 50, unit: 'ms', label: 'ui.menu.gesture_long_press' },
     longPressTouch : { pointer: 'touch', key: 'longPressMs', def: 500, min: 200, max: 2000, step: 50, unit: 'ms', label: 'ui.menu.gesture_long_press_touch' },
-    drag           : { pointer: 'mouse', key: 'slop',        def: 10,  min: 2,   max: 40,   step: 1,  unit: 'px', label: 'ui.menu.gesture_drag' },
-    dragTouch      : { pointer: 'touch', key: 'slop',        def: 10,  min: 2,   max: 40,   step: 1,  unit: 'px', label: 'ui.menu.gesture_drag_touch' },
+    precision      : { pointer: 'mouse', key: 'slop',        def: 8,   min: 2,   max: 40,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision' },
+    precisionTouch : { pointer: 'touch', key: 'slop',        def: 12,  min: 2,   max: 40,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision_touch' },
 };
 
 const LOCAL_KEY = 'history-explorer-gestures';

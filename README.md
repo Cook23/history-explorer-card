@@ -23,7 +23,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. It is a rewrite of the card's code, where the interactions on phones, tablets and with a pen are being reworked, and the line that gets the new features. What 1.2 changes today:
 > - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away and drag; a pinch also zooms the time;
 > - **the tooltip** opens on a click or a tap near a curve, for that curve — several curves can show theirs — then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it; a long-press (or a right click) near a curve shows or hides its points;
-> - **gesture settings** for every card: how long a long-press lasts and how far a pointer moves before it drags, for a mouse or a pen and for a finger — in the options menu or in the YAML;
+> - **gesture settings** for every card: how long a long-press lasts and how precise a pointer is — how far it moves before it drags, how near a target it must be — for a mouse or a pen and for a finger — in the options menu or in the YAML;
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
 > - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
 > - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
@@ -141,11 +141,11 @@ type: custom:history-explorer-card
 gestures:
   longPress: 500        # ms, mouse and pen: a press held this long is a long-press
   longPressTouch: 500   # ms, finger
-  drag: 10              # px, mouse and pen: a pointer that moved further is dragging
-  dragTouch: 10         # px, finger
+  precision: 8          # px, mouse and pen: a pointer that moved further is dragging; a target this near is picked
+  precisionTouch: 12    # px, finger
 ```
 
-The long-press duration is also how soon a second press must follow a release to make a double-click, or a tap-then-drag. The values are kept within reasonable bounds (200 to 2000 ms, 2 to 40 px). Whether set in the YAML or in the menu, the last one to speak wins, and they are kept on every device — as the info panel's switch.
+The long-press duration is also how soon a second press must follow a release to make a double-click, or a tap-then-drag. The precision is also how near a label, a button or a curve must be to be picked. The values are kept within reasonable bounds (200 to 2000 ms, 2 to 40 px). Whether set in the YAML or in the menu, the last one to speak wins, and they are kept on every device — as the info panel's switch.
 
 ## Adding entities
 

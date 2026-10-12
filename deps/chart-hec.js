@@ -17,24 +17,28 @@
   // ── Geometry primitives (no chart instance involved) ──
 
   // Picking what's under a pointer (a label, a button, a curve, a bar): the one the pointer
-  // is on; else the nearest one, if it's near enough (within PICK_MARGIN px), and not about
+  // is on; else the nearest one, if it's near enough (within the pointer's immobility
+  // distance — the gesture settings' slop, for a mouse or a pen, or for a finger), and not about
   // halfway between it and the next one — in the middle third between the two (the dead
   // zone: a third of the distance between them), where which one was aimed at can't be
   // told. A point clearly beside every candidate picks none (-1); in the dead zone, none
   // either, but told apart (PICK_BETWEEN). From above or below two close candidates, the
   // one on that side is picked, however close they are; two on top of each other (on the
   // same pixel) are one place: the first one — for curves, the one drawn over the other.
-  var PICK_MARGIN = 12;
   var PICK_BETWEEN = -2;
-  function _hecPick(px, py, rects) {
+  // The pointer type of the gesture being resolved (each event's, see _hecGestureHandler):
+  // its immobility distance is the picking margin
+  var pickPointerType = 'mouse';
+  function _hecPickMargin() { return Chart.hecGestures(pickPointerType).slop; }
+  function _hecPick(px, py, rects, margin) {
     return _hecPickNearest(rects.map(function (r) {
       var cx = Math.max(r.x, Math.min(px, r.x + r.width)), cy = Math.max(r.y, Math.min(py, r.y + r.height));
       return { d: Math.sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py)), x: cx, y: cy };
-    }));
+    }), margin);
   }
   // The same rule, from each candidate's point nearest the pointer: { d (its distance to
-  // the pointer), x, y }, or null (not a candidate)
-  function _hecPickNearest(cands) {
+  // the pointer), x, y }, or null (not a candidate); margin: the current pointer's by default
+  function _hecPickNearest(cands, margin) {
     var best = -1, second = -1;
     for (var i = 0; i < cands.length; i++) {
       var c = cands[i];
@@ -45,7 +49,7 @@
     if (best < 0) return -1;
     var c1 = cands[best], c2 = second >= 0 ? cands[second] : null;
     var _gap = c2 ? Math.sqrt((c2.x - c1.x) * (c2.x - c1.x) + (c2.y - c1.y) * (c2.y - c1.y)) : Infinity;
-    if (c1.d > PICK_MARGIN) return -1;
+    if (c1.d > (margin !== undefined ? margin : _hecPickMargin())) return -1;
     // (on the same pixel — less than one apart: one place, the first one)
     if (_gap < 1) return Math.min(best, second);
     return !c2 || c2.d - c1.d >= _gap / 3 ? best : PICK_BETWEEN;
@@ -358,11 +362,12 @@
   //                 the page from scrolling over a draggable zone this long after it;
   //   slop        — a pointer that moved more than this (px, x + y) is dragging; a second
   //                 press of a double-click lands within it of the first one.
-  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 10 }, touch: { longPressMs: 500, slop: 10 } };
+  //                 Also how near a target must be to be picked (_hecPick).
+  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 8 }, touch: { longPressMs: 500, slop: 12 } };
   // The thresholds of a pointer type ('mouse', 'pen' — a mouse's —, 'touch')
   Chart.hecGestures = function (pointerType) {
     var g = Chart.defaults.global.gestures || {};
-    return (pointerType === 'touch' ? g.touch : g.mouse) || { longPressMs: 500, slop: 10 };
+    return (pointerType === 'touch' ? g.touch : g.mouse) || { longPressMs: 500, slop: pointerType === 'touch' ? 12 : 8 };
   };
 
   var hecUi = Chart.hecUi = {
@@ -378,13 +383,14 @@
     },
 
     // The picking rule (_hecPick) on page elements — small buttons: of `elements`, the one
-    // at client point (clientX, clientY), else the nearest one if near enough and not in
-    // the dead zone between two; → its index, -1, or -2 (between two)
-    pick: function (clientX, clientY, elements) {
+    // at client point (clientX, clientY), else the nearest one if near enough for
+    // pointerType ('mouse', 'pen', 'touch') and not in the dead zone between two; → its
+    // index, -1, or -2 (between two)
+    pick: function (clientX, clientY, elements, pointerType) {
       return _hecPick(clientX, clientY, elements.map(function (el) {
         var r = el.getBoundingClientRect();
         return { x: r.left, y: r.top, width: r.width, height: r.height };
-      }));
+      }), Chart.hecGestures(pointerType).slop);
     },
 
     // Is a piece of text (no space in it) a word? Two letters or digits at least — not a
@@ -1988,6 +1994,7 @@
     // two. Two curves drawn on top of each other there: the one drawn over (the first)
     _hecCurveAt: function (px, py) {
       var me = this;
+      var _m = _hecPickMargin();
       var _cands = (me.data.datasets || []).map(function (ds, i) {
         var meta = me.getDatasetMeta(i);
         if (!meta.dataset || !me.isDatasetVisible(i)) return null;
@@ -1997,7 +2004,7 @@
         for (var k = 1; k < pts.length; k++) {
           var a = pts[k - 1], b = pts[k];
           // (only the segments around the point can be near it)
-          if (Math.max(a.x, b.x) < px - PICK_MARGIN || Math.min(a.x, b.x) > px + PICK_MARGIN) continue;
+          if (Math.max(a.x, b.x) < px - _m || Math.min(a.x, b.x) > px + _m) continue;
           var path = !st ? [a, b]
             : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
             : st === 'after' ? [a, { x: a.x, y: b.y }, b]
@@ -2434,6 +2441,7 @@
       if (!h) return;
       var _pt = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
       var _g = Chart.hecGestures(_pt);
+      pickPointerType = _pt;
       h({ me: this, e: e, gs: this._hecGesture,
         cfg: helpers.extend({}, cfg, { longPressMs: _g.longPressMs, dragSlop: _g.slop }),
         pid: e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0,
