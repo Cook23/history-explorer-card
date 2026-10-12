@@ -56,8 +56,10 @@ function withoutArticles(name, lang)
 
 // curves: [{ name, device }] (device: the name of the entity's device, when known); options:
 // frequent(q) — whether many entities carry the qualifier q ('(Filtered)'), lang — the
-// language ('fr', 'en'…). → for each curve, its shorter forms, least shortened first (none:
-// nothing to shorten)
+// language ('fr', 'en'…). → for each curve, its forms after each of the three steps, least
+// shortened first — always three, a step that changes nothing giving the same form, so
+// that the curves' forms stay step by step side by side (the legend takes every curve at
+// the same step)
 export function shortNames(curves, { frequent = () => false, lang = 'en' } = {})
 {
     const _names = curves.map(c => String(c.name ?? ''));
@@ -79,5 +81,5 @@ export function shortNames(curves, { frequent = () => false, lang = 'en' } = {})
         return _clash ? abbreviateDevice(_device(i)) + ' ' + _removed[i] : _removed[i];
     });
     const s3 = step(s2, n => withoutArticles(n, lang));
-    return _names.map((n, i) => [s1[i], s2[i], s3[i]].filter((f, k, all) => f !== n && ( k === 0 || f !== all[k - 1] )));
+    return _names.map((n, i) => [s1[i], s2[i], s3[i]]);
 }

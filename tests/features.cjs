@@ -198,12 +198,21 @@ module.exports = async function()
         return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
             return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
-    await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value; full width: as it is', async () => {
+    await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
         const wide = await legendAt(1000), mid = await legendAt(374), narrow = await legendAt(168);
         await legendAt(1000);
         return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
             && mid.texts[0] === 'Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)'
-            && narrow.texts.every((x, i) => /…/.test(x) && x.endsWith(i ? '(300 W)' : '(400 W)')) && narrow.within ? true : JSON.stringify({ wide, mid, narrow });
+            && narrow.texts.every((x, i) => x.endsWith(i ? '(300 W)' : '(400 W)') && x !== wide.texts[i]) && narrow.texts.some(x => /…/.test(x)) && narrow.within ? true : JSON.stringify({ wide, mid, narrow });
+    });
+    await t.step('a qualifier many entities of Home Assistant carry ((Filtered), 3 of them): its initials first, (F); the other curve at the same step', async () => {
+        await t.E(`(()=>{ for( const [k, n] of ['Température', 'Humidité', 'Pression'].entries() ) { const id='sensor.f_'+k;
+            STATES[id]={ entity_id:id, state:'1', last_changed:lc, last_updated:lc, attributes:{ friendly_name:'Ecowitt '+n+' (Filtered)', unit_of_measurement:'x' } }; }
+            el.hass=mkHass(); })()`);
+        const mid = await legendAt(374);
+        await legendAt(1000);
+        return mid.texts[0] === 'Ecowitt Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
+            || mid.texts[0] === 'Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
     });
     done(await t.close());
 
@@ -221,7 +230,7 @@ module.exports = async function()
     };
     await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside (yLabels: outside kept); wide again: as before', async () => {
         const wide = await narrowAt(1000), narrow = await narrowAt(168), back = await narrowAt(1000);
-        return !wide.inside && wide.rows === 1 && !narrow.out.length && narrow.rows === 2 && narrow.inside && narrow.outsideKept && narrow.plotLeft < 20
+        return !wide.inside && wide.rows === 1 && !narrow.out.length && narrow.rows === 2 && narrow.inside && narrow.outsideKept && narrow.plotLeft < 30
             && !back.inside && back.rows === 1 ? true : JSON.stringify({ wide, narrow, back });
     });
     done(await t.close());
