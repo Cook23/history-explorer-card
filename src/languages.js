@@ -79,10 +79,11 @@ const lang_en =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hourly",
-            "daily" : "Daily",
-            "monthly" : "Monthly",
-            "rawline" : "Raw line"
+            "hourly" : "Hour",
+            "daily" : "Day",
+            "weekly" : "Week",
+            "monthly" : "Month",
+            "rawline" : "Raw"
         }
     }
 }
@@ -168,10 +169,11 @@ const lang_fr =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Par heure",
-            "daily" : "Par jour",
-            "monthly" : "Par mois",
-            "rawline" : "Courbe brute"
+            "hourly" : "Heure",
+            "daily" : "Jour",
+            "weekly" : "Semaine",
+            "monthly" : "Mois",
+            "rawline" : "Brut"
         }
     }
 }
@@ -256,11 +258,12 @@ const lang_de =
             "year" : "1 Jahr"
         },
         "interval" : {
-            "_10m" : "10 Min",
-            "hourly" : "Stündlich",
-            "daily" : "Täglich",
-            "monthly" : "Monatlich",
-            "rawline" : "Linie (roh)"
+            "_10m" : "10 Min.",
+            "hourly" : "Stunde",
+            "daily" : "Tag",
+            "weekly" : "Woche",
+            "monthly" : "Monat",
+            "rawline" : "Roh"
         }
     }
 }
@@ -346,10 +349,11 @@ const lang_es =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Por hora",
-            "daily" : "Por día",
-            "monthly" : "Por mes",
-            "rawline" : "Línea bruta"
+            "hourly" : "Hora",
+            "daily" : "Día",
+            "weekly" : "Semana",
+            "monthly" : "Mes",
+            "rawline" : "Bruto"
         }
     }
 }
@@ -435,10 +439,11 @@ const lang_nl =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Per uur",
-            "daily" : "Dagelijks",
-            "monthly" : "Maandelijks",
-            "rawline" : "Ruwe lijn"
+            "hourly" : "Uur",
+            "daily" : "Dag",
+            "weekly" : "Week",
+            "monthly" : "Maand",
+            "rawline" : "Ruw"
         }
     }
 }
@@ -524,10 +529,11 @@ const lang_pl =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Co godzinę",
-            "daily" : "Co dzień",
-            "monthly" : "Co miesiąc",
-            "rawline" : "Surowa linia"
+            "hourly" : "Godzina",
+            "daily" : "Dzień",
+            "weekly" : "Tydzień",
+            "monthly" : "Miesiąc",
+            "rawline" : "Surowe"
         }
     }
 }
@@ -611,12 +617,13 @@ const lang_sv =
             "n_months": "%1 månader",
             "year": "1 år"
         },
-        "interval": {
-            "_10m": "10 min",
-            "hourly": "Varje timme",
-            "daily": "Varje dag",
-            "monthly": "Varje månad",
-            "rawline" : "Rå linje"
+        "interval" : {
+            "_10m" : "10 min",
+            "hourly" : "Timme",
+            "daily" : "Dag",
+            "weekly" : "Vecka",
+            "monthly" : "Månad",
+            "rawline" : "Rå"
         }
     }
 }
@@ -702,10 +709,11 @@ const lang_da =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hver time",
-            "daily" : "Daglig",
-            "monthly" : "Månedlig",
-            "rawline" : "Rå linje"
+            "hourly" : "Time",
+            "daily" : "Dag",
+            "weekly" : "Uge",
+            "monthly" : "Måned",
+            "rawline" : "Rå"
         }
     }
 }
@@ -791,10 +799,11 @@ const lang_sk =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hodinovo",
-            "daily" : "Denne",
-            "monthly" : "Mesačne",
-            "rawline" : "Surová čiara"
+            "hourly" : "Hodina",
+            "daily" : "Deň",
+            "weekly" : "Týždeň",
+            "monthly" : "Mesiac",
+            "rawline" : "Surové"
         }
     }
 }
@@ -880,10 +889,11 @@ const lang_ru =
         },
         "interval" : {
             "_10m" : "10 мин",
-            "hourly" : "По часам",
-            "daily" : "По дням",
-            "monthly" : "По месяцам",
-            "rawline" : "Исходная линия"
+            "hourly" : "Час",
+            "daily" : "День",
+            "weekly" : "Неделя",
+            "monthly" : "Месяц",
+            "rawline" : "Сырые"
         }
     }
 }

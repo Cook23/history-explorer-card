@@ -440,9 +440,9 @@ showUnavailable: true
 
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
-Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between 10 min, hourly, daily and monthly bars (hourly by default), or *Raw line*.
+Energy, gas, water or volume entities that add up (state class `total_increasing`, or `total` with such a device class or unit) are shown as bars when added from the card (the type menu pre-selects *Bar*). Use the interval selector on the graph to switch between bars of *10 min*, an *Hour*, a *Day*, a *Week* (from Monday) and a *Month* (an hour by default), or *Raw*.
 
-A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a curve dropped onto it): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw line* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
+A bar graph can also hold curves (a YAML graph mixing both, a curve changed to bars, or a curve dropped onto it): the curves are drawn over the bars and aren't affected by the interval, nor stacked. *Raw* in the interval selector only turns the bars into raw curves; picking an interval again turns them back into bars. Bars and curves of two groups of units (e.g. kWh bars and a W curve) get an axis each, the bars on the left; with more groups they share one axis — use `scale:` to bring them to comparable values (with `unit:` to show the new unit, e.g. `scale: 0.001` and `unit: kW`).
 
 ```yaml
 entityOptions:
@@ -640,7 +640,7 @@ graphs:
 | `showMinMax` | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
 | `decimation` | ✓ | ✓ | ✓ | `fast` (default), `accurate`, or `false` |
 | `netBars` | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
-| `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `interval` | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `scale` | | | ✓ | Multiply values by this factor before drawing — see *6 |
 | `yAxis` | ✓ | ✓ | ✓ | `auto`, `left` or `right`: the Y axis of the curves (`auto`, the default: the second group of units goes on the right; `left` keeps one axis) |
 | `unit` | | | ✓ | Unit shown instead of the entity's own — see *6 |

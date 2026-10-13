@@ -144,10 +144,11 @@ module.exports = async function()
 
     // ── Every language's options menu no wider than the French one (the one tried on screen) ──
     t = await openCard(YAML(), { mock: { series: true } });
-    await t.step('the options menu and its submenus: in every language, no wider than in French (5 % more at most)', async () => {
+    await t.step('the options menu and its submenus, a bar graph\'s intervals: in every language, no wider than in French (5 % more at most)', async () => {
         const src = require('fs').readFileSync(require('path').join(__dirname, '../src/languages.js'), 'utf8');
         const MENUS = { options: ['options_export', 'options_card', 'options_all'], export: ['export_csv', 'export_stats'],
-                        card: ['default_graphs', 'default_display'], confirm: ['confirm_ok', 'confirm_cancel'] };
+                        card: ['default_graphs', 'default_display'], confirm: ['confirm_ok', 'confirm_cancel'],
+                        interval: ['_10m', 'hourly', 'daily', 'weekly', 'monthly', 'rawline'] };
         const langs = {};
         for( const m of src.matchAll(/const lang_(\w+) =([\s\S]*?)\n};?\n/g) ) {
             langs[m[1]] = {};

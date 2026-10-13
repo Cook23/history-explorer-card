@@ -4,7 +4,7 @@
 
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId } from "./history-series.js";
-import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -133,8 +133,7 @@ export class CardConfig
 
     parseIntervalConfig(s)
     {
-        const options = { '10m' : 0, 'hourly' : 1, 'daily' : 2, 'monthly' : 3 };
-        return options[s];
+        return BAR_INTERVALS.find(i => i.yaml && i.yaml === s)?.code;
     }
 
     // --------------------------------------------------------------------------------------

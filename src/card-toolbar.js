@@ -4,6 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
+import { BAR_INTERVALS, RAW_INTERVAL } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
@@ -429,13 +430,13 @@ export class CardToolbar
         if( !g ) return;
 
         const _value = parseInt(event.target.value);
-        const _wasRaw = g.interval == 4;
-        const _isRaw = _value == 4;
+        const _wasRaw = g.interval == RAW_INTERVAL;
+        const _isRaw = _value == RAW_INTERVAL;
         g.interval = _value;
 
         // Persist the interval on every entity of this graph (whichever is rebuilt first
         // carries it — see addGraph's _graphInterval). The entities' own types are left
-        // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
+        // alone: raw (RAW_INTERVAL) only changes how the bar entities are drawn, never what
         // they are, so picking an interval again turns them back into bars.
         for( let en of g.entities ) {
             const _e = this.store.entry(keyOf(en));
@@ -458,11 +459,7 @@ export class CardToolbar
     createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
         return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
-                    <option value="0" ${optionStyle} ${selected == 0 ? 'selected' : ''}>${i18n('ui.interval._10m')}</option>
-                    <option value="1" ${optionStyle} ${selected == 1 ? 'selected' : ''}>${i18n('ui.interval.hourly')}</option>
-                    <option value="2" ${optionStyle} ${selected == 2 ? 'selected' : ''}>${i18n('ui.interval.daily')}</option>
-                    <option value="3" ${optionStyle} ${selected == 3 ? 'selected' : ''}>${i18n('ui.interval.monthly')}</option>
-                    <option value="4" ${optionStyle} ${selected == 4 ? 'selected' : ''}>${i18n('ui.interval.rawline')}</option>
+                    ${BAR_INTERVALS.map(i => `<option value="${i.code}" ${optionStyle} ${selected == i.code ? 'selected' : ''}>${i18n('ui.interval.' + i.label)}</option>`).join('')}
                 </select>`;
     }
 

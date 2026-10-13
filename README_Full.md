@@ -426,13 +426,13 @@ The graph type and display options for the entity are taken from the card's `ent
 
 ### Bar graphs for total increasing entities
 
-Entities that represent a total (monotonically increasing or net metering) can be visualized as adaptive bar charts. This applies to entities such as, for example, consumed energy, water or gas, rainfall, or network data usage. The data is visualized over a time interval (10 minutes, hourly, daily or monthly) that can be toggled on the fly and independently for each graph.
+Entities that represent a total (monotonically increasing or net metering) can be visualized as adaptive bar charts. This applies to entities such as, for example, consumed energy, water or gas, rainfall, or network data usage. The data is visualized over a time interval (10 minutes, an hour, a day, a week — from Monday — or a month) that can be toggled on the fly and independently for each graph.
 
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When adding an entity from the card, the type menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw line* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly` (**1.2**) or `monthly`.
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`, so that the entity is shown as bars without picking it in the type menu.
 
@@ -441,7 +441,7 @@ entityOptions:
   sensor.rain_amount:
     type: bar
     color: '#3e95cd'
-    interval: 10m     # Default interval for this entity can be 10m, hourly, daily or monthly
+    interval: 10m     # Default interval for this entity can be 10m, hourly, daily, weekly or monthly
 ```
 
 Bar graphs can be manually added in the YAML too. Multiple entities can be combined into a single graph. The bars for each entity will then be displayed side by side:
@@ -463,7 +463,7 @@ graphs:
 
 #### Bars and curves on the same graph
 
-A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and *Raw line* only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when a curve is dropped onto it. An entity added from the UI never joins a graph of the other type on its own.
+A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and *Raw* only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when a curve is dropped onto it. An entity added from the UI never joins a graph of the other type on its own.
 
 ```yaml
 graphs:
@@ -1238,7 +1238,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `ylock` | boolean | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | Graph height in pixels (overrides global height settings) |
 | `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
-| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `circular` | `null`, `false`, number or `2pi` | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | Enable net metering mode for bar graphs |
 | `stacked` | boolean | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |

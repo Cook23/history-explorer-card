@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.16b1] - 2026-10-12
+## [v1.2.16] - 2026-10-13
 
 ### Fixed — a narrow card (a grid, a horizontal stack) readable
 - The toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its full name) and the entity search each on a line of their own, centered — they wrapped over up to 7 lines, the range's name cut, the search and ▾ out of the card. The search field is never wider than the card
@@ -55,6 +55,12 @@ Changelog for the HA History Explorer Card.
 - A card without any entity selector (`uiLayout: { selector: hide }`, `look: mini`) had no menu of an entity nor of a graph: they were built with the selector. A long-press on a label, on the ⠿ zone, now opens them there too (`#hm_0`, their own place)
 - On a narrow card, a timeline's handle, in its box over the rows, was no longer picked: the controls were only looked for above the plot area. On their box, they are now, wherever it is drawn
 - Tests: suite `modes` — every gesture (the padlock, the menus of a graph, of a curve, of a timeline's row, the Y axis, a value's tooltip and points, the hover, the time, the split and the merge by the chain icon, a curve and a graph moved) with a mouse and a finger, on a card at full width and on a narrow one; and on `look: mini`
+
+### New — a bar graph's bars by week; its intervals named shortly
+- *Week* in a bar graph's interval selector (`interval: weekly` in the YAML), a week from Monday, as Home Assistant's statistics count it — between *Day* and *Month*
+- The intervals named as what they are, in every language: *10 min*, *Hour*, *Day*, *Week*, *Month*, *Raw* (*Heure*, *Jour*, *Semaine*, *Mois*, *Brut*), rather than *Hourly*, *Daily*, *Monthly*, *Raw line* (*Par heure*, *Par jour*, *Par mois*, *Courbe brute*)
+- The intervals in one table (`BAR_INTERVALS`: the code saved, the YAML name, the label, the length and start of a bar); a code saved before keeps its meaning (*Week* is saved as 5)
+- Tests: `interval: weekly` — a bar each week, from Monday; *Day* picked: a bar each day, saved
 
 ### Changed — the options menu as wide in every language as in French
 - Its new and shortened lines translated as short: *Export* (de, nl, sv, sk), *Eksport* (pl, da), *Historie* (nl), *Карта* / *Общие* (ru), *Ogólne* (pl), *Všetky* (sk), *Gráficos* / *Vista por defecto* (es), *Predvolený pohľad* (sk), *Исходные графики* / *Исходный вид* (ru); the confirmation's *Yes* / *No* in the languages where *Confirm* / *Cancel* were wider (de, es, nl, pl, sv, da, ru)

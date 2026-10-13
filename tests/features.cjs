@@ -216,6 +216,22 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Bars by week: from Monday, each the sum of its week ──
+    t = await openCard(card({ statistics: { enabled: false }, defaultTimeRange: '30d', graphs: [{ type: 'bar', interval: 'weekly', entities: [{ entity: 'sensor.energy' }] }] }),
+        { mock: { series: true } });
+    await t.step('interval: weekly — the selector on Week, a bar each week, from Monday; Day picked: a bar each day, saved', async () => {
+        const bars = () => t.E(`(()=>{ const g=el.instance.graphs[0], x=g.chart.data.datasets[0].data.map(p=>+p.x);
+            return { sel: el.querySelector('#bd-'+g.id).value, label: el.querySelector('#bd-'+g.id).selectedOptions[0].textContent, step: (x[1]-x[0])/864e5,
+                     monday: x.every(v=>{ const m=window.HXLocal_moment(v-(x[1]-x[0])/2); return m.isoWeekday()===1 && m.hours()===0 && m.minutes()===0; }), n: x.length,
+                     saved: el.instance.pconfig.entities.find(e=>e.entity==='sensor.energy')?.interval }; })()`);
+        const week = await bars();
+        await t.E(`(()=>{ const g=el.instance.graphs[0], s=el.querySelector('#bd-'+g.id); s.value='2'; s.dispatchEvent(new Event('change')); })()`); await t.wait(1500);
+        const day = await bars();
+        return week.sel === '5' && week.label === 'Week' && week.step === 7 && week.monday && week.n >= 4 && day.sel === '2' && day.step === 1 && day.saved === 2
+            ? true : JSON.stringify({ week, day });
+    });
+    done(await t.close());
+
     // ── A bar graph's legend clear of its interval selector ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'bar', entities: [{ entity: 'sensor.energy', name: 'Énergie consommée maison' }] }] }),
         { mock: { series: true, language: 'fr' } });
