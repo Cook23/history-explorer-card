@@ -37,6 +37,12 @@ mini-graph-card is replaced by changing its `type:` alone.
   `yAxis: right`), or a value our option accepts in addition, with the same meaning. Never
   convert a value, never rescale, never change what a parameter means. An option with no
   exact equivalent (`value_factor`…) is a function to add under its own name.
+- **`look: mini` = defaults of parameters, nothing else.** If it has to change an aspect no
+  parameter sets, a parameter is missing: add it to the card (usable without `look`), and
+  `look: mini` only gives its default.
+- **A conversion that would remain** is described in the migration doc, never done in the
+  code. The aim is none.
+- An aspect that is unclear: ask the user.
 - **`look: mini` only switches defaults** — mini-graph-card's look instead of ours. It
   never changes what an option means: an option means one thing, whatever the look (an
   option whose meaning would depend on the look is an ergonomic nightmare). A name that
