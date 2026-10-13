@@ -432,14 +432,14 @@ export class CardSelector
 
         this.entitiesPopulated = true;
 
+        // Entity type menu listeners (its gestures open it, with or without a selector)
+        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
+
         // No point populating the datalist if the selector is not visible
         if( this.ui.hideSelector ) return;
 
         this.ui.inputField[0] = this._this.querySelector(`#b7_0`);
         this.ui.inputField[1] = this._this.querySelector(`#b7_1`);
-
-        // Entity type menu listeners
-        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
 
         if( this.pconfig.recordedEntitiesOnly ) {
 

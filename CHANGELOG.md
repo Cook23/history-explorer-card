@@ -51,6 +51,15 @@ Changelog for the HA History Explorer Card.
 - The graphs are built from the entity list by one function, at first display and on going back to the YAML (`_buildGraphsFromStore`)
 - Tests: Cancel, Enter, then Confirm; the graphs added gone, the YAML's changes kept (Default graphs) or forgotten with the time range (Default display), here, after a reload and on another device
 
+### Fixed — every gesture in every layout
+- A card without any entity selector (`uiLayout: { selector: hide }`, `look: mini`) had no menu of an entity nor of a graph: they were built with the selector. A long-press on a label, on the ⠿ zone, now opens them there too (`#hm_0`, their own place)
+- On a narrow card, a timeline's handle, in its box over the rows, was no longer picked: the controls were only looked for above the plot area. On their box, they are now, wherever it is drawn
+- Tests: suite `modes` — every gesture (the padlock, the menus of a graph, of a curve, of a timeline's row, the Y axis, a value's tooltip and points, the hover, the time, the split and the merge by the chain icon, a curve and a graph moved) with a mouse and a finger, on a card at full width and on a narrow one; and on `look: mini`
+
+### Changed — the options menu as wide in every language as in French
+- Its new and shortened lines translated as short: *Export* (de, nl, sv, sk), *Eksport* (pl, da), *Historie* (nl), *Карта* / *Общие* (ru), *Ogólne* (pl), *Všetky* (sk), *Gráficos* / *Vista por defecto* (es), *Predvolený pohľad* (sk), *Исходные графики* / *Исходный вид* (ru); the confirmation's *Yes* / *No* in the languages where *Confirm* / *Cancel* were wider (de, es, nl, pl, sv, da, ru)
+- Tests: each menu's widest line, in every language, no wider than in French
+
 ### Changed — the export submenu says what it exports
 - *Export ▸ History* (the history of the entities shown, over the time window shown) and *Export ▸ Statistics* (their long-term statistics), rather than *Export as CSV* and *Export statistics as CSV*: the format is in the documentation
 

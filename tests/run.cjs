@@ -1,6 +1,6 @@
 // Runs every interaction test suite against the built history-explorer-card.js (run
 // `yarn build` first). usage: yarn test [lint|store|legend|mouse|touch|cards|features|panel|typemenu|arrowline|scale|options|persistence|pen|colors|yaxes|graphmenu|attributes|copies|values ...]
-const SUITES = ['lint', 'store', 'legend', 'mouse', 'touch', 'cards', 'features', 'panel', 'typemenu', 'arrowline', 'scale', 'options', 'persistence', 'pen', 'colors', 'yaxes', 'graphmenu', 'attributes', 'copies', 'values', 'realtime', 'points', 'settings'];
+const SUITES = ['lint', 'store', 'legend', 'mouse', 'touch', 'cards', 'features', 'panel', 'typemenu', 'arrowline', 'scale', 'options', 'persistence', 'pen', 'colors', 'yaxes', 'graphmenu', 'attributes', 'copies', 'values', 'realtime', 'points', 'settings', 'modes'];
 
 (async () => {
     const only = process.argv.slice(2);

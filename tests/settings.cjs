@@ -142,5 +142,25 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Every language's options menu no wider than the French one (the one tried on screen) ──
+    t = await openCard(YAML(), { mock: { series: true } });
+    await t.step('the options menu and its submenus: in every language, no wider than in French (5 % more at most)', async () => {
+        const src = require('fs').readFileSync(require('path').join(__dirname, '../src/languages.js'), 'utf8');
+        const MENUS = { options: ['options_export', 'options_card', 'options_all'], export: ['export_csv', 'export_stats'],
+                        card: ['default_graphs', 'default_display'], confirm: ['confirm_ok', 'confirm_cancel'] };
+        const langs = {};
+        for( const m of src.matchAll(/const lang_(\w+) =([\s\S]*?)\n};?\n/g) ) {
+            langs[m[1]] = {};
+            for( const k of Object.values(MENUS).flat() ) { const r = new RegExp('"' + k + '"\\s*:\\s*"([^"]*)"').exec(m[2]); if( r ) langs[m[1]][k] = r[1]; }
+        }
+        const wider = await t.E(`(()=>{ const L=${JSON.stringify(langs)}, M=${JSON.stringify(MENUS)}, c=document.createElement('canvas').getContext('2d');
+            c.font='14px Roboto, Noto, sans-serif'; const w=(m,t)=>c.measureText(t+(m==='options'?' ▸':'')).width; const out=[];
+            for( const m in M ) { const fr=Math.max(...M[m].map(k=>w(m,L.fr[k])));
+                for( const l in L ) { const x=Math.max(...M[m].map(k=>w(m,L[l][k]??''))); if( x>fr*1.05 ) out.push(m+' '+l+' '+Math.round(x)+'>'+Math.round(fr)); } }
+            return out; })()`);
+        return Object.keys(langs).length >= 10 && !wider.length ? true : JSON.stringify(wider);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

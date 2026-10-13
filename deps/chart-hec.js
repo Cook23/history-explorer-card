@@ -1574,10 +1574,16 @@
     // legend's labels (within the legend's band) — picked together (_hecPick): the one
     // under the point, else the nearest one if near enough and clearly nearer than the
     // next. → 'linkMarker', 'lockAndHandle', a legend label's index, -1 or PICK_BETWEEN.
-    // Never from the plot area or the Y axis column (y below the plot area's top).
+    // Never from the plot area or the Y axis column (y below the plot area's top) — but
+    // on the controls' box drawn over them (hecControlsBackdrop).
     _hecTopTargetAt: function (x, y) {
       var me = this, _a = me.chartArea;
-      if (_a && y >= _a.top) return -1;
+      // (below the plot area's top: only the controls' box drawn over it, when it is —
+      // hecControlsBackdrop: on it, the controls')
+      if (_a && y >= _a.top) {
+        var _bd = me.options.hecControlsBackdrop && me._hecHasControls();
+        return _bd && x >= 0 && x <= me._hecLockAndHandleWidth() && y <= 28 ? 'lockAndHandle' : -1;
+      }
       var rects = [], ids = [];
       var _lm = me._hecLinkMarkerRect();
       if (_lm) { rects.push({ x: _lm.left, y: _lm.top, width: _lm.width, height: _lm.height }); ids.push('linkMarker'); }

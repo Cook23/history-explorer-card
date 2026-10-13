@@ -17,6 +17,14 @@ export class CardToolbar
 
     // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
     // !! Keep in sync with _hec_render() in history-info-panel.js !!
+    // The menus of an entity and of a graph on a card without any entity selector, where
+    // they otherwise are: their gestures (a long-press on a label, on the ⠿ zone…) open them
+    // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
+    menusOnlyHtml()
+    {
+        return `<div id="hm_0" style="position:relative;height:0;line-height:normal">${typeMenuHtml(0, true)}</div>`;
+    }
+
     addUIHtml(tools, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
     {
         let html = '';

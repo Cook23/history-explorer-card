@@ -270,7 +270,7 @@ export class CardMenus
         // (before _openMenu turns it on). #tb_N is already known to be the real positioned
         // ancestor (see its position:relative in the HTML), no need to read it back off an
         // element that isn't shown yet.
-        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         let _top, _left;
         if( _longPress ) {
@@ -335,7 +335,7 @@ export class CardMenus
             _titleEl.style.borderBottom = '1px solid #444';
         }
 
-        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
         this._openRememberedSubmenu(input_idx, _numeric ? 'rep' : 'layout');
@@ -943,6 +943,13 @@ export class CardMenus
     //           whichever makes sense for it) — center/right shift the menu natively via
     //           CSS transform, same mechanism already used for _showLabelTooltip, so there's
     //           no need to measure the menu's rendered width and recompute afterward.
+    // The positioned parent of the menus of toolbar i: the toolbar, or on a card without any
+    // entity selector, their own (menusOnlyHtml)
+    _menuParent(i)
+    {
+        return this._this.querySelector(`#tb_${i}`) ?? this._this.querySelector(`#hm_${i}`);
+    }
+
     _openMenu(menuEl, top, left, align = 'left') {
         // (a curve's tooltip closes: a menu opened is never under it)
         for( const g of this.graphs ?? [] ) g.chart?.hecEndTooltip();

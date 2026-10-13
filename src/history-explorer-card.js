@@ -706,6 +706,7 @@ class HistoryExplorerCard extends HTMLElement
             <ha-card id="maincard" header="${this.instance.ui.hideHeader ? '' : header}">
             <div id='graphlist' class='card-content' style='margin-top:0px;padding-top:0px;'>
             ${this.instance.addUIHtml(tools & 1, selector & 1, bgcol, optionStyle, inputStyle, invertZoom, 0)}
+            ${selector ? '' : this.instance.menusOnlyHtml()}
         `;
 
         // Footer
