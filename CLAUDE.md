@@ -32,6 +32,11 @@ mini-graph-card is replaced by changing its `type:` alone.
   an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the
   same levels; its structured forms (`show:`, root `entities`, `color_thresholds`…) are read
   by the card natively, as its own options.
+- **Aliases, never conversions.** A mini-graph-card name is an alias of one of our names; a
+  mini-graph-card value is an alias of one of our values (`y_axis: secondary` is
+  `yAxis: right`), or a value our option accepts in addition, with the same meaning. Never
+  convert a value, never rescale, never change what a parameter means. An option with no
+  exact equivalent (`value_factor`…) is a function to add under its own name.
 - **`look: mini` only switches defaults** — mini-graph-card's look instead of ours. It
   never changes what an option means: an option means one thing, whatever the look (an
   option whose meaning would depend on the look is an ergonomic nightmare). A name that
