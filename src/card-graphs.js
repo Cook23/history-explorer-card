@@ -316,12 +316,55 @@ export class CardGraphs
         return !!_ds && !this._isRowGraph(g) && ( g.type === 'line' || _ds.type === 'line' );
     }
 
-    // Whether every curve of graph g shows its samples' dots (none: undefined)
-    _curvesShowPoints(g)
+    // Whether every curve of graph g — of its entities given — shows its samples' dots
+    // (none: undefined)
+    _curvesShowPoints(g, entities = g.entities)
     {
         if( this._isRowGraph(g) ) return undefined;
-        const _idx = g.entities.map((e, i) => i).filter(i => this._isCurve(g, i));
+        const _idx = entities.map(e => g.entities.indexOf(e)).filter(i => this._isCurve(g, i));
         return _idx.length ? _idx.every(i => g.chart.data.datasets[i].pointRadius > 0) : undefined;
+    }
+
+    // Entity idx of graph g shown or hidden, the other way round (its dataset's hidden);
+    // → whether it's hidden now
+    _toggleCurveHidden(g, idx)
+    {
+        const _ds = g.chart.data.datasets[idx];
+        _ds.hidden = !_ds.hidden;
+        g.chart.update();
+        return _ds.hidden;
+    }
+
+    // Entity i of graph g's legend label brought up to date (its value now)
+    _refreshLegendParts(g, i)
+    {
+        const d = g.chart.data.datasets[i];
+        if( d ) Object.assign(d, this._legendParts(d));
+    }
+
+    // How a curve drawn in line mode `mode` bends
+    _lineModeStyle(mode)
+    {
+        return { steppedLine: mode === 'stepped', lineTension: ( mode === 'lines' || mode === 'stepped' ) ? 0 : 0.1 };
+    }
+
+    // Entity idx of graph g drawn in lineMode, its type unchanged (its entry keeps it: the
+    // menu marks it next time, and it's saved with it)
+    _setLineMode(g, idx, lineMode)
+    {
+        const _mode = this.normalizeLineMode(lineMode);
+        const _ds = g.chart.data.datasets[idx];
+        if( _ds ) Object.assign(_ds, this._lineModeStyle(_mode));
+        if( g.entities[idx] ) g.entities[idx].lineMode = _mode;
+    }
+
+    // Entity e of graph g drawn with the interpolation algorithm algo (its entry — the
+    // store's own — keeps it, saved with it)
+    _setInterpolation(g, e, algo)
+    {
+        e.interpolation = algo;
+        const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
+        if( _ds ) _ds.hecInterpolation = algo;
     }
 
     _curveDataset(d, graphtype, config)
@@ -350,11 +393,10 @@ export class CardGraphs
             // values of two scales on each other would mean nothing)
             stack: d.yAxisID,
             name: d.name,
-            steppedLine: d.mode === 'stepped',
             cubicInterpolationMode: 'monotone',
             // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
             hecInterpolation: d.interpolation,
-            lineTension: ( d.mode === 'lines' || d.mode === 'stepped' ) ? 0 : 0.1,
+            ...this._lineModeStyle(d.mode),
             domain: d.domain,
             entity_id: d.entity_id,
             unit: d.unit,

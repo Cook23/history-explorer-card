@@ -54,6 +54,8 @@ const RULES = [
     { id: 'graph-gestures', why: "a gesture on a graph is Chart.js's: the card listens only to its own toolbars, menus and dialogs",
       files: CARD.filter(f => !['src/card-toolbar.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-tests.js'].includes(f)),
       re: /addEventListener\(\s*(?!['"](click|change|keydown|focusin|focusout|input|selectionchange)['"])/g },
+    { id: 'datasets', why: "a graph's datasets are made and changed by card-graphs.js (card-datasets.js fills their data); the others ask it",
+      files: CARD.filter(f => !['src/card-graphs.js', 'src/card-datasets.js'].includes(f)), re: /chart\??\.data\??\.datasets/g },
     { id: 'menus', why: "a menu's elements are card-menus.js's (and the selector's own)",
       files: CARD.filter(f => !['src/card-menus.js', 'src/card-toolbar.js'].includes(f)), re: /#(et|eo|ets|eoo)_/g },
     { id: 'rendering', why: "how something is drawn is Chart.js's (or the card's own toolbars' and menus' layout)",
@@ -67,6 +69,7 @@ const STOCK_OPTIONS = new Set(['scales', 'layout', 'legend', 'tooltips', 'elemen
 const EXCEPTIONS = [
     ['store', 'src/history-explorer-card.js', 'pconfig.entities             =', 'the card creates the list the store then manages'],
     ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'during a cut, a press anywhere on the page or Escape cancels it — the page, not a graph'],
+    ['datasets', 'src/card-values.js', 'chart.data.datasets', "the values read a curve's own data there (its unit, its scale, its period, its color, hidden), never change it"],
     ['rendering', 'src/card-toolbar.js', 'getComputedStyle', "the toolbar's own layout"],
     ['rendering', 'src/card-menus.js', 'getComputedStyle', "a menu's own layout"],
     ['rendering', 'src/history-default-colors.js', 'getComputedStyle', "a color option naming a theme variable (--name), resolved to the color the card gives"],

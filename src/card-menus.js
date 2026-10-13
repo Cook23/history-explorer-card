@@ -228,7 +228,7 @@ export class CardMenus
         const _isCurve = _longPress && !!_e && this._isCurve(graph, graph.entities.indexOf(_e));
         show(_points, _isCurve);
         if( _points && _isCurve )
-            _points.textContent = i18n(graph.chart.data.datasets[graph.entities.indexOf(_e)].pointRadius > 0 ? 'ui.menu.points_hide' : 'ui.menu.points_show');
+            _points.textContent = i18n(this._curvesShowPoints(graph, [_e]) ? 'ui.menu.points_hide' : 'ui.menu.points_show');
         show(q('rep'), true);
         show(q('tests'), true);
 
@@ -531,10 +531,7 @@ export class CardMenus
         if( !g ) return;
         for( const e of entities ) {
             if( !this._isInterpolated(e, g) ) continue;
-            // (g.entities[i] is the entity's entry in the store itself: saved with it)
-            e.interpolation = algo;
-            const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
-            if( _ds ) _ds.hecInterpolation = algo;
+            this._setInterpolation(g, e, algo);
         }
         g.chart.update();
         this.writeLocalState();
@@ -670,19 +667,6 @@ export class CardMenus
             }
         }
         this.writeLocalState();
-    }
-
-    // Entity idx of graph g drawn in lineMode, its type unchanged
-    _setLineMode(g, idx, lineMode)
-    {
-        const _mode = this.normalizeLineMode(lineMode);
-        const _ds = g.chart.data.datasets[idx];
-        if( _ds ) {
-            _ds.steppedLine = _mode === 'stepped';
-            _ds.lineTension = (_mode === 'lines' || _mode === 'stepped') ? 0 : 0.1;
-        }
-        // (in memory too, so the menu marks it next time)
-        if( g.entities[idx] ) g.entities[idx].lineMode = _mode;
     }
 
     // From a graph's menu: every entity of graph g shown as type (lineMode), saved with

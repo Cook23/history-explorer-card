@@ -519,10 +519,7 @@ export class HistoryCardState {
             for( let e of g.entities ) {
                 const lc = this.stateOf(e.entity)?.last_changed;
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
-                    if( this.pconfig.showCurrentValues && g !== this._frozenChart ) {
-                        let d = g.chart.data.datasets[i];
-                        Object.assign(d, this._legendParts(d));
-                    }
+                    if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this._refreshLegendParts(g, i);
                     changed = true;
                 }
                 this.stateMap.set(e.entity, lc);

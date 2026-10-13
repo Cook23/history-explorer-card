@@ -9,7 +9,7 @@ The suites:
 | Suite | What it checks |
 |---|---|
 | `lint` | Every identifier declared, no import assigned, in every source (static, no browser) |
-| `architecture` | The rules of `ARCHITECTURE.md`, on the sources (static, no browser): each part keeps to its own job and reaches another one only through its contract — the card uses only Chart.js's stock API and what `deps/Chart Custom.js.md` documents, no business in Chart.js, no DOM in the data-only parts, persistence in `card-storage.js` alone, the entity list through the store, no listener on a graph, the menus' elements in `card-menus.js`, no rendering in the card; each exception with its reason, and none left unused |
+| `architecture` | The rules of `ARCHITECTURE.md`, on the sources (static, no browser): each part keeps to its own job and reaches another one only through its contract — the card uses only Chart.js's stock API and what `deps/Chart Custom.js.md` documents, no business in Chart.js, no DOM in the data-only parts, persistence in `card-storage.js` alone, the entity list through the store, the datasets changed by `card-graphs.js`, no listener on a graph, the menus' elements in `card-menus.js`, no rendering in the card; each exception with its reason, and none left unused |
 | `legend` | The shorter forms of curve names for a narrow legend (`src/legend-names.js`), no browser: a frequent qualifier, the device removed or abbreviated, the articles, never two curves the same |
 | `store` | The entity store (`src/history-entity-store.js`) on its own (no browser), the place a curve dropped without saving is saved at included |
 | `mouse`, `touch` | Every gesture on the graphs, with a mouse and with fingers; a text shortened or hidden shown in full in place, on a hover and on a click or a tap |

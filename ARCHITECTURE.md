@@ -76,7 +76,8 @@ keep them apart. For the details of the boundary with Chart.js, see
 5. **Each part does its own job, and talks to another one directly — through that one's
    contract.** No part goes through a single gateway to reach another, and none does
    another's job by the shortest path: the time axis is set by `card-timerange.js` alone,
-   what is saved is read and written by `card-storage.js` alone, a menu's lines are
+   what is saved is read and written by `card-storage.js` alone, a graph's datasets are
+   made and changed by `card-graphs.js` (filled by `card-datasets.js`), a menu's lines are
    `card-menus.js`'s, what Chart.js keeps for itself (its layout, a dataset's meta) is
    never read. A field the card and Chart.js exchange is documented in
    `deps/Chart Custom.js.md`; a name starting with `hec` or `_hec` is Chart.js's — the
@@ -110,7 +111,7 @@ keep them apart. For the details of the boundary with Chart.js, see
 - **architecture** — the rules above, checked on the sources: the card uses only Chart.js's
   stock API and what its contract documents, Chart.js knows nothing of the card's business,
   the data-only parts have no DOM, persistence is `card-storage.js`'s, the entity list
-  changes through the store, a gesture on a graph is Chart.js's, a menu's elements are
+  changes through the store, a graph's datasets are `card-graphs.js`'s, a gesture on a graph is Chart.js's, a menu's elements are
   `card-menus.js`'s, rendering is Chart.js's. An exception is written in the test with its
   reason, and fails once it's no longer needed;
 - **store** — the entity store on its own, no browser;
