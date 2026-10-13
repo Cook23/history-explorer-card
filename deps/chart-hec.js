@@ -300,6 +300,55 @@
   };
 
   // ---------------------------------------------------------------------------
+  // Y labels drawn inside the plot (ticks.mirror) with ticks.hecBackdrop { color }: over the
+  // datasets, each in a rounded box of that color (semi-opaque: the curves show through a
+  // little) — readable over the curves, as mini-graph-card's labels
+  Chart.plugins.register({
+    id: 'hecTickBackdrops',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx;
+      helpers.each(chart.scales, function (scale) {
+        var labels = scale._hecDeferredLabels;
+        if (!labels || !labels.length) return;
+        var _bd = scale.options.ticks.hecBackdrop;
+        // (the boxes drawn: a label whose box would touch one of them is skipped)
+        var _drawn = [];
+        ctx.save();
+        labels.forEach(function (l) {
+          var _text = helpers.isArray(l.label) ? l.label.join(' ') : String(l.label);
+          if (_text === '' || _text === 'undefined') return;
+          ctx.font = l.font;
+          var w = ctx.measureText(_text).width, h = parseInt(l.font, 10) || 12;
+          var padX = 4, padY = 1, bw = w + 2 * padX, bh = h + 2 * padY;
+          var bx = l.align === 'left' ? l.x - padX : l.align === 'right' ? l.x - w - padX : l.x - w / 2 - padX;
+          var by = l.baseline === 'middle' ? l.y - bh / 2 : l.baseline === 'top' ? l.y - padY : l.y - h - padY;
+          // (kept within the plot: the top one never over the legend, the bottom one never
+          // over the time labels)
+          var _area = chart.chartArea, _dy = by < _area.top ? _area.top - by : by + bh > _area.bottom ? _area.bottom - by - bh : 0;
+          by += _dy;
+          var _ty = l.y + _dy;
+          if (_drawn.some(function (d) { return by < d.y + d.h + 3 && by + bh + 3 > d.y && bx < d.x + d.w && bx + bw > d.x; })) return;
+          _drawn.push({ x: bx, y: by, w: bw, h: bh });
+          var r = bh / 2;
+          ctx.beginPath();
+          ctx.moveTo(bx + r, by);
+          ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+          ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+          ctx.arcTo(bx, by + bh, bx, by, r);
+          ctx.arcTo(bx, by, bx + bw, by, r);
+          ctx.closePath();
+          ctx.fillStyle = _bd.color;
+          ctx.fill();
+          ctx.fillStyle = l.color;
+          ctx.textAlign = l.align;
+          ctx.textBaseline = l.baseline;
+          ctx.fillText(_text, l.x, _ty);
+        });
+        ctx.restore();
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
   // over the curves as its point would be if shown — its own style and border — at the size
   // of a dot shown by default

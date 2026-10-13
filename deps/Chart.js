@@ -8005,6 +8005,11 @@
 
             });
 
+            // (fork) labels drawn inside the plot (mirror) with ticks.hecBackdrop: kept for
+            // later — drawn over the datasets, each in its box (plugin hecTickBackdrops)
+            var _hecDefer = !isHorizontal && optionTicks.mirror && !!optionTicks.hecBackdrop;
+            me._hecDeferredLabels = _hecDefer ? [] : null;
+
             // Draw all of the tick labels, tick marks, and grid lines at the correct places
             helpers.each(itemsToDraw, function (itemToDraw) {
               if (gridLines.display) {
@@ -8032,7 +8037,11 @@
                 context.restore();
               }
 
-              if (optionTicks.display) {
+              if (optionTicks.display && _hecDefer) {
+                me._hecDeferredLabels.push({ x: itemToDraw.labelX, y: itemToDraw.labelY, label: itemToDraw.label,
+                  font: itemToDraw.major ? majorTickFont.font : tickFont.font, color: itemToDraw.major ? majorTickFontColor : tickFontColor,
+                  align: itemToDraw.textAlign, baseline: itemToDraw.textBaseline });
+              } else if (optionTicks.display) {
                 // Make sure we draw text in the correct color and font
                 context.save();
                 context.translate(itemToDraw.labelX, itemToDraw.labelY);

@@ -426,10 +426,22 @@ export class CardGraphs
     }
 
     // The Y labels' ticks options, inside the plot — just above their grid line, so that the
-    // lowest one keeps clear of the time labels — or beside it
+    // lowest one keeps clear of the time labels, each in a box of the card's background
+    // (hecTickBackdrops in deps/chart-hec.js) — or beside it
     _yLabelTicks(inside)
     {
-        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0 };
+        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0,
+                 hecBackdrop: inside ? { color: this._tickBackdropColor() } : null };
+    }
+
+    // The boxes of the Y labels inside a plot: the card's background, as opaque as the
+    // tooltip (80 %) — the theme's own color, else white or, on a dark theme, dark grey
+    _tickBackdropColor()
+    {
+        const _bg = this._this?.querySelector('#maincard') ? getComputedStyle(this._this.querySelector('#maincard')).backgroundColor : '';
+        const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(_bg);
+        const [r, g, b] = m && ( m[4] === undefined || +m[4] > 0 ) ? [m[1], m[2], m[3]] : this.ui.darkMode ? [28, 28, 28] : [255, 255, 255];
+        return `rgba(${r},${g},${b},0.8)`;
     }
 
     // The Y labels of each graph placed as the card's width now says (_yLabelsInside) —
@@ -441,7 +453,10 @@ export class CardGraphs
             for( const ax of g.chart.options.scales?.yAxes ?? [] ) {
                 const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
                 if( !!ax.ticks.mirror === _inside ) continue;
-                Object.assign(ax.ticks, this._yLabelTicks(_inside));
+                // (Chart.js draws from its copies of them — ticks.minor, ticks.major — made once:
+                // they change too)
+                const _ticks = this._yLabelTicks(_inside);
+                for( const t of [ax.ticks, ax.ticks.minor, ax.ticks.major] ) if( t && typeof t === 'object' ) Object.assign(t, _ticks);
                 ax.scaleLabel.display = !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '';
                 _changed = true;
             }

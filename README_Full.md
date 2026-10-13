@@ -952,7 +952,7 @@ A curve hidden from its legend shows neither. Both are set at every level — ca
 
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
-- **`yLabels: inside`** — the Y labels drawn inside the plot, just above their grid line, the plot then taking the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch). A card narrower than 300 px draws them so by itself; `yLabels: outside` keeps them beside the plot whatever the width;
+- **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, the plot then taking the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch). A card narrower than 300 px draws them so by itself; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
 **`look: mini`** sets, for the whole card, what mini-graph-card shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
