@@ -8,13 +8,14 @@ Changelog for the HA History Explorer Card.
 
 ### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near
 - The values over a graph (`showState`, `look: mini`): a hover on a curve shows, in place of its value now, the value it's on with its time; leaving it, the value now again
-- The Y labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): their boxes opaque while the pointer is near them — in the column a drag of that axis starts in — rather than 80 %; elsewhere, as before (Chart.js `ticks.hecBackdrop.hoverColor`)
+- The Y labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): their boxes opaque while the pointer is near them — in the column a drag of that axis starts in — rather than 80 %; elsewhere, as before (Chart.js `ticks.hecBackdrop`)
 - A value over the graph or a statistics' name cut ('…', a narrow card): shown in full in place while hovered, and on a click (on a name: a click on a value opens its entity's dialog)
 - The hand cursor on what a click opens: a legend label's value, a value over the graph
 - Tests: the value hovered in place, and back; a name cut shown in full; the boxes opaque near the labels, not away; the cursor on a value and on a name
 
 ### Changed — the values over a graph drawn by Chart.js, as everything shown on and around a graph
 - The card computes them (the values now, the statistics, their colors, the layout, how a value at a point reads) and gives them to the chart (`chart.hecSetValues`); Chart.js draws them, above the graph as before, and reports a click on a value (`customEvent`, zone `'value'`). The card no longer builds their HTML nor listens to them (ARCHITECTURE.md, rule 1)
+- The boxes drawn over a graph (the Y labels inside the plot, the controls over the legend on a narrow card, a text shown in full) take their color from Chart.js, one rule for all (`Chart.hecUi.background`: the graph's background, 80 % opaque) — the card only says whether there are boxes (`ticks.hecBackdrop`, `hecControlsBackdrop`: `true`), no longer their color
 - A bar graph's legend kept clear of its interval selector from where the card puts it (its own style: its distance from the edge, its width), no longer by measuring the graph on screen
 
 ### New — a click on a value opens its entity's dialog

@@ -313,9 +313,9 @@
   };
 
   // ---------------------------------------------------------------------------
-  // Y labels drawn inside the plot (ticks.mirror) with ticks.hecBackdrop { color }: over the
-  // datasets, each in a rounded box of that color (semi-opaque: the curves show through a
-  // little) — readable over the curves, as mini-graph-card's labels
+  // Y labels drawn inside the plot (ticks.mirror) with ticks.hecBackdrop: over the datasets,
+  // each in a rounded box of the graph's background (hecUi.background, BOX_OPACITY: the
+  // curves show through a little) — readable over the curves, as mini-graph-card's labels
   Chart.plugins.register({
     id: 'hecTickBackdrops',
     afterDatasetsDraw: function (chart) {
@@ -323,7 +323,8 @@
       helpers.each(chart.scales, function (scale) {
         var labels = scale._hecDeferredLabels;
         if (!labels || !labels.length) return;
-        var _bd = scale.options.ticks.hecBackdrop;
+        // (opaque while the pointer is near that axis' labels — _hecSetLabelsHovered)
+        var _bg = hecUi.background(chart.canvas, chart._hecLabelsHovered === scale.position ? 1 : hecUi.BOX_OPACITY);
         // (the boxes drawn: a label whose box would touch one of them is skipped; kept on
         // the scale — the column of its labels, see _hecInsideLabelColumns)
         var _drawn = scale._hecLabelBoxes = [];
@@ -351,8 +352,7 @@
           ctx.arcTo(bx, by + bh, bx, by, r);
           ctx.arcTo(bx, by, bx + bw, by, r);
           ctx.closePath();
-          // (opaque while the pointer is near that axis' labels — _hecSetLabelsHovered)
-          ctx.fillStyle = _bd.hoverColor && chart._hecLabelsHovered === scale.position ? _bd.hoverColor : _bd.color;
+          ctx.fillStyle = _bg;
           ctx.fill();
           ctx.fillStyle = l.color;
           ctx.textAlign = l.align;
@@ -505,6 +505,28 @@
     // How long a floating element takes to fade out (its CSS opacity transition)
     FADE: 1000,
 
+    // How opaque the boxes drawn over a graph are (the Y labels inside the plot, the controls
+    // over the legend, a text shown in full): as the tooltip
+    BOX_OPACITY: 0.8,
+
+    // The background a graph is drawn on (el: an element in it), at opacity alpha (default
+    // 1) — the color of the boxes drawn over it: the first ancestor's background that isn't
+    // see-through (out of shadow roots too: the card's), else dark grey under a light text
+    // (a dark theme), else white. A canvas can't use the theme's CSS variables.
+    background: function (el, alpha) {
+      var _rgb = null;
+      for (var n = el; n && !_rgb; n = n.parentNode || n.host) {
+        if (n.nodeType !== 1) continue;
+        var m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(getComputedStyle(n).backgroundColor);
+        if (m && (m[4] === undefined || +m[4] > 0)) _rgb = [m[1], m[2], m[3]];
+      }
+      if (!_rgb) {
+        var t = el && el.nodeType === 1 ? /(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(getComputedStyle(el).color) : null;
+        _rgb = t && +t[1] + +t[2] + +t[3] > 382 ? [28, 28, 28] : [255, 255, 255];
+      }
+      return 'rgba(' + _rgb.join(',') + ',' + (alpha === undefined ? 1 : alpha) + ')';
+    },
+
     // How long a message stays up: 1 s, plus 0.5 s per word (isWord; words split on
     // spaces and underscores — entity ids read as words).
     readingTime: function (text) {
@@ -655,8 +677,8 @@
     },
 
     // A text shown in full where it is shortened or hidden (a legend's label, a timeline's
-    // row name or state): drawn over it, in its own font, in a box of the card's background
-    // as opaque as the Y labels' (80 %), from the same edge — r: { text, left, right, top,
+    // row name or state): drawn over it, in its own font, in a box of the graph's background
+    // as opaque as the Y labels' (background, BOX_OPACITY), from the same edge — r: { text, left, right, top,
     // bottom (client), align: 'left' | 'right', font }. sticky: kept while the pointer
     // hovers it (closeReveal), else faded out after its readingTime. One element per
     // document or shadow root (the anchor's), reused.
@@ -668,13 +690,14 @@
         _el = document.createElement('div');
         _el.id = 'hec-reveal';
         _el.style.cssText = 'z-index:9999;pointer-events:none;white-space:nowrap;border-radius:6px;padding:0 4px;box-sizing:border-box;' +
-          'background:color-mix(in srgb, var(--card-background-color,#fff) 80%, transparent);color:var(--primary-text-color,#333);' +
+          'color:var(--primary-text-color,#333);' +
           'box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:opacity ' + hecUi.FADE / 1000 + 's ease;opacity:0;';
         _root._hecRevealEl = _el;
       }
       hecUi.attachFloating(_el, anchorEl);
       _el.textContent = r.text;
       _el.style.font = r.font;
+      _el.style.background = hecUi.background(anchorEl, hecUi.BOX_OPACITY);
       // (a little room above and below its text)
       var _fm = /(\d+(?:\.\d+)?)px/.exec(r.font);
       var _h = Math.max(r.bottom - r.top, ( _fm ? parseFloat(_fm[1]) : 12 ) + 6);
@@ -2010,7 +2033,7 @@
 
     // The labels drawn inside the plot of the axis on side ('left', 'right', or null: none)
     // the pointer is near (_hecInsideLabelSideAt): their boxes drawn opaque
-    // (ticks.hecBackdrop.hoverColor), as the pointer points them out
+    // (ticks.hecBackdrop), as the pointer points them out
     _hecSetLabelsHovered: function (side) {
       if ((this._hecLabelsHovered || null) === (side || null)) return;
       this._hecLabelsHovered = side || null;
@@ -2275,8 +2298,8 @@
       return this.options.moveHandleVisible !== false || this._hecHasYAxisLock() || !!this._hecHandleButtons();
     },
 
-    // options.hecControlsBackdrop ({ color }): the controls at the graph's top left — the
-    // lock+handle zone, the chain icon — each drawn in a rounded box of that color, over the
+    // options.hecControlsBackdrop (true): the controls at the graph's top left — the
+    // lock+handle zone, the chain icon — each drawn in a rounded box like the Y labels', over the
     // legend's labels, which keep no room for them (a narrow card: they take no height). On
     // the box, a gesture is the control's; beside it, on a label, the label's (_hecTopTargetAt)
     _hecUpdateControlsBackdrop: function () {
@@ -2293,7 +2316,7 @@
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = '';
-      _el.style.background = _bd.color;
+      _el.style.background = hecUi.background(me.canvas, hecUi.BOX_OPACITY);
       _el.style.left = (me.canvas.offsetLeft + 1) + 'px';
       _el.style.top = (me.canvas.offsetTop + 2) + 'px';
       _el.style.width = (me._hecLockAndHandleWidth() - 2) + 'px';
@@ -2700,7 +2723,7 @@
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
       // (in a box like the other controls' — options.hecControlsBackdrop — else half see-through)
-      _el.style.background = me.options.hecControlsBackdrop ? me.options.hecControlsBackdrop.color :
+      _el.style.background = me.options.hecControlsBackdrop ? hecUi.background(me.canvas, hecUi.BOX_OPACITY) :
         'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
       _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
       _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';

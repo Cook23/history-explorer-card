@@ -452,22 +452,21 @@ export class CardGraphs
     }
 
     // The Y labels' ticks options, inside the plot — just above their grid line, so that the
-    // lowest one keeps clear of the time labels, each in a box of the card's background
-    // (hecTickBackdrops in deps/chart-hec.js) — or beside it
+    // lowest one keeps clear of the time labels, each in a box (Chart.js ticks.hecBackdrop:
+    // its color and opacity are Chart.js's) — or beside it
     _yLabelTicks(inside)
     {
-        // (the boxes opaque while the pointer is near the labels: hoverColor)
         return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this._textSizes().yLabels(inside),
-                 hecBackdrop: inside ? { color: this._tickBackdropColor(), hoverColor: this._tickBackdropColor(1) } : null };
+                 hecBackdrop: inside };
     }
 
     // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
     // narrow card: each in a box like the Y labels', over the legend or the rows, taking no
-    // room (Chart.js hecControlsBackdrop) — else null: beside the legend's first line, as
+    // room (Chart.js hecControlsBackdrop) — else false: beside the legend's first line, as
     // much room as they need (the Y axes' labels and units keep theirs)
     _controlsBackdrop()
     {
-        return this._narrowCard() ? { color: this._tickBackdropColor() } : null;
+        return this._narrowCard();
     }
 
     // The room above a timeline's or an arrowline's rows for its handle (px): none on a
@@ -477,16 +476,6 @@ export class CardGraphs
         return ( graphtype === 'timeline' || graphtype === 'arrowline' ) && !this._narrowCard() ? 24 : 0;
     }
 
-    // The boxes of the Y labels inside a plot: the card's background, as opaque as the
-    // tooltip (80 %; alpha: another opacity) — the theme's own color, else white or, on a
-    // dark theme, dark grey
-    _tickBackdropColor(alpha = 0.8)
-    {
-        const _bg = this._this?.querySelector('#maincard') ? getComputedStyle(this._this.querySelector('#maincard')).backgroundColor : '';
-        const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(_bg);
-        const [r, g, b] = m && ( m[4] === undefined || +m[4] > 0 ) ? [m[1], m[2], m[3]] : this.ui.darkMode ? [28, 28, 28] : [255, 255, 255];
-        return `rgba(${r},${g},${b},${alpha})`;
-    }
 
     // Each graph's Y labels placed, its text sized and its controls laid out as the card's
     // width now says (_yLabelsInside, _textSizes, _controlsBackdrop) — when the card

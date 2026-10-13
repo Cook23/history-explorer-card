@@ -187,7 +187,7 @@ module.exports = async function()
     await t.step('the pointer near the Y labels inside the plot: their boxes opaque; away: as before', async () => {
         const col = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='left'); return {x:r.left+k.left+4, y:r.top+(A.top+A.bottom)/2}; })()`);
         await t.page.mouse.move(col.x, col.y, { steps: 3 }); await t.wait(300);
-        const near = await t.E(`[graphAt(0).chart._hecLabelsHovered, graphAt(0).chart.options.scales.yAxes[0].ticks.hecBackdrop.hoverColor]`);
+        const near = await t.E(`[graphAt(0).chart._hecLabelsHovered, graphAt(0).chart.constructor.hecUi.background(graphAt(0).chart.canvas, 1)]`);
         await t.page.mouse.move(5, 5, { steps: 3 }); await t.wait(300);
         const away = await t.E('graphAt(0).chart._hecLabelsHovered');
         return near[0] === 'left' && /,1\)$/.test(near[1]) && !away ? true : JSON.stringify({ near, away });
