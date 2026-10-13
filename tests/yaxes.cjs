@@ -174,5 +174,136 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The labels drawn inside the plot (a narrow card): near them, the gesture decides — a
+    // drag (a finger's or a pen's after a tap) is the axis', a click, a long press, a hover the curves' ──
+    const narrow = async () => { await t.E(`(()=>{ document.body.style.width='260px'; document.getElementById('host').style.width='260px'; })()`); await t.wait(1500); };
+    // A point of the column along the labels of side ('left', 'right'), at frac of the plot's height
+    const colPt = (side, frac) => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='${side}');
+        return k ? { x: r.left+(${side === 'left'} ? k.left+4 : k.right-4), y: r.top+A.top+(A.bottom-A.top)*${frac} } : null; })()`);
+    // A value of the curve of side's axis (power on the left, rain on the right) within its column — not hidden by a label's
+    // box, the farthest from the other curve (the two drawn alike, the right axis moved to set them apart)
+    const valueInCol = (side = 'left') => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='${side}');
+        const i=${side === 'left' ? 0 : 1}, b=c.scales['y-axis-'+i]._hecLabelBoxes||[], free=v=>!b.some(q=>v.x>q.x-3&&v.x<q.x+q.w+3&&v.y>q.y-4&&v.y<q.y+q.h+4);
+        const o=c.getDatasetMeta(1-i).data.map(p=>p._view), far=v=>Math.min(...o.map(w=>Math.hypot(w.x-v.x, w.y-v.y)));
+        const v=c.getDatasetMeta(i).data.map(p=>p._view).filter(v=>!v.skip&&v.x>k.left+2&&v.x<k.right-2&&v.y>A.top+10&&v.y<A.bottom-10&&free(v)&&far(v)>6)
+            .sort((a,b)=>far(b)-far(a))[0];
+        return v ? { x: r.left+v.x, y: r.top+v.y } : null; })()`);
+    const tipOf = () => t.E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
+    const pointsOf = (i = 0) => t.E(`graphAt(0).chart.data.datasets[${i}].pointRadius`);
+    const lock = () => t.E('!!graphAt(0).chart._hecYAxisLock');
+    const release = async () => { if( await lock() ) { await t.E('graphAt(0).chart._hecToggleYAxisLock()'); await t.wait(300); } };
+    const time = () => t.E('JSON.stringify(timeRange())');
+    // Where curve 0 (power, left axis) and curve 1 (rain, right axis) are drawn: a value's height of each
+    const drawn = () => t.E(`[0,1].map(i=>{ const d=graphAt(0).chart.getDatasetMeta(i).data.filter(p=>!p._model.skip); return Math.round(d[Math.floor(d.length/2)]._model.y); })`);
+
+    t = await openCard(twoAxes, { height: 800, mock: { series: true } });
+    await narrow();
+    await t.step('labels inside: a column along each axis\' labels, as wide as their boxes and the pointer\'s precision', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, m=c._hecInsideLabelColumns('mouse'), f=c._hecInsideLabelColumns('touch'), b=c.scales['y-axis-0']._hecLabelBoxes||[];
+            return { mirror: c.options.scales.yAxes[0].ticks.mirror, sides: m.map(k=>k.side).join(), mw: Math.round(m[0].right-m[0].left), fw: Math.round(f[0].right-f[0].left),
+                     box: Math.round(Math.max(...b.map(q=>q.x+q.w-A.left))), left: Math.round(m[0].left-A.left) }; })()`);
+        return r.mirror && r.sides === 'left,right' && r.left === 0 && r.mw >= r.box && r.fw > r.mw ? true : JSON.stringify(r);
+    });
+    r0 = await ranges();
+    await t.step('mouse: a drag near the left labels moves the left axis and its curve, not the time', async () => {
+        const a = await colPt('left', 0.5), t0 = await time(), y0 = await drawn();
+        await t.drag(a, { x: a.x, y: a.y + 50 }); await t.wait(300);
+        const r = await ranges(), t1 = await time(), y = await drawn(); await release();
+        return !same(r[0], r0[0]) && same(r[1], r0[1]) && t1 === t0 && y[0] - y0[0] > 20 && y[1] === y0[1] ? true : JSON.stringify({ r0, r, t0, t1, y0, y });
+    });
+    await t.step('mouse: a drag near the right labels moves the right axis and its curve', async () => {
+        const r1 = await ranges(), a = await colPt('right', 0.5), y0 = await drawn();
+        await t.drag(a, { x: a.x, y: a.y + 50 }); await t.wait(300);
+        const r = await ranges(), y = await drawn();
+        return same(r[0], r1[0]) && !same(r[1], r1[1]) && y[0] === y0[0] && y[1] - y0[1] > 20 ? true : JSON.stringify({ r1, r, y0, y });
+    });
+    await t.step('mouse: a hover on a value near the labels shows its dot', async () => {
+        const v = await valueInCol(); if( !v ) return 'no value near the labels';
+        await t.page.mouse.move(v.x + 30, v.y - 20, { steps: 3 }); await t.page.mouse.move(v.x, v.y, { steps: 5 }); await t.wait(300);
+        const d = await t.E('(()=>{ const d=graphAt(0).chart._hecHoverDot; return d ? d._datasetIndex : null; })()');
+        return d === 0 ? true : JSON.stringify({ d });
+    });
+    await t.step('mouse: a click on a value near the labels shows its tooltip, the axis untouched', async () => {
+        const v = await valueInCol(), r1 = await ranges();
+        await t.page.mouse.click(v.x, v.y); await t.wait(400);
+        const tip = await tipOf(), r = await ranges();
+        await t.page.keyboard.press('Escape'); await t.page.mouse.move(5, 5); await t.wait(300);
+        return tip && same(r[0], r1[0]) && same(r[1], r1[1]) ? true : JSON.stringify({ tip, r1, r });
+    });
+    for( const [side, i] of [['left', 0], ['right', 1]] ) {
+        await t.step(`mouse: a long press on a value near the ${side} labels shows its curve\'s points, the axis untouched`, async () => {
+            const v = await valueInCol(side); if( !v ) return 'no value near the labels';
+            const p0 = await pointsOf(i), r1 = await ranges();
+            await t.longPress(v);
+            const p1 = await pointsOf(i), r = await ranges();
+            await t.longPress(v);
+            return p1 !== p0 && same(r[0], r1[0]) && same(r[1], r1[1]) ? true : JSON.stringify({ p0, p1, r1, r });
+        });
+    }
+    await t.step('mouse: a click on a value near the right labels shows its tooltip', async () => {
+        const v = await valueInCol('right'); if( !v ) return 'no value near the labels';
+        await t.page.mouse.click(v.x, v.y); await t.wait(400);
+        const tip = await tipOf();
+        await t.page.keyboard.press('Escape'); await t.page.mouse.move(5, 5); await t.wait(300);
+        return tip ? true : JSON.stringify({ tip });
+    });
+    await release();
+    done(await t.close());
+
+    t = await openCard(twoAxes, { touch: true, height: 800, scrollRoom: 1500, mock: { series: true } });
+    await narrow();
+    r0 = await ranges();
+    await t.step('touch: a swipe near the labels is not the axis\'', async () => {
+        const a = await colPt('left', 0.3);
+        await t.swipe(a, { x: a.x, y: a.y + 60 }); await t.scrollTop();
+        const r = await ranges();
+        return same(r[0], r0[0]) && !(await lock()) ? true : JSON.stringify({ r0, r });
+    });
+    await t.step('touch: a tap near the left labels, then press again and drag: the left axis and its curve move, the page doesn\'t scroll', async () => {
+        const a = await colPt('left', 0.5), y0 = await drawn();
+        await t.tapDrag(a, { x: a.x, y: a.y + 60 });
+        const r = await ranges(), y = await t.scrollY(), d = await drawn(); await release();
+        return !same(r[0], r0[0]) && same(r[1], r0[1]) && y === 0 && d[0] - y0[0] > 20 && d[1] === y0[1] ? true : JSON.stringify({ r0, r, y, y0, d });
+    });
+    await t.step('touch: the same near the right labels moves the right axis and its curve', async () => {
+        const r1 = await ranges(), a = await colPt('right', 0.5), y0 = await drawn();
+        await t.tapDrag(a, { x: a.x, y: a.y + 60 });
+        const r = await ranges(), d = await drawn();
+        return same(r[0], r1[0]) && !same(r[1], r1[1]) && d[0] === y0[0] && d[1] - y0[1] > 20 ? true : JSON.stringify({ r1, r, y0, d });
+    });
+    await t.step('touch: a long press on a value near the labels shows the curve\'s points, the axis untouched', async () => {
+        const v = await valueInCol(), p0 = await pointsOf(), r1 = await ranges();
+        await t.touchLongPress(v);
+        const p1 = await pointsOf(), r = await ranges();
+        await t.touchLongPress(v);
+        return p1 !== p0 && same(r[0], r1[0]) && same(r[1], r1[1]) ? true : JSON.stringify({ p0, p1, r1, r });
+    });
+    await t.step('touch: a tap on a value near the labels shows its tooltip', async () => {
+        const v = await valueInCol(), r1 = await ranges();
+        await t.tap(v); await t.wait(700);
+        const tip = await tipOf(), r = await ranges(); await release();
+        return tip && same(r[0], r1[0]) && same(r[1], r1[1]) ? true : JSON.stringify({ tip, r1, r });
+    });
+    done(await t.close());
+
+    t = await openCard(twoAxes, { height: 800, mock: { series: true } });
+    await narrow();
+    r0 = await ranges();
+    await t.step('pen: a drag near the labels is not the axis\'; a tap, then press again and drag: it is', async () => {
+        const a = await colPt('left', 0.5);
+        await t.penDrag(a, { x: a.x, y: a.y + 50 }); await t.wait(300);
+        const r1 = await ranges();
+        await t.penTap(a); await t.wait(120); await t.penDrag(a, { x: a.x, y: a.y + 50 }); await t.wait(300);
+        const r2 = await ranges(); await release();
+        return same(r1[0], r0[0]) && !same(r2[0], r0[0]) && same(r2[1], r0[1]) ? true : JSON.stringify({ r0, r1, r2 });
+    });
+    await t.step('pen: the same near the right labels moves the right axis', async () => {
+        const r1 = await ranges(), a = await colPt('right', 0.5);
+        await t.penTap(a); await t.wait(120); await t.penDrag(a, { x: a.x, y: a.y + 50 }); await t.wait(300);
+        const r = await ranges(); await release();
+        return same(r[0], r1[0]) && !same(r[1], r1[1]) ? true : JSON.stringify({ r1, r });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

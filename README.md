@@ -32,7 +32,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
 > - **colors that change**: `color` takes thresholds on curves too, or an entity or one of its attributes — holding the color, or whose value (a mode, a temperature, a thermostat's `hvac_action`) picks it, point by point;
 > - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
-> - **values over a graph**, as mini-graph-card shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
+> - **values over a graph**, as [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
 >
 > If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
@@ -302,7 +302,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both.
+The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both. **(1.2)** Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -566,7 +566,18 @@ graphs:
         showStats: false
 ```
 
-`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, which takes the whole width); `fill: fade` (each curve's color fading out downwards); `height: 150`.
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
+  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
+</picture>
+
+*Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
+
+**(1.2) A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen.
+
+> Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
 > How each mini-graph-card option translates → [README_Full.md — Replacing mini-graph-card](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#replacing-mini-graph-card)
 

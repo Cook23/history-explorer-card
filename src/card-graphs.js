@@ -19,8 +19,12 @@ const moment = window.HXLocal_moment;
 export const LEFT_Y_AXIS = 'y-axis-0';
 export const RIGHT_Y_AXIS = 'y-axis-1';
 // A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
-// _yLabelsInside)
+// _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
 export const NARROW_CARD_PX = 300;
+// The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
+// a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
+// labels' calc(.15em + 8.5px) of its 14 px — see _textSizes
+const FONT_PX = 12, TIMELINE_FONT_PX = 13, NARROW_FONT_PX = 11, INSIDE_Y_LABEL_FONT_PX = 10.5;
 
 export class CardGraphs
 {
@@ -149,6 +153,7 @@ export class CardGraphs
                         },
                         ticks: {
                             fontColor: ( config?.showTimeLabels === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphLabelColor,
+                            fontSize: this._textSizes().text,
                             major: {
                                 enabled: true,
                                 unit: 'day',
@@ -210,6 +215,7 @@ export class CardGraphs
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
                         boxWidth: 0,
+                        fontSize: this._textSizes().text,
                         // (a label wider than the legend: shortened, its value kept)
                         hecShortNames: chart => this._legendShortNames(chart)
                     },
@@ -229,7 +235,7 @@ export class CardGraphs
                         return this.getStateColor(datasets[index].domain, datasets[index].device_class, datasets[index].entity_id, data[2]);
                     },
                     showText: true,
-                    font: 'normal 13px "Helvetica Neue", Helvetica, Arial, sans-serif',
+                    font: this._textSizes().timeline,
                     textPadding: 4,
                     arrowColor: getComputedStyle(document.body).getPropertyValue('--primary-text-color')
                 },
@@ -376,7 +382,7 @@ export class CardGraphs
         const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
         const _right = id === RIGHT_Y_AXIS;
         // (the labels drawn inside the plot, which then takes the whole width: yLabels: inside,
-        // or a narrow card — see _yLabelsInside; hecYLabels, hecUnit: what _placeYLabels reads)
+        // or a narrow card — see _yLabelsInside; hecYLabels, hecUnit: what _fitToCardWidth reads)
         const _inside = this._yLabelsInside(config?.yLabels, graphtype);
         return {
             id,
@@ -422,7 +428,24 @@ export class CardGraphs
     {
         if( yLabels === 'inside' ) return true;
         if( yLabels === 'outside' || !( graphtype == 'line' || graphtype == 'bar' ) ) return false;
+        return this._narrowCard();
+    }
+
+    // Whether the card is narrower than NARROW_CARD_PX
+    _narrowCard()
+    {
         return ( this._this?.querySelector('#maincard')?.clientWidth || Infinity ) < NARROW_CARD_PX;
+    }
+
+    // The size of the graphs' text, as the card's width says: text (the legend, the time
+    // labels, a timeline's names), timeline (its states, a canvas font), yLabels(inside)
+    _textSizes()
+    {
+        const _narrow = this._narrowCard();
+        const _text = _narrow ? NARROW_FONT_PX : FONT_PX;
+        return { text: _text,
+                 timeline: `normal ${_narrow ? NARROW_FONT_PX : TIMELINE_FONT_PX}px "Helvetica Neue", Helvetica, Arial, sans-serif`,
+                 yLabels: inside => inside ? INSIDE_Y_LABEL_FONT_PX : _text };
     }
 
     // The Y labels' ticks options, inside the plot — just above their grid line, so that the
@@ -430,7 +453,7 @@ export class CardGraphs
     // (hecTickBackdrops in deps/chart-hec.js) — or beside it
     _yLabelTicks(inside)
     {
-        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0,
+        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this._textSizes().yLabels(inside),
                  hecBackdrop: inside ? { color: this._tickBackdropColor() } : null };
     }
 
@@ -444,23 +467,32 @@ export class CardGraphs
         return `rgba(${r},${g},${b},0.8)`;
     }
 
-    // The Y labels of each graph placed as the card's width now says (_yLabelsInside) —
-    // when the card crosses NARROW_CARD_PX
-    _placeYLabels()
+    // Each graph's Y labels placed and its text sized as the card's width now says
+    // (_yLabelsInside, _textSizes) — when the card crosses NARROW_CARD_PX
+    _fitToCardWidth()
     {
+        const _sizes = this._textSizes();
         for( const g of this.graphs ) {
+            const o = g.chart.options;
             let _changed = false;
-            for( const ax of g.chart.options.scales?.yAxes ?? [] ) {
+            // (values set on each object where they differ; Chart.js draws a scale from its
+            // copies of its ticks' options — ticks.minor, ticks.major — made once: they change too)
+            const _set = (objs, values) => {
+                for( const t of objs ) if( t && typeof t === 'object' ) for( const [k, v] of Object.entries(values) )
+                    if( JSON.stringify(t[k]) !== JSON.stringify(v) ) { t[k] = v; _changed = true; }
+            };
+            const _ticksOf = ax => [ax.ticks, ax.ticks?.minor, ax.ticks?.major];
+            for( const ax of o.scales?.yAxes ?? [] ) {
                 const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
-                if( !!ax.ticks.mirror === _inside ) continue;
-                // (Chart.js draws from its copies of them — ticks.minor, ticks.major — made once:
-                // they change too)
-                const _ticks = this._yLabelTicks(_inside);
-                for( const t of [ax.ticks, ax.ticks.minor, ax.ticks.major] ) if( t && typeof t === 'object' ) Object.assign(t, _ticks);
-                ax.scaleLabel.display = !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '';
-                _changed = true;
+                _set(_ticksOf(ax), this._yLabelTicks(_inside));
+                _set([ax.scaleLabel], { display: !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '' });
             }
+            for( const ax of o.scales?.xAxes ?? [] ) _set(_ticksOf(ax), { fontSize: _sizes.text });
+            _set([o.legend?.labels], { fontSize: _sizes.text });
+            _set([o.elements], { font: _sizes.timeline });
             if( _changed ) g.chart.update(0);
+            // (the values over it laid out for that width too — see _showValues)
+            if( _changed && g.valueSamples ) this._showValues(g);
         }
     }
 

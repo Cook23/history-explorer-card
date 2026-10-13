@@ -202,8 +202,8 @@ export class CardToolbar
             const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
-            // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot)
-            this._placeYLabels();
+            // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
+            this._fitToCardWidth();
             const _tbEl = this._this.querySelector('#tb_0');
             if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }

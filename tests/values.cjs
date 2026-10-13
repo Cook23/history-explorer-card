@@ -109,5 +109,20 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A narrow card: the values as mini-graph-card keeps them ──
+    t = await openCard(card({ look: 'mini', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    // Each value now: its font size (px), its row (its top, rounded); the statistics' font size
+    const layout = () => t.E(`[...el.querySelectorAll('.hec-state')].map(e=>Math.round(parseFloat(getComputedStyle(e).fontSize))+'@'+Math.round(e.getBoundingClientRect().top))
+        .concat(Math.round(parseFloat(getComputedStyle(el.querySelector('.hec-stats')).fontSize)))`);
+    const widthOf = async w => { await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500); return layout(); };
+    await t.step('a narrow card: the first value large, the next one small on its right, the statistics a little smaller; wide again: as before', async () => {
+        const wide = await layout(), narrow = await widthOf(200), back = await widthOf(1000);
+        const size = x => +x.split('@')[0];
+        return size(wide[0]) === size(wide[1]) && size(narrow[1]) < size(narrow[0]) * 0.7 && narrow[2] < wide[2] && JSON.stringify(back) === JSON.stringify(wide)
+            ? true : JSON.stringify({ wide, narrow, back });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

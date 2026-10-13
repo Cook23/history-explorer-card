@@ -241,12 +241,14 @@ module.exports = async function()
             const rows=new Set(els.filter(b=>b.id!=='b7_0'&&b.id!=='bo_0').map(b=>Math.round(b.getBoundingClientRect().top/10))).size;
             const c=graphAt(0).chart, A=c.chartArea, s0=c.scales['y-axis-0'];
             return { out, rows, inside: c.options.scales.yAxes[0].ticks.mirror, outsideKept: !graphAt(1).chart.options.scales.yAxes[0].ticks.mirror,
-                     plotLeft: Math.round(A.left), boxes: (s0._hecDeferredLabels||[]).length, boxColor: c.options.scales.yAxes[0].ticks.hecBackdrop?.color ?? null }; })()`);
+                     plotLeft: Math.round(A.left), boxes: (s0._hecDeferredLabels||[]).length, boxColor: c.options.scales.yAxes[0].ticks.hecBackdrop?.color ?? null,
+                     fonts: [c.options.scales.yAxes[0].ticks.minor.fontSize, graphAt(1).chart.options.scales.yAxes[0].ticks.minor.fontSize, c.options.scales.xAxes[0].ticks.minor.fontSize, c.options.legend.labels.fontSize].join() }; })()`);
     };
-    await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside, each in a box of the card\'s background, 80 % opaque (yLabels: outside kept); wide again: as before', async () => {
+    await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside, each in a box of the card\'s background, 80 % opaque, at mini-graph-card\'s size (yLabels: outside kept), the text a little smaller; wide again: as before', async () => {
         const wide = await narrowAt(1000), narrow = await narrowAt(168), back = await narrowAt(1000);
         return !wide.inside && wide.rows === 1 && !wide.boxes && !narrow.out.length && narrow.rows === 2 && narrow.inside && narrow.outsideKept && narrow.plotLeft < 30
-            && narrow.boxes > 1 && /^rgba\(.*,0\.8\)$/.test(narrow.boxColor) && !back.inside && back.rows === 1 && !back.boxes ? true : JSON.stringify({ wide, narrow, back });
+            && narrow.boxes > 1 && /^rgba\(.*,0\.8\)$/.test(narrow.boxColor) && !back.inside && back.rows === 1 && !back.boxes
+            && wide.fonts === '12,12,12,12' && narrow.fonts === '10.5,11,11,11' && back.fonts === wide.fonts ? true : JSON.stringify({ wide, narrow, back });
     });
     done(await t.close());
 

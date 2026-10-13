@@ -663,6 +663,8 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle, so the curves keep their positions relative to each other; the padlock locks and releases both.
 
+**(1.2) Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
+
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
@@ -952,10 +954,10 @@ A curve hidden from its legend shows neither. Both are set at every level — ca
 
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
-- **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, the plot then taking the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch). A card narrower than 300 px draws them so by itself; `yLabels: outside` keeps them beside the plot whatever the width;
+- **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what mini-graph-card shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -971,6 +973,25 @@ graphs:
         name: Total
         showStats: false        # its value now only
 ```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
+  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
+</picture>
+
+*Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
+
+**(1.2) A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen. In detail:
+- the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
+- the Y labels inside the plot, each in a box of the card's background 80 % opaque, at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
+- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
+- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the device's name removed (abbreviated, `M-F V…`, where two curves would then read the same), the articles removed, then '…' before the value;
+- the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
+- a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
+
+The card follows its width as it changes (a screen turned, a window resized).
+
+> Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
 ### Replacing mini-graph-card
 

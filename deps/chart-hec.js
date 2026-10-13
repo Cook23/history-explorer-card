@@ -311,8 +311,9 @@
         var labels = scale._hecDeferredLabels;
         if (!labels || !labels.length) return;
         var _bd = scale.options.ticks.hecBackdrop;
-        // (the boxes drawn: a label whose box would touch one of them is skipped)
-        var _drawn = [];
+        // (the boxes drawn: a label whose box would touch one of them is skipped; kept on
+        // the scale — the column of its labels, see _hecInsideLabelColumns)
+        var _drawn = scale._hecLabelBoxes = [];
         ctx.save();
         labels.forEach(function (l) {
           var _text = helpers.isArray(l.label) ? l.label.join(' ') : String(l.label);
@@ -761,13 +762,21 @@
         if (!_axes.length) return false;
         // On an axis' label column, that axis; anywhere with Shift, every axis
         var _side = me._hecYAxisSideAt(p.x0, p.y0);
+        // (its labels drawn inside the plot: near them — a finger's or a pen's drag only
+        // after a tap, a second press right away (dblclickdown engages the lock); a long
+        // press there is the curves')
+        var _inside = !_side && me._hecInsideLabelSideAt(p.x0, p.y0, p.pointerType);
+        if (_inside) {
+          if (p.pointerType !== 'mouse' && !me._hecYAxisLock) return false;
+          _side = _inside;
+        }
         var _shiftKey = p.native ? p.native.shiftKey : false;
         if (!_shiftKey && !_side) return false;
         // On touch, entering the Y-axis zone alone isn't enough — the
         // long-press must have already fired (unless the lock is already
         // engaged), so a normal page scroll starting in that zone isn't
         // mistaken for an axis drag. Mouse/pen activate immediately.
-        if (_side && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
+        if (_side && !_inside && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
         p.dragYRanges = me._hecYRanges();
         p.dragYAxes = _axes.map(function (a) { return _shiftKey || a.side === _side; });
         p.dragShiftKey = _shiftKey;
@@ -1044,7 +1053,10 @@
       // Third and fourth triggers for engaging the Y-axis lock, alongside
       // drag — same zone check, kept here as a consumer of the
       // already-detected event, not mixed into its detection.
-      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
+      // (near labels drawn inside the plot: a finger's or a pen's tap then press only — a
+      // long press there is the curves', and a mouse drags the axis right away)
+      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length &&
+        (me._hecYAxisSideAt(_hx, _hy) || (gestureType === 'dblclickdown' && c.pointerType !== 'mouse' && me._hecInsideLabelSideAt(_hx, _hy, c.pointerType)));
       if (_dblYAxisZone && !me._hecYAxisLock) {
         me._hecYAxisLock = 2;
         me._hecUpdateYAxisState();
@@ -1083,7 +1095,8 @@
       // a click in this zone arms a 500ms window to anticipate a possible
       // NEXT contact there (this click itself is already over by the time it
       // fires, per Thierry), separate from the lock-driven trigger below.
-      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
+      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length &&
+        (me._hecYAxisSideAt(_hx, _hy) || me._hecInsideLabelSideAt(_hx, _hy, c.pointerType));
       if (_clickInYAxisZone) {
         me._hecYAxisClickArmed = true;
         me._hecUpdateYAxisState();
@@ -1782,6 +1795,31 @@
       return null;
     },
 
+    // The column of an axis' labels drawn inside the plot (ticks.mirror): along the plot's
+    // edge, as wide as the labels' boxes, and the pointer's precision more (pointerType:
+    // 'mouse', 'pen', 'touch') — { side, left, right } for each such axis
+    _hecInsideLabelColumns: function (pointerType) {
+      var me = this, _a = me.chartArea, _slop = Chart.hecGestures(pointerType || 'touch').slop;
+      if (!_a) return [];
+      return me._hecValueYAxes().filter(function (a) { return a.scale.options.ticks.mirror; }).map(function (a) {
+        var _boxes = a.scale._hecLabelBoxes || [];
+        var _w = _boxes.length ? Math.max.apply(null, _boxes.map(function (b) { return a.side === 'left' ? b.x + b.w - _a.left : _a.right - b.x; })) : 24;
+        return a.side === 'left' ? { side: 'left', left: _a.left, right: Math.min(_a.right, _a.left + _w + _slop) }
+                                 : { side: 'right', left: Math.max(_a.left, _a.right - _w - _slop), right: _a.right };
+      });
+    },
+
+    // The axis whose labels drawn inside the plot a canvas-relative point is near (see
+    // _hecInsideLabelColumns): 'left', 'right' or null. A point there is on the plot as
+    // well — what it's for depends on the gesture: a drag (a mouse's, a finger's or a pen's
+    // after a tap) is the axis', a click, a long press or a hover the curves'
+    _hecInsideLabelSideAt: function (x, y, pointerType) {
+      var _a = this.chartArea;
+      if (!_a || y < _a.top || y > _a.bottom) return null;
+      var _c = this._hecInsideLabelColumns(pointerType).filter(function (c) { return x >= c.left && x <= c.right; })[0];
+      return _c ? _c.side : null;
+    },
+
     // Shows or hides every sample of the curves (see the hecShowSamples plugin): on while
     // the pointer moves over the chart with Alt (Option) held, off when it moves without,
     // or leaves the chart
@@ -1878,10 +1916,17 @@
       // else. Forwards every event it receives straight to the canvas so
       // Chart.js's own gesture handling still does 100% of the actual work.
       // (one per Y axis: the left one's label column, and the right one's when there is one)
+      // (labels drawn inside the plot: the column along them — see _hecInsideLabelColumns)
       if (me.chartArea) {
         var _hasRight = me._hecValueYAxes().some(function (a) { return a.side === 'right'; });
-        [['_hecYAxisTouchEl', 0, me.chartArea.left, true],
-         ['_hecRightYAxisTouchEl', me.chartArea.right, me.width - me.chartArea.right, _hasRight]].forEach(function (z) {
+        var _inCols = me._hecInsideLabelColumns('touch');
+        var _col = function (side, x, w) {
+          var _c = _inCols.filter(function (c) { return c.side === side; })[0];
+          return _c ? [_c.left, _c.right - _c.left] : [x, w];
+        };
+        var _l = _col('left', 0, me.chartArea.left), _r = _col('right', me.chartArea.right, me.width - me.chartArea.right);
+        [['_hecYAxisTouchEl', _l[0], _l[1], true],
+         ['_hecRightYAxisTouchEl', _r[0], _r[1], _hasRight]].forEach(function (z) {
           if (!z[3]) { if (me[z[0]]) me[z[0]].style.display = 'none'; return; }
           var _yo = me._hecTouchOverlay(z[0], 'ns-resize');
           _yo.style.display = '';
