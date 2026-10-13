@@ -199,7 +199,7 @@ module.exports = async function()
             return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
     await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
-        const wide = await legendAt(1000), mid = await legendAt(374), narrow = await legendAt(168);
+        const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);
         await legendAt(1000);
         return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
             && mid.texts[0] === 'Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)'
@@ -209,7 +209,7 @@ module.exports = async function()
         await t.E(`(()=>{ for( const [k, n] of ['Température', 'Humidité', 'Pression'].entries() ) { const id='sensor.f_'+k;
             STATES[id]={ entity_id:id, state:'1', last_changed:lc, last_updated:lc, attributes:{ friendly_name:'Ecowitt '+n+' (Filtered)', unit_of_measurement:'x' } }; }
             el.hass=mkHass(); })()`);
-        const mid = await legendAt(374);
+        const mid = await legendAt(300);
         await legendAt(1000);
         return mid.texts[0] === 'Ecowitt Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
             || mid.texts[0] === 'Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
@@ -252,7 +252,7 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The controls at a graph's top left (handle, padlock, chain icon): never any room of their own on a narrow card ──
+    // ── The controls at a graph's top left (handle, padlock, chain icon): never any room of their own ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'binary_sensor.a', type: 'timeline' }] },
         { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true } });
     const controlsAt = async w => {
@@ -262,7 +262,8 @@ module.exports = async function()
             return { boxes: [0,1,2].map(i=>shown(bd(i))).join(), boxColor: shown(bd(0)) ? getComputedStyle(bd(0)).backgroundColor : null,
                      chainColor: getComputedStyle(c(1)._hecLinkMarkerEl).backgroundColor, chainLeft: lm && lm.left, zone: c(1)._hecLockAndHandleWidth(),
                      firstLabel: Math.round(c(0).legend.legendHitBoxes[0].left), firstTop: Math.round(c(0).legend.legendHitBoxes[0].top),
-                     timelineTop: Math.round(c(1).chartArea.top), legendH: Math.round(c(0).legend.height) }; })()`);
+                     timelineTop: Math.round(c(1).chartArea.top), legendH: Math.round(c(0).legend.height), legendLeft: c(0).legend.leftMargin,
+                     unit: c(0).options.scales.yAxes[0].scaleLabel.display, yColumn: Math.round(c(0).chartArea.left) }; })()`);
     };
     await t.step('the chain icon takes no room: hidden or shown, nothing moves; right above the handle and the padlock, it is just right of them', async () => {
         const tops = () => t.E(`[0,1,2].map(i=>Math.round(graphAt(i).canvas.getBoundingClientRect().top)+'/'+Math.round(graphAt(i).chart.chartArea.top)).join()`);
@@ -272,13 +273,14 @@ module.exports = async function()
         await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=true; c.update(); })()'); await t.wait(300);
         return shown === hidden && r.chainLeft >= r.zone + 4 ? true : JSON.stringify({ shown, hidden, r });
     });
-    await t.step('a narrow card: the handle, the padlock and the chain icon each in a box like the Y labels\', over the legend or the rows, which keep no room for them; wide again: as before', async () => {
+    await t.step('a narrow card: the handle, the padlock and the chain icon each in a box like the Y labels\', over the legend or the rows, which keep no room for them; wider: beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept; wide again: as before', async () => {
         const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
-        return wide.boxes === 'false,false,false' && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
-            && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < wide.timelineTop - 15 && narrow.legendH <= wide.legendH
-            && wide.firstLabel >= 50 && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
+        return wide.boxes === 'false,false,false' && wide.legendLeft === wide.zone + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
+            && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
+            && narrow.legendLeft === 4 && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
+            && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
     });
-    await t.step('a narrow card: on the box, a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
+    await t.step('a narrow card: on the box (over a label), a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
         await controlsAt(168);
         const locked = () => t.E('!!graphAt(0).chart._hecYAxisLock');
         const graphMenu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'), y=el.querySelector('#et_0_ylock'); return !m||m.style.display==='none' ? 'closed' : y&&y.style.display!=='none' ? 'graph' : 'entity'; })()`);

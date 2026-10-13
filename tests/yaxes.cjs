@@ -180,12 +180,12 @@ module.exports = async function()
     // A point of the column along the labels of side ('left', 'right'), at frac of the plot's height
     const colPt = (side, frac) => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='${side}');
         return k ? { x: r.left+(${side === 'left'} ? k.left+4 : k.right-4), y: r.top+A.top+(A.bottom-A.top)*${frac} } : null; })()`);
-    // A value of the curve of side's axis (power on the left, rain on the right) within its column — not hidden by a label's
-    // box, the farthest from the other curve (the two drawn alike, the right axis moved to set them apart)
+    // A value of the curve of side's axis (power on the left, rain on the right) within its column — under a label's box
+    // or not: the labels aren't targets — the farthest from the other curve (the two drawn alike, the right axis moved to set them apart)
     const valueInCol = (side = 'left') => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='${side}');
-        const i=${side === 'left' ? 0 : 1}, b=c.scales['y-axis-'+i]._hecLabelBoxes||[], free=v=>!b.some(q=>v.x>q.x-3&&v.x<q.x+q.w+3&&v.y>q.y-4&&v.y<q.y+q.h+4);
+        const i=${side === 'left' ? 0 : 1};
         const o=c.getDatasetMeta(1-i).data.map(p=>p._view), far=v=>Math.min(...o.map(w=>Math.hypot(w.x-v.x, w.y-v.y)));
-        const v=c.getDatasetMeta(i).data.map(p=>p._view).filter(v=>!v.skip&&v.x>k.left+2&&v.x<k.right-2&&v.y>A.top+10&&v.y<A.bottom-10&&free(v)&&far(v)>6)
+        const v=c.getDatasetMeta(i).data.map(p=>p._view).filter(v=>!v.skip&&v.x>k.left+2&&v.x<k.right-2&&v.y>A.top+10&&v.y<A.bottom-10&&far(v)>6)
             .sort((a,b)=>far(b)-far(a))[0];
         return v ? { x: r.left+v.x, y: r.top+v.y } : null; })()`);
     const tipOf = () => t.E(`(()=>{ const el=graphAt(0).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);

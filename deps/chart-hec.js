@@ -268,7 +268,7 @@
   // the names that still don't fit cut, '…' before what follows — and before a qualifier
   // in parentheses at their end ('(F)'), kept when there's room for it: it often is what
   // tells two curves apart
-  Chart.hecFitLegendTexts = function (ctx, items, room) {
+  Chart.hecFitLegendTexts = function (ctx, items, room, opts) {
     var fits = function (t) { return ctx.measureText(t).width <= room; };
     var parts = items.map(function (it) {
       var _named = typeof it.name === 'string' && it.name && it.text.indexOf(it.name) === 0;
@@ -280,6 +280,7 @@
     for (var k = 0; k <= _last; k++) {
       if (parts.every(function (p) { return fits(at(p, k)); })) return parts.map(function (p) { return at(p, k); });
     }
+    if (opts && opts.formsOnly) return null;
     // (the longest start of base that fits with '…' then tail, or null)
     var cut = function (base, tail) {
       if (!fits(base.slice(0, 1) + '…' + tail)) return null;
@@ -1901,7 +1902,8 @@
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.left = '15px';
-      _el.style.top = '5px';
+      // (its bottom on the handle's ⠿ bottom)
+      _el.style.top = '7px';
       var _svg = _el.children[0];
       var _showIcon = !(_forced && !me._hecYAxisLock) && !me._hecHandleButtons();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';

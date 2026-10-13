@@ -11967,21 +11967,23 @@
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
                 // (options.legend.leftMargin / rightMargin: room kept free at both ends of
                 // the legend's lines, for what the card draws there)
-                // (fork) the controls drawn in a box over the labels (hecControlsBackdrop): no room
-                // kept for them on the left
-                me.leftMargin = me.chart && me.chart.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin : 50;
+                // (fork) on the left, the room the controls at the graph's top left need (the
+                // lock+handle zone, 4 px apart) — none when they're drawn in boxes over the
+                // labels (hecControlsBackdrop) or there's none
+                var _ch = me.chart;
+                me.leftMargin = _ch && _ch.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
+                  _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
                 me.rightMargin = me.options.rightMargin !== undefined ? me.options.rightMargin : 25;
-                // (fork) the margins of a line: the first one's, for what the card draws at both
-                // ends of the legend's top; below it, with legend.hecMarginsOnFirstLine, 4 px —
-                // the whole width for the labels
-                var _narrow = !!me.options.hecMarginsOnFirstLine;
+                // (fork) the margins of a line: the first one's, for what is drawn at both ends
+                // of the legend's top (the controls, the card's buttons — no taller than it);
+                // below it, 4 px — the whole width for the labels
                 me._hecMarginsOf = function (line) {
-                  return line > 0 && _narrow ? { l: 4, r: 4 } : { l: me.leftMargin, r: me.rightMargin };
+                  return line > 0 ? { l: 4, r: 4 } : { l: me.leftMargin, r: me.rightMargin };
                 };
                 // (the ratchet below keeps the lines' count while the values in the labels
                 // change; a change of names or of the room the lines have starts it over)
                 var _baseKey = (me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '') +
-                  '|' + Math.round(me.width) + '|' + me.leftMargin + '|' + me.rightMargin + '|' + _narrow;
+                  '|' + Math.round(me.width) + '|' + me.leftMargin + '|' + me.rightMargin;
                 if (me._ratchetBaseKey !== _baseKey) {
                     me._ratchetBaseKey = _baseKey;
                     me._ratchetLineCount = 0;
@@ -11998,12 +12000,19 @@
                 // (Chart.hecFitLegendText)
                 if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
                   var _shortNames = labelOpts.hecShortNames(me.chart) || [];
-                  var _widest = _narrow ? me._hecMarginsOf(1) : me._hecMarginsOf(0);
-                  var _lineRoom = me.width - _widest.l - _widest.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
-                  var _fitted = Chart.hecFitLegendTexts(ctx, me.legendItems.map(function (it) {
+                  var _roomOf = function (line) {
+                    var _m = me._hecMarginsOf(line);
+                    return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
+                  };
+                  var _items = me.legendItems.map(function (it) {
                     var _ds = me.chart.data.datasets[it.datasetIndex] || {};
                     return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
-                  }), _lineRoom);
+                  });
+                  // (to a whole line below the first; the first label not fitting the first line,
+                  // between its margins, to that one if a shorter form fits there — rather than a
+                  // first line left empty — never cut for it)
+                  var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
+                  if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
                   me.legendItems.forEach(function (it, k) { it.text = _fitted[k]; });
                 }
                 helpers.each(me.legendItems, function (legendItem, i) {
