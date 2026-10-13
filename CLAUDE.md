@@ -21,6 +21,24 @@ it each time. So:
   its kind;
 - split code only when it reads better split — never for its size.
 
+## mini-graph-card — the product's direction, set by the user, not negotiable
+
+history-explorer-card is one versatile product: its YAML is read in its own syntax or in
+[mini-graph-card](https://github.com/kalkih/mini-graph-card)'s, indifferently, so that a
+mini-graph-card is replaced by changing its `type:` alone.
+
+- **No separate mode, no translation layer.** Every mini-graph-card option is an option of
+  this card, valid with or without `look: mini`: a name meaning the same as one of ours is
+  an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the
+  same levels; its structured forms (`show:`, root `entities`, `color_thresholds`…) are read
+  by the card natively, as its own options.
+- **`look: mini` only switches defaults**: mini-graph-card's look instead of ours — and, for
+  a name that means something else on each side, which meaning applies.
+- **A mini-graph-card function this card lacks is added to it**, mini-graph-card's code
+  (MIT) taken as the example, and becomes a function of this card like any other: in its
+  part, through its contracts, documented, tested, usable in this card's own syntax too.
+- For the UI, this card's gestures and actions stay.
+
 ## An example is a symptom — set by the user, not negotiable
 
 An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
