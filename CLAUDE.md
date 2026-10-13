@@ -21,6 +21,14 @@ it each time. So:
   its kind;
 - split code only when it reads better split — never for its size.
 
+## An example is a symptom — set by the user, not negotiable
+
+An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
+the thing to fix. Never patch for it: no value tuned to it, no special case, no test built
+around it. Search globally for the general cause it shows — which rule, in which part,
+produces it for every case — explain that cause to the user, and propose the general rule
+that fixes it. The example then only checks that the rule holds.
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
