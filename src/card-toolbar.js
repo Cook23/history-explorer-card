@@ -6,7 +6,6 @@ import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { BAR_INTERVALS, RAW_INTERVAL } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
-import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -17,7 +16,7 @@ export class CardToolbar
     // --------------------------------------------------------------------------------------
 
     // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
-    // !! Keep in sync with _hec_render() in history-info-panel.js !!
+    // !! Keep in sync with _hxRender() in history-info-panel.js !!
     // The menus of an entity and of a graph on a card without any entity selector, where
     // they otherwise are: their gestures (a long-press on a label, on the ⠿ zone…) open them
     // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
@@ -166,12 +165,9 @@ export class CardToolbar
 
     insertUIHtmlText(i)
     {
-        let ef = this._this.querySelector(`#ef_${i}`); if( ef ) ef.innerHTML = i18n('ui.menu.export_csv');
-        // Entity type menu labels — updated here so language is already set
+        // The menus' labels — updated here so language is already set
         this.relabelTypeMenu(i);
         this.relabelOptionsMenu(i);
-        let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
-        let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
             by.children[0].innerHTML = i18n('ui.ranges.l_hour');
@@ -399,25 +395,6 @@ export class CardToolbar
         this.statsExporter.exportFile(this);
     }
 
-    // The info panel switched on or off (confirmed in the options menu, see _CONFIRMED)
-    toggleInfoPanel()
-    {
-        setInfoPanelEnabled(!infoPanelEnabled);
-        // Persist in dedicated global HA user key (background)
-        this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
-        this.applyInfoPanelState();
-    }
-
-    // The panel switched on or off (here, or on another device): saved where the panel reads
-    // it at each render (writeInfoPanelConfig) — it applies the next time an entity's dialog
-    // shows its history, without reloading the page — and the menu entry follows
-    applyInfoPanelState()
-    {
-        if( infoPanelEnabled !== !!window.localStorage.getItem('history-explorer-info-panel') )
-            this.writeInfoPanelConfig(true);
-        for( const ei of this._this.querySelectorAll('[id^="ei_"]') )
-            ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
-    }
 
     // --------------------------------------------------------------------------------------
     // Display interval for accumulating bar graphs

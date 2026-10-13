@@ -134,7 +134,7 @@ module.exports = async function()
     const valueOf = i => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;
         ctx.save(); ctx.font=c._hecLegendFont(); const m=it.hecMark?ctx.measureText(' '+it.hecMark).width:0, v=ctx.measureText(it.hecValue).width; ctx.restore();
         return { x: r.left+b.left+b.width-m-v/2, y: r.top+b.top+b.height/2 }; })()`);
-    const hidden = i => t.E(`!!graphAt(0).chart.getDatasetMeta(${i}).hidden`);
+    const hidden = i => t.E(`!!graphAt(0).chart.data.datasets[${i}].hidden`);
     await t.step('a click on a legend label\'s value: its entity\'s dialog, the curve still shown; on its name: the curve hidden', async () => {
         const v = await valueOf(1); await t.page.mouse.click(v.x, v.y); await t.wait(500);
         const onValue = await mi(), h1 = await hidden(1);

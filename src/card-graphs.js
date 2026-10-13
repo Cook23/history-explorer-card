@@ -44,10 +44,10 @@ export class CardGraphs
                  hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '' };
     }
 
-    // The shorter forms of the names of a chart's curves, for a legend too narrow for them
+    // The shorter forms of the names of a graph's curves (its datasets), for a legend too narrow for them
     // (legend-names.js), from what Home Assistant knows: each entity's device, and how
     // many entities carry a qualifier
-    _legendShortNames(chart)
+    _legendShortNames(datasets)
     {
         const _hass = this._hass;
         const _device = id => {
@@ -62,7 +62,7 @@ export class CardGraphs
             if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
             return _n.get(q) >= 3;
         };
-        return shortNames(chart.data.datasets.map(d => ({ name: d.name, device: _device(d.entity_id) })),
+        return shortNames(datasets.map(d => ({ name: d.name, device: _device(d.entity_id) })),
                           { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 
@@ -101,15 +101,13 @@ export class CardGraphs
 
     newGraph(canvas, graphtype, datasets, config)
     {
-        const ctx = canvas.getContext('2d');
-
         // Any dataset drawn as a curve / as bars (a bar graph can hold both)
         const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
         const _yAxis = id => this._chartYAxis(id, graphtype, datasets, config, _hasCurves && !_hasBars);
 
-        var chart = new Chart(ctx, {
+        var chart = new Chart(canvas, {
 
             type: graphtype,
 
@@ -220,7 +218,7 @@ export class CardGraphs
                         boxWidth: 0,
                         fontSize: this._textSizes().text,
                         // (a label wider than the legend: shortened, its value kept)
-                        hecShortNames: chart => this._legendShortNames(chart)
+                        hecShortNames: datasets => this._legendShortNames(datasets)
                     },
                 },
                 elements: {
@@ -239,8 +237,7 @@ export class CardGraphs
                     },
                     showText: true,
                     font: this._textSizes().timeline,
-                    textPadding: 4,
-                    arrowColor: getComputedStyle(document.body).getPropertyValue('--primary-text-color')
+                    textPadding: 4
                 },
                 responsive: true,
                 maintainAspectRatio: false,
@@ -301,7 +298,7 @@ export class CardGraphs
     _toggleCurvePoints(g, entities)
     {
         const _ds = e => g.chart.data.datasets[g.entities.indexOf(e)];
-        const _curves = this._isRowGraph(g) ? [] : entities.filter(e => _ds(e) && g.chart.getDatasetMeta(g.entities.indexOf(e)).dataset);
+        const _curves = entities.filter(e => this._isCurve(g, g.entities.indexOf(e)));
         if( !_curves.length ) return;
         const _show = !_curves.every(e => _ds(e).pointRadius > 0);
         for( const e of _curves ) {
@@ -312,11 +309,18 @@ export class CardGraphs
         this.writeLocalState();
     }
 
+    // Whether entity i of graph g is drawn as a curve (not a bar, not a timeline's row)
+    _isCurve(g, i)
+    {
+        const _ds = g.chart.data.datasets[i];
+        return !!_ds && !this._isRowGraph(g) && ( g.type === 'line' || _ds.type === 'line' );
+    }
+
     // Whether every curve of graph g shows its samples' dots (none: undefined)
     _curvesShowPoints(g)
     {
         if( this._isRowGraph(g) ) return undefined;
-        const _idx = g.entities.map((e, i) => i).filter(i => g.chart.getDatasetMeta(i).dataset);
+        const _idx = g.entities.map((e, i) => i).filter(i => this._isCurve(g, i));
         return _idx.length ? _idx.every(i => g.chart.data.datasets[i].pointRadius > 0) : undefined;
     }
 
@@ -328,7 +332,7 @@ export class CardGraphs
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
             hecNoStack: graphtype == 'bar' && d.kind === 'line',
-            hecCircular: d.circular,
+            circularPeriod: d.circular,
             borderColor: d.bColor,
             backgroundColor: d.fillColor,
             // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
@@ -355,7 +359,7 @@ export class CardGraphs
             entity_id: d.entity_id,
             unit: d.unit,
             shownScale: d.shownScale,
-            hecTextFactor: d.shownScale / d.drawScale,
+            textFactor: d.shownScale / d.drawScale,
             hidden: d.hidden,
             showMinMax: d.showMinMax ? true : false,
             siConversionFactor: d.siConversionFactor,
@@ -385,13 +389,13 @@ export class CardGraphs
         const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
         const _right = id === RIGHT_Y_AXIS;
         // (the labels drawn inside the plot, which then takes the whole width: yLabels: inside,
-        // or a narrow card — see _yLabelsInside; hecYLabels, hecUnit: what _fitToCardWidth reads)
+        // or a narrow card — see _yLabelsInside; yLabelsMode, labelUnit: what _fitToCardWidth reads)
         const _inside = this._yLabelsInside(config?.yLabels, graphtype);
         return {
             id,
             position: _right ? 'right' : 'left',
-            hecYLabels: config?.yLabels,
-            hecUnit: _unit,
+            yLabelsMode: config?.yLabels,
+            labelUnit: _unit,
             afterFit: (scaleInstance) => {
                 scaleInstance.width = scaleInstance.options.ticks.mirror ? 0 : this.pconfig.labelAreaWidth;
             },
@@ -492,9 +496,9 @@ export class CardGraphs
                     if( JSON.stringify(obj[k]) !== JSON.stringify(v) ) { obj[k] = v; _changed = true; }
             };
             for( const ax of o.scales?.yAxes ?? [] ) {
-                const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
+                const _inside = this._yLabelsInside(ax.yLabelsMode, g.chart.config.type);
                 _set(ax.ticks, this._yLabelTicks(_inside));
-                _set(ax.scaleLabel, { display: !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '' });
+                _set(ax.scaleLabel, { display: !_inside && ax.labelUnit !== undefined && ax.labelUnit !== '' });
             }
             for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
             _set(o, { hecControlsBackdrop: this._controlsBackdrop() });
@@ -522,8 +526,8 @@ export class CardGraphs
                         const p = 10 ** this.pconfig.roundingPrecision;
                         const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
                         // (from the value drawn back to the value shown: see shownScale)
-                        const _tf = data.datasets[item.datasetIndex].hecTextFactor ?? 1;
-                        const _circQ = data.datasets[item.datasetIndex].hecCircular;
+                        const _tf = data.datasets[item.datasetIndex].textFactor ?? 1;
+                        const _circQ = data.datasets[item.datasetIndex].circularPeriod;
                         let _v = Math.round(item.yLabel / _siFactor * _tf * p) / p;
                         // (a circular curve shows its real value, in [0, period))
                         if( _circQ ) _v = Math.round(this._wrapCircular(_v, _circQ * Math.abs(_tf)) * p) / p;

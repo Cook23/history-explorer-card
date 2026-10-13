@@ -184,7 +184,7 @@ module.exports = async function()
         // (on its name: its value at its end opens its entity's dialog)
         const p = await E2(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*0.4, y: r.top+b.top+b.height/2 }; })()`);
         await t2.tap(p); await t2.wait(500);
-        const label = await E2('reveal()'), hidden = await E2('!!graphAt(0).chart.getDatasetMeta(0).hidden');
+        const label = await E2('reveal()'), hidden = await E2('!!graphAt(0).chart.data.datasets[0].hidden');
         await t2.tap(p); await t2.wait(4000);
         const row = await E2(`(()=>{ const q=tlPt(1,0), c=graphAt(1).chart, r=c.canvas.getBoundingClientRect(); return { x: r.left+c.chartArea.left-15, y: q.y }; })()`);
         await t2.tap(row); await t2.wait(500);

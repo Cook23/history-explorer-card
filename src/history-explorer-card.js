@@ -7,7 +7,7 @@ import "../deps/md5.js"
 import "../deps/FileSaver.js"
 
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
-import { stateColors, stateColorsDark, defaultColors, parseColor } from "./history-default-colors.js";
+import { stateColors, stateColorsDark, defaultColors, parseColor, buttonsColor } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
 import { EntityStore, entityIdOf } from "./history-entity-store.js";
 import { CardConfig } from "./card-config.js";
@@ -22,21 +22,13 @@ import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
 import { withLook } from "./history-options.js";
-import { GESTURE_SETTINGS, clampGesture } from "./gesture-settings.js";
+import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-settings.js";
+import { localGestures } from "./card-storage.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
 
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
-
-
-// --------------------------------------------------------------------------------------
-// HA entity history info panel enabled flag
-// --------------------------------------------------------------------------------------
-
-export let infoPanelEnabled = !!JSON.parse(window.localStorage.getItem('history-explorer-info-panel'));
-// (for the other modules: an imported binding can be read, not assigned)
-export function setInfoPanelEnabled(v) { infoPanelEnabled = v; }
 
 
 // --------------------------------------------------------------------------------------
@@ -352,6 +344,8 @@ export class HistoryCardState {
 
 
             const _needsIntervalRedraw = await this.readLocalState();
+            // (the info panel's switch as read: the options menu shows it)
+            this._showInfoPanelSwitch();
 
             // (the time window known before the graphs are built: their time axis has it
             // from the first drawing — without it, it spans the data, ticked for the
@@ -679,7 +673,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.entitiesPopulated = false;
 
         const header = config.header || `History explorer v${Version}`;
-        const bgcol = parseColor(config.uiColors?.buttons ?? getComputedStyle(document.body).getPropertyValue('--primary-color') + '1f');
+        const bgcol = buttonsColor(config.uiColors);
 
         const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };
         const tools = bitmask[config.uiLayout?.toolbar] ?? 1;
@@ -738,6 +732,9 @@ class HistoryExplorerCard extends HTMLElement
     }
 
 }
+
+// The gesture settings of this device given to Chart.js, before any chart exists
+applyGestures(localGestures());
 
 console.info(`%c HISTORY-EXPLORER-CARD %c Version ${Version}`, "color:white;background:blue;font-weight:bold", "color:black;background:white;font-weight:bold");
 

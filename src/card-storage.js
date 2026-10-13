@@ -5,8 +5,64 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
-import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
-import { GESTURE_SETTINGS, HA_GESTURES_KEY, gestureValues, setGestureValues } from "./gesture-settings.js";
+import { GESTURE_SETTINGS, clampGesture, gestureSettings, applyGestures } from "./gesture-settings.js";
+
+// --------------------------------------------------------------------------------------
+// What is kept for the whole page — every card and the info panel, read before any card
+// exists: the gesture settings, the info panel's switch and its config. On this device
+// (localStorage) and in Home Assistant's user data (every device).
+// --------------------------------------------------------------------------------------
+
+const GESTURES_KEY = 'history-explorer-gestures';
+// (the info panel's config, { enabled, config }: none when it's off)
+const INFO_PANEL_KEY = 'history-explorer-info-panel';
+// (Home Assistant only: the switch { enabled }, and the registry of the cards' defaultInfoPanel)
+const INFO_PANEL_SWITCH_KEY = 'history-explorer-infopanel-enabled';
+
+const _readLocal = key => { try { return JSON.parse(window.localStorage.getItem(key)); } catch(e) { return null; } };
+
+// The gesture settings in force on this device: { name: value } for each of them
+export function localGestures()
+{
+    return gestureSettings(_readLocal(GESTURES_KEY));
+}
+
+// Some gesture settings set on this device (saved, and given to Chart.js); returns whether
+// any changed
+function keepGestures(values)
+{
+    const _v = localGestures();
+    let _changed = false;
+    for( const k in values ) {
+        const _c = clampGesture(k, values[k]);
+        if( _c !== undefined && _c !== _v[k] ) { _v[k] = _c; _changed = true; }
+    }
+    if( _changed ) window.localStorage.setItem(GESTURES_KEY, JSON.stringify(_v));
+    applyGestures(_v);
+    return _changed;
+}
+
+// The info panel's config on this device ({ enabled, config }), null when it's off
+export function infoPanelData()
+{
+    return _readLocal(INFO_PANEL_KEY);
+}
+
+// Nothing saved on this device: what Home Assistant's user data says, asked once per page;
+// on, kept here, then onKept()
+export function fetchInfoPanelData(hass, onKept)
+{
+    if( window.__hxInfoPanelFetched || !hass?.callWS ) return;
+    window.__hxInfoPanelFetched = true;
+    hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_KEY }).then(r => {
+        if( !r?.value || window.localStorage.getItem(INFO_PANEL_KEY) ) return;
+        window.localStorage.setItem(INFO_PANEL_KEY, JSON.stringify(r.value));
+        onKept?.();
+    }, () => {});
+}
+
+// Is the info panel on (on this device)?
+export let infoPanelEnabled = !!infoPanelData();
 
 // --------------------------------------------------------------------------------------
 // Where each field of an entity that can be saved goes — the one place to change it:
@@ -151,13 +207,13 @@ export class CardStorage
 
         let haInfoEnabled = undefined;
         try {
-            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
+            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_SWITCH_KEY });
             if( _ipe?.value?.enabled !== undefined ) haInfoEnabled = !!_ipe.value.enabled;
         } catch(e) {}
 
         let haGestures = undefined;
         try {
-            const _g = await this._hass.callWS({ type: 'frontend/get_user_data', key: HA_GESTURES_KEY });
+            const _g = await this._hass.callWS({ type: 'frontend/get_user_data', key: GESTURES_KEY });
             if( _g?.value ) haGestures = _g.value;
         } catch(e) {}
 
@@ -360,14 +416,6 @@ export class CardStorage
             else if( _ls?.timeRangeMinutes > 0 )
                 this.setTimeRangeMinutes(_ls.timeRangeMinutes);
         }
-
-        // Sync time.min/time.max on all charts so determineDataLimits is constrained
-        // by the active time window before any updateHistory call (prevents stale data
-        // from previous session from extending the X axis range)
-        for( let g of this.graphs ) {
-            g.chart.options.scales.xAxes[0].time.min = this.startTime;
-            g.chart.options.scales.xAxes[0].time.max = this.endTime;
-        }
     }
 
     // --- Last one to speak wins — the info panel's switch ---
@@ -384,7 +432,7 @@ export class CardStorage
 
         const _active = _yamlInfoChanged ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
         if( _active === infoPanelEnabled ) return false;
-        setInfoPanelEnabled(_active);
+        infoPanelEnabled = _active;
         return true;
     }
 
@@ -403,15 +451,15 @@ export class CardStorage
             if( _yamlChanged ) _set[k] = _yaml;
             else if( _haChanged ) _set[k] = _ha;
         }
-        setGestureValues(_set);
+        keepGestures(_set);
     }
 
     // A gesture threshold set from the options menu: on this device, and in Home
     // Assistant's user data for every other device (and card)
     setGesture(name, value)
     {
-        setGestureValues({ [name]: value });
-        this._hass.callWS({ type: 'frontend/set_user_data', key: HA_GESTURES_KEY, value: gestureValues() }).catch(() => {});
+        keepGestures({ [name]: value });
+        this._hass.callWS({ type: 'frontend/set_user_data', key: GESTURES_KEY, value: localGestures() }).catch(() => {});
     }
 
     // Register defaultInfoPanel with HA user key and detect conflicts across cards.
@@ -422,7 +470,7 @@ export class CardStorage
     async _registerInfoPanelDefault()
     {
         try {
-            const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer-infopanel-enabled' });
+            const _ipe2 = await this._hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_SWITCH_KEY });
             const _globalData = _ipe2?.value || {};
             if( !_globalData.registry ) _globalData.registry = {};
 
@@ -453,13 +501,7 @@ export class CardStorage
             }
 
             if( _registryChanged ) {
-                await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: _globalData });
-            }
-
-            // Update info panel menu label
-            for( let i = 0; i < 2; i++ ) {
-                const ei = this._this.querySelector(`#ei_${i}`);
-                if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
+                await this._hass.callWS({ type: 'frontend/set_user_data', key: INFO_PANEL_SWITCH_KEY, value: _globalData });
             }
         } catch(e) {}
     }
@@ -491,18 +533,36 @@ export class CardStorage
         return multi.has('groupId') || local.has('groupId');
     }
 
+    // The info panel switched on or off (the options menu): on every device, and saved where
+    // the panel reads it
+    toggleInfoPanel()
+    {
+        infoPanelEnabled = !infoPanelEnabled;
+        this._hass.callWS({ type: 'frontend/set_user_data', key: INFO_PANEL_SWITCH_KEY, value: { enabled: infoPanelEnabled } }).catch(() => {});
+        this.applyInfoPanelState();
+    }
+
+    // The panel switched on or off (here, or on another device): saved where the panel reads
+    // it at each render — it applies the next time an entity's dialog shows its history,
+    // without reloading the page
+    applyInfoPanelState()
+    {
+        if( infoPanelEnabled !== !!infoPanelData() ) this.writeInfoPanelConfig(true);
+    }
+
+    // The info panel's config (the card's infoPanelConfig) saved where the panel reads it —
+    // removed when it's off
     async writeInfoPanelConfig(forceUpdate = false)
     {
         if( !infoPanelEnabled ) {
-            window.localStorage.removeItem('history-explorer-info-panel');
-            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-info-panel', value: null }); } catch(e) {}
+            window.localStorage.removeItem(INFO_PANEL_KEY);
+            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: INFO_PANEL_KEY, value: null }); } catch(e) {}
         } else if( infoPanelEnabled && (this.pconfig.infoPanelConfig || forceUpdate) ) {
             let _data = {};
             _data.enabled = true;
             _data.config = this.pconfig.infoPanelConfig;
-            window.localStorage.removeItem('history-explorer-info-panel');
-            window.localStorage.setItem('history-explorer-info-panel', JSON.stringify(_data));
-            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-info-panel', value: _data }); } catch(e) {}
+            window.localStorage.setItem(INFO_PANEL_KEY, JSON.stringify(_data));
+            try { await this._hass.callWS({ type: 'frontend/set_user_data', key: INFO_PANEL_KEY, value: _data }); } catch(e) {}
         }
     }
 

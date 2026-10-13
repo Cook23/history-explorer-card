@@ -66,7 +66,7 @@ module.exports = async function()
     t = await openCard(card({ graphs: [] }), { mock: { series: true }, height: 1100 });
     await t.wait(800);
     const sub = () => t.E(`(()=>{ const s=el.querySelector('#es_0_series'); return s.style.display==='none' ? 'closed' : [...s.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
-    const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._hec_entity_id; })()`);
+    const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._menuEntityId; })()`);
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };

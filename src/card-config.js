@@ -8,7 +8,7 @@ import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
-// render can happen before _hec_instance is created). HistoryCardState's own methods
+// render can happen before its instance is created). HistoryCardState's own methods
 // (CardConfig) just delegate to these, so there's one implementation, not two.
 export function getDomainForEntityPure(entity)
 {

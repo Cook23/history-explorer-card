@@ -38,12 +38,12 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-menus.js` | The entity type menu — the same menu for a graph (its Y axis lock, its layout) — the options menu, their keyboard navigation. |
 | `src/card-selector.js` | The entity selector: the entities listed and filtered, and those it adds (wildcards included) or removes. |
 | `src/card-toolbar.js` | The card's HTML: the toolbars and their menu entries, the interval selector of bar graphs, the layout as the card resizes. |
-| `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML. |
+| `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML — the only part reading or writing either. What the whole page shares, read before any card exists, too: the gesture settings (`localGestures`), the info panel's switch and config (`infoPanelEnabled`, `infoPanelData`, `fetchInfoPanelData`). |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
 | `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history — computed and formatted, given to the chart to show (`hecSetValues`). |
 | `src/legend-names.js` | The shorter forms of the curves' names, for a legend too narrow for them (a qualifier as its initials, the device's name removed or abbreviated, the articles removed). Pure data, no DOM. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id (`climate.salon.current_temperature`), its state as Home Assistant would give an entity's (`stateOf`), its history from its entity's. |
-| `src/gesture-settings.js` | The gesture settings of every card (long-press duration, drag distance, for a mouse or a pen and for a finger): their bounds, this device's values, given to Chart.js (`Chart.defaults.global.gestures`). |
+| `src/gesture-settings.js` | The gesture settings of every card (long-press duration, drag distance, for a mouse or a pen and for a finger): their bounds, and given to Chart.js (`Chart.defaults.global.gestures`). Saved by `card-storage.js`. |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
 | `src/card-tests.js` | *Tests (beta)* at the end of the type menu: what a browser reports of a pen, shown and sent as a report. |
 | `src/history-csv-exporter.js` | The CSV export. |
@@ -73,6 +73,14 @@ keep them apart. For the details of the boundary with Chart.js, see
    floating element...), never two copies.
 4. **A new feature extends a contract, it doesn't reach across one.** A new gesture is a
    `gestureType` or a payload field; a new entity operation is a store method.
+5. **Each part does its own job, and talks to another one directly — through that one's
+   contract.** No part goes through a single gateway to reach another, and none does
+   another's job by the shortest path: the time axis is set by `card-timerange.js` alone,
+   what is saved is read and written by `card-storage.js` alone, a menu's lines are
+   `card-menus.js`'s, what Chart.js keeps for itself (its layout, a dataset's meta) is
+   never read. A field the card and Chart.js exchange is documented in
+   `deps/Chart Custom.js.md`; a name starting with `hec` or `_hec` is Chart.js's — the
+   card's own fields don't use it.
 
 ## Where a change goes
 
@@ -99,6 +107,12 @@ keep them apart. For the details of the boundary with Chart.js, see
 
 - **lint** — every identifier is declared, no import is assigned (catches what moving
   code between files leaves behind);
+- **architecture** — the rules above, checked on the sources: the card uses only Chart.js's
+  stock API and what its contract documents, Chart.js knows nothing of the card's business,
+  the data-only parts have no DOM, persistence is `card-storage.js`'s, the entity list
+  changes through the store, a gesture on a graph is Chart.js's, a menu's elements are
+  `card-menus.js`'s, rendering is Chart.js's. An exception is written in the test with its
+  reason, and fails once it's no longer needed;
 - **store** — the entity store on its own, no browser;
 - the other suites — the built card in Chromium against a mocked Home Assistant: every
   gesture with a mouse and with fingers (real touch: `touch-action` and page scrolling

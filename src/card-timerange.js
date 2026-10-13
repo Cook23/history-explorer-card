@@ -246,11 +246,7 @@ export class CardTimeRange
         }
 
         if( update ) {
-            for( let g of this.graphs ) {
-                g.chart.options.scales.xAxes[0].time.unit = this.activeRange.tickStepUnit;
-                g.chart.options.scales.xAxes[0].time.stepSize = this.activeRange.tickStepSize;
-                g.chart.update();
-            }
+            for( let g of this.graphs ) this._applyTimeAxis(g);
         }
     }
 
@@ -319,8 +315,8 @@ export class CardTimeRange
         }
     }
 
-    // Applies the current time window and tick step to a graph's time axis — or to every
-    // graph's
+    // Applies the current time window and tick step to graph g's time axis, and redraws it —
+    // the only place a graph's time axis is set (a time range set applies it: setStepSize)
     _applyTimeAxis(g)
     {
         // (linked graphs keep their time aligned: when one of them has a right Y axis, the

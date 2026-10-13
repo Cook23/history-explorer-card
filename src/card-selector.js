@@ -122,10 +122,10 @@ export class CardSelector
         this.setDropdownVisibility(idx, true);
 
         // Clear keyboard highlight on text change
-        const _highlighted = dropdown.querySelector('a[data-hec-selected]');
+        const _highlighted = dropdown.querySelector('a[data-selected]');
         if( _highlighted ) {
             _highlighted.style.background = '';
-            delete _highlighted.dataset.hecSelected;
+            delete _highlighted.dataset.selected;
         }
     }
 
@@ -214,18 +214,18 @@ export class CardSelector
             if( it.series ) _a.dataset.series = it.series;
             _a.style = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;white-space:nowrap';
             _a.textContent = it.label;
-            if( it.marked ) { _a.style.fontWeight = 'bold'; _a.dataset.hecSelected = '1'; }
+            if( it.marked ) { _a.style.fontWeight = 'bold'; _a.dataset.selected = '1'; }
             _a.addEventListener('click', (e) => { e.preventDefault(); it.choose(); }, true);
             menuEl.appendChild(_a);
         }
-        menuEl._hecBack = back;
-        if( menuEl._hecListening ) return;
-        menuEl._hecListening = true;
+        menuEl._subBack = back;
+        if( menuEl._subListening ) return;
+        menuEl._subListening = true;
         menuEl.addEventListener('keydown', (e) => {
             if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
                 e.preventDefault();
                 e.stopPropagation();
-                menuEl._hecBack();
+                menuEl._subBack();
                 return;
             }
             this._menuKeyDown(e, menuEl);
@@ -252,7 +252,7 @@ export class CardSelector
         this.hideSeriesMenu(idx);
         this._fillSelectorMenu(idx, _sub, _items, () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); });
         entryEl.style.fontWeight = 'bold';
-        _sub._hecEntry = entryEl;
+        _sub._subEntry = entryEl;
         this._openSubmenu(_sub, entryEl);
         _sub.focus();
     }
@@ -262,7 +262,7 @@ export class CardSelector
         const _sub = this._this.querySelector(`#es_${idx}_series`);
         if( !_sub ) return;
         _sub.style.display = 'none';
-        if( _sub._hecEntry ) { _sub._hecEntry.style.fontWeight = ''; _sub._hecEntry = null; }
+        if( _sub._subEntry ) { _sub._subEntry.style.fontWeight = ''; _sub._subEntry = null; }
     }
 
     // Series id already shown (its graphs flagged, its message given): a choice under the

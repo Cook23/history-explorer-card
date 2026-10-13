@@ -874,7 +874,7 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         let fill = ( this.index < this.chart.data.datasets.length ) ? this.chart.data.datasets[this.index].arrowBackground : undefined;
 
         if( !arrowImageMap.has(color) ) {
-            let outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="${color ?? this.chart.options.elements.arrowColor}" d="M7.03 9.97H11.03V18.89L13.04 18.92V9.97H17.03L12.03 4.97Z" /></svg>`;
+            let outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="${color ?? this.chart.options.elements.arrowColor ?? ( getComputedStyle(this.chart.canvas).getPropertyValue('--primary-text-color').trim() || '#000' )}" d="M7.03 9.97H11.03V18.89L13.04 18.92V9.97H17.03L12.03 4.97Z" /></svg>`;
             let blob = new Blob([outerHTML], {type:'image/svg+xml;charset=utf-8'});
             let URL = window.URL || window.webkitURL || window;
             let blobURL = URL.createObjectURL(blob);

@@ -11978,7 +11978,7 @@
                 // (fork) a label wider than a whole line: shortened — labels.hecShortNames
                 // (Chart.hecFitLegendText)
                 if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
-                  var _shortNames = labelOpts.hecShortNames(me.chart) || [];
+                  var _shortNames = labelOpts.hecShortNames(me.chart.data.datasets) || [];
                   var _roomOf = function (line) {
                     var _m = me._hecMarginsOf(line);
                     return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;

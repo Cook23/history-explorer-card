@@ -67,12 +67,12 @@ export class CardGestures
         }
         const idx = info.legendIndex;
         if( idx < 0 ) return;
-        const meta = g.chart.getDatasetMeta(idx);
-        meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
+        // (shown or hidden: the card's own data — its entry, saved, and its dataset's hidden)
+        const _ds = g.chart.data.datasets[idx];
+        _ds.hidden = !_ds.hidden;
         g.chart.update();
-        const _hiddenState = meta.hidden !== null ? meta.hidden : g.chart.data.datasets[idx].hidden;
         const _e = this.store.entry(keyOf(g.entities[idx]));
-        if( _e ) _e.hidden = _hiddenState || undefined;
+        if( _e ) _e.hidden = _ds.hidden || undefined;
         this._showValues(g);
         this.writeLocalState();
     }

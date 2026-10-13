@@ -533,9 +533,7 @@ export class CardHistory
     {
         for( let g of this.graphs ) {
             if( !this.state.updateCanvas || this.state.updateCanvas === g.canvas ) {
-                g.chart.options.scales.xAxes[0].time.min = this.startTime;
-                g.chart.options.scales.xAxes[0].time.max = this.endTime;
-                g.chart.update();
+                this._applyTimeAxis(g);
                 this._showValues(g);
             }
         }

@@ -9,7 +9,7 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
     // Each graph in display order: its curves, hidden ones with (h)
-    const shown = t => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map((e,i)=>e.entity.split('.')[1]+((g.chart.getDatasetMeta(i).hidden ?? g.chart.data.datasets[i].hidden)?'(h)':'')).join('+')).join(' | ')`);
+    const shown = t => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map((e,i)=>e.entity.split('.')[1]+(g.chart.data.datasets[i].hidden?'(h)':'')).join('+')).join(' | ')`);
     const keys = t => t.E(`el.instance.store.list.map(e=>e.entity.split('.')[1]+(e.copy?'#'+e.copy:'')).join(' ')`);
     const reload = async t => { await t.page.reload(); await t.wait(3500); };
 

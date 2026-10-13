@@ -24,7 +24,7 @@ module.exports = async function()
     const entry = id => t.E(`(()=>{ const e=el.instance.pconfig.entities.find(x=>x.entity==='${id}'); return e ? Object.fromEntries(${JSON.stringify(FIELDS)}.map(k=>[k, e[k] ?? null])) : null; })()`);
     const shown = id => t.E(`(()=>{ const g=el.instance.graphs.find(g=>g.entities.some(e=>e.entity==='${id}')); if( !g ) return null;
         const i=g.entities.findIndex(e=>e.entity==='${id}'); const d=g.chart.data.datasets[i];
-        return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!(g.chart.getDatasetMeta(i).hidden ?? d?.hidden), graphs: el.instance.graphs.length }; })()`);
+        return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!d?.hidden, graphs: el.instance.graphs.length }; })()`);
     const menu = (id, act) => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'));
         I.showEntityTypeMenu(0, '${id}', g, 100, 100); ${act} })()`);
     const setInterp = (id, a) => menu(id, `I.entityInterpolationClicked(0, '${a}');`).then(() => t.wait(500));
@@ -257,7 +257,7 @@ module.exports = async function()
         await cardAction('defgraphs');
         const r = await t.E(`(()=>{ const c=el.querySelector('#eo_0_defgraphs_sub'), s=el.querySelector('#eo_0_card_sub');
             return { shown: c.style.display !== 'none', right: Math.round(c.getBoundingClientRect().right - s.getBoundingClientRect().right),
-                     marked: el.querySelector('#eo_0_defgraphs_cancel').dataset.hecSelected === '1', lines: [...c.children].map(a=>a.textContent).join('|') }; })()`);
+                     marked: el.querySelector('#eo_0_defgraphs_cancel').dataset.selected === '1', lines: [...c.children].map(a=>a.textContent).join('|') }; })()`);
         await t.E(`el.querySelector('#eo_0_defgraphs_cancel').click()`); await t.wait(300);
         const afterCancel = { confirm: await visible('#eo_0_defgraphs_sub'), card: await visible('#eo_0_card_sub'), ids: await ids() };
         await t.E(`el.querySelector('#eo_0_defgraphs').click()`); await t.wait(300);

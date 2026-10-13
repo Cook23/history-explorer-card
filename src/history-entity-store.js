@@ -128,6 +128,13 @@ export class EntityStore
         return i >= 0 && !(dynamicOnly && entry.isStatic) ? this.list.splice(i, 1)[0] : undefined;
     }
 
+    // The list started over with these entries only (a card showing just them, never saved:
+    // the info panel)
+    reset(entries)
+    {
+        this.list = [...entries];
+    }
+
     // Removes every entity added from the UI, keeps the YAML ones
     removeAllDynamic()
     {

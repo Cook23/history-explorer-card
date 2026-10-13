@@ -1,9 +1,10 @@
 
-import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, parseColor } from "./history-default-colors";
+import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, buttonsColor } from "./history-default-colors";
 import { HistoryCardState } from "./history-explorer-card";
 import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure, baseTypePure } from "./card-config.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
+import { infoPanelData, fetchInfoPanelData } from "./card-storage.js";
 
 // --------------------------------------------------------------------------------------
 // Clone of lit html(), don't want to pull in the entire framework
@@ -29,11 +30,10 @@ const html = litHtml(1);
 // this file runs — by a dashboard showing a card, or earlier on any page through
 // `frontend: extra_module_url` — and stays hooked: whether the panel replaces Home
 // Assistant's own history is decided at each render, from what the card saves
-// (localStorage 'history-explorer-info-panel': present = on, with the panel's config), or,
-// on a browser where the card never ran, from the same data in Home Assistant's user data.
+// (card-storage.js infoPanelData: present = on, with the panel's config), or, on a browser
+// where the card never ran, from the same data in Home Assistant's user data
+// (fetchInfoPanelData).
 // --------------------------------------------------------------------------------------
-
-const INFO_PANEL_KEY = 'history-explorer-info-panel';
 
 let hec_panel = {};
     hec_panel.config = null;
@@ -43,8 +43,7 @@ let hec_panel = {};
 // Is the panel on? Its config read along (hec_panel.config)
 function panelEnabled()
 {
-    let data = null;
-    try { data = JSON.parse(window.localStorage.getItem(INFO_PANEL_KEY)); } catch( e ) { /* none */ }
+    const data = infoPanelData();
     if( data ) hec_panel.config = data.config;
     return !!data;
 }
@@ -53,22 +52,16 @@ function panelEnabled()
 // (whichever copy of this file asks); on, it's saved here and the dialog rendered again
 function fetchPanelState(el)
 {
-    if( window.__hecInfoPanelFetched || !el.hass?.callWS ) return;
-    window.__hecInfoPanelFetched = true;
-    el.hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_KEY }).then(r => {
-        if( !r?.value || window.localStorage.getItem(INFO_PANEL_KEY) ) return;
-        window.localStorage.setItem(INFO_PANEL_KEY, JSON.stringify(r.value));
-        el.requestUpdate?.();
-    }, () => {});
+    fetchInfoPanelData(el.hass, () => el.requestUpdate?.());
 }
 
-function hecHookInfoPanel()
+function hxHookInfoPanel()
 {
     let __fn = customElements.get("ha-more-info-history");
     // (hooked once: another copy of this file — loaded from another URL — leaves it as it is;
     // hooking it twice would make _oldUpdated call itself)
-    if( !__fn || __fn.prototype._hecInfoPanelHooked ) return;
-    __fn.prototype._hecInfoPanelHooked = true;
+    if( !__fn || __fn.prototype._hxInfoPanelHooked ) return;
+    __fn.prototype._hxInfoPanelHooked = true;
 
     __fn.prototype._databaseCallback = function(valid)
     {
@@ -123,7 +116,7 @@ function hecHookInfoPanel()
             interval : instance.parseIntervalConfig(entityOptions?.interval) ?? null,
             isStatic : true,
         };
-        instance.pconfig.entities = [_pcEntry];
+        instance.store.reset([_pcEntry]);
 
         instance.graphs = [];
         instance.addGraph(entity_id, { noAutoGroup: true, color: entityOptions?.color, fill: entityOptions?.fill, isStatic: true, interval: instance.parseIntervalConfig(entityOptions?.interval), groupId: instance.g_id, entry: _pcEntry });
@@ -214,7 +207,7 @@ function hecHookInfoPanel()
         return false;
     }
 
-    __fn.prototype._hec_updated = function(changedProps)
+    __fn.prototype._hxUpdated = function(changedProps)
     {
         if( !panelEnabled() ) return this._oldUpdated(changedProps);
 
@@ -252,7 +245,7 @@ function hecHookInfoPanel()
         }
     };
 
-    __fn.prototype._hec_render = function()
+    __fn.prototype._hxRender = function()
     {
         if( !panelEnabled() ) {
             fetchPanelState(this);
@@ -277,7 +270,7 @@ function hecHookInfoPanel()
         const optColor = 'var(--primary-text-color)';
         const optBack = 'var(--card-background-color)';
 
-        const bgcol = parseColor(hec_panel?.config?.uiColors?.buttons ?? getComputedStyle(document.body).getPropertyValue('--primary-color') + '1f');
+        const bgcol = buttonsColor(hec_panel?.config?.uiColors);
         const tools = hec_panel?.config?.uiLayout?.toolbar != 'hide';
         const invertZoom = hec_panel?.config?.uiLayout?.invertZoom === true;
         const interval = hec_panel?.config?.uiLayout?.interval != 'hide';
@@ -361,9 +354,9 @@ function hecHookInfoPanel()
 
     __fn.prototype._oldUpdated = __fn.prototype.updated;
     __fn.prototype._oldRender = __fn.prototype.render;
-    __fn.prototype.updated = __fn.prototype._hec_updated;
-    __fn.prototype.render = __fn.prototype._hec_render;
+    __fn.prototype.updated = __fn.prototype._hxUpdated;
+    __fn.prototype.render = __fn.prototype._hxRender;
 }
 
-customElements.whenDefined('ha-more-info-history').then(hecHookInfoPanel);
+customElements.whenDefined('ha-more-info-history').then(hxHookInfoPanel);
 

@@ -63,7 +63,7 @@ export class CardValues
     _showValues(g)
     {
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
-            .filter(x => x.d && !( g.chart.getDatasetMeta(x.j).hidden ?? x.d.hidden ));
+            .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
         const _stats = _entities.map(x => ({ ...x, which: normalizeStats(this._resolveShow(x.e, 'showStats')) })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
@@ -84,7 +84,7 @@ export class CardValues
         // (a value at a point of curve j — the point hovered: as its value now, with its time;
         // a circular curve's in [0, period), as its labels show it)
         const format = (j, y, x) => {
-            const d = g.chart.data.datasets[j], p = d?.hecCircular;
+            const d = g.chart.data.datasets[j], p = d?.circularPeriod;
             const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
             return { text: this._roundedValue(v), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
         };

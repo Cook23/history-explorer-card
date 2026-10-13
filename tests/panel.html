@@ -30,6 +30,6 @@ customElements.define('ha-more-info-history', FakeMoreInfoHistory);
 // Opens the entity dialog's history of entity eid
 window.openPanel=(eid)=>{ const p=document.createElement('ha-more-info-history'); p.entityId=eid; p.hass=mkHass(); document.getElementById('host').appendChild(p); p.requestUpdate(); window.P=p; window.hassTargets=[p]; return true; };
 window.inst=()=>window.P.hec_instance;
-window.datasets=(gi)=>inst().graphs[gi].chart.data.datasets.map(d=>({ label:d.label, n:d.data.length, circular:d.hecCircular, type:d.type }));
+window.datasets=(gi)=>inst().graphs[gi].chart.data.datasets.map(d=>({ label:d.label, n:d.data.length, circular:d.circularPeriod, type:d.type }));
 window.timeRange=()=>[inst().startTime,inst().endTime];
 </script></body></html>
