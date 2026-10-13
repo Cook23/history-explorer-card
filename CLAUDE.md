@@ -32,8 +32,10 @@ mini-graph-card is replaced by changing its `type:` alone.
   an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the
   same levels; its structured forms (`show:`, root `entities`, `color_thresholds`…) are read
   by the card natively, as its own options.
-- **`look: mini` only switches defaults**: mini-graph-card's look instead of ours — and, for
-  a name that means something else on each side, which meaning applies.
+- **`look: mini` only switches defaults** — mini-graph-card's look instead of ours. It
+  never changes what an option means: an option means one thing, whatever the look (an
+  option whose meaning would depend on the look is an ergonomic nightmare). A name that
+  means something else on each side is a conflict to settle once for all, not by the look.
 - **A mini-graph-card function this card lacks is added to it**, mini-graph-card's code
   (MIT) taken as the example, and becomes a function of this card like any other: in its
   part, through its contracts, documented, tested, usable in this card's own syntax too.
