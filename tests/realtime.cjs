@@ -86,7 +86,7 @@ module.exports = async function()
     t = await openCard(card(), { mock: { series: true } });
     await t.wait(800);
     // (each graph's time labels drawn: [their number, whether two of them overlap])
-    const labels = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>{ const s=g.chart.scales['x-axis-0'], ctx=g.chart.ctx;
+    const labels = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>{ const s=g.chart.scales['x-axis-0'], ctx=g.chart.ctx;
         const shown=s.getTicks().map((k,i)=>({ x:s.getPixelForTick(i), l:k.label })).filter(k=>k.l!==undefined&&k.l!==null&&k.l!=='');
         ctx.save(); ctx.font='12px sans-serif'; const w=shown.map(k=>ctx.measureText(String(k.l)).width); ctx.restore();
         return [shown.length, shown.some((k,i)=>i>0 && k.x-shown[i-1].x < (w[i]+w[i-1])/2)]; })`);

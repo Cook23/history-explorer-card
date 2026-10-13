@@ -166,7 +166,7 @@ module.exports = async function()
         { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] });
     // Over graph 0's curves: which graphs draw the cursor line
     const cursorDrawn = async () => { const c = await t.E('graphPtAt(0, 0.5)'); await t.page.mouse.move(c.x, c.y); await t.page.mouse.move(c.x + 5, c.y); await t.wait(300);
-        return t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.chart._hecCursorLine?.draw?1:0).join('')`); };
+        return t.E(`el.instance.graphsInDisplayOrder().map(g=>g.chart._hecCursorLine?.draw?1:0).join('')`); };
     t = await openCard(cursorCard('auto'), { height: 1200, mock: { series: true } }); await t.wait(800);
     await t.step('cursor auto: the line drawn on the graph under the pointer only', async () => {
         const d = await cursorDrawn(); return d === '100' ? true : d;

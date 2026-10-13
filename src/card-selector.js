@@ -23,7 +23,7 @@ export class CardSelector
             const inputRect = input.getBoundingClientRect();
             // #tb_N directly, not dropdown.offsetParent — offsetParent of a display:none
             // element is always null, and dropdown still has display:none at this exact
-            // point (before _openMenu turns it on) on its very first open. #tb_N is already
+            // point (before openMenu turns it on) on its very first open. #tb_N is already
             // known to be the real positioned ancestor (see its position:relative in the
             // HTML), so there's no need to read it back off an element that isn't shown yet.
             const _tb = this._this.querySelector(`#tb_${input_idx}`);
@@ -43,7 +43,7 @@ export class CardSelector
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
-            this._openMenu(dropdown, topPos, leftPos);
+            this.openMenu(dropdown, topPos, leftPos);
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
@@ -116,7 +116,7 @@ export class CardSelector
         // Refilter if already open (typing, paste, voice input, autofill, or a script
         // setting .value and firing this same event to keep the dropdown in sync). Only
         // reopen a closed dropdown if the field genuinely has focus — a synthetic 'input'
-        // fired by _resetEntityInput after the user has already moved away from the field
+        // fired by resetEntityInput after the user has already moved away from the field
         // must not pop the dropdown back open.
         if( dropdown.style.display === 'none' && document.activeElement !== event.target ) return;
         this.setDropdownVisibility(idx, true);
@@ -146,7 +146,7 @@ export class CardSelector
             return;
         }
 
-        this._menuKeyDown(event, dropdown, {
+        this.menuKeyDown(event, dropdown, {
             onClose: () => {
                 input.value = '';
                 input.style.fontWeight = '';
@@ -170,7 +170,7 @@ export class CardSelector
                 return false; // let the default click on _sel happen
             },
             onHighlight: (_el) => {
-                this._previewEntityTooltip(_el.dataset.entity, idx);
+                this.previewEntityTooltip(_el.dataset.entity, idx);
             },
         });
     }
@@ -228,7 +228,7 @@ export class CardSelector
                 menuEl._subBack();
                 return;
             }
-            this._menuKeyDown(e, menuEl);
+            this.menuKeyDown(e, menuEl);
         });
         menuEl.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
     }
@@ -253,7 +253,7 @@ export class CardSelector
         this._fillSelectorMenu(idx, _sub, _items, () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); });
         entryEl.style.fontWeight = 'bold';
         _sub._subEntry = entryEl;
-        this._openSubmenu(_sub, entryEl);
+        this.openSubmenu(_sub, entryEl);
         _sub.focus();
     }
 
@@ -273,7 +273,7 @@ export class CardSelector
         const _menu = this._this.querySelector(`#es_${idx}_choice`);
         const _input = this.ui.inputField[idx];
         if( !_menu || !_input ) return;
-        const _cancel = () => { _menu.style.display = 'none'; this._resetEntityInput(_input); };
+        const _cancel = () => { _menu.style.display = 'none'; this.resetEntityInput(_input); };
         this._fillSelectorMenu(idx, _menu, [
             { label: i18n('ui.menu.duplicate_cancel'), marked: true, choose: _cancel },
             { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null); } },
@@ -282,7 +282,7 @@ export class CardSelector
         const _tb = this._this.querySelector(`#tb_${idx}`);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         const _r = _input.getBoundingClientRect();
-        this._openMenu(_menu, (_r.bottom - _parentRect.top) + 'px', (_r.left + 30 - _parentRect.left) + 'px');
+        this.openMenu(_menu, (_r.bottom - _parentRect.top) + 'px', (_r.left + 30 - _parentRect.left) + 'px');
         _menu.focus();
     }
 
@@ -433,7 +433,7 @@ export class CardSelector
         this.entitiesPopulated = true;
 
         // Entity type menu listeners (its gestures open it, with or without a selector)
-        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
+        for( let _ii = 0; _ii < 2; _ii++ ) this.initEntityTypeMenu(_ii);
 
         // No point populating the datalist if the selector is not visible
         if( this.ui.hideSelector ) return;
@@ -488,7 +488,7 @@ export class CardSelector
     // an ambiguous or duplicate friendly name can be resolved to its real entity_id before
     // the user commits to a selection. Wildcard patterns aren't previewed here (only single
     // resolved entity_ids reach this, one per dropdown entry).
-    _previewEntityTooltip(entity_id, ii)
+    previewEntityTooltip(entity_id, ii)
     {
         if( this.stateOf(entity_id) === undefined ) return;
         const _exists = this.store.curvesOf(entity_id).length > 0;
@@ -502,8 +502,8 @@ export class CardSelector
     {
         const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
         // (over graph g: centered on it by Chart.hecUi — no coordinates)
-        if( !_ir && g ) return this._showLabelTooltip(text, null, null, 'center', g.canvas);
-        this._showLabelTooltip(text, _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2, _ir ? _ir.top : 0, 'center', this.ui.inputField[ii] ?? document.body);
+        if( !_ir && g ) return this.showMessage(text, null, null, 'center', g.canvas);
+        this.showMessage(text, _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2, _ir ? _ir.top : 0, 'center', this.ui.inputField[ii] ?? document.body);
     }
 
     addEntitySelected(ii)
@@ -526,8 +526,6 @@ export class CardSelector
 
         for( let i of this.ui.inputField ) if( i ) { delete i.dataset.entityId; i.style.fontWeight = ''; }
         if( this._entitySelected ) this._entitySelected = [false, false];
-        this._justAdded = null;
-        const _addedNames = [];
 
         // Multi-entity from wildcard selection (ids separated by ';')
         if( entity_id.indexOf(';') >= 0 ) {
@@ -564,18 +562,8 @@ export class CardSelector
                 if( !_newIds.length && _dupEntityId ) {
                     this.showEntityTypeMenu(ii, _dupEntityId, _dupG);
                 }
-                this._flagGraphs(Array.from(_duplicateGraphs));
+                this.flagGraphs(Array.from(_duplicateGraphs));
             }
-
-            if( _addedNames.length ) {
-                this._justAdded = _addedNames.join('; ');
-                const _fi1 = this.ui.inputField[ii];
-                _fi1.value = this._justAdded;
-                _fi1.style.fontWeight = 'bold';
-                setTimeout(() => { this._resetEntityInput(_fi1); }, 500);
-            }
-            this.updateHistoryWithClearCache();
-            this.writeLocalState();
             return;
         }
 
@@ -613,7 +601,7 @@ export class CardSelector
                 // Already shown — said so, its graphs outlined; then cancel, or a second curve
                 // of it in another graph
                 this._selectorTooltip(ii, i18n('ui.label.already_exists') + ': ' + entity_id, _existingGs[0]);
-                this._flagGraphs(_existingGs);
+                this.flagGraphs(_existingGs);
                 this.showDuplicateChoice(ii, entity_id);
                 return;
             }
@@ -625,22 +613,20 @@ export class CardSelector
             this.showEntityTypeMenu(ii, entity_id, null);
 
         }
-
-        if( _addedNames.length ) {
-            // Reached only when entities were created directly (non-numeric wildcard batch) —
-            // numeric cases already show the type menu inline above and return/continue there
-            this._justAdded = _addedNames.join('; ');
-            const _fi2 = this.ui.inputField[ii];
-            _fi2.value = this._justAdded;
-            _fi2.style.fontWeight = 'bold';
-            setTimeout(() => { this._resetEntityInput(_fi2); }, 500);
-        }
-        this.updateHistoryWithClearCache();
-
-        this.writeLocalState();
+        // (nothing added yet: the type menu adds what's chosen — addCurves)
     }
 
-    _resetEntityInput(fi)
+    // The names of entities just added, shown a moment in the selector's field ii, in bold
+    showAdded(ii, names)
+    {
+        const _fi = this.ui.inputField[ii];
+        if( !names.length || !_fi ) return;
+        _fi.value = names.join('; ');
+        _fi.style.fontWeight = 'bold';
+        setTimeout(() => { this.resetEntityInput(_fi); }, 500);
+    }
+
+    resetEntityInput(fi)
     {
         // Clears an entity-selector input field back to its placeholder state
         // after an add/duplicate/error, cancelling any pending "just added" bold highlight
@@ -648,53 +634,10 @@ export class CardSelector
         fi.value = '';
         fi.style.fontWeight = '';
         delete fi.dataset.entityId;
-        this._justAdded = null;
         // Programmatically setting .value doesn't fire 'input' on its own — dispatch it so
         // the dropdown (if open) refilters/re-populates against the now-empty field, exactly
         // as it would for the user clearing the field by hand.
         fi.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    // "Default graphs": the graphs added from the card removed — the YAML's kept as they
-    // were changed from the card
-    defaultGraphs()
-    {
-        // Remove only actually non-fixed graphs, wherever they sit in the array — the old
-        // "first non-fixed index, then everything after it" logic predates `isStatic` and
-        // assumed statics always came first with dynamics strictly after; that assumption
-        // breaks the moment graphs are reordered (drag & drop, or synced order), silently
-        // deleting static graphs caught after the first dynamic one while leaving dynamic
-        // graphs before it untouched. Iterate backwards so splice() doesn't shift the
-        // indices of entries still to be checked.
-        for( let i = this.graphs.length - 1; i >= 0; i-- ) {
-            if( !this.graphs[i].isStatic ) {
-                this._graphDiv(this.graphs[i]).remove();
-                this.graphs.splice(i, 1);
-            }
-        }
-
-        this.store.removeAllDynamic();
-
-        this._updateMoVisibility();
-        this._updateGroupLinkMarkers();
-        this.writeLocalState();
-    }
-
-    // "Default display": back to the YAML — the graphs added from the card removed, every
-    // change made from the card to the YAML's forgotten (their order, their types, colors,
-    // splits, hidden curves, points…), the YAML's time range. Saved as any change: the last
-    // one to speak, it reaches the other devices for what they share
-    defaultDisplay()
-    {
-        for( const g of this.graphs ) this._graphDiv(g).remove();
-        this.graphs = [];
-        this.store.list = JSON.parse(JSON.stringify(this._pureYamlEntities ?? []));
-        this.pconfig.nextDefaultColor = 0;
-        this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
-        this._setPresentWindow();
-        this._buildGraphsFromStore();
-        this._updateMoVisibility();
-        this._updateGroupLinkMarkers();
-        this.updateHistoryWithClearCache();
-    }
 }

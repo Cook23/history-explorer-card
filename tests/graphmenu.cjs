@@ -19,8 +19,8 @@ module.exports = async function()
     let t = await openCard(card({ graphs: GRAPHS }), { height: 1600, mock: { series: true } });
     await t.wait(800);
     // The graphs in display order, each its entities
-    const layout = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
-    const gi = name => t.E(`el.instance._allGraphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity.split('.')[1]==='${name}'))`);
+    const layout = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+    const gi = name => t.E(`el.instance.graphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity.split('.')[1]==='${name}'))`);
     // The menu: its title, its items shown (* in bold), the items of its open submenu
     const menu = () => t.E(`(()=>{ const shown=a=>a.style.display!=='none';
         const items=[...el.querySelectorAll('#et_0 > a')].filter(shown).map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':''));
@@ -29,9 +29,9 @@ module.exports = async function()
             el.querySelector('#et_0_title').textContent+' || '+items.join(' | ')+' || '+(sub?[...sub.querySelectorAll('a')].filter(shown).map(a=>a.textContent).join(' | '):''); })()`);
     const click = id => t.E(`el.querySelector('#et_0_${id}').click()`).then(() => t.wait(500));
     // The buttons of each graph's zone, in display order (- disabled)
-    const buttons = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>(g.chart.options.handleButtons||[]).map(b=>(b.disabled?'-':'')+b.id).join(',')).join(' | ')`);
+    const buttons = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>(g.chart.options.handleButtons||[]).map(b=>(b.disabled?'-':'')+b.id).join(',')).join(' | ')`);
     // Where button k of graph i's zone is
-    const buttonPt = (i, k) => t.E(`(()=>{ const g=el.instance._allGraphsInDisplayOrder()[${i}]; const n=g.chart.options.handleButtons.length; const w=Math.max(33,n*18)/n;
+    const buttonPt = (i, k) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${i}]; const n=g.chart.options.handleButtons.length; const w=Math.max(33,n*18)/n;
         const r=g.canvas.getBoundingClientRect(); return {x:r.left+w*(${k}+0.5), y:r.top+14}; })()`);
     const pressButton = async (i, k) => { const p = await buttonPt(i, k); await t.page.mouse.click(p.x, p.y); await t.wait(900); };
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
@@ -85,7 +85,7 @@ module.exports = async function()
         return l === 'power+power_kw | a | rain | tank' ? true : l;
     });
     // A point of graph i's zone: x px from its left, y px from its top
-    const zonePt = (i, x, y) => t.E(`(()=>{ const r=el.instance._allGraphsInDisplayOrder()[${i}].canvas.getBoundingClientRect(); return {x:r.left+${x}, y:r.top+${y}}; })()`);
+    const zonePt = (i, x, y) => t.E(`(()=>{ const r=el.instance.graphsInDisplayOrder()[${i}].canvas.getBoundingClientRect(); return {x:r.left+${x}, y:r.top+${y}}; })()`);
     const clickAt = async p => { await t.page.mouse.click(p.x, p.y); await t.wait(900); };
     await t.step('just beside a button (under ↓): that button', async () => {
         await graphMenu('tank'); await click('cut');
@@ -146,7 +146,7 @@ module.exports = async function()
         return l === 'power+power_kw+rain | a | tank' ? true : l;
     });
     await t.step('a graph added from the card: its menu can delete it', async () => {
-        await t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('sensor.wind_rad'); I._createAndPersistEntity('sensor.wind_rad', d.type, d.lineMode); I.updateHistoryWithClearCache(); })()`);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.wind_rad'], 'default'); })()`);
         await t.wait(1200);
         await graphMenu('wind_rad'); await click('layout');
         const m = await menu(); await click('gdelete');
@@ -162,7 +162,7 @@ module.exports = async function()
         { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }, { entity: 'binary_sensor.b' }] }] }), { height: 1400, mock: { series: true } });
     await t.wait(800);
     // The graphs in display order: type, then each entity with its line mode and interpolation
-    const shown = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]+(e.lineMode?'/'+e.lineMode:'')+(e.interpolation?'/'+e.interpolation:'')).join('+')).join(' | ')`);
+    const shown = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]+(e.lineMode?'/'+e.lineMode:'')+(e.interpolation?'/'+e.interpolation:'')).join('+')).join(' | ')`);
     // The entries of submenu key shown, the marked one(s) with *
     const subOf = key => t.E(`[...el.querySelectorAll('#et_0_${key}_sub a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
     const items = () => t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>a.textContent).join(' | ')`);

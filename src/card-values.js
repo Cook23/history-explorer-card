@@ -47,7 +47,7 @@ export class CardValues
 
     // The history of entity j of graph g kept for its values (its samples as numbers, in the
     // value shown — see shownScale), from its history rows and its process function
-    _keepValueSamples(g, j, rows, process)
+    keepValueSamples(g, j, rows, process)
     {
         g.valueSamples ??= [];
         const _scale = g.chart.data.datasets[j]?.shownScale ?? 1;
@@ -58,16 +58,16 @@ export class CardValues
     // The values over graph g, given to its chart to show (Chart.js hecSetValues — it draws
     // them, and says when one is clicked: customEvent, zone 'value'): each curve's value now
     // (showState), then, for each curve showing them, its statistics over the window shown —
-    // none: nothing shown. On a narrow card (_narrowCard), as mini-graph-card keeps them:
+    // none: nothing shown. On a narrow card (narrowCard), as mini-graph-card keeps them:
     // layout 'narrow'. A hover on a curve shows the value it is on in its place: format
-    _showValues(g)
+    showValues(g)
     {
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
             .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
         const _stats = _entities.map(x => ({ ...x, which: normalizeStats(this._resolveShow(x.e, 'showStats')) })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
-        const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this._currentColor(x.e);
+        const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
         const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
         const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? 'LT' : 'L LT');
         const states = _states.map(x => {
@@ -88,7 +88,7 @@ export class CardValues
             const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
             return { text: this._roundedValue(v), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
         };
-        g.chart.hecSetValues({ layout: this._narrowCard() ? 'narrow' : 'row', states, stats, format });
+        g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format });
     }
 
     // A value as the values over a graph show it: rounded (roundingPrecision)

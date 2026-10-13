@@ -83,7 +83,7 @@ module.exports = async function()
     t = await openCard(card({ cardName: 'p', interpolation: 'steffen', graphs: [] }), { height: 900 });
     const all = `el.instance.graphs.map(g=>g.chart.data.datasets.map(d=>d.entity_id.split('.')[1]+':'+d.hecInterpolation).join(',')).join(' | ')`;
     await t.step('entities added from the UI follow the card\'s interpolation', async () => {
-        await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.rain'] ) I._createAndPersistEntity(id, 'line', 'smart'); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power','sensor.rain'], 'line', 'smart'); })()`);
         await t.wait(1500); const v = await t.E(all); return /power:steffen/.test(v) && /rain:steffen/.test(v) ? true : v;
     });
     await t.step('a Interpolation choice is kept after a reload', async () => {

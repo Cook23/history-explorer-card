@@ -128,7 +128,7 @@ function hxHookInfoPanel()
 
         instance.insertUIHtmlText(0);
 
-        instance._wireToolbar(0);
+        instance.wireToolbar(0);
 
         const config = hec_panel.config ?? {};
 
@@ -171,7 +171,7 @@ function hxHookInfoPanel()
             // (the card's menu markup, without what only the card offers)
             const _etw = instance._this.querySelector('#etw_0');
             if( _etw ) _etw.innerHTML = typeMenuHtml(0, false);
-            instance._initEntityTypeMenu(0);
+            instance.initEntityTypeMenu(0);
             _tf0.addEventListener('click', () => {
                 const _g = instance.graphs[0];
                 if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');

@@ -305,11 +305,11 @@ export class CardStorage
         ]);
 
         const _find = (arr, key) => arr.find(e => keyOf(e) === key);
-        this.store.list = [..._entityIds].map(id => this._resolveEntity(
-            _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id)));
+        this.store.reset([..._entityIds].map(id => this._resolveEntity(
+            _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id))));
 
         // Group ids left wrong by older versions repaired; next free dynamic group id set
-        this.store.normalizeGroupIds(e => e.type ?? this._detectDefaultType(e.entity).type);
+        this.store.normalizeGroupIds(e => e.type ?? this.detectDefaultType(e.entity).type);
     }
 
     // One entity's entry, from its YAML entry and its image, its HA entry and its image, and
@@ -526,7 +526,7 @@ export class CardStorage
     // Is what graph g holds — its entities' group — saved? A YAML graph's (one holding a
     // YAML entity) follows that entity's options — not saved, by default; a graph added
     // from the card is
-    _graphPlacementPersisted(g)
+    graphPlacementPersisted(g)
     {
         const _e = g.entities.find(e => e.isStatic);
         const { multi, local } = this._persistedFieldSets(_e ?? null);

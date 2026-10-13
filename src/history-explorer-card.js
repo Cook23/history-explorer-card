@@ -14,6 +14,8 @@ import { CardConfig } from "./card-config.js";
 import { CardTimeRange } from "./card-timerange.js";
 import { CardHistory } from "./card-history.js";
 import { CardGraphs } from "./card-graphs.js";
+import { CardCharts } from "./card-charts.js";
+import { CardOperations } from "./card-operations.js";
 import { CardToolbar } from "./card-toolbar.js";
 import { CardSelector } from "./card-selector.js";
 import { CardDatasets } from "./card-datasets.js";
@@ -67,7 +69,6 @@ export class HistoryCardState {
 
         this.i18n = {};
         this.i18n.valid                = false;
-        this.i18n.styleDateSelector    = '';
         this.i18n.styleTimeTicks       = '';
         this.i18n.styleDateTicks       = '';
         this.i18n.styleDateTimeTooltip = '';
@@ -197,89 +198,6 @@ export class HistoryCardState {
     // Color queries
     // --------------------------------------------------------------------------------------
 
-    normalizeLineMode(m)
-    {
-        // Accept singular aliases: 'line' -> 'lines', 'curve' -> 'curves', 'step' -> 'stepped'
-        // ('smart': curves while the source reports, flat dashed plateaus over its
-        // silences — see _applySilencePlateaus)
-        if( m === 'line'  ) return 'lines';
-        if( m === 'curve' ) return 'curves';
-        if( m === 'step'  ) return 'stepped';
-        return m;
-    }
-
-    getNextDefaultColor()
-    {
-        let i = this.pconfig.nextDefaultColor++;
-        this.pconfig.nextDefaultColor = this.pconfig.nextDefaultColor % defaultColors.length;
-        return defaultColors[i];
-    }
-
-    getStateColor(domain, device_class, entity_id, value)
-    {
-        let c;
-
-        if( value === undefined || value === null || value === '' ) value = 'unknown';
-
-        // entity_id.state override
-        if( entity_id ) {
-            const v = entity_id + '.' + value;
-            c = this.pconfig.customStateColors?.[v];
-            if( !c ) c = this.pconfig.customStateColors?.[entity_id];
-        }
-
-        // device_class.state override
-        if( !c && device_class ) {
-            const v = device_class + '.' + value;
-            c = this.pconfig.customStateColors?.[v];
-            if( !c ) c = this.pconfig.customStateColors?.[device_class];
-        }
-
-        // domain.state override
-        if( !c && domain ) {
-            const v = domain + '.' + value;
-            c = this.pconfig.customStateColors?.[v];
-            if( !c ) c = this.pconfig.customStateColors?.[domain];
-        }
-
-        // global state override
-        if( !c ) {
-            c = this.pconfig.customStateColors?.[value];
-        }
-
-        // device_class.state defaults
-        if( !c && device_class ) {
-            const v = device_class + '.' + value;
-            c = (( this.ui.darkMode && this.stateColorsDark[v] ) ? this.stateColorsDark[v] : this.stateColors[v]);
-        }
-
-        // domain.state defaults
-        if( !c && domain ) {
-            const v = domain + '.' + value;
-            c = (( this.ui.darkMode && this.stateColorsDark[v] ) ? this.stateColorsDark[v] : this.stateColors[v]);
-        }
-
-        // global state defaults
-        if( !c ) {
-            c = (( this.ui.darkMode && this.stateColorsDark[value] ) ? this.stateColorsDark[value] : this.stateColors[value]);
-        }
-
-        // general fallback if state color is not defined anywhere, generate color from the MD5 hash of the state name
-        if( !c ) {
-            if( !this.colorMap.has(value) ) {
-                const md = md5hx(value);
-                const h = ((md[0] & 0x7FFFFFFF) * this.pconfig.colorSeed) % 359;
-                const s = Math.ceil(45.0 + (30.0 * (((md[1] & 0x7FFFFFFF) % 255) / 255.0))) - (this.ui.darkMode ? 13 : 0);
-                const l = Math.ceil(55.0 + (10.0 * (((md[1] & 0x7FFFFFFF) % 255) / 255.0))) - (this.ui.darkMode ? 5 : 0);
-                c = 'hsl(' + h +',' + s + '%,' + l + '%)';
-                this.colorMap.set(value, c);
-            } else
-               c = this.colorMap.get(value);
-        }
-
-        return c;
-    }
-
 
     // Dark or light: Home Assistant's theme (or a dark background behind the card), unless
     // uimode says; then the colors of the labels, grid and cursor line (uiColors, else the
@@ -299,23 +217,6 @@ export class HistoryCardState {
     // Device class or domain specific state localization
     // --------------------------------------------------------------------------------------
 
-    getLocalizedState(state, domain, device_class, entity)
-    {
-        const s = entity + state;
-
-        let v = this.stateTexts.get(s);
-        if( !v ) {
-            v = ( device_class && this._hass.localize(`component.${domain}.entity_component.${device_class}.state.${state}`) ) ||
-                  this._hass.localize(`component.${domain}.entity_component._.state.${state}`) ||
-                ( device_class && this._hass.localize(`component.${domain}.state.${device_class}.${state}`) ) ||
-                  this._hass.localize(`component.${domain}.state._.${state}`) ||
-                  state;
-            this.stateTexts.set(s, v);
-        }
-
-        return v;
-    }
-
     // --------------------------------------------------------------------------------------
     // Card content
     // --------------------------------------------------------------------------------------
@@ -334,29 +235,25 @@ export class HistoryCardState {
 
             this.applyTheme(this._this.config, !!( bgcol && bgcol.length == 4 && (((+bgcol[1]) + (+bgcol[2]) + (+bgcol[3])) / 3 <= 100) ));
 
-            this.pconfig.nextDefaultColor = 0;
-
-            this.graphs = [];
+            this.clearGraphs();
 
             this.resizeSelector();
 
-            for( let i = 0; i < 2; i++ ) this._wireToolbar(i);
+            for( let i = 0; i < 2; i++ ) this.wireToolbar(i);
 
 
             const _needsIntervalRedraw = await this.readLocalState();
             // (the info panel's switch as read: the options menu shows it)
-            this._showInfoPanelSwitch();
+            this.showInfoPanelSwitch();
 
             // (the time window known before the graphs are built: their time axis has it
             // from the first drawing — without it, it spans the data, ticked for the
             // window's range: thousands of labels over each other until the window is set)
-            this._setPresentWindow();
-
-            this.pconfig.nextDefaultColor = 0;
+            this.setPresentWindow();
 
             // Every graph (static and dynamic) built from the entity list
-            if( this.store.list ) this._buildGraphsFromStore();
-            else this.store.list = [];
+            if( this.store.list ) this.buildGraphsFromStore();
+            else this.store.reset([]);
 
             this.today(false);
 
@@ -377,75 +274,6 @@ export class HistoryCardState {
                 setInterval(this.refresh.bind(this), this.pconfig.refreshInterval * 1000);
 
         }
-    }
-
-    // Builds every graph (static and dynamic) from the entity list (pconfig.entities), in
-    // its order, then saves the result — at first display, and when the card goes back to
-    // the YAML (_resetToYaml)
-    _buildGraphsFromStore()
-    {
-        // Group by groupId, preserving first-occurrence order
-        const _groupMap = new Map();
-        const _groupOrder = [];
-        for( let e of this.store.list ) {
-            const _groupId = typeof e === 'object' ? e.groupId : undefined;
-            const _key = _groupId ?? Symbol();
-            if( !_groupMap.has(_key) ) {
-                _groupMap.set(_key, { groupId: _groupId, entities: [] });
-                _groupOrder.push(_key);
-            }
-            _groupMap.get(_key).entities.push(e);
-        }
-        // Sort each group's entities by their initial graphIndex — captured here,
-        // before any recomputation — so a solid block of several linked graphs
-        // (same groupId, different graphIndex) gets rebuilt in the order it was
-        // actually displayed in, not pconfig.entities' array order (which must stay
-        // untouched below for re-combine to keep working when a type becomes
-        // compatible again). Stable sort: entities that already share one
-        // graphIndex (one graph) keep their relative order.
-        for( let _group of _groupMap.values() )
-            _group.entities.sort((a, b) => (a.graphIndex ?? 0) - (b.graphIndex ?? 0));
-        // Physically regroup the persisted list the same way — never interleaved
-        // again, so its order stays the single source of truth for display order
-        // everywhere else (neighbor lookups, graphIndex averaging).
-        this.store.regroup();
-
-        // Rebuild: call addGraph one entity at a time
-        // For statics: force combineSameUnits (YAML author responsible for grouping)
-        // For dynamics: combine logic in addGraph handles groupId + compatibility
-        // The graphIndex each entity had when last saved, captured before addGraph
-        // recomputes it: within a group, only entities that were shown in the same
-        // graph are combined again (see addGraph). Statics never persist graphIndex,
-        // so for them this is always undefined === undefined — graphKey decides.
-        this._rebuildGraphIndex = new Map(this.store.list.map(e => [e, e.graphIndex]));
-        for( let _key of _groupOrder ) {
-            const _group = _groupMap.get(_key);
-            const _isStaticGroup = _group.entities.some(e => e.isStatic);
-            const _saved = this.pconfig.combineSameUnits;
-            if( _isStaticGroup ) this.pconfig.combineSameUnits = true;
-            // _group.entities is sorted by graphIndex above — walk it in that order
-            // and always pass no `before`: addGraph's own combine logic
-            // (matched by groupId) merges compatible entities regardless, and any
-            // entity that can't combine simply becomes a new graph appended after
-            // whatever's been built so far — correct precisely because we're
-            // walking the group in its true display order already.
-            _group.entities.forEach((_e) => {
-                const _eid = entityIdOf(_e);
-                this.addGraph(_eid, { color: _e.color, fill: _e.fill, hidden: _e.hidden, isStatic: _e.isStatic, interval: _e.interval, groupId: _group.groupId, entry: _e });
-            });
-            if( _isStaticGroup ) this.pconfig.combineSameUnits = _saved;
-        }
-        this._rebuildGraphIndex = null;
-        // The rebuild just recomputed graphIndex (and default colors, etc.) fresh
-        // from scratch — persist that result now rather than leaving storage stale
-        // until some unrelated later action happens to call writeLocalState.
-        this.writeLocalState();
-    }
-
-    refresh()
-    {
-        this.cache[this.cacheSize].valid = false;
-        this.updateHistory();
     }
 
     updateContent()
@@ -480,7 +308,6 @@ export class HistoryCardState {
         this.i18n.styleDateTicks = this.pconfig.timeTickShortDate ? 'D' : dt;
         this.i18n._styleDateLong = ds;
         this.i18n._styleDateShort = dt;
-        this.i18n.styleDateSelector = ds; // will be updated by resizeSelector
 
         if( this._hass.locale?.time_format === '24' ) locale = 'en-GB';
         if( this._hass.locale?.time_format === '12' ) locale = 'en-US';
@@ -519,7 +346,7 @@ export class HistoryCardState {
             for( let e of g.entities ) {
                 const lc = this.stateOf(e.entity)?.last_changed;
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
-                    if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this._refreshLegendParts(g, i);
+                    if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this.refreshLegendParts(g, i);
                     changed = true;
                 }
                 this.stateMap.set(e.entity, lc);
@@ -541,7 +368,7 @@ export class HistoryCardState {
 
 // HistoryCardState's methods are spread over several files by role (see each file's
 // header) — added to it here, as if written in the class itself
-for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage, CardValues] )
+for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardCharts, CardOperations, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage, CardValues] )
     for( const name of Object.getOwnPropertyNames(part.prototype) )
         if( name !== 'constructor' )
             Object.defineProperty(HistoryCardState.prototype, name, Object.getOwnPropertyDescriptor(part.prototype, name));

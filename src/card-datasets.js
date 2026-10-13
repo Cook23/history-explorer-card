@@ -4,7 +4,7 @@
 
 import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
-import { barInterval, RAW_INTERVAL } from "./history-options.js";
+import { barInterval, RAW_INTERVAL, normalizeLineMode } from "./history-options.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -52,7 +52,7 @@ export class CardDatasets
 
     // The color of entity e now, for its current value — the legend's, and the curve's until
     // its history is drawn; the palette's (e.paletteColor) when no valid color applies
-    _currentColor(e)
+    entityColor(e)
     {
         const _ce = colorEntityOf(e);
         const _state = id => this.stateOf(id)?.state;
@@ -219,15 +219,15 @@ export class CardDatasets
 
                     const process = this.buildProcessFunction(e.process);
 
-                    // Per entity: a bar graph can hold curves too (see _entityKind)
-                    const _kind = this._entityKind(g, e);
+                    // Per entity: a bar graph can hold curves too (see entityKind)
+                    const _kind = this.entityKind(g, e);
 
                     // Circular values (angles): a continuous curve, see _unwrapCircular
-                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this._circularPeriod(e) : null;
+                    const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this.circularPeriodOf(e) : null;
                     let _circBand = false;
                     if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
 
-                    if( _kind == 'line' ) this._keepValueSamples(g, j, result[id], process);
+                    if( _kind == 'line' ) this.keepValueSamples(g, j, result[id], process);
 
                     if( _kind == 'line' ) {
                         const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
@@ -254,7 +254,7 @@ export class CardDatasets
 
             }
 
-            if( updated ) { this._applyTimeAxis(g); this._showValues(g); }
+            if( updated ) { this.applyTimeAxis(g); this.showValues(g); }
 
         }
     }
@@ -340,7 +340,7 @@ export class CardDatasets
             }
         }
 
-        if( (this.normalizeLineMode(e.lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+        if( (normalizeLineMode(e.lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
             // Silences are detected on every recorded value (before decimation)
             const _raw = [];
             for( let i = 0; i < n; i++ ) {
@@ -490,7 +490,7 @@ export class CardDatasets
     // line' (4) — which only ever turns its bar entities into raw curves. A graph holding
     // at least one bar entity is a 'bar' graph (interval selector), its line entities
     // being drawn as curves over the bars.
-    _entityKind(g, e)
+    entityKind(g, e)
     {
         if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
         return ( g.type === 'bar' && e?.type === 'bar' && g.interval != RAW_INTERVAL ) ? 'bar' : 'line';
@@ -502,7 +502,7 @@ export class CardDatasets
     // attribute, the unit ° only when its name says it's a direction: see isDirectionAttribute), false
     // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
     // period <= 0, disables it with a warning.
-    _circularPeriod(e)
+    circularPeriodOf(e)
     {
         const c = e?.circular;
         if( c === false ) return null;
@@ -589,7 +589,7 @@ export class CardDatasets
     }
 
     // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)
-    _wrapCircular(v, Q)
+    wrapCircular(v, Q)
     {
         return ( ( v % Q ) + Q ) % Q;
     }

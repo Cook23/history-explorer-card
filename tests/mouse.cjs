@@ -187,7 +187,7 @@ module.exports = async function()
         await t.drag({ x: a.x - 150, y: a.y }, { x: a.x + 50, y: a.y });
         const r1 = (await t.state()).range;
         const mode = await E('el.instance.state.zoomMode');
-        const tooltips = await E(`el.instance._allGraphsInDisplayOrder()[${li}].chart.options.tooltips.enabled`);
+        const tooltips = await E(`el.instance.graphsInDisplayOrder()[${li}].chart.options.tooltips.enabled`);
         return r1[0] < r0[0] && mode === false && tooltips === true ? true : JSON.stringify({ r0, r1, mode, tooltips });
     });
     await t.step('Alt held while moving over a graph shows every sample, moving without it hides them', async () => {

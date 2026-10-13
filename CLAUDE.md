@@ -21,7 +21,7 @@ that session (or to the user), not made from here.
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
 |---|---|
-| `_circularPeriod` | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
+| `_circularPeriod` (1.2: `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
 
 - absent / `null` / `none` (trimmed, any case): automatic — state class `measurement_angle`,
   or a unit of exactly `°` (not `°C`/`°F`), gives a period of 360;
@@ -67,7 +67,7 @@ Review of the silence detection (October 2026), decided by the user:
 
 | card 1.2 | lowpass_dt |
 |---|---|
-| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `_circularPeriod` | `attributes.py` |
+| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `circularPeriodOf` | `attributes.py` |
 
 - An attribute's unit: the one its value holds (`45 %`), else Home Assistant frontend's tables
   (weather units, units by domain, temperatures in the system unit; a light's `brightness`

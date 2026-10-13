@@ -3,7 +3,7 @@
 // the room kept on the right for linked graphs). Part of HistoryCardState (added to it in
 // history-explorer-card.js).
 
-import { RIGHT_Y_AXIS } from "./card-graphs.js";
+import { RIGHT_Y_AXIS } from "./card-charts.js";
 const moment = window.HXLocal_moment;
 
 // Valid time ranges in hours
@@ -22,7 +22,7 @@ export class CardTimeRange
             if( resetRange )
                 this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
 
-            this._setPresentWindow();
+            this.setPresentWindow();
             this.updateHistory();
 
         }
@@ -34,7 +34,7 @@ export class CardTimeRange
     // The time window ending at the present (moved by defaultTimeOffset), over the active
     // range — set before the graphs are first built, so their time axis has it from the
     // start
-    _setPresentWindow()
+    setPresentWindow()
     {
         let endTime = moment();
         if( this.pconfig.defaultTimeOffset ) {
@@ -110,7 +110,7 @@ export class CardTimeRange
             if( g.chart ) g.chart.options.zoomSelectMode = this.state.zoomMode;
     }
 
-    // The zoom buttons and the duration menu: in real time (the present shown, see _isLive)
+    // The zoom buttons and the duration menu: in real time (the present shown, see isLive)
     // the window keeps its end — the present stays on the right; looking at the history, it
     // keeps its middle
     decZoom()
@@ -132,7 +132,7 @@ export class CardTimeRange
     }
 
     // Is the window showing the present, following it (real time) — rather than the history?
-    _isLive()
+    isLive()
     {
         return !!this.state.autoScroll && moment() >= moment(this.startTime);
     }
@@ -141,7 +141,7 @@ export class CardTimeRange
     // its end in real time, its middle (null) otherwise
     _zoomAnchor()
     {
-        return this._isLive() ? [this.endTime, 1.0] : [null, 0.5];
+        return this.isLive() ? [this.endTime, 1.0] : [null, 0.5];
     }
 
     // --------------------------------------------------------------------------------------
@@ -246,7 +246,7 @@ export class CardTimeRange
         }
 
         if( update ) {
-            for( let g of this.graphs ) this._applyTimeAxis(g);
+            for( let g of this.graphs ) this.applyTimeAxis(g);
         }
     }
 
@@ -306,9 +306,9 @@ export class CardTimeRange
             }
 
             // (a window whose end moved follows the present only if it shows it)
-            if( this.endTime !== _end0 ) this.state.autoScroll = moment() <= moment(this.endTime);
+            if( this.endTime !== _end0 ) this.followPresentIfShown();
 
-            this._applyTimeAxes();
+            this.applyTimeAxes();
 
             this.updateHistory();
 
@@ -317,7 +317,7 @@ export class CardTimeRange
 
     // Applies the current time window and tick step to graph g's time axis, and redraws it —
     // the only place a graph's time axis is set (a time range set applies it: setStepSize)
-    _applyTimeAxis(g)
+    applyTimeAxis(g)
     {
         // (linked graphs keep their time aligned: when one of them has a right Y axis, the
         // others keep the same room on the right)
@@ -332,9 +332,9 @@ export class CardTimeRange
         g.chart.update();
     }
 
-    _applyTimeAxes()
+    applyTimeAxes()
     {
-        for( let g of this.graphs ) this._applyTimeAxis(g);
+        for( let g of this.graphs ) this.applyTimeAxis(g);
     }
 
     setTimeRangeMinutes(range, update, t_center, t_position = 0.5)
@@ -367,9 +367,9 @@ export class CardTimeRange
             this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
 
             // (a window whose end moved follows the present only if it shows it)
-            if( this.endTime !== _end0 ) this.state.autoScroll = moment() <= moment(this.endTime);
+            if( this.endTime !== _end0 ) this.followPresentIfShown();
 
-            this._applyTimeAxes();
+            this.applyTimeAxes();
 
             this.updateHistory();
 
@@ -397,5 +397,83 @@ export class CardTimeRange
             this.setTimeRange(this.validateRange(h, true), update, t_center);
         else
             this.setTimeRangeMinutes(t, update, t_center);
+    }
+
+    // Real time followed (the window moving with the present) only when the window shows the
+    // present
+    followPresentIfShown()
+    {
+        this.state.autoScroll = moment() <= moment(this.endTime);
+    }
+
+    // Moves the time window (same length) to start at t0, then redraws — fetching the newly
+    // visible data, or only the axes while a fetch is already under way
+    moveTimeWindow(t0)
+    {
+        const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
+        this.startTime = moment(t0).format("YYYY-MM-DDTHH:mm:ss");
+        this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+        if( !this.state.loading )
+            this.updateHistory();
+        else
+            this.updateAxes();
+    }
+
+    // Length of the time window, in seconds
+    timeRangeSeconds()
+    {
+        return 3600.0 * this.activeRange.timeRangeHours + 60.0 * this.activeRange.timeRangeMinutes;
+    }
+
+    factorToTimecode(f)
+    {
+        return moment(this.startTime) + moment(this.endTime).diff(this.startTime) * f;
+    }
+
+    // A zoom selection, between factor0 and factor1 along the time axis: the time range
+    // becomes the nearest preset covering it, centred on it
+    zoomToSelection(_factor0, _factor1)
+    {
+        let st0 = this.factorToTimecode(_factor0);
+        let st1 = this.factorToTimecode(_factor1);
+        if( st1 < st0 ) [st1, st0] = [st0, st1];
+
+        const tm = (moment(st1) + moment(st0)) / 2;
+
+        // Time delta in minutes
+        const dt = moment.duration(st1 - st0).asMinutes();
+
+        // Time delta in hours, ceiled
+        let d = ( dt >= 60.0 ) ? Math.ceil(dt / 60.0) : 0;
+
+        if( d < 12 ) {
+
+            if( d < 1 )
+                this.setTimeRangeMinutes(Math.ceil(dt), true, tm);
+            else
+                this.setTimeRange(d, true, tm);
+
+        } else {
+
+            d = Math.ceil(d / 24.0);
+
+            if( d < 1 ) this.setTimeRange(12, true, tm); else       // 12 hours
+            if( d < 2 ) this.setTimeRange(24, true, tm); else       // 1 day
+            if( d < 3 ) this.setTimeRange(48, true, tm); else       // 2 days
+            if( d < 4 ) this.setTimeRange(72, true, tm); else       // 3 days
+            if( d < 5 ) this.setTimeRange(96, true, tm); else       // 4 days
+            if( d < 6 ) this.setTimeRange(120, true, tm); else      // 5 days
+            if( d < 7 ) this.setTimeRange(144, true, tm); else      // 6 days
+            if( d < 13 ) this.setTimeRange(168, true, tm); else     // 1 week
+            if( d < 20 ) this.setTimeRange(336, true, tm); else     // 2 weeks
+            if( d < 28 ) this.setTimeRange(504, true, tm); else     // 3 weeks
+            if( d < 45 ) this.setTimeRange(720, true, tm); else     // 1 month
+            if( d < 105 ) this.setTimeRange(2184, true, tm); else   // 3 months
+                          this.setTimeRange(4368, true, tm);        // 6 months
+
+        }
+
+        this.toggleZoom();
+        this.writeLocalState();
     }
 }

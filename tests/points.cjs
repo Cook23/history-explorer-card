@@ -21,7 +21,7 @@ module.exports = async function()
     const done = r => { passed += r.passed; failed += r.failed; };
 
     // Curve k of graph gi: its dots' radius, its showPoints saved
-    const dots = (t, gi, k = 0) => t.E(`(()=>{ const g=el.instance._allGraphsInDisplayOrder()[${gi}];
+    const dots = (t, gi, k = 0) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${gi}];
         const d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, R: (d.borderWidth+2)/2, hover: d.pointHoverRadius, saved: g.entities[${k}].showPoints }; })()`);
     const shown = d => near(d.r, d.R) && near(d.hover, d.R + 1);
     const menuOpen = t => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
@@ -304,7 +304,7 @@ module.exports = async function()
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false } }, { mock: { series: true } });
     await t.wait(800);
     await t.step('a curve added from the card, its points shown by a long-press: kept after a reload, not on another device', async () => {
-        await t.E(`(()=>{ const I=el.instance; I._createAndPersistEntity('sensor.power', 'line', 'curves'); I.updateHistoryWithClearCache(); })()`); await t.wait(1500);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power'], 'line', 'curves'); })()`); await t.wait(1500);
         const p = await valuePt(0, 3); await t.longPress(p);
         const shown = (await dots(t, 0)).r > 0;
         await t.page.reload(); await t.wait(3500); const reloaded = (await dots(t, 0)).r > 0;

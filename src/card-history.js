@@ -410,8 +410,7 @@ export class CardHistory
 
     updateHistory()
     {
-        for( let i of this.ui.dateSelector )
-            if( i ) i.innerHTML = moment(this.startTime).format(this.i18n.styleDateSelector);
+        this.showDate();
 
         // Prime the cache on first call
         if( !this.cache.length ) this.initCache();
@@ -533,8 +532,8 @@ export class CardHistory
     {
         for( let g of this.graphs ) {
             if( !this.state.updateCanvas || this.state.updateCanvas === g.canvas ) {
-                this._applyTimeAxis(g);
-                this._showValues(g);
+                this.applyTimeAxis(g);
+                this.showValues(g);
             }
         }
     }
@@ -584,5 +583,12 @@ export class CardHistory
             period,
             statistic_ids: ids
         };
+    }
+
+    // The automatic refresh: the newest part of the cache asked again
+    refresh()
+    {
+        this.cache[this.cacheSize].valid = false;
+        this.updateHistory();
     }
 }

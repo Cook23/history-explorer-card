@@ -24,6 +24,39 @@ function code(file)
 // Stock Chart.js API the card may use on a chart or on Chart (chartjs.org, 2.7)
 const STOCK = new Set(['data', 'options', 'config', 'update', 'resize', 'destroy', 'helpers', 'defaults']);
 
+// The card's parts (HistoryCardState's methods, spread over files by role): which file
+// defines each method, and what each method writes on the state — this.x, or this.state.x,
+// this.pconfig.x, this.ui.x, this.i18n.x
+const PART_FILES = CARD.filter(f => /^src\/(card-[^/]*|history-explorer-card)\.js$/.test(f));
+function walk(n, f) { if( !n || typeof n !== 'object' ) return; if( Array.isArray(n) ) return n.forEach(x => walk(x, f)); if( typeof n.type === 'string' ) f(n); for( const k in n ) if( n[k] && typeof n[k] === 'object' ) walk(n[k], f); }
+const PARTS = (() => {
+    const methods = new Map(), writes = [];
+    for( const file of PART_FILES ) {
+        const src = read(file);
+        const ast = acorn.parse(src, { ecmaVersion: 2022, sourceType: 'module', locations: true });
+        walk(ast, n => {
+            if( n.type !== 'ClassDeclaration' ) return;
+            // (the card element itself — HistoryExplorerCard — isn't a part of the state)
+            if( n.id?.name === 'HistoryExplorerCard' ) return;
+            for( const m of n.body.body ) {
+                if( m.type !== 'MethodDefinition' || !m.key.name ) continue;
+                if( m.key.name !== 'constructor' ) methods.set(m.key.name, file);
+                // (the state's constructor gives every field its first value: not a writer)
+                if( m.key.name === 'constructor' ) continue;
+                walk(m.value.body, x => {
+                    if( x.type !== 'AssignmentExpression' && x.type !== 'UpdateExpression' ) return;
+                    let t = x.left || x.argument; const chain = [];
+                    while( t && t.type === 'MemberExpression' ) { chain.unshift(t.computed ? '[]' : t.property.name); t = t.object; }
+                    if( t?.type !== 'ThisExpression' || !chain.length ) return;
+                    const field = ['state', 'pconfig', 'ui', 'i18n'].includes(chain[0]) && chain[1] ? chain.slice(0, 2).join('.') : chain[0];
+                    writes.push({ field, file, method: m.key.name, line: x.loc.start.line });
+                });
+            }
+        });
+    }
+    return { methods, writes };
+})();
+
 const RULES = [
     { id: 'chart-internals', why: 'the card never reads or sets what Chart.js keeps for itself (its layout, its meta, what it drew, anything _hec)',
       files: CARD, re: /getDatasetMeta|chartArea|legendHitBoxes|\.scales\[|\b_hec|\._view\b|chart\??\.ctx\b|measureText|getContext\(/g },
@@ -54,12 +87,26 @@ const RULES = [
     { id: 'graph-gestures', why: "a gesture on a graph is Chart.js's: the card listens only to its own toolbars, menus and dialogs",
       files: CARD.filter(f => !['src/card-toolbar.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-tests.js'].includes(f)),
       re: /addEventListener\(\s*(?!['"](click|change|keydown|focusin|focusout|input|selectionchange)['"])/g },
-    { id: 'datasets', why: "a graph's datasets are made and changed by card-graphs.js (card-datasets.js fills their data); the others ask it",
-      files: CARD.filter(f => !['src/card-graphs.js', 'src/card-datasets.js'].includes(f)), re: /chart\??\.data\??\.datasets/g },
+    { id: 'datasets', why: "a graph's datasets are made and changed by card-charts.js (card-datasets.js fills their data); the others ask it",
+      files: CARD.filter(f => !['src/card-charts.js', 'src/card-datasets.js'].includes(f)), re: /chart\??\.data\??\.datasets/g },
     { id: 'menus', why: "a menu's elements are card-menus.js's (and the selector's own)",
       files: CARD.filter(f => !['src/card-menus.js', 'src/card-toolbar.js'].includes(f)), re: /#(et|eo|ets|eoo)_/g },
     { id: 'rendering', why: "how something is drawn is Chart.js's (or the card's own toolbars' and menus' layout)",
       files: CARD, re: /getComputedStyle/g },
+    { id: 'part-contracts', why: "a part calls another part's public methods only — its contract; a method starting with _ is its own",
+      files: PART_FILES, check: (src, file) => [...src.matchAll(/this\.(_\w+)\(/g)]
+          .filter(m => PARTS.methods.has(m[1]) && PARTS.methods.get(m[1]) !== file).map(m => ({ index: m.index, text: m[1] + ' (' + PARTS.methods.get(m[1]) + ')' })) },
+    { id: 'state-owner', why: "each field of the card's state is written by one part (its constructor gives every field its first value)",
+      files: PART_FILES, check: (src, file) => {
+          const owners = new Map();
+          for( const w of PARTS.writes ) (owners.get(w.field) ?? owners.set(w.field, new Set()).get(w.field)).add(w.file);
+          const lines = src.split('\n'), at = l => lines.slice(0, l - 1).join('\n').length + 1;
+          return PARTS.writes.filter(w => w.file === file && owners.get(w.field).size > 1)
+              .map(w => ({ index: at(w.line), text: w.field + ' (also ' + [...owners.get(w.field)].filter(f => f !== file).join(', ') + ')' }));
+      } },
+    { id: 'inputs', why: "the gestures, the menus, the selector and the toolbar ask card-operations.js for a change of what's shown: they never change the entity list or the graphs themselves",
+      files: ['src/card-gestures.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-toolbar.js'],
+      re: /this\.store\.(add|remove|reset|removeAllDynamic|moveToGroup|setGraphOrder|syncGroupOrder|moveBefore|regroup|setGraphKey|newGroupId|normalizeGroupIds)\(|this\.(addGraph|detachGraph|rebuildGraph|detachAndRebuildRemaining|removeGraphs|placeGraphs|buildGraphsFromStore|clearGraphs|writeLocalState)\(/g },
 ];
 
 // Stock Chart.js options the card sets on a chart already made (chartjs.org, 2.7)
@@ -85,7 +132,7 @@ module.exports = async function()
         const found = [];
         for( const f of rule.files ) {
             const s = src(f);
-            const hits = rule.check ? rule.check(s) : [...s.matchAll(rule.re)].map(m => ({ index: m.index, text: m[0] }));
+            const hits = rule.check ? rule.check(s, f) : [...s.matchAll(rule.re)].map(m => ({ index: m.index, text: m[0] }));
             for( const h of hits ) {
                 const line = s.slice(0, h.index).split('\n').length, lineText = s.split('\n')[line - 1];
                 const ex = EXCEPTIONS.findIndex(([r, ef, t]) => r === rule.id && ef === f && lineText.includes(t));

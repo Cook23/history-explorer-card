@@ -116,7 +116,7 @@ module.exports = async function()
 
         // ── Adding an entity already shown: a message, and that graph outlined for a moment ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }]), { height: 900 });
-    const outlines = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.canvas.parentNode.style.outline||'-').join(' / ')`);
+    const outlines = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.canvas.parentNode.style.outline||'-').join(' / ')`);
     await t.step('adding an entity already shown says so and outlines its graph, cleared soon after', async () => {
         await t.E(`(()=>{ const f=el.instance.ui.inputField[0]; f.value='sensor.rain'; f.dataset.entityId='sensor.rain'; el.instance.addEntitySelected(0); })()`);
         await t.wait(300);
@@ -128,7 +128,7 @@ module.exports = async function()
 
     // ── Graphs added from the UI: split, move a curve across groups, delete ──
     t = await openCard({ ...card([]), combineSameUnits: true }, { height: 1200 });
-    const add = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    const add = id => t.E(`(()=>{ const I=el.instance; I.addCurves(['${id}'], 'default'); })()`);
     const check = async () => (await t.E('storeProblems()')) || true;
     await t.step('entities added from the UI: combined by unit, persisted in display order', async () => {
         for( const id of ['sensor.power', 'sensor.power_kw', 'sensor.rain', 'binary_sensor.a', 'binary_sensor.b'] ) { await add(id); await t.wait(300); }
@@ -175,7 +175,7 @@ module.exports = async function()
 
     // ── A curve dropped on a graph of another group, below it: graphs stay in place ──
     t = await openCard({ ...card([]), combineSameUnits: true }, { height: 1200 });
-    const add2 = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    const add2 = id => t.E(`(()=>{ const I=el.instance; I.addCurves(['${id}'], 'default'); })()`);
     await t.step('a curve dropped on the graph split off below its own: the graphs keep their order', async () => {
         for( const id of ['sensor.power', 'sensor.power_kw', 'sensor.power2', 'sensor.rain'] ) { await add2(id); await t.wait(300); }
         await t.wait(800);

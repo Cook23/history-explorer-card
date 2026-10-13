@@ -11,7 +11,7 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
     // The values over graph i: the states shown, then each stats row (its entity: stat=value)
-    const values = (t, i = 0) => t.E(`(()=>{ const el2=el.instance._allGraphsInDisplayOrder()[${i}].chart._hecValuesEl; if(!el2) return null;
+    const values = (t, i = 0) => t.E(`(()=>{ const el2=el.instance.graphsInDisplayOrder()[${i}].chart._hecValuesEl; if(!el2) return null;
         return { states: [...el2.querySelectorAll('.hec-state')].map(s=>s.dataset.key.split('.')[1]+'='+s.textContent.trim()),
                  stats: [...el2.querySelectorAll('.hec-stats')].map(r=>r.dataset.key.split('.')[1]+':'+[...r.querySelectorAll('.hec-stat')].map(c=>c.dataset.stat+'='+c.children[1].textContent).join(',')) }; })()`);
     const num = (s, k) => Number((s.match(new RegExp(k + '=(-?[\\d.]+)')) || [])[1]);
@@ -34,7 +34,7 @@ module.exports = async function()
         { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);
     await t.step('the names of a timeline\'s and an arrowline\'s rows drawn beside them', async () => {
-        const n = await t.E(`el.instance._allGraphsInDisplayOrder().map(g=>{ const c=g.chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
+        const n = await t.E(`el.instance.graphsInDisplayOrder().map(g=>{ const c=g.chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
             const d=c.ctx.getImageData(0, a.top*r, Math.max(1,(a.left-4)*r), (a.bottom-a.top)*r).data; let k=0; for(let i=3;i<d.length;i+=4) if(d[i]>0) k++; return g.type+':'+k; })`);
         return n.every(x => Number(x.split(':')[1]) > 100) ? true : n.join(' ');
     });

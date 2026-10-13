@@ -4,7 +4,7 @@
 
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId } from "./history-series.js";
-import { INTERPOLATIONS, normalizeInterpolation, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -22,7 +22,7 @@ export function getDeviceClassPure(hass, entity)
 
 // The type an entity is shown as when nothing sets it (a YAML entity, the info panel): a
 // quantity that only adds up (total_increasing) as bars, no unit and not a measurement as a
-// timeline, anything else as a line (entities added from the card: _detectDefaultType)
+// timeline, anything else as a line (entities added from the card: detectDefaultType)
 export function baseTypePure(hass, entity)
 {
     const _attr = seriesState(hass, entity)?.attributes;
@@ -85,7 +85,7 @@ export class CardConfig
         P.roundingPrecision =      c.rounding || 2;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
-        P.defaultLineMode =        this.normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
+        P.defaultLineMode =        normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
         P.defaultInterpolation =   normalizeInterpolation(c.interpolation) ?? 'monotone';
         P.defaultLineWidth =       c.lineWidth ?? 2.0;
         P.defaultDashMode =        c.dashMode;
@@ -201,7 +201,7 @@ export class CardConfig
 
     // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
     // submenu), else its graph's, else entityOptions', else the card's
-    _resolveInterpolation(e)
+    resolveInterpolation(e)
     {
         return e?.interpolation
             ?? normalizeInterpolation(this.pconfig.graphs[e?.groupId]?.interpolation)
@@ -213,7 +213,7 @@ export class CardConfig
     // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
     // Resolved when drawn, never copied onto the entity: a curve moved to another graph
     // takes that graph's.
-    _resolveYAxis(e)
+    resolveYAxis(e)
     {
         const _valid = v => ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
         return _valid(e?.yAxis)
@@ -235,7 +235,7 @@ export class CardConfig
         return new RegExp('^' + escaped.join('.*') + '$').test(str);
     }
 
-    _isNumericEntity(entity_id)
+    isNumericEntity(entity_id)
     {
         // The entity type menu (line/bar/arrowline/timeline) only offers a real choice for
         // entities whose current state can be treated as a number. Non-numeric states
@@ -254,7 +254,7 @@ export class CardConfig
     //   - no unit and not a measurement (a state, a count...) — timeline
     //   - any other measurement — line, smart mode (or the card's own lineMode)
     // (YAML graph entities without a type keep addGraph's own simpler rule.)
-    _detectDefaultType(entity_id)
+    detectDefaultType(entity_id)
     {
         const entityOptions = this.getEntityOptions(entity_id);
         const uom = this.getUnitOfMeasure(entity_id);
@@ -263,10 +263,10 @@ export class CardConfig
         const _cumulative = sc === 'total_increasing' ||
             ( sc === 'total' && ( ['energy', 'gas', 'water', 'volume'].includes(dc) || /^([kMG]?Wh|m³|L|gal|ft³|CCF)$/.test(uom ?? '') ) );
         const type = entityOptions?.type ? entityOptions.type :
-                     this._circularPeriod({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
+                     this.circularPeriodOf({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
                      _cumulative ? 'bar' :
                      ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
-        const lineMode = this.normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
+        const lineMode = normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }
 
@@ -344,7 +344,7 @@ export class CardConfig
                     console.warn(`history-explorer-card: graph '${graph.title ?? graph.type ?? '?'}' has an invalid 'entities' (expected a list, got ${JSON.stringify(graph.entities)}) — graph skipped`);
                 continue;
             }
-            const _gid = this.g_id++;
+            const _gid = this.newGraphId();
             const _groupId = _gid; // use graph index as groupId for static graphs
             // The graph's options: under `options:`, or directly on the graph (`options:`
             // wins when both are set), with every synonym accepted
@@ -434,5 +434,19 @@ export class CardConfig
                 yAxis          : _opts.yAxis,
             };
         }
+    }
+
+    // The line mode an entity is drawn with
+    lineModeOf(e)
+    {
+        return normalizeLineMode(e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+    }
+
+    // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only
+    // modes interpolation applies to)?
+    isInterpolated(e, g)
+    {
+        const _mode = this.lineModeOf(e);
+        return ( e.type ?? g.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
     }
 }
