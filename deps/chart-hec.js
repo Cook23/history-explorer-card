@@ -636,6 +636,55 @@
       if (_root._hecMessageEl) hecUi.startFade(_root._hecMessageEl, 0);
     },
 
+    // A text shown in full where it is shortened or hidden (a legend's label, a timeline's
+    // row name or state): drawn over it, in its own font, in a box of the card's background
+    // as opaque as the Y labels' (80 %), from the same edge — r: { text, left, right, top,
+    // bottom (client), align: 'left' | 'right', font }. sticky: kept while the pointer
+    // hovers it (closeReveal), else faded out after its readingTime. One element per
+    // document or shadow root (the anchor's), reused.
+    reveal: function (r, sticky, anchorEl, boundsEl) {
+      anchorEl = anchorEl || document.body;
+      var _root = anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+      var _el = _root._hecRevealEl;
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.id = 'hec-reveal';
+        _el.style.cssText = 'z-index:9999;pointer-events:none;white-space:nowrap;border-radius:6px;padding:0 4px;box-sizing:border-box;' +
+          'background:color-mix(in srgb, var(--card-background-color,#fff) 80%, transparent);color:var(--primary-text-color,#333);' +
+          'box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:opacity ' + hecUi.FADE / 1000 + 's ease;opacity:0;';
+        _root._hecRevealEl = _el;
+      }
+      hecUi.attachFloating(_el, anchorEl);
+      _el.textContent = r.text;
+      _el.style.font = r.font;
+      // (a little room above and below its text)
+      var _fm = /(\d+(?:\.\d+)?)px/.exec(r.font);
+      var _h = Math.max(r.bottom - r.top, ( _fm ? parseFloat(_fm[1]) : 12 ) + 6);
+      r = { text: r.text, font: r.font, align: r.align, left: r.left, right: r.right, top: (r.top + r.bottom - _h) / 2, bottom: (r.top + r.bottom + _h) / 2 };
+      _el.style.lineHeight = _h + 'px';
+      _el.style.height = _h + 'px';
+      var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
+      _el.style.top = (r.top - _origin.top) + 'px';
+      _el.style.transform = '';
+      // (its text where the shortened one starts: the box's padding before it)
+      _el.style.left = (r.align === 'right' ? r.right + 4 - _el.offsetWidth : r.left - 4) - _origin.left + 'px';
+      hecUi.clampToViewport(_el, boundsEl);
+      clearTimeout(_el._hecFadeTimer);
+      clearTimeout(_el._hecRemoveTimer);
+      _el._hecSticky = !!sticky;
+      // (kept while hovered: shown at once; else faded in and out — armAutoFade)
+      _el.style.transition = sticky ? 'none' : 'opacity ' + hecUi.FADE / 1000 + 's ease';
+      if (sticky) _el.style.opacity = '1';
+      else hecUi.armAutoFade(_el, hecUi.readingTime(r.text));
+    },
+
+    // Closes the text shown in full by reveal (only the one kept while hovered, when sticky)
+    closeReveal: function (anchorEl, sticky) {
+      var _root = anchorEl && anchorEl.getRootNode ? anchorEl.getRootNode() : document;
+      var _el = _root._hecRevealEl;
+      if (_el && (!sticky || _el._hecSticky)) hecUi.closeFloating(_el);
+    },
+
     // Outlines el (a graph's wrapper): solid primary color when valid, dashed error
     // color otherwise — that one fades out (over 1.5 s) once clearOutline is called.
     outline: function (el, valid) {
@@ -998,22 +1047,56 @@
   }
 
   function truncatedYAxisLabelAt(c, idx) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    return _hecTruncatedRowLabel(c.me, idx);
+  }
+
+  // (a timeline's or arrowline's row name: its full text when cut to fit its column, else null)
+  // A scale's label too wide for availW, on two lines (ctx: in its font): at a word
+  // boundary, else at the character it no longer fits — the second line may still be too
+  // wide (_hecTruncatedRowLabel). A label already on several lines (an array, a newline)
+  // is left as it is. Used to draw it (Chart.js, scale draw) and to tell it's cut.
+  Chart.hecWrapLabel = function (ctx, label, availW) {
+    if (typeof label !== 'string' || label.indexOf('\n') !== -1 || ctx.measureText(label).width <= availW) return label;
+    var _words = label.split(' ');
+    if (_words.length > 1) {
+      var _line1 = '', _line2 = '';
+      for (var i = 0; i < _words.length; i++) {
+        var _try = _line1 ? _line1 + ' ' + _words[i] : _words[i];
+        if (ctx.measureText(_try).width <= availW) { _line1 = _try; }
+        else { _line2 = _words.slice(i).join(' '); break; }
+      }
+      if (_line1 && _line2) return [_line1, _line2];
+    }
+    // (no word boundary fits: split at the character)
+    var _split = 0;
+    for (var c = 1; c <= label.length; c++) {
+      if (ctx.measureText(label.substring(0, c)).width <= availW) _split = c;
+      else break;
+    }
+    return [label.substring(0, _split), label.substring(_split)];
+  };
+
+  // (a row's name as its Y axis draws it: on two lines when too wide — Chart.hecWrapLabel —
+  // ctx in its font)
+  function _hecRowLabelLines(me, idx, ctx) {
+    var _ys = me.scales && me.scales['y-axis-0'], lbl = me.data.labels[idx];
+    if (_ys && _ys.ticks && _ys.ticks[idx] !== undefined) lbl = _ys.ticks[idx];
+    var _l = Chart.hecWrapLabel(ctx, lbl === undefined || lbl === null ? '' : lbl, (_ys ? _ys.width : me.chartArea.left) - 8);
+    return helpers.isArray(_l) ? _l : String(_l).split('\n');
+  }
+
+  function _hecTruncatedRowLabel(me, idx) {
     if (idx < 0 || !me.data || !me.data.labels || !me.chartArea) return null;
-    var lbl = me.data.labels[idx];
-    var labelStr = helpers.isArray(lbl) ? lbl.join(' ') : lbl;
-    // A label already containing a newline was pre-wrapped upstream — already
-    // fitted to its column, nothing left to detect here.
-    if (typeof labelStr === 'string' && labelStr.indexOf('\n') !== -1) return null;
-    var origName = (me.data.datasets[idx] && me.data.datasets[idx].name) || labelStr;
-    if (!origName) return null;
     var ctx2 = me.canvas.getContext('2d');
     ctx2.save();
-    ctx2.font = '12px "Helvetica Neue", Helvetica, Arial, sans-serif';
-    var textW = ctx2.measureText(origName).width;
+    ctx2.font = me._hecRowLabelFont();
+    // (its lines as drawn — on two when too wide: one of them can still be)
+    var lines = _hecRowLabelLines(me, idx, ctx2);
+    var textW = Math.max.apply(null, lines.map(function (l) { return ctx2.measureText(String(l)).width; }));
     ctx2.restore();
-    var availW = me.chartArea.left - 8;
-    return textW > availW ? origName : null;
+    var _ys = me.scales && me.scales['y-axis-0'];
+    var origName = (me.data.datasets[idx] && me.data.datasets[idx].name) || lines.join(' ');
+    return origName && textW > (_ys ? _ys.width : me.chartArea.left) - 8 ? origName : null;
   }
 
   // Single distribution point for every consumer of a detected gesture —
@@ -1074,12 +1157,8 @@
       // options.labelTooltipEnabled), same as wheelZoomEnabled and legend
       // click toggling — a plain click on a truncated Y-axis category label
       // shows its full text, unless explicitly turned off.
-      if (_truncated && me.options.labelTooltipEnabled !== false && me.tooltip) {
-        var _cx2 = e.native ? e.native.clientX : _hx;
-        var _cy2 = e.native ? e.native.clientY : _hy;
-        var _bSel = me.options.floatingBoundsSelector;
-        Chart.hecUi.showMessage(_truncated, _cx2, _cy2, 'left', me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
-      }
+      // (and a shortened legend label: the same, in place — see _hecRevealAt)
+      if (me.options.labelTooltipEnabled !== false) me._hecShowReveal(me._hecRevealAt(_hx, _hy, true), false);
       // (with handleButtons shown there instead, a click is for them: payload.handleButton)
       var _clickInLockAndHandleZone = me._hecInLockAndHandleZone(_hx, _hy) && !me._hecHandleButtons();
       if (_clickInLockAndHandleZone) {
@@ -2171,29 +2250,89 @@
       return _i >= 0 ? els[_i] : null;
     },
 
-    // The value a hover is on, among the curves whose points aren't shown (by the picking
-    // rule, on each value drawn); null when there's none. Its dot is drawn (hecHoverDot) —
-    // e null: none
+    // The value a hover shows the dot of (hecHoverDot): the curve the hover is on, by the
+    // picking rule (_hecCurveAt, along its drawn path), and its value nearest the pointer
+    // along the time axis (_hecNearestValueOf) — as the tooltip mode does; none on a curve
+    // showing its points, or between two curves — e null: none
     _hecUpdateHoverDot: function (e) {
       var me = this, el = null;
       if (e && e.x !== null && e.y !== null && !me._hecShowSamples) {
-        var _m = Chart.hecGestures(pickPointerType).slop, els = [];
-        (me.data.datasets || []).forEach(function (ds, i) {
-          var meta = me.getDatasetMeta(i);
-          if (!meta.dataset || !me.isDatasetVisible(i) || ds.pointRadius > 0) return;
-          me._hecOnlyDrawnPoints(meta.data || []).forEach(function (p) {
-            if (!p._view.hecVirtual && Math.abs(p._view.x - e.x) <= _m) els.push(p);
-          });
-        });
-        var _i = _hecPickNearest(els.map(function (p) {
-          var dx = p._view.x - e.x, dy = p._view.y - e.y;
-          return { d: Math.sqrt(dx * dx + dy * dy), x: p._view.x, y: p._view.y };
-        }));
-        el = _i >= 0 ? els[_i] : null;
+        var _i = me._hecCurveAt(e.x, e.y);
+        if (_i >= 0 && !(me.data.datasets[_i].pointRadius > 0)) el = me._hecNearestValueOf(_i, e.x);
       }
       if (el === (me._hecHoverDot || null)) return;
       me._hecHoverDot = el;
       me.render({ duration: 0, lazy: true });
+    },
+
+    // The font of a timeline's or arrowline's row names (its Y axis' ticks)
+    _hecRowLabelFont: function () {
+      var _s = this.scales && this.scales['y-axis-0'], t = (_s && _s.options.ticks) || {}, gd = Chart.defaults.global;
+      return helpers.fontString(helpers.valueOrDefault(t.fontSize, gd.defaultFontSize), helpers.valueOrDefault(t.fontStyle, gd.defaultFontStyle),
+                                helpers.valueOrDefault(t.fontFamily, gd.defaultFontFamily));
+    },
+
+    // A text shortened or hidden at a canvas-relative point, to show in full where it is
+    // (Chart.hecUi.reveal): a legend's label shortened (legend.labels.hecShortNames), a
+    // timeline's or arrowline's row name cut to fit its column, a timeline's state its bar
+    // is too narrow for (not on a click: that one opens the tooltip) — { text, left, right,
+    // top, bottom (client), align, font }, or null
+    _hecRevealAt: function (x, y, click) {
+      var me = this, _a = me.chartArea, _c = me.canvas.getBoundingClientRect(), ctx = me.ctx;
+      var at = function (o) { return { text: o.text, font: o.font, align: o.align, left: _c.left + o.left, right: _c.left + o.right, top: _c.top + o.top, bottom: _c.top + o.bottom }; };
+      var width = function (text, font) { ctx.save(); ctx.font = font; var w = ctx.measureText(text).width; ctx.restore(); return w; };
+      var _li = me._hecLegendIndexAt(x, y);
+      if (_li >= 0) {
+        var it = me.legend.legendItems[_li], hb = me.legend.legendHitBoxes[_li];
+        if (!it || !hb || !it.hecFullText || it.hecFullText === it.text) return null;
+        var lo = me.legend.options.labels, gd = Chart.defaults.global;
+        var _lf = helpers.fontString(helpers.valueOrDefault(lo.fontSize, gd.defaultFontSize), helpers.valueOrDefault(lo.fontStyle, gd.defaultFontStyle),
+                                     helpers.valueOrDefault(lo.fontFamily, gd.defaultFontFamily));
+        var _right = hb.left + hb.width;
+        return at({ text: it.hecFullText, font: _lf, align: 'left', left: _right - width(it.text, _lf), right: _right, top: hb.top, bottom: hb.top + hb.height });
+      }
+      var _rows = me.config.type === 'timeline' || me.config.type === 'arrowline';
+      if (!_rows || !_a || y < _a.top || y > _a.bottom) return null;
+      if (x < _a.left) {
+        var _yi = me._hecYAxisIndexAt(x, y), _full = _hecTruncatedRowLabel(me, _yi);
+        if (!_full) return null;
+        var _py = me.scales['y-axis-0'].getPixelForValue(null, _yi, _yi), _rf = me._hecRowLabelFont();
+        var _fs = helpers.valueOrDefault((me.scales['y-axis-0'].options.ticks || {}).fontSize, Chart.defaults.global.defaultFontSize);
+        // (over all its lines, as wrapped: none of them shows through)
+        ctx.save(); ctx.font = _rf; var _n = _hecRowLabelLines(me, _yi, ctx).length; ctx.restore();
+        var _bh = _n * _fs * 1.2 + 6;
+        return at({ text: _full, font: _rf, align: 'right', left: 0, right: _a.left - 6, top: _py - _bh / 2, bottom: _py + _bh / 2 });
+      }
+      if (click || me.config.type !== 'timeline') return null;
+      var el = me._hecElementAt(x, y), v = el && el._view, eo = me.options.elements || {};
+      if (!v || !v.text || x < v.x || x > v.x + v.width || y < v.y || y > v.y + v.height) return null;
+      var _sf = eo.font || 'bold 12px "Helvetica Neue", Helvetica, Arial, sans-serif', _pad = eo.textPadding || 0;
+      var _tw = width(String(v.text), _sf);
+      // (drawn when it fits — deps/timeline.js)
+      if (_tw > 0 && _tw + _pad + 2 < v.width) return null;
+      return at({ text: String(v.text), font: _sf, align: 'left', left: v.x + _pad, right: v.x + _pad + _tw, top: v.y, bottom: v.y + v.height });
+    },
+
+    // Shows r (_hecRevealAt) in full, kept while hovered (sticky) or for its reading time;
+    // r null: the one kept while hovered closes
+    _hecShowReveal: function (r, sticky) {
+      var me = this, _bSel = me.options.floatingBoundsSelector;
+      if (!r) {
+        if (sticky && me._hecRevealKey) Chart.hecUi.closeReveal(me.canvas, true);
+        me._hecRevealKey = null;
+        return;
+      }
+      var _key = r.text + '|' + Math.round(r.left) + '|' + Math.round(r.top);
+      if (sticky && me._hecRevealKey === _key) return;
+      me._hecRevealKey = sticky ? _key : null;
+      Chart.hecUi.reveal(r, sticky, me.canvas, _bSel && me.canvas.closest ? me.canvas.closest(_bSel) : null);
+    },
+
+    // A hover (a mouse, a pen above the screen) over a text shortened or hidden shows it in
+    // full while it stays there (options.labelTooltipEnabled) — e null: the pointer left
+    _hecUpdateReveal: function (e) {
+      if (this.options.labelTooltipEnabled === false) return;
+      this._hecShowReveal(e && e.x !== null && e.y !== null ? this._hecRevealAt(e.x, e.y, false) : null, true);
     },
 
     // The tooltip mode ends: no curve in it any more
@@ -2217,15 +2356,19 @@
       var me = this, ho = me.options.hover;
       var _curves = (me._hecTooltipCurves || []).filter(function (i) { return me.isDatasetVisible(i); });
       if (!_curves.length) return me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho));
-      return _curves.map(function (i) {
-        var _best = null, _d = Infinity;
-        me._hecOnlyDrawnPoints(me.getDatasetMeta(i).data || []).forEach(function (el) {
-          if (el._view.hecVirtual) return;
-          var d = Math.abs(el._view.x - e.x);
-          if (d < _d) { _d = d; _best = el; }
-        });
-        return _best;
-      }).filter(function (el) { return el; });
+      return _curves.map(function (i) { return me._hecNearestValueOf(i, e.x); }).filter(function (el) { return el; });
+    },
+
+    // Curve i's value drawn on the plot area nearest x along the time axis (never a
+    // curve-shaping point), or null
+    _hecNearestValueOf: function (i, x) {
+      var _best = null, _d = Infinity;
+      this._hecOnlyDrawnPoints(this.getDatasetMeta(i).data || []).forEach(function (el) {
+        if (el._view.hecVirtual) return;
+        var d = Math.abs(el._view.x - x);
+        if (d < _d) { _d = d; _best = el; }
+      });
+      return _best;
     },
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):

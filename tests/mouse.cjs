@@ -147,11 +147,11 @@ module.exports = async function()
         const name = names(g0[0])[0];
         return !names(g1[0]).includes(name) && names(g1[1]).includes(name) && g2.join() === g0.join() ? true : JSON.stringify({ g0, g1, g2 });
     });
-    await t.step('click a truncated timeline label shows its full name', async () => {
+    await t.step('click a truncated timeline label shows its full name, in place', async () => {
         const i = (await t.graphs()).findIndex(x => x.startsWith('t:'));
         const a = await E(`tlPt(${i},0)`);
         await t.page.mouse.click(a.x, a.y); await t.wait(500);
-        const tip = await E('tip()');
+        const tip = await E('reveal()');
         return /garden shed near the pool/.test(tip || '') ? true : 'message=' + tip;
     });
     await t.step('reorder curve labels within a graph (time range untouched)', async () => {
@@ -254,5 +254,35 @@ module.exports = async function()
             : JSON.stringify({ free0, free1, l0, l1, locked, back, b1 });
     });
     const r2 = await t2.close();
-    return { passed: r.passed + r2.passed, failed: r.failed + r2.failed };
+
+    // ── A text shortened or hidden, shown in full in place: a hover, a click ──
+    const t3 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a', name: 'front door of the garden shed near the pool' }, { entity: 'binary_sensor.b' }] }] }, { mock: { series: true } });
+    const E3 = x => t3.E(x);
+    await E3(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t3.wait(1500);
+    const away = async () => { await t3.page.mouse.move(5, 5, { steps: 3 }); await t3.wait(300); };
+    const hover = async p => { await t3.page.mouse.move(p.x, p.y, { steps: 4 }); await t3.wait(300); return E3('reveal()'); };
+    // (where the reveal box is, against where the shortened text starts)
+    const box = () => E3(`(()=>{ const e=document.getElementById('hec-reveal'); const r=e.getBoundingClientRect(); return { l: r.left, r: r.right }; })()`);
+    await t3.step('a hover on a shortened legend label shows its full name over it, from where it starts; leaving it, gone', async () => {
+        const p = await E3(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-10, y: r.top+b.top+b.height/2, right: r.left+b.left+b.width, text: c.legend.legendItems[0].text }; })()`);
+        const shown = await hover(p), b = await box(); await away(); const after = await E3('reveal()');
+        return shown === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && p.text !== shown && b.r > p.right && after === null ? true : JSON.stringify({ p, shown, b, after });
+    });
+    await t3.step('a hover on a cut timeline row name shows it in full; on one shown whole, nothing', async () => {
+        const row = i => E3(`(()=>{ const p=tlPt(1,${i}), c=graphAt(1).chart, r=c.canvas.getBoundingClientRect(); return { x: r.left+c.chartArea.left-15, y: p.y }; })()`);
+        const cut = await hover(await row(0)); await away();
+        const whole = await hover(await row(1)); await away();
+        return /garden shed near the pool/.test(cut || '') && whole === null ? true : JSON.stringify({ cut, whole });
+    });
+    await t3.step('a hover on a timeline state its bar is too narrow for shows it', async () => {
+        const s = await E3(`(()=>{ const c=graphAt(1).chart, r=c.canvas.getBoundingClientRect(); const v=c.getDatasetMeta(0).data.map(p=>p._view).find(v=>v.width>2&&v.width<30&&v.x>c.chartArea.left+5);
+            return v ? { x: r.left+v.x+v.width/2, y: r.top+v.y+v.height/2, text: String(v.text) } : null; })()`);
+        if( !s ) return 'no narrow state';
+        const shown = await hover(s); await away();
+        return shown === s.text ? true : JSON.stringify({ s, shown });
+    });
+    const r3 = await t3.close();
+    return { passed: r.passed + r2.passed + r3.passed, failed: r.failed + r2.failed + r3.failed };
 };

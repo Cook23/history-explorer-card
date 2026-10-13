@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.17b1] - 2026-10-13
+
+### Fixed — the point hovered: on the curve hovered, not only on one of its values
+- Outside the tooltip mode, a hover showed a curve's point only when it was almost on one of its values: between two values far apart, nothing. The curve is now picked as everywhere else — the one the pointer is on, along its drawn line, or just beside it — and the dot shown is its value nearest along the time, as in the tooltip mode (Chart.js `_hecNearestValueOf`, shared by both)
+- Tests: a hover on a curve a third of the way between two values far apart shows the dot of the nearest
+
+### New — a text shortened or hidden shown in full, in place
+- A legend's label shortened, a timeline's or arrowline's row name cut to fit its column, a timeline's state its bar is too narrow for: a hover (a mouse, a pen above the screen) shows it in full while it stays there; a click or a tap does too, for its reading time, where the click isn't taken (a row name; a legend label — its curve hidden or shown as before)
+- Shown where the text is, from the same edge, in its own font, in a box of the card's background as opaque as the Y labels' — rather than a tooltip beside the pointer; over a row name's lines, all of them (Chart.hecUi `reveal`)
+- A row name wrapped on two lines counts as cut only when one of its lines still is: the wrap is one rule, used to draw it and to tell (`Chart.hecWrapLabel`)
+- Tests: a hover on a shortened legend label, a cut row name (one shown whole: nothing), a timeline state too narrow; a tap on a legend label and on a row name
+
 ## [v1.2.16] - 2026-10-13
 
 ### Fixed — a narrow card (a grid, a horizontal stack) readable

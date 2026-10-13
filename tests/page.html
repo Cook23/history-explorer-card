@@ -50,6 +50,8 @@ window.datasets=(gi)=>graphAt(gi).chart.data.datasets.map(d=>{ const xs=d.data.m
   return { label:d.label, n:d.data.length, x0:xs.length?Math.min(...xs):null, x1:xs.length?Math.max(...xs):null }; });
 // The next file the card saves (FileSaver's saveAs), as text
 window.captureSave=()=>{ window.__saved=null; window.saveAs=(blob,name)=>blob.text().then(t=>{ window.__saved={name,text:t}; }); };
+// The text shown in full in place of a shortened one (Chart.hecUi.reveal): its text while shown, else null
+window.reveal=()=>{ const t=document.getElementById('hec-reveal'); return t&&t.isConnected&&getComputedStyle(t).opacity!=='0'?t.textContent:null; };
 window.tip=()=>{ const t=el.querySelector('#hec-label-tooltip')||document.getElementById('hec-label-tooltip'); return t?t.textContent:null; };
 window.menuOpen=()=>{ const m=el.querySelector('#et_0'); return m? getComputedStyle(m).display!=='none' && m.style.display!=='none' : null; };
 </script></body></html>

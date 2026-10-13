@@ -172,5 +172,24 @@ module.exports = async function()
         return open ? true : 'type menu not open';
     });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
-    return t.close();
+    const r = await t.close();
+
+    // ── A text shortened, shown in full in place by a tap ──
+    const t2 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] },
+        { type: 'timeline', entities: [{ entity: 'binary_sensor.a', name: 'front door of the garden shed near the pool' }, { entity: 'binary_sensor.b' }] }] }, { touch: true, mock: { series: true } });
+    const E2 = x => t2.E(x);
+    await E2(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t2.wait(1500);
+    await t2.step('a tap on a shortened legend label: its curve hidden, its full name shown over it for a while; a tap on a cut timeline row name: shown in full', async () => {
+        const p = await E2(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-10, y: r.top+b.top+b.height/2 }; })()`);
+        await t2.tap(p); await t2.wait(500);
+        const label = await E2('reveal()'), hidden = await E2('!!graphAt(0).chart.getDatasetMeta(0).hidden');
+        await t2.tap(p); await t2.wait(4000);
+        const row = await E2(`(()=>{ const q=tlPt(1,0), c=graphAt(1).chart, r=c.canvas.getBoundingClientRect(); return { x: r.left+c.chartArea.left-15, y: q.y }; })()`);
+        await t2.tap(row); await t2.wait(500);
+        const name = await E2('reveal()');
+        return label === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && hidden && /garden shed near the pool/.test(name || '') ? true : JSON.stringify({ label, hidden, name });
+    });
+    const r2 = await t2.close();
+    return { passed: r.passed + r2.passed, failed: r.failed + r2.failed };
 };

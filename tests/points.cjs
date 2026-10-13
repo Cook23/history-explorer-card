@@ -325,5 +325,24 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The hover dot: the curve the pointer is on, then its value nearest along the time ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true } });
+    await t.step('a hover on a curve between two values far apart: the dot of the one nearest along the time', async () => {
+        // (a point of the drawn path, a third of the way from a value to the next, away from both)
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
+            const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>A.left&&o.v.x<A.right);
+            const k=real.findIndex((o,j)=>j+1<real.length&&real[j+1].v.x-o.v.x>60); if(k<0) return null;
+            const a=real[k], b=real[k+1], x=a.v.x+(b.v.x-a.v.x)/3;
+            const path=m.map(q=>q._view).filter(v=>!v.skip).sort((u,w)=>u.x-w.x); const j=path.findIndex(v=>v.x>=x); const u=path[j-1], w=path[j];
+            const y=u.y+(w.y-u.y)*(x-u.x)/(w.x-u.x);
+            return { x: r.left+x, y: r.top+y, a: a.i, gap: Math.round(b.v.x-a.v.x), da: Math.round(Math.hypot(a.v.x-x, a.v.y-y)) }; })()`);
+        if( !p ) return 'no values far apart';
+        await t.page.mouse.move(p.x, p.y - 30, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(300);
+        const d = await hoverDot(0);
+        return d && d[0] === 0 && d[1] === p.a && p.da > 15 ? true : JSON.stringify({ p, d });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

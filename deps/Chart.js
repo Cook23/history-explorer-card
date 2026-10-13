@@ -4697,6 +4697,7 @@
                 me._hecLastHitXY = undefined;
                 me._hecEndTooltipMode();
                 me._hecUpdateHoverDot(null);
+                me._hecUpdateReveal(null);
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -4751,6 +4752,8 @@
               // the value it's on (_hecUpdateHoverDot)
               if (hoverOptions.dotOnHover) me._hecUpdateHoverDot(!me._hecTooltipMode && _inPlot && !(e.native && e.native.buttons) ? e : null);
             }
+            // (fork) a hover over a text shortened or hidden shows it in full (_hecUpdateReveal)
+            if (e.type === 'mousemove') me._hecUpdateReveal(!(e.native && e.native.buttons) ? e : null);
 
             // ── Generic gesture detection (customEvent hook + panX/zoomX) ─
             // Timing/threshold constants and overall structure (arm long-press on
@@ -8070,36 +8073,7 @@
                 // specifically. Idempotent: a label that already arrived pre-wrapped —
                 // as an array, or as a string containing a newline — is left exactly as
                 // given; this only ever wraps a plain single-line string that doesn't fit.
-                if (typeof label === 'string' && label.indexOf('\n') === -1) {
-                  var _availW = me.width - 8;
-                  if (context.measureText(label).width > _availW) {
-                    var _words = label.split(' ');
-                    var _wrapped = null;
-                    if (_words.length > 1) {
-                      var _line1 = '', _line2 = '';
-                      for (var _wi = 0; _wi < _words.length; _wi++) {
-                        var _try = _line1 ? _line1 + ' ' + _words[_wi] : _words[_wi];
-                        if (context.measureText(_try).width <= _availW) {
-                          _line1 = _try;
-                        } else {
-                          _line2 = _words.slice(_wi).join(' ');
-                          break;
-                        }
-                      }
-                      if (_line1 && _line2) _wrapped = [_line1, _line2];
-                    }
-                    if (!_wrapped) {
-                      // No word boundary fits — split at character level
-                      var _split = 0;
-                      for (var _ci = 1; _ci <= label.length; _ci++) {
-                        if (context.measureText(label.substring(0, _ci)).width <= _availW) _split = _ci;
-                        else break;
-                      }
-                      _wrapped = [label.substring(0, _split), label.substring(_split)];
-                    }
-                    label = _wrapped;
-                  }
-                }
+                label = Chart.hecWrapLabel(context, label, me.width - 8);
 
                 if (helpers.isArray(label)) {
                   var lineHeight = tickFont.size * 1.2;
@@ -12013,7 +11987,8 @@
                   // first line left empty — never cut for it)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
                   if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
-                  me.legendItems.forEach(function (it, k) { it.text = _fitted[k]; });
+                  // (the full text kept: shown in place on a hover or a click — _hecRevealAt)
+                  me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
                 }
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
