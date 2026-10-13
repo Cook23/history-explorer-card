@@ -74,6 +74,8 @@ export class CardValues
             _el.id = `hv-${g.id}`;
             _el.style.cssText = 'padding:0 10px 4px 10px;color:var(--primary-text-color)';
             _box.parentNode.insertBefore(_el, _box);
+            // (a click on a value now: its entity's dialog, as on its value in the legend)
+            _el.addEventListener('click', ev => { const _s = ev.target.closest?.('.hec-state'); if( _s ) this._openEntityInfo(_s.dataset.entity); });
         }
         const _p = 10 ** this.pconfig.roundingPrecision;
         const _num = v => String(Math.round(v * _p) / _p);
@@ -84,7 +86,7 @@ export class CardValues
         const _state = (x, size) => {
             const s = this.stateOf(x.e.entity)?.state;
             const v = isNaN(Number(s)) ? ( s ?? '' ) : _num(Number(s) * ( x.d.shownScale ?? 1 ));
-            return `<div class="hec-state" data-entity="${x.e.entity}" style="color:${_color(x)};font-size:${size};line-height:1.2;${_narrow ? _cut : ''}">${v}${_unit(x)}</div>`;
+            return `<div class="hec-state" data-entity="${x.e.entity}" style="color:${_color(x)};font-size:${size};line-height:1.2;cursor:pointer;${_narrow ? _cut : ''}">${v}${_unit(x)}</div>`;
         };
         let html = '';
         if( _states.length && _narrow && _states.length > 1 ) {

@@ -161,6 +161,10 @@ card may need, so it never has to compute one from the chart's layout.
   xFactor,             // where x is along the time axis: 0 at the plot area's left
                        // edge, 1 at its right edge (undefined before the first layout)
   legendIndex,         // legend label under the point, or -1
+  legendPart,          // which part of it: 'value' (what follows its dataset's name —
+                       // '(400 W)', the right axis' '▸' — at its end) or 'name' (its
+                       // swatch and mark too); null off a label. Hidden, only its name
+                       // is struck through
   yAxisIndex,          // timeline/arrowline row under the point, or -1
   labelRect,           // client rectangle {left, top, right, bottom} of that legend
                        // label, else of that row (the whole label column), else null

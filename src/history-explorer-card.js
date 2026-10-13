@@ -527,7 +527,7 @@ export class HistoryCardState {
                 if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
                     if( this.pconfig.showCurrentValues && g !== this._frozenChart ) {
                         let d = g.chart.data.datasets[i];
-                        d.label = this._legendLabel(d);
+                        Object.assign(d, this._legendParts(d));
                     }
                     changed = true;
                 }

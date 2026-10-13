@@ -57,9 +57,11 @@ export function typeMenuHtml(i, full)
     const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k));
     // (the tests set apart from what concerns the entity)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
+    // (Info: the entity's dialog, as a click on its value — before the tests; the card's only)
+    const line = k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k));
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
+            ${keys.filter(k => k !== 'tests').map(line).join('')}${full ? a(`et_${i}_info`, i18n('ui.menu.entity_info'), true) : ''}${keys.includes('tests') ? line('tests') : ''}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
@@ -120,6 +122,7 @@ export class CardMenus
         _TYPE_MENU_DEFS.forEach((d, k) => set(`et_${i}_${k}`, i18n(d.label)));
         for( const k in _LAYOUT_ENTRIES ) set(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]));
         for( const k in CARD_TESTS ) set(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label));
+        set(`et_${i}_info`, i18n('ui.menu.entity_info'));
     }
 
     // Shows the representation submenu's entries for an entity — only Timeline when it
@@ -217,6 +220,8 @@ export class CardMenus
         show(q('delete'), _longPress);
         show(q('gdelete'), false);
         show(q('ylock'), false);
+        // (Info: an entity shown, from its label)
+        show(q('info'), _longPress);
         // (a curve: its samples' dots)
         const _points = q('points');
         const _isCurve = _longPress && !!_e && !this._isRowGraph(graph) && !!graph.chart.getDatasetMeta(graph.entities.indexOf(_e)).dataset;
@@ -308,7 +313,7 @@ export class CardMenus
         _menu._hec_anchor    = { clientX, clientY };
         this.hideTypeSubmenus(input_idx);
 
-        for( const k of ['tests', 'split', 'delete', 'default'] ) show(q(k), false);
+        for( const k of ['tests', 'split', 'delete', 'default', 'info'] ) show(q(k), false);
         // (entities not all numeric: timeline the only choice — nothing to choose)
         const _numeric = graph.entities.every(e => this._isNumericEntity(e.entity));
         show(q('rep'), _numeric);
@@ -479,6 +484,7 @@ export class CardMenus
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
         for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
         for( const k in CARD_TESTS ) _on(`test_${k}`, () => { this.hideEntityTypeMenu(_ii); openCardTest(k); });
+        _on('info', () => { const _id = _etMenu._hec_entity_id; this.hideEntityTypeMenu(_ii); this._openEntityInfo(_id); });
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
             const _sel = _etMenu.querySelector('a[data-hec-selected]');

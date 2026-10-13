@@ -124,5 +124,44 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A click on a value: the entity's dialog (the info panel, when on) ──
+    t = await openCard(card({ showState: true, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1000);
+    await t.E(`window.__mi=[]; document.addEventListener('hass-more-info', e => __mi.push(e.detail.entityId))`);
+    const mi = () => t.E('__mi.splice(0)');
+    // (a legend label's point, at fraction f of its width; its value's middle — before its mark)
+    const labelAt = (i, f) => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*${f}, y: r.top+b.top+b.height/2 }; })()`);
+    const valueOf = i => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;
+        ctx.save(); ctx.font=c._hecLegendFont(); const m=it.hecMark?ctx.measureText(' '+it.hecMark).width:0, v=ctx.measureText(it.hecValue).width; ctx.restore();
+        return { x: r.left+b.left+b.width-m-v/2, y: r.top+b.top+b.height/2 }; })()`);
+    const hidden = i => t.E(`!!graphAt(0).chart.getDatasetMeta(${i}).hidden`);
+    await t.step('a click on a legend label\'s value: its entity\'s dialog, the curve still shown; on its name: the curve hidden', async () => {
+        const v = await valueOf(1); await t.page.mouse.click(v.x, v.y); await t.wait(500);
+        const onValue = await mi(), h1 = await hidden(1);
+        const n = await labelAt(1, 0.4); await t.page.mouse.click(n.x, n.y); await t.wait(500);
+        const onName = await mi(), h2 = await hidden(1);
+        return onValue.join() === 'sensor.rain' && !h1 && !onName.length && h2 ? true : JSON.stringify({ onValue, h1, onName, h2 });
+    });
+    await t.step('a curve hidden: its name struck through, not its value', async () => {
+        // (the share of the label's middle row inked, over its name and over its value)
+        const inked = await t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend, b=L.legendHitBoxes[1], it=L.legendItems[1], k=c.canvas.width/c.canvas.getBoundingClientRect().width, ctx=c.ctx;
+            ctx.save(); ctx.font=c._hecLegendFont(); const nw=ctx.measureText(it.text).width, tw=ctx.measureText(legendText(it)).width, vw=ctx.measureText(it.hecValue).width; ctx.restore();
+            const left=b.left+b.width-tw, y=Math.round((b.top+L.options.labels.fontSize/2)*k);
+            const share=(x0,x1)=>{ const d=c.ctx.getImageData(Math.round(x0*k), y, Math.max(1,Math.round((x1-x0)*k)), 1).data; let n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]>100 && d[i]+d[i+1]+d[i+2]<500) n++; return n/(d.length/4); };
+            const vl=left+nw+ctx.measureText(' ').width;
+            return { name: share(left+2, left+nw-2), value: share(vl+3, vl+vw-2) }; })()`);
+        return inked.name > 0.9 && inked.value < 0.6 ? true : JSON.stringify(inked);
+    });
+    await t.step('a click on a value over the graph: its entity\'s dialog; the Info of a curve\'s menu: the same', async () => {
+        await t.E(`el.querySelector('.hec-state[data-entity="sensor.power"]').click()`); await t.wait(300);
+        const fromValue = await mi();
+        const p = await labelAt(0, 0.3); await t.longPress(p);
+        const shown = await t.E(`(()=>{ const i=el.querySelector('#et_0_info'); return !!i && i.style.display!=='none'; })()`);
+        await t.E(`el.querySelector('#et_0_info').click()`); await t.wait(300);
+        const fromMenu = await mi();
+        return fromValue.join() === 'sensor.power' && shown && fromMenu.join() === 'sensor.power' ? true : JSON.stringify({ fromValue, shown, fromMenu });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

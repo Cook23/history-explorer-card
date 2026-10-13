@@ -345,7 +345,7 @@ All drag operations show a ghost element and horizontal insertion marker for pre
 
 ### Legend / entity labels
 
-You can hide an entity in a graph by clicking its label on the top. Click it a second time to make the entity visible again. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced YAML example at the end of this readme). **(1.2)** A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
+You can hide an entity in a graph by clicking its label on the top — its name, struck through then, not its value. Click it a second time to make the entity visible again. **(1.2)** A click on its value — `(400 W)` at the end of its label — or on its value shown over the graph (`showState`) opens Home Assistant's dialog of the entity, with the [info panel](#overriding-the-ha-more-info-history-info-panel) in it when it's on; so does *Info* in its menu. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced YAML example at the end of this readme). **(1.2)** A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
 
 **Double-clicking** a label extracts the corresponding curve into its own graph (see the *Ungrouping a curve* section above).
 

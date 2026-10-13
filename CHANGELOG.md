@@ -6,6 +6,13 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.17b1] - 2026-10-13
 
+### New — a click on a value opens its entity's dialog
+- A legend label is now two parts: its name — a click shows or hides the curve, the other gestures as before — and its value at its end (`(400 W)`): a click there opens Home Assistant's dialog of the entity, with the card's info panel in it when it's on, the curve left as it is. The other gestures (a drag, a long-press, a double-click) act on the whole label, as before
+- The same from a value shown over the graph (`showState`, `look: mini`), and from *Info* in a curve's menu (not the info panel's own menu: it is that dialog)
+- A curve hidden: its name struck through, no longer its value
+- A legend label is made of distinct parts the card gives Chart.js — its name (`dataset.label`), its value (`dataset.hecLegendValue`, `(400 W)`), the right axis' mark (`dataset.hecLegendMark`, `▸`) — rather than one text: Chart.js lays them out (`Chart.hecLegendTail`), shortens the name only, strikes through the name only, and says which part a gesture is on (`legendPart`: 'name', 'value')
+- Tests: a click on a label's value (the dialog, the curve shown) and on its name (hidden); the strike over the name only; a value over the graph and the menu's Info
+
 ### Fixed — the point hovered: on the curve hovered, not only on one of its values
 - Outside the tooltip mode, a hover showed a curve's point only when it was almost on one of its values: between two values far apart, nothing. The curve is now picked as everywhere else — the one the pointer is on, along its drawn line, or just beside it — and the dot shown is its value nearest along the time, as in the tooltip mode (Chart.js `_hecNearestValueOf`, shared by both)
 - Tests: a hover on a curve a third of the way between two values far apart shows the dot of the nearest

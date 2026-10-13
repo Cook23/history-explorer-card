@@ -60,6 +60,8 @@ export class CardGestures
     {
         const idx = info.legendIndex;
         if( idx < 0 ) return;
+        // (on its value: the entity's dialog — the curve stays as it is)
+        if( info.legendPart === 'value' ) return this._openEntityInfo(g.entities[idx]?.entity);
         const meta = g.chart.getDatasetMeta(idx);
         meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
         g.chart.update();
@@ -68,6 +70,16 @@ export class CardGestures
         if( _e ) _e.hidden = _hiddenState || undefined;
         this._showValues(g);
         this.writeLocalState();
+    }
+
+    // Home Assistant's dialog of an entity — with the card's info panel in it, when it's on —
+    // from a click on its value (in the legend, over the graph) or its menu's Info
+    _openEntityInfo(entityId)
+    {
+        if( !entityId ) return;
+        const _e = new Event('hass-more-info', { bubbles: true, composed: true });
+        _e.detail = { entityId };
+        this._this.dispatchEvent(_e);
     }
 
     // Double-click: on the chain icon, merges two linked graphs back into one; on a legend

@@ -11745,6 +11745,10 @@
               return helpers.isArray(data.datasets) ? data.datasets.map(function (dataset, i) {
                 return {
                   text: dataset.label,
+                  // (fork) the label's other parts, after its name: its value ('(400 W)'),
+                  // a mark ('▸') — see Chart.hecLegendTail
+                  hecValue: dataset.hecLegendValue || '',
+                  hecMark: dataset.hecLegendMark || '',
                   fillStyle: last(dataset.backgroundColor),
                   hidden: !chart.isDatasetVisible(i),
                   lineCap: dataset.borderCapStyle,
@@ -11979,20 +11983,20 @@
                     return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
                   };
                   var _items = me.legendItems.map(function (it) {
-                    var _ds = me.chart.data.datasets[it.datasetIndex] || {};
-                    return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
+                    return { name: it.text, tail: Chart.hecLegendTail(it), forms: _shortNames[it.datasetIndex] };
                   });
                   // (to a whole line below the first; the first label not fitting the first line,
                   // between its margins, to that one if a shorter form fits there — rather than a
                   // first line left empty — never cut for it)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
                   if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
-                  // (the full text kept: shown in place on a hover or a click — _hecRevealAt)
+                  // (its name shortened, its full name kept: shown in place on a hover or a click
+                  // — _hecRevealAt)
                   me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
                 }
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
+                  var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   var _m = me._hecMarginsOf(lineWidths.length - 1);
                   if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - _m.l - _m.r) {
@@ -12033,7 +12037,7 @@
 
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var itemWidth = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
+                  var itemWidth = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   // If too tall, go to new column
                   if (currentColHeight + itemHeight > minSize.height) {
@@ -12151,14 +12155,18 @@
                 var xLeft = boxWidth + halfFontSize + x;
                 var yMiddle = y + halfFontSize;
 
+                // (fork) its name, then its other parts (Chart.hecLegendTail)
+                var _nameWidth = ctx.measureText(legendItem.text).width;
                 ctx.fillText(legendItem.text, xLeft, yMiddle);
+                var _tail = Chart.hecLegendTail(legendItem);
+                if (_tail) ctx.fillText(_tail, xLeft + _nameWidth, yMiddle);
 
                 if (legendItem.hidden) {
-                  // Strikethrough the text if hidden
+                  // Strikethrough the text if hidden — (fork) its name only
                   ctx.beginPath();
                   ctx.lineWidth = 2;
                   ctx.moveTo(xLeft, yMiddle);
-                  ctx.lineTo(xLeft + textWidth, yMiddle);
+                  ctx.lineTo(xLeft + _nameWidth, yMiddle);
                   ctx.stroke();
                 }
               };
@@ -12181,7 +12189,7 @@
 
               var itemHeight = fontSize + labelOpts.padding;
               helpers.each(me.legendItems, function (legendItem, i) {
-                var textWidth = ctx.measureText(legendItem.text).width;
+                var textWidth = ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
                 var width = boxWidth + fontSize / 2 + textWidth;
                 var x = cursor.x;
                 var y = cursor.y;

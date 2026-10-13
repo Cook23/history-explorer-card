@@ -12,7 +12,7 @@ module.exports = async function()
     const done = r => { passed += r.passed; failed += r.failed; };
     // Each graph: its type, its Y axes (id:unit), its plot area's right edge, each curve's axis and legend label
     const graphs = t => t.E(`el.instance.graphs.map(g=>({ type: g.type, group: g.groupId, axes: g.chart.options.scales.yAxes.map(a=>a.id+':'+(a.scaleLabel.labelString ?? '')).join(),
-        right: Math.round(g.chart.chartArea.right), curves: g.chart.data.datasets.map(d=>(d.yAxisID ?? '')+'|'+d.label) }))`);
+        right: Math.round(g.chart.chartArea.right), curves: g.chart.data.datasets.map(d=>(d.yAxisID ?? '')+'|'+legendText(d)) }))`);
 
     let t = await openCard(card({ graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }, { entity: 'sensor.rain' }, { entity: 'binary_sensor.a', type: 'timeline' }] },

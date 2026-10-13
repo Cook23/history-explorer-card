@@ -260,43 +260,47 @@
     } });
 
   // ---------------------------------------------------------------------------
-  // A chart's legend labels fitted to room px each (legend.labels.hecShortNames, see the
-  // legend's fit) — items: [{ text, name, forms }], text the label, name the dataset's name
-  // at its start, forms its shorter forms (least shortened first). As they are when they
-  // all fit; else every name at the same step — the first one at which they all fit —
-  // what follows the name (the value, the right axis' arrow) kept; else, at the last step,
-  // the names that still don't fit cut, '…' before what follows — and before a qualifier
-  // in parentheses at their end ('(F)'), kept when there's room for it: it often is what
-  // tells two curves apart
+  // What a legend label shows after its name (legend item: hecValue — its value, '(400 W)' —
+  // and hecMark — the right axis' '▸'), each after a space; '' without them
+  Chart.hecLegendTail = function (it) {
+    return (it.hecValue ? ' ' + it.hecValue : '') + (it.hecMark ? ' ' + it.hecMark : '');
+  };
+
+  // A chart's legend names fitted to room px each, with what follows them (legend.labels.
+  // hecShortNames, see the legend's fit) — items: [{ name, tail, forms }], tail what the
+  // label shows after its name (Chart.hecLegendTail), forms the name's shorter forms (least
+  // shortened first) → the names. As they are when they all fit; else every name at the
+  // same step — the first one at which they all fit; else, at the last step, the names
+  // that still don't fit cut, '…' at their end — before a qualifier in parentheses at their
+  // end ('(F)'), kept when there's room for it: it often is what tells two curves apart.
+  // opts.formsOnly: null rather than a name cut
   Chart.hecFitLegendTexts = function (ctx, items, room, opts) {
     var fits = function (t) { return ctx.measureText(t).width <= room; };
     var parts = items.map(function (it) {
-      var _named = typeof it.name === 'string' && it.name && it.text.indexOf(it.name) === 0;
-      return { text: it.text, rest: _named ? it.text.slice(it.name.length) : '',
-               steps: _named ? [it.name].concat(it.forms || []) : [it.text] };
+      return { tail: it.tail || '', steps: [String(it.name === undefined || it.name === null ? '' : it.name)].concat(it.forms || []) };
     });
-    var at = function (p, k) { return p.steps[Math.min(k, p.steps.length - 1)] + p.rest; };
+    var at = function (p, k) { return p.steps[Math.min(k, p.steps.length - 1)]; };
     var _last = Math.max.apply(null, parts.map(function (p) { return p.steps.length - 1; }));
     for (var k = 0; k <= _last; k++) {
-      if (parts.every(function (p) { return fits(at(p, k)); })) return parts.map(function (p) { return at(p, k); });
+      if (parts.every(function (p) { return fits(at(p, k) + p.tail); })) return parts.map(function (p) { return at(p, k); });
     }
     if (opts && opts.formsOnly) return null;
-    // (the longest start of base that fits with '…' then tail, or null)
-    var cut = function (base, tail) {
-      if (!fits(base.slice(0, 1) + '…' + tail)) return null;
+    // (the longest start of base that fits with '…' then end then tail, or null)
+    var cut = function (base, end, tail) {
+      if (!fits(base.slice(0, 1) + '…' + end + tail)) return null;
       var lo = 1, hi = base.length - 1, best = 1;
       while (lo <= hi) {
         var mid = (lo + hi) >> 1;
-        if (fits(base.slice(0, mid).trimEnd() + '…' + tail)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+        if (fits(base.slice(0, mid).trimEnd() + '…' + end + tail)) { best = mid; lo = mid + 1; } else hi = mid - 1;
       }
-      return base.slice(0, best).trimEnd() + '…' + tail;
+      return base.slice(0, best).trimEnd() + '…' + end;
     };
     return parts.map(function (p) {
-      if (fits(at(p, _last))) return at(p, _last);
+      if (fits(at(p, _last) + p.tail)) return at(p, _last);
       var _base = p.steps[p.steps.length - 1];
       var _q = /\s*(\([^()]*\))$/.exec(_base);
-      var _withQualifier = _q && _q.index > 0 ? cut(_base.slice(0, _q.index), ' ' + _q[1] + p.rest) : null;
-      return _withQualifier || cut(_base, p.rest) || _base.slice(0, 1) + '…' + p.rest;
+      var _withQualifier = _q && _q.index > 0 ? cut(_base.slice(0, _q.index), ' ' + _q[1], p.tail) : null;
+      return _withQualifier || cut(_base, '', p.tail) || _base.slice(0, 1) + '…';
     });
   };
 
@@ -2265,6 +2269,29 @@
       me.render({ duration: 0, lazy: true });
     },
 
+    // The font of the legend's labels
+    _hecLegendFont: function () {
+      var lo = (this.legend && this.legend.options.labels) || {}, gd = Chart.defaults.global;
+      return helpers.fontString(helpers.valueOrDefault(lo.fontSize, gd.defaultFontSize), helpers.valueOrDefault(lo.fontStyle, gd.defaultFontStyle),
+                                helpers.valueOrDefault(lo.fontFamily, gd.defaultFontFamily));
+    },
+
+    // Which part of legend label i a canvas-relative x is on: 'value' — its value after its
+    // name ('(400 W)', legend item hecValue) — or 'name' (its color swatch and its mark
+    // too: the swatch covered by the controls' box on a narrow card); null without one
+    _hecLegendPartAt: function (i, x) {
+      var it = this.legend && this.legend.legendItems[i], hb = this.legend && this.legend.legendHitBoxes[i];
+      if (!it || !hb) return null;
+      if (!it.hecValue) return 'name';
+      var ctx = this.ctx;
+      ctx.save(); ctx.font = this._hecLegendFont();
+      // (the text ends at the hit box's right edge: name, ' ', value, then ' ' and the mark)
+      var _mark = it.hecMark ? ctx.measureText(' ' + it.hecMark).width : 0, _value = ctx.measureText(it.hecValue).width;
+      ctx.restore();
+      var _end = hb.left + hb.width - _mark;
+      return x >= _end - _value && x <= _end ? 'value' : 'name';
+    },
+
     // The font of a timeline's or arrowline's row names (its Y axis' ticks)
     _hecRowLabelFont: function () {
       var _s = this.scales && this.scales['y-axis-0'], t = (_s && _s.options.ticks) || {}, gd = Chart.defaults.global;
@@ -2285,11 +2312,8 @@
       if (_li >= 0) {
         var it = me.legend.legendItems[_li], hb = me.legend.legendHitBoxes[_li];
         if (!it || !hb || !it.hecFullText || it.hecFullText === it.text) return null;
-        var lo = me.legend.options.labels, gd = Chart.defaults.global;
-        var _lf = helpers.fontString(helpers.valueOrDefault(lo.fontSize, gd.defaultFontSize), helpers.valueOrDefault(lo.fontStyle, gd.defaultFontStyle),
-                                     helpers.valueOrDefault(lo.fontFamily, gd.defaultFontFamily));
-        var _right = hb.left + hb.width;
-        return at({ text: it.hecFullText, font: _lf, align: 'left', left: _right - width(it.text, _lf), right: _right, top: hb.top, bottom: hb.top + hb.height });
+        var _lf = me._hecLegendFont(), _tail = Chart.hecLegendTail(it), _right = hb.left + hb.width;
+        return at({ text: it.hecFullText + _tail, font: _lf, align: 'left', left: _right - width(it.text + _tail, _lf), right: _right, top: hb.top, bottom: hb.top + hb.height });
       }
       var _rows = me.config.type === 'timeline' || me.config.type === 'arrowline';
       if (!_rows || !_a || y < _a.top || y > _a.bottom) return null;
@@ -2515,6 +2539,7 @@
         zone: this._hecZoneAt(x, y),
         xFactor: this._hecPlotFactor(x),
         legendIndex: _legendIdx,
+        legendPart: _legendIdx >= 0 ? this._hecLegendPartAt(_legendIdx, x) : null,
         yAxisIndex: _yIdx,
         labelRect: this._hecLabelRect(_legendIdx, _yIdx),
         button: native ? native.button : undefined,

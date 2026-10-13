@@ -249,7 +249,7 @@ combineSameUnits: true
 
 When multiple curves share a graph, the Y axis and tooltips always show each entity's value in its original unit. SI unit conversion also applies to graphs defined in YAML containing mixed units.
 
-- **Single-click** a curve label to show/hide it
+- **Single-click** a curve label's name to show/hide it (its name struck through when hidden); **(1.2)** a click on its value — `(400 W)` — or on a value shown over the graph opens the entity's dialog (with the [info panel](#info-panel--replacing-the-ha-more-info-popup) when it's on); its menu's *Info* does the same
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** (or right click) a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph (on a touch screen, tap it, then press it again right away and drag)

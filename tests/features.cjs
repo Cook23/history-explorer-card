@@ -196,7 +196,7 @@ module.exports = async function()
     const legendAt = async w => {
         await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
         return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
-            return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
+            return { texts: L.legendItems.map(legendText), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
     await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
         const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);

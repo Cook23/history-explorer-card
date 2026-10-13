@@ -32,12 +32,14 @@ export class CardGraphs
     // Return entity label name with current value
     // --------------------------------------------------------------------------------------
 
-    // A curve's legend label: its name, with its value now (showCurrentValues), and a small
-    // arrow when it's on the right Y axis
-    _legendLabel(d)
+    // A curve's legend label, as distinct parts Chart.js lays out (legend.labels): its name
+    // (dataset.label — what's shortened, struck through when hidden, clicked to hide it),
+    // its value now ('(400 W)', showCurrentValues — clicked to open its entity's dialog)
+    // and a small arrow when it's on the right Y axis
+    _legendParts(d)
     {
-        const _label = this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name;
-        return d.yAxisID === RIGHT_Y_AXIS ? _label + ' ▸' : _label;
+        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale) : '',
+                 hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '' };
     }
 
     // The shorter forms of the names of a chart's curves, for a legend too narrow for them
@@ -62,15 +64,13 @@ export class CardGraphs
                           { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 
-    getFormattedLabelName(name, entity, unit, shownScale = 1)
+    // An entity's value now, in its unit, as the legend shows it after its name: '(400 W)' —
+    // '' when it isn't a number
+    _legendValue(entity, unit, shownScale = 1)
     {
-        let label = name;
         const p = 10 ** this.pconfig.roundingPrecision;
         const v = Math.round(this.stateOf(entity)?.state * shownScale * p) / p;
-        if( !isNaN(v) ) {
-            label += ' (' + v + (unit ? ' ' + unit : '') + ')';
-        }
-        return label;
+        return isNaN(v) ? '' : '(' + v + (unit ? ' ' + unit : '') + ')';
     }
 
     // --------------------------------------------------------------------------------------
@@ -338,7 +338,7 @@ export class CardGraphs
             pointBackgroundColor: d.bColor,
             pointHoverRadius: _pointHoverRadius,
             hitRadius: 5,
-            label: this._legendLabel(d),
+            ...this._legendParts(d),
             yAxisID: d.yAxisID,
             // (stacked bars: those of each Y axis in their own column — stacking
             // values of two scales on each other would mean nothing)
