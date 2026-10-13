@@ -3,7 +3,8 @@
 // from the YAML. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColor } from "./history-default-colors.js";
-import { seriesState, seriesId } from "./history-series.js";
+import { seriesState, seriesId, seriesOf } from "./history-series.js";
+import { shortNames } from "./legend-names.js";
 import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -448,5 +449,28 @@ export class CardConfig
     {
         const _mode = this.lineModeOf(e);
         return ( e.type ?? g.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
+    }
+
+    // The shorter forms of names (legend-names.js) — items: [{ name, entity_id }] — from
+    // what Home Assistant knows: each entity's device, and how many entities carry a
+    // qualifier. For a legend too narrow for its curves' names, and the entity selector's
+    // lines too long for its field
+    shortNameForms(items)
+    {
+        const _hass = this._hass;
+        const _device = id => {
+            const _did = _hass?.entities?.[seriesOf(id ?? '').entity]?.device_id;
+            const _d = _did ? _hass?.devices?.[_did] : null;
+            return _d ? ( _d.name_by_user || _d.name || null ) : null;
+        };
+        // (a qualifier carried by 3 entities or more, counted once per states object)
+        if( this._qualifierCount?.states !== _hass?.states ) this._qualifierCount = { states: _hass?.states, n: new Map() };
+        const _frequent = q => {
+            const _n = this._qualifierCount.n;
+            if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
+            return _n.get(q) >= 3;
+        };
+        return shortNames(items.map(d => ({ name: d.name, device: _device(d.entity_id) })),
+                          { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 }

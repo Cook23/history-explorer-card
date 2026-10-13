@@ -107,7 +107,7 @@ function statistics(d){
   return r;
 }
 function mkHass(){ return {
-  states:{...STATES}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   user:{id:'u1',name:'u'}, localize:(k)=>k,
   // the entity and device registries (an entity's device: its name)

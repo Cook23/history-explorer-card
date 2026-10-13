@@ -8,8 +8,6 @@ import { i18n } from "./languages.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeLineMode } from "./history-options.js";
 import { parseColor } from "./history-default-colors.js";
-import { shortNames } from "./legend-names.js";
-import { seriesOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -38,28 +36,6 @@ export class CardCharts
     {
         return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale) : '',
                  hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '' };
-    }
-
-    // The shorter forms of the names of a graph's curves (its datasets), for a legend too narrow for them
-    // (legend-names.js), from what Home Assistant knows: each entity's device, and how
-    // many entities carry a qualifier
-    _legendShortNames(datasets)
-    {
-        const _hass = this._hass;
-        const _device = id => {
-            const _did = _hass?.entities?.[seriesOf(id ?? '').entity]?.device_id;
-            const _d = _did ? _hass?.devices?.[_did] : null;
-            return _d ? ( _d.name_by_user || _d.name || null ) : null;
-        };
-        // (a qualifier carried by 3 entities or more, counted once per states object)
-        if( this._qualifierCount?.states !== _hass?.states ) this._qualifierCount = { states: _hass?.states, n: new Map() };
-        const _frequent = q => {
-            const _n = this._qualifierCount.n;
-            if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
-            return _n.get(q) >= 3;
-        };
-        return shortNames(datasets.map(d => ({ name: d.name, device: _device(d.entity_id) })),
-                          { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 
     // An entity's value now, in its unit, as the legend shows it after its name: '(400 W)' —
@@ -210,7 +186,7 @@ export class CardCharts
                         boxWidth: 0,
                         fontSize: this._textSizes().text,
                         // (a label wider than the legend: shortened, its value kept)
-                        hecShortNames: datasets => this._legendShortNames(datasets)
+                        hecShortNames: datasets => this.shortNameForms(datasets)
                     },
                 },
                 elements: {

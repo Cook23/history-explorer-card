@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.18b1] - 2026-10-13
+
+### Changed — the entity selector sized from its list
+- The field goes between the date and the range when 90 % of the menu's lines fit there; else on a line of its own (three lines on a narrow card). It then takes the room there, up to what its longest line needs — no fixed 150 / 400 / 500 px any more. Measured once, on the whole list
+- Its menu as wide as the field: a line too long shortened as the legend does (a frequent qualifier as its initials, the device's name removed or abbreviated, the articles), only the lines that need it, never two the same; the search still on the full names. Still too long: on two lines
+- The field shown once its list is ready — with `recordedEntitiesOnly`, no *Loading…* any more (the text removed)
+- The shorter forms of names shared by the legend and the selector (`card-config.js` `shortNameForms`); ARCHITECTURE.md rule 6: an element is shown only once its data is ready
+- Tests: two lists (short names, a realistic installation), five card widths — the layout, the field's width, the menu as wide, every line fitted, none twice, nothing out of the card; a shortened line found by its full name
+
+### Changed — shorter texts
+- The entity selector's placeholder: *Add an entity* (was *Type to search for an entity to add*), in every language
+- *Loading…*, *Entities unavailable*, *Second curve*, *Linked graphs: inseparable*, a graph's menu *Delete*, and in French *Affichage* (was *Représentation*) — every language
+
 ## [v1.2.17] - 2026-10-13
 
 ### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near

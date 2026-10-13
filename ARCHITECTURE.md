@@ -106,6 +106,9 @@ show it, and the conductor starts the card and wires the parts together.
    - what Chart.js keeps for itself (its layout, a dataset's meta) is never read; a field
      the card and Chart.js exchange is documented in `deps/Chart Custom.js.md`; a name
      starting with `hec` or `_hec` is Chart.js's — the card's own fields don't use it.
+6. **An element is shown only once its data is ready**, sized from it once: a menu's list
+   is complete before the menu or the field that opens it shows (the entity selector waits
+   for its list); nothing moves under the user afterwards, but for the card's own resize.
 
 ## Where a change goes
 

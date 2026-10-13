@@ -6,6 +6,9 @@ import { i18n } from "./languages.js";
 import { seriesAttributes, seriesId, attributeLabel } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
+// A line of the entity list: its padding on each side (px)
+const LINE_PAD_X = 5;
+
 export class CardSelector
 {
     // --------------------------------------------------------------------------------------
@@ -18,7 +21,8 @@ export class CardSelector
         let dropdown = this._this.querySelector(`#es_${input_idx}`);
         if( !input || !dropdown ) return;
         if( show ) {
-            dropdown.style['min-width'] = input.clientWidth + 'px';
+            // (as wide as the field — its lines fitted to it, fitEntityLines)
+            dropdown.style.width = input.getBoundingClientRect().width + 'px';
             // Position relative to input: below if top selector (idx=0), above if bottom selector (idx=1)
             const inputRect = input.getBoundingClientRect();
             // #tb_N directly, not dropdown.offsetParent — offsetParent of a display:none
@@ -396,11 +400,15 @@ export class CardSelector
                 o.href = `#s_${i}`;
                 o.id = entity;
                 o.dataset.entity = entity;
-                o.style = "display:block;padding:2px 5px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden";
+                o.style = `display:block;padding:2px ${LINE_PAD_X}px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden`;
                 // (an entity with attributes that can be shown opens their submenu: marked ▸,
                 // as every menu line opening a submenu)
+                // (its name, the part shortened when the line is too long for the field, and
+                // what follows it — its value, ▸ — always shown; the search is on the full label)
                 o.dataset.label = _label;
-                o.textContent = _label + ( seriesAttributes(this.stateOf(entity)).length ? ' ▸' : '' );
+                o.dataset.name = friendly;
+                o.dataset.tail = ( _valStr ? ` (${_valStr})` : '' ) + ( seriesAttributes(this.stateOf(entity)).length ? ' ▸' : '' );
+                o.textContent = friendly + o.dataset.tail;
                 o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
@@ -409,6 +417,93 @@ export class CardSelector
 
         for( let i of this.ui.inputField )
             if( i ) i.placeholder = i18n("ui.label.type_to_search");
+        // (ready: the toolbar shows the selector, sized from its lines — measured once)
+        this._entityList = { ready: true, widths: null, forms: null };
+        this.resizeSelector();
+    }
+
+    // Is the entity list ready — the selector shown only then?
+    entityListReady()
+    {
+        return !!this._entityList?.ready;
+    }
+
+    // The widths the selector's lines need (px, the list's border and scrollbar included):
+    // { most: 90 % of them, all: every one } — measured once, on the whole list
+    entityLineWidths()
+    {
+        const L = this._entityList;
+        if( !L?.ready ) return { most: 0, all: 0 };
+        if( !L.widths ) {
+            const _lines = [...( this._this.querySelector('#es_0')?.children ?? [] )];
+            const _w = this._textWidths(_lines.map(a => a.dataset.name + a.dataset.tail)).sort((a, b) => a - b);
+            if( !_w.length || !_w[_w.length - 1] ) return { most: 0, all: 0 };
+            const _box = 2 * LINE_PAD_X + 2 + this._scrollbarWidth();
+            L.widths = { most: _w[Math.min(_w.length - 1, Math.ceil(0.9 * _w.length) - 1)] + _box, all: _w[_w.length - 1] + _box };
+        }
+        return L.widths;
+    }
+
+    // The lines of selector i fitted to its field, width px: each line too long shortened — its
+    // name only, at the first step that fits (legend-names.js, the legend's steps), never
+    // two lines the same; a line still too long goes on two lines
+    fitEntityLines(i, width)
+    {
+        const L = this._entityList;
+        if( !L?.ready ) return;
+        const _room = width - 2 * LINE_PAD_X - 2 - this._scrollbarWidth();
+        {
+            const _lines = [...( this._this.querySelector(`#es_${i}`)?.children ?? [] )];
+            if( !_lines.length ) return;
+            // (each line's forms, and their widths, measured once — the two lists hold the same lines)
+            if( !L.forms ) {
+                const _forms = this.shortNameForms(_lines.map(a => ({ name: a.dataset.name, entity_id: a.dataset.entity })));
+                const _all = _lines.map((a, k) => [a.dataset.name, ..._forms[k]].map(n => n + a.dataset.tail));
+                const _w = this._textWidths(_all.flat());
+                // (not shown yet: nothing measured — fitted at the next layout)
+                if( !Math.max(0, ..._w) ) return;
+                let _n = 0;
+                L.forms = _all.map(f => f.map(text => ({ text, width: _w[_n++] })));
+            }
+            // (the first form that fits; then, two lines the same, the more shortened one back
+            // a step, until none are)
+            const _step = L.forms.map(f => { const k = f.findIndex(x => x.width <= _room); return k < 0 ? f.length - 1 : k; });
+            for( let _changed = true; _changed; ) {
+                _changed = false;
+                const _seen = new Map();
+                L.forms.forEach((f, k) => { const t = f[_step[k]].text; _seen.set(t, [...( _seen.get(t) ?? [] ), k]); });
+                for( const ks of _seen.values() ) if( ks.length > 1 )
+                    for( const k of ks ) if( _step[k] > 0 ) { _step[k]--; _changed = true; }
+            }
+            _lines.forEach((a, k) => { a.textContent = L.forms[k][_step[k]].text; });
+        }
+    }
+
+    // The widths of texts as the selector's lines show them (px), in one layout
+    _textWidths(texts)
+    {
+        const _host = this._this.querySelector('#maincard');
+        if( !_host ) return texts.map(() => 0);
+        const m = document.createElement('div');
+        m.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;width:max-content;white-space:nowrap';
+        for( const t of texts ) { const d = document.createElement('div'); d.style.width = 'max-content'; d.textContent = t; m.appendChild(d); }
+        _host.appendChild(m);
+        const _w = [...m.children].map(d => Math.ceil(d.getBoundingClientRect().width));
+        m.remove();
+        return _w;
+    }
+
+    // The width of a scrollbar on this device (0 where it's drawn over the content)
+    _scrollbarWidth()
+    {
+        if( this._sbw === undefined ) {
+            const d = document.createElement('div');
+            d.style.cssText = 'position:absolute;visibility:hidden;width:100px;height:50px;overflow:scroll';
+            ( this._this.querySelector('#maincard') ?? document.body ).appendChild(d);
+            this._sbw = d.offsetWidth - d.clientWidth;
+            d.remove();
+        }
+        return this._sbw;
     }
 
     // The value of a state as the selector shows it: like the legend's labels, rounded to
@@ -442,9 +537,6 @@ export class CardSelector
         this.ui.inputField[1] = this._this.querySelector(`#b7_1`);
 
         if( this.pconfig.recordedEntitiesOnly ) {
-
-            for( let i of this.ui.inputField )
-                if( i ) i.placeholder = i18n("ui.label.loading");
 
             const t0 = moment().subtract(1, "hour");
 

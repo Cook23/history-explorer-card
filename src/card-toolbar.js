@@ -54,7 +54,7 @@ export class CardToolbar
         if( selector ) html += `
             <div id='sl_${i}' style="display:none;padding-left:10px;padding-right:10px;text-align:center;grid-area:sl;justify-self:center;min-width:0;overflow:hidden;">
                 <input id="b7_${i}" ${inputStyle} autoComplete="off"/>
-                <div id="es_${i}" style="display:none;position:absolute;text-align:left;min-width:260px;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
+                <div id="es_${i}" style="display:none;position:absolute;box-sizing:border-box;text-align:left;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="es_${i}_series" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 <div id="es_${i}_choice" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 ${typeMenuHtml(i, true)}
@@ -291,9 +291,19 @@ export class CardToolbar
                 el.style.justifySelf = narrow ? 'center' : side;
                 el.style.whiteSpace = narrow ? 'nowrap' : '';
             }
-            // (the entity selector's input: up to 500 px, at least 150 — less on a card
-            // narrower than that, so it never overflows the card)
-            const _inputW = room => Math.max(Math.min(150, room), Math.min(500, room));
+            // (the entity selector's field: the layout chosen from the width 90 % of its list's
+            // lines need — its placeholder's at least —; then as wide as the room there, up to
+            // the width every line needs; the lines still too long shortened — fitEntityLines)
+            const _lw = this.entityLineWidths();
+            const _minW = input && this.entityListReady() ? Math.max(this._placeholderWidth(input), _lw.most) : 0;
+            const _maxW = Math.max(_minW, _lw.all);
+            const _inputW = room => Math.max(0, Math.min(room, _maxW));
+            // (the menu as wide as the field: its lines fitted to the field as it's drawn)
+            const _setInputW = room => { input.style.boxSizing = 'border-box'; input.style.width = _inputW(room) + 'px'; this.fitEntityLines(i, input.getBoundingClientRect().width); };
+
+            // (the entity field shown once its list is ready, sized from it — its line, which
+            // holds the menus too, always)
+            if( input ) input.style.display = this.entityListReady() ? '' : 'none';
 
             // Layout C : no selector, just dl and dr
             if( !input || !sl ) {
@@ -339,13 +349,10 @@ export class CardToolbar
             // Measure it: sl natural width - sum of children - padding
             const CORRECTION = 23; // inputExtra(~8) + flex gap(~5) + safety margin(10)
 
-            const inputWA = Math.max(150, Math.min(500, tbw - 2*(Math.max(dlw, drw) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION));
-            if( !this._inputWidth ) this._inputWidth = [];
-            this._inputWidth[i] = inputWA;
-            const totalA = dlw + 10 + 400 + slBtnsW + drw + 10; // switch at 400px input width
+            // (the room between the date and the range, the toolbar's middle column centered)
+            const roomA = tbw - 2*(Math.max(dlw, drw) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION;
 
-
-            if( totalA + 50 <= w ) {
+            if( roomA >= _minW ) {
                 // Layout A : dl | sl | dr on one line
                 if( tb ) {
                     tb.style.gridTemplateColumns = '1fr auto 1fr';
@@ -354,14 +361,14 @@ export class CardToolbar
                 sl.style.display = 'flex';
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
-                input.style.width = inputWA + 'px';
+                _setInputW(roomA);
             } else if( !narrow ) {
                 // Layout B : dl | dr on line 1, sl centered on line 2
                 if( tb ) {
                     tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
                     tb.style.gridTemplateAreas = "'dl dr' 'sl sl'";
                 }
-                input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
+                _setInputW((tb ? tb.clientWidth : w) - slBtnsW - CORRECTION);
             } else {
                 // Layout D (a narrow card) : dl, dr and sl each on a line, the input as wide
                 // as the card leaves beside the options button
@@ -369,9 +376,24 @@ export class CardToolbar
                     tb.style.gridTemplateColumns = '1fr';
                     tb.style.gridTemplateAreas = "'dl' 'dr' 'sl'";
                 }
-                input.style.width = _inputW((tb ? tb.clientWidth : w) - slBtnsW - 16) + 'px';
+                _setInputW((tb ? tb.clientWidth : w) - slBtnsW - 16);
             }
         }
+    }
+
+    // The width the entity selector's field needs to be read (px): its placeholder's text,
+    // in its own font, with its padding and border
+    _placeholderWidth(input)
+    {
+        const cs = getComputedStyle(input);
+        const s = document.createElement('span');
+        s.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font};letter-spacing:${cs.letterSpacing}`;
+        s.textContent = input.placeholder || '';
+        input.parentNode.appendChild(s);
+        const _text = s.getBoundingClientRect().width;
+        s.remove();
+        const _box = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'].reduce((a, k) => a + ( parseFloat(cs[k]) || 0 ), 0);
+        return Math.ceil(_text + _box);
     }
 
     // --------------------------------------------------------------------------------------
