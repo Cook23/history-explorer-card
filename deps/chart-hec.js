@@ -2052,9 +2052,43 @@
     // true: straddling this chart's top edge, under the Y axis labels of the graph
     // above (an empty spot — centered on the top it would cover this chart's legend).
     // Canvas-relative rectangle, or null when hidden.
+    // (right above the lock+handle zone, it would sit on it — then just right of it)
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
-      return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+      var _left = Math.max(0, Math.round(this.chartArea.left / 2) - 11);
+      var _zone = this._hecHasControls() ? this._hecLockAndHandleWidth() : 0;
+      if (_zone && _left < _zone + 4) _left = _zone + 4;
+      return { left: _left, top: -23, width: 22, height: 22 };
+    },
+
+    // Whether the lock+handle zone shows anything: the handle, the padlock or handleButtons
+    _hecHasControls: function () {
+      return this.options.moveHandleVisible !== false || this._hecHasYAxisLock() || !!this._hecHandleButtons();
+    },
+
+    // options.hecControlsBackdrop ({ color }): the controls at the graph's top left — the
+    // lock+handle zone, the chain icon — each drawn in a rounded box of that color, over the
+    // legend's labels, which keep no room for them (a narrow card: they take no height). On
+    // the box, a gesture is the control's; beside it, on a label, the label's (_hecTopTargetAt)
+    _hecUpdateControlsBackdrop: function () {
+      var me = this, _bd = me.options.hecControlsBackdrop;
+      var _el = me._hecControlsBackdropEl;
+      if (!_bd || !me.canvas || !me._hecHasControls()) {
+        if (_el) _el.style.display = 'none';
+        return;
+      }
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.style.cssText = 'position:absolute;z-index:9;border-radius:6px;pointer-events:none;';
+        me._hecControlsBackdropEl = _el;
+      }
+      me._hecAttachToCanvasParent(_el);
+      _el.style.display = '';
+      _el.style.background = _bd.color;
+      _el.style.left = (me.canvas.offsetLeft + 1) + 'px';
+      _el.style.top = (me.canvas.offsetTop + 2) + 'px';
+      _el.style.width = (me._hecLockAndHandleWidth() - 2) + 'px';
+      _el.style.height = '24px';
     },
 
     // On one of the controls drawn over the graph's top left corner (lock+handle, chain
@@ -2365,11 +2399,13 @@
         _el.style.alignItems = 'center';
         _el.style.justifyContent = 'center';
         _el.style.borderRadius = '50%';
-        _el.style.background = 'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
         _el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
+      // (in a box like the other controls' — options.hecControlsBackdrop — else half see-through)
+      _el.style.background = me.options.hecControlsBackdrop ? me.options.hecControlsBackdrop.color :
+        'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
       _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
       _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
       _el.style.width = _r.width + 'px';
@@ -2388,7 +2424,7 @@
       var _el = me._hecMoveHandleIconEl;
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
+        _el.style.cssText = 'position:absolute;z-index:10;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
         _el.textContent = '\u283F';
         me._hecMoveHandleIconEl = _el;
       }

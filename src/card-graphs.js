@@ -176,11 +176,14 @@ export class CardGraphs
                 },
                 topClipMargin : 4,
                 bottomClipMargin: 4,
+                // (a timeline's or an arrowline's room for the handle, above its rows — none on a
+                // narrow card, where it's in a box over them: _controlsBackdrop)
                 layout: {
                     padding: {
-                        top: ( graphtype === 'timeline' || graphtype === 'arrowline' ) ? 24 : 0
+                        top: this._controlsRoom(graphtype)
                     }
                 },
+                hecControlsBackdrop: this._controlsBackdrop(),
                 animation: {
                     duration: 0
                 },
@@ -210,7 +213,7 @@ export class CardGraphs
                 legend: {
                     display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true,
                     // (a narrow card: below the first line, the labels take the whole width)
-                    hecFullWidthBelow: NARROW_CARD_PX,
+                    hecMarginsOnFirstLine: this._narrowCard(),
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
@@ -457,6 +460,21 @@ export class CardGraphs
                  hecBackdrop: inside ? { color: this._tickBackdropColor() } : null };
     }
 
+    // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
+    // narrow card: each in a box like the Y labels', over the legend or the rows, taking no
+    // room (Chart.js hecControlsBackdrop) — else null: beside them, in their own room
+    _controlsBackdrop()
+    {
+        return this._narrowCard() ? { color: this._tickBackdropColor() } : null;
+    }
+
+    // The room above a timeline's or an arrowline's rows for its handle (px): none on a
+    // narrow card (_controlsBackdrop)
+    _controlsRoom(graphtype)
+    {
+        return ( graphtype === 'timeline' || graphtype === 'arrowline' ) && !this._narrowCard() ? 24 : 0;
+    }
+
     // The boxes of the Y labels inside a plot: the card's background, as opaque as the
     // tooltip (80 %) — the theme's own color, else white or, on a dark theme, dark grey
     _tickBackdropColor()
@@ -467,29 +485,34 @@ export class CardGraphs
         return `rgba(${r},${g},${b},0.8)`;
     }
 
-    // Each graph's Y labels placed and its text sized as the card's width now says
-    // (_yLabelsInside, _textSizes) — when the card crosses NARROW_CARD_PX
+    // Each graph's Y labels placed, its text sized and its controls laid out as the card's
+    // width now says (_yLabelsInside, _textSizes, _controlsBackdrop) — when the card
+    // crosses NARROW_CARD_PX
     _fitToCardWidth()
     {
         const _sizes = this._textSizes();
         for( const g of this.graphs ) {
             const o = g.chart.options;
             let _changed = false;
-            // (values set on each object where they differ; Chart.js draws a scale from its
-            // copies of its ticks' options — ticks.minor, ticks.major — made once: they change too)
-            const _set = (objs, values) => {
-                for( const t of objs ) if( t && typeof t === 'object' ) for( const [k, v] of Object.entries(values) )
-                    if( JSON.stringify(t[k]) !== JSON.stringify(v) ) { t[k] = v; _changed = true; }
+            // (values set on an options object where they differ)
+            const _set = (obj, values) => {
+                if( obj ) for( const [k, v] of Object.entries(values) )
+                    if( JSON.stringify(obj[k]) !== JSON.stringify(v) ) { obj[k] = v; _changed = true; }
             };
-            const _ticksOf = ax => [ax.ticks, ax.ticks?.minor, ax.ticks?.major];
             for( const ax of o.scales?.yAxes ?? [] ) {
                 const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
-                _set(_ticksOf(ax), this._yLabelTicks(_inside));
-                _set([ax.scaleLabel], { display: !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '' });
+                _set(ax.ticks, this._yLabelTicks(_inside));
+                _set(ax.scaleLabel, { display: !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '' });
             }
-            for( const ax of o.scales?.xAxes ?? [] ) _set(_ticksOf(ax), { fontSize: _sizes.text });
-            _set([o.legend?.labels], { fontSize: _sizes.text });
-            _set([o.elements], { font: _sizes.timeline });
+            for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
+            _set(o.legend, { hecMarginsOnFirstLine: this._narrowCard() });
+            const _rightMargin = o.legend?.rightMargin;
+            this._updateLegendMargins(g);
+            if( o.legend?.rightMargin !== _rightMargin ) _changed = true;
+            _set(o, { hecControlsBackdrop: this._controlsBackdrop() });
+            _set(o.layout?.padding, { top: this._controlsRoom(g.chart.config.type) });
+            _set(o.legend?.labels, { fontSize: _sizes.text });
+            _set(o.elements, { font: _sizes.timeline });
             if( _changed ) g.chart.update(0);
             // (the values over it laid out for that width too — see _showValues)
             if( _changed && g.valueSamples ) this._showValues(g);
@@ -1138,7 +1161,8 @@ export class CardGraphs
             if( bd && _bdR.width ) _legend.rightMargin = Math.max(_cR.right - _bdR.left + 8, _isStatic ? 25 : 45);
             else if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
         } else {
-            _legend.rightMargin = _isStatic ? 25 : 45;
+            // (nothing over a YAML graph's top right: on a narrow card, no room kept there)
+            _legend.rightMargin = _isStatic ? ( this._narrowCard() ? 4 : 25 ) : 45;
         }
     }
 

@@ -3772,6 +3772,8 @@
           } else if (newOptions.scales) {
             newOptions.scales.xAxes.concat(newOptions.scales.yAxes).forEach(function (scaleOptions) {
               chart.scales[scaleOptions.id].options = scaleOptions;
+              // (fork) ticks.minor / ticks.major following a change of ticks
+              chart.scales[scaleOptions.id].mergeTicksOptions();
             });
           }
 
@@ -4323,6 +4325,7 @@
             me._hecUpdateDragTouchOverlays();
             me._hecUpdateMoveHandleIcon();
             me._hecUpdateHandleButtons();
+            me._hecUpdateControlsBackdrop();
             me._hecUpdateLinkMarker();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
@@ -7326,6 +7329,8 @@
           // Any function defined here is inherited by all scale types.
           // Any function can be extended by the scale type
 
+          // (fork) also on each update (updateConfig): what ticks.minor / ticks.major took from
+          // ticks follows ticks when it changes — what they set themselves stays theirs
           mergeTicksOptions: function () {
             var ticks = this.options.ticks;
             if (ticks.minor === false) {
@@ -7338,14 +7343,17 @@
                 display: false };
 
             }
+            [ticks.minor, ticks.major].forEach(function (t) {
+              if (!t._hecInherited) Object.defineProperty(t, '_hecInherited', { value: {}, enumerable: false });
+            });
             for (var key in ticks) {
               if (key !== 'major' && key !== 'minor') {
-                if (typeof ticks.minor[key] === 'undefined') {
-                  ticks.minor[key] = ticks[key];
-                }
-                if (typeof ticks.major[key] === 'undefined') {
-                  ticks.major[key] = ticks[key];
-                }
+                [ticks.minor, ticks.major].forEach(function (t) {
+                  if (typeof t[key] === 'undefined' || t._hecInherited[key]) {
+                    t[key] = ticks[key];
+                    t._hecInherited[key] = true;
+                  }
+                });
               }
             }
           },
@@ -11959,17 +11967,21 @@
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
                 // (options.legend.leftMargin / rightMargin: room kept free at both ends of
                 // the legend's lines, for what the card draws there)
-                me.leftMargin = me.options.leftMargin !== undefined ? me.options.leftMargin : 50;
+                // (fork) the controls drawn in a box over the labels (hecControlsBackdrop): no room
+                // kept for them on the left
+                me.leftMargin = me.chart && me.chart.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin : 50;
                 me.rightMargin = me.options.rightMargin !== undefined ? me.options.rightMargin : 25;
                 // (fork) the margins of a line: the first one's, for what the card draws at both
-                // ends of the legend's top; below it, on a chart narrower than
-                // legend.hecFullWidthBelow, 4 px — the whole width for the labels
-                var _fullBelow = me.options.hecFullWidthBelow;
-                var _narrow = !!_fullBelow && me.width < _fullBelow;
+                // ends of the legend's top; below it, with legend.hecMarginsOnFirstLine, 4 px —
+                // the whole width for the labels
+                var _narrow = !!me.options.hecMarginsOnFirstLine;
                 me._hecMarginsOf = function (line) {
                   return line > 0 && _narrow ? { l: 4, r: 4 } : { l: me.leftMargin, r: me.rightMargin };
                 };
-                var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
+                // (the ratchet below keeps the lines' count while the values in the labels
+                // change; a change of names or of the room the lines have starts it over)
+                var _baseKey = (me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '') +
+                  '|' + Math.round(me.width) + '|' + me.leftMargin + '|' + me.rightMargin + '|' + _narrow;
                 if (me._ratchetBaseKey !== _baseKey) {
                     me._ratchetBaseKey = _baseKey;
                     me._ratchetLineCount = 0;

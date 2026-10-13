@@ -252,6 +252,47 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The controls at a graph's top left (handle, padlock, chain icon): never any room of their own on a narrow card ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'binary_sensor.a', type: 'timeline' }] },
+        { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true } });
+    const controlsAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const c=i=>graphAt(i).chart, bd=i=>c(i)._hecControlsBackdropEl, shown=e=>!!e&&e.style.display!=='none';
+            const lm=c(1)._hecLinkMarkerRect();
+            return { boxes: [0,1,2].map(i=>shown(bd(i))).join(), boxColor: shown(bd(0)) ? getComputedStyle(bd(0)).backgroundColor : null,
+                     chainColor: getComputedStyle(c(1)._hecLinkMarkerEl).backgroundColor, chainLeft: lm && lm.left, zone: c(1)._hecLockAndHandleWidth(),
+                     firstLabel: Math.round(c(0).legend.legendHitBoxes[0].left), firstTop: Math.round(c(0).legend.legendHitBoxes[0].top),
+                     timelineTop: Math.round(c(1).chartArea.top), legendH: Math.round(c(0).legend.height) }; })()`);
+    };
+    await t.step('the chain icon takes no room: hidden or shown, nothing moves; right above the handle and the padlock, it is just right of them', async () => {
+        const tops = () => t.E(`[0,1,2].map(i=>Math.round(graphAt(i).canvas.getBoundingClientRect().top)+'/'+Math.round(graphAt(i).chart.chartArea.top)).join()`);
+        const shown = await tops(), r = await controlsAt(1000);
+        await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=false; c.update(); })()'); await t.wait(300);
+        const hidden = await tops();
+        await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=true; c.update(); })()'); await t.wait(300);
+        return shown === hidden && r.chainLeft >= r.zone + 4 ? true : JSON.stringify({ shown, hidden, r });
+    });
+    await t.step('a narrow card: the handle, the padlock and the chain icon each in a box like the Y labels\', over the legend or the rows, which keep no room for them; wide again: as before', async () => {
+        const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
+        return wide.boxes === 'false,false,false' && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
+            && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < wide.timelineTop - 15 && narrow.legendH <= wide.legendH
+            && wide.firstLabel >= 50 && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
+    });
+    await t.step('a narrow card: on the box, a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
+        await controlsAt(168);
+        const locked = () => t.E('!!graphAt(0).chart._hecYAxisLock');
+        const graphMenu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'), y=el.querySelector('#et_0_ylock'); return !m||m.style.display==='none' ? 'closed' : y&&y.style.display!=='none' ? 'graph' : 'entity'; })()`);
+        const close = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400); };
+        const p = await t.E('lockPt(0)'), l0 = await locked();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400); const l1 = await locked();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        await t.longPress(p); const onBox = await graphMenu(); await close();
+        const lb = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-6, y: r.top+b.top+b.height/2 }; })()`);
+        await t.longPress(lb); const onLabel = await graphMenu(); await close();
+        return !l0 && l1 && onBox === 'graph' && onLabel === 'entity' ? true : JSON.stringify({ l0, l1, onBox, onLabel });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {
