@@ -58,10 +58,15 @@ export class CardGestures
     // Click on a legend label: shows/hides its curve, persisted
     _onGraphClick(info, g)
     {
+        // (a value — over the graph, or at the end of a legend label: the entity's dialog, on a
+        // click; the curve stays as it is)
+        if( info.zone === 'value' || info.legendPart === 'value' ) {
+            const _curve = info.zone === 'value' ? info.curveIndex : info.legendIndex;
+            if( info.gestureType === 'click' ) this._openEntityInfo(g.entities[_curve]?.entity);
+            return;
+        }
         const idx = info.legendIndex;
         if( idx < 0 ) return;
-        // (on its value: the entity's dialog — the curve stays as it is)
-        if( info.legendPart === 'value' ) return this._openEntityInfo(g.entities[idx]?.entity);
         const meta = g.chart.getDatasetMeta(idx);
         meta.hidden = meta.hidden === null ? !g.chart.data.datasets[idx].hidden : null;
         g.chart.update();

@@ -260,6 +260,14 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // A value over the chart (hecSetValues): its text, its unit smaller, the time it's from
+  // smaller still — { text, unit, time }
+  function _hecValueHtml(s) {
+    return s.text + (s.unit ? '<span style="font-size:0.5em;opacity:0.9"> ' + s.unit + '</span>' : '') +
+      (s.time ? '<span class="hec-time" style="font-size:0.4em;opacity:0.75;margin-left:0.5em">' + s.time + '</span>' : '');
+  }
+
+  // ---------------------------------------------------------------------------
   // What a legend label shows after its name (legend item: hecValue — its value, '(400 W)' —
   // and hecMark — the right axis' '▸'), each after a space; '' without them
   Chart.hecLegendTail = function (it) {
@@ -343,7 +351,8 @@
           ctx.arcTo(bx, by + bh, bx, by, r);
           ctx.arcTo(bx, by, bx + bw, by, r);
           ctx.closePath();
-          ctx.fillStyle = _bd.color;
+          // (opaque while the pointer is near that axis' labels — _hecSetLabelsHovered)
+          ctx.fillStyle = _bd.hoverColor && chart._hecLabelsHovered === scale.position ? _bd.hoverColor : _bd.color;
           ctx.fill();
           ctx.fillStyle = l.color;
           ctx.textAlign = l.align;
@@ -611,9 +620,14 @@
     // truncated label's full text: one element per document or shadow root (the
     // anchor's), reused, faded out after its readingTime. align: 'left' (default —
     // just right of and above the point), 'center' or 'right' (centered on / ending
-    // at the point, above it). boundsEl: see clampToViewport.
+    // at the point, above it). boundsEl: see clampToViewport. clientX null: centered over
+    // anchorEl, halfway down
     showMessage: function (text, clientX, clientY, align, anchorEl, boundsEl) {
       anchorEl = anchorEl || document.body;
+      if (clientX === null || clientX === undefined) {
+        var _ar = anchorEl.getBoundingClientRect();
+        clientX = _ar.left + _ar.width / 2; clientY = _ar.top + _ar.height / 2; align = 'center';
+      }
       var _root = anchorEl.getRootNode ? anchorEl.getRootNode() : document;
       var _el = _root._hecMessageEl;
       if (!_el) {
@@ -1492,11 +1506,14 @@
         // over a draggable legend label (line/bar) or a draggable
         // timeline/arrowline Y-axis label, '' otherwise (cursorEnabled: false
         // turns it all off).
+        // (a legend label's value: 'pointer' — a click there is its own, see legendPart)
         if (me.options.cursorEnabled !== false && me.canvas) {
           var _draggable = (_hLegendIdx >= 0 && (me.config.type === 'line' || me.config.type === 'bar')) ||
                             (_hYIdx >= 0 && (me.config.type === 'timeline' || me.config.type === 'arrowline'));
-          me.canvas.style.cursor = _draggable ? 'move' : '';
+          me.canvas.style.cursor = _hLegendIdx >= 0 && me._hecLegendPartAt(_hLegendIdx, e.x) === 'value' ? 'pointer' : _draggable ? 'move' : '';
         }
+        // (the Y labels drawn inside the plot near the pointer: their boxes opaque)
+        me._hecSetLabelsHovered(me._hecInsideLabelSideAt(e.x, e.y, pointerType));
         fire(c, 'hover', undefined, undefined, { legendIndex: _hLegendIdx, yAxisIndex: _hYIdx });
       }
     }
@@ -1899,6 +1916,107 @@
       });
     },
 
+    // Public (Chart Custom.js.md §1): the values shown over the chart, given by its owner —
+    // values null: none. { layout: 'row' | 'narrow', states: [{ curve, key, text, unit,
+    // color }], stats: [{ curve, key, name, color, cells: [{ stat, label, value, time }] }],
+    // format(curve, y, x) → { text, unit, time } }: each curve's value now (states, in a
+    // row; 'narrow': the first one large, the others small in a column on its right, each
+    // cut rather than wrapped), its statistics (stats: name — null with only one curve
+    // showing them —, then a cell each), all in the given colors; format: a value of curve
+    // at a point, as states show it (the point a hover is on: shown in its curve's place).
+    // A click on a value now reaches customEvent (zone 'value', curveIndex); a text cut
+    // ('…') is shown in full in place while hovered, and on a click (Chart.hecUi.reveal)
+    hecSetValues: function (values) {
+      this._hecValues = values || null;
+      this._hecRenderValues();
+    },
+
+    // The values over the chart (hecSetValues): an element of their own right above the
+    // chart's box (its canvas' parent), in the page's flow — gone without values
+    _hecRenderValues: function () {
+      var me = this, v = me._hecValues, _box = me.canvas && me.canvas.parentNode, _el = me._hecValuesEl;
+      if (!v || !_box || !((v.states || []).length || (v.stats || []).length)) {
+        if (_el) _el.remove();
+        me._hecValuesEl = null;
+        return;
+      }
+      if (!_el) {
+        _el = me._hecValuesEl = document.createElement('div');
+        _el.style.cssText = 'padding:0 10px 4px 10px;color:var(--primary-text-color)';
+        _el.addEventListener('click', function (ev) { me._hecOnValuesClick(ev); });
+        _el.addEventListener('mousemove', function (ev) { me._hecRevealValuesCut(ev.target, true); });
+        _el.addEventListener('mouseleave', function () { Chart.hecUi.closeReveal(_el, true); });
+      }
+      if (_el.nextSibling !== _box || _el.parentNode !== _box.parentNode) _box.parentNode.insertBefore(_el, _box);
+      var _narrow = v.layout === 'narrow';
+      var _cut = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0';
+      var state = function (s, size) {
+        return '<div class="hec-state' + (_narrow ? ' hec-cut' : '') + '" data-curve="' + s.curve + '" data-key="' + s.key + '" style="color:' + s.color +
+          ';font-size:' + size + ';line-height:1.2;cursor:pointer;' + (_narrow ? _cut : '') + '">' + _hecValueHtml(s) + '</div>';
+      };
+      var html = '', st = v.states || [];
+      if (st.length && _narrow && st.length > 1) {
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' + state(st[0], '2.2em') +
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">' + st.slice(1).map(function (s) { return state(s, '1.3em'); }).join('') + '</div></div>';
+      } else if (st.length) {
+        html += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px">' + st.map(function (s) { return state(s, '2.2em'); }).join('') + '</div>';
+      }
+      (v.stats || []).forEach(function (x) {
+        var _aligns = x.cells.length === 1 ? ['left'] : x.cells.length === 2 ? ['left', 'right'] : ['left', 'center', 'right'];
+        html += (x.name !== null && x.name !== undefined ? '<div' + (_narrow ? ' class="hec-cut"' : '') + ' style="margin-top:6px;color:' + x.color + ';' +
+                  (_narrow ? 'font-size:0.85em;' + _cut : '') + '">' + x.name + '</div>' : '') +
+          '<div class="hec-stats" data-curve="' + x.curve + '" data-key="' + x.key + '" style="display:flex;justify-content:space-between;gap:8px;margin-top:4px' + (_narrow ? ';font-size:0.85em' : '') + '">' +
+          x.cells.map(function (c, i) {
+            return '<div class="hec-stat" data-stat="' + c.stat + '" style="text-align:' + _aligns[i] + '"><div style="font-weight:600">' + c.label + '</div><div>' + c.value + '</div>' +
+              (c.time ? '<div style="opacity:0.8">' + c.time + '</div>' : '') + '</div>';
+          }).join('') + '</div>';
+      });
+      _el.innerHTML = html;
+      me._hecShowHoveredValue(me._hecHoverDot || null);
+    },
+
+    // The point a hover is on (hecHoverDot) shown over the chart in its curve's place, with
+    // its time (hecSetValues' format) — el null: the values now back
+    _hecShowHoveredValue: function (el) {
+      var _el = this._hecValuesEl, v = this._hecValues;
+      if (!_el || !v) return;
+      _el.querySelectorAll('.hec-state[data-hec-now]').forEach(function (s) { s.innerHTML = s.getAttribute('data-hec-now'); s.removeAttribute('data-hec-now'); });
+      var p = el && this.data.datasets[el._datasetIndex] && this.data.datasets[el._datasetIndex].data[el._index];
+      var s = p && typeof v.format === 'function' && _el.querySelector('.hec-state[data-curve="' + el._datasetIndex + '"]');
+      if (!s) return;
+      s.setAttribute('data-hec-now', s.innerHTML);
+      s.innerHTML = _hecValueHtml(v.format(el._datasetIndex, p.y, p.x));
+    },
+
+    // A click on the values over the chart: on a value now, customEvent (zone 'value',
+    // curveIndex); on a text cut, shown in full for a while
+    _hecOnValuesClick: function (ev) {
+      var me = this, s = ev.target.closest && ev.target.closest('.hec-state');
+      if (!s) { me._hecRevealValuesCut(ev.target, false); return; }
+      if (typeof me.options.customEvent !== 'function') return;
+      me.options.customEvent.call(me, { chart: me, gestureType: 'click', zone: 'value', curveIndex: +s.getAttribute('data-curve'),
+        legendIndex: -1, yAxisIndex: -1, clientX: ev.clientX, clientY: ev.clientY, event: ev });
+    },
+
+    // A text of the values over the chart cut ('…') at target: shown in full in place —
+    // kept while hovered (sticky), else for a while; none: the one kept while hovered closes
+    _hecRevealValuesCut: function (target, sticky) {
+      var _c = target && target.closest && target.closest('.hec-cut');
+      if (!_c || _c.scrollWidth <= _c.clientWidth) { if (sticky) Chart.hecUi.closeReveal(this._hecValuesEl, true); return; }
+      var r = _c.getBoundingClientRect(), _bSel = this.options.floatingBoundsSelector;
+      Chart.hecUi.reveal({ text: _c.textContent, left: r.left, right: r.right, top: r.top, bottom: r.bottom, align: 'left', font: getComputedStyle(_c).font },
+        sticky, _c, _bSel && this.canvas && this.canvas.closest ? this.canvas.closest(_bSel) : null);
+    },
+
+    // The labels drawn inside the plot of the axis on side ('left', 'right', or null: none)
+    // the pointer is near (_hecInsideLabelSideAt): their boxes drawn opaque
+    // (ticks.hecBackdrop.hoverColor), as the pointer points them out
+    _hecSetLabelsHovered: function (side) {
+      if ((this._hecLabelsHovered || null) === (side || null)) return;
+      this._hecLabelsHovered = side || null;
+      this.render({ duration: 0, lazy: true });
+    },
+
     // The axis whose labels drawn inside the plot a canvas-relative point is near (see
     // _hecInsideLabelColumns): 'left', 'right' or null. A point there is on the plot as
     // well — what it's for depends on the gesture: a drag (a mouse's, a finger's or a pen's
@@ -2267,6 +2385,8 @@
       if (el === (me._hecHoverDot || null)) return;
       me._hecHoverDot = el;
       me.render({ duration: 0, lazy: true });
+      // (the values over the graph: the hovered one's in its curve's place — _hecShowHoveredValue)
+      me._hecShowHoveredValue(el);
     },
 
     // The font of the legend's labels

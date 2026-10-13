@@ -6,6 +6,17 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.17b1] - 2026-10-13
 
+### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near
+- The values over a graph (`showState`, `look: mini`): a hover on a curve shows, in place of its value now, the value it's on with its time; leaving it, the value now again
+- The Y labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): their boxes opaque while the pointer is near them — in the column a drag of that axis starts in — rather than 80 %; elsewhere, as before (Chart.js `ticks.hecBackdrop.hoverColor`)
+- A value over the graph or a statistics' name cut ('…', a narrow card): shown in full in place while hovered, and on a click (on a name: a click on a value opens its entity's dialog)
+- The hand cursor on what a click opens: a legend label's value, a value over the graph
+- Tests: the value hovered in place, and back; a name cut shown in full; the boxes opaque near the labels, not away; the cursor on a value and on a name
+
+### Changed — the values over a graph drawn by Chart.js, as everything shown on and around a graph
+- The card computes them (the values now, the statistics, their colors, the layout, how a value at a point reads) and gives them to the chart (`chart.hecSetValues`); Chart.js draws them, above the graph as before, and reports a click on a value (`customEvent`, zone `'value'`). The card no longer builds their HTML nor listens to them (ARCHITECTURE.md, rule 1)
+- A bar graph's legend kept clear of its interval selector from where the card puts it (its own style: its distance from the edge, its width), no longer by measuring the graph on screen
+
 ### New — a click on a value opens its entity's dialog
 - A legend label is now two parts: its name — a click shows or hides the curve, the other gestures as before — and its value at its end (`(400 W)`): a click there opens Home Assistant's dialog of the entity, with the card's info panel in it when it's on, the curve left as it is. The other gestures (a drag, a long-press, a double-click) act on the whole label, as before
 - The same from a value shown over the graph (`showState`, `look: mini`), and from *Info* in a curve's menu (not the info panel's own menu: it is that dialog)

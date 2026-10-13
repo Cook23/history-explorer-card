@@ -21,6 +21,8 @@ export const RIGHT_Y_AXIS = 'y-axis-1';
 // A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
 // _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
 export const NARROW_CARD_PX = 300;
+// Where a bar graph's interval selector is: this far from the graph's right edge (px)
+const INTERVAL_SELECTOR_RIGHT_PX = 40;
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
 // labels' calc(.15em + 8.5px) of its 14 px — see _textSizes
@@ -454,8 +456,9 @@ export class CardGraphs
     // (hecTickBackdrops in deps/chart-hec.js) — or beside it
     _yLabelTicks(inside)
     {
+        // (the boxes opaque while the pointer is near the labels: hoverColor)
         return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this._textSizes().yLabels(inside),
-                 hecBackdrop: inside ? { color: this._tickBackdropColor() } : null };
+                 hecBackdrop: inside ? { color: this._tickBackdropColor(), hoverColor: this._tickBackdropColor(1) } : null };
     }
 
     // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
@@ -475,13 +478,14 @@ export class CardGraphs
     }
 
     // The boxes of the Y labels inside a plot: the card's background, as opaque as the
-    // tooltip (80 %) — the theme's own color, else white or, on a dark theme, dark grey
-    _tickBackdropColor()
+    // tooltip (80 %; alpha: another opacity) — the theme's own color, else white or, on a
+    // dark theme, dark grey
+    _tickBackdropColor(alpha = 0.8)
     {
         const _bg = this._this?.querySelector('#maincard') ? getComputedStyle(this._this.querySelector('#maincard')).backgroundColor : '';
         const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(_bg);
         const [r, g, b] = m && ( m[4] === undefined || +m[4] > 0 ) ? [m[1], m[2], m[3]] : this.ui.darkMode ? [28, 28, 28] : [255, 255, 255];
-        return `rgba(${r},${g},${b},0.8)`;
+        return `rgba(${r},${g},${b},${alpha})`;
     }
 
     // Each graph's Y labels placed, its text sized and its controls laid out as the card's
@@ -1134,7 +1138,7 @@ export class CardGraphs
         if( !isStatic )
             html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, graphInterval, this.ui.optionStyle, 40);
+            html += this.createIntervalSelectorHtml(this.g_id, h, graphInterval, this.ui.optionStyle, INTERVAL_SELECTOR_RIGHT_PX);
         html += `</div>`;
 
         const e = document.createElement('div');
@@ -1148,13 +1152,10 @@ export class CardGraphs
     {
         const _isStatic = g.isStatic;
         const _legend = g.chart.options.legend;
-        if( g.type === 'bar' ) {
-            // (from where the interval selector actually is: its left edge, a gap before it —
-            // it isn't against the graph's right edge)
-            const bd = this._this.querySelector(`#bd-${g.id}`);
-            const _bdR = bd?.getBoundingClientRect(), _cR = g.canvas.getBoundingClientRect();
-            if( bd && _bdR.width ) _legend.rightMargin = Math.max(_cR.right - _bdR.left + 8, _isStatic ? 25 : 45);
-            else if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
+        if( g.type === 'bar' && !this.ui.hideInterval ) {
+            // (from where the card puts the interval selector — not against the graph's right
+            // edge: its left edge, a gap before it)
+            _legend.rightMargin = Math.max(INTERVAL_SELECTOR_RIGHT_PX + this._intervalSelectorWidth() + 8, _isStatic ? 25 : 45);
         } else {
             // (nothing over a YAML graph's top right: no room kept there)
             _legend.rightMargin = _isStatic ? 4 : 45;

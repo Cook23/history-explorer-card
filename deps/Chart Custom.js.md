@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu) — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu); closing the tooltip; the values shown over the chart — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -83,10 +83,10 @@ or `maintainAspectRatio`.
 | `handleButtons` | `array` | `null` | Buttons drawn over the lock+handle zone (§5) in place of the handle and the padlock, each `{ id, text, disabled }` — `text` an icon, `disabled` greyed and struck through in red. The zone is then 18px per button (at least 33px); a button is picked by the general picking rule (`_hecPick`, on each one's icon): the one under the point, else the nearest one if near enough and clearly nearer than the next — so just beside a button (above the plot, below the zone) still picks it, about halfway between two picks none but says so (`handleButtonBetween`), clearly beside them picks none. A click on one fires `customEvent` (`click`) with `handleButton: id` and `handleButtonDisabled`, and neither toggles the lock nor starts a graph drag. A swipe starting on one (or halfway between two) is reported at its end: `dragend` with `swipe` (`'up'`, `'down'`, or `null` within `slop`) and that button's `handleButton` (or `handleButtonBetween`); on touch, the zone keeps that swipe (`touch-action: none`) instead of scrolling the page. The card shows them during a cut (where what was cut can be pasted). |
 | `linkMarkerTitle` | `string` | `''` | Hover text of the chain icon (the card's translated text). |
 | `floatingBoundsSelector` | CSS selector | none | The area Chart.js's floating elements (hover tooltip, truncated-label message) stay in: the closest ancestor of the canvas matching it, else the viewport only (see `Chart.hecUi.clampToViewport`, §7). The card passes `'#maincard'` — Chart.js knows nothing about the card's markup. |
-| `legend.labels.hecShortNames` | `function(chart)` → `[[string]]` | — | The shorter forms of each dataset's `name` (by dataset index, least shortened first), for labels too wide for a legend line (`Chart.hecFitLegendTexts`, from the legend's `fit`): as they are when they all fit; else every name at the same step, the first at which they all fit, what follows the name in the label (the value, an arrow) kept; else, at the last step, the names that still don't fit cut, '…' before what follows — and before a qualifier in parentheses at their end, kept when there's room. The card gives `src/legend-names.js`'s forms. |
+| `legend.labels.hecShortNames` | `function(chart)` → `[[string]]` | — | The shorter forms of each dataset's `name` (by dataset index, least shortened first), for labels too wide for a legend line (`Chart.hecFitLegendTexts`, from the legend's `fit`): as they are when they all fit; else every name at the same step, the first at which they all fit, what follows the name (`hecLegendValue`, `hecLegendMark`) kept as it is; else, at the last step, the names that still don't fit cut, '…' at their end — before a qualifier in parentheses at their end, kept when there's room. A first line left empty is never chosen: a shorter form fitting the first line's room is taken, never a cut. The card gives `src/legend-names.js`'s forms. |
 | `legend.leftMargin` / `legend.rightMargin` | `number` (px) | the lock+handle zone's width + 4 (4 without any control, or with `hecControlsBackdrop`) / `25` | Room kept free at both ends of the legend's first line (`options.legend`, next to the stock legend options) — what is drawn there is no taller than it: the lines below take the whole width, 4 px from each edge. The card sets `rightMargin` so the legend keeps clear of the buttons it draws over the graph's top right corner (4 when there's none). |
 | `ticks` (any scale's), changed after creation | — | — | Takes effect at the next `update()`: `ticks.minor` and `ticks.major` (Chart.js's copies, from which a scale is drawn) follow `ticks` for every value they took from it (`mergeTicksOptions`, also run by `updateConfig`); a value they set themselves stays theirs. |
-| `ticks.hecBackdrop` (a vertical scale's) | `{ color }` | — | Labels drawn inside the plot (`ticks.mirror`): drawn after the datasets, over them (plugin `hecTickBackdrops`), each in a rounded box of `color`; kept within the plot area; a label whose box would come within 3 px of one already drawn is skipped. The card gives the card's background, 80 % opaque. |
+| `ticks.hecBackdrop` (a vertical scale's) | `{ color, hoverColor }` | — | Labels drawn inside the plot (`ticks.mirror`): drawn after the datasets, over them (plugin `hecTickBackdrops`), each in a rounded box of `color`; kept within the plot area; a label whose box would come within 3 px of one already drawn is skipped. `hoverColor`: the boxes' color while the pointer is near those labels (the column along them, `_hecInsideLabelColumns` — the one a drag of that axis starts in), as the pointer points them out. The card gives the card's background, 80 % opaque, and opaque for `hoverColor`. |
 | `dragScope` | any value | none | A cross-graph drag (curve, label, graph move) only reaches the charts with the same `dragScope` — the card gives each of its instances its own, so two cards on the same dashboard never see each other's drags. |
 
 ### Global option: `Chart.defaults.global.gestures`
@@ -116,6 +116,7 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
 | `showMinMax` | `boolean` | `false` | A line dataset whose points carry `yMin` / `yMax`: the area between them shaded in the dataset's line color (alpha 0.15), on its own Y axis (plugin `hecMinMaxBand`). |
+| `hecLegendValue`, `hecLegendMark` | `string` | `''` | A legend label's parts after its name (`label`): its value (`'(400 W)'`) and a mark (`'▸'`, the right axis), each after a space (`Chart.hecLegendTail`) — distinct parts, not one text: only the name is shortened (`legend.labels.hecShortNames`) and struck through when hidden; a gesture says which part it's on (`legendPart`: `'value'`, or `'name'` for the rest). The card sets them from its `showCurrentValues` and the curve's axis. |
 | `hecFillFade` | `boolean` | `false` | A line dataset filled with its own `borderColor` fading out downwards (alpha 0.4 at the top of the plot area, 0 at its bottom): its `backgroundColor` set to that gradient after each layout (plugin `hecFillFade`). The card sets it from its `fill: fade`. |
 
 ---
@@ -129,6 +130,21 @@ without a lock (`yAxisLockEnabled: false`, a timeline or arrowline).
 `chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
 its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls
 it on every chart when one of its menus opens, so nothing of a tooltip stays over the menu.
+
+`chart.hecSetValues(values)` — the values shown over the chart, given by the card (`null`:
+none), drawn by Chart.js in an element of its own right above the chart's box (its canvas'
+parent), in the page's flow:
+`{ layout: 'row' | 'narrow', states: [{ curve, key, text, unit, color }], stats: [{ curve,
+key, name, color, cells: [{ stat, label, value, time }] }], format(curve, y, x) → { text,
+unit, time } }`. `states`: each curve's value now, on a row — `'narrow'`: the first one large,
+the others small in a column on its right, each cut ('…') rather than wrapped, the
+statistics a little smaller; `stats`: a curve's statistics, `name` above them (`null`: none),
+a cell each; all in the given colors (`curve`: its dataset index, `key`: an opaque id kept on
+its element). `format`: a value of a curve at a point, as `states` shows one — the value a
+hover is on (`hover.dotOnHover`) is shown in its curve's place, with its time, while it lasts.
+A click or a tap on a value now reaches `customEvent` (`gestureType: 'click'`, `zone:
+'value'`, `curveIndex`); a text cut is shown in full in place while hovered, and on a click
+(`Chart.hecUi.reveal`).
 
 ## 2. The `customEvent` gesture system
 
@@ -157,7 +173,9 @@ card may need, so it never has to compute one from the chart's layout.
   zone,                // where that point is: 'linkMarker' (chain icon, §5),
                        // 'lockAndHandle' (§5), 'legend' (its band, whole width),
                        // 'yAxis' (a Y axis' label column: left of the plot area, or right
-                       // of it on a chart with a right axis), 'plot', or 'other'
+                       // of it on a chart with a right axis), 'plot', or 'other' — and
+                       // 'value': a value shown over the chart (hecSetValues, §1; with
+                       // curveIndex, no position)
   xFactor,             // where x is along the time axis: 0 at the plot area's left
                        // edge, 1 at its right edge (undefined before the first layout)
   legendIndex,         // legend label under the point, or -1
@@ -416,7 +434,7 @@ is passed in).
 | `armAutoFade(el, duration[, justMoved])` | (Re)shows `el`, fading in, then fades it out after `duration` and closes it. With a third argument, only does so when `justMoved === true` (a render that follows a real pointer gesture, not a data refresh under a still pointer). |
 | `startFade(el, duration)` | Fades `el` out after `duration` — calling `el._hecOnFade` then, if its owner set one, for what must go with it —, then closes it. The hover tooltip's owner, its chart, ends the hover there: its highlighted points fade back to their normal look over `FADE`. |
 | `closeFloating(el)` | Removes `el` and its observer. |
-| `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`. |
+| `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`; `clientX` null: centered over `anchorEl` (a graph's canvas — the card never measures it). |
 | `reveal(r, sticky, anchorEl, boundsEl)`, `closeReveal(anchorEl, sticky)` | A text shown in full over where it's shortened or hidden: `r` `{ text, left, right, top, bottom (client), align: 'left' \| 'right', font }` — its text from the same edge, in its font, in a box of the card's background 80 % opaque; `sticky`: kept until `closeReveal`, else faded out after its reading time. One element per document or shadow root. |
 | `Chart.hecWrapLabel(ctx, label, availW)` | A scale's label too wide, on two lines (at a word, else at a character) — what a scale draws, and what tells a row name is cut (a line still too wide). |
 | `closeMessage(anchorEl)` | Closes the message of `anchorEl`'s document or shadow root. |

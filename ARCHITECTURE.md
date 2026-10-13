@@ -40,7 +40,8 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/card-toolbar.js` | The card's HTML: the toolbars and their menu entries, the interval selector of bar graphs, the layout as the card resizes. |
 | `src/card-storage.js` | What is kept between sessions and devices (the persistence scopes of the options), and the "last one to speak wins" merge of local state, HA user data and YAML. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
-| `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history. |
+| `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum over the window shown (`showStats`), from its history — computed and formatted, given to the chart to show (`hecSetValues`). |
+| `src/legend-names.js` | The shorter forms of the curves' names, for a legend too narrow for them (a qualifier as its initials, the device's name removed or abbreviated, the articles removed). Pure data, no DOM. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id (`climate.salon.current_temperature`), its state as Home Assistant would give an entity's (`stateOf`), its history from its entity's. |
 | `src/gesture-settings.js` | The gesture settings of every card (long-press duration, drag distance, for a mouse or a pen and for a finger): their bounds, this device's values, given to Chart.js (`Chart.defaults.global.gestures`). |
 | `src/history-options.js` | The card's options: the curve interpolation algorithms, the synonyms of the option names, which options can be set at which level (card, entityOptions, graph, entity). |
@@ -49,17 +50,21 @@ keep them apart. For the details of the boundary with Chart.js, see
 | `src/history-default-colors.js` | The default colors: the palette of the curves, the colors of the timeline states. |
 | `src/languages.js` | The card's texts in each language. |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
-| `deps/chart-hec.js` | **The interaction layer**: everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, `Chart.hecUi`. |
+| `deps/chart-hec.js` | **The interaction and display layer**: everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, the legend's layout (shortened names, its parts), the values over a graph, texts shown in full, `Chart.hecUi`. |
 | `deps/Chart.js` | Chart.js 2.7.1, with small changes and the hooks calling into `chart-hec.js`. |
 
 ## The rules
 
-1. **Chart.js owns every interaction, the card owns every meaning.** The card never
-   listens to a pointer, touch or wheel event on a graph, never reads a chart's layout,
-   never calls anything `_hec`. It gets gestures already resolved (zone, label, position
-   on the time axis, drop target) and answers through documented options. Chart.js never
-   knows what an entity, a group or a time window is.
-   (`deps/Chart Custom.js.md` §0)
+1. **Chart.js owns every interaction and everything drawn on and around a graph, the card
+   owns every meaning and every piece of data.** The card never listens to a pointer, touch
+   or wheel event on a graph or what's drawn around it, never builds what a graph shows
+   (its legend, the values over it), never reads a chart's layout, never calls anything
+   `_hec`. It gives data and decisions through documented options and methods (what to
+   show, in which colors, how a value reads), and gets gestures already resolved (zone,
+   label, part of a label, position on the time axis, drop target). Chart.js never knows
+   what an entity, a group or a time window is. The menus (`card-menus.js`), the
+   persistence (`card-storage.js`) and the entity list (the store) each keep to their own
+   contract. (`deps/Chart Custom.js.md` §0)
 2. **The entity list changes only through the store.** The graphs on screen are built
    from it; its order is the display order between groups; a group's entries are always
    contiguous.
@@ -77,6 +82,8 @@ keep them apart. For the details of the boundary with Chart.js, see
 | What a gesture does | `src/card-gestures.js` |
 | How entities are grouped, ordered, moved, saved | `src/history-entity-store.js` (rules), `src/card-gestures.js` (operations), `src/card-storage.js` (persistence) |
 | What a curve looks like | `src/card-datasets.js` |
+| The values over a graph | `src/card-values.js` (what they are), `deps/chart-hec.js` (how they're shown, their gestures) |
+| The legend | `src/card-graphs.js` (its parts, colors), `src/legend-names.js` (shorter names), `deps/chart-hec.js` + `deps/Chart.js` (its layout) |
 | How data is fetched | `src/card-history.js` |
 | A menu | `src/card-menus.js` |
 | The entity selector | `src/card-selector.js` |

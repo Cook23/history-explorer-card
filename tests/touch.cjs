@@ -181,7 +181,8 @@ module.exports = async function()
     const E2 = x => t2.E(x);
     await E2(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t2.wait(1500);
     await t2.step('a tap on a shortened legend label: its curve hidden, its full name shown over it for a while; a tap on a cut timeline row name: shown in full', async () => {
-        const p = await E2(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-10, y: r.top+b.top+b.height/2 }; })()`);
+        // (on its name: its value at its end opens its entity's dialog)
+        const p = await E2(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*0.4, y: r.top+b.top+b.height/2 }; })()`);
         await t2.tap(p); await t2.wait(500);
         const label = await E2('reveal()'), hidden = await E2('!!graphAt(0).chart.getDatasetMeta(0).hidden');
         await t2.tap(p); await t2.wait(4000);

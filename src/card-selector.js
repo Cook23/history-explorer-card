@@ -501,10 +501,9 @@ export class CardSelector
     _selectorTooltip(ii, text, g = null)
     {
         const _ir = this.ui.inputField[ii]?.getBoundingClientRect();
-        const _r = g?.canvas.getBoundingClientRect();
-        const _tx = _ir ? _ir.left + _ir.width / 2 : (_r ? _r.left + _r.width / 2 : window.innerWidth / 2);
-        const _ty = _ir ? _ir.top : (_r ? _r.top + _r.height / 2 : 0);
-        this._showLabelTooltip(text, _tx, _ty, 'center', this.ui.inputField[ii] ?? g?.canvas ?? document.body);
+        // (over graph g: centered on it by Chart.hecUi — no coordinates)
+        if( !_ir && g ) return this._showLabelTooltip(text, null, null, 'center', g.canvas);
+        this._showLabelTooltip(text, _ir ? _ir.left + _ir.width / 2 : window.innerWidth / 2, _ir ? _ir.top : 0, 'center', this.ui.inputField[ii] ?? document.body);
     }
 
     addEntitySelected(ii)
