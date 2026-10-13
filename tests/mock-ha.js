@@ -8,6 +8,8 @@
 //   fail        WS message types that fail
 //   language    Home Assistant's language ('en')
 //   dark        dark theme
+// The entity and device registries (hass.entities, hass.devices) give sensor.power and
+// sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids}).
 // setState(id, value) pushes the change to every element in window.hassTargets.
 window.logs=[]; window.onerror=(m)=>{logs.push('ERR '+m)};
@@ -108,6 +110,9 @@ function mkHass(){ return {
   states:{...STATES}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   user:{id:'u1',name:'u'}, localize:(k)=>k,
+  // the entity and device registries (an entity's device: its name)
+  entities:{ 'sensor.power':{entity_id:'sensor.power',device_id:'d_ecowitt'}, 'sensor.power2':{entity_id:'sensor.power2',device_id:'d_mf'}, 'sensor.rain':{entity_id:'sensor.rain',device_id:'d_ecowitt'} },
+  devices:{ d_ecowitt:{id:'d_ecowitt',name:'Ecowitt'}, d_mf:{id:'d_mf',name:'Météo-France Villeveyrac'} },
   callWS:(d)=>{
     __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));

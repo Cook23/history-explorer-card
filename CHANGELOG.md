@@ -4,6 +4,79 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.16] - 2026-10-13
+
+### Fixed — a narrow card (a grid, a horizontal stack) readable
+- The toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its full name) and the entity search each on a line of their own, centered — they wrapped over up to 7 lines, the range's name cut, the search and ▾ out of the card. The search field is never wider than the card
+- The Y labels inside the plot on a card narrower than 300 px (as `yLabels: inside`), so that the plot keeps its width — it was down to 85 px, 38 with two axes, on a 168 px card; `yLabels: outside` keeps them beside it. Inside, each label is drawn just above its grid line, clear of the time labels
+- The text of a card narrower than 300 px a little smaller, as mini-graph-card's: the legend, the time labels and a timeline's text in 11 px (12, 13 for a timeline's states, otherwise); the Y labels inside the plot (a narrow card, `yLabels: inside`, `look: mini`) at mini-graph-card's size, 10.5 px (its `calc(.15em + 8.5px)` of 14 px)
+- The values over a graph (`showState`, `showStats`, `look: mini`) on a card narrower than 300 px, as mini-graph-card keeps them: the first curve's value large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics' text a little smaller — the values wrapped, each as large as the first, and pushed the plot down
+- A card crossing 300 px once shown (a screen turned, a window resized) placed its Y labels by half: Chart.js draws from copies of the ticks' options (`ticks.minor`, `ticks.major`) made once, left as they were — they now follow `ticks` on each update (Chart.js `mergeTicksOptions`, also called by `updateConfig`), what they set themselves kept — the card only changes `ticks` (`_fitToCardWidth`)
+- The Y labels inside the plot (a narrow card, `yLabels: inside`, `look: mini`) each in a rounded box of the card's background, 80 % opaque like the tooltip, drawn over the curves (Chart.js `ticks.hecBackdrop`, plugin `hecTickBackdrops`) — as mini-graph-card's; kept within the plot, a label whose box would touch another one skipped
+- The Y labels inside the plot: near them, what a gesture is for depends on the gesture, as on the ⠿ zone — a drag is the axis' (a mouse's at once; a finger's or a pen's after a tap, then a second press right away), a click, a long press or a hover the curves' (their tooltip, their points, the point hovered). Near them: in a column along the plot's edge as wide as the labels' boxes, and the pointer's precision more (`Chart.hecGestures(pointerType).slop`), one per axis. Inside, the labels left no room for the axis' own gestures: a drag there moved the time
+- The handle, the padlock and the chain icon no longer cost the legend room it doesn't need. On a card narrower than 300 px they take none: each in a box like the Y labels', over the legend's labels or a timeline's rows — the legend's first line was left empty when its labels didn't fit beside them (on a 168 px card, 73 px of a 150 px `look: mini` graph went to its legend), a timeline kept 24 px above its rows. On a wider card they keep the room they need beside the legend's first line only — their width and 4 px, rather than 50 px — and nothing beside a YAML graph's (no button at its top right: 4 px rather than 25); the lines below take the whole width — the names taken at a shorter form fitting the first line's room when the first one wouldn't fit there, rather than leaving that line empty (never cut for it); the Y axes' labels and units keep their column, a timeline its room for the handle. On the box a gesture is the control's — a click locks, a drag moves the graph, a long-press opens its menu — beside it, on a label, the label's (Chart.js `hecControlsBackdrop`)
+- The padlock 2 px lower: its bottom on the handle's (⠿)
+- The chain icon, right above the handle and the padlock, touched them: it is now just right of them. It still takes no room — laid over the graphs, nothing moves when it shows
+- A legend kept the lines it had once its card wider (a screen turned, a window resized): an empty line at its bottom, the plot that much shorter. Its count of lines, kept while the values in its labels change, now starts over when the room for its lines changes
+- The time labels that would overlap skipped (Chart.js `autoSkip`): a narrow plot drew them over each other; at full width they are all drawn, as before
+- A legend too narrow for its labels shortens the names, every curve of the graph at the same step — the first at which they all fit — each value kept (`src/legend-names.js`, Chart.js `legend.labels.hecShortNames`): a qualifier in parentheses that many entities carry as its initials (`(Filtered)` → `(F)`); the entity's device name removed (Home Assistant's device registry), abbreviated instead where two curves would then read the same (`Météo-France Villeveyrac` → `M-F V…`); the articles of the language removed; then '…' before the value, and before a final qualifier kept when there's room. The labels were cut by the card's edges, on both sides
+- A bar graph's legend kept clear of its interval selector from where the selector actually is: its margin assumed the selector against the graph's right edge, 40 px short — hidden until now, a long label going to the next line anyway; a shortened one stayed under the selector
+- The legend's margins (kept clear for the padlock, the handle and the buttons at the graph's top, no taller than its first line) only on its first line: the lines below take the whole width — on a 168 px card, the margins took more room than the labels
+- Tests: the Y labels inside the plot — near them a drag (mouse), a tap then a drag (finger, pen) moves that axis and its curves, left and right, the other one's not; a swipe, a pen's drag don't; a click, a tap, a long press and a hover on a value there are the curve's; the chain icon taking no room, clear of the padlock; a narrow card's controls in boxes over the legend and the rows, a wide card's beside the legend's first line, the units kept, a click and a long-press on the box the controls', on the label beside it the label's; a narrow card's values (the first large, the next small, the statistics smaller; back as before); a 168 px card — the toolbar's lines, nothing out of the card, the Y labels inside (`outside` kept), the time labels apart; the legend at 1000, 300 and 168 px; suite `legend` (the shorter forms)
+
+### Docs — a narrow card and `look: mini` illustrated
+- README and README_Full: a card 168 px wide and `look: mini` at 374 and 168 px (light and dark themes); what a narrow card changes; the gestures along labels drawn inside the plot
+- [mini-graph-card](https://github.com/kalkih/mini-graph-card) linked, and thanked for its good ideas on showing a graph in little room, which this version follows
+
+### Fixed — the tooltip: closed when a menu opens, its arrow on its point
+- A curve's tooltip still shown (its reading time) stayed over a menu opened then — the options menu, the entity selector's list. Opening any menu of the card now closes it at once and ends its mode (Chart.js `hecEndTooltip`), as an entity's menu already did
+- A tooltip wider than its card (a narrow card) was kept within the card, so pushed out of the screen on its other side; it is now kept within the screen, at most as wide as it (its lines wrapped then)
+- A tooltip moved to stay within the card or the screen kept its arrow where it was in it, beside the point (20 px on a phone); the arrow now stays on the point (never in the tooltip's rounded corners)
+- Tests: the options menu and the selector opened over a tooltip; the arrow on the point, the tooltip moved to the right edge and to the bottom
+
+### Fixed — the entity selector in the theme's colors
+- The search field was the browser's own, white on a dark theme; it now takes the card's colors (`uiColors.selector` still wins)
+- Tests: the selector's background on a dark theme
+
+### Fixed — a menu stays readable under its submenus
+- The options menu was narrower than its submenus: *Export ▸* covered every line of the menu, so another submenu couldn't be picked. A menu is now wider than each of its submenus by its widest line, so its lines show beside the submenu open — the last line's submenu aside, which hides no line below it: as wide as the menu at most. One rule for every menu with submenus (`_fitMenuToSubmenus`, when the menu opens); a submenu's lines never wrap
+- On a card or a screen too narrow for that, the menu takes the room there is (its border included) and opens without any submenu, with the keyboard — Escape, or a click beside it, closes it (the default one, or the one it had open 10 s ago): its lines are read first, a click more opens one. A submenu opened then leaves at least 48 px and the first three characters of the menu's lines, so another one can still be picked; its own lines are cut ('…') if they don't fit
+- Tests: each submenu of the options menu and of an entity's menu open, the menu's lines clear of it; a narrow card: the menu alone, then a submenu leaving the start of its lines
+
+### Changed — the options menu: Card ▸ Default graphs, Default display, each confirmed; Global ▸
+- *Remove all added graphs* is now *Default graphs*: the graphs added from the card removed, the YAML's kept as they were changed
+- New *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Saved as any change: the last one to speak, it reaches the other devices for what they share — a hidden curve and its points stay each device's own
+- *This card ▸* is now *Card ▸*, *All cards ▸* now *Global ▸*
+- Each is confirmed in a submenu over *Card ▸*, right-aligned on it: *Confirm* / *Cancel* — Cancel marked, so that Enter or Escape changes nothing — rather than the browser's dialog; the info panel switched on or off in *Global ▸* too
+- The graphs are built from the entity list by one function, at first display and on going back to the YAML (`_buildGraphsFromStore`)
+- Tests: Cancel, Enter, then Confirm; the graphs added gone, the YAML's changes kept (Default graphs) or forgotten with the time range (Default display), here, after a reload and on another device
+
+### Fixed — every gesture in every layout
+- A card without any entity selector (`uiLayout: { selector: hide }`, `look: mini`) had no menu of an entity nor of a graph: they were built with the selector. A long-press on a label, on the ⠿ zone, now opens them there too (`#hm_0`, their own place)
+- On a narrow card, a timeline's handle, in its box over the rows, was no longer picked: the controls were only looked for above the plot area. On their box, they are now, wherever it is drawn
+- Tests: suite `modes` — every gesture (the padlock, the menus of a graph, of a curve, of a timeline's row, the Y axis, a value's tooltip and points, the hover, the time, the split and the merge by the chain icon, a curve and a graph moved) with a mouse and a finger, on a card at full width and on a narrow one; and on `look: mini`
+
+### New — a bar graph's bars by week; its intervals named shortly
+- *Week* in a bar graph's interval selector (`interval: weekly` in the YAML), a week from Monday, as Home Assistant's statistics count it — between *Day* and *Month*
+- The intervals named as what they are, in every language: *10 min*, *Hour*, *Day*, *Week*, *Month*, *Raw* (*Heure*, *Jour*, *Semaine*, *Mois*, *Brut*), rather than *Hourly*, *Daily*, *Monthly*, *Raw line* (*Par heure*, *Par jour*, *Par mois*, *Courbe brute*)
+- The intervals in one table (`BAR_INTERVALS`: the code saved, the YAML name, the label, the length and start of a bar); a code saved before keeps its meaning (*Week* is saved as 5)
+- Tests: `interval: weekly` — a bar each week, from Monday; *Day* picked: a bar each day, saved
+
+### Changed — the options menu as wide in every language as in French
+- Its new and shortened lines translated as short: *Export* (de, nl, sv, sk), *Eksport* (pl, da), *Historie* (nl), *Карта* / *Общие* (ru), *Ogólne* (pl), *Všetky* (sk), *Gráficos* / *Vista por defecto* (es), *Predvolený pohľad* (sk), *Исходные графики* / *Исходный вид* (ru); the confirmation's *Yes* / *No* in the languages where *Confirm* / *Cancel* were wider (de, es, nl, pl, sv, da, ru)
+- Tests: each menu's widest line, in every language, no wider than in French
+
+### Changed — the export submenu says what it exports
+- *Export ▸ History* (the history of the entities shown, over the time window shown) and *Export ▸ Statistics* (their long-term statistics), rather than *Export as CSV* and *Export statistics as CSV*: the format is in the documentation
+
+### Fixed — the point hovered as large as a point shown
+- Hovering a value of a curve whose points aren't shown drew its point smaller than a point shown: filled only, without the border a point has. It is now drawn as a point shown — its style, its border — so there are two sizes only: the points, and the one the tooltip shows
+- Tests: the point hovered covers as many pixels as the same point shown
+
+### Fixed — the tooltip as far from its point on the left as on the right
+- On the left of its point, the tooltip stood too near (its arrow on the point) or too far, depending on the font: it was placed by the width Chart.js measured for its own drawing, not by its real one. It is now placed by its real size, as far from the point on either side
+- Tests: the gap between the point and the tooltip, on its right and on its left
+
 ## [v1.2.15] - 2026-10-12
 
 ### New — the point hovered

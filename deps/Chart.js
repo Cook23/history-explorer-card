@@ -3772,6 +3772,8 @@
           } else if (newOptions.scales) {
             newOptions.scales.xAxes.concat(newOptions.scales.yAxes).forEach(function (scaleOptions) {
               chart.scales[scaleOptions.id].options = scaleOptions;
+              // (fork) ticks.minor / ticks.major following a change of ticks
+              chart.scales[scaleOptions.id].mergeTicksOptions();
             });
           }
 
@@ -4323,6 +4325,7 @@
             me._hecUpdateDragTouchOverlays();
             me._hecUpdateMoveHandleIcon();
             me._hecUpdateHandleButtons();
+            me._hecUpdateControlsBackdrop();
             me._hecUpdateLinkMarker();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
@@ -7326,6 +7329,8 @@
           // Any function defined here is inherited by all scale types.
           // Any function can be extended by the scale type
 
+          // (fork) also on each update (updateConfig): what ticks.minor / ticks.major took from
+          // ticks follows ticks when it changes — what they set themselves stays theirs
           mergeTicksOptions: function () {
             var ticks = this.options.ticks;
             if (ticks.minor === false) {
@@ -7338,14 +7343,17 @@
                 display: false };
 
             }
+            [ticks.minor, ticks.major].forEach(function (t) {
+              if (!t._hecInherited) Object.defineProperty(t, '_hecInherited', { value: {}, enumerable: false });
+            });
             for (var key in ticks) {
               if (key !== 'major' && key !== 'minor') {
-                if (typeof ticks.minor[key] === 'undefined') {
-                  ticks.minor[key] = ticks[key];
-                }
-                if (typeof ticks.major[key] === 'undefined') {
-                  ticks.major[key] = ticks[key];
-                }
+                [ticks.minor, ticks.major].forEach(function (t) {
+                  if (typeof t[key] === 'undefined' || t._hecInherited[key]) {
+                    t[key] = ticks[key];
+                    t._hecInherited[key] = true;
+                  }
+                });
               }
             }
           },
@@ -8005,6 +8013,11 @@
 
             });
 
+            // (fork) labels drawn inside the plot (mirror) with ticks.hecBackdrop: kept for
+            // later — drawn over the datasets, each in its box (plugin hecTickBackdrops)
+            var _hecDefer = !isHorizontal && optionTicks.mirror && !!optionTicks.hecBackdrop;
+            me._hecDeferredLabels = _hecDefer ? [] : null;
+
             // Draw all of the tick labels, tick marks, and grid lines at the correct places
             helpers.each(itemsToDraw, function (itemToDraw) {
               if (gridLines.display) {
@@ -8032,7 +8045,11 @@
                 context.restore();
               }
 
-              if (optionTicks.display) {
+              if (optionTicks.display && _hecDefer) {
+                me._hecDeferredLabels.push({ x: itemToDraw.labelX, y: itemToDraw.labelY, label: itemToDraw.label,
+                  font: itemToDraw.major ? majorTickFont.font : tickFont.font, color: itemToDraw.major ? majorTickFontColor : tickFontColor,
+                  align: itemToDraw.textAlign, baseline: itemToDraw.textBaseline });
+              } else if (optionTicks.display) {
                 // Make sure we draw text in the correct color and font
                 context.save();
                 context.translate(itemToDraw.labelX, itemToDraw.labelY);
@@ -11950,9 +11967,23 @@
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
                 // (options.legend.leftMargin / rightMargin: room kept free at both ends of
                 // the legend's lines, for what the card draws there)
-                me.leftMargin = me.options.leftMargin !== undefined ? me.options.leftMargin : 50;
+                // (fork) on the left, the room the controls at the graph's top left need (the
+                // lock+handle zone, 4 px apart) — none when they're drawn in boxes over the
+                // labels (hecControlsBackdrop) or there's none
+                var _ch = me.chart;
+                me.leftMargin = _ch && _ch.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
+                  _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
                 me.rightMargin = me.options.rightMargin !== undefined ? me.options.rightMargin : 25;
-                var _baseKey = me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '';
+                // (fork) the margins of a line: the first one's, for what is drawn at both ends
+                // of the legend's top (the controls, the card's buttons — no taller than it);
+                // below it, 4 px — the whole width for the labels
+                me._hecMarginsOf = function (line) {
+                  return line > 0 ? { l: 4, r: 4 } : { l: me.leftMargin, r: me.rightMargin };
+                };
+                // (the ratchet below keeps the lines' count while the values in the labels
+                // change; a change of names or of the room the lines have starts it over)
+                var _baseKey = (me.chart ? me.chart.data.datasets.map(function(ds){ return ds.name || ds.label || ''; }).join('|') : '') +
+                  '|' + Math.round(me.width) + '|' + me.leftMargin + '|' + me.rightMargin;
                 if (me._ratchetBaseKey !== _baseKey) {
                     me._ratchetBaseKey = _baseKey;
                     me._ratchetLineCount = 0;
@@ -11965,11 +11996,31 @@
                 ctx.textBaseline = 'top';
 
                 var _computedLineCount = 1;
+                // (fork) a label wider than a whole line: shortened — labels.hecShortNames
+                // (Chart.hecFitLegendText)
+                if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
+                  var _shortNames = labelOpts.hecShortNames(me.chart) || [];
+                  var _roomOf = function (line) {
+                    var _m = me._hecMarginsOf(line);
+                    return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
+                  };
+                  var _items = me.legendItems.map(function (it) {
+                    var _ds = me.chart.data.datasets[it.datasetIndex] || {};
+                    return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
+                  });
+                  // (to a whole line below the first; the first label not fitting the first line,
+                  // between its margins, to that one if a shorter form fits there — rather than a
+                  // first line left empty — never cut for it)
+                  var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
+                  if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
+                  me.legendItems.forEach(function (it, k) { it.text = _fitted[k]; });
+                }
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
                   var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
 
-                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - me.leftMargin - me.rightMargin) {
+                  var _m = me._hecMarginsOf(lineWidths.length - 1);
+                  if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - _m.l - _m.r) {
                     totalHeight += fontSize + labelOpts.padding;
                     lineWidths[lineWidths.length] = me.left;
                     _computedLineCount++;
@@ -12161,10 +12212,12 @@
                 var y = cursor.y;
 
                 if (isHorizontal) {
-                  if (x + width >= legendWidth - me.rightMargin) {
+                  var _mNow = me._hecMarginsOf ? me._hecMarginsOf(cursor.line) : { l: me.leftMargin, r: me.rightMargin };
+                  if (x + width >= legendWidth - _mNow.r) {
                     y = cursor.y += itemHeight;
                     cursor.line++;
-                    x = cursor.x = me.left + me.leftMargin + (legendWidth - me.leftMargin - me.rightMargin - lineWidths[cursor.line]) / 2;
+                    var _mNext = me._hecMarginsOf ? me._hecMarginsOf(cursor.line) : _mNow;
+                    x = cursor.x = me.left + _mNext.l + (legendWidth - _mNext.l - _mNext.r - lineWidths[cursor.line]) / 2;
                   }
                 } else if (y + itemHeight > me.bottom) {
                   x = cursor.x = x + me.columnWidths[cursor.line] + labelOpts.padding;

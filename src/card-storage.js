@@ -193,7 +193,9 @@ export class CardStorage
         // ended up winning below, or the YAML-changed detection breaks: a field overridden
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
-        this._pureYamlEntities = _yamlEntities;
+        // (a copy: the entries themselves go on living in the card — also what the card goes
+        // back to, see _resetToYaml)
+        this._pureYamlEntities = JSON.parse(JSON.stringify(_yamlEntities));
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
         const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(keyOf);

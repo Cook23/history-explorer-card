@@ -32,7 +32,7 @@ module.exports = async function()
 
     t = await openCard(YAML(), { mock: { series: true } });
     await t.wait(800);
-    await t.step('the options menu: Export ▸, This card ▸, All cards ▸; All cards: the info panel and the four thresholds, as they are', async () => {
+    await t.step('the options menu: Export ▸, Card ▸, Global ▸; Global: the info panel and the four thresholds, as they are', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         const m = await items('#eo_0');
         await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
@@ -40,9 +40,47 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Export ▸ | This card ▸ | All cards ▸' && /CSV/.test(r.ex) && r.exportClosed
+        return r.m === 'Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
             && /panel/i.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12 }) ? true : JSON.stringify(r);
+    });
+    // With submenu sub of menu open: '' when the menu's lines are readable beside it (its
+    // text clear of the submenu) — the last line's submenu: no wider than the menu —, else
+    // what's wrong
+    const readable = (menu, sub, last) => t.E(`(()=>{ const m=el.querySelector('${menu}').getBoundingClientRect(), s=el.querySelector('${sub}').getBoundingClientRect();
+        if( ${last} ) return s.width <= m.width + 0.5 ? '' : 'last submenu wider than the menu: '+s.width+' > '+m.width;
+        const r=document.createRange(); const bad=[...el.querySelector('${menu}').children].filter(a=>a.tagName==='A'&&a.style.display!=='none')
+            .filter(a=>{ r.selectNodeContents(a); return r.getBoundingClientRect().right > s.left; }).map(a=>a.textContent.trim());
+        return bad.length ? 'hidden by the submenu: '+bad.join(', ') : ''; })()`);
+    await t.step('a menu is wider than its submenus: its lines readable beside each — the last line\'s submenu, the menu\'s width at most', async () => {
+        const r = {};
+        for( const [k, last] of [['export', false], ['card', false], ['all', true]] ) {
+            await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#eo_0_${k}').click()`); await t.wait(300);
+            r[k] = await readable('#eo_0', `#eo_0_${k}_sub`, last); await closeMenus();
+        }
+        await hold(800); await t.wait(400);
+        r.rep = await readable('#et_0', '#et_0_rep_sub', false);
+        await t.E(`el.querySelector('#et_0_layout').click()`); await t.wait(300);
+        r.layout = await readable('#et_0', '#et_0_layout_sub', false); await closeMenus();
+        return Object.values(r).every(v => v === '') ? true : JSON.stringify(r);
+    });
+    await t.step('a card too narrow for a menu and a submenu beside its lines: the menu opens alone; a submenu opened leaves 48 px and three characters of its lines; Escape or a click beside closes it', async () => {
+        await t.E(`(()=>{ document.body.style.width='230px'; document.getElementById('host').style.width='230px'; })()`); await t.wait(1200);
+        await hold(800); await t.wait(400);
+        const r = await t.E(`(()=>{ const m=el.querySelector('#et_0'); return { cramped: m.dataset.hecCramped, open: [...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(s=>s.style.display!=='none').map(s=>s.id) }; })()`);
+        await t.E(`el.querySelector('#et_0_rep').click()`); await t.wait(300);
+        const strip = await t.E(`(()=>{ const m=el.querySelector('#et_0'), s=el.querySelector('#et_0_rep_sub').getBoundingClientRect(), mr=m.getBoundingClientRect();
+            const lines=[...m.children].filter(a=>a.tagName==='A'&&a.style.display!=='none');
+            const cut=lines.filter(a=>{ const t=document.createTreeWalker(a,NodeFilter.SHOW_TEXT).nextNode(); const g=document.createRange(); g.setStart(t,0); g.setEnd(t,Math.min(3,t.length)); return g.getBoundingClientRect().right > s.left; }).map(a=>a.textContent);
+            return { left: Math.round(s.left - mr.left), cut, within: s.right <= mr.right + 0.5 }; })()`);
+        await closeMenus();
+        // (opened alone, it has the keyboard: Escape closes it, and so does a click beside it)
+        const isOpen = () => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
+        await hold(800); await t.wait(300); await t.page.keyboard.press('Escape'); await t.wait(300); const afterEscape = await isOpen();
+        await hold(800); await t.wait(300); await t.page.mouse.click(5, 5); await t.wait(400); const afterClick = await isOpen();
+        await t.E(`(()=>{ document.body.style.width='1000px'; document.getElementById('host').style.width=''; })()`); await t.wait(1200);
+        return r.cramped === '1' && !r.open.length && strip.left >= 48 && !strip.cut.length && strip.within && !afterEscape && !afterClick ? true : JSON.stringify({ r, strip, afterEscape, afterClick });
     });
     await t.step('a value entered is kept within its bounds, and given to Chart.js for every chart', async () => {
         await openAll(); await enter('longPress', 99999); await enter('precision', 1);
@@ -89,13 +127,39 @@ module.exports = async function()
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const v = await inputs(); await closeMenus();
         return JSON.stringify(v) === JSON.stringify({ longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20 }) ? true : JSON.stringify(v);
     });
-    await t.step('the info panel switch: saved on every device without any persistence option', async () => {
-        t.page.once('dialog', d => d.accept());
-        await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(800);
+    await t.step('the info panel switch: confirmed in a submenu (Cancel: unchanged); saved on every device without any persistence option', async () => {
+        await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
+        const asked = { shown: await shown('#ei_0_sub'), marked: await t.E(`el.querySelector('#ei_0_cancel').dataset.hecSelected`) };
+        await t.E(`el.querySelector('#ei_0_cancel').click()`); await t.wait(500);
+        const kept = await t.E(`el.querySelector('#ei_0').textContent`);
+        await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#ei_0_ok').click()`); await t.wait(800);
         const on = await t.E(`el.querySelector('#ei_0').textContent`);
+        if( !asked.shown || asked.marked !== '1' || !/enable/i.test(kept) ) return JSON.stringify({ asked, kept });
         await newDevice(YAML({ gestures: { longPress: 800 } })); await openAll();
         const after = await t.E(`el.querySelector('#ei_0').textContent`); await closeMenus();
         return /disable/i.test(on) && /disable/i.test(after) ? true : JSON.stringify({ on, after });
+    });
+    done(await t.close());
+
+    // ── Every language's options menu no wider than the French one (the one tried on screen) ──
+    t = await openCard(YAML(), { mock: { series: true } });
+    await t.step('the options menu and its submenus, a bar graph\'s intervals: in every language, no wider than in French (5 % more at most)', async () => {
+        const src = require('fs').readFileSync(require('path').join(__dirname, '../src/languages.js'), 'utf8');
+        const MENUS = { options: ['options_export', 'options_card', 'options_all'], export: ['export_csv', 'export_stats'],
+                        card: ['default_graphs', 'default_display'], confirm: ['confirm_ok', 'confirm_cancel'],
+                        interval: ['_10m', 'hourly', 'daily', 'weekly', 'monthly', 'rawline'] };
+        const langs = {};
+        for( const m of src.matchAll(/const lang_(\w+) =([\s\S]*?)\n};?\n/g) ) {
+            langs[m[1]] = {};
+            for( const k of Object.values(MENUS).flat() ) { const r = new RegExp('"' + k + '"\\s*:\\s*"([^"]*)"').exec(m[2]); if( r ) langs[m[1]][k] = r[1]; }
+        }
+        const wider = await t.E(`(()=>{ const L=${JSON.stringify(langs)}, M=${JSON.stringify(MENUS)}, c=document.createElement('canvas').getContext('2d');
+            c.font='14px Roboto, Noto, sans-serif'; const w=(m,t)=>c.measureText(t+(m==='options'?' ▸':'')).width; const out=[];
+            for( const m in M ) { const fr=Math.max(...M[m].map(k=>w(m,L.fr[k])));
+                for( const l in L ) { const x=Math.max(...M[m].map(k=>w(m,L[l][k]??''))); if( x>fr*1.05 ) out.push(m+' '+l+' '+Math.round(x)+'>'+Math.round(fr)); } }
+            return out; })()`);
+        return Object.keys(langs).length >= 10 && !wider.length ? true : JSON.stringify(wider);
     });
     done(await t.close());
 

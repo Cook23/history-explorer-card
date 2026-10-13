@@ -54,6 +54,21 @@ export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'showState', 'showStats'
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels'];
 
+// A bar graph's intervals, in the order its selector shows them: the code saved for each
+// (weekly, added last, gets the next one: the codes saved before keep their meaning), its
+// YAML name, its label (ui.interval.*), and its length and start (moment) — raw: no
+// interval, the bar entities drawn as curves
+export const BAR_INTERVALS = [
+    { code: 0, yaml: '10m',     label: '_10m',    length: [10, 'minute'], start: 'hour' },
+    { code: 1, yaml: 'hourly',  label: 'hourly',  length: [1, 'hour'],    start: 'hour' },
+    { code: 2, yaml: 'daily',   label: 'daily',   length: [1, 'day'],     start: 'day' },
+    { code: 5, yaml: 'weekly',  label: 'weekly',  length: [1, 'week'],    start: 'isoWeek' },
+    { code: 3, yaml: 'monthly', label: 'monthly', length: [1, 'month'],   start: 'month' },
+    { code: 4, yaml: null,      label: 'rawline' },
+];
+export const RAW_INTERVAL = 4;
+export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
+
 // Looks: a set of options given at once with `look:` — the card's own options still win.
 // mini: what mini-graph-card shows — no header, toolbar nor selector, each curve's value
 // now and its minimum and maximum over the window, no time labels nor grid, the Y labels

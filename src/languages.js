@@ -14,15 +14,13 @@ const lang_en =
             "add" : "Add",
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
         }, 
-        "popup" : {
-            "remove_all" : "Remove all the graphs added from the card?",
-            "enable_panel" : "Enable the history info panel of the entities?",
-            "disable_panel" : "Disable the history info panel of the entities?"
-        },
         "menu" : {  
-            "export_csv" : "Export as CSV",
-            "export_stats" : "Export statistics as CSV",
-            "remove_all" : "Remove all added graphs",
+            "export_csv" : "History",
+            "export_stats" : "Statistics",
+            "default_graphs" : "Default graphs",
+            "default_display" : "Default display",
+            "confirm_ok" : "Confirm",
+            "confirm_cancel" : "Cancel",
             "enable_panel" : "Enable history info panel",
             "disable_panel" : "Disable history info panel",
             "type_line_straight" : "Straight",
@@ -55,8 +53,8 @@ const lang_en =
             "points_show"       : "Show the points",
             "points_hide"       : "Hide the points",
             "options_export"    : "Export",
-            "options_card"      : "This card",
-            "options_all"       : "All cards",
+            "options_card"      : "Card",
+            "options_all"       : "Global",
             "gesture_long_press" : "Long press, mouse and pen (ms)",
             "gesture_long_press_touch" : "Long press, finger (ms)",
             "gesture_precision" : "Precision, mouse and pen (px)",
@@ -81,10 +79,11 @@ const lang_en =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hourly",
-            "daily" : "Daily",
-            "monthly" : "Monthly",
-            "rawline" : "Raw line"
+            "hourly" : "Hour",
+            "daily" : "Day",
+            "weekly" : "Week",
+            "monthly" : "Month",
+            "rawline" : "Raw"
         }
     }
 }
@@ -105,15 +104,13 @@ const lang_fr =
             "add" : "Ajouter",
             "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
         }, 
-        "popup" : {
-            "remove_all" : "Supprimer tous les graphiques ajoutés depuis la carte ?",
-            "enable_panel" : "Activer le panneau d'historique des entités ?",
-            "disable_panel" : "Désactiver le panneau d'historique des entités ?"
-        },
         "menu" : {  
-            "export_csv" : "Exporter en CSV",
-            "export_stats" : "Exporter les statistiques en CSV",
-            "remove_all" : "Supprimer les graphiques ajoutés",
+            "export_csv" : "Historique",
+            "export_stats" : "Statistiques",
+            "default_graphs" : "Graphes par défaut",
+            "default_display" : "Affichage par défaut",
+            "confirm_ok" : "Valider",
+            "confirm_cancel" : "Annuler",
             "enable_panel" : "Activer le panneau d'historique",
             "disable_panel" : "Désactiver le panneau d'historique",
             "type_line_straight" : "Droite",
@@ -146,8 +143,8 @@ const lang_fr =
             "points_show"       : "Afficher les points",
             "points_hide"       : "Masquer les points",
             "options_export"    : "Exporter",
-            "options_card"      : "Cette carte",
-            "options_all"       : "Toutes les cartes",
+            "options_card"      : "Carte",
+            "options_all"       : "Global",
             "gesture_long_press" : "Appui long, souris et stylet (ms)",
             "gesture_long_press_touch" : "Appui long, doigt (ms)",
             "gesture_precision" : "Précision, souris et stylet (px)",
@@ -172,10 +169,11 @@ const lang_fr =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Par heure",
-            "daily" : "Par jour",
-            "monthly" : "Par mois",
-            "rawline" : "Courbe brute"
+            "hourly" : "Heure",
+            "daily" : "Jour",
+            "weekly" : "Semaine",
+            "monthly" : "Mois",
+            "rawline" : "Brut"
         }
     }
 }
@@ -196,15 +194,13 @@ const lang_de =
             "add" : "Hinzufügen",
             "infopanel_conflict" : "Konflikt beim YAML-Parameter infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "Alle über die Karte hinzugefügten Diagramme entfernen?",
-            "enable_panel" : "Verlaufsinfo der Entitäten aktivieren?",
-            "disable_panel" : "Verlaufsinfo der Entitäten deaktivieren?"
-        },
         "menu" : {  
-            "export_csv" : "Als CSV exportieren",
-            "export_stats" : "Statistik als CSV exportieren",
-            "remove_all" : "Hinzugefügte Diagramme entfernen",
+            "export_csv" : "Verlauf",
+            "export_stats" : "Statistiken",
+            "default_graphs" : "Standarddiagramme",
+            "default_display" : "Standardanzeige",
+            "confirm_ok" : "Ja",
+            "confirm_cancel" : "Nein",
             "enable_panel" : "Verlaufsinfo aktivieren",
             "disable_panel" : "Verlaufsinfo deaktivieren",
             "type_line_straight" : "Gerade",
@@ -236,9 +232,9 @@ const lang_de =
             "yunlock"           : "Y-Achse entsperren",
             "points_show"       : "Punkte anzeigen",
             "points_hide"       : "Punkte ausblenden",
-            "options_export"    : "Exportieren",
-            "options_card"      : "Diese Karte",
-            "options_all"       : "Alle Karten",
+            "options_export"    : "Export",
+            "options_card"      : "Karte",
+            "options_all"       : "Global",
             "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
             "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
             "gesture_precision" : "Genauigkeit, Maus und Stift (px)",
@@ -262,11 +258,12 @@ const lang_de =
             "year" : "1 Jahr"
         },
         "interval" : {
-            "_10m" : "10 Min",
-            "hourly" : "Stündlich",
-            "daily" : "Täglich",
-            "monthly" : "Monatlich",
-            "rawline" : "Linie (roh)"
+            "_10m" : "10 Min.",
+            "hourly" : "Stunde",
+            "daily" : "Tag",
+            "weekly" : "Woche",
+            "monthly" : "Monat",
+            "rawline" : "Roh"
         }
     }
 }
@@ -287,15 +284,13 @@ const lang_es =
             "add" : "Añadir",
             "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "¿Eliminar todos los gráficos añadidos desde la tarjeta?",
-            "enable_panel" : "¿Activar el panel de historial de las entidades?",
-            "disable_panel" : "¿Desactivar el panel de historial de las entidades?"
-        },
         "menu" : {  
-            "export_csv" : "Exportar como CSV",
-            "export_stats" : "Exportar estadísticas como CSV",
-            "remove_all" : "Eliminar los gráficos añadidos",
+            "export_csv" : "Historial",
+            "export_stats" : "Estadísticas",
+            "default_graphs" : "Gráficos por defecto",
+            "default_display" : "Vista por defecto",
+            "confirm_ok" : "Sí",
+            "confirm_cancel" : "No",
             "enable_panel" : "Activar el panel de historial",
             "disable_panel" : "Desactivar el panel de historial",
             "type_line_straight" : "Recta",
@@ -328,8 +323,8 @@ const lang_es =
             "points_show"       : "Mostrar los puntos",
             "points_hide"       : "Ocultar los puntos",
             "options_export"    : "Exportar",
-            "options_card"      : "Esta tarjeta",
-            "options_all"       : "Todas las tarjetas",
+            "options_card"      : "Tarjeta",
+            "options_all"       : "Global",
             "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
             "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
             "gesture_precision" : "Precisión, ratón y lápiz (px)",
@@ -354,10 +349,11 @@ const lang_es =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Por hora",
-            "daily" : "Por día",
-            "monthly" : "Por mes",
-            "rawline" : "Línea bruta"
+            "hourly" : "Hora",
+            "daily" : "Día",
+            "weekly" : "Semana",
+            "monthly" : "Mes",
+            "rawline" : "Bruto"
         }
     }
 }
@@ -378,15 +374,13 @@ const lang_nl =
             "add" : "Toevoegen",
             "infopanel_conflict" : "Conflict met de YAML-parameter infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "Alle via de kaart toegevoegde grafieken verwijderen?",
-            "enable_panel" : "Geschiedenispaneel van de entiteiten inschakelen?",
-            "disable_panel" : "Geschiedenispaneel van de entiteiten uitschakelen?"
-        },
         "menu" : {  
-            "export_csv" : "Exporteren als CSV",
-            "export_stats" : "Exporteer statistieken als CSV",
-            "remove_all" : "Toegevoegde grafieken verwijderen",
+            "export_csv" : "Historie",
+            "export_stats" : "Statistieken",
+            "default_graphs" : "Standaardgrafieken",
+            "default_display" : "Standaardweergave",
+            "confirm_ok" : "Ja",
+            "confirm_cancel" : "Nee",
             "enable_panel" : "Geschiedenispaneel inschakelen",
             "disable_panel" : "Geschiedenispaneel uitschakelen",
             "type_line_straight" : "Recht",
@@ -418,9 +412,9 @@ const lang_nl =
             "yunlock"           : "Y-as ontgrendelen",
             "points_show"       : "Punten tonen",
             "points_hide"       : "Punten verbergen",
-            "options_export"    : "Exporteren",
-            "options_card"      : "Deze kaart",
-            "options_all"       : "Alle kaarten",
+            "options_export"    : "Export",
+            "options_card"      : "Kaart",
+            "options_all"       : "Globaal",
             "gesture_long_press" : "Lang drukken, muis en pen (ms)",
             "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
             "gesture_precision" : "Precisie, muis en pen (px)",
@@ -445,10 +439,11 @@ const lang_nl =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Per uur",
-            "daily" : "Dagelijks",
-            "monthly" : "Maandelijks",
-            "rawline" : "Ruwe lijn"
+            "hourly" : "Uur",
+            "daily" : "Dag",
+            "weekly" : "Week",
+            "monthly" : "Maand",
+            "rawline" : "Ruw"
         }
     }
 }
@@ -469,15 +464,13 @@ const lang_pl =
             "add" : "Dodaj",
             "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "Usunąć wszystkie wykresy dodane z karty?",
-            "enable_panel" : "Włączyć panel historii encji?",
-            "disable_panel" : "Wyłączyć panel historii encji?"
-        },
         "menu" : {  
-            "export_csv" : "Eksportuj w CSV",
-            "export_stats" : "Eksportuj statystyki w CSV",
-            "remove_all" : "Usuń dodane wykresy",
+            "export_csv" : "Historia",
+            "export_stats" : "Statystyki",
+            "default_graphs" : "Domyślne wykresy",
+            "default_display" : "Domyślny widok",
+            "confirm_ok" : "Tak",
+            "confirm_cancel" : "Nie",
             "enable_panel" : "Włącz panel historii",
             "disable_panel" : "Wyłącz panel historii",
             "type_line_straight" : "Prosta",
@@ -509,9 +502,9 @@ const lang_pl =
             "yunlock"           : "Odblokuj oś Y",
             "points_show"       : "Pokaż punkty",
             "points_hide"       : "Ukryj punkty",
-            "options_export"    : "Eksportuj",
-            "options_card"      : "Ta karta",
-            "options_all"       : "Wszystkie karty",
+            "options_export"    : "Eksport",
+            "options_card"      : "Karta",
+            "options_all"       : "Ogólne",
             "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
             "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
             "gesture_precision" : "Precyzja, mysz i pióro (px)",
@@ -536,10 +529,11 @@ const lang_pl =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Co godzinę",
-            "daily" : "Co dzień",
-            "monthly" : "Co miesiąc",
-            "rawline" : "Surowa linia"
+            "hourly" : "Godzina",
+            "daily" : "Dzień",
+            "weekly" : "Tydzień",
+            "monthly" : "Miesiąc",
+            "rawline" : "Surowe"
         }
     }
 }
@@ -560,15 +554,13 @@ const lang_sv =
             "add" : "Lägg till",
             "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
         },
-        "popup": {
-            "remove_all": "Ta bort alla grafer som lagts till från kortet?",
-            "enable_panel": "Aktivera panelen för enhetens historikinformation?",
-            "disable_panel": "Inaktivera panelen för enhetens historikinformation?"
-        },
         "menu": {
-            "export_csv": "Exportera som CSV",
-            "export_stats": "Exportera statistik som CSV",
-            "remove_all": "Ta bort tillagda grafer",
+            "export_csv": "Historik",
+            "export_stats": "Statistik",
+            "default_graphs" : "Standardgrafer",
+            "default_display" : "Standardvisning",
+            "confirm_ok" : "Ja",
+            "confirm_cancel" : "Nej",
             "enable_panel": "Aktivera historikinfo-panelen",
             "disable_panel": "Inaktivera historikinfo-panelen",
             "type_line_straight" : "Rak",
@@ -600,9 +592,9 @@ const lang_sv =
             "yunlock"           : "Lås upp Y-axeln",
             "points_show"       : "Visa punkterna",
             "points_hide"       : "Dölj punkterna",
-            "options_export"    : "Exportera",
-            "options_card"      : "Det här kortet",
-            "options_all"       : "Alla kort",
+            "options_export"    : "Export",
+            "options_card"      : "Kort",
+            "options_all"       : "Globalt",
             "gesture_long_press" : "Långt tryck, mus och penna (ms)",
             "gesture_long_press_touch" : "Långt tryck, finger (ms)",
             "gesture_precision" : "Precision, mus och penna (px)",
@@ -625,12 +617,13 @@ const lang_sv =
             "n_months": "%1 månader",
             "year": "1 år"
         },
-        "interval": {
-            "_10m": "10 min",
-            "hourly": "Varje timme",
-            "daily": "Varje dag",
-            "monthly": "Varje månad",
-            "rawline" : "Rå linje"
+        "interval" : {
+            "_10m" : "10 min",
+            "hourly" : "Timme",
+            "daily" : "Dag",
+            "weekly" : "Vecka",
+            "monthly" : "Månad",
+            "rawline" : "Rå"
         }
     }
 }
@@ -651,15 +644,13 @@ const lang_da =
             "add" : "Tilføj",
             "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
         }, 
-        "popup" : {
-            "remove_all" : "Fjern alle grafer tilføjet fra kortet?",
-            "enable_panel" : "Aktivér historikpanelet for entiteter?",
-            "disable_panel" : "Deaktivér historikpanelet for entiteter?"
-        },
         "menu" : {  
-            "export_csv" : "Eksporter som CSV",
-            "export_stats" : "Eksporter statistik som CSV",
-            "remove_all" : "Fjern tilføjede grafer",
+            "export_csv" : "Historik",
+            "export_stats" : "Statistik",
+            "default_graphs" : "Standardgrafer",
+            "default_display" : "Standardvisning",
+            "confirm_ok" : "Ja",
+            "confirm_cancel" : "Nej",
             "enable_panel" : "Aktivér historikpanelet",
             "disable_panel" : "Deaktivér historikpanelet",
             "type_line_straight" : "Ret",
@@ -691,9 +682,9 @@ const lang_da =
             "yunlock"           : "Lås Y-aksen op",
             "points_show"       : "Vis punkterne",
             "points_hide"       : "Skjul punkterne",
-            "options_export"    : "Eksportér",
-            "options_card"      : "Dette kort",
-            "options_all"       : "Alle kort",
+            "options_export"    : "Eksport",
+            "options_card"      : "Kort",
+            "options_all"       : "Globalt",
             "gesture_long_press" : "Langt tryk, mus og pen (ms)",
             "gesture_long_press_touch" : "Langt tryk, finger (ms)",
             "gesture_precision" : "Præcision, mus og pen (px)",
@@ -718,10 +709,11 @@ const lang_da =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hver time",
-            "daily" : "Daglig",
-            "monthly" : "Månedlig",
-            "rawline" : "Rå linje"
+            "hourly" : "Time",
+            "daily" : "Dag",
+            "weekly" : "Uge",
+            "monthly" : "Måned",
+            "rawline" : "Rå"
         }
     }
 }
@@ -742,15 +734,13 @@ const lang_sk =
             "add" : "Pridať",
             "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "Odstrániť všetky grafy pridané z karty?",
-            "enable_panel" : "Povoliť informačný panel histórie entít?",
-            "disable_panel" : "Zakázať informačný panel histórie entít?"
-        },
         "menu" : {  
-            "export_csv" : "Export ako CSV",
-            "export_stats" : "Export štatistiky ako CSV",
-            "remove_all" : "Odstrániť pridané grafy",
+            "export_csv" : "História",
+            "export_stats" : "Štatistiky",
+            "default_graphs" : "Predvolené grafy",
+            "default_display" : "Predvolený pohľad",
+            "confirm_ok" : "Potvrdiť",
+            "confirm_cancel" : "Zrušiť",
             "enable_panel" : "Povoliť informačný panel histórie",
             "disable_panel" : "Zakázať informačný panel histórie",
             "type_line_straight" : "Priamka",
@@ -782,9 +772,9 @@ const lang_sk =
             "yunlock"           : "Odomknúť os Y",
             "points_show"       : "Zobraziť body",
             "points_hide"       : "Skryť body",
-            "options_export"    : "Exportovať",
-            "options_card"      : "Táto karta",
-            "options_all"       : "Všetky karty",
+            "options_export"    : "Export",
+            "options_card"      : "Karta",
+            "options_all"       : "Všetky",
             "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
             "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
             "gesture_precision" : "Presnosť, myš a pero (px)",
@@ -809,10 +799,11 @@ const lang_sk =
         },
         "interval" : {
             "_10m" : "10 min",
-            "hourly" : "Hodinovo",
-            "daily" : "Denne",
-            "monthly" : "Mesačne",
-            "rawline" : "Surová čiara"
+            "hourly" : "Hodina",
+            "daily" : "Deň",
+            "weekly" : "Týždeň",
+            "monthly" : "Mesiac",
+            "rawline" : "Surové"
         }
     }
 }
@@ -833,15 +824,13 @@ const lang_ru =
             "add" : "Добавить",
             "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
         }, 
-        "popup" : {
-            "remove_all" : "Удалить все графики, добавленные из карточки?",
-            "enable_panel" : "Включить панель истории объектов?",
-            "disable_panel" : "Выключить панель истории объектов?"
-        },
         "menu" : {  
-            "export_csv" : "Экспортировать как CSV",
-            "export_stats" : "Экспортировать статистику как CSV",
-            "remove_all" : "Удалить добавленные графики",
+            "export_csv" : "История",
+            "export_stats" : "Статистика",
+            "default_graphs" : "Исходные графики",
+            "default_display" : "Исходный вид",
+            "confirm_ok" : "Да",
+            "confirm_cancel" : "Нет",
             "enable_panel" : "Включить панель истории",
             "disable_panel" : "Выключить панель истории",
             "type_line_straight" : "Прямая",
@@ -874,8 +863,8 @@ const lang_ru =
             "points_show"       : "Показать точки",
             "points_hide"       : "Скрыть точки",
             "options_export"    : "Экспорт",
-            "options_card"      : "Эта карточка",
-            "options_all"       : "Все карточки",
+            "options_card"      : "Карта",
+            "options_all"       : "Общие",
             "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
             "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
             "gesture_precision" : "Точность, мышь и перо (пикс.)",
@@ -900,10 +889,11 @@ const lang_ru =
         },
         "interval" : {
             "_10m" : "10 мин",
-            "hourly" : "По часам",
-            "daily" : "По дням",
-            "monthly" : "По месяцам",
-            "rawline" : "Исходная линия"
+            "hourly" : "Час",
+            "daily" : "День",
+            "weekly" : "Неделя",
+            "monthly" : "Месяц",
+            "rawline" : "Сырые"
         }
     }
 }

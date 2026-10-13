@@ -116,7 +116,7 @@ What is changed from the card is saved in your Home Assistant user account and s
 
 ### Interface
 
-The toolbar adapts its layout to the card's width; menus and tooltips stay within the card and the screen; the graph tooltip is an HTML element, readable at any size.
+The toolbar adapts its layout to the card's width — on a narrow card (a grid or a horizontal stack), the date, the range and the entity search each on a line of their own; menus and tooltips stay within the card and the screen, a tooltip's arrow on its point; the graph tooltip is an HTML element, readable at any size, closed as soon as a menu opens. **(1.2)** A legend too narrow for its labels shortens the names, all of a graph's alike, and keeps each value: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the entity's device name removed (abbreviated — `M-F V…` — where two curves would then read the same), the articles removed, then '…' before the value; the full name stays in the tooltip. The time labels that wouldn't fit side by side are skipped.
 
 ### Info panel
 
@@ -238,7 +238,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*).
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
 The type menu opens:
 
@@ -313,7 +313,7 @@ Curve labels in the legend can be dragged left or right to change their display 
 
 #### Reordering graphs
 
-Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area toggles the Y axis lock. The new order is synchronized with your HA user account. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
+Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (a 30 px wide zone). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area toggles the Y axis lock. **(1.2)** The handle, the padlock and the chain icon of linked graphs keep only the room they need beside the legend's first line; on a narrow card they take none — each is drawn in a small box of the card's background over the legend's labels (or a timeline's rows): on the box, a gesture is theirs; beside it, on a label, the label's. The new order is synchronized with your HA user account. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
 
 Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
 
@@ -426,13 +426,13 @@ The graph type and display options for the entity are taken from the card's `ent
 
 ### Bar graphs for total increasing entities
 
-Entities that represent a total (monotonically increasing or net metering) can be visualized as adaptive bar charts. This applies to entities such as, for example, consumed energy, water or gas, rainfall, or network data usage. The data is visualized over a time interval (10 minutes, hourly, daily or monthly) that can be toggled on the fly and independently for each graph.
+Entities that represent a total (monotonically increasing or net metering) can be visualized as adaptive bar charts. This applies to entities such as, for example, consumed energy, water or gas, rainfall, or network data usage. The data is visualized over a time interval (10 minutes, an hour, a day, a week — from Monday — or a month) that can be toggled on the fly and independently for each graph.
 
 ![image](https://user-images.githubusercontent.com/60828821/193383950-53242b11-d467-42ba-9859-3b3df0b0dcb8.png)
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When adding an entity from the card, the type menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw line* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily` or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly` (**1.2**) or `monthly`.
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`, so that the entity is shown as bars without picking it in the type menu.
 
@@ -441,7 +441,7 @@ entityOptions:
   sensor.rain_amount:
     type: bar
     color: '#3e95cd'
-    interval: 10m     # Default interval for this entity can be 10m, hourly, daily or monthly
+    interval: 10m     # Default interval for this entity can be 10m, hourly, daily, weekly or monthly
 ```
 
 Bar graphs can be manually added in the YAML too. Multiple entities can be combined into a single graph. The bars for each entity will then be displayed side by side:
@@ -463,7 +463,7 @@ graphs:
 
 #### Bars and curves on the same graph
 
-A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and *Raw line* only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when a curve is dropped onto it. An entity added from the UI never joins a graph of the other type on its own.
+A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and *Raw* only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when a curve is dropped onto it. An entity added from the UI never joins a graph of the other type on its own.
 
 ```yaml
 graphs:
@@ -662,6 +662,8 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
 
 **With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle, so the curves keep their positions relative to each other; the padlock locks and releases both.
+
+**(1.2) Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
 
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
@@ -952,10 +954,10 @@ A curve hidden from its legend shows neither. Both are set at every level — ca
 
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
-- **`yLabels: inside`** — the Y labels drawn inside the plot, which then takes the whole width (no label area: an axis is moved with Shift + drag on the graph, or a pinch);
+- **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what mini-graph-card shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -971,6 +973,26 @@ graphs:
         name: Total
         showStats: false        # its value now only
 ```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
+  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
+</picture>
+
+*Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
+
+**(1.2) A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen. In detail:
+- the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
+- the Y labels inside the plot, each in a box of the card's background 80 % opaque, at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
+- the handle, the padlock and the chain icon each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
+- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
+- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the device's name removed (abbreviated, `M-F V…`, where two curves would then read the same), the articles removed, then '…' before the value;
+- the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
+- a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
+
+The card follows its width as it changes (a screen turned, a window resized).
+
+> Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
 ### Replacing mini-graph-card
 
@@ -1216,7 +1238,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `ylock` | boolean | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | Graph height in pixels (overrides global height settings) |
 | `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
-| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `monthly` |
+| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `circular` | `null`, `false`, number or `2pi` | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | Enable net metering mode for bar graphs |
 | `stacked` | boolean | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
@@ -1323,9 +1345,9 @@ Either way, an option set on a graph or on the entity itself wins over `entityOp
 ### The options menu
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
-- **Export ▸** — *Export as CSV*, *Export statistics as CSV* (with long-term statistics on);
-- **This card ▸** — *Remove all added graphs*;
-- **All cards ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`), and the gesture settings below, entered right in the submenu.
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
+- **Card ▸** — *Default graphs*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu (*Confirm* / *Cancel*, Cancel marked: Enter or Escape changes nothing). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
+- **Global ▸** — what applies to every card of every dashboard, on every device: the info panel on or off (see `defaultInfoPanel`; confirmed as above), and the gesture settings below, entered right in the submenu.
 
 Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
@@ -1335,7 +1357,7 @@ Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 - **the long-press duration** — a press held this long is a long-press; a second press this soon after a release, at the same place, is a double-click (or a tap-then-drag); after a tap on a label, a graph's ⠿ zone or the Y axis, the page doesn't scroll from there for that long, so that a drag can follow;
 - **the precision** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
 
-Raise them for a less steady or slower hand. In the YAML (any card), or in *All cards ▸* of the options menu:
+Raise them for a less steady or slower hand. In the YAML (any card), or in *Global ▸* of the options menu:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1529,7 +1551,7 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ Export as CSV*. Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History* (*Export ▸ Statistics* for the long-term statistics). Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 

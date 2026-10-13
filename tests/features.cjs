@@ -189,15 +189,141 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A legend too narrow for its labels: shortened, the value kept ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
+        { entity: 'sensor.power', name: 'Ecowitt Vitesse du vent (Filtered)' }, { entity: 'sensor.power2', name: 'Météo-France Villeveyrac Vitesse du vent' }] }] }),
+        { mock: { series: true, language: 'fr' } });
+    const legendAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
+            return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
+    };
+    await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
+        const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);
+        await legendAt(1000);
+        return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
+            && mid.texts[0] === 'Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)'
+            && narrow.texts.every((x, i) => x.endsWith(i ? '(300 W)' : '(400 W)') && x !== wide.texts[i]) && narrow.texts.some(x => /…/.test(x)) && narrow.within ? true : JSON.stringify({ wide, mid, narrow });
+    });
+    await t.step('a qualifier many entities of Home Assistant carry ((Filtered), 3 of them): its initials first, (F); the other curve at the same step', async () => {
+        await t.E(`(()=>{ for( const [k, n] of ['Température', 'Humidité', 'Pression'].entries() ) { const id='sensor.f_'+k;
+            STATES[id]={ entity_id:id, state:'1', last_changed:lc, last_updated:lc, attributes:{ friendly_name:'Ecowitt '+n+' (Filtered)', unit_of_measurement:'x' } }; }
+            el.hass=mkHass(); })()`);
+        const mid = await legendAt(300);
+        await legendAt(1000);
+        return mid.texts[0] === 'Ecowitt Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
+            || mid.texts[0] === 'Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
+    });
+    done(await t.close());
+
+    // ── Bars by week: from Monday, each the sum of its week ──
+    t = await openCard(card({ statistics: { enabled: false }, defaultTimeRange: '30d', graphs: [{ type: 'bar', interval: 'weekly', entities: [{ entity: 'sensor.energy' }] }] }),
+        { mock: { series: true } });
+    await t.step('interval: weekly — the selector on Week, a bar each week, from Monday; Day picked: a bar each day, saved', async () => {
+        const bars = () => t.E(`(()=>{ const g=el.instance.graphs[0], x=g.chart.data.datasets[0].data.map(p=>+p.x);
+            return { sel: el.querySelector('#bd-'+g.id).value, label: el.querySelector('#bd-'+g.id).selectedOptions[0].textContent, step: (x[1]-x[0])/864e5,
+                     monday: x.every(v=>{ const m=window.HXLocal_moment(v-(x[1]-x[0])/2); return m.isoWeekday()===1 && m.hours()===0 && m.minutes()===0; }), n: x.length,
+                     saved: el.instance.pconfig.entities.find(e=>e.entity==='sensor.energy')?.interval }; })()`);
+        const week = await bars();
+        await t.E(`(()=>{ const g=el.instance.graphs[0], s=el.querySelector('#bd-'+g.id); s.value='2'; s.dispatchEvent(new Event('change')); })()`); await t.wait(1500);
+        const day = await bars();
+        return week.sel === '5' && week.label === 'Week' && week.step === 7 && week.monday && week.n >= 4 && day.sel === '2' && day.step === 1 && day.saved === 2
+            ? true : JSON.stringify({ week, day });
+    });
+    done(await t.close());
+
+    // ── A bar graph's legend clear of its interval selector ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'bar', entities: [{ entity: 'sensor.energy', name: 'Énergie consommée maison' }] }] }),
+        { mock: { series: true, language: 'fr' } });
+    await t.step('a bar graph: its legend labels never under its interval selector — 1000, 374 and 230 px', async () => {
+        const r = [];
+        for( const w of [1000, 374, 230] ) {
+            await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+            r.push(await t.E(`(()=>{ const g=el.instance.graphs[0], c=g.chart, cr=c.canvas.getBoundingClientRect(), bd=el.querySelector('#bd-'+g.id).getBoundingClientRect();
+                return c.legend.legendHitBoxes.some(h => cr.left+h.left+h.width > bd.left && cr.left+h.left < bd.right && cr.top+h.top < bd.bottom && cr.top+h.top+h.height > bd.top) ? '${w}: under' : ''; })()`));
+        }
+        return r.every(x => x === '') ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── A narrow card (under 300 px): the toolbar on lines of its own, the Y labels inside ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', yLabels: 'outside', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true, language: 'fr' } });
+    const narrowAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const card=el.querySelector('#maincard').getBoundingClientRect();
+            const els=[...el.querySelectorAll('#tb_0 button, #tb_0 select, #tb_0 input')].filter(b=>b.offsetParent);
+            const out=els.filter(b=>{ const r=b.getBoundingClientRect(); return r.left<card.left-1||r.right>card.right+1; }).map(b=>b.id);
+            const rows=new Set(els.filter(b=>b.id!=='b7_0'&&b.id!=='bo_0').map(b=>Math.round(b.getBoundingClientRect().top/10))).size;
+            const c=graphAt(0).chart, A=c.chartArea, s0=c.scales['y-axis-0'];
+            return { out, rows, inside: c.options.scales.yAxes[0].ticks.mirror, outsideKept: !graphAt(1).chart.options.scales.yAxes[0].ticks.mirror,
+                     plotLeft: Math.round(A.left), boxes: (s0._hecDeferredLabels||[]).length, boxColor: c.options.scales.yAxes[0].ticks.hecBackdrop?.color ?? null,
+                     fonts: [c.options.scales.yAxes[0].ticks.minor.fontSize, graphAt(1).chart.options.scales.yAxes[0].ticks.minor.fontSize, c.options.scales.xAxes[0].ticks.minor.fontSize, c.options.legend.labels.fontSize].join() }; })()`);
+    };
+    await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside, each in a box of the card\'s background, 80 % opaque, at mini-graph-card\'s size (yLabels: outside kept), the text a little smaller; wide again: as before', async () => {
+        const wide = await narrowAt(1000), narrow = await narrowAt(168), back = await narrowAt(1000);
+        return !wide.inside && wide.rows === 1 && !wide.boxes && !narrow.out.length && narrow.rows === 2 && narrow.inside && narrow.outsideKept && narrow.plotLeft < 30
+            && narrow.boxes > 1 && /^rgba\(.*,0\.8\)$/.test(narrow.boxColor) && !back.inside && back.rows === 1 && !back.boxes
+            && wide.fonts === '12,12,12,12' && narrow.fonts === '10.5,11,11,11' && back.fonts === wide.fonts ? true : JSON.stringify({ wide, narrow, back });
+    });
+    done(await t.close());
+
+    // ── The controls at a graph's top left (handle, padlock, chain icon): never any room of their own ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'binary_sensor.a', type: 'timeline' }] },
+        { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true } });
+    const controlsAt = async w => {
+        await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+        return t.E(`(()=>{ const c=i=>graphAt(i).chart, bd=i=>c(i)._hecControlsBackdropEl, shown=e=>!!e&&e.style.display!=='none';
+            const lm=c(1)._hecLinkMarkerRect();
+            return { boxes: [0,1,2].map(i=>shown(bd(i))).join(), boxColor: shown(bd(0)) ? getComputedStyle(bd(0)).backgroundColor : null,
+                     chainColor: getComputedStyle(c(1)._hecLinkMarkerEl).backgroundColor, chainLeft: lm && lm.left, zone: c(1)._hecLockAndHandleWidth(),
+                     firstLabel: Math.round(c(0).legend.legendHitBoxes[0].left), firstTop: Math.round(c(0).legend.legendHitBoxes[0].top),
+                     timelineTop: Math.round(c(1).chartArea.top), legendH: Math.round(c(0).legend.height), legendLeft: c(0).legend.leftMargin,
+                     unit: c(0).options.scales.yAxes[0].scaleLabel.display, yColumn: Math.round(c(0).chartArea.left) }; })()`);
+    };
+    await t.step('the chain icon takes no room: hidden or shown, nothing moves; right above the handle and the padlock, it is just right of them', async () => {
+        const tops = () => t.E(`[0,1,2].map(i=>Math.round(graphAt(i).canvas.getBoundingClientRect().top)+'/'+Math.round(graphAt(i).chart.chartArea.top)).join()`);
+        const shown = await tops(), r = await controlsAt(1000);
+        await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=false; c.update(); })()'); await t.wait(300);
+        const hidden = await tops();
+        await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=true; c.update(); })()'); await t.wait(300);
+        return shown === hidden && r.chainLeft >= r.zone + 4 ? true : JSON.stringify({ shown, hidden, r });
+    });
+    await t.step('a narrow card: the handle, the padlock and the chain icon each in a box like the Y labels\', over the legend or the rows, which keep no room for them; wider: beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept; wide again: as before', async () => {
+        const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
+        return wide.boxes === 'false,false,false' && wide.legendLeft === wide.zone + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
+            && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
+            && narrow.legendLeft === 4 && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
+            && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
+    });
+    await t.step('a narrow card: on the box (over a label), a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
+        await controlsAt(168);
+        const locked = () => t.E('!!graphAt(0).chart._hecYAxisLock');
+        const graphMenu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'), y=el.querySelector('#et_0_ylock'); return !m||m.style.display==='none' ? 'closed' : y&&y.style.display!=='none' ? 'graph' : 'entity'; })()`);
+        const close = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400); };
+        const p = await t.E('lockPt(0)'), l0 = await locked();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400); const l1 = await locked();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        await t.longPress(p); const onBox = await graphMenu(); await close();
+        const lb = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-6, y: r.top+b.top+b.height/2 }; })()`);
+        await t.longPress(lb); const onLabel = await graphMenu(); await close();
+        return !l0 && l1 && onBox === 'graph' && onLabel === 'entity' ? true : JSON.stringify({ l0, l1, onBox, onLabel });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {
         const c = await t.E(`[el.instance.ui.darkMode, graphAt(0).chart.options.scales.yAxes[0].ticks.fontColor]`);
         return !!c[0] && /9b9b9b|155, ?155, ?155/i.test(String(c[1])) ? true : JSON.stringify(c);
     });
+    await t.step('dark theme: the entity selector in the theme\'s colors, not the browser\'s white field', async () => {
+        const c = await t.E(`(()=>{ const s=getComputedStyle(el.querySelector('#b7_0')); return [s.backgroundColor, s.color]; })()`);
+        return !/255, ?255, ?255/.test(c[0]) ? true : JSON.stringify(c);
+    });
     await t.step('French: the menus are in French', async () => {
         const txt = await t.E(`el.querySelector('#ef_0')?.textContent`);
-        return txt === 'Exporter en CSV' ? true : JSON.stringify(txt);
+        return txt === 'Historique' ? true : JSON.stringify(txt);
     });
     done(await t.close());
 

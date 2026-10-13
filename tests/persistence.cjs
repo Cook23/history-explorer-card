@@ -240,5 +240,55 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Card ▸ Default graphs / Default display, each confirmed in a submenu ──
+    t = await openCard(YAML({ enable_multidevice_persistence: 'all' }), { mock: { series: true }, height: 1400 });
+    const add2 = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    const ids = () => t.E(`el.instance.graphs.flatMap(g=>g.entities.map(e=>e.entity.split('.')[1])).sort().join(',')`);
+    const visible = sel => t.E(`(()=>{ const e=el.querySelector('${sel}'); return !!e && e.style.display !== 'none'; })()`);
+    const cardAction = async k => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_card').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_${k}').click()`); await t.wait(300);
+    };
+    await add2('sensor.rain'); await t.wait(1200);
+    await setInterp('sensor.power', 'makima');
+    await t.step('Card ▸ Default graphs: confirmed in a submenu over Card ▸, right-aligned, Cancel marked; Cancel, or Enter: nothing changes', async () => {
+        const i0 = await ids();
+        await cardAction('defgraphs');
+        const r = await t.E(`(()=>{ const c=el.querySelector('#eo_0_defgraphs_sub'), s=el.querySelector('#eo_0_card_sub');
+            return { shown: c.style.display !== 'none', right: Math.round(c.getBoundingClientRect().right - s.getBoundingClientRect().right),
+                     marked: el.querySelector('#eo_0_defgraphs_cancel').dataset.hecSelected === '1', lines: [...c.children].map(a=>a.textContent).join('|') }; })()`);
+        await t.E(`el.querySelector('#eo_0_defgraphs_cancel').click()`); await t.wait(300);
+        const afterCancel = { confirm: await visible('#eo_0_defgraphs_sub'), card: await visible('#eo_0_card_sub'), ids: await ids() };
+        await t.E(`el.querySelector('#eo_0_defgraphs').click()`); await t.wait(300);
+        await t.page.keyboard.press('Enter'); await t.wait(500);
+        const afterEnter = await ids();
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(300);
+        return r.shown && r.right === 0 && r.marked && r.lines === 'Confirm|Cancel' && !afterCancel.confirm && afterCancel.card && afterCancel.ids === i0 && afterEnter === i0
+            ? true : JSON.stringify({ i0, r, afterCancel, afterEnter });
+    });
+    await t.step('Default graphs confirmed: the graphs added from the card removed, the YAML\'s kept as changed — on another device too', async () => {
+        await cardAction('defgraphs'); await t.E(`el.querySelector('#eo_0_defgraphs_ok').click()`); await t.wait(1200);
+        const here = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, menu: await visible('#eo_0') };
+        await newDevice(); const other = { ids: await ids(), interp: (await entry('sensor.power')).interpolation };
+        return !/rain/.test(here.ids) && here.interp === 'makima' && !here.menu && !/rain/.test(other.ids) && other.interp === 'makima'
+            ? true : JSON.stringify({ here, other });
+    });
+    await t.step('Default display confirmed: back to the YAML — added graphs, changes, hidden curves, time range — on another device too (hidden: this device\'s own)', async () => {
+        await add2('sensor.tank'); await t.wait(1200);
+        await setType('sensor.power2', 'line', 'stepped'); await toggleHidden('sensor.power');
+        await t.E(`(()=>{ el.instance.setTimeRange(48, true); el.instance.writeLocalState(); })()`); await t.wait(800);
+        const before = { ids: await ids(), mode: (await entry('sensor.power2')).lineMode, range: await t.E('el.instance.activeRange.timeRangeHours') };
+        await cardAction('defdisplay'); await t.E(`el.querySelector('#eo_0_defdisplay_ok').click()`); await t.wait(1500);
+        const here = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, mode: (await entry('sensor.power2')).lineMode,
+                       hidden: (await shown('sensor.power')).hidden, range: await t.E('el.instance.activeRange.timeRangeHours') };
+        await reload(); const reloaded = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, range: await t.E('el.instance.activeRange.timeRangeHours') };
+        await newDevice(); const other = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, mode: (await entry('sensor.power2')).lineMode, range: await t.E('el.instance.activeRange.timeRangeHours') };
+        const yaml = x => x.ids === 'energy,power,power2' && x.interp === null && x.range === 24;
+        return /tank/.test(before.ids) && before.mode === 'stepped' && before.range === 48 && yaml(here) && here.mode === 'curves' && !here.hidden
+            && yaml(reloaded) && yaml(other) && other.mode === 'curves' ? true : JSON.stringify({ before, here, reloaded, other });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

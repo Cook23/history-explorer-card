@@ -25,7 +25,7 @@ export const _TYPE_MENU_DEFS = [
 // Display order of the type menu's entries (indices in _TYPE_MENU_DEFS), and their style —
 // shared by the card's menu and the info panel's
 export const _TYPE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
-export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit';
+export const _TYPE_MENU_ITEM_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis';
 
 // The type menu's items, each opening its submenu over the menu, right-aligned, level with
 // it: what the entity is shown as (open when the menu opens), how its curve is
@@ -43,6 +43,9 @@ const _LAYOUT_ENTRIES = { points: 'ui.menu.points_show', ylock: 'ui.menu.ylock',
                           delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
+// A submenu's lines on one line each, whatever the room beside its menu (it opens over it,
+// right-aligned on it: see _openSubmenu)
+const _SUBMENU_STYLE = 'white-space:nowrap';
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
 // The type menu et_N and its submenus et_N_<key>_sub — the card's (full: "Default" for a
@@ -50,7 +53,7 @@ const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1
 export function typeMenuHtml(i, full)
 {
     const a = (id, label, hidden, style = '') => `<a id="${id}" href="#et" style="${_TYPE_MENU_ITEM_STYLE}${style}${hidden ? ';display:none' : ''}">${label}</a>`;
-    const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
+    const sub = (key, entries) => `<div id="et_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};min-width:110px;z-index:3">${entries.join('')}</div>`;
     const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k));
     // (the tests set apart from what concerns the entity)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
@@ -72,19 +75,32 @@ const SUBMENU_MEMORY_MS = 10000;
 // it), and what concerns every card of the page and every device (the info panel, the
 // gesture thresholds — entered in the submenu itself, kept within their bounds)
 const _OPTIONS_SUBMENUS = { export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
+// The options menu's actions confirmed first, each in a submenu of its own over the
+// submenu its line is in (`${line}_sub`: Confirm / Cancel — Cancel marked, so that Enter
+// changes nothing): in Card ▸, the graphs added from the card removed (defaultGraphs) and
+// everything back to the YAML (defaultDisplay); in Global ▸, the info panel switched
+// (toggleInfoPanel). line: the line's id; label: its name (none: named by its owner)
+const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
+                        defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
+const _CONFIRMED = i => [
+    ...Object.keys(_CARD_ACTIONS).map(k => ({ line: `eo_${i}_${k}`, in: 'card', ..._CARD_ACTIONS[k] })),
+    { line: `ei_${i}`, in: 'all', run: 'toggleInfoPanel' },
+];
 export function optionsMenuHtml(i, statistics)
 {
     const a = (id, label = '') => `<a id="${id}" href="#" style="${_TYPE_MENU_ITEM_STYLE}">${label}</a>`;
-    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
+    const sub = (key, entries) => `<div id="eo_${i}_${key}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};min-width:150px;z-index:3">${entries.join('')}</div>`;
     const input = k => { const s = GESTURE_SETTINGS[k];
-        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}">${i18n(s.label)}</span>` +
+        return `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span id="eo_${i}_gl_${k}" style="overflow:hidden;text-overflow:ellipsis;min-width:0">${i18n(s.label)}</span>` +
                `<input id="eo_${i}_g_${k}" type="number" min="${s.min}" max="${s.max}" step="${s.step}" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`; };
     return `<div id="eo_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:150px;z-index:1">
             ${Object.keys(_OPTIONS_SUBMENUS).map(k => a(`eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]) + ' ▸')).join('')}
         </div>
         ${sub('export', [a(`ef_${i}`), statistics ? a(`eh_${i}`) : ''])}
-        ${sub('card', [a(`eg_${i}`)])}
-        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}`;
+        ${sub('card', Object.keys(_CARD_ACTIONS).map(k => a(`eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label))))}
+        ${sub('all', [a(`ei_${i}`), ...Object.keys(GESTURE_SETTINGS).map(input)])}
+        ${_CONFIRMED(i).map(c => `<div id="${c.line}_sub" tabindex="0" style="${_MENU_BOX_STYLE};${_SUBMENU_STYLE};z-index:4">` +
+            a(`${c.line}_ok`, i18n('ui.menu.confirm_ok')) + a(`${c.line}_cancel`, i18n('ui.menu.confirm_cancel')) + `</div>`).join('')}`;
 }
 
 export class CardMenus
@@ -254,7 +270,7 @@ export class CardMenus
         // (before _openMenu turns it on). #tb_N is already known to be the real positioned
         // ancestor (see its position:relative in the HTML), no need to read it back off an
         // element that isn't shown yet.
-        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         let _top, _left;
         if( _longPress ) {
@@ -319,7 +335,7 @@ export class CardMenus
             _titleEl.style.borderBottom = '1px solid #444';
         }
 
-        const _tb = this._this.querySelector(`#tb_${input_idx}`);
+        const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
         this._openRememberedSubmenu(input_idx, _numeric ? 'rep' : 'layout');
@@ -366,6 +382,10 @@ export class CardMenus
     // remembered submenu this menu doesn't show: def)
     _openRememberedSubmenu(input_idx, def)
     {
+        // (no room for the menu and a submenu beside its lines: the menu alone, read first —
+        // with the keyboard, so that Escape, or the focus leaving it, closes it)
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        if( _menu?.dataset.hecCramped ) { _menu.focus(); return; }
         const _key = this._submenuToOpen(this._typeMenuKind(input_idx), def);
         this.showTypeSubmenu(input_idx, _key);
         if( _key !== def && this._this.querySelector(`#et_${input_idx}_${_key}_sub`)?.style.display === 'none' )
@@ -699,15 +719,36 @@ export class CardMenus
     // The options menu (eo_N, see optionsMenuHtml)
     // --------------------------------------------------------------------------------------
 
+    // The options menu's submenus, the confirmations included
     _optionsSubmenus(i)
     {
-        return Object.keys(_OPTIONS_SUBMENUS).map(k => this._this.querySelector(`#eo_${i}_${k}_sub`)).filter(s => s);
+        return [...Object.keys(_OPTIONS_SUBMENUS).map(k => `eo_${i}_${k}_sub`), ..._CONFIRMED(i).map(c => `${c.line}_sub`)]
+            .map(id => this._this.querySelector(`#${id}`)).filter(s => s);
+    }
+
+    // Asks for the confirmation of action c over the submenu its line is in (Cancel marked)
+    _confirmAction(i, c)
+    {
+        const _item = this._this.querySelector(`#${c.line}`);
+        const _sub  = this._this.querySelector(`#${c.line}_sub`);
+        if( !_item || !_sub ) return;
+        for( const o of _CONFIRMED(i) ) if( o !== c ) this._this.querySelector(`#${o.line}_sub`).style.display = 'none';
+        this._openSubmenu(_sub, _item);
+        delete this._this.querySelector(`#${c.line}_ok`).dataset.hecSelected;
+        this._this.querySelector(`#${c.line}_cancel`).dataset.hecSelected = '1';
+        _sub.focus();
     }
 
     // The options menu's names, in the card's language
     relabelOptionsMenu(i)
     {
         for( const k in _OPTIONS_SUBMENUS ) { const _el = this._this.querySelector(`#eo_${i}_${k}`); if( _el ) _el.textContent = i18n(_OPTIONS_SUBMENUS[k]) + ' ▸'; }
+        const set = (id, text) => { const _el = this._this.querySelector(`#${id}`); if( _el ) _el.textContent = text; };
+        for( const c of _CONFIRMED(i) ) {
+            if( c.label ) set(c.line, i18n(c.label));
+            set(`${c.line}_ok`, i18n('ui.menu.confirm_ok'));
+            set(`${c.line}_cancel`, i18n('ui.menu.confirm_cancel'));
+        }
         for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
     }
 
@@ -734,6 +775,14 @@ export class CardMenus
         const _subs = this._optionsSubmenus(i);
         for( const k in _OPTIONS_SUBMENUS )
             this._this.querySelector(`#eo_${i}_${k}`)?.addEventListener('click', (e) => { e.preventDefault(); this.showOptionsSubmenu(i, k); }, true);
+        // The actions confirmed first — Confirm runs it, the menu closed; Cancel goes back
+        // to the submenu its line is in
+        for( const c of _CONFIRMED(i) ) {
+            const _on = (id, fn) => this._this.querySelector(`#${id}`)?.addEventListener('click', (e) => { e.preventDefault(); fn(); }, true);
+            _on(c.line, () => this._confirmAction(i, c));
+            _on(`${c.line}_ok`, () => { this.menuSetVisibility(i, false); this[c.run](); });
+            _on(`${c.line}_cancel`, () => { this._this.querySelector(`#${c.line}_sub`).style.display = 'none'; this._this.querySelector(`#eo_${i}_${c.in}_sub`)?.focus(); });
+        }
         // A gesture threshold entered: kept within its bounds, then set for every card
         for( const k in GESTURE_SETTINGS ) {
             const _in = this._this.querySelector(`#eo_${i}_g_${k}`);
@@ -749,13 +798,16 @@ export class CardMenus
             if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
             this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
         });
+        // (a confirmation goes back to the submenu its line is in, a submenu to the menu)
+        const _parentOf = sub => { const c = _CONFIRMED(i).find(c => sub.id === `${c.line}_sub`);
+                                   return c ? this._this.querySelector(`#eo_${i}_${c.in}_sub`) : _menu; };
         for( const _sub of _subs ) _sub.addEventListener('keydown', (e) => {
             const _inInput = e.target.tagName === 'INPUT';
             if( e.key === 'Escape' || ( e.key === 'ArrowLeft' && !_inInput ) ) {
                 e.preventDefault();
                 e.stopPropagation();
                 _sub.style.display = 'none';
-                _menu.focus();
+                _parentOf(_sub).focus();
                 return;
             }
             if( !_inInput ) this._menuKeyDown(e, _sub);
@@ -794,8 +846,9 @@ export class CardMenus
             this._openMenu(dropdown, _top, _left);
             dropdown.focus();
             // (reopened soon after it was closed: with the submenu it had open)
+            // (no room for the menu and a submenu beside its lines: the menu alone, read first)
             const _key = this._submenuToOpen('options', null);
-            if( _key ) this.showOptionsSubmenu(idx, _key);
+            if( _key && !dropdown.dataset.hecCramped ) this.showOptionsSubmenu(idx, _key);
         } else
             dropdown.style.display = 'none';
     }
@@ -890,24 +943,122 @@ export class CardMenus
     //           whichever makes sense for it) — center/right shift the menu natively via
     //           CSS transform, same mechanism already used for _showLabelTooltip, so there's
     //           no need to measure the menu's rendered width and recompute afterward.
+    // The positioned parent of the menus of toolbar i: the toolbar, or on a card without any
+    // entity selector, their own (menusOnlyHtml)
+    _menuParent(i)
+    {
+        return this._this.querySelector(`#tb_${i}`) ?? this._this.querySelector(`#hm_${i}`);
+    }
+
     _openMenu(menuEl, top, left, align = 'left') {
+        // (a curve's tooltip closes: a menu opened is never under it)
+        for( const g of this.graphs ?? [] ) g.chart?.hecEndTooltip();
         menuEl.style.display = 'block';
         if( top  !== undefined ) menuEl.style.top  = top;
         if( left !== undefined ) menuEl.style.left = left;
         menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
         for( let _a of menuEl.getElementsByTagName('a') ) _a.style.background = '';
+        this._fitMenuToSubmenus(menuEl);
         Chart.hecUi.clampToViewport(menuEl, this._this?.querySelector('#maincard'));
+    }
+
+    // A menu stays readable under its submenus (each opened over it, right-aligned on it,
+    // level with its line, see _openSubmenu): wider than each of them by its widest line's
+    // text, so that its lines show beside the submenu open and another one can be picked —
+    // the last line's submenu aside, which hides no line below it: as wide as the menu at
+    // most. Set when the menu opens (with what it shows then), so it keeps its width. With
+    // no room for that (a small card or screen: menuEl.dataset.hecCramped), the menu takes
+    // the room there is, opens with no submenu (its lines read first), and a submenu opened
+    // leaves a strip of its lines (_menuStrip). A menu's lines open the submenus
+    // `${line id}_sub`, its siblings
+    _fitMenuToSubmenus(menuEl)
+    {
+        // (a menu without submenus, not one itself: as built)
+        const _hasSubs = this._menuLines(menuEl).some(a => this._submenuOf(a));
+        if( !_hasSubs && !menuEl.dataset.hecRoom ) return;
+        menuEl.dataset.hecMinWidth ??= parseFloat(menuEl.style.minWidth) || 0;
+        // (its widths with its border: never wider than the room, border included)
+        menuEl.style.boxSizing = 'border-box';
+        const _room = Math.min(this._menuRoom(), +menuEl.dataset.hecRoom || Infinity);
+        const _need = Math.max(+menuEl.dataset.hecMinWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
+        menuEl.style.maxWidth = Math.floor(_room) + 'px';
+        menuEl.style.minWidth = Math.floor(Math.min(_need, _room)) + 'px';
+        menuEl.dataset.hecCramped = _need > _room ? '1' : '';
+    }
+
+    // The room a menu has: the card's width, within the screen's
+    _menuRoom()
+    {
+        const _card = this._this?.querySelector('#maincard');
+        return Math.min(_card?.clientWidth || Infinity, document.documentElement.clientWidth || Infinity);
+    }
+
+    // The width menuEl needs to stay readable under its submenus (its own, without any)
+    _menuNeed(menuEl)
+    {
+        return this._laidOut(menuEl, () => {
+            const _lines = this._menuLines(menuEl);
+            const _withSub = _lines.filter(a => this._submenuOf(a));
+            if( !_withSub.length ) return menuEl.offsetWidth;
+            const _readable = Math.max(..._lines.map(a => this._lineTextWidth(a)));
+            const _last = _lines[_lines.length - 1];
+            return Math.max(menuEl.offsetWidth, ..._withSub.map(a => this._menuNeed(this._submenuOf(a)) + ( a === _last ? 0 : _readable )));
+        });
+    }
+
+    // What a submenu leaves of its menu's lines, at least: their first three characters, and
+    // 48 px — what a finger can still pick
+    _menuStrip(menuEl)
+    {
+        return Math.max(48, ...this._menuLines(menuEl).map(a => this._lineTextWidth(a, 3)));
+    }
+
+    // A menu's lines shown, and the submenu a line opens
+    _menuLines(menuEl)
+    {
+        return [...menuEl.children].filter(a => a.tagName === 'A' && a.style.display !== 'none');
+    }
+    _submenuOf(line)
+    {
+        return line.id ? line.parentNode?.parentNode?.querySelector(`#${line.id}_sub`) : null;
+    }
+
+    // A line's text width (its first n characters), with its left padding and a gap
+    _lineTextWidth(line, n = Infinity)
+    {
+        const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
+        if( !_text ) return 0;
+        const _range = document.createRange();
+        _range.setStart(_text, 0);
+        _range.setEnd(_text, Math.min(n, _text.length));
+        return _range.getBoundingClientRect().width + ( parseFloat(getComputedStyle(line).paddingLeft) || 0 ) + 8;
+    }
+
+    // fn() run with el laid out at its own width — shown (hidden from sight) if it isn't,
+    // its own minimum width (as built) rather than the one a fit gave it — then put back
+    _laidOut(el, fn)
+    {
+        const _s = el.style;
+        el.dataset.hecMinWidth ??= parseFloat(_s.minWidth) || 0;
+        const _saved = { display: _s.display, visibility: _s.visibility, left: _s.left, transform: _s.transform, minWidth: _s.minWidth, maxWidth: _s.maxWidth };
+        if( _s.display === 'none' ) Object.assign(_s, { visibility: 'hidden', display: 'block', left: '0px', transform: '' });
+        Object.assign(_s, { minWidth: el.dataset.hecMinWidth + 'px', maxWidth: '' });
+        try { return fn(); } finally { Object.assign(_s, _saved); }
     }
 
     // Opens a submenu over its menu, level with the item that opens it, its right edge on the
     // menu's right edge — so it takes no room beside the menu — and, like every menu
     // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
     // positioned parent (both are its children).
+    // At most as wide as the menu less the strip of its lines it must leave (_menuStrip) —
+    // the last line's submenu: as wide as the menu —, its lines cut ('…') if they don't fit
     _openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
+        const _lines = this._menuLines(_menu);
+        subEl.dataset.hecRoom = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
         this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 

@@ -243,7 +243,12 @@
   Chart.hecSampleRadius = function (chart, pt, radius) {
     if (radius > 0 || !chart._hecShowSamples || !chart.getDatasetMeta(pt._datasetIndex).dataset) return radius;
     var _ds = chart.data.datasets[pt._datasetIndex] || {}, _d = (_ds.data || [])[pt._index];
-    return _d && _d.hecVirtual ? radius : ((+_ds.borderWidth || 0) + 2) / 2;
+    return _d && _d.hecVirtual ? radius : Chart.hecDotRadius(_ds);
+  };
+  // The radius of a dot shown by default on a curve (Alt's, the one hovered): a diameter of
+  // its line width + 2 px
+  Chart.hecDotRadius = function (ds) {
+    return ((+ds.borderWidth || 0) + 2) / 2;
   };
   Chart.plugins.register({
     id: 'hecShowSamples',
@@ -255,20 +260,110 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // A chart's legend labels fitted to room px each (legend.labels.hecShortNames, see the
+  // legend's fit) — items: [{ text, name, forms }], text the label, name the dataset's name
+  // at its start, forms its shorter forms (least shortened first). As they are when they
+  // all fit; else every name at the same step — the first one at which they all fit —
+  // what follows the name (the value, the right axis' arrow) kept; else, at the last step,
+  // the names that still don't fit cut, '…' before what follows — and before a qualifier
+  // in parentheses at their end ('(F)'), kept when there's room for it: it often is what
+  // tells two curves apart
+  Chart.hecFitLegendTexts = function (ctx, items, room, opts) {
+    var fits = function (t) { return ctx.measureText(t).width <= room; };
+    var parts = items.map(function (it) {
+      var _named = typeof it.name === 'string' && it.name && it.text.indexOf(it.name) === 0;
+      return { text: it.text, rest: _named ? it.text.slice(it.name.length) : '',
+               steps: _named ? [it.name].concat(it.forms || []) : [it.text] };
+    });
+    var at = function (p, k) { return p.steps[Math.min(k, p.steps.length - 1)] + p.rest; };
+    var _last = Math.max.apply(null, parts.map(function (p) { return p.steps.length - 1; }));
+    for (var k = 0; k <= _last; k++) {
+      if (parts.every(function (p) { return fits(at(p, k)); })) return parts.map(function (p) { return at(p, k); });
+    }
+    if (opts && opts.formsOnly) return null;
+    // (the longest start of base that fits with '…' then tail, or null)
+    var cut = function (base, tail) {
+      if (!fits(base.slice(0, 1) + '…' + tail)) return null;
+      var lo = 1, hi = base.length - 1, best = 1;
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        if (fits(base.slice(0, mid).trimEnd() + '…' + tail)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+      }
+      return base.slice(0, best).trimEnd() + '…' + tail;
+    };
+    return parts.map(function (p) {
+      if (fits(at(p, _last))) return at(p, _last);
+      var _base = p.steps[p.steps.length - 1];
+      var _q = /\s*(\([^()]*\))$/.exec(_base);
+      var _withQualifier = _q && _q.index > 0 ? cut(_base.slice(0, _q.index), ' ' + _q[1] + p.rest) : null;
+      return _withQualifier || cut(_base, p.rest) || _base.slice(0, 1) + '…' + p.rest;
+    });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Y labels drawn inside the plot (ticks.mirror) with ticks.hecBackdrop { color }: over the
+  // datasets, each in a rounded box of that color (semi-opaque: the curves show through a
+  // little) — readable over the curves, as mini-graph-card's labels
+  Chart.plugins.register({
+    id: 'hecTickBackdrops',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx;
+      helpers.each(chart.scales, function (scale) {
+        var labels = scale._hecDeferredLabels;
+        if (!labels || !labels.length) return;
+        var _bd = scale.options.ticks.hecBackdrop;
+        // (the boxes drawn: a label whose box would touch one of them is skipped; kept on
+        // the scale — the column of its labels, see _hecInsideLabelColumns)
+        var _drawn = scale._hecLabelBoxes = [];
+        ctx.save();
+        labels.forEach(function (l) {
+          var _text = helpers.isArray(l.label) ? l.label.join(' ') : String(l.label);
+          if (_text === '' || _text === 'undefined') return;
+          ctx.font = l.font;
+          var w = ctx.measureText(_text).width, h = parseInt(l.font, 10) || 12;
+          var padX = 4, padY = 1, bw = w + 2 * padX, bh = h + 2 * padY;
+          var bx = l.align === 'left' ? l.x - padX : l.align === 'right' ? l.x - w - padX : l.x - w / 2 - padX;
+          var by = l.baseline === 'middle' ? l.y - bh / 2 : l.baseline === 'top' ? l.y - padY : l.y - h - padY;
+          // (kept within the plot: the top one never over the legend, the bottom one never
+          // over the time labels)
+          var _area = chart.chartArea, _dy = by < _area.top ? _area.top - by : by + bh > _area.bottom ? _area.bottom - by - bh : 0;
+          by += _dy;
+          var _ty = l.y + _dy;
+          if (_drawn.some(function (d) { return by < d.y + d.h + 3 && by + bh + 3 > d.y && bx < d.x + d.w && bx + bw > d.x; })) return;
+          _drawn.push({ x: bx, y: by, w: bw, h: bh });
+          var r = bh / 2;
+          ctx.beginPath();
+          ctx.moveTo(bx + r, by);
+          ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+          ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+          ctx.arcTo(bx, by + bh, bx, by, r);
+          ctx.arcTo(bx, by, bx + bw, by, r);
+          ctx.closePath();
+          ctx.fillStyle = _bd.color;
+          ctx.fill();
+          ctx.fillStyle = l.color;
+          ctx.textAlign = l.align;
+          ctx.textBaseline = l.baseline;
+          ctx.fillText(_text, l.x, _ty);
+        });
+        ctx.restore();
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // The dot of the value a hover is on (hover.dotOnHover, see _hecUpdateHoverDot): drawn
-  // over the curves, of a diameter of its line's width + 2 px, in its point's color
+  // over the curves as its point would be if shown — its own style and border — at the size
+  // of a dot shown by default
   Chart.plugins.register({
     id: 'hecHoverDot',
     afterDatasetsDraw: function (chart) {
       var el = chart._hecHoverDot;
       if (!el || !el._view) return;
-      var ds = chart.data.datasets[el._datasetIndex] || {}, v = el._view, ctx = chart.ctx;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(v.x, v.y, ((+ds.borderWidth || 0) + 2) / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = v.backgroundColor || ds.pointBackgroundColor || ds.borderColor;
-      ctx.fill();
-      ctx.restore();
+      var ds = chart.data.datasets[el._datasetIndex] || {};
+      chart.ctx.save();
+      Chart.elements.Point.prototype.draw.call({ _chart: chart, _model: el._model,
+        _view: Chart.helpers.extend({}, el._view, { radius: Chart.hecDotRadius(ds) }) });
+      chart.ctx.restore();
     } });
 
   // ---------------------------------------------------------------------------
@@ -432,11 +527,14 @@
     // boundsEl null: viewport only.
     clampToViewport: function (el, boundsEl) {
       var _bR = boundsEl ? boundsEl.getBoundingClientRect() : null;
+      var _r = el.getBoundingClientRect();
+      // (an element wider than the bounds — a tooltip on a narrow card — kept within the
+      // screen only: kept within the bounds, it would be pushed out on their other side)
+      if (_bR && _r.width > Math.min(_bR.right, window.innerWidth) - Math.max(_bR.left, 0)) _bR = null;
       var _bounds = _bR
         ? { left: Math.max(_bR.left, 0), right: Math.min(_bR.right, window.innerWidth),
             top: Math.max(_bR.top, 0), bottom: window.innerHeight }
         : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-      var _r = el.getBoundingClientRect();
       var _dx = 0, _dy = 0;
       if (_r.right > _bounds.right) _dx = _bounds.right - _r.right;
       else if (_r.left < _bounds.left) _dx = _bounds.left - _r.left;
@@ -665,13 +763,21 @@
         if (!_axes.length) return false;
         // On an axis' label column, that axis; anywhere with Shift, every axis
         var _side = me._hecYAxisSideAt(p.x0, p.y0);
+        // (its labels drawn inside the plot: near them — a finger's or a pen's drag only
+        // after a tap, a second press right away (dblclickdown engages the lock); a long
+        // press there is the curves')
+        var _inside = !_side && me._hecInsideLabelSideAt(p.x0, p.y0, p.pointerType);
+        if (_inside) {
+          if (p.pointerType !== 'mouse' && !me._hecYAxisLock) return false;
+          _side = _inside;
+        }
         var _shiftKey = p.native ? p.native.shiftKey : false;
         if (!_shiftKey && !_side) return false;
         // On touch, entering the Y-axis zone alone isn't enough — the
         // long-press must have already fired (unless the lock is already
         // engaged), so a normal page scroll starting in that zone isn't
         // mistaken for an axis drag. Mouse/pen activate immediately.
-        if (_side && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
+        if (_side && !_inside && !_shiftKey && p.pointerType === 'touch' && !me._hecYAxisLock && !p.longPressFired) return false;
         p.dragYRanges = me._hecYRanges();
         p.dragYAxes = _axes.map(function (a) { return _shiftKey || a.side === _side; });
         p.dragShiftKey = _shiftKey;
@@ -948,7 +1054,10 @@
       // Third and fourth triggers for engaging the Y-axis lock, alongside
       // drag — same zone check, kept here as a consumer of the
       // already-detected event, not mixed into its detection.
-      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
+      // (near labels drawn inside the plot: a finger's or a pen's tap then press only — a
+      // long press there is the curves', and a mouse drags the axis right away)
+      var _dblYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length &&
+        (me._hecYAxisSideAt(_hx, _hy) || (gestureType === 'dblclickdown' && c.pointerType !== 'mouse' && me._hecInsideLabelSideAt(_hx, _hy, c.pointerType)));
       if (_dblYAxisZone && !me._hecYAxisLock) {
         me._hecYAxisLock = 2;
         me._hecUpdateYAxisState();
@@ -987,7 +1096,8 @@
       // a click in this zone arms a 500ms window to anticipate a possible
       // NEXT contact there (this click itself is already over by the time it
       // fires, per Thierry), separate from the lock-driven trigger below.
-      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length && me._hecYAxisSideAt(_hx, _hy);
+      var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length &&
+        (me._hecYAxisSideAt(_hx, _hy) || me._hecInsideLabelSideAt(_hx, _hy, c.pointerType));
       if (_clickInYAxisZone) {
         me._hecYAxisClickArmed = true;
         me._hecUpdateYAxisState();
@@ -1464,10 +1574,16 @@
     // legend's labels (within the legend's band) — picked together (_hecPick): the one
     // under the point, else the nearest one if near enough and clearly nearer than the
     // next. → 'linkMarker', 'lockAndHandle', a legend label's index, -1 or PICK_BETWEEN.
-    // Never from the plot area or the Y axis column (y below the plot area's top).
+    // Never from the plot area or the Y axis column (y below the plot area's top) — but
+    // on the controls' box drawn over them (hecControlsBackdrop).
     _hecTopTargetAt: function (x, y) {
       var me = this, _a = me.chartArea;
-      if (_a && y >= _a.top) return -1;
+      // (below the plot area's top: only the controls' box drawn over it, when it is —
+      // hecControlsBackdrop: on it, the controls')
+      if (_a && y >= _a.top) {
+        var _bd = me.options.hecControlsBackdrop && me._hecHasControls();
+        return _bd && x >= 0 && x <= me._hecLockAndHandleWidth() && y <= 28 ? 'lockAndHandle' : -1;
+      }
       var rects = [], ids = [];
       var _lm = me._hecLinkMarkerRect();
       if (_lm) { rects.push({ x: _lm.left, y: _lm.top, width: _lm.width, height: _lm.height }); ids.push('linkMarker'); }
@@ -1686,6 +1802,31 @@
       return null;
     },
 
+    // The column of an axis' labels drawn inside the plot (ticks.mirror): along the plot's
+    // edge, as wide as the labels' boxes, and the pointer's precision more (pointerType:
+    // 'mouse', 'pen', 'touch') — { side, left, right } for each such axis
+    _hecInsideLabelColumns: function (pointerType) {
+      var me = this, _a = me.chartArea, _slop = Chart.hecGestures(pointerType || 'touch').slop;
+      if (!_a) return [];
+      return me._hecValueYAxes().filter(function (a) { return a.scale.options.ticks.mirror; }).map(function (a) {
+        var _boxes = a.scale._hecLabelBoxes || [];
+        var _w = _boxes.length ? Math.max.apply(null, _boxes.map(function (b) { return a.side === 'left' ? b.x + b.w - _a.left : _a.right - b.x; })) : 24;
+        return a.side === 'left' ? { side: 'left', left: _a.left, right: Math.min(_a.right, _a.left + _w + _slop) }
+                                 : { side: 'right', left: Math.max(_a.left, _a.right - _w - _slop), right: _a.right };
+      });
+    },
+
+    // The axis whose labels drawn inside the plot a canvas-relative point is near (see
+    // _hecInsideLabelColumns): 'left', 'right' or null. A point there is on the plot as
+    // well — what it's for depends on the gesture: a drag (a mouse's, a finger's or a pen's
+    // after a tap) is the axis', a click, a long press or a hover the curves'
+    _hecInsideLabelSideAt: function (x, y, pointerType) {
+      var _a = this.chartArea;
+      if (!_a || y < _a.top || y > _a.bottom) return null;
+      var _c = this._hecInsideLabelColumns(pointerType).filter(function (c) { return x >= c.left && x <= c.right; })[0];
+      return _c ? _c.side : null;
+    },
+
     // Shows or hides every sample of the curves (see the hecShowSamples plugin): on while
     // the pointer moves over the chart with Alt (Option) held, off when it moves without,
     // or leaves the chart
@@ -1767,7 +1908,8 @@
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.left = '15px';
-      _el.style.top = '5px';
+      // (its bottom on the handle's ⠿ bottom)
+      _el.style.top = '7px';
       var _svg = _el.children[0];
       var _showIcon = !(_forced && !me._hecYAxisLock) && !me._hecHandleButtons();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
@@ -1782,10 +1924,17 @@
       // else. Forwards every event it receives straight to the canvas so
       // Chart.js's own gesture handling still does 100% of the actual work.
       // (one per Y axis: the left one's label column, and the right one's when there is one)
+      // (labels drawn inside the plot: the column along them — see _hecInsideLabelColumns)
       if (me.chartArea) {
         var _hasRight = me._hecValueYAxes().some(function (a) { return a.side === 'right'; });
-        [['_hecYAxisTouchEl', 0, me.chartArea.left, true],
-         ['_hecRightYAxisTouchEl', me.chartArea.right, me.width - me.chartArea.right, _hasRight]].forEach(function (z) {
+        var _inCols = me._hecInsideLabelColumns('touch');
+        var _col = function (side, x, w) {
+          var _c = _inCols.filter(function (c) { return c.side === side; })[0];
+          return _c ? [_c.left, _c.right - _c.left] : [x, w];
+        };
+        var _l = _col('left', 0, me.chartArea.left), _r = _col('right', me.chartArea.right, me.width - me.chartArea.right);
+        [['_hecYAxisTouchEl', _l[0], _l[1], true],
+         ['_hecRightYAxisTouchEl', _r[0], _r[1], _hasRight]].forEach(function (z) {
           if (!z[3]) { if (me[z[0]]) me[z[0]].style.display = 'none'; return; }
           var _yo = me._hecTouchOverlay(z[0], 'ns-resize');
           _yo.style.display = '';
@@ -1911,9 +2060,43 @@
     // true: straddling this chart's top edge, under the Y axis labels of the graph
     // above (an empty spot — centered on the top it would cover this chart's legend).
     // Canvas-relative rectangle, or null when hidden.
+    // (right above the lock+handle zone, it would sit on it — then just right of it)
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
-      return { left: Math.max(0, Math.round(this.chartArea.left / 2) - 11), top: -23, width: 22, height: 22 };
+      var _left = Math.max(0, Math.round(this.chartArea.left / 2) - 11);
+      var _zone = this._hecHasControls() ? this._hecLockAndHandleWidth() : 0;
+      if (_zone && _left < _zone + 4) _left = _zone + 4;
+      return { left: _left, top: -23, width: 22, height: 22 };
+    },
+
+    // Whether the lock+handle zone shows anything: the handle, the padlock or handleButtons
+    _hecHasControls: function () {
+      return this.options.moveHandleVisible !== false || this._hecHasYAxisLock() || !!this._hecHandleButtons();
+    },
+
+    // options.hecControlsBackdrop ({ color }): the controls at the graph's top left — the
+    // lock+handle zone, the chain icon — each drawn in a rounded box of that color, over the
+    // legend's labels, which keep no room for them (a narrow card: they take no height). On
+    // the box, a gesture is the control's; beside it, on a label, the label's (_hecTopTargetAt)
+    _hecUpdateControlsBackdrop: function () {
+      var me = this, _bd = me.options.hecControlsBackdrop;
+      var _el = me._hecControlsBackdropEl;
+      if (!_bd || !me.canvas || !me._hecHasControls()) {
+        if (_el) _el.style.display = 'none';
+        return;
+      }
+      if (!_el) {
+        _el = document.createElement('div');
+        _el.style.cssText = 'position:absolute;z-index:9;border-radius:6px;pointer-events:none;';
+        me._hecControlsBackdropEl = _el;
+      }
+      me._hecAttachToCanvasParent(_el);
+      _el.style.display = '';
+      _el.style.background = _bd.color;
+      _el.style.left = (me.canvas.offsetLeft + 1) + 'px';
+      _el.style.top = (me.canvas.offsetTop + 2) + 'px';
+      _el.style.width = (me._hecLockAndHandleWidth() - 2) + 'px';
+      _el.style.height = '24px';
     },
 
     // On one of the controls drawn over the graph's top left corner (lock+handle, chain
@@ -2088,6 +2271,25 @@
       });
     },
 
+    // The tooltip closed at once and its mode ended, the point it showed back to its normal
+    // look, no hover dot — a menu opens over the card: nothing of the tooltip stays over it
+    hecEndTooltip: function () {
+      var me = this;
+      me._hecEndTooltipMode();
+      me._hecUpdateHoverDot(null);
+      if (me.active && me.active.length) me.updateHoverStyle(me.active, me.options.hover.mode, false);
+      me.active = [];
+      me.lastActive = [];
+      me._hecLastHitXY = undefined;
+      if (me.tooltip) {
+        me.tooltip._active = [];
+        me.tooltip.update(true);
+        // (removed at once, not faded out: nothing of it over the menu)
+        if (me.tooltip._hecHoverTooltipEl) Chart.hecUi.closeFloating(me.tooltip._hecHoverTooltipEl);
+      }
+      me.render({ duration: 0, lazy: true });
+    },
+
     // Ends the hover: the highlighted points go back to their normal look, fading as the
     // tooltip does (Chart.hecUi.FADE), and the tooltip closes — when the tooltip fades out
     // by itself. A move or a contact on a point opens them again, as before.
@@ -2205,11 +2407,13 @@
         _el.style.alignItems = 'center';
         _el.style.justifyContent = 'center';
         _el.style.borderRadius = '50%';
-        _el.style.background = 'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
         _el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
+      // (in a box like the other controls' — options.hecControlsBackdrop — else half see-through)
+      _el.style.background = me.options.hecControlsBackdrop ? me.options.hecControlsBackdrop.color :
+        'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
       _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
       _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
       _el.style.width = _r.width + 'px';
@@ -2228,7 +2432,7 @@
       var _el = me._hecMoveHandleIconEl;
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
+        _el.style.cssText = 'position:absolute;z-index:10;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
         _el.textContent = '\u283F';
         me._hecMoveHandleIconEl = _el;
       }
@@ -2515,7 +2719,7 @@
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';
-        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
+        _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);width:max-content;max-width:calc(100vw - 8px);transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
         this._hecHoverTooltipEl = _el;
       }
       _el._hecOnFade = onFade;
@@ -2536,9 +2740,10 @@
         _el.appendChild(content);
       }
 
+      var _caretEl = null;
       if (caret) {
         var _cs = caret.size, _cr = caret.cornerRadius, _bw = caret.borderWidth;
-        var _caretEl = document.createElement('div');
+        _caretEl = document.createElement('div');
         _caretEl.style.cssText = 'position:absolute;width:0;height:0;border:' + _cs + 'px solid transparent;left:auto;right:auto;top:auto;bottom:auto;margin:0;';
         if (caret.yAlign === 'center') {
           _caretEl.style.top = '50%';
@@ -2556,15 +2761,46 @@
       }
 
       _el.style.display = 'block';
+      // (beside the point it shows — caret.x, caret.y —, as Chart.js places its own: by the
+      // element's real size, not the one Chart.js measured for its own drawing, which
+      // differs, so that it stands as far from the point on either side)
+      if (caret && caret.x !== undefined) {
+        var _at = backgroundPoint(caret, _el.offsetWidth, _el.offsetHeight);
+        x = _at.x; y = _at.y;
+      }
       var _origin = (_el.style.position === 'fixed') ? { left: 0, top: 0 } : _el.parentNode.getBoundingClientRect();
       _el.style.left = (x - _origin.left) + 'px';
       _el.style.top = (y - _origin.top) + 'px';
       // (the area to stay in: the card's, if it says which — floatingBoundsSelector)
       var _boundsSel = me._chart && me._chart.options.floatingBoundsSelector;
       Chart.hecUi.clampToViewport(_el, _boundsSel && anchorEl && anchorEl.closest ? anchorEl.closest(_boundsSel) : null);
+      // (moved to stay within the card and the screen: its arrow still on the point, within
+      // its rounded corners)
+      if (_caretEl && caret.x !== undefined) {
+        var _box = _el.getBoundingClientRect(), _half = caret.size, _in = caret.cornerRadius + _half;
+        var _clampIn = function (v, len) { return Math.max(_in, Math.min(v, len - _in)); };
+        if (caret.yAlign === 'center') {
+          _caretEl.style.top = (_clampIn(caret.y - _box.top, _box.height) - caret.borderWidth - _half) + 'px';
+          _caretEl.style.marginTop = '0px';
+        } else {
+          _caretEl.style.left = (_clampIn(caret.x - _box.left, _box.width) - caret.borderWidth - _half) + 'px';
+          _caretEl.style.right = 'auto';
+          _caretEl.style.marginLeft = '0px';
+        }
+      }
       Chart.hecUi.armAutoFade(_el, _readingTime, justMoved);
 
       function borderWidth(_caret) { return _caret ? _caret.borderWidth : 1; }
+      // The top-left corner of a box w × h beside the point (c.x, c.y), on the side its
+      // alignment says — Chart.js's own rule (getBackgroundPoint in deps/Chart.js)
+      function backgroundPoint(c, w, h) {
+        var _x = c.x, _y = c.y, _ps = c.size + c.padding, _rp = c.cornerRadius + c.padding;
+        if (c.xAlign === 'right') _x -= w; else if (c.xAlign === 'center') _x -= w / 2;
+        if (c.yAlign === 'top') _y += _ps; else if (c.yAlign === 'bottom') _y -= h + _ps; else _y -= h / 2;
+        if (c.yAlign === 'center') { if (c.xAlign === 'left') _x += _ps; else if (c.xAlign === 'right') _x -= _ps; }
+        else if (c.xAlign === 'left') _x -= _rp; else if (c.xAlign === 'right') _x += _rp;
+        return { x: _x, y: _y };
+      }
     },
 
     // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
@@ -2635,7 +2871,8 @@
         _canvasRect.left + _vm.x, _canvasRect.top + _vm.y,
         this._chart.canvas,
         _vm.backgroundColor, _vm.borderColor, _vm.bodyFontColor,
-        { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth },
+        { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth,
+          padding: _vm.caretPadding, x: _canvasRect.left + _vm.caretX, y: _canvasRect.top + _vm.caretY },
         _justMoved,
         // (as it fades out, the highlighted point fades out with it)
         function () { _chart._hecEndHover(); }

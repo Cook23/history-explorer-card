@@ -9,6 +9,8 @@ import { keyOf } from "./history-entity-store.js";
 import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
 import { normalizeInterpolation, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import { baseTypePure } from "./card-config.js";
+import { shortNames } from "./legend-names.js";
+import { seriesOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -16,6 +18,13 @@ const moment = window.HXLocal_moment;
 // right for a second group of units (see _assignYAxes)
 export const LEFT_Y_AXIS = 'y-axis-0';
 export const RIGHT_Y_AXIS = 'y-axis-1';
+// A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
+// _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
+export const NARROW_CARD_PX = 300;
+// The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
+// a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
+// labels' calc(.15em + 8.5px) of its 14 px — see _textSizes
+const FONT_PX = 12, TIMELINE_FONT_PX = 13, NARROW_FONT_PX = 11, INSIDE_Y_LABEL_FONT_PX = 10.5;
 
 export class CardGraphs
 {
@@ -29,6 +38,28 @@ export class CardGraphs
     {
         const _label = this.pconfig.showCurrentValues ? this.getFormattedLabelName(d.name, d.entity_id, d.unit, d.shownScale) : d.name;
         return d.yAxisID === RIGHT_Y_AXIS ? _label + ' ▸' : _label;
+    }
+
+    // The shorter forms of the names of a chart's curves, for a legend too narrow for them
+    // (legend-names.js), from what Home Assistant knows: each entity's device, and how
+    // many entities carry a qualifier
+    _legendShortNames(chart)
+    {
+        const _hass = this._hass;
+        const _device = id => {
+            const _did = _hass?.entities?.[seriesOf(id ?? '').entity]?.device_id;
+            const _d = _did ? _hass?.devices?.[_did] : null;
+            return _d ? ( _d.name_by_user || _d.name || null ) : null;
+        };
+        // (a qualifier carried by 3 entities or more, counted once per states object)
+        if( this._qualifierCount?.states !== _hass?.states ) this._qualifierCount = { states: _hass?.states, n: new Map() };
+        const _frequent = q => {
+            const _n = this._qualifierCount.n;
+            if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
+            return _n.get(q) >= 3;
+        };
+        return shortNames(chart.data.datasets.map(d => ({ name: d.name, device: _device(d.entity_id) })),
+                          { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 
     getFormattedLabelName(name, entity, unit, shownScale = 1)
@@ -122,6 +153,7 @@ export class CardGraphs
                         },
                         ticks: {
                             fontColor: ( config?.showTimeLabels === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphLabelColor,
+                            fontSize: this._textSizes().text,
                             major: {
                                 enabled: true,
                                 unit: 'day',
@@ -129,7 +161,11 @@ export class CardGraphs
                                 unitStepSize: 1,
                                 displayFormats: { 'day': this.i18n.styleDateTicks },
                             },
-                            maxRotation: 0
+                            maxRotation: 0,
+                            // (labels that don't fit side by side — a narrow plot — skipped,
+                            // never drawn over each other)
+                            autoSkip: true,
+                            autoSkipPadding: 8
                         },
                         gridLines: {
                             color: ( config?.showGrid === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphGridColor
@@ -140,11 +176,14 @@ export class CardGraphs
                 },
                 topClipMargin : 4,
                 bottomClipMargin: 4,
+                // (a timeline's or an arrowline's room for the handle, above its rows — none on a
+                // narrow card, where it's in a box over them: _controlsBackdrop)
                 layout: {
                     padding: {
-                        top: ( graphtype === 'timeline' || graphtype === 'arrowline' ) ? 24 : 0
+                        top: this._controlsRoom(graphtype)
                     }
                 },
+                hecControlsBackdrop: this._controlsBackdrop(),
                 animation: {
                     duration: 0
                 },
@@ -176,7 +215,10 @@ export class CardGraphs
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
-                        boxWidth: 0
+                        boxWidth: 0,
+                        fontSize: this._textSizes().text,
+                        // (a label wider than the legend: shortened, its value kept)
+                        hecShortNames: chart => this._legendShortNames(chart)
                     },
                 },
                 elements: {
@@ -194,7 +236,7 @@ export class CardGraphs
                         return this.getStateColor(datasets[index].domain, datasets[index].device_class, datasets[index].entity_id, data[2]);
                     },
                     showText: true,
-                    font: 'normal 13px "Helvetica Neue", Helvetica, Arial, sans-serif',
+                    font: this._textSizes().timeline,
                     textPadding: 4,
                     arrowColor: getComputedStyle(document.body).getPropertyValue('--primary-text-color')
                 },
@@ -340,13 +382,16 @@ export class CardGraphs
         const _p0 = _list[0]?.circular;
         const _period = ( _p0 && _list.every(d => d.circular === _p0 && ( d.siConversionFactor ?? 1 ) === 1) ) ? _p0 : undefined;
         const _right = id === RIGHT_Y_AXIS;
-        // (yLabels: inside — the labels drawn inside the plot, which then takes the whole width)
-        const _inside = config?.yLabels === 'inside';
+        // (the labels drawn inside the plot, which then takes the whole width: yLabels: inside,
+        // or a narrow card — see _yLabelsInside; hecYLabels, hecUnit: what _fitToCardWidth reads)
+        const _inside = this._yLabelsInside(config?.yLabels, graphtype);
         return {
             id,
             position: _right ? 'right' : 'left',
+            hecYLabels: config?.yLabels,
+            hecUnit: _unit,
             afterFit: (scaleInstance) => {
-                scaleInstance.width = _inside ? 0 : this.pconfig.labelAreaWidth;
+                scaleInstance.width = scaleInstance.options.ticks.mirror ? 0 : this.pconfig.labelAreaWidth;
             },
             afterDataLimits: (me) => {
                 const epsilon = 0.0001;
@@ -361,8 +406,7 @@ export class CardGraphs
                 forceMax: config?.ymax ?? undefined,
                 stepSize: config?.ystepSize ?? undefined,
                 period: _period,
-                // (only inside: an option given, even undefined, replaces Chart.js' default)
-                ...( _inside ? { mirror: true, padding: -6 } : {} )
+                ...this._yLabelTicks(_inside)
             },
             gridLines: {
                 color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
@@ -376,6 +420,98 @@ export class CardGraphs
             barThickness: this.pconfig.timelineBarHeight - 4,
             stacked: config?.stacked
         };
+    }
+
+    // Whether a graph's Y labels are drawn inside its plot: yLabels: inside; on a card
+    // narrower than NARROW_CARD_PX too — the plot keeps its width there — unless yLabels:
+    // outside. A curve's or a bar's axis only (a timeline's labels are its rows' names)
+    _yLabelsInside(yLabels, graphtype)
+    {
+        if( yLabels === 'inside' ) return true;
+        if( yLabels === 'outside' || !( graphtype == 'line' || graphtype == 'bar' ) ) return false;
+        return this._narrowCard();
+    }
+
+    // Whether the card is narrower than NARROW_CARD_PX
+    _narrowCard()
+    {
+        return ( this._this?.querySelector('#maincard')?.clientWidth || Infinity ) < NARROW_CARD_PX;
+    }
+
+    // The size of the graphs' text, as the card's width says: text (the legend, the time
+    // labels, a timeline's names), timeline (its states, a canvas font), yLabels(inside)
+    _textSizes()
+    {
+        const _narrow = this._narrowCard();
+        const _text = _narrow ? NARROW_FONT_PX : FONT_PX;
+        return { text: _text,
+                 timeline: `normal ${_narrow ? NARROW_FONT_PX : TIMELINE_FONT_PX}px "Helvetica Neue", Helvetica, Arial, sans-serif`,
+                 yLabels: inside => inside ? INSIDE_Y_LABEL_FONT_PX : _text };
+    }
+
+    // The Y labels' ticks options, inside the plot — just above their grid line, so that the
+    // lowest one keeps clear of the time labels, each in a box of the card's background
+    // (hecTickBackdrops in deps/chart-hec.js) — or beside it
+    _yLabelTicks(inside)
+    {
+        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this._textSizes().yLabels(inside),
+                 hecBackdrop: inside ? { color: this._tickBackdropColor() } : null };
+    }
+
+    // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
+    // narrow card: each in a box like the Y labels', over the legend or the rows, taking no
+    // room (Chart.js hecControlsBackdrop) — else null: beside the legend's first line, as
+    // much room as they need (the Y axes' labels and units keep theirs)
+    _controlsBackdrop()
+    {
+        return this._narrowCard() ? { color: this._tickBackdropColor() } : null;
+    }
+
+    // The room above a timeline's or an arrowline's rows for its handle (px): none on a
+    // narrow card (_controlsBackdrop)
+    _controlsRoom(graphtype)
+    {
+        return ( graphtype === 'timeline' || graphtype === 'arrowline' ) && !this._narrowCard() ? 24 : 0;
+    }
+
+    // The boxes of the Y labels inside a plot: the card's background, as opaque as the
+    // tooltip (80 %) — the theme's own color, else white or, on a dark theme, dark grey
+    _tickBackdropColor()
+    {
+        const _bg = this._this?.querySelector('#maincard') ? getComputedStyle(this._this.querySelector('#maincard')).backgroundColor : '';
+        const m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(_bg);
+        const [r, g, b] = m && ( m[4] === undefined || +m[4] > 0 ) ? [m[1], m[2], m[3]] : this.ui.darkMode ? [28, 28, 28] : [255, 255, 255];
+        return `rgba(${r},${g},${b},0.8)`;
+    }
+
+    // Each graph's Y labels placed, its text sized and its controls laid out as the card's
+    // width now says (_yLabelsInside, _textSizes, _controlsBackdrop) — when the card
+    // crosses NARROW_CARD_PX
+    _fitToCardWidth()
+    {
+        const _sizes = this._textSizes();
+        for( const g of this.graphs ) {
+            const o = g.chart.options;
+            let _changed = false;
+            // (values set on an options object where they differ)
+            const _set = (obj, values) => {
+                if( obj ) for( const [k, v] of Object.entries(values) )
+                    if( JSON.stringify(obj[k]) !== JSON.stringify(v) ) { obj[k] = v; _changed = true; }
+            };
+            for( const ax of o.scales?.yAxes ?? [] ) {
+                const _inside = this._yLabelsInside(ax.hecYLabels, g.chart.config.type);
+                _set(ax.ticks, this._yLabelTicks(_inside));
+                _set(ax.scaleLabel, { display: !_inside && ax.hecUnit !== undefined && ax.hecUnit !== '' });
+            }
+            for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
+            _set(o, { hecControlsBackdrop: this._controlsBackdrop() });
+            _set(o.layout?.padding, { top: this._controlsRoom(g.chart.config.type) });
+            _set(o.legend?.labels, { fontSize: _sizes.text });
+            _set(o.elements, { font: _sizes.timeline });
+            if( _changed ) g.chart.update(0);
+            // (the values over it laid out for that width too — see _showValues)
+            if( _changed && g.valueSamples ) this._showValues(g);
+        }
     }
 
     // The tooltip of a chart: a curve's value in its unit (circular ones in [0, period)), a
@@ -1013,10 +1149,15 @@ export class CardGraphs
         const _isStatic = g.isStatic;
         const _legend = g.chart.options.legend;
         if( g.type === 'bar' ) {
+            // (from where the interval selector actually is: its left edge, a gap before it —
+            // it isn't against the graph's right edge)
             const bd = this._this.querySelector(`#bd-${g.id}`);
-            if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
+            const _bdR = bd?.getBoundingClientRect(), _cR = g.canvas.getBoundingClientRect();
+            if( bd && _bdR.width ) _legend.rightMargin = Math.max(_cR.right - _bdR.left + 8, _isStatic ? 25 : 45);
+            else if( bd ) _legend.rightMargin = bd.offsetWidth + (_isStatic ? 15 : 45);
         } else {
-            _legend.rightMargin = _isStatic ? 25 : 45;
+            // (nothing over a YAML graph's top right: no room kept there)
+            _legend.rightMargin = _isStatic ? 4 : 45;
         }
     }
 

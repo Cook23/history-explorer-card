@@ -4,6 +4,7 @@
 
 import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
+import { barInterval, RAW_INTERVAL } from "./history-options.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -355,7 +356,7 @@ export class CardDatasets
     }
 
     // A bar entity's bars: what it added over each interval of the graph (10 minutes, an
-    // hour, a day, a month) — a counter reset starting again from its new value, unless
+    // hour, a day, a week — from Monday — a month: BAR_INTERVALS) — a counter reset starting again from its new value, unless
     // netBars — each bar at the middle of its interval; its colors when they vary (colorFn)
     _barSamples(g, e, data, process, w, colorFn)
     {
@@ -364,19 +365,15 @@ export class CardDatasets
         const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
         const netBars = e.netBars ?? false;
 
-        let td;
-        if( g.interval == 0 ) td = moment.duration(10, "minute"); else
-        if( g.interval == 1 ) td = moment.duration(1, "hour"); else
-        if( g.interval == 2 ) td = moment.duration(1, "day"); else
-        if( g.interval == 3 ) td = moment.duration(1, "month");
+        const _interval = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1);
+        const td = moment.duration(..._interval.length);
 
         let i = 0;
         let y0 = this.process(data[0].state, process) * 1.0;
         let y1 = y0;
 
         // Start time of the range, snapped to interval boundary
-        const f = ( g.interval <= 1 ) ? 'YYYY-MM-DDTHH[:00:00]' : ( g.interval <= 2 ) ? 'YYYY-MM-DDT[00:00:00]' : 'YYYY-MM-[01]T[00:00:00]';
-        let t = moment(moment(w.start).format(f));
+        let t = moment(w.start).startOf(_interval.start);
 
         // Search for the first state in the time range
         while( i < n && moment(data[i].last_changed) <= t ) {
@@ -496,7 +493,7 @@ export class CardDatasets
     _entityKind(g, e)
     {
         if( g.type !== 'line' && g.type !== 'bar' ) return g.type;
-        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != 4 ) ? 'bar' : 'line';
+        return ( g.type === 'bar' && e?.type === 'bar' && g.interval != RAW_INTERVAL ) ? 'bar' : 'line';
     }
 
     // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.

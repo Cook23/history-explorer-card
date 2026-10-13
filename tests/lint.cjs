@@ -37,7 +37,7 @@ const GLOBALS = new Set([
     'isNaN', 'isFinite', 'parseFloat', 'parseInt', 'encodeURIComponent', 'decodeURIComponent', 'btoa', 'atob',
     'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame',
     'queueMicrotask', 'structuredClone', 'getComputedStyle', 'fetch', 'Blob', 'URL', 'FileReader',
-    'Event', 'CustomEvent', 'PointerEvent', 'Element', 'HTMLElement', 'HTMLCanvasElement', 'Node', 'ShadowRoot',
+    'Event', 'CustomEvent', 'PointerEvent', 'Element', 'HTMLElement', 'HTMLCanvasElement', 'Node', 'NodeFilter', 'ShadowRoot',
     'MutationObserver', 'ResizeObserver', 'IntersectionObserver',
     'md5hx', 'saveAs',
 ]);

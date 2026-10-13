@@ -432,14 +432,14 @@ export class CardSelector
 
         this.entitiesPopulated = true;
 
+        // Entity type menu listeners (its gestures open it, with or without a selector)
+        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
+
         // No point populating the datalist if the selector is not visible
         if( this.ui.hideSelector ) return;
 
         this.ui.inputField[0] = this._this.querySelector(`#b7_0`);
         this.ui.inputField[1] = this._this.querySelector(`#b7_1`);
-
-        // Entity type menu listeners
-        for( let _ii = 0; _ii < 2; _ii++ ) this._initEntityTypeMenu(_ii);
 
         if( this.pconfig.recordedEntitiesOnly ) {
 
@@ -656,13 +656,10 @@ export class CardSelector
         fi.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    removeAllEntities()
+    // "Default graphs": the graphs added from the card removed — the YAML's kept as they
+    // were changed from the card
+    defaultGraphs()
     {
-        this.menuSetVisibility(0, false);
-        this.menuSetVisibility(1, false);
-
-        if( !confirm(i18n('ui.popup.remove_all')) ) return;
-
         // Remove only actually non-fixed graphs, wherever they sit in the array — the old
         // "first non-fixed index, then everything after it" logic predates `isStatic` and
         // assumed statics always came first with dynamics strictly after; that assumption
@@ -682,5 +679,23 @@ export class CardSelector
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
         this.writeLocalState();
+    }
+
+    // "Default display": back to the YAML — the graphs added from the card removed, every
+    // change made from the card to the YAML's forgotten (their order, their types, colors,
+    // splits, hidden curves, points…), the YAML's time range. Saved as any change: the last
+    // one to speak, it reaches the other devices for what they share
+    defaultDisplay()
+    {
+        for( const g of this.graphs ) this._graphDiv(g).remove();
+        this.graphs = [];
+        this.store.list = JSON.parse(JSON.stringify(this._pureYamlEntities ?? []));
+        this.pconfig.nextDefaultColor = 0;
+        this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+        this._setPresentWindow();
+        this._buildGraphsFromStore();
+        this._updateMoVisibility();
+        this._updateGroupLinkMarkers();
+        this.updateHistoryWithClearCache();
     }
 }

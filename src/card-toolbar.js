@@ -4,6 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
+import { BAR_INTERVALS, RAW_INTERVAL } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
 import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
@@ -15,8 +16,16 @@ export class CardToolbar
     // HTML generation
     // --------------------------------------------------------------------------------------
 
-    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
+    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
     // !! Keep in sync with _hec_render() in history-info-panel.js !!
+    // The menus of an entity and of a graph on a card without any entity selector, where
+    // they otherwise are: their gestures (a long-press on a label, on the ⠿ zone…) open them
+    // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
+    menusOnlyHtml()
+    {
+        return `<div id="hm_0" style="position:relative;height:0;line-height:normal">${typeMenuHtml(0, true)}</div>`;
+    }
+
     addUIHtml(tools, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
     {
         let html = '';
@@ -113,8 +122,6 @@ export class CardToolbar
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
         this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
         this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
-        this._this.querySelector(`#eg_${i}`)?.addEventListener('click', this.removeAllEntities.bind(this), false);
-        this._this.querySelector(`#ei_${i}`)?.addEventListener('click', this.toggleInfoPanel.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
         // A click on the toolbar beside its small buttons — none under it: the one picked
         // (Chart.hecUi.pick: the nearest, unless about halfway between two)
@@ -164,7 +171,6 @@ export class CardToolbar
         this.relabelTypeMenu(i);
         this.relabelOptionsMenu(i);
         let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
-        let eg = this._this.querySelector(`#eg_${i}`); if( eg ) eg.innerHTML = i18n('ui.menu.remove_all');
         let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
@@ -205,6 +211,8 @@ export class CardToolbar
             const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
+            // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
+            this._fitToCardWidth();
             const _tbEl = this._this.querySelector('#tb_0');
             if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }
@@ -279,11 +287,24 @@ export class CardToolbar
             const dlFrNow = Math.round(dlwNow / totNow * 100);
             const drFrNow = 100 - dlFrNow;
 
+            // (a narrow card — even the compact date and range don't fit side by side: each on
+            // a line of its own, centered, never wrapped — layout D below)
+            const narrow = dlwShort + drwShort > tbwNow - 10;
+            // (the range on a line of its own: its whole name)
+            if( narrow && byEl ) byEl.style.maxWidth = '83px';
+            for( const [el, side] of [[dl, 'start'], [dr, 'end']] ) if( el ) {
+                el.style.justifySelf = narrow ? 'center' : side;
+                el.style.whiteSpace = narrow ? 'nowrap' : '';
+            }
+            // (the entity selector's input: up to 500 px, at least 150 — less on a card
+            // narrower than that, so it never overflows the card)
+            const _inputW = room => Math.max(Math.min(150, room), Math.min(500, room));
+
             // Layout C : no selector, just dl and dr
             if( !input || !sl ) {
                 if( tb && (dl || dr) ) {
-                    tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
-                    tb.style.gridTemplateAreas = "'dl dr'";
+                    tb.style.gridTemplateColumns = narrow ? '1fr' : `${dlFrNow}fr ${drFrNow}fr`;
+                    tb.style.gridTemplateAreas = narrow ? "'dl' 'dr'" : "'dl dr'";
                 }
                 continue;
             }
@@ -297,7 +318,7 @@ export class CardToolbar
                 sl.style.display = 'flex';
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
-                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
                 sl.style.display = 'flex';
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
@@ -339,13 +360,21 @@ export class CardToolbar
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
                 input.style.width = inputWA + 'px';
-            } else {
+            } else if( !narrow ) {
                 // Layout B : dl | dr on line 1, sl centered on line 2
                 if( tb ) {
                     tb.style.gridTemplateColumns = `${dlFrNow}fr ${drFrNow}fr`;
                     tb.style.gridTemplateAreas = "'dl dr' 'sl sl'";
                 }
-                input.style.width = Math.max(150, Math.min(500, (tb ? tb.clientWidth : w) - 80)) + 'px';
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
+            } else {
+                // Layout D (a narrow card) : dl, dr and sl each on a line, the input as wide
+                // as the card leaves beside the options button
+                if( tb ) {
+                    tb.style.gridTemplateColumns = '1fr';
+                    tb.style.gridTemplateAreas = "'dl' 'dr' 'sl'";
+                }
+                input.style.width = _inputW((tb ? tb.clientWidth : w) - slBtnsW - 16) + 'px';
             }
         }
     }
@@ -370,17 +399,13 @@ export class CardToolbar
         this.statsExporter.exportFile(this);
     }
 
+    // The info panel switched on or off (confirmed in the options menu, see _CONFIRMED)
     toggleInfoPanel()
     {
-        this.menuSetVisibility(0, false);
-        this.menuSetVisibility(1, false);
-
-        if( confirm(infoPanelEnabled ? i18n('ui.popup.disable_panel') : i18n('ui.popup.enable_panel')) ) {
-            setInfoPanelEnabled(!infoPanelEnabled);
-            // Persist in dedicated global HA user key (background)
-            this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
-            this.applyInfoPanelState();
-        }
+        setInfoPanelEnabled(!infoPanelEnabled);
+        // Persist in dedicated global HA user key (background)
+        this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
+        this.applyInfoPanelState();
     }
 
     // The panel switched on or off (here, or on another device): saved where the panel reads
@@ -405,13 +430,13 @@ export class CardToolbar
         if( !g ) return;
 
         const _value = parseInt(event.target.value);
-        const _wasRaw = g.interval == 4;
-        const _isRaw = _value == 4;
+        const _wasRaw = g.interval == RAW_INTERVAL;
+        const _isRaw = _value == RAW_INTERVAL;
         g.interval = _value;
 
         // Persist the interval on every entity of this graph (whichever is rebuilt first
         // carries it — see addGraph's _graphInterval). The entities' own types are left
-        // alone: 'raw line' (4) only changes how the bar entities are drawn, never what
+        // alone: raw (RAW_INTERVAL) only changes how the bar entities are drawn, never what
         // they are, so picking an interval again turns them back into bars.
         for( let en of g.entities ) {
             const _e = this.store.entry(keyOf(en));
@@ -434,11 +459,7 @@ export class CardToolbar
     createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
         return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
-                    <option value="0" ${optionStyle} ${selected == 0 ? 'selected' : ''}>${i18n('ui.interval._10m')}</option>
-                    <option value="1" ${optionStyle} ${selected == 1 ? 'selected' : ''}>${i18n('ui.interval.hourly')}</option>
-                    <option value="2" ${optionStyle} ${selected == 2 ? 'selected' : ''}>${i18n('ui.interval.daily')}</option>
-                    <option value="3" ${optionStyle} ${selected == 3 ? 'selected' : ''}>${i18n('ui.interval.monthly')}</option>
-                    <option value="4" ${optionStyle} ${selected == 4 ? 'selected' : ''}>${i18n('ui.interval.rawline')}</option>
+                    ${BAR_INTERVALS.map(i => `<option value="${i.code}" ${optionStyle} ${selected == i.code ? 'selected' : ''}>${i18n('ui.interval.' + i.label)}</option>`).join('')}
                 </select>`;
     }
 
