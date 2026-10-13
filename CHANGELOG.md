@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.17b1] - 2026-10-13
+## [v1.2.17] - 2026-10-13
 
 ### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near
 - The values over a graph (`showState`, `look: mini`): a hover on a curve shows, in place of its value now, the value it's on with its time; leaving it, the value now again
