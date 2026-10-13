@@ -128,6 +128,29 @@ export class EntityStore
         return i >= 0 && !(dynamicOnly && entry.isStatic) ? this.list.splice(i, 1)[0] : undefined;
     }
 
+    // Which sub-graph of its group an entry is shown in (undefined: the group's main graph)
+    // — the property removed rather than set to undefined, so that the saved entry and the
+    // YAML-change mirror stay clean
+    setGraphKey(entry, key)
+    {
+        if( key === undefined ) delete entry.graphKey;
+        else entry.graphKey = key;
+    }
+
+    // A new sub-graph identifier within a group (see setGraphKey). Random rather than a
+    // counter: it's saved, and must never collide with one restored from storage.
+    newGraphKey()
+    {
+        return 'k' + Math.random().toString(36).slice(2, 10);
+    }
+
+    // The list started over with these entries only (a card showing just them, never saved:
+    // the info panel)
+    reset(entries)
+    {
+        this.list = [...entries];
+    }
+
     // Removes every entity added from the UI, keeps the YAML ones
     removeAllDynamic()
     {

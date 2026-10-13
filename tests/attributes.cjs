@@ -9,7 +9,7 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
     // The graphs in display order: type, then each curve's series id and its points
-    const shown = t => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.type+':'+g.chart.data.datasets.map(d=>d.entity_id+'#'+d.data.length).join('+')).join(' | ')`);
+    const shown = t => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.type+':'+g.chart.data.datasets.map(d=>d.entity_id+'#'+d.data.length).join('+')).join(' | ')`);
 
     // ── In the YAML ──
     let t = await openCard(card({ graphs: [
@@ -66,7 +66,7 @@ module.exports = async function()
     t = await openCard(card({ graphs: [] }), { mock: { series: true }, height: 1100 });
     await t.wait(800);
     const sub = () => t.E(`(()=>{ const s=el.querySelector('#es_0_series'); return s.style.display==='none' ? 'closed' : [...s.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
-    const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._hec_entity_id; })()`);
+    const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._menuEntityId; })()`);
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };
@@ -89,7 +89,7 @@ module.exports = async function()
     await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
     await t.step('an attribute in ° is circular — and pre-selected as arrowline — only when it is a direction: wind_bearing, the sun\'s azimuth; not the sun\'s elevation', async () => {
         const r = await t.E(`(()=>{ const i=el.instance; const ids=['weather.villeveyrac.wind_bearing','sun.sun.azimuth','sun.sun.elevation'];
-            return ids.map(id => id.split('.').pop()+':'+i._circularPeriod({ entity: id })+':'+i._detectDefaultType(id).type).join(' '); })()`);
+            return ids.map(id => id.split('.').pop()+':'+i.circularPeriodOf({ entity: id })+':'+i.detectDefaultType(id).type).join(' '); })()`);
         return r === 'wind_bearing:360:arrowline azimuth:360:arrowline elevation:null:line' ? true : r;
     });
     await t.step('like every submenu: over the dropdown, level with the entry, right edges aligned', async () => {

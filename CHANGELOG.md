@@ -4,6 +4,51 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.17] - 2026-10-13
+
+### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near
+- The values over a graph (`showState`, `look: mini`): a hover on a curve shows, in place of its value now, the value it's on with its time; leaving it, the value now again
+- The Y labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): their boxes opaque while the pointer is near them — in the column a drag of that axis starts in — rather than 80 %; elsewhere, as before (Chart.js `ticks.hecBackdrop`)
+- A value over the graph or a statistics' name cut ('…', a narrow card): shown in full in place while hovered, and on a click (on a name: a click on a value opens its entity's dialog)
+- The hand cursor on what a click opens: a legend label's value, a value over the graph
+- Tests: the value hovered in place, and back; a name cut shown in full; the boxes opaque near the labels, not away; the cursor on a value and on a name
+
+### Changed — the card in parts with contracts: inputs, operations, outputs
+- Every change of what's shown is now an operation of `card-operations.js` — a curve or a row moved, split off, merged back; a graph moved, merged, removed; curves added, deleted, their type, line mode, interpolation, points, a curve hidden; a bar graph's interval; the default graphs and display. The gestures, the menus, the selector and the toolbar ask for them and show their refusal; they no longer change the entity list or the graphs themselves (they did, each in its own way: a type changed from an entity's menu and from a graph's menu were two implementations, now one)
+- `card-graphs.js` split in two: the graphs on the page (`card-graphs.js`) and one graph for Chart.js — options, axes, legend, datasets (`card-charts.js`)
+- Each part's contract is its public methods: a method starting with `_` is no longer called from another file (122 such calls before); each field of the card's state has one owner (seven were written by several parts: the time window moved by the gestures, real time by the gestures and the time range, the toolbar's date written by the history, the list of graphs and the default colors reset by the card itself, the selector's field by the menus, the history's cache by the card's refresh)
+- Small rules moved where they belong: the line modes and which types share a graph in `history-options.js`, a curve's sub-graph key in the store, a curve's line mode and interpolation in `card-config.js`
+- `deps/chart-hec.js`: the methods added to every chart grouped by subject under subtitles — what is under a point, a gesture resolved, the Y axes, the controls, the legend's fonts and texts shown in full, the values over the graph, hover and the tooltip mode, a drag, the elements over the canvas — in the same file (not split: a gesture is followed from its detection to the card in one place); not a line of code changed
+- Dead code removed in the entity selector (names of entities added that never were, a save and a fetch for nothing)
+- ARCHITECTURE.md: the parts by layer (inputs, business, data, outputs, the conductor, the toolbox); `architecture` test: three new rules — a part calls another part's public methods only, one owner per field of the state, the inputs never change what's shown themselves
+
+### Changed — the architecture checked by a test, every part to its own job
+- A new test suite, `architecture`, checks the rules of ARCHITECTURE.md on the sources, before any review: the card uses only Chart.js's stock API and what `deps/Chart Custom.js.md` documents; Chart.js knows nothing of entities or Home Assistant; the data-only parts have no DOM; persistence is `card-storage.js`'s alone; the entity list changes through the store; a graph's datasets are `card-graphs.js`'s; no listener on a graph; a menu's elements are `card-menus.js`'s; no rendering in the card. Each exception is written in the test with its reason, and fails once no longer needed. New rule 5: each part talks to another directly, through that one's contract — never by doing its job by the shortest path
+- What it found, set right: the card read what Chart.js keeps for itself — a dataset's meta, to know whether it's a curve or hidden (now its own data: `dataset.hidden`, its type), and set the hidden state there; the time axis was set in three parts (the history, the persistence, the time range: now `card-timerange.js` alone, `_applyTimeAxis`); the persistence set the options menu's line, the toolbar saved the info panel's switch, the info panel read and wrote its own keys, the gesture settings saved themselves (now all in `card-storage.js`: `localGestures`, `infoPanelEnabled`, `infoPanelData`, `fetchInfoPanelData`; the menu's lines in `card-menus.js`); the arrowline's arrows took their color from the card (now Chart.js's, from the theme); `legend.labels.hecShortNames` was given the chart (now its datasets); the info panel set the entity list directly (now through the store: `reset`); fields Chart.js reads were missing from its contract (`hecNoStack`, `hecPlateauEnd`, `hecVirtual`, the `hecMixed` mode); the card's own fields and its menus' marks used Chart.js's `hec` prefix (renamed); the toolbar buttons' color computed twice (`buttonsColor`); the menus, the gestures and the card itself changed a graph's datasets — a line mode's look written in two places — now `card-graphs.js`'s alone (`_setLineMode`, `_setInterpolation`, `_toggleCurveHidden`, `_refreshLegendParts`)
+- `lint` checks every source (a few were left out)
+
+### Changed — the values over a graph drawn by Chart.js, as everything shown on and around a graph
+- The card computes them (the values now, the statistics, their colors, the layout, how a value at a point reads) and gives them to the chart (`chart.hecSetValues`); Chart.js draws them, above the graph as before, and reports a click on a value (`customEvent`, zone `'value'`). The card no longer builds their HTML nor listens to them (ARCHITECTURE.md, rule 1)
+- The boxes drawn over a graph (the Y labels inside the plot, the controls over the legend on a narrow card, a text shown in full) take their color from Chart.js, one rule for all (`Chart.hecUi.background`: the graph's background, 80 % opaque) — the card only says whether there are boxes (`ticks.hecBackdrop`, `hecControlsBackdrop`: `true`), no longer their color
+- A bar graph's legend kept clear of its interval selector from where the card puts it (its own style: its distance from the edge, its width), no longer by measuring the graph on screen
+
+### New — a click on a value opens its entity's dialog
+- A legend label is now two parts: its name — a click shows or hides the curve, the other gestures as before — and its value at its end (`(400 W)`): a click there opens Home Assistant's dialog of the entity, with the card's info panel in it when it's on, the curve left as it is. The other gestures (a drag, a long-press, a double-click) act on the whole label, as before
+- The same from a value shown over the graph (`showState`, `look: mini`), and from *Info* in a curve's menu (not the info panel's own menu: it is that dialog)
+- A curve hidden: its name struck through, no longer its value
+- A legend label is made of distinct parts the card gives Chart.js — its name (`dataset.label`), its value (`dataset.hecLegendValue`, `(400 W)`), the right axis' mark (`dataset.hecLegendMark`, `▸`) — rather than one text: Chart.js lays them out (`Chart.hecLegendTail`), shortens the name only, strikes through the name only, and says which part a gesture is on (`legendPart`: 'name', 'value')
+- Tests: a click on a label's value (the dialog, the curve shown) and on its name (hidden); the strike over the name only; a value over the graph and the menu's Info
+
+### Fixed — the point hovered: on the curve hovered, not only on one of its values
+- Outside the tooltip mode, a hover showed a curve's point only when it was almost on one of its values: between two values far apart, nothing. The curve is now picked as everywhere else — the one the pointer is on, along its drawn line, or just beside it — and the dot shown is its value nearest along the time, as in the tooltip mode (Chart.js `_hecNearestValueOf`, shared by both)
+- Tests: a hover on a curve a third of the way between two values far apart shows the dot of the nearest
+
+### New — a text shortened or hidden shown in full, in place
+- A legend's label shortened, a timeline's or arrowline's row name cut to fit its column, a timeline's state its bar is too narrow for: a hover (a mouse, a pen above the screen) shows it in full while it stays there; a click or a tap does too, for its reading time, where the click isn't taken (a row name; a legend label — its curve hidden or shown as before)
+- Shown where the text is, from the same edge, in its own font, in a box of the card's background as opaque as the Y labels' — rather than a tooltip beside the pointer; over a row name's lines, all of them (Chart.hecUi `reveal`)
+- A row name wrapped on two lines counts as cut only when one of its lines still is: the wrap is one rule, used to draw it and to tell (`Chart.hecWrapLabel`)
+- Tests: a hover on a shortened legend label, a cut row name (one shown whole: nothing), a timeline state too narrow; a tap on a legend label and on a row name
+
 ## [v1.2.16] - 2026-10-13
 
 ### Fixed — a narrow card (a grid, a horizontal stack) readable

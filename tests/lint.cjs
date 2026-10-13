@@ -5,26 +5,10 @@ const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
 
-// Sources checked, and whether each is an ES module or a plain script
+// Sources checked — every one of the card's (ES modules), and Chart.js's additions (a plain
+// script)
 const FILES = [
-    ['src/history-explorer-card.js', 'module'],
-    ['src/history-entity-store.js', 'module'],
-    ['src/history-units.js', 'module'],
-    ['src/history-options.js', 'module'],
-    ['src/card-config.js', 'module'],
-    ['src/card-timerange.js', 'module'],
-    ['src/card-history.js', 'module'],
-    ['src/card-graphs.js', 'module'],
-    ['src/card-toolbar.js', 'module'],
-    ['src/card-selector.js', 'module'],
-    ['src/card-datasets.js', 'module'],
-    ['src/card-gestures.js', 'module'],
-    ['src/card-menus.js', 'module'],
-    ['src/card-storage.js', 'module'],
-    ['src/card-values.js', 'module'],
-    ['src/history-series.js', 'module'],
-    ['src/history-info-panel.js', 'module'],
-    ['src/history-csv-exporter.js', 'module'],
+    ...fs.readdirSync(path.join(__dirname, '..', 'src')).filter(f => f.endsWith('.js')).sort().map(f => ['src/' + f, 'module']),
     ['deps/chart-hec.js', 'script'],
 ];
 
@@ -39,7 +23,7 @@ const GLOBALS = new Set([
     'queueMicrotask', 'structuredClone', 'getComputedStyle', 'fetch', 'Blob', 'URL', 'FileReader',
     'Event', 'CustomEvent', 'PointerEvent', 'Element', 'HTMLElement', 'HTMLCanvasElement', 'Node', 'NodeFilter', 'ShadowRoot',
     'MutationObserver', 'ResizeObserver', 'IntersectionObserver',
-    'md5hx', 'saveAs',
+    'CSS', 'md5hx', 'saveAs',
 ]);
 
 // Names a pattern (parameter, variable, destructuring) declares

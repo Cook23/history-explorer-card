@@ -68,7 +68,7 @@ module.exports = async function()
     await t.step('a card too narrow for a menu and a submenu beside its lines: the menu opens alone; a submenu opened leaves 48 px and three characters of its lines; Escape or a click beside closes it', async () => {
         await t.E(`(()=>{ document.body.style.width='230px'; document.getElementById('host').style.width='230px'; })()`); await t.wait(1200);
         await hold(800); await t.wait(400);
-        const r = await t.E(`(()=>{ const m=el.querySelector('#et_0'); return { cramped: m.dataset.hecCramped, open: [...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(s=>s.style.display!=='none').map(s=>s.id) }; })()`);
+        const r = await t.E(`(()=>{ const m=el.querySelector('#et_0'); return { cramped: m.dataset.cramped, open: [...el.querySelectorAll('[id^="et_0_"][id$="_sub"]')].filter(s=>s.style.display!=='none').map(s=>s.id) }; })()`);
         await t.E(`el.querySelector('#et_0_rep').click()`); await t.wait(300);
         const strip = await t.E(`(()=>{ const m=el.querySelector('#et_0'), s=el.querySelector('#et_0_rep_sub').getBoundingClientRect(), mr=m.getBoundingClientRect();
             const lines=[...m.children].filter(a=>a.tagName==='A'&&a.style.display!=='none');
@@ -129,7 +129,7 @@ module.exports = async function()
     });
     await t.step('the info panel switch: confirmed in a submenu (Cancel: unchanged); saved on every device without any persistence option', async () => {
         await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
-        const asked = { shown: await shown('#ei_0_sub'), marked: await t.E(`el.querySelector('#ei_0_cancel').dataset.hecSelected`) };
+        const asked = { shown: await shown('#ei_0_sub'), marked: await t.E(`el.querySelector('#ei_0_cancel').dataset.selected`) };
         await t.E(`el.querySelector('#ei_0_cancel').click()`); await t.wait(500);
         const kept = await t.E(`el.querySelector('#ei_0').textContent`);
         await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);

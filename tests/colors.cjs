@@ -108,10 +108,10 @@ module.exports = async function()
     ] }), { height: 1200, mock: { series: true } });
     await t.wait(800);
     const colorOf = id => t.E(`el.instance.graphs.flatMap(g=>g.entities).find(e=>e.entity==='${id}').color`);
-    const graphsOf = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
-    const legendPtOf = id => t.E(`(()=>{ const all=el.instance._allGraphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
+    const graphsOf = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+    const legendPtOf = id => t.E(`(()=>{ const all=el.instance.graphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
         return legendPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
-    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance._allGraphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
+    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance.graphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
     const dragOnto = async (id, ontoId) => { await t.drag(await legendPtOf(id), await graphPtOf(ontoId)); await t.wait(800); };
     await t.step('a curve whose color the card picked, dropped where that color is taken: a free color of the palette', async () => {
         const before = await colorOf('sensor.power2');

@@ -3,6 +3,24 @@
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
 
+## Architecture (1.2) — set by the user, not negotiable
+
+Read `ARCHITECTURE.md` before changing any code, and keep to it: the card gives data and
+decisions, Chart.js draws and detects gestures; the inputs (gestures, menus, selector,
+toolbar) ask `card-operations.js`, never change what's shown themselves; each part talks to
+another only through its public methods; each field of the state has one owner. Past
+sessions broke these rules again and again by taking the shortest path — the user caught
+it each time. So:
+
+- before writing code, say which part it belongs to and why; never put a behavior where it
+  is quickest to write;
+- run `node tests/run.cjs lint architecture` after every change, before anything else;
+- never add an exception to `tests/architecture.cjs`, nor loosen a rule, without the
+  user's explicit approval — ask, giving the reason;
+- a deviation the test can't see, found by reading: fix it, and add a rule that catches
+  its kind;
+- split code only when it reads better split — never for its size.
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
@@ -21,7 +39,7 @@ that session (or to the user), not made from here.
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
 |---|---|
-| `_circularPeriod` | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
+| `_circularPeriod` (1.2: `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
 
 - absent / `null` / `none` (trimmed, any case): automatic — state class `measurement_angle`,
   or a unit of exactly `°` (not `°C`/`°F`), gives a period of 360;
@@ -67,7 +85,7 @@ Review of the silence detection (October 2026), decided by the user:
 
 | card 1.2 | lowpass_dt |
 |---|---|
-| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `_circularPeriod` | `attributes.py` |
+| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `circularPeriodOf` | `attributes.py` |
 
 - An attribute's unit: the one its value holds (`45 %`), else Home Assistant frontend's tables
   (weather units, units by domain, temperatures in the system unit; a light's `brightness`

@@ -4,10 +4,10 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { keyOf } from "./history-entity-store.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, normalizeLineMode } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
-import { GESTURE_SETTINGS, gestureValues } from "./gesture-settings.js";
+import { GESTURE_SETTINGS } from "./gesture-settings.js";
+import { localGestures, infoPanelEnabled } from "./card-storage.js";
 const Chart = window.HXLocal_Chart;
 
 // Entity type menu definitions — shared by showEntityTypeMenu and listeners
@@ -44,7 +44,7 @@ const _LAYOUT_ENTRIES = { points: 'ui.menu.points_show', ylock: 'ui.menu.ylock',
 // Wide enough for the items' names with a submenu open beside them, over the menu
 const _TYPE_MENU_MIN_WIDTH = 260;
 // A submenu's lines on one line each, whatever the room beside its menu (it opens over it,
-// right-aligned on it: see _openSubmenu)
+// right-aligned on it: see openSubmenu)
 const _SUBMENU_STYLE = 'white-space:nowrap';
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 
@@ -57,9 +57,11 @@ export function typeMenuHtml(i, full)
     const keys = Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k));
     // (the tests set apart from what concerns the entity)
     const itemStyle = k => k === 'tests' ? ';border-top:1px solid #444' : '';
+    // (Info: the entity's dialog, as a click on its value — before the tests; the card's only)
+    const line = k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k));
     return `<div id="et_${i}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${_TYPE_MENU_MIN_WIDTH}px;z-index:2">
             <div id="et_${i}_title" style="margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-            ${keys.map(k => a(`et_${i}_${k}`, i18n(_TYPE_SUBMENUS[k]) + ' ▸', true, itemStyle(k))).join('')}
+            ${keys.filter(k => k !== 'tests').map(line).join('')}${full ? a(`et_${i}_info`, i18n('ui.menu.entity_info'), true) : ''}${keys.includes('tests') ? line('tests') : ''}
         </div>
         ${sub('rep', [full ? a(`et_${i}_default`, i18n('ui.menu.type_default'), true) : '', ..._TYPE_MENU_ORDER.map(k => a(`et_${i}_${k}`, i18n(_TYPE_MENU_DEFS[k].label)))])}
         ${sub('interp', INTERPOLATIONS.map(k => a(`et_${i}_algo_${k}`, INTERPOLATION_LABELS[k])))}
@@ -120,10 +122,11 @@ export class CardMenus
         _TYPE_MENU_DEFS.forEach((d, k) => set(`et_${i}_${k}`, i18n(d.label)));
         for( const k in _LAYOUT_ENTRIES ) set(`et_${i}_${k}`, i18n(_LAYOUT_ENTRIES[k]));
         for( const k in CARD_TESTS ) set(`et_${i}_test_${k}`, i18n(CARD_TESTS[k].label));
+        set(`et_${i}_info`, i18n('ui.menu.entity_info'));
     }
 
     // Shows the representation submenu's entries for an entity — only Timeline when it
-    // isn't numeric — and marks (bold, hecSelected) the one isActive(def) says is current
+    // isn't numeric — and marks (bold, selected) the one isActive(def) says is current
     _markTypeMenu(input_idx, numeric, isActive)
     {
         _TYPE_MENU_DEFS.forEach((_def, _idx) => {
@@ -134,7 +137,7 @@ export class CardMenus
             _el.style.background = '';
             const _active = isActive(_def);
             _el.style.fontWeight = _active ? 'bold' : '';
-            if( _active ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
+            if( _active ) _el.dataset.selected = '1'; else delete _el.dataset.selected;
         });
     }
 
@@ -143,44 +146,30 @@ export class CardMenus
     _menuTargets(input_idx)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
-        const g = this.graphs.find(g => g.id === _menu?._hec_graph_id);
+        const g = this.graphs.find(g => g.id === _menu?._menuGraphId);
         if( !g ) return { g: null, entities: [] };
-        return { g, entities: _menu._hec_for_graph ? g.entities : g.entities.filter(e => e.entity === _menu._hec_entity_id) };
-    }
-
-    // The line mode an entity is drawn with
-    _lineModeOf(e)
-    {
-        return this.normalizeLineMode(e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+        return { g, entities: _menu._menuForGraph ? g.entities : g.entities.filter(e => e.entity === _menu._menuEntityId) };
     }
 
     // Is entity e of graph g shown as the type menu's entry def? (its own type — a bar
     // graph can also hold line entities)
     _isShownAs(e, g, def)
     {
-        return ( e.type ?? g.type ) === def.type && ( def.lineMode === null || this._lineModeOf(e) === def.lineMode );
+        return ( e.type ?? g.type ) === def.type && ( def.lineMode === null || this.lineModeOf(e) === def.lineMode );
     }
 
-    // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only
-    // modes interpolation applies to)?
-    _isInterpolated(e, g)
-    {
-        const _mode = this._lineModeOf(e);
-        return ( e.type ?? g.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
-    }
-
-    // Marks (bold, hecSelected) the interpolation algorithm in use for the menu's entity —
+    // Marks (bold, selected) the interpolation algorithm in use for the menu's entity —
     // for a graph, the one all its interpolated curves share, if they do
     _markInterpolationMenu(input_idx)
     {
         const { g, entities } = this._menuTargets(input_idx);
-        const _algos = new Set(entities.filter(e => this._isInterpolated(e, g)).map(e => this._resolveInterpolation(e)));
+        const _algos = new Set(entities.filter(e => this.isInterpolated(e, g)).map(e => this.resolveInterpolation(e)));
         const _cur = _algos.size === 1 ? [..._algos][0] : null;
         INTERPOLATIONS.forEach(k => {
             const _el = this._this.querySelector(`#et_${input_idx}_algo_${k}`);
             if( !_el ) return;
             _el.style.fontWeight = k === _cur ? 'bold' : '';
-            if( k === _cur ) _el.dataset.hecSelected = '1'; else delete _el.dataset.hecSelected;
+            if( k === _cur ) _el.dataset.selected = '1'; else delete _el.dataset.selected;
         });
     }
 
@@ -198,31 +187,33 @@ export class CardMenus
 
         // Store context for click handler — entity_id is a string (existing entity, or
         // new single entity) or an array (new entities from a wildcard match)
-        _menu._hec_entity_id = entity_id;
-        _menu._hec_graph_id  = graph ? graph.id : null;
-        _menu._hec_for_graph = false;
-        _menu._hec_anchor    = { clientX: anchorClientX, clientY: anchorClientY };
+        _menu._menuEntityId = entity_id;
+        _menu._menuGraphId  = graph ? graph.id : null;
+        _menu._menuForGraph = false;
+        _menu._menuAnchor    = { clientX: anchorClientX, clientY: anchorClientY };
         this.hideTypeSubmenus(input_idx);
 
         const _isWildcard = Array.isArray(entity_id);
         const _e = graph?.entities.find(e => e.entity === entity_id);
         // Interpolation: for an entity already shown as an interpolated curve
-        show(q('interp'), !!_e && this._isInterpolated(_e, graph));
+        show(q('interp'), !!_e && this.isInterpolated(_e, graph));
         // Layout: an entity already in a graph, from a long-press on its own label
         const _longPress = !!graph && anchorClientX !== null && anchorClientY !== null;
         show(q('layout'), _longPress);
-        show(q('split'), _longPress && this._canUncombine(graph));
-        show(q('merge'), _longPress && this._canMergeLinkedGraph(graph));
+        show(q('split'), _longPress && this.canSplitCurve(graph));
+        show(q('merge'), _longPress && this.canMergeGraphUp(graph));
         show(q('cut'), _longPress);
         show(q('delete'), _longPress);
         show(q('gdelete'), false);
         show(q('ylock'), false);
+        // (Info: an entity shown, from its label)
+        show(q('info'), _longPress);
         // (a curve: its samples' dots)
         const _points = q('points');
-        const _isCurve = _longPress && !!_e && !this._isRowGraph(graph) && !!graph.chart.getDatasetMeta(graph.entities.indexOf(_e)).dataset;
-        show(_points, _isCurve);
-        if( _points && _isCurve )
-            _points.textContent = i18n(graph.chart.data.datasets[graph.entities.indexOf(_e)].pointRadius > 0 ? 'ui.menu.points_hide' : 'ui.menu.points_show');
+        const isCurve = _longPress && !!_e && this.isCurve(graph, graph.entities.indexOf(_e));
+        show(_points, isCurve);
+        if( _points && isCurve )
+            _points.textContent = i18n(this.curvesShowPoints(graph, [_e]) ? 'ui.menu.points_hide' : 'ui.menu.points_show');
         show(q('rep'), true);
         show(q('tests'), true);
 
@@ -244,30 +235,30 @@ export class CardMenus
         if( graph ) {
             // Existing entity — change type. Non-numeric entity (only ever timeline): the
             // only choice is timeline itself.
-            this._markTypeMenu(input_idx, this._isNumericEntity(entity_id), d => !!_e && this._isShownAs(_e, graph, d));
+            this._markTypeMenu(input_idx, this.isNumericEntity(entity_id), d => !!_e && this._isShownAs(_e, graph, d));
         } else if( _isWildcard ) {
             // Brand-new entities from a wildcard match: "Default" (each entity's own
             // auto-detected type) offered and pre-selected — unless none of them is
             // numeric, timeline then being the only possible outcome
-            const _anyNumeric = entity_id.some(eid => this._isNumericEntity(eid));
+            const _anyNumeric = entity_id.some(eid => this.isNumericEntity(eid));
             if( _defaultEl && _anyNumeric ) {
                 show(_defaultEl, true);
                 _defaultEl.style.background = '';
                 _defaultEl.style.fontWeight = 'bold';
-                _defaultEl.dataset.hecSelected = '1';
+                _defaultEl.dataset.selected = '1';
             }
             this._markTypeMenu(input_idx, _anyNumeric, d => !_anyNumeric && d.type === 'timeline');
         } else {
             // Brand-new single entity: its own auto-detected type (YAML/state/unit)
             // pre-selected, same as what addGraph would pick
-            const _numeric = this._isNumericEntity(entity_id);
-            const _detected = _numeric ? this._detectDefaultType(entity_id) : { type: 'timeline', lineMode: null };
+            const _numeric = this.isNumericEntity(entity_id);
+            const _detected = _numeric ? this.detectDefaultType(entity_id) : { type: 'timeline', lineMode: null };
             this._markTypeMenu(input_idx, _numeric, d => d.type === _detected.type && (d.lineMode === null || d.lineMode === _detected.lineMode));
         }
 
         // Position — #tb_N directly, not _menu.offsetParent — offsetParent of a display:none
         // element is always null, and _menu still has display:none at this exact point
-        // (before _openMenu turns it on). #tb_N is already known to be the real positioned
+        // (before openMenu turns it on). #tb_N is already known to be the real positioned
         // ancestor (see its position:relative in the HTML), no need to read it back off an
         // element that isn't shown yet.
         const _tb = this._menuParent(input_idx);
@@ -284,7 +275,7 @@ export class CardMenus
                             : _inputRect.left + 30;
             _left = (_anchorX - _parentRect.left) + 'px';
         }
-        this._openMenu(_menu, _top, _left, align);
+        this.openMenu(_menu, _top, _left, align);
         this._openRememberedSubmenu(input_idx, 'rep');
     }
 
@@ -302,30 +293,30 @@ export class CardMenus
         if( !_menu || !q('layout') ) return;
         const show = (el, on) => { if( el ) el.style.display = on ? 'block' : 'none'; };
 
-        _menu._hec_entity_id = null;
-        _menu._hec_graph_id  = graph.id;
-        _menu._hec_for_graph = true;
-        _menu._hec_anchor    = { clientX, clientY };
+        _menu._menuEntityId = null;
+        _menu._menuGraphId  = graph.id;
+        _menu._menuForGraph = true;
+        _menu._menuAnchor    = { clientX, clientY };
         this.hideTypeSubmenus(input_idx);
 
-        for( const k of ['tests', 'split', 'delete', 'default'] ) show(q(k), false);
+        for( const k of ['tests', 'split', 'delete', 'default', 'info'] ) show(q(k), false);
         // (entities not all numeric: timeline the only choice — nothing to choose)
-        const _numeric = graph.entities.every(e => this._isNumericEntity(e.entity));
+        const _numeric = graph.entities.every(e => this.isNumericEntity(e.entity));
         show(q('rep'), _numeric);
         this._markTypeMenu(input_idx, _numeric, d => graph.entities.every(e => this._isShownAs(e, graph, d)));
-        show(q('interp'), graph.entities.some(e => this._isInterpolated(e, graph)));
+        show(q('interp'), graph.entities.some(e => this.isInterpolated(e, graph)));
         show(q('layout'), true);
-        show(q('merge'), this._canMergeLinkedGraph(graph));
+        show(q('merge'), this.canMergeGraphUp(graph));
         show(q('cut'), true);
         show(q('gdelete'), !graph.isStatic);
-        const _points = q('points'), _shown = this._curvesShowPoints(graph);
+        const _points = q('points'), _shown = this.curvesShowPoints(graph);
         show(_points, _shown !== undefined);
         if( _points ) _points.textContent = i18n(_shown ? 'ui.menu.points_hide' : 'ui.menu.points_show');
         const _lock = q('ylock');
         show(_lock, yAxisLocked !== undefined);
         if( _lock ) {
             _lock.textContent = i18n(yAxisLocked ? 'ui.menu.yunlock' : 'ui.menu.ylock');
-            _lock.dataset.hecLocked = yAxisLocked ? '1' : '';
+            _lock.dataset.locked = yAxisLocked ? '1' : '';
         }
 
         const _titleEl = q('title');
@@ -337,7 +328,7 @@ export class CardMenus
 
         const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
-        this._openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
+        this.openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
         this._openRememberedSubmenu(input_idx, _numeric ? 'rep' : 'layout');
     }
 
@@ -352,7 +343,7 @@ export class CardMenus
     _typeMenuKind(input_idx)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
-        return _menu?._hec_for_graph ? 'graph' : _menu?._hec_graph_id === null ? 'add' : 'entity';
+        return _menu?._menuForGraph ? 'graph' : _menu?._menuGraphId === null ? 'add' : 'entity';
     }
 
     // The submenu a menu of this kind should open with: the one it had open, if it was
@@ -385,7 +376,7 @@ export class CardMenus
         // (no room for the menu and a submenu beside its lines: the menu alone, read first —
         // with the keyboard, so that Escape, or the focus leaving it, closes it)
         const _menu = this._this.querySelector(`#et_${input_idx}`);
-        if( _menu?.dataset.hecCramped ) { _menu.focus(); return; }
+        if( _menu?.dataset.cramped ) { _menu.focus(); return; }
         const _key = this._submenuToOpen(this._typeMenuKind(input_idx), def);
         this.showTypeSubmenu(input_idx, _key);
         if( _key !== def && this._this.querySelector(`#et_${input_idx}_${_key}_sub`)?.style.display === 'none' )
@@ -420,10 +411,10 @@ export class CardMenus
             for( let _a of _box.getElementsByTagName('a') ) {
                 _a.style.background = '';
                 _a.style.fontWeight = '';
-                delete _a.dataset.hecSelected;
+                delete _a.dataset.selected;
             }
         _menu.style.display = 'none';
-        this._resetEntityInput(this.ui.inputField[input_idx]);
+        this.resetEntityInput(this.ui.inputField[input_idx]);
     }
 
     // The type menu's submenus present in this menu (the info panel's has no layout, no tests)
@@ -444,7 +435,7 @@ export class CardMenus
         if( key === 'interp' ) this._markInterpolationMenu(input_idx);
         this._rememberSubmenu(this._typeMenuKind(input_idx), key);
         _item.style.fontWeight = 'bold';
-        this._openSubmenu(_sub, _item);
+        this.openSubmenu(_sub, _item);
         _sub.focus();
     }
 
@@ -466,7 +457,7 @@ export class CardMenus
 
     // Listeners of the type menu et_N and its submenus — shared by the card and the info
     // panel (whose menu has no "Default", no layout and no tests)
-    _initEntityTypeMenu(_ii)
+    initEntityTypeMenu(_ii)
     {
         const _etMenu = this._this.querySelector(`#et_${_ii}`);
         if( !_etMenu ) return;
@@ -479,16 +470,17 @@ export class CardMenus
         INTERPOLATIONS.forEach(k => _on(`algo_${k}`, () => this.entityInterpolationClicked(_ii, k)));
         for( const k in _LAYOUT_ENTRIES ) _on(k, () => this.entityLayoutClicked(_ii, k));
         for( const k in CARD_TESTS ) _on(`test_${k}`, () => { this.hideEntityTypeMenu(_ii); openCardTest(k); });
+        _on('info', () => { const _id = _etMenu._menuEntityId; this.hideEntityTypeMenu(_ii); this.openEntityInfo(_id); });
         // Keyboard navigation — Enter or → on an item opens its submenu
         _etMenu.addEventListener('keydown', (e) => {
-            const _sel = _etMenu.querySelector('a[data-hec-selected]');
+            const _sel = _etMenu.querySelector('a[data-selected]');
             if( e.key === 'ArrowRight' && _sel?.style.background ) {
                 e.preventDefault();
                 _sel.click();
                 return;
             }
-            this._menuKeyDown(e, _etMenu, {
-                onClose: () => { this._menuClosed(this._typeMenuKind(_ii)); this.hideTypeSubmenus(_ii); this._resetEntityInput(this.ui.inputField[_ii]); },
+            this.menuKeyDown(e, _etMenu, {
+                onClose: () => { this._menuClosed(this._typeMenuKind(_ii)); this.hideTypeSubmenus(_ii); this.resetEntityInput(this.ui.inputField[_ii]); },
             });
         });
         // A submenu: same navigation; Escape or ← goes back to the menu
@@ -499,7 +491,7 @@ export class CardMenus
                 this.hideTypeSubmenus(_ii, true);
                 return;
             }
-            this._menuKeyDown(e, _sub);
+            this.menuKeyDown(e, _sub);
         });
         // Close on focusout — same as es_N; moving between the menu and its submenus
         // keeps them open
@@ -521,16 +513,7 @@ export class CardMenus
     {
         const { g, entities } = this._menuTargets(input_idx);
         this.hideEntityTypeMenu(input_idx);
-        if( !g ) return;
-        for( const e of entities ) {
-            if( !this._isInterpolated(e, g) ) continue;
-            // (g.entities[i] is the entity's entry in the store itself: saved with it)
-            e.interpolation = algo;
-            const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
-            if( _ds ) _ds.hecInterpolation = algo;
-        }
-        g.chart.update();
-        this.writeLocalState();
+        if( g ) this.setInterpolation(g, entities, algo);
     }
 
     // Layout: the entity's samples' dots — or, from the graph menu, its curves' — shown or
@@ -538,177 +521,48 @@ export class CardMenus
     // click on the padlock), the entity taken out into its own graph (as a double-click on
     // its label), its linked graph merged back into the one above (as a double-click on the
     // chain icon), the entity — or the graph — cut to be put elsewhere (as a drag, see
-    // _startCut), the entity or the graph deleted
+    // startCut), the entity or the graph deleted
     entityLayoutClicked(input_idx, action)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( !_menu ) return;
-        const _g = this.graphs.find(g => g.id === _menu._hec_graph_id);
-        const _forGraph = _menu._hec_for_graph;
-        const _idx = _g ? _g.entities.findIndex(e => e.entity === _menu._hec_entity_id) : -1;
-        const _anchor = _menu._hec_anchor;
-        const _locked = !!this._this.querySelector(`#et_${input_idx}_ylock`)?.dataset.hecLocked;
+        const _g = this.graphs.find(g => g.id === _menu._menuGraphId);
+        const _forGraph = _menu._menuForGraph;
+        const _idx = _g ? _g.entities.findIndex(e => e.entity === _menu._menuEntityId) : -1;
+        const _anchor = _menu._menuAnchor;
+        const _locked = !!this._this.querySelector(`#et_${input_idx}_ylock`)?.dataset.locked;
         this.hideEntityTypeMenu(input_idx);
         if( !_g || ( !_forGraph && _idx < 0 ) ) return;
-        if( action === 'points' ) this._toggleCurvePoints(_g, _forGraph ? _g.entities : [_g.entities[_idx]]);
+        if( action === 'points' ) this.toggleCurvePoints(_g, _forGraph ? _g.entities : [_g.entities[_idx]]);
         else if( action === 'ylock' ) _g.chart.hecSetYAxisLocked(!_locked);
-        else if( action === 'merge' ) this._mergeLinkedGraph(_g, _anchor);
-        else if( action === 'cut' ) this._startCut(_g, _forGraph ? null : _idx);
-        else if( action === 'gdelete' ) this._removeGraph(_g);
-        else if( action === 'split' ) this._uncombineEntity(_g, _idx);
-        else this._deleteEntity(_g, _idx);
+        else if( action === 'merge' ) {
+            const _why = this.mergeGraphUp(_g);
+            if( _why ) this.showMessage(_why, _anchor.clientX, _anchor.clientY, 'left', _g.canvas);
+        }
+        else if( action === 'cut' ) this.startCut(_g, _forGraph ? null : _idx);
+        else if( action === 'gdelete' ) this.removeGraph(_g);
+        else if( action === 'split' ) this.splitCurve(_g, _idx);
+        else this.deleteCurve(_g, _idx);
     }
 
     entityTypeMenuClicked(input_idx, type, lineMode)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( !_menu ) return;
-        const _entity_id = _menu._hec_entity_id;
-        const _graph_id  = _menu._hec_graph_id;
-        const _forGraph  = _menu._hec_for_graph;
+        const _entity_id = _menu._menuEntityId;
+        const _graph_id  = _menu._menuGraphId;
+        const _forGraph  = _menu._menuForGraph;
         this.hideEntityTypeMenu(input_idx);
-
-        if( _forGraph ) return this._setGraphType(this.graphs.find(g => g.id === _graph_id), type, lineMode);
-        if( !_entity_id ) return;
-
-        if( _graph_id === null ) {
-            // Brand-new entity/entities — nothing created yet, this click both defines
-            // the type and performs the creation. _entity_id is a string (single) or
-            // an array (wildcard match).
-            const _ids = Array.isArray(_entity_id) ? _entity_id : [_entity_id];
-            const _addedNames = [];
-            for( let eid of _ids ) {
-                // Guard: a non-numeric-convertible entity can only ever be represented
-                // as a timeline, regardless of what was chosen (including "default")
-                const _isNumeric = this._isNumericEntity(eid);
-                let _finalType, _finalLineMode;
-                if( !_isNumeric ) {
-                    _finalType = 'timeline';
-                    _finalLineMode = null;
-                } else if( type === 'default' ) {
-                    const _det = this._detectDefaultType(eid);
-                    _finalType = _det.type;
-                    _finalLineMode = _det.lineMode;
-                } else {
-                    _finalType = type;
-                    _finalLineMode = lineMode;
-                }
-                _addedNames.push(this._createAndPersistEntity(eid, _finalType, _finalLineMode));
-            }
-            if( _addedNames.length ) {
-                this._justAdded = _addedNames.join('; ');
-                const _fi = this.ui.inputField[input_idx];
-                if( _fi ) {
-                    _fi.value = this._justAdded;
-                    _fi.style.fontWeight = 'bold';
-                    setTimeout(() => { this._resetEntityInput(_fi); }, 500);
-                }
-            }
-            this.updateHistoryWithClearCache();
-            this.writeLocalState();
-            return;
-        }
-
-        // Update pconfig.entities — persist lineMode and type (the entity's curve in this graph)
-        const _gOld = this.graphs.find(g => g.id === _graph_id);
-        const _shownE = _gOld?.entities.find(e => e.entity === _entity_id);
-        const _pcEntry = _shownE && this.store.entry(keyOf(_shownE));
-        // The entity's own type before this change (a bar graph can also hold line entities)
-        const _oldType = _shownE?.type ?? _gOld?.type;
-        if( _pcEntry ) {
-            _pcEntry.lineMode = lineMode;
-            _pcEntry.type     = type;
-        }
-
         const _g = this.graphs.find(g => g.id === _graph_id);
-        if( _g ) {
-            if( _oldType === type ) {
-                // Same type — update lineMode on the specific entity's dataset only
-                this._setLineMode(_g, _g.entities.findIndex(e => e.entity === _entity_id), lineMode);
-                _g.chart.update();
-                this.updateHistory();
-            } else {
-                // Type change (line/bar/arrowline/timeline) — extract entity and re-add with new type
-                // Same as uncombine but without noAutoGroup flag so re-combine is allowed
-                const _entIdx    = _g.entities.findIndex(e => e.entity === _entity_id);
-                const _entity    = _g.entities[_entIdx];
-                const _newEntities = _g.entities.filter((_, i) => i !== _entIdx);
-                // Reset SI conversion factors
-                _entity.siConversionFactor = undefined;
-                _newEntities.forEach(en => { en.siConversionFactor = undefined; });
-                // Keep original groupId — noAutoGroup=false allows natural re-combine
-                // A new groupId would prevent re-combine after refresh
-                const _origGroupId = _g.groupId;
-                const _nextG = this._nextGroup(_g);
-                this._detachGraph(_g);
-                // Re-add remaining entities. fill is not kept across a type change: it's derived
-                // from color+type, not a type-independent value — null, so addGraph recomputes
-                // it for the target type (transparent for line/arrowline/timeline, solid for bar).
-                this._rebuildGraph(_newEntities, _origGroupId, _nextG, { fill: null });
-                // Re-add extracted entity — color only; fill recomputed for the new type (see
-                // above). Goes right before whatever followed the original graph _g — i.e.
-                // right after the just-rebuilt remaining-entities graph.
-                this.addGraph(_entity.entity, { color: _pcEntry?.color ?? _entity.color, before: _nextG, interval: _entity.interval, groupId: _origGroupId, entry: _pcEntry ?? _entity });
-                // Sync the freshly-computed fill (correct for the NEW type) back into
-                // pconfig.entities, so persistence stays consistent with what the next
-                // rebuild will read as its fill — no need to special-case fill at rebuild time
-                if( _pcEntry ) {
-                    const _updatedG = this.graphs.find(g => g.entities.some(e => keyOf(e) === keyOf(_entity)));
-                    const _updatedEntity = _updatedG?.entities.find(e => keyOf(e) === keyOf(_entity));
-                    if( _updatedEntity ) _pcEntry.fill = _updatedEntity.fill;
-                }
-                this._updateMoVisibility();
-                this._updateGroupLinkMarkers();
-                this.updateHistoryWithClearCache();
-            }
+        if( _forGraph ) return _g && this.setGraphType(_g, type, lineMode);
+        if( !_entity_id ) return;
+        if( _graph_id === null ) {
+            // Brand-new entities (a wildcard: several), created now as chosen — their names
+            // shown a moment in the selector's field
+            return this.showAdded(input_idx, this.addCurves(Array.isArray(_entity_id) ? _entity_id : [_entity_id], type, lineMode));
         }
-        this.writeLocalState();
-    }
-
-    // Entity idx of graph g drawn in lineMode, its type unchanged
-    _setLineMode(g, idx, lineMode)
-    {
-        const _mode = this.normalizeLineMode(lineMode);
-        const _ds = g.chart.data.datasets[idx];
-        if( _ds ) {
-            _ds.steppedLine = _mode === 'stepped';
-            _ds.lineTension = (_mode === 'lines' || _mode === 'stepped') ? 0 : 0.1;
-        }
-        // (in memory too, so the menu marks it next time)
-        if( g.entities[idx] ) g.entities[idx].lineMode = _mode;
-    }
-
-    // From a graph's menu: every entity of graph g shown as type (lineMode), saved with
-    // each — the graph rebuilt once, in its place, when their types change
-    _setGraphType(g, type, lineMode)
-    {
-        if( !g ) return;
-        const _sameType = g.entities.every(e => ( e.type ?? g.type ) === type);
-        for( const e of g.entities ) {
-            const _entry = this.store.entry(keyOf(e));
-            if( _entry ) { _entry.type = type; _entry.lineMode = lineMode; }
-        }
-        if( _sameType ) {
-            g.entities.forEach((e, i) => this._setLineMode(g, i, lineMode));
-            g.chart.update();
-            this.updateHistory();
-        } else {
-            const _entities = g.entities;
-            const _nextG = this._nextGraph(g);
-            this._detachGraph(g);
-            // (fill recomputed for the new type, as for one entity — see entityTypeMenuClicked)
-            _entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
-            this._rebuildGraph(_entities, g.groupId, _nextG, { fill: null });
-            for( const e of _entities ) {
-                const _entry = this.store.entry(keyOf(e));
-                const _shown = this.graphs.find(_g => _g.entities.some(x => keyOf(x) === keyOf(e)))?.entities.find(x => keyOf(x) === keyOf(e));
-                if( _entry && _shown ) _entry.fill = _shown.fill;
-            }
-            this._updateMoVisibility();
-            this._updateGroupLinkMarkers();
-            this.updateHistoryWithClearCache();
-        }
-        this.writeLocalState();
+        const _idx = _g ? _g.entities.findIndex(e => e.entity === _entity_id) : -1;
+        if( _idx >= 0 ) this.setCurveType(_g, _idx, type, lineMode);
     }
 
     // --------------------------------------------------------------------------------------
@@ -733,9 +587,9 @@ export class CardMenus
         const _sub  = this._this.querySelector(`#${c.line}_sub`);
         if( !_item || !_sub ) return;
         for( const o of _CONFIRMED(i) ) if( o !== c ) this._this.querySelector(`#${o.line}_sub`).style.display = 'none';
-        this._openSubmenu(_sub, _item);
-        delete this._this.querySelector(`#${c.line}_ok`).dataset.hecSelected;
-        this._this.querySelector(`#${c.line}_cancel`).dataset.hecSelected = '1';
+        this.openSubmenu(_sub, _item);
+        delete this._this.querySelector(`#${c.line}_ok`).dataset.selected;
+        this._this.querySelector(`#${c.line}_cancel`).dataset.selected = '1';
         _sub.focus();
     }
 
@@ -750,6 +604,16 @@ export class CardMenus
             set(`${c.line}_cancel`, i18n('ui.menu.confirm_cancel'));
         }
         for( const k in GESTURE_SETTINGS ) { const _el = this._this.querySelector(`#eo_${i}_gl_${k}`); if( _el ) _el.textContent = i18n(GESTURE_SETTINGS[k].label); }
+        set(`ef_${i}`, i18n('ui.menu.export_csv'));
+        set(`eh_${i}`, i18n('ui.menu.export_stats'));
+        this.showInfoPanelSwitch();
+    }
+
+    // The options menu's info panel line, as the panel is (on: to switch it off)
+    showInfoPanelSwitch()
+    {
+        for( const ei of [...this._this.querySelectorAll('[id^="ei_"]')].filter(e => /^ei_\d+$/.test(e.id)) )
+            ei.textContent = i18n(infoPanelEnabled ? 'ui.menu.disable_panel' : 'ui.menu.enable_panel');
     }
 
     // Opens the options menu's submenu key over the menu, level with its item (the
@@ -761,14 +625,14 @@ export class CardMenus
         if( !_item || !_sub ) return;
         for( const _s of this._optionsSubmenus(i) ) _s.style.display = 'none';
         this._rememberSubmenu('options', key);
-        const _v = gestureValues();
+        const _v = localGestures();
         for( const k in GESTURE_SETTINGS ) { const _in = this._this.querySelector(`#eo_${i}_g_${k}`); if( _in ) _in.value = _v[k]; }
-        this._openSubmenu(_sub, _item);
+        this.openSubmenu(_sub, _item);
         _sub.focus();
     }
 
     // Listeners of the options menu and its submenus
-    _initOptionsMenu(i)
+    initOptionsMenu(i)
     {
         const _menu = this._this.querySelector(`#eo_${i}`);
         if( !_menu ) return;
@@ -780,7 +644,7 @@ export class CardMenus
         for( const c of _CONFIRMED(i) ) {
             const _on = (id, fn) => this._this.querySelector(`#${id}`)?.addEventListener('click', (e) => { e.preventDefault(); fn(); }, true);
             _on(c.line, () => this._confirmAction(i, c));
-            _on(`${c.line}_ok`, () => { this.menuSetVisibility(i, false); this[c.run](); });
+            _on(`${c.line}_ok`, () => { this.menuSetVisibility(i, false); this[c.run](); this.showInfoPanelSwitch(); });
             _on(`${c.line}_cancel`, () => { this._this.querySelector(`#${c.line}_sub`).style.display = 'none'; this._this.querySelector(`#eo_${i}_${c.in}_sub`)?.focus(); });
         }
         // A gesture threshold entered: kept within its bounds, then set for every card
@@ -788,15 +652,15 @@ export class CardMenus
             const _in = this._this.querySelector(`#eo_${i}_g_${k}`);
             _in?.addEventListener('change', () => {
                 this.setGesture(k, _in.value);
-                _in.value = gestureValues()[k];
+                _in.value = localGestures()[k];
             });
         }
         // Keyboard: Enter or → on an item opens its submenu; in a submenu, ← or Escape goes
         // back to the menu (an input keeps its own keys, Escape aside)
         _menu.addEventListener('keydown', (e) => {
-            const _sel = _menu.querySelector('a[data-hec-selected]');
+            const _sel = _menu.querySelector('a[data-selected]');
             if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
-            this._menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
+            this.menuKeyDown(e, _menu, { onClose: () => this.menuSetVisibility(i, false) });
         });
         // (a confirmation goes back to the submenu its line is in, a submenu to the menu)
         const _parentOf = sub => { const c = _CONFIRMED(i).find(c => sub.id === `${c.line}_sub`);
@@ -810,7 +674,7 @@ export class CardMenus
                 _parentOf(_sub).focus();
                 return;
             }
-            if( !_inInput ) this._menuKeyDown(e, _sub);
+            if( !_inInput ) this.menuKeyDown(e, _sub);
         });
         // Closed once the focus has left the menu and its submenus
         const _closeIfLeft = () => setTimeout(() => {
@@ -843,12 +707,12 @@ export class CardMenus
             const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
             const _top  = (_boRect.bottom - _parentRect.top) + 'px';
             const _left = (_boRect.left   - _parentRect.left - 30) + 'px';
-            this._openMenu(dropdown, _top, _left);
+            this.openMenu(dropdown, _top, _left);
             dropdown.focus();
             // (reopened soon after it was closed: with the submenu it had open)
             // (no room for the menu and a submenu beside its lines: the menu alone, read first)
             const _key = this._submenuToOpen('options', null);
-            if( _key && !dropdown.dataset.hecCramped ) this.showOptionsSubmenu(idx, _key);
+            if( _key && !dropdown.dataset.cramped ) this.showOptionsSubmenu(idx, _key);
         } else
             dropdown.style.display = 'none';
     }
@@ -886,19 +750,19 @@ export class CardMenus
     //                   highlighted — only the entity selector currently uses it, to preview
     //                   what an ambiguous friendly name actually resolves to before the user
     //                   commits, but nothing here is specific to that use.
-    _menuKeyDown(event, menuEl, { onClose, onEnter, onHighlight } = {}) {
+    menuKeyDown(event, menuEl, { onClose, onEnter, onHighlight } = {}) {
         if( !['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(event.key) ) return;
         if( !menuEl || menuEl.style.display === 'none' ) return;
 
         if( event.key === 'Escape' ) {
             event.preventDefault();
-            // Clears the keyboard-navigation highlight only (background + hecSelected
+            // Clears the keyboard-navigation highlight only (background + selected
             // marker) — never fontWeight, which is menu-specific business state (e.g. the
             // entity type menu's "bold = currently active type") set by the caller, not by
             // this generic navigation logic, and must survive closing/reopening the menu.
             for( let _a of menuEl.getElementsByTagName('a') ) {
                 _a.style.background = '';
-                delete _a.dataset.hecSelected;
+                delete _a.dataset.selected;
             }
             menuEl.style.display = 'none';
             onClose?.();
@@ -910,7 +774,7 @@ export class CardMenus
 
         if( event.key === 'Enter' ) {
             event.preventDefault();
-            const _sel = menuEl.querySelector('a[data-hec-selected]');
+            const _sel = menuEl.querySelector('a[data-selected]');
             if( !_sel ) return;
             if( onEnter?.(_sel) ) return;
             _sel.click();
@@ -935,13 +799,13 @@ export class CardMenus
     // button or an input, or at pointer coordinates — stays with the caller, since that
     // part genuinely differs), clears any leftover navigation highlight (background only)
     // from a previous use of this same menu, and clamps the result to the viewport. Never
-    // touches hecSelected — that's entirely business logic: each menu's own caller decides
-    // whether to pre-select an option (and mark it hecSelected) as part of populating the
+    // touches selected — that's entirely business logic: each menu's own caller decides
+    // whether to pre-select an option (and mark it selected) as part of populating the
     // menu's content, before this function is even called.
     //   align — 'left' (default), 'center', or 'right': the caller passes `left` as the
     //           point to align against (the anchor's left edge, center, or right edge,
     //           whichever makes sense for it) — center/right shift the menu natively via
-    //           CSS transform, same mechanism already used for _showLabelTooltip, so there's
+    //           CSS transform, same mechanism already used for showMessage, so there's
     //           no need to measure the menu's rendered width and recompute afterward.
     // The positioned parent of the menus of toolbar i: the toolbar, or on a card without any
     // entity selector, their own (menusOnlyHtml)
@@ -950,7 +814,7 @@ export class CardMenus
         return this._this.querySelector(`#tb_${i}`) ?? this._this.querySelector(`#hm_${i}`);
     }
 
-    _openMenu(menuEl, top, left, align = 'left') {
+    openMenu(menuEl, top, left, align = 'left') {
         // (a curve's tooltip closes: a menu opened is never under it)
         for( const g of this.graphs ?? [] ) g.chart?.hecEndTooltip();
         menuEl.style.display = 'block';
@@ -963,11 +827,11 @@ export class CardMenus
     }
 
     // A menu stays readable under its submenus (each opened over it, right-aligned on it,
-    // level with its line, see _openSubmenu): wider than each of them by its widest line's
+    // level with its line, see openSubmenu): wider than each of them by its widest line's
     // text, so that its lines show beside the submenu open and another one can be picked —
     // the last line's submenu aside, which hides no line below it: as wide as the menu at
     // most. Set when the menu opens (with what it shows then), so it keeps its width. With
-    // no room for that (a small card or screen: menuEl.dataset.hecCramped), the menu takes
+    // no room for that (a small card or screen: menuEl.dataset.cramped), the menu takes
     // the room there is, opens with no submenu (its lines read first), and a submenu opened
     // leaves a strip of its lines (_menuStrip). A menu's lines open the submenus
     // `${line id}_sub`, its siblings
@@ -975,15 +839,15 @@ export class CardMenus
     {
         // (a menu without submenus, not one itself: as built)
         const _hasSubs = this._menuLines(menuEl).some(a => this._submenuOf(a));
-        if( !_hasSubs && !menuEl.dataset.hecRoom ) return;
-        menuEl.dataset.hecMinWidth ??= parseFloat(menuEl.style.minWidth) || 0;
+        if( !_hasSubs && !menuEl.dataset.room ) return;
+        menuEl.dataset.minWidth ??= parseFloat(menuEl.style.minWidth) || 0;
         // (its widths with its border: never wider than the room, border included)
         menuEl.style.boxSizing = 'border-box';
-        const _room = Math.min(this._menuRoom(), +menuEl.dataset.hecRoom || Infinity);
-        const _need = Math.max(+menuEl.dataset.hecMinWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
+        const _room = Math.min(this._menuRoom(), +menuEl.dataset.room || Infinity);
+        const _need = Math.max(+menuEl.dataset.minWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
         menuEl.style.maxWidth = Math.floor(_room) + 'px';
         menuEl.style.minWidth = Math.floor(Math.min(_need, _room)) + 'px';
-        menuEl.dataset.hecCramped = _need > _room ? '1' : '';
+        menuEl.dataset.cramped = _need > _room ? '1' : '';
     }
 
     // The room a menu has: the card's width, within the screen's
@@ -1039,27 +903,27 @@ export class CardMenus
     _laidOut(el, fn)
     {
         const _s = el.style;
-        el.dataset.hecMinWidth ??= parseFloat(_s.minWidth) || 0;
+        el.dataset.minWidth ??= parseFloat(_s.minWidth) || 0;
         const _saved = { display: _s.display, visibility: _s.visibility, left: _s.left, transform: _s.transform, minWidth: _s.minWidth, maxWidth: _s.maxWidth };
         if( _s.display === 'none' ) Object.assign(_s, { visibility: 'hidden', display: 'block', left: '0px', transform: '' });
-        Object.assign(_s, { minWidth: el.dataset.hecMinWidth + 'px', maxWidth: '' });
+        Object.assign(_s, { minWidth: el.dataset.minWidth + 'px', maxWidth: '' });
         try { return fn(); } finally { Object.assign(_s, _saved); }
     }
 
     // Opens a submenu over its menu, level with the item that opens it, its right edge on the
     // menu's right edge — so it takes no room beside the menu — and, like every menu
-    // (_openMenu), kept within the card and the viewport. The submenu must share the menu's
+    // (openMenu), kept within the card and the viewport. The submenu must share the menu's
     // positioned parent (both are its children).
     // At most as wide as the menu less the strip of its lines it must leave (_menuStrip) —
     // the last line's submenu: as wide as the menu —, its lines cut ('…') if they don't fit
-    _openSubmenu(subEl, itemEl)
+    openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
         const _lines = this._menuLines(_menu);
-        subEl.dataset.hecRoom = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
-        this._openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
+        subEl.dataset.room = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
+        this.openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
     }
 
     _navigateMenuArrowKey(visible, key)
@@ -1067,14 +931,14 @@ export class CardMenus
         // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity type menu
         // (et_N), the entity selector dropdown (es_N), and the export menu (eo_N) — moves
         // the highlighted <a> to the next/previous visible item, wrapping at either end.
-        // Only ever touches the navigation highlight (background + hecSelected marker) —
+        // Only ever touches the navigation highlight (background + selected marker) —
         // never fontWeight, which is menu-specific business state (e.g. the entity type
         // menu's "bold = default/currently active type", or the selector's wildcard-match
         // bolding) set by the caller, not by this generic navigation logic.
-        const _cur = visible.find(a => a.dataset.hecSelected);
-        // The entity type menu marks its default/active option with hecSelected right when
+        const _cur = visible.find(a => a.dataset.selected);
+        // The entity type menu marks its default/active option with selected right when
         // the menu opens (see showEntityTypeMenu), before any key is pressed — no blue
-        // highlight is shown yet at that point. So hecSelected alone doesn't mean "there's
+        // highlight is shown yet at that point. So selected alone doesn't mean "there's
         // already a highlight to move from" — check the highlight itself (background) too.
         // The very first arrow key press makes the highlight appear at that starting
         // position instead of moving away from it; only once it's actually showing does a
@@ -1086,49 +950,11 @@ export class CardMenus
             const _i = visible.indexOf(_cur);
             _next = key === 'ArrowDown' ? (visible[_i + 1] || visible[0]) : (visible[_i - 1] || visible[visible.length - 1]);
             _cur.style.background = '';
-            delete _cur.dataset.hecSelected;
+            delete _cur.dataset.selected;
         }
         _next.style.background = 'var(--primary-color, #03a9f4)';
-        _next.dataset.hecSelected = '1';
+        _next.dataset.selected = '1';
         return _next;
     }
 
-    // Deletes one entity entirely — removes it from its graph (rebuilding that graph with
-    // whatever entities remain, or removing it outright if this was its last entity) AND
-    // from pconfig.entities, so it's gone for good rather than split off into its own graph
-    // (that's what _uncombineEntity does instead). Currently only reachable via the entity
-    // type menu opened by a long-press on a legend/timeline label — deleting from the
-    // entity selector's own type menu (a not-yet-created entity) wouldn't make sense there.
-    _deleteEntity(g, idx)
-    {
-        const _entity = this._detachAndRebuildRemaining(g, idx);
-        this.store.remove(_entity);
-        this._updateMoVisibility();
-        this._updateGroupLinkMarkers();
-        this.writeLocalState();
-        this.updateHistory();
-    }
-
-    _createAndPersistEntity(eid, type, lineMode)
-    {
-        // Creates one brand-new entity with an explicit type and persists it —
-        // shared by the non-numeric direct-create path and the type-menu new-entity path
-        // addGraph registers _entry itself as the entity's pconfig.entities entry (and adopts
-        // the groupId of the graph it combined into, if any) — it must not be pushed a second
-        // time here: a duplicate entry, never displayed, used to carry the groupId instead,
-        // leaving the displayed one with none (so a type change couldn't link its graphs).
-        const _entry = { type, lineMode };
-        // (already shown: a second curve of it, in another graph — see keyOf)
-        const _copy = this.store.newCopy(eid);
-        if( _copy ) _entry.copy = _copy;
-        this.addGraph(eid, { entry: _entry });
-        const _g = this.graphs.find(g => g.entities.includes(_entry));
-        if( _g && ( _g.groupId === null || _g.groupId === undefined ) ) {
-            // A brand-new graph (or one left without a group by that old bug): a group of its own
-            const _gid = this.store.newGroupId();
-            _g.groupId = _gid;
-            _g.entities.forEach(e => { e.groupId = _gid; });
-        }
-        return this.stateOf(eid)?.attributes?.friendly_name || eid;
-    }
 }

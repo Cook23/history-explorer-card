@@ -21,7 +21,7 @@ module.exports = async function()
     const done = r => { passed += r.passed; failed += r.failed; };
 
     // Curve k of graph gi: its dots' radius, its showPoints saved
-    const dots = (t, gi, k = 0) => t.E(`(()=>{ const g=el.instance._allGraphsInDisplayOrder()[${gi}];
+    const dots = (t, gi, k = 0) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${gi}];
         const d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, R: (d.borderWidth+2)/2, hover: d.pointHoverRadius, saved: g.entities[${k}].showPoints }; })()`);
     const shown = d => near(d.r, d.R) && near(d.hover, d.R + 1);
     const menuOpen = t => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
@@ -304,7 +304,7 @@ module.exports = async function()
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false } }, { mock: { series: true } });
     await t.wait(800);
     await t.step('a curve added from the card, its points shown by a long-press: kept after a reload, not on another device', async () => {
-        await t.E(`(()=>{ const I=el.instance; I._createAndPersistEntity('sensor.power', 'line', 'curves'); I.updateHistoryWithClearCache(); })()`); await t.wait(1500);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power'], 'line', 'curves'); })()`); await t.wait(1500);
         const p = await valuePt(0, 3); await t.longPress(p);
         const shown = (await dots(t, 0)).r > 0;
         await t.page.reload(); await t.wait(3500); const reloaded = (await dots(t, 0)).r > 0;
@@ -322,6 +322,25 @@ module.exports = async function()
         await t.touchLongPress(p); const on = await dots(t, 0);
         await t.touchLongPress(p); const off = await dots(t, 0);
         return shown(on) && off.r === 0 ? true : JSON.stringify({ on, off });
+    });
+    done(await t.close());
+
+    // ── The hover dot: the curve the pointer is on, then its value nearest along the time ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true } });
+    await t.step('a hover on a curve between two values far apart: the dot of the one nearest along the time', async () => {
+        // (a point of the drawn path, a third of the way from a value to the next, away from both)
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
+            const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>A.left&&o.v.x<A.right);
+            const k=real.findIndex((o,j)=>j+1<real.length&&real[j+1].v.x-o.v.x>60); if(k<0) return null;
+            const a=real[k], b=real[k+1], x=a.v.x+(b.v.x-a.v.x)/3;
+            const path=m.map(q=>q._view).filter(v=>!v.skip).sort((u,w)=>u.x-w.x); const j=path.findIndex(v=>v.x>=x); const u=path[j-1], w=path[j];
+            const y=u.y+(w.y-u.y)*(x-u.x)/(w.x-u.x);
+            return { x: r.left+x, y: r.top+y, a: a.i, gap: Math.round(b.v.x-a.v.x), da: Math.round(Math.hypot(a.v.x-x, a.v.y-y)) }; })()`);
+        if( !p ) return 'no values far apart';
+        await t.page.mouse.move(p.x, p.y - 30, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(300);
+        const d = await hoverDot(0);
+        return d && d[0] === 0 && d[1] === p.a && p.da > 15 ? true : JSON.stringify({ p, d });
     });
     done(await t.close());
 

@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu) — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu); closing the tooltip; the values shown over the chart — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -68,8 +68,8 @@ or `maintainAspectRatio`.
 | `yAxisLockEnabled` | `boolean` | `true` | The Y-axis lock icon (padlock) is never drawn, never engages automatically, and the grouped lock+handle click/dblclick toggle (§5) does nothing. |
 | `legendClickEnabled` | `boolean` | `true` | A click/double-click on a legend label is not forwarded to the stock `legend.onClick`. The card sets it to `false`: it handles legend clicks like every other gesture, from `customEvent` (`click`/`dblclick` with `legendIndex`). |
 | `hover.activateOnContact` | `boolean` | `false` | A hover move only moves a tooltip that a click or a tap on the plot area opened (released without a drag, a pinch or a long press — never a press alone): near a curve (`_hecCurveAt`, the picking rule), that curve joins the tooltip mode — several can be in it, each showing its value nearest the pointer along the time axis; beside or between the curves, nothing changes; on a chart without curves, or on a bar, the element picked (`_hecElementAt`); leaving the plot area, or the canvas (a pen moving out of hover range), closes it, and the next hover opens nothing. The card sets it to `true`. |
-| `hover.dotOnHover` | `boolean` | `false` | A hover outside the tooltip mode on a value of a curve whose points aren't shown (picked by the picking rule among the values drawn) draws its dot alone (plugin `hecHoverDot`), as its point is drawn when shown (its style and border), of a diameter of the line width + 2 px; it goes when the hover leaves it, or in the tooltip mode. The card sets it to `true`. |
-| `labelTooltipEnabled` | `boolean` | `true` | Clicking a truncated Y-axis category label (timeline/arrowline) never shows its full text in a tooltip. |
+| `hover.dotOnHover` | `boolean` | `false` | A hover outside the tooltip mode on a curve whose points aren't shown (the curve picked by the picking rule, along its drawn line — `_hecCurveAt`; its value nearest along the time, as in the tooltip mode — `_hecNearestValueOf`) draws that value's dot alone (plugin `hecHoverDot`), as its point is drawn when shown (its style and border), of a diameter of the line width + 2 px; it goes when the hover leaves it, or in the tooltip mode. The card sets it to `true`. |
+| `labelTooltipEnabled` | `boolean` | `true` | `false`: a text shortened or hidden is never shown in full — a legend label shortened (`legend.labels.hecShortNames`), a timeline/arrowline row name cut to fit its column, a timeline state its bar is too narrow for. Otherwise a hover over one shows it in full while it stays there, and a click on a row name or a legend label for its reading time (`_hecRevealAt`, `Chart.hecUi.reveal`): in place, from the same edge, in its font, in a box of the graph's background, 80 % opaque (`Chart.hecUi.background`). |
 | `altSampleModeEnabled` | `boolean` | `true` | Holding Alt (Option) while moving over the chart draws every sample of its curves as a dot (`hecShowSamples`) of a diameter of the line width + 2 px (a dataset already showing its points keeps their size); the hover and its tooltip stay on the point under the pointer. `false`: never. |
 | `moveHandleVisible` | `boolean` | `true` | Hides the graph-reorder handle (`⠿`) and neutralizes its touch zone. The card sets this to `false` when there's only one graph total — Chart.js has no way to know the total graph count itself, so the card is the only legitimate source for this value. |
 | `panX` | `function({chart, phase, deltaFactor, source, pointerFactors, startFactors, event})` | none | The time axis (the card's — the time window is shared by every graph) is moved by a drag: the one-finger drag on the plot area, and the fingers' common horizontal movement in a pinch. `phase`: `'start'`, `'move'` (`deltaFactor`: the movement since the last call, in widths of the plot area, > 0 rightward) or `'end'`. `source`: `'drag'` or `'pinch'`; for a pinch, at `'start'` and `'end'`, `pointerFactors`: where its two fingers are along the plot area (0 at its left edge, 1 at its right edge), and at `'end'` `startFactors`: where they were at its start. Label drags, graph moves and drags in zoom select mode never call it. |
@@ -79,14 +79,14 @@ or `maintainAspectRatio`.
 | `dropAllowed` | `boolean` | `true` | Written by the card on the chart a drag is over, from its `dragovergraph` event (§2): `false` shows that graph's drop highlight as refused (dashed, error color), no insertion marker, and the dragging pointer's cursor as `not-allowed` (otherwise `grabbing`). |
 | `insertionForbidden` | `boolean` | `false` | Written by the card during a graph move, from the `dragovergraph` it receives (with `insertBefore`): `true` draws the graph-move insertion marker in the error color (dropping there would split a block of linked graphs). |
 | `linkMarkerVisible` | `boolean` | `false` | When `true`, the linked-graphs chain icon is drawn straddling this chart's top edge, under the labels of the graph above (§5). The card sets it on the lower graph of two linked ones. A double-click/double-tap on it fires `customEvent` with `zone: 'linkMarker'`. Laid over the graphs, it takes no room; right above the lock+handle zone, it moves just right of it (4 px apart). |
-| `hecControlsBackdrop` | `{ color }` or `null` | `null` | The controls at the top left — the lock+handle zone (handle, padlock, `handleButtons`), the chain icon — each drawn in a rounded box of `color`, over the legend's labels, which keep no room for them on the left (`legend.leftMargin` 4 px). On the box a gesture is the control's; beside it, on a label, the label's (the picking rule: the one the point is on, the control first). The card sets it on a card narrower than 300 px, with the Y labels' box color, together with no `layout.padding.top` above a timeline's rows; on a wider card, the controls keep the room they need beside the legend's first line. |
+| `hecControlsBackdrop` | `boolean` | `false` | The controls at the top left — the lock+handle zone (handle, padlock, `handleButtons`), the chain icon — each drawn in a rounded box like the Y labels' (`Chart.hecUi.background`, 80 % opaque), over the legend's labels, which keep no room for them on the left (`legend.leftMargin` 4 px). On the box a gesture is the control's; beside it, on a label, the label's (the picking rule: the one the point is on, the control first). The card sets it on a card narrower than 300 px, together with no `layout.padding.top` above a timeline's rows; on a wider card, the controls keep the room they need beside the legend's first line. |
 | `handleButtons` | `array` | `null` | Buttons drawn over the lock+handle zone (§5) in place of the handle and the padlock, each `{ id, text, disabled }` — `text` an icon, `disabled` greyed and struck through in red. The zone is then 18px per button (at least 33px); a button is picked by the general picking rule (`_hecPick`, on each one's icon): the one under the point, else the nearest one if near enough and clearly nearer than the next — so just beside a button (above the plot, below the zone) still picks it, about halfway between two picks none but says so (`handleButtonBetween`), clearly beside them picks none. A click on one fires `customEvent` (`click`) with `handleButton: id` and `handleButtonDisabled`, and neither toggles the lock nor starts a graph drag. A swipe starting on one (or halfway between two) is reported at its end: `dragend` with `swipe` (`'up'`, `'down'`, or `null` within `slop`) and that button's `handleButton` (or `handleButtonBetween`); on touch, the zone keeps that swipe (`touch-action: none`) instead of scrolling the page. The card shows them during a cut (where what was cut can be pasted). |
 | `linkMarkerTitle` | `string` | `''` | Hover text of the chain icon (the card's translated text). |
 | `floatingBoundsSelector` | CSS selector | none | The area Chart.js's floating elements (hover tooltip, truncated-label message) stay in: the closest ancestor of the canvas matching it, else the viewport only (see `Chart.hecUi.clampToViewport`, §7). The card passes `'#maincard'` — Chart.js knows nothing about the card's markup. |
-| `legend.labels.hecShortNames` | `function(chart)` → `[[string]]` | — | The shorter forms of each dataset's `name` (by dataset index, least shortened first), for labels too wide for a legend line (`Chart.hecFitLegendTexts`, from the legend's `fit`): as they are when they all fit; else every name at the same step, the first at which they all fit, what follows the name in the label (the value, an arrow) kept; else, at the last step, the names that still don't fit cut, '…' before what follows — and before a qualifier in parentheses at their end, kept when there's room. The card gives `src/legend-names.js`'s forms. |
+| `legend.labels.hecShortNames` | `function(datasets)` → `[[string]]` | — | The shorter forms of each dataset's `name` (by dataset index, least shortened first), for labels too wide for a legend line (`Chart.hecFitLegendTexts`, from the legend's `fit`): as they are when they all fit; else every name at the same step, the first at which they all fit, what follows the name (`hecLegendValue`, `hecLegendMark`) kept as it is; else, at the last step, the names that still don't fit cut, '…' at their end — before a qualifier in parentheses at their end, kept when there's room. A first line left empty is never chosen: a shorter form fitting the first line's room is taken, never a cut. The card gives `src/legend-names.js`'s forms. |
 | `legend.leftMargin` / `legend.rightMargin` | `number` (px) | the lock+handle zone's width + 4 (4 without any control, or with `hecControlsBackdrop`) / `25` | Room kept free at both ends of the legend's first line (`options.legend`, next to the stock legend options) — what is drawn there is no taller than it: the lines below take the whole width, 4 px from each edge. The card sets `rightMargin` so the legend keeps clear of the buttons it draws over the graph's top right corner (4 when there's none). |
 | `ticks` (any scale's), changed after creation | — | — | Takes effect at the next `update()`: `ticks.minor` and `ticks.major` (Chart.js's copies, from which a scale is drawn) follow `ticks` for every value they took from it (`mergeTicksOptions`, also run by `updateConfig`); a value they set themselves stays theirs. |
-| `ticks.hecBackdrop` (a vertical scale's) | `{ color }` | — | Labels drawn inside the plot (`ticks.mirror`): drawn after the datasets, over them (plugin `hecTickBackdrops`), each in a rounded box of `color`; kept within the plot area; a label whose box would come within 3 px of one already drawn is skipped. The card gives the card's background, 80 % opaque. |
+| `ticks.hecBackdrop` (a vertical scale's) | `boolean` | `false` | Labels drawn inside the plot (`ticks.mirror`): drawn after the datasets, over them (plugin `hecTickBackdrops`), each in a rounded box of the graph's background, 80 % opaque (`Chart.hecUi.background`, `BOX_OPACITY`); kept within the plot area; a label whose box would come within 3 px of one already drawn is skipped. Opaque while the pointer is near those labels (the column along them, `_hecInsideLabelColumns` — the one a drag of that axis starts in), as the pointer points them out. Their color and opacity are Chart.js's: the card only says whether there are boxes. |
 | `dragScope` | any value | none | A cross-graph drag (curve, label, graph move) only reaches the charts with the same `dragScope` — the card gives each of its instances its own, so two cards on the same dashboard never see each other's drags. |
 
 ### Global option: `Chart.defaults.global.gestures`
@@ -116,7 +116,24 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | `colorSteps` | `[{ x, borderColor, backgroundColor }]`, sorted by `x` | none | A line whose color changes along the X axis: from each `x` on (an X axis value), until the next one, its stroke and fill take that step's colors (one left undefined: the dataset's own `borderColor` / `backgroundColor`), and so do its points. Drawn as horizontal gradients with hard stops, rebuilt at each update (plugin `hecColorSteps`, `deps/chart-hec.js`). The card puts a step on each point where an entity's color changes. |
 | `hecInterpolation` | `'monotone'`, `'steffen'`, `'makima'` or `'catmullrom'` | `'monotone'` | For a line dataset with `cubicInterpolationMode: 'monotone'` and a tension: the algorithm of its tangents — `monotone` is Chart.js' own (Fritsch–Carlson); the others are in `helpers.hecSplineTangents` / `helpers.hecSplineCurve` (`deps/chart-hec.js`). The card sets it from its `interpolation` option. |
 | `showMinMax` | `boolean` | `false` | A line dataset whose points carry `yMin` / `yMax`: the area between them shaded in the dataset's line color (alpha 0.15), on its own Y axis (plugin `hecMinMaxBand`). |
+| `hecLegendValue`, `hecLegendMark` | `string` | `''` | A legend label's parts after its name (`label`): its value (`'(400 W)'`) and a mark (`'▸'`, the right axis), each after a space (`Chart.hecLegendTail`) — distinct parts, not one text: only the name is shortened (`legend.labels.hecShortNames`) and struck through when hidden; a gesture says which part it's on (`legendPart`: `'value'`, or `'name'` for the rest). The card sets them from its `showCurrentValues` and the curve's axis. |
 | `hecFillFade` | `boolean` | `false` | A line dataset filled with its own `borderColor` fading out downwards (alpha 0.4 at the top of the plot area, 0 at its bottom): its `backgroundColor` set to that gradient after each layout (plugin `hecFillFade`). The card sets it from its `fill: fade`. |
+| `hecNoStack` | `boolean` | `false` | A line dataset in a graph of stacked bars: never stacked, drawn in a second pass, over the bars. The card sets it on a curve of a mixed bar/line graph. |
+
+### Data point fields (a line dataset's `data` items)
+
+| Field | Type | Effect |
+|---|---|---|
+| `hecPlateauEnd` | `boolean` | The point ends a flat stretch: drawn from the previous point as a straight, dashed segment (no tension, not stepped). |
+| `hecVirtual` | `boolean` | The point only shapes the curve — not a value: no dot, never hit, never hovered nor shown in a tooltip. |
+
+The card sets both from its `lineMode: smart` (a silence: the curve held flat, then a virtual point where the next value starts).
+
+### Interaction mode
+
+| Mode | Effect |
+|---|---|
+| `hover.mode: 'hecMixed'` (also the tooltips') | A mixed bar/line graph: a curve's point near the pointer (8 px) wins — the curves are drawn over the bars —, else the bar under the pointer, else the plain `'nearest'`. The card sets it on a graph with both bars and curves. |
 
 ---
 
@@ -129,6 +146,21 @@ without a lock (`yAxisLockEnabled: false`, a timeline or arrowline).
 `chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
 its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls
 it on every chart when one of its menus opens, so nothing of a tooltip stays over the menu.
+
+`chart.hecSetValues(values)` — the values shown over the chart, given by the card (`null`:
+none), drawn by Chart.js in an element of its own right above the chart's box (its canvas'
+parent), in the page's flow:
+`{ layout: 'row' | 'narrow', states: [{ curve, key, text, unit, color }], stats: [{ curve,
+key, name, color, cells: [{ stat, label, value, time }] }], format(curve, y, x) → { text,
+unit, time } }`. `states`: each curve's value now, on a row — `'narrow'`: the first one large,
+the others small in a column on its right, each cut ('…') rather than wrapped, the
+statistics a little smaller; `stats`: a curve's statistics, `name` above them (`null`: none),
+a cell each; all in the given colors (`curve`: its dataset index, `key`: an opaque id kept on
+its element). `format`: a value of a curve at a point, as `states` shows one — the value a
+hover is on (`hover.dotOnHover`) is shown in its curve's place, with its time, while it lasts.
+A click or a tap on a value now reaches `customEvent` (`gestureType: 'click'`, `zone:
+'value'`, `curveIndex`); a text cut is shown in full in place while hovered, and on a click
+(`Chart.hecUi.reveal`).
 
 ## 2. The `customEvent` gesture system
 
@@ -157,10 +189,16 @@ card may need, so it never has to compute one from the chart's layout.
   zone,                // where that point is: 'linkMarker' (chain icon, §5),
                        // 'lockAndHandle' (§5), 'legend' (its band, whole width),
                        // 'yAxis' (a Y axis' label column: left of the plot area, or right
-                       // of it on a chart with a right axis), 'plot', or 'other'
+                       // of it on a chart with a right axis), 'plot', or 'other' — and
+                       // 'value': a value shown over the chart (hecSetValues, §1; with
+                       // curveIndex, no position)
   xFactor,             // where x is along the time axis: 0 at the plot area's left
                        // edge, 1 at its right edge (undefined before the first layout)
   legendIndex,         // legend label under the point, or -1
+  legendPart,          // which part of it: 'value' (what follows its dataset's name —
+                       // '(400 W)', the right axis' '▸' — at its end) or 'name' (its
+                       // swatch and mark too); null off a label. Hidden, only its name
+                       // is struck through
   yAxisIndex,          // timeline/arrowline row under the point, or -1
   labelRect,           // client rectangle {left, top, right, bottom} of that legend
                        // label, else of that row (the whole label column), else null
@@ -412,7 +450,10 @@ is passed in).
 | `armAutoFade(el, duration[, justMoved])` | (Re)shows `el`, fading in, then fades it out after `duration` and closes it. With a third argument, only does so when `justMoved === true` (a render that follows a real pointer gesture, not a data refresh under a still pointer). |
 | `startFade(el, duration)` | Fades `el` out after `duration` — calling `el._hecOnFade` then, if its owner set one, for what must go with it —, then closes it. The hover tooltip's owner, its chart, ends the hover there: its highlighted points fade back to their normal look over `FADE`. |
 | `closeFloating(el)` | Removes `el` and its observer. |
-| `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added, truncated label's full text): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`. |
+| `showMessage(text, clientX, clientY, align, anchorEl, boundsEl)` | A short message near a point (refused drop, entity already added): one element per document or shadow root, reused; `align` `'left'` (default), `'center'` or `'right'`; `clientX` null: centered over `anchorEl` (a graph's canvas — the card never measures it). |
+| `background(el, alpha)`, `BOX_OPACITY` | The background a graph is drawn on (`el`: an element in it) as `rgba(…, alpha)` (default 1): the first ancestor's background that isn't see-through, out of shadow roots too (the card's), else dark grey under a light text, else white — a canvas can't use the theme's CSS variables. The color of every box drawn over a graph (the Y labels inside the plot, the controls, a text shown in full), `BOX_OPACITY` (0.8) opaque. |
+| `reveal(r, sticky, anchorEl, boundsEl)`, `closeReveal(anchorEl, sticky)` | A text shown in full over where it's shortened or hidden: `r` `{ text, left, right, top, bottom (client), align: 'left' \| 'right', font }` — its text from the same edge, in its font, in a box of the graph's background 80 % opaque (`background`); `sticky`: kept until `closeReveal`, else faded out after its reading time. One element per document or shadow root. |
+| `Chart.hecWrapLabel(ctx, label, availW)` | A scale's label too wide, on two lines (at a word, else at a character) — what a scale draws, and what tells a row name is cut (a line still too wide). |
 | `closeMessage(anchorEl)` | Closes the message of `anchorEl`'s document or shadow root. |
 | `outline(el, valid)` / `clearOutline(el[, immediate])` | Outlines a graph's wrapper — solid primary color when valid, dashed error color otherwise (that one fades out when cleared). |
 

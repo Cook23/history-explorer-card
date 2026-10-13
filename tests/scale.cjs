@@ -12,7 +12,7 @@ module.exports = async function()
     // For each curve of graph G: its legend label, a point as drawn, and the tooltip's value for it
     const curves = G => t.E(`(()=>{ const c=el.instance.graphs[${G}].chart; const cb=c.options.tooltips.callbacks.label;
         return c.data.datasets.map((d,i)=>{ const pt=d.data.find(p=>p.y!=null);
-            return { label: d.label, y: pt.y, tip: cb({ datasetIndex: i, yLabel: pt.y }, c.data).replace(/^.*: /, '') }; }); })()`);
+            return { label: legendText(d), y: pt.y, tip: cb({ datasetIndex: i, yLabel: pt.y }, c.data).replace(/^.*: /, '') }; }); })()`);
     const near = (a, b) => Math.abs(a - b) < 0.011;
 
     await t.step('without unit: drawn scaled, the real value in the legend and tooltip', async () => {

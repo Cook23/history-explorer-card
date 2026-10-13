@@ -11,9 +11,9 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
     // The values over graph i: the states shown, then each stats row (its entity: stat=value)
-    const values = (t, i = 0) => t.E(`(()=>{ const el2=el.querySelector('#hv-'+el.instance._allGraphsInDisplayOrder()[${i}].id); if(!el2) return null;
-        return { states: [...el2.querySelectorAll('.hec-state')].map(s=>s.dataset.entity.split('.')[1]+'='+s.textContent.trim()),
-                 stats: [...el2.querySelectorAll('.hec-stats')].map(r=>r.dataset.entity.split('.')[1]+':'+[...r.querySelectorAll('.hec-stat')].map(c=>c.dataset.stat+'='+c.children[1].textContent).join(',')) }; })()`);
+    const values = (t, i = 0) => t.E(`(()=>{ const el2=el.instance.graphsInDisplayOrder()[${i}].chart._hecValuesEl; if(!el2) return null;
+        return { states: [...el2.querySelectorAll('.hec-state')].map(s=>s.dataset.key.split('.')[1]+'='+s.textContent.trim()),
+                 stats: [...el2.querySelectorAll('.hec-stats')].map(r=>r.dataset.key.split('.')[1]+':'+[...r.querySelectorAll('.hec-stat')].map(c=>c.dataset.stat+'='+c.children[1].textContent).join(',')) }; })()`);
     const num = (s, k) => Number((s.match(new RegExp(k + '=(-?[\\d.]+)')) || [])[1]);
 
     // ── The Y labels drawn (by default, beside the plot) ──
@@ -34,7 +34,7 @@ module.exports = async function()
         { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);
     await t.step('the names of a timeline\'s and an arrowline\'s rows drawn beside them', async () => {
-        const n = await t.E(`el.instance._allGraphsInDisplayOrder().map(g=>{ const c=g.chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
+        const n = await t.E(`el.instance.graphsInDisplayOrder().map(g=>{ const c=g.chart; const a=c.chartArea; const r=window.devicePixelRatio||1;
             const d=c.ctx.getImageData(0, a.top*r, Math.max(1,(a.left-4)*r), (a.bottom-a.top)*r).data; let k=0; for(let i=3;i<d.length;i+=4) if(d[i]>0) k++; return g.type+':'+k; })`);
         return n.every(x => Number(x.split(':')[1]) > 100) ? true : n.join(' ');
     });
@@ -121,6 +121,85 @@ module.exports = async function()
         const size = x => +x.split('@')[0];
         return size(wide[0]) === size(wide[1]) && size(narrow[1]) < size(narrow[0]) * 0.7 && narrow[2] < wide[2] && JSON.stringify(back) === JSON.stringify(wide)
             ? true : JSON.stringify({ wide, narrow, back });
+    });
+    done(await t.close());
+
+    // ── A click on a value: the entity's dialog (the info panel, when on) ──
+    t = await openCard(card({ showState: true, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1000);
+    await t.E(`window.__mi=[]; document.addEventListener('hass-more-info', e => __mi.push(e.detail.entityId))`);
+    const mi = () => t.E('__mi.splice(0)');
+    // (a legend label's point, at fraction f of its width; its value's middle — before its mark)
+    const labelAt = (i, f) => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*${f}, y: r.top+b.top+b.height/2 }; })()`);
+    const valueOf = i => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;
+        ctx.save(); ctx.font=c._hecLegendFont(); const m=it.hecMark?ctx.measureText(' '+it.hecMark).width:0, v=ctx.measureText(it.hecValue).width; ctx.restore();
+        return { x: r.left+b.left+b.width-m-v/2, y: r.top+b.top+b.height/2 }; })()`);
+    const hidden = i => t.E(`!!graphAt(0).chart.data.datasets[${i}].hidden`);
+    await t.step('a click on a legend label\'s value: its entity\'s dialog, the curve still shown; on its name: the curve hidden', async () => {
+        const v = await valueOf(1); await t.page.mouse.click(v.x, v.y); await t.wait(500);
+        const onValue = await mi(), h1 = await hidden(1);
+        const n = await labelAt(1, 0.4); await t.page.mouse.click(n.x, n.y); await t.wait(500);
+        const onName = await mi(), h2 = await hidden(1);
+        return onValue.join() === 'sensor.rain' && !h1 && !onName.length && h2 ? true : JSON.stringify({ onValue, h1, onName, h2 });
+    });
+    await t.step('a curve hidden: its name struck through, not its value', async () => {
+        // (the share of the label's middle row inked, over its name and over its value)
+        const inked = await t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend, b=L.legendHitBoxes[1], it=L.legendItems[1], k=c.canvas.width/c.canvas.getBoundingClientRect().width, ctx=c.ctx;
+            ctx.save(); ctx.font=c._hecLegendFont(); const nw=ctx.measureText(it.text).width, tw=ctx.measureText(legendText(it)).width, vw=ctx.measureText(it.hecValue).width; ctx.restore();
+            const left=b.left+b.width-tw, y=Math.round((b.top+L.options.labels.fontSize/2)*k);
+            const share=(x0,x1)=>{ const d=c.ctx.getImageData(Math.round(x0*k), y, Math.max(1,Math.round((x1-x0)*k)), 1).data; let n=0; for(let i=0;i<d.length;i+=4) if(d[i+3]>100 && d[i]+d[i+1]+d[i+2]<500) n++; return n/(d.length/4); };
+            const vl=left+nw+ctx.measureText(' ').width;
+            return { name: share(left+2, left+nw-2), value: share(vl+3, vl+vw-2) }; })()`);
+        return inked.name > 0.9 && inked.value < 0.6 ? true : JSON.stringify(inked);
+    });
+    await t.step('a click on a value over the graph: its entity\'s dialog; the Info of a curve\'s menu: the same', async () => {
+        await t.E(`el.querySelector('.hec-state[data-key="sensor.power"]').click()`); await t.wait(300);
+        const fromValue = await mi();
+        const p = await labelAt(0, 0.3); await t.longPress(p);
+        const shown = await t.E(`(()=>{ const i=el.querySelector('#et_0_info'); return !!i && i.style.display!=='none'; })()`);
+        await t.E(`el.querySelector('#et_0_info').click()`); await t.wait(300);
+        const fromMenu = await mi();
+        return fromValue.join() === 'sensor.power' && shown && fromMenu.join() === 'sensor.power' ? true : JSON.stringify({ fromValue, shown, fromMenu });
+    });
+    done(await t.close());
+
+    // ── A hover: the value it's on in its curve's place, texts cut shown in full, the Y labels near it opaque ──
+    t = await openCard(card({ look: 'mini', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', name: 'Rafales du vent mesurées au sommet du mât' },
+        { entity: 'sensor.power2', name: 'Vitesse moyenne du vent mesurée au sommet du mât' }] }] }), { mock: { series: true }, height: 700 });
+    await t.E(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t.wait(1500);
+    const first = () => t.E(`(()=>{ const s=graphAt(0).chart._hecValuesEl.querySelector('.hec-state[data-curve="0"]'); return { text: s.textContent, time: !!s.querySelector('.hec-time') }; })()`);
+    await t.step('a hover on a curve: its value there, with its time, in place of its value now; leaving it: the value now back', async () => {
+        const now = await first();
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(); const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&!v.hecVirtual&&v.x>A.left+(A.right-A.left)*0.4&&v.x<A.right-10)[0]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
+        await t.page.mouse.move(p.x, p.y - 20, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(300);
+        const hovered = await first();
+        await t.page.mouse.move(5, 5, { steps: 3 }); await t.wait(300);
+        const back = await first();
+        return !now.time && hovered.time && hovered.text !== now.text && back.text === now.text && !back.time ? true : JSON.stringify({ now, hovered, back });
+    });
+    await t.step('a hover on a statistics name cut: shown in full in place', async () => {
+        const n = await t.E(`(()=>{ const c=[...graphAt(0).chart._hecValuesEl.querySelectorAll('.hec-cut')].find(e=>e.scrollWidth>e.clientWidth&&!e.classList.contains('hec-state')); if(!c) return null; const r=c.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2, text:c.textContent}; })()`);
+        if( !n ) return 'no name cut';
+        await t.page.mouse.move(n.x, n.y, { steps: 3 }); await t.wait(300);
+        const shown = await t.E('reveal()'); await t.page.mouse.move(5, 5); await t.wait(300);
+        return shown === n.text ? true : JSON.stringify({ n, shown });
+    });
+    await t.step('the pointer near the Y labels inside the plot: their boxes opaque; away: as before', async () => {
+        const col = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='left'); return {x:r.left+k.left+4, y:r.top+(A.top+A.bottom)/2}; })()`);
+        await t.page.mouse.move(col.x, col.y, { steps: 3 }); await t.wait(300);
+        const near = await t.E(`[graphAt(0).chart._hecLabelsHovered, graphAt(0).chart.constructor.hecUi.background(graphAt(0).chart.canvas, 1)]`);
+        await t.page.mouse.move(5, 5, { steps: 3 }); await t.wait(300);
+        const away = await t.E('graphAt(0).chart._hecLabelsHovered');
+        return near[0] === 'left' && /,1\)$/.test(near[1]) && !away ? true : JSON.stringify({ near, away });
+    });
+    done(await t.close());
+
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true }, height: 700 });
+    await t.step('the pointer on a legend label\'s value: the hand cursor; on its name: the move cursor', async () => {
+        const at = f => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*${f}, y: r.top+b.top+b.height/2 }; })()`);
+        const cursor = async p => { await t.page.mouse.move(p.x, p.y, { steps: 3 }); await t.wait(200); return t.E('graphAt(0).chart.canvas.style.cursor'); };
+        const onValue = await cursor(await at(0.95)), onName = await cursor(await at(0.3));
+        return onValue === 'pointer' && onName === 'move' ? true : JSON.stringify({ onValue, onName });
     });
     done(await t.close());
 

@@ -9,7 +9,7 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
     // Each graph in display order: its curves, hidden ones with (h)
-    const shown = t => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map((e,i)=>e.entity.split('.')[1]+((g.chart.getDatasetMeta(i).hidden ?? g.chart.data.datasets[i].hidden)?'(h)':'')).join('+')).join(' | ')`);
+    const shown = t => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map((e,i)=>e.entity.split('.')[1]+(g.chart.data.datasets[i].hidden?'(h)':'')).join('+')).join(' | ')`);
     const keys = t => t.E(`el.instance.store.list.map(e=>e.entity.split('.')[1]+(e.copy?'#'+e.copy:'')).join(' ')`);
     const reload = async t => { await t.page.reload(); await t.wait(3500); };
 
@@ -20,13 +20,13 @@ module.exports = async function()
     let t = await openCard(card({ ...YAML, enable_persistence: 'entities' }), { mock: { series: true }, height: 900 });
     await t.wait(1500);
     await t.step('the same entity in two YAML graphs: a curve in each, with its history; twice in one graph: once, said in the console', async () => {
-        const r = { shown: await shown(t), keys: await keys(t), n: await t.E(`el.instance._allGraphsInDisplayOrder()[1].chart.data.datasets[0].data.length`),
+        const r = { shown: await shown(t), keys: await keys(t), n: await t.E(`el.instance.graphsInDisplayOrder()[1].chart.data.datasets[0].data.length`),
                     warned: await t.E(`logs.some(l=>/twice in graph/.test(l))`) };
         return r.shown === 'power+rain | power' && r.keys === 'power rain power#1' && r.n > 100 ? true : JSON.stringify(r);
     });
     await t.step('each curve its own: one hidden, one changed to stepped — the other unchanged, both kept after a reload', async () => {
         const p = await t.E('legendPt(1,0)'); await t.page.mouse.click(p.x, p.y); await t.wait(800);
-        await t.E(`(()=>{ const I=el.instance; const g=I._allGraphsInDisplayOrder()[0]; I.showEntityTypeMenu(0, 'sensor.power', g, 100, 100); I.entityTypeMenuClicked(0, 'line', 'stepped'); })()`); await t.wait(1000);
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.showEntityTypeMenu(0, 'sensor.power', g, 100, 100); I.entityTypeMenuClicked(0, 'line', 'stepped'); })()`); await t.wait(1000);
         const modes = () => t.E(`el.instance.store.list.filter(e=>e.entity==='sensor.power').map(e=>(e.copy||0)+':'+(e.lineMode||'-')+':'+!!e.hidden).join(' ')`);
         const before = { shown: await shown(t), modes: await modes() };
         await reload(t);
@@ -47,7 +47,7 @@ module.exports = async function()
     const choice = () => t.E(`(()=>{ const m=el.querySelector('#es_0_choice'); return m.style.display==='none' ? 'closed' : [...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
     const typeMenuOpen = () => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
     const pick = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); await t.page.click(`#es_0 a[data-entity="sensor.power2"]`); await t.wait(500); };
-    await t.E(`(()=>{ const I=el.instance; I._createAndPersistEntity('sensor.power2', 'line', 'smart'); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power2'], 'line', 'smart'); })()`);
     await t.wait(1500);
     await t.step('an entity already shown: said so, its graph outlined, then a choice — cancel first, marked', async () => {
         await pick('power two');
@@ -68,17 +68,17 @@ module.exports = async function()
         return r.menu && r.shown === 'power2 | power2' && r.keys === 'power2 power2#1' ? true : JSON.stringify(r);
     });
     await t.step('cut, the graph showing the other: 📋 struck through', async () => {
-        await t.E(`(()=>{ const I=el.instance; const g=I._allGraphsInDisplayOrder()[1]; I._startCut(g, 0); })()`); await t.wait(400);
-        const b = await t.E(`el.instance._allGraphsInDisplayOrder().map(g=>(g.chart.options.handleButtons||[]).map(b=>(b.disabled?'-':'')+b.id).join(',')).join(' | ')`);
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[1]; I.startCut(g, 0); })()`); await t.wait(400);
+        const b = await t.E(`el.instance.graphsInDisplayOrder().map(g=>(g.chart.options.handleButtons||[]).map(b=>(b.disabled?'-':'')+b.id).join(',')).join(' | ')`);
         await t.page.keyboard.press('Escape'); await t.wait(300);
         return b === '-paste | cancel' ? true : b;
     });
     await t.step('kept after a reload and on another device; the first one deleted, the second stays, its number reused next', async () => {
         await reload(t); const a = await keys(t);
         await t.E('localStorage.clear()'); await reload(t); const other = await keys(t);
-        await t.E(`(()=>{ const I=el.instance; const g=I._allGraphsInDisplayOrder()[0]; I._deleteEntity(g, 0); })()`); await t.wait(800);
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.deleteCurve(g, 0); })()`); await t.wait(800);
         const left = await keys(t);
-        await t.E(`(()=>{ const I=el.instance; I._createAndPersistEntity('sensor.power2', 'line', 'smart'); I.updateHistoryWithClearCache(); })()`); await t.wait(1200);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power2'], 'line', 'smart'); })()`); await t.wait(1200);
         const again = await keys(t);
         return a === 'power2 power2#1' && other === a && left === 'power2#1' && again === 'power2#1 power2' ? true : JSON.stringify({ a, other, left, again });
     });

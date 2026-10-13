@@ -257,6 +257,13 @@ export function parseColor(c)
     return t ? `rgb(${t[1]},${t[2]},${t[3]})` : c;
 }
 
+// The toolbar buttons' background: uiColors.buttons, else the theme's primary color, faint —
+// the card's and the info panel's
+export function buttonsColor(uiColors)
+{
+    return parseColor(uiColors?.buttons ?? parseColor('--primary-color') + '1f');
+}
+
 // Thresholds written as text — JSON, or a dict as a Home Assistant template writes it
 // (single quotes, keys left unquoted)
 function _parseThresholdText(s)

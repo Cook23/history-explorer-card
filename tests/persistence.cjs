@@ -24,12 +24,12 @@ module.exports = async function()
     const entry = id => t.E(`(()=>{ const e=el.instance.pconfig.entities.find(x=>x.entity==='${id}'); return e ? Object.fromEntries(${JSON.stringify(FIELDS)}.map(k=>[k, e[k] ?? null])) : null; })()`);
     const shown = id => t.E(`(()=>{ const g=el.instance.graphs.find(g=>g.entities.some(e=>e.entity==='${id}')); if( !g ) return null;
         const i=g.entities.findIndex(e=>e.entity==='${id}'); const d=g.chart.data.datasets[i];
-        return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!(g.chart.getDatasetMeta(i).hidden ?? d?.hidden), graphs: el.instance.graphs.length }; })()`);
+        return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!d?.hidden, graphs: el.instance.graphs.length }; })()`);
     const menu = (id, act) => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'));
         I.showEntityTypeMenu(0, '${id}', g, 100, 100); ${act} })()`);
     const setInterp = (id, a) => menu(id, `I.entityInterpolationClicked(0, '${a}');`).then(() => t.wait(500));
     const setType = (id, type, mode) => menu(id, `I.entityTypeMenuClicked(0, '${type}', ${mode ? `'${mode}'` : 'null'});`).then(() => t.wait(1500));
-    const legendPtOf = id => t.E(`(()=>{ const all=el.instance._allGraphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
+    const legendPtOf = id => t.E(`(()=>{ const all=el.instance.graphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
         return legendPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
     const toggleHidden = async id => { const p = await legendPtOf(id); await t.page.mouse.click(p.x, p.y); await t.wait(800); };
     const split = async id => { await t.dblclick(await legendPtOf(id)); await t.wait(800); };
@@ -127,9 +127,9 @@ module.exports = async function()
     // ── The graph menu on entities added from the card (combined in one graph): kept, the graph one graph ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true, graphs: [] }, { mock: { series: true }, height: 1200 });
     await t.step('entities added from the card: a graph made a timeline from its menu, one timeline after a reload and on another device', async () => {
-        await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.power_kw'] ) I._createAndPersistEntity(id, 'line', 'smart'); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power','sensor.power_kw'], 'line', 'smart'); })()`);
         await t.wait(2000);
-        const look = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+        const look = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
         const before = await look();
         await graphMenu(`I.entityTypeMenuClicked(0, 'timeline', null);`); await t.wait(1500);
         const now = await look(); await reload(); const after = await look(); await newDevice(); const other = await look();
@@ -194,7 +194,7 @@ module.exports = async function()
     // ── Entities added from the card: always kept, and on every device ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [] }, { mock: { series: true }, height: 1200 });
     await t.step('entities added from the card: every change kept on another device — a curve hidden aside', async () => {
-        await t.E(`(()=>{ const I=el.instance; for( const id of ['sensor.power','sensor.power2','sensor.energy'] ) { const d=I._detectDefaultType(id); I._createAndPersistEntity(id, d.type, d.lineMode); } I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+        await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power','sensor.power2','sensor.energy'], 'default'); })()`);
         await t.wait(2000);
         await setInterp('sensor.power', 'makima');
         await setType('sensor.power2', 'line', 'stepped');
@@ -216,10 +216,10 @@ module.exports = async function()
 
     // ── A curve dragged onto another graph: saved only when both graphs' placements are ──
     t = await openCard({ ...YAML(), graphs: [YAML().graphs[0]] }, { mock: { series: true }, height: 1400 });
-    const add = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    const add = id => t.E(`(()=>{ const I=el.instance; I.addCurves(['${id}'], 'default'); })()`);
     // Each graph: its entities, in display order
-    const layout = () => t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
-    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance._allGraphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
+    const layout = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
+    const graphPtOf = id => t.E(`(()=>{ const gi=el.instance.graphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
     const dragOnto = async (id, ontoId) => { await t.drag(await legendPtOf(id), await graphPtOf(ontoId)); await t.wait(800); };
     await add('sensor.rain'); await t.wait(400); await add('sensor.tank'); await t.wait(1200);
     const initial = await layout();
@@ -242,7 +242,7 @@ module.exports = async function()
 
     // ── Card ▸ Default graphs / Default display, each confirmed in a submenu ──
     t = await openCard(YAML({ enable_multidevice_persistence: 'all' }), { mock: { series: true }, height: 1400 });
-    const add2 = id => t.E(`(()=>{ const I=el.instance; const d=I._detectDefaultType('${id}'); I._createAndPersistEntity('${id}', d.type, d.lineMode); I.updateHistoryWithClearCache(); I.writeLocalState(); })()`);
+    const add2 = id => t.E(`(()=>{ const I=el.instance; I.addCurves(['${id}'], 'default'); })()`);
     const ids = () => t.E(`el.instance.graphs.flatMap(g=>g.entities.map(e=>e.entity.split('.')[1])).sort().join(',')`);
     const visible = sel => t.E(`(()=>{ const e=el.querySelector('${sel}'); return !!e && e.style.display !== 'none'; })()`);
     const cardAction = async k => {
@@ -257,7 +257,7 @@ module.exports = async function()
         await cardAction('defgraphs');
         const r = await t.E(`(()=>{ const c=el.querySelector('#eo_0_defgraphs_sub'), s=el.querySelector('#eo_0_card_sub');
             return { shown: c.style.display !== 'none', right: Math.round(c.getBoundingClientRect().right - s.getBoundingClientRect().right),
-                     marked: el.querySelector('#eo_0_defgraphs_cancel').dataset.hecSelected === '1', lines: [...c.children].map(a=>a.textContent).join('|') }; })()`);
+                     marked: el.querySelector('#eo_0_defgraphs_cancel').dataset.selected === '1', lines: [...c.children].map(a=>a.textContent).join('|') }; })()`);
         await t.E(`el.querySelector('#eo_0_defgraphs_cancel').click()`); await t.wait(300);
         const afterCancel = { confirm: await visible('#eo_0_defgraphs_sub'), card: await visible('#eo_0_card_sub'), ids: await ids() };
         await t.E(`el.querySelector('#eo_0_defgraphs').click()`); await t.wait(300);

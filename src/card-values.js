@@ -47,7 +47,7 @@ export class CardValues
 
     // The history of entity j of graph g kept for its values (its samples as numbers, in the
     // value shown — see shownScale), from its history rows and its process function
-    _keepValueSamples(g, j, rows, process)
+    keepValueSamples(g, j, rows, process)
     {
         g.valueSamples ??= [];
         const _scale = g.chart.data.datasets[j]?.shownScale ?? 1;
@@ -55,58 +55,46 @@ export class CardValues
                                           .filter(p => !isNaN(p.v));
     }
 
-    // The values over graph g (its element #hv-<id>, right above its chart): the curves'
-    // values now on one row, then, for each curve showing them, its statistics over the
-    // window shown — none: no element. On a narrow card (_narrowCard), as mini-graph-card
-    // keeps them: the first value large, the others small in a column on its right, each cut
-    // ('…') rather than wrapped; the statistics' text a little smaller
-    _showValues(g)
+    // The values over graph g, given to its chart to show (Chart.js hecSetValues — it draws
+    // them, and says when one is clicked: customEvent, zone 'value'): each curve's value now
+    // (showState), then, for each curve showing them, its statistics over the window shown —
+    // none: nothing shown. On a narrow card (narrowCard), as mini-graph-card keeps them:
+    // layout 'narrow'. A hover on a curve shows the value it is on in its place: format
+    showValues(g)
     {
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
-            .filter(x => x.d && !( g.chart.getDatasetMeta(x.j).hidden ?? x.d.hidden ));
+            .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
         const _stats = _entities.map(x => ({ ...x, which: normalizeStats(this._resolveShow(x.e, 'showStats')) })).filter(x => x.which.length);
-        const _box = g.canvas.parentNode;
-        let _el = _box.parentNode.querySelector(`#hv-${g.id}`);
-        if( !_states.length && !_stats.length ) { _el?.remove(); return; }
-        if( !_el ) {
-            _el = document.createElement('div');
-            _el.id = `hv-${g.id}`;
-            _el.style.cssText = 'padding:0 10px 4px 10px;color:var(--primary-text-color)';
-            _box.parentNode.insertBefore(_el, _box);
-        }
-        const _p = 10 ** this.pconfig.roundingPrecision;
-        const _num = v => String(Math.round(v * _p) / _p);
-        const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this._currentColor(x.e);
-        const _unit = x => x.d.unit ? `<span style="font-size:0.5em;opacity:0.9"> ${x.d.unit}</span>` : '';
-        const _narrow = this._narrowCard();
-        const _cut = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0';
-        const _state = (x, size) => {
-            const s = this.stateOf(x.e.entity)?.state;
-            const v = isNaN(Number(s)) ? ( s ?? '' ) : _num(Number(s) * ( x.d.shownScale ?? 1 ));
-            return `<div class="hec-state" data-entity="${x.e.entity}" style="color:${_color(x)};font-size:${size};line-height:1.2;${_narrow ? _cut : ''}">${v}${_unit(x)}</div>`;
-        };
-        let html = '';
-        if( _states.length && _narrow && _states.length > 1 ) {
-            html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">` + _state(_states[0], '2.2em') +
-                `<div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">` + _states.slice(1).map(x => _state(x, '1.3em')).join('') + `</div></div>`;
-        } else if( _states.length ) {
-            html += `<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px">` + _states.map(x => _state(x, '2.2em')).join('') + `</div>`;
-        }
+        if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
+        const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
         const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
         const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? 'LT' : 'L LT');
-        for( const x of _stats ) {
+        const states = _states.map(x => {
+            const s = this.stateOf(x.e.entity)?.state;
+            return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '',
+                     text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 )) };
+        });
+        const stats = _stats.map(x => {
             const st = curveStats(g.valueSamples?.[x.j] ?? [], t0, t1);
-            if( !st ) continue;
-            const _cell = (k, align) => `<div class="hec-stat" data-stat="${k}" style="text-align:${align}">` +
-                `<div style="font-weight:600">${i18n('ui.values.' + k)}</div>` +
-                `<div>${_num(st[k].v)}${x.d.unit ? ' ' + x.d.unit : ''}</div>` +
-                ( k !== 'average' ? `<div style="opacity:0.8">${_time(st[k].t)}</div>` : '' ) + `</div>`;
-            const _aligns = x.which.length === 1 ? ['left'] : x.which.length === 2 ? ['left', 'right'] : ['left', 'center', 'right'];
-            html += ( _stats.length > 1 ? `<div style="margin-top:6px;color:${_color(x)};${_narrow ? 'font-size:0.85em;' + _cut : ''}">${x.d.name ?? x.e.entity}</div>` : '' ) +
-                `<div class="hec-stats" data-entity="${x.e.entity}" style="display:flex;justify-content:space-between;gap:8px;margin-top:4px${_narrow ? ';font-size:0.85em' : ''}">` +
-                x.which.map((k, i) => _cell(k, _aligns[i])).join('') + `</div>`;
-        }
-        _el.innerHTML = html;
+            return st && { curve: x.j, key: x.e.entity, color: _color(x), name: _stats.length > 1 ? ( x.d.name ?? x.e.entity ) : null,
+                           cells: x.which.map(k => ({ stat: k, label: i18n('ui.values.' + k), value: this._roundedValue(st[k].v) + ( x.d.unit ? ' ' + x.d.unit : '' ),
+                                                      time: k !== 'average' ? _time(st[k].t) : null })) };
+        }).filter(x => x);
+        // (a value at a point of curve j — the point hovered: as its value now, with its time;
+        // a circular curve's in [0, period), as its labels show it)
+        const format = (j, y, x) => {
+            const d = g.chart.data.datasets[j], p = d?.circularPeriod;
+            const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
+            return { text: this._roundedValue(v), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
+        };
+        g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format });
+    }
+
+    // A value as the values over a graph show it: rounded (roundingPrecision)
+    _roundedValue(v)
+    {
+        const _p = 10 ** this.pconfig.roundingPrecision;
+        return String(Math.round(v * _p) / _p);
     }
 }

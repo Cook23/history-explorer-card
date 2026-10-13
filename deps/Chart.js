@@ -4697,6 +4697,8 @@
                 me._hecLastHitXY = undefined;
                 me._hecEndTooltipMode();
                 me._hecUpdateHoverDot(null);
+                me._hecUpdateReveal(null);
+                me._hecSetLabelsHovered(null);
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -4751,6 +4753,8 @@
               // the value it's on (_hecUpdateHoverDot)
               if (hoverOptions.dotOnHover) me._hecUpdateHoverDot(!me._hecTooltipMode && _inPlot && !(e.native && e.native.buttons) ? e : null);
             }
+            // (fork) a hover over a text shortened or hidden shows it in full (_hecUpdateReveal)
+            if (e.type === 'mousemove') me._hecUpdateReveal(!(e.native && e.native.buttons) ? e : null);
 
             // ── Generic gesture detection (customEvent hook + panX/zoomX) ─
             // Timing/threshold constants and overall structure (arm long-press on
@@ -8070,36 +8074,7 @@
                 // specifically. Idempotent: a label that already arrived pre-wrapped —
                 // as an array, or as a string containing a newline — is left exactly as
                 // given; this only ever wraps a plain single-line string that doesn't fit.
-                if (typeof label === 'string' && label.indexOf('\n') === -1) {
-                  var _availW = me.width - 8;
-                  if (context.measureText(label).width > _availW) {
-                    var _words = label.split(' ');
-                    var _wrapped = null;
-                    if (_words.length > 1) {
-                      var _line1 = '', _line2 = '';
-                      for (var _wi = 0; _wi < _words.length; _wi++) {
-                        var _try = _line1 ? _line1 + ' ' + _words[_wi] : _words[_wi];
-                        if (context.measureText(_try).width <= _availW) {
-                          _line1 = _try;
-                        } else {
-                          _line2 = _words.slice(_wi).join(' ');
-                          break;
-                        }
-                      }
-                      if (_line1 && _line2) _wrapped = [_line1, _line2];
-                    }
-                    if (!_wrapped) {
-                      // No word boundary fits — split at character level
-                      var _split = 0;
-                      for (var _ci = 1; _ci <= label.length; _ci++) {
-                        if (context.measureText(label.substring(0, _ci)).width <= _availW) _split = _ci;
-                        else break;
-                      }
-                      _wrapped = [label.substring(0, _split), label.substring(_split)];
-                    }
-                    label = _wrapped;
-                  }
-                }
+                label = Chart.hecWrapLabel(context, label, me.width - 8);
 
                 if (helpers.isArray(label)) {
                   var lineHeight = tickFont.size * 1.2;
@@ -11771,6 +11746,10 @@
               return helpers.isArray(data.datasets) ? data.datasets.map(function (dataset, i) {
                 return {
                   text: dataset.label,
+                  // (fork) the label's other parts, after its name: its value ('(400 W)'),
+                  // a mark ('▸') — see Chart.hecLegendTail
+                  hecValue: dataset.hecLegendValue || '',
+                  hecMark: dataset.hecLegendMark || '',
                   fillStyle: last(dataset.backgroundColor),
                   hidden: !chart.isDatasetVisible(i),
                   lineCap: dataset.borderCapStyle,
@@ -11999,25 +11978,26 @@
                 // (fork) a label wider than a whole line: shortened — labels.hecShortNames
                 // (Chart.hecFitLegendText)
                 if (typeof labelOpts.hecShortNames === 'function' && me.legendItems.length) {
-                  var _shortNames = labelOpts.hecShortNames(me.chart) || [];
+                  var _shortNames = labelOpts.hecShortNames(me.chart.data.datasets) || [];
                   var _roomOf = function (line) {
                     var _m = me._hecMarginsOf(line);
                     return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
                   };
                   var _items = me.legendItems.map(function (it) {
-                    var _ds = me.chart.data.datasets[it.datasetIndex] || {};
-                    return { text: it.text, name: _ds.name, forms: _shortNames[it.datasetIndex] };
+                    return { name: it.text, tail: Chart.hecLegendTail(it), forms: _shortNames[it.datasetIndex] };
                   });
                   // (to a whole line below the first; the first label not fitting the first line,
                   // between its margins, to that one if a shorter form fits there — rather than a
                   // first line left empty — never cut for it)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
                   if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
-                  me.legendItems.forEach(function (it, k) { it.text = _fitted[k]; });
+                  // (its name shortened, its full name kept: shown in place on a hover or a click
+                  // — _hecRevealAt)
+                  me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
                 }
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
+                  var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   var _m = me._hecMarginsOf(lineWidths.length - 1);
                   if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - _m.l - _m.r) {
@@ -12058,7 +12038,7 @@
 
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var itemWidth = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text).width;
+                  var itemWidth = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   // If too tall, go to new column
                   if (currentColHeight + itemHeight > minSize.height) {
@@ -12176,14 +12156,18 @@
                 var xLeft = boxWidth + halfFontSize + x;
                 var yMiddle = y + halfFontSize;
 
+                // (fork) its name, then its other parts (Chart.hecLegendTail)
+                var _nameWidth = ctx.measureText(legendItem.text).width;
                 ctx.fillText(legendItem.text, xLeft, yMiddle);
+                var _tail = Chart.hecLegendTail(legendItem);
+                if (_tail) ctx.fillText(_tail, xLeft + _nameWidth, yMiddle);
 
                 if (legendItem.hidden) {
-                  // Strikethrough the text if hidden
+                  // Strikethrough the text if hidden — (fork) its name only
                   ctx.beginPath();
                   ctx.lineWidth = 2;
                   ctx.moveTo(xLeft, yMiddle);
-                  ctx.lineTo(xLeft + textWidth, yMiddle);
+                  ctx.lineTo(xLeft + _nameWidth, yMiddle);
                   ctx.stroke();
                 }
               };
@@ -12206,7 +12190,7 @@
 
               var itemHeight = fontSize + labelOpts.padding;
               helpers.each(me.legendItems, function (legendItem, i) {
-                var textWidth = ctx.measureText(legendItem.text).width;
+                var textWidth = ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
                 var width = boxWidth + fontSize / 2 + textWidth;
                 var x = cursor.x;
                 var y = cursor.y;

@@ -3,10 +3,8 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { keyOf } from "./history-entity-store.js";
-import { BAR_INTERVALS, RAW_INTERVAL } from "./history-options.js";
+import { BAR_INTERVALS } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
-import { infoPanelEnabled, setInfoPanelEnabled } from "./history-explorer-card.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -17,7 +15,7 @@ export class CardToolbar
     // --------------------------------------------------------------------------------------
 
     // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
-    // !! Keep in sync with _hec_render() in history-info-panel.js !!
+    // !! Keep in sync with _hxRender() in history-info-panel.js !!
     // The menus of an entity and of a graph on a card without any entity selector, where
     // they otherwise are: their gestures (a long-press on a label, on the ⠿ zone…) open them
     // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
@@ -110,7 +108,7 @@ export class CardToolbar
 
     // Wires toolbar i's controls (the card has two toolbars, top and bottom; the info panel
     // one, with fewer controls — those it lacks are skipped)
-    _wireToolbar(i)
+    wireToolbar(i)
     {
         this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
         this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
@@ -131,7 +129,7 @@ export class CardToolbar
             const _k = Chart.hecUi.pick(e.clientX, e.clientY, _buttons, e.pointerType || 'mouse');
             if( _k >= 0 ) _buttons[_k].click();
         }, false);
-        this._initOptionsMenu(i);
+        this.initOptionsMenu(i);
 
         this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
         this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
@@ -145,7 +143,7 @@ export class CardToolbar
         this._this.querySelector(`#es_${i}`)?.addEventListener('pointerover', (e) => {
             if( e.pointerType === 'touch' ) return;
             const _a = e.target.closest('a[data-entity]');
-            if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+            if( _a ) this.previewEntityTooltip(_a.dataset.entity, i);
         });
         // Touch has no hover event at all — preview on pointerdown/pointermove
         // instead, while the finger can still be dragged to a different entry
@@ -154,7 +152,7 @@ export class CardToolbar
         const _touchPreview = (e) => {
             if( e.pointerType !== 'touch' ) return;
             const _a = e.target.closest('a[data-entity]');
-            if( _a ) this._previewEntityTooltip(_a.dataset.entity, i);
+            if( _a ) this.previewEntityTooltip(_a.dataset.entity, i);
         };
         this._this.querySelector(`#es_${i}`)?.addEventListener('pointerdown', _touchPreview);
         this._this.querySelector(`#es_${i}`)?.addEventListener('pointermove', _touchPreview);
@@ -166,12 +164,9 @@ export class CardToolbar
 
     insertUIHtmlText(i)
     {
-        let ef = this._this.querySelector(`#ef_${i}`); if( ef ) ef.innerHTML = i18n('ui.menu.export_csv');
-        // Entity type menu labels — updated here so language is already set
+        // The menus' labels — updated here so language is already set
         this.relabelTypeMenu(i);
         this.relabelOptionsMenu(i);
-        let eh = this._this.querySelector(`#eh_${i}`); if( eh ) eh.innerHTML = i18n('ui.menu.export_stats');
-        let ei = this._this.querySelector(`#ei_${i}`); if( ei ) ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
             by.children[0].innerHTML = i18n('ui.ranges.l_hour');
@@ -212,7 +207,7 @@ export class CardToolbar
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
-            this._fitToCardWidth();
+            this.fitToCardWidth();
             const _tbEl = this._this.querySelector('#tb_0');
             if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }
@@ -277,7 +272,7 @@ export class CardToolbar
             // Apply chosen format and range width
             const fmt = isCompact ? this.i18n._styleDateShort : this.i18n._styleDateLong;
             if( bxEl && fmt ) {
-                this.i18n.styleDateSelector = fmt;
+                this.ui.dateFormat = fmt;
                 bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
             }
             if( byEl ) byEl.style.maxWidth = isCompact ? '50px' : '83px';
@@ -399,25 +394,6 @@ export class CardToolbar
         this.statsExporter.exportFile(this);
     }
 
-    // The info panel switched on or off (confirmed in the options menu, see _CONFIRMED)
-    toggleInfoPanel()
-    {
-        setInfoPanelEnabled(!infoPanelEnabled);
-        // Persist in dedicated global HA user key (background)
-        this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer-infopanel-enabled', value: { enabled: infoPanelEnabled } }).catch(() => {});
-        this.applyInfoPanelState();
-    }
-
-    // The panel switched on or off (here, or on another device): saved where the panel reads
-    // it at each render (writeInfoPanelConfig) — it applies the next time an entity's dialog
-    // shows its history, without reloading the page — and the menu entry follows
-    applyInfoPanelState()
-    {
-        if( infoPanelEnabled !== !!window.localStorage.getItem('history-explorer-info-panel') )
-            this.writeInfoPanelConfig(true);
-        for( const ei of this._this.querySelectorAll('[id^="ei_"]') )
-            ei.innerHTML = infoPanelEnabled ? i18n('ui.menu.disable_panel') : i18n('ui.menu.enable_panel');
-    }
 
     // --------------------------------------------------------------------------------------
     // Display interval for accumulating bar graphs
@@ -427,38 +403,25 @@ export class CardToolbar
     {
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
         const g = this.graphs.find(gr => gr.id == id);
-        if( !g ) return;
+        if( g ) this.setBarInterval(g, parseInt(event.target.value));
+    }
 
-        const _value = parseInt(event.target.value);
-        const _wasRaw = g.interval == RAW_INTERVAL;
-        const _isRaw = _value == RAW_INTERVAL;
-        g.interval = _value;
+    // The toolbar's date: the time window's start, as long as its room allows (resizeSelector)
+    showDate()
+    {
+        for( const i of this.ui.dateSelector )
+            if( i ) i.innerHTML = moment(this.startTime).format(this.ui.dateFormat ?? this.i18n._styleDateLong);
+    }
 
-        // Persist the interval on every entity of this graph (whichever is rebuilt first
-        // carries it — see addGraph's _graphInterval). The entities' own types are left
-        // alone: raw (RAW_INTERVAL) only changes how the bar entities are drawn, never what
-        // they are, so picking an interval again turns them back into bars.
-        for( let en of g.entities ) {
-            const _e = this.store.entry(keyOf(en));
-            if( _e ) _e.interval = _value;
-        }
-
-        // Bars <-> raw curves: rebuilt in place, each bar entity's dataset changing kind
-        if( _wasRaw !== _isRaw ) {
-            const _nextG = this._nextGraph(g);
-            const _entities = [...g.entities];
-            const _groupId = g.groupId;
-            this._detachGraph(g);
-            this._rebuildGraph(_entities, _groupId, _nextG, { interval: _value });
-        }
-
-        this.updateHistory();
-        this.writeLocalState();
+    // The width of a bar graph's interval selector (px)
+    intervalSelectorWidth()
+    {
+        return this.ui.wideInterval ? 100 : 80;
     }
 
     createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
     {
-        return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.ui.wideInterval ? 100 : 80}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
+        return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.intervalSelectorWidth()}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
                     ${BAR_INTERVALS.map(i => `<option value="${i.code}" ${optionStyle} ${selected == i.code ? 'selected' : ''}>${i18n('ui.interval.' + i.label)}</option>`).join('')}
                 </select>`;
     }

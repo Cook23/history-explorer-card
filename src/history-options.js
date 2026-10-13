@@ -11,6 +11,25 @@ export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', 
 // (each unknown value is reported once: it's resolved again at each redraw)
 const _reportedInterpolations = new Set();
 
+// A line mode as the card knows it: the singular aliases accepted — 'line' → 'lines',
+// 'curve' → 'curves', 'step' → 'stepped' ('smart': curves while the source reports, flat
+// dashed plateaus over its silences — see _applySilencePlateaus)
+export function normalizeLineMode(m)
+{
+    if( m === 'line'  ) return 'lines';
+    if( m === 'curve' ) return 'curves';
+    if( m === 'step'  ) return 'stepped';
+    return m;
+}
+
+// Can entities of types a and b share one graph? Lines and bars can (curves drawn over the
+// bars); a timeline or an arrowline only ever holds its own type
+export function typesCompatible(a, b)
+{
+    const _xy = t => t === 'line' || t === 'bar';
+    return a === b || ( _xy(a) && _xy(b) );
+}
+
 export function normalizeInterpolation(v)
 {
     if( v === undefined || v === null ) return undefined;

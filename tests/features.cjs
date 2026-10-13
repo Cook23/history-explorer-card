@@ -166,7 +166,7 @@ module.exports = async function()
         { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] } ] });
     // Over graph 0's curves: which graphs draw the cursor line
     const cursorDrawn = async () => { const c = await t.E('graphPtAt(0, 0.5)'); await t.page.mouse.move(c.x, c.y); await t.page.mouse.move(c.x + 5, c.y); await t.wait(300);
-        return t.E(`el.instance._allGraphsInDisplayOrder().map(g=>g.chart._hecCursorLine?.draw?1:0).join('')`); };
+        return t.E(`el.instance.graphsInDisplayOrder().map(g=>g.chart._hecCursorLine?.draw?1:0).join('')`); };
     t = await openCard(cursorCard('auto'), { height: 1200, mock: { series: true } }); await t.wait(800);
     await t.step('cursor auto: the line drawn on the graph under the pointer only', async () => {
         const d = await cursorDrawn(); return d === '100' ? true : d;
@@ -196,7 +196,7 @@ module.exports = async function()
     const legendAt = async w => {
         await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
         return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
-            return { texts: L.legendItems.map(i=>i.text), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
+            return { texts: L.legendItems.map(legendText), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
     await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
         const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);
@@ -257,7 +257,7 @@ module.exports = async function()
             const rows=new Set(els.filter(b=>b.id!=='b7_0'&&b.id!=='bo_0').map(b=>Math.round(b.getBoundingClientRect().top/10))).size;
             const c=graphAt(0).chart, A=c.chartArea, s0=c.scales['y-axis-0'];
             return { out, rows, inside: c.options.scales.yAxes[0].ticks.mirror, outsideKept: !graphAt(1).chart.options.scales.yAxes[0].ticks.mirror,
-                     plotLeft: Math.round(A.left), boxes: (s0._hecDeferredLabels||[]).length, boxColor: c.options.scales.yAxes[0].ticks.hecBackdrop?.color ?? null,
+                     plotLeft: Math.round(A.left), boxes: (s0._hecDeferredLabels||[]).length, boxColor: c.options.scales.yAxes[0].ticks.hecBackdrop ? c.constructor.hecUi.background(c.canvas, c.constructor.hecUi.BOX_OPACITY) : null,
                      fonts: [c.options.scales.yAxes[0].ticks.minor.fontSize, graphAt(1).chart.options.scales.yAxes[0].ticks.minor.fontSize, c.options.scales.xAxes[0].ticks.minor.fontSize, c.options.legend.labels.fontSize].join() }; })()`);
     };
     await t.step('a narrow card (168 px): the date, the range and the search each on a line, nothing out of the card; the Y labels inside, each in a box of the card\'s background, 80 % opaque, at mini-graph-card\'s size (yLabels: outside kept), the text a little smaller; wide again: as before', async () => {
