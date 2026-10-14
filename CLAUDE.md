@@ -63,6 +63,14 @@ graph, then `entityOptions`, then the card). It's allowed, not a task: an option
 full scope when it's touched or needed, never in a rework of all options. Never restrict an
 option's scope because it "seems logical".
 
+## Words have a meaning — set by the user, not negotiable
+
+Read the user's words as they are, with their nuance: a possibility is not an obligation
+("may" is not "must"), an example is not a rule, a guideline is not a mandate to push to
+the extreme. Past sessions turned "can" into "must" and a guideline into a rework of
+everything — the user had to correct it each time. Do what is asked, at the scale asked;
+when the scale is unclear, ask.
+
 ## An example is a symptom — set by the user, not negotiable
 
 An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
