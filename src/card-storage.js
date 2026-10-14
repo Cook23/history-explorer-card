@@ -107,6 +107,10 @@ export class CardStorage
 
     async writeLocalState()
     {
+        // (never before Home Assistant's user data is read: what this device writes would
+        // overwrite what another device saved there and this one hasn't seen yet — see
+        // readLocalState)
+        if( this._haSavedRead ) await this._haSavedRead;
         // HA's image (ha_* below) is deliberately NOT updated with what this device writes:
         // it's only ever updated from what HA itself returns (readLocalState). The write
         // below is asynchronous and may land late or not at all (connection lost, page
@@ -147,11 +151,69 @@ export class CardStorage
     }
     // The saved state merged with the YAML, by the "last one to speak wins" rules: the
     // entities (each field, and the display order), the time range, the info panel's
-    // switch, the gesture thresholds
+    // switch, the gesture thresholds. This device's own first: Home Assistant's user data is
+    // read meanwhile, and taken only if it changed since this device last saw it (another
+    // device spoke — rarely): what's shown is then taken again from it (reloadSaved). A new
+    // device (nothing saved here) waits for it.
     async readLocalState()
     {
-        const { ls: _ls, haCard: _haCard, haInfoEnabled: _haInfoEnabled, haGestures: _haGestures } = await this._readSavedSources();
+        const _ls = this._readLocalSaved();
+        const _haRead = this._readHaSaved();
+        // (on its own, meanwhile — see there)
+        this._registerInfoPanelDefault();
+        if( !_ls ) {
+            this._haSavedRead = null;
+            return this._restoreSaved(_ls, await _haRead);
+        }
+        // (until it's read, nothing is written — writeLocalState waits for it)
+        this._haSavedRead = _haRead.then(ha => {
+            this._haSavedRead = null;
+            if( this._haSpoke(_ls, ha) ) this.reloadSaved(() => this._restoreSaved(_ls, ha));
+            else { this._keepHaImages(_ls, ha); this.writeLocalState(); }
+        });
+        return this._restoreSaved(_ls, this._haAsLastSeen(_ls), false);
+    }
 
+    // Home Assistant's user data as this device last saw it (its images on this device)
+    _haAsLastSeen(_ls)
+    {
+        return {
+            haCard: _ls.ha_entities === undefined && _ls.ha_timeRangeHours === undefined ? null
+                : { entities: _ls.ha_entities, timeRangeHours: _ls.ha_timeRangeHours, timeRangeMinutes: _ls.ha_timeRangeMinutes },
+            haInfoEnabled: _ls.ha_infoPanelEnabled ?? undefined,
+            haGestures: _ls.ha_gestures ?? undefined,
+        };
+    }
+
+    // Has another device spoken — does Home Assistant's user data (ha) hold, anywhere, a
+    // value other than the one this device last saw there (_ls's images) and other than the
+    // one it wrote there itself (its own write coming back: nothing new)?
+    _haSpoke(_ls, ha)
+    {
+        const _seen = this._haAsLastSeen(_ls), _j = v => JSON.stringify(v ?? null);
+        const _new = (v, seen, own) => _j(v) !== _j(seen) && _j(v) !== _j(own);
+        return _new(ha.haCard?.entities, _seen.haCard?.entities, _ls.entities)
+            || _new(ha.haCard?.timeRangeHours, _seen.haCard?.timeRangeHours, _ls.timeRangeHours)
+            || _new(ha.haCard?.timeRangeMinutes, _seen.haCard?.timeRangeMinutes, _ls.timeRangeMinutes)
+            || _new(ha.haInfoEnabled, _seen.haInfoEnabled, infoPanelEnabled)
+            || _new(ha.haGestures, _seen.haGestures, localGestures());
+    }
+
+    // This device's images of Home Assistant's user data (ha, else as _ls had them), for
+    // the next writeLocalState
+    _keepHaImages(_ls, { haCard: _haCard, haInfoEnabled: _haInfoEnabled, haGestures: _haGestures })
+    {
+        this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
+        this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
+        this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
+        this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
+        this._lastHaGestures         = _haGestures               ?? _ls?.ha_gestures        ?? null;
+    }
+
+    // The saved state (_ls: this device's, ha: Home Assistant's user data) merged with the
+    // YAML, then saved (save: false — not yet, Home Assistant's not read)
+    async _restoreSaved(_ls, { haCard: _haCard, haInfoEnabled: _haInfoEnabled, haGestures: _haGestures }, save = true)
+    {
         // The YAML as last seen — by this device, else (a new device: nothing stored here yet)
         // by the device that last saved to HA, which stored the same image: without it, a
         // new device would take the YAML as changed and let it win over everything saved.
@@ -172,16 +234,10 @@ export class CardStorage
         this._resolveGestures(_ls, _haGestures, _yamlImage);
 
         // Update HA user mirrors for next writeLocalState
-        this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
-        this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
-        this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
-        this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
-        this._lastHaGestures         = _haGestures               ?? _ls?.ha_gestures        ?? null;
-
-        await this._registerInfoPanelDefault();
+        this._keepHaImages(_ls, { haCard: _haCard, haInfoEnabled: _haInfoEnabled, haGestures: _haGestures });
 
         // Persist updated state (mirrors included) before any potential reload
-        await this.writeLocalState();
+        if( save ) await this.writeLocalState();
 
         // Apply infoPanel state last, after everything (including writeLocalState) is done
         if( _infoPanelChanged ) {
@@ -191,33 +247,51 @@ export class CardStorage
         return false; // interval redraw handled via pconfig.entities in createContent
     }
 
-    // What was saved: on this device (localStorage — the source of truth for change
-    // detection, it holds all the mirrors), in Home Assistant's user data (may come from
-    // another device), and the info panel's switch there
-    async _readSavedSources()
+    // The widths the entity selector's lines needed the last time its list was built on this
+    // device ({ most, all } — see entityLineWidths), or null: the toolbar laid out with them
+    // before the list is built again. On this device only (its fonts)
+    savedSelectorWidths()
+    {
+        return _readLocal('history-explorer_selector_' + this.id);
+    }
+
+    keepSelectorWidths(w)
+    {
+        try { window.localStorage.setItem('history-explorer_selector_' + this.id, JSON.stringify({ most: w.most, all: w.all })); } catch(e) {}
+    }
+
+    // The shorter forms of the entity selector's lines (shortNameForms), as computed the
+    // last time on this device — { entity_id: { name, forms } }, or null: used at once,
+    // before they're computed again. On this device only
+    savedEntityForms()
+    {
+        return _readLocal('history-explorer_selector_forms_' + this.id);
+    }
+
+    keepEntityForms(forms)
+    {
+        try { window.localStorage.setItem('history-explorer_selector_forms_' + this.id, JSON.stringify(forms)); } catch(e) {}
+    }
+
+    // What was saved on this device (localStorage — the source of truth for change
+    // detection, it holds all the mirrors), or null
+    _readLocalSaved()
     {
         const _lsRaw = window.localStorage.getItem('history-explorer_card_' + this.id);
-        const ls = _lsRaw ? JSON.parse(_lsRaw) : null;
+        return _lsRaw ? JSON.parse(_lsRaw) : null;
+    }
 
-        let haCard = null;
-        try {
-            const _result = await this._hass.callWS({ type: 'frontend/get_user_data', key: 'history-explorer_card_' + this.id });
-            if( _result?.value ) haCard = _result.value;
-        } catch(e) {}
-
-        let haInfoEnabled = undefined;
-        try {
-            const _ipe = await this._hass.callWS({ type: 'frontend/get_user_data', key: INFO_PANEL_SWITCH_KEY });
-            if( _ipe?.value?.enabled !== undefined ) haInfoEnabled = !!_ipe.value.enabled;
-        } catch(e) {}
-
-        let haGestures = undefined;
-        try {
-            const _g = await this._hass.callWS({ type: 'frontend/get_user_data', key: GESTURES_KEY });
-            if( _g?.value ) haGestures = _g.value;
-        } catch(e) {}
-
-        return { ls, haCard, haInfoEnabled, haGestures };
+    // What Home Assistant's user data holds (may come from another device): the card's, the
+    // info panel's switch, the gesture thresholds — read together
+    async _readHaSaved()
+    {
+        const _get = key => this._hass.callWS({ type: 'frontend/get_user_data', key }).then(r => r?.value, () => undefined);
+        const [_card, _ipe, _g] = await Promise.all([_get('history-explorer_card_' + this.id), _get(INFO_PANEL_SWITCH_KEY), _get(GESTURES_KEY)]);
+        return {
+            haCard: _card || null,
+            haInfoEnabled: _ipe?.enabled !== undefined ? !!_ipe.enabled : undefined,
+            haGestures: _g || undefined,
+        };
     }
 
     // Is persistence category (range, entities, order) on, by the card's options —

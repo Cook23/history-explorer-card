@@ -164,6 +164,9 @@ export class CardToolbar
 
     insertUIHtmlText(i)
     {
+        // The entity field's prompt: "Loading…" until its list is built (see requestEntityCollection)
+        const _in = this._this.querySelector(`#b7_${i}`);
+        if( _in ) _in.placeholder = i18n(this.entityListReady() ? 'ui.label.type_to_search' : 'ui.label.loading');
         // The menus' labels — updated here so language is already set
         this.relabelTypeMenu(i);
         this.relabelOptionsMenu(i);
@@ -295,15 +298,15 @@ export class CardToolbar
             // lines need — its placeholder's at least —; then as wide as the room there, up to
             // the width every line needs; the lines still too long shortened — fitEntityLines)
             const _lw = this.entityLineWidths();
-            const _minW = input && this.entityListReady() ? Math.max(this._placeholderWidth(input), _lw.most) : 0;
+            const _minW = input ? Math.max(this._placeholderWidth(input), _lw.most) : 0;
             const _maxW = Math.max(_minW, _lw.all);
             const _inputW = room => Math.max(0, Math.min(room, _maxW));
-            // (the menu as wide as the field: its lines fitted to the field as it's drawn)
-            const _setInputW = room => { input.style.boxSizing = 'border-box'; input.style.width = _inputW(room) + 'px'; this.fitEntityLines(i, input.getBoundingClientRect().width); };
-
-            // (the entity field shown once its list is ready, sized from it — its line, which
-            // holds the menus too, always)
-            if( input ) input.style.display = this.entityListReady() ? '' : 'none';
+            // (the menu as wide as the field: its lines fitted to the field when it opens, and
+            // as the field changes while it's open)
+            const _setInputW = room => {
+                input.style.boxSizing = 'border-box'; input.style.width = _inputW(room) + 'px';
+                if( this._this.querySelector(`#es_${i}`)?.style.display === 'block' ) this.fitEntityLines(i, input.getBoundingClientRect().width);
+            };
 
             // Layout C : no selector, just dl and dr
             if( !input || !sl ) {

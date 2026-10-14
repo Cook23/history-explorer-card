@@ -4,11 +4,12 @@
 import { normalizeColor } from "./history-default-colors.js";
 
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
-// line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js
-export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
+// line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js,
+// and helpers.canvas.lineTo in deps/Chart.js for bspline
+export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom', 'bspline'];
 
 // How each algorithm is named in the Interpolation submenu (names, not translated)
-export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom' };
+export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom', bspline: 'B-spline' };
 
 // (each unknown value is reported once: it's resolved again at each redraw)
 const _reportedInterpolations = new Set();
@@ -180,7 +181,8 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // the plot, thick smooth lines with a fill fading out, a small graph
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
-            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves' },
+            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
+            interpolation: 'bspline' },
 };
 
 // The card's configuration, in its one form (see normalizeOptions), with its

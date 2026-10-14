@@ -59,6 +59,22 @@
     return !c2 || c2.d - c1.d >= _gap / 3 ? best : PICK_BETWEEN;
   }
 
+  // The B-spline segment ending at pts[k] as drawn (helpers.canvas.lineTo), as a few
+  // straight pieces: from the middle of the segment before (or from pts[k - 1], after a
+  // straight one or at the start) to the middle of this one, pts[k - 1] its control point
+  // — then on to pts[k] when the run of B-spline segments ends there
+  function _hecBsplinePath(pts, k) {
+    var a = pts[k - 1], b = pts[k], p = pts[k - 2];
+    var s = p && a.hecBspline ? { x: (p.x + a.x) / 2, y: (p.y + a.y) / 2 } : a;
+    var e = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, path = [s];
+    for (var t = 0.25; t <= 1; t += 0.25) {
+      var u = 1 - t;
+      path.push({ x: u * u * s.x + 2 * u * t * a.x + t * t * e.x, y: u * u * s.y + 2 * u * t * a.y + t * t * e.y });
+    }
+    if (!pts[k + 1] || !pts[k + 1].hecBspline) path.push(b);
+    return path;
+  }
+
   // The point of the segment (ax, ay)-(bx, by) nearest (px, py): { d, x, y }
   function _hecSegmentNearest(px, py, ax, ay, bx, by) {
     var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
@@ -1923,8 +1939,9 @@
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
     // each shown line's point nearest it, along its drawn path — its points joined
-    // straight, or in steps for a stepped line; -1, or PICK_BETWEEN about halfway between
-    // two. Two curves drawn on top of each other there: the one drawn over (the first)
+    // straight, in steps for a stepped line, or a B-spline's arcs (_hecBsplinePath); -1, or
+    // PICK_BETWEEN about halfway between two. Two curves drawn on top of each other there:
+    // the one drawn over (the first)
     _hecCurveAt: function (px, py) {
       var me = this;
       var _m = _hecPickMargin();
@@ -1938,7 +1955,8 @@
           var a = pts[k - 1], b = pts[k];
           // (only the segments around the point can be near it)
           if (Math.max(a.x, b.x) < px - _m || Math.min(a.x, b.x) > px + _m) continue;
-          var path = !st ? [a, b]
+          var path = b.hecBspline ? _hecBsplinePath(pts, k)
+            : !st ? [a, b]
             : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
             : st === 'after' ? [a, { x: a.x, y: b.y }, b]
             : [a, { x: b.x, y: a.y }, b];

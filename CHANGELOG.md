@@ -6,6 +6,18 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.19] - 2026-10-14
 
+### New — mini-graph-card's interpolation
+- `interpolation: bspline` (`b-spline`): mini-graph-card's smoothing, a quadratic B-spline — each segment drawn from the middle of the one before to its own middle, its first value the control point. Never overshoots, the smoothest; it passes through the middles, not through the values (a peak drawn lower), and the dots and the tooltip keep the values measured. In the Interpolation submenu, on the card, a graph, an entity or in `entityOptions`, as the others
+- `look: mini` gives it by default (`smoothing: true` with `look: mini` draws as mini-graph-card)
+- Chart.js: `hecInterpolation: 'bspline'` — drawn by `helpers.canvas.lineTo` (line and fill), a run of it closed at its last point (`helpers.canvas.hecLineEnd`); the curve picking follows its arcs
+- Tests: a peak drawn lower than its value with `bspline`, through it with the others; the curve picked on its arc; `look: mini`'s default; the submenu
+
+### Changed — the card shown sooner
+- What this device saved is restored and shown at once; Home Assistant's user data — the card's, the info panel's switch, the gesture settings — is read meanwhile, its three keys together (one after the other before, the card waiting for them). When it changed since this device last saw it (another device spoke), what's shown is taken again from it (`reloadSaved`); else (nearly always) nothing changes. Nothing is written to it before it's read. A device where the card was never shown still waits for it. The info panel's registry (`defaultInfoPanel`) is updated meanwhile too
+- The entity selector's list built once the card is drawn, no longer before: until then its field reads "Loading…", sized as its list needed the last time on this device (the widths for 90 % and for all of its lines, kept on this device). The lines' shortened forms (`shortNameForms`) are kept on this device too, used as soon as the list is built, then computed again out of the way and kept: ready before the menu opens (it took a second to open with 3 000 entities, 50 ms now), no longer computed at each layout
+- The shorter forms of names (`shortNames`, `legend-names.js`, for the legend and the selector) computed in linear time: each name was compared with every other one to find two the same — 2 s for 3 000 names, 14 ms now, the same forms
+- Tests: the widths and the forms kept on this device, the field sized from them reading "Loading…" before the list is built, the forms ready before the menu opens; a change made on another device taken after the card is shown; the menu's lines fitted when it opens
+
 ### Fixed — the attributes offered
 - The entity selector's attribute submenu offered references that aren't values — an attribute naming an entity (`source: sensor.x`, as lowpass_dt gives its sensors) or a web address (an update entity's `release_url`) — and attributes about a version or an update, their name saying so (`installed_version`, `latest_version`, `auto_update`). They are no longer offered (`seriesAttributes`)
 - Test: such attributes on an entity, not in its submenu
