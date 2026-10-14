@@ -25,7 +25,7 @@ it each time. So:
 
 history-explorer-card is one versatile product: its YAML is read in its own syntax or in
 [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s, indifferently, so that a
-mini-graph-card is replaced by changing its `type:` alone.
+mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`.
 
 - **No separate mode, no translation layer.** Every mini-graph-card option is an option of
   this card, valid with or without `look: mini`: a name meaning the same as one of ours is
