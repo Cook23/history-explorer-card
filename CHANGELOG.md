@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.18b2] - 2026-10-14
+## [v1.2.18] - 2026-10-14
 
 ### New — mini-graph-card's YAML read by the card, as its own
 - A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini` — its options keep working. No separate mode, no translation: each of its names is an alias of one of the card's options, valid with or without `look: mini`, at every level (card, `entityOptions`, graph, entity); each of its values one the option accepts, with the same meaning
@@ -26,8 +26,6 @@ Changelog for the HA History Explorer Card.
 
 ### Tests
 - A new suite, `minigraph`: a mini-graph-card's YAML in place (its graph, its time range, its lines, axes, bounds, legend, fill, decimals); the same values in the card's syntax (points, dashes, thresholds as a list, rounding, `yAxis: primary`); `tap_action` on the card and on entities; every option in its one form from its reading
-
-## [v1.2.18b1] - 2026-10-13
 
 ### Changed — the entity selector sized from its list
 - The field goes between the date and the range when 90 % of the menu's lines fit there; else on a line of its own (three lines on a narrow card). It then takes the room there, up to what its longest line needs — no fixed 150 / 400 / 500 px any more. Measured once, on the whole list
