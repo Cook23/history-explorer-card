@@ -18,6 +18,14 @@ module.exports = async function()
         const d = await t.E('datasets(0)');
         return d.length === 1 && d[0].n > 100 ? true : JSON.stringify(d);
     });
+    await t.step('a click on the padlock locks the Y axis (no legend: the padlock over the Y labels)', async () => {
+        const p = await t.E(`(()=>{ const r=inst().graphs[0].chart._hecLockIconEl.getBoundingClientRect(); return { x: r.left+9, y: r.top+9 }; })()`);
+        const l0 = await t.E('!!inst().graphs[0].chart._hecYAxisLock');
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const l1 = await t.E('!!inst().graphs[0].chart._hecYAxisLock');
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        return !l0 && l1 ? true : JSON.stringify({ l0, l1 });
+    });
     await t.step('the toolbar moves the time window (one day back)', async () => {
         const t0 = await t.E('timeRange()');
         await t.E(`inst()._this.querySelector('#b1_0').click()`); await t.wait(1200);

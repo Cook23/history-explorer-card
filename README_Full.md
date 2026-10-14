@@ -1352,8 +1352,8 @@ type: custom:history-explorer-card
 gestures:
   longPress: 500        # ms, mouse and pen (200 to 2000; default 500)
   longPressTouch: 500   # ms, finger
-  precision: 8          # px, mouse and pen (2 to 40; default 8)
-  precisionTouch: 12    # px, finger (default 12)
+  precision: 8          # px, mouse and pen (4 to 20; default 8)
+  precisionTouch: 12    # px, finger (4 to 20; default 12)
 ```
 
 A value out of bounds is brought within them. They apply to every card and info panel of the page: whether set in a card's YAML or in the menu, the last one to speak wins, and they are kept on every device, whatever the card's persistence options — as the info panel's switch.

@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.19] - 2026-10-14
+
+### Fixed — the attributes offered
+- The entity selector's attribute submenu offered references that aren't values — an attribute naming an entity (`source: sensor.x`, as lowpass_dt gives its sensors) or a web address (an update entity's `release_url`) — and attributes about a version or an update, their name saying so (`installed_version`, `latest_version`, `auto_update`). They are no longer offered (`seriesAttributes`)
+- Test: such attributes on an entity, not in its submenu
+
+### Fixed — the padlock out of reach without a legend
+- In the info panel (and in any graph without a legend), a click on the padlock did nothing: drawn over the Y axis' labels, it was below the plot area's top, where the controls took no gesture except in their narrow card's box. The handle and the padlock, and the chain icon, are now floating icons: drawn wherever they fit, over what is under them, each takes a gesture on its box or within half the largest picking margin around it (half a finger's or a mouse's `slop`, the larger, whatever the pointer: 36 px targets by default) — whatever is under; not drawn, it takes nothing, and the gesture goes to what is under. The chain icon stays right of the handle and the padlock's box, the largest picking margin apart, so that their sensitive zones never meet (`_hecTopTargetAt`, `_hecLockAndHandleRect`, `_hecLinkMarkerRect`)
+- The handle and the padlock in a half see-through box like the chain icon's, on every card (only on a narrow one before, then as opaque as the Y labels' boxes, as it stays there): the chain icon and the padlock alone in round boxes of the same size (24 px), the handle and the padlock in an oblong one — half circles at both ends
+- The precision settings (`gestures: precision`, `precisionTouch`) within 4 to 20 px — 2 to 40 before: the floating icons' sensitive zones and the chain icon's distance grow with them, and 2 px made any tremor a drag
+- Tests: a click on the padlock in the info panel, and on a graph without a legend; the corner without a handle or a padlock; the boxes; the chain icon's distance
+
+
 ## [v1.2.18] - 2026-10-14
 
 ### New — mini-graph-card's YAML read by the card, as its own
@@ -28,10 +41,6 @@ Changelog for the HA History Explorer Card.
 - A pinch is never exactly horizontal, vertical or centred, and every pinch changed everything at once — the time's zoom, the Y axis' zoom (locking it), the time's and the Y axis' pan. Now, of these four changes counted since the pinch started, the one it's mostly made in — the largest once one goes beyond the finger's precision (the gesture settings' `slop`) — is the pinch's way, the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side, in pixels. Each counts only beyond its threshold (no jump), and back within it is brought back. A pinch rather horizontal zooms the time only, rather vertical the Y axis only, a centred one doesn't pan
 - The pinch applied once per frame, both fingers' positions known — each finger's event comes on its own, and one finger moved alone looked like a change of spread
 - Tests: a pinch rather horizontal (the Y axis untouched, not locked), rather vertical (the time span unchanged), nearly centred (zoomed as a centred one, not panned) and off centre (panned too), two fingers moving diagonally (both panned)
-
-### Fixed — the attributes offered
-- The entity selector's attribute submenu offered references that aren't values — an attribute naming an entity (`source: sensor.x`, as lowpass_dt gives its sensors) or a web address (an update entity's `release_url`) — and attributes about a version or an update, their name saying so (`installed_version`, `latest_version`, `auto_update`). They are no longer offered (`seriesAttributes`)
-- Test: such attributes on an entity, not in its submenu
 
 ### Fixed — the entity selector's search (#141)
 - Typing in the entity selector filtered nothing — the list stayed whole — as soon as one entity listed had an entity_id with a part starting with a digit (`binary_sensor.4341…`, Zigbee's `sensor.0x00158d…`): each line had its entity_id as its id, and the menu's layout looked a line's submenu up by it, an invalid CSS selector then. A line's entity is now in its `dataset` only; `architecture` test: a new rule, `element-ids` — an element's id is the card's own name, never a piece of data
