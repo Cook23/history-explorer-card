@@ -104,6 +104,8 @@ const RULES = [
           return PARTS.writes.filter(w => w.file === file && owners.get(w.field).size > 1)
               .map(w => ({ index: at(w.line), text: w.field + ' (also ' + [...owners.get(w.field)].filter(f => f !== file).join(', ') + ')' }));
       } },
+    { id: 'options-read', why: "the options are put in their one form where they're read (card-config.js, history-options.js's normalizeOptions): the rest of the card only knows that form",
+      files: CARD.filter(f => !['src/card-config.js', 'src/history-options.js'].includes(f)), re: /\bnormalize(Options|LineMode|Interpolation|YAxis|Stats)\b|\bparseIntervalConfig\b/g },
     { id: 'inputs', why: "the gestures, the menus, the selector and the toolbar ask card-operations.js for a change of what's shown: they never change the entity list or the graphs themselves",
       files: ['src/card-gestures.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-toolbar.js'],
       re: /this\.store\.(add|remove|reset|removeAllDynamic|moveToGroup|setGraphOrder|syncGroupOrder|moveBefore|regroup|setGraphKey|newGroupId|normalizeGroupIds)\(|this\.(addGraph|detachGraph|rebuildGraph|detachAndRebuildRemaining|removeGraphs|placeGraphs|buildGraphsFromStore|clearGraphs|writeLocalState)\(/g },

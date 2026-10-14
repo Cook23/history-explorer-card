@@ -281,24 +281,6 @@ function _parseThresholdText(s)
 const _isColor = c => typeof c === 'string' && c !== '' && ( typeof CSS === 'undefined' || !CSS.supports || CSS.supports('color', c) );
 const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.trim() !== '' ) ? Number(v) : NaN;
 
-// Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
-// as an object of thresholds; a stop without a value (or a color alone) between two that
-// have one gets its value spaced evenly between them (null when it isn't such a list —
-// an RGB triplet, [r, g, b], is a color)
-function _thresholdList(list)
-{
-    if( list.every(x => typeof x === 'number' || ( typeof x === 'string' && x.trim() !== '' && !isNaN(Number(x)) )) ) return null;
-    const _stops = list.map(x => typeof x === 'string' ? { color: x } : ( x && typeof x === 'object' ) ? { value: _number(x.value), color: x.color } : null)
-                       .filter(x => x && x.color !== undefined);
-    for( let i = 0; i < _stops.length; i++ ) {
-        if( !isNaN(_stops[i].value) ) continue;
-        const a = i - 1, b = _stops.findIndex((x, j) => j > i && !isNaN(x.value));
-        if( a < 0 || isNaN(_stops[a].value) || b < 0 ) continue;
-        _stops[i].value = _stops[a].value + ( _stops[b].value - _stops[a].value ) / ( b - a );
-    }
-    return Object.fromEntries(_stops.filter(x => !isNaN(x.value)).map(x => [x.value, x.color]));
-}
-
 // The fill of a curve of color `color`: `fill` as it's written — true, its color as
 // transparent as the palette's fills (for a color that varies — thresholds, an entity's —
 // only that transparency, each point's fill taking its own color: see _fillLike); false,
@@ -313,8 +295,8 @@ export function fillValue(fill, color)
 }
 
 // The value of a color option — the same forms whether it's given in the configuration or
-// read from an entity's state: a color (see parseColor), or thresholds (an object, the
-// same as text, or a list — see _thresholdList): a number key is a threshold, any other
+// read from an entity's state: a color (see parseColor), or thresholds (an object, or the
+// same as text): a number key is a threshold, any other
 // key a state compared as it is written, `default` the color of every value they don't
 // cover (`entity`, the entity whose value they compare — see colorEntityOf — is left to
 // the caller) → { color }, or { thresholds: [[value, color], ...] in increasing order,
@@ -322,7 +304,6 @@ export function fillValue(fill, color)
 export function parseColorValue(v)
 {
     if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim());
-    if( Array.isArray(v) ) v = _thresholdList(v) ?? v;
     if( v && typeof v === 'object' && !Array.isArray(v) ) {
         const spec = { thresholds: [], states: {}, default: undefined };
         for( const [k, c0] of Object.entries(v) ) {

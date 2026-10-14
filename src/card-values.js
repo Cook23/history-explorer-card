@@ -8,16 +8,6 @@ import { i18n } from "./languages.js";
 import { formatNumber } from "./history-units.js";
 const moment = window.HXLocal_moment;
 
-// The statistics a curve can show, in the order they're shown (left to right)
-export const STATS = ['min', 'average', 'max'];
-
-// showStats as a list of STATS: true for all of them, a name or a list of names, else none
-export function normalizeStats(v)
-{
-    if( v === true ) return STATS;
-    const _l = ( Array.isArray(v) ? v : typeof v === 'string' ? [v] : [] ).map(s => String(s).toLowerCase());
-    return STATS.filter(s => _l.includes(s) || ( s === 'average' && _l.includes('avg') ));
-}
 
 // A curve's minimum, average (weighted by time: each value counts for as long as it lasted)
 // and maximum over [t0, t1] (ms) — samples: { t, v } in time order, the first one possibly
@@ -66,7 +56,7 @@ export class CardValues
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
             .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
-        const _stats = _entities.map(x => ({ ...x, which: normalizeStats(this._resolveShow(x.e, 'showStats')) })).filter(x => x.which.length);
+        const _stats = _entities.map(x => ({ ...x, which: this._resolveShow(x.e, 'showStats') ?? [] })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
         const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
         const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
@@ -96,6 +86,6 @@ export class CardValues
     // roundingOf)
     _roundedValue(v, d)
     {
-        return formatNumber(v, d?.rounding ?? this.pconfig.rounding);
+        return formatNumber(v, d?.rounding);
     }
 }

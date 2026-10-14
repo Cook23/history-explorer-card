@@ -113,13 +113,13 @@ function hxHookInfoPanel()
             entity   : entity_id,
             groupId  : instance.g_id,
             width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.lineWidth ?? 1.001) : undefined,
-            interval : instance.parseIntervalConfig(entityOptions?.interval) ?? null,
+            interval : entityOptions?.interval ?? null,
             isStatic : true,
         };
         instance.store.reset([_pcEntry]);
 
         instance.graphs = [];
-        instance.addGraph(entity_id, { noAutoGroup: true, color: entityOptions?.color, fill: entityOptions?.fill, isStatic: true, interval: instance.parseIntervalConfig(entityOptions?.interval), groupId: instance.g_id, entry: _pcEntry });
+        instance.addGraph(entity_id, { noAutoGroup: true, color: entityOptions?.color, fill: entityOptions?.fill, isStatic: true, interval: entityOptions?.interval, groupId: instance.g_id, entry: _pcEntry });
     }
 
     __fn.prototype._injectHistoryExplorer = function(instance)

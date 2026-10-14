@@ -6,7 +6,6 @@
 
 import { i18n } from "./languages.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
-import { normalizeLineMode } from "./history-options.js";
 import { parseColor } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
@@ -43,7 +42,7 @@ export class CardCharts
     _legendValue(entity, unit, shownScale = 1, rounding)
     {
         const v = Number(this.stateOf(entity)?.state) * shownScale;
-        return isNaN(v) ? '' : '(' + formatNumber(v, rounding ?? this.pconfig.rounding) + (unit ? ' ' + unit : '') + ')';
+        return isNaN(v) ? '' : '(' + formatNumber(v, rounding) + (unit ? ' ' + unit : '') + ')';
     }
 
     generateTooltipContents(label, d, mode, n = 1)
@@ -306,11 +305,10 @@ export class CardCharts
     // keep it: the menu marks it next time, and it's saved with them)
     setLineMode(g, indices, lineMode)
     {
-        const _mode = normalizeLineMode(lineMode);
         for( const i of indices ) {
             const _ds = g.chart.data.datasets[i];
-            if( _ds ) Object.assign(_ds, this._lineModeStyle(_mode));
-            if( g.entities[i] ) g.entities[i].lineMode = _mode;
+            if( _ds ) Object.assign(_ds, this._lineModeStyle(lineMode));
+            if( g.entities[i] ) g.entities[i].lineMode = lineMode;
         }
         g.chart.update();
     }
@@ -338,10 +336,8 @@ export class CardCharts
     _curveDataset(d, graphtype, config)
     {
         const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(d.showPoints, config?.showPoints, d.width);
-        // (dashMode: a style's name, or its dashes and gaps — a list, or as CSS writes them:
-        // '10,10', '10 5')
+        // (dashMode: a style's name, or its dashes and gaps)
         const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
-        const _dash = m => Array.isArray(m) ? m : _dashes[m] ?? ( typeof m === 'string' && /^[\d.\s,]+$/.test(m) ? m.trim().split(/[\s,]+/).map(Number) : undefined );
         return {
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
@@ -352,7 +348,7 @@ export class CardCharts
             // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
             hecFillFade: d.fillFade && d.kind === 'line',
             borderWidth: d.width,
-            borderDash: _dash(d.dashMode),
+            borderDash: Array.isArray(d.dashMode) ? d.dashMode : _dashes[d.dashMode],
             pointRadius: _pointRadius,
             pointStyle: 'circle',
             pointBackgroundColor: d.bColor,
@@ -544,7 +540,7 @@ export class CardCharts
                         let _v = item.yLabel / _siFactor * _tf;
                         // (a circular curve shows its real value, in [0, period))
                         if( _circQ ) _v = this.wrapCircular(_v, _circQ * Math.abs(_tf));
-                        label += formatNumber(_v, _ds.rounding ?? this.pconfig.rounding);
+                        label += formatNumber(_v, _ds.rounding);
                         label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                         return label;
                     } else if( graphtype == 'timeline' ) {
@@ -556,7 +552,7 @@ export class CardCharts
                         return this.generateTooltipContents(label, d, tooltipSize, datasets.length);
                     } else if( graphtype == 'arrowline' ) {
                         const d = data.datasets[item.datasetIndex].data[item.index];
-                        let label = formatNumber(d[2], data.datasets[item.datasetIndex].rounding ?? this.pconfig.rounding);
+                        let label = formatNumber(d[2], data.datasets[item.datasetIndex].rounding);
                         label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                         return this.generateTooltipContents(label, d, 'slim');
                     }
@@ -634,7 +630,7 @@ export class CardCharts
         const canvas = this._this.querySelector(`#graph${gid}`);
 
         // Needed before building the datasets: it decides how each bar entity is drawn
-        const interval = config?._graphInterval ?? this.parseIntervalConfig(config?.interval) ?? 1;
+        const interval = config?._graphInterval ?? config?.interval ?? 1;
 
         let datasets = [];
         for( let d of entities ) {
@@ -648,7 +644,7 @@ export class CardCharts
                 "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : parseColor(d.fill),
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
-                "mode": normalizeLineMode(d.lineMode) || this.pconfig.defaultLineMode,
+                "mode": d.lineMode || this.pconfig.defaultLineMode,
                 "interpolation": this.resolveInterpolation(d),
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,

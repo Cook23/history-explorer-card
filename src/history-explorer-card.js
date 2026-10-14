@@ -102,7 +102,7 @@ export class HistoryCardState {
         this.pconfig.filterEntities       = undefined;
         this.pconfig.excludeFilterEntities = undefined;
         this.pconfig.decimation           = 'fast';
-        this.pconfig.rounding             = { digits: 2, exact: false };
+        this.pconfig.rounding             = undefined;
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
         this.pconfig.cardGraphDefaults    = {};

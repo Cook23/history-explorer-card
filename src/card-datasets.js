@@ -4,7 +4,7 @@
 
 import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
-import { barInterval, RAW_INTERVAL, normalizeLineMode } from "./history-options.js";
+import { barInterval, RAW_INTERVAL } from "./history-options.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -340,7 +340,7 @@ export class CardDatasets
             }
         }
 
-        if( (normalizeLineMode(e.lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+        if( (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
             // Silences are detected on every recorded value (before decimation)
             const _raw = [];
             for( let i = 0; i < n; i++ ) {

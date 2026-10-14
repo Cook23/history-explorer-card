@@ -20,8 +20,12 @@ Changelog for the HA History Explorer Card.
 - `rounding` (`decimals`) set: exactly that many decimals (`20.0`); not set: at most 2, as before. `rounding: 0` gave 2 decimals — now none. It can be set on an entity, a graph or in `entityOptions` too
 - `showPoints: false`: no dot at all, not even the hovered one; `hover` (the default): only the hovered dot. Points hidden from a curve's menu: back to `hover`
 
+### Changed — every option in its one form where it's read
+- Every spelling the user may write — a synonym, mini-graph-card's names and values, `show:`, a bar interval's name, `showStats` as a name, an interpolation's case — is resolved once, where the card, `entityOptions`, a graph and an entity are read (`history-options.js` `normalizeOptions`, called by `card-config.js`); the rest of the card only tests that form, and that form is what is saved — an alias written instead of its value is no longer a change. Before, each part read some of them again (`lineMode` in five places, the bar interval in four, `entityOptions` on each read)
+- ARCHITECTURE.md rule 7; `architecture` test: a new rule, `options-read`
+
 ### Tests
-- A new suite, `minigraph`: a mini-graph-card's YAML in place (its graph, its time range, its lines, axes, bounds, legend, fill, decimals); the same values in the card's syntax (points, dashes, thresholds as a list, rounding, `yAxis: primary`); `tap_action` on the card and on entities
+- A new suite, `minigraph`: a mini-graph-card's YAML in place (its graph, its time range, its lines, axes, bounds, legend, fill, decimals); the same values in the card's syntax (points, dashes, thresholds as a list, rounding, `yAxis: primary`); `tap_action` on the card and on entities; every option in its one form from its reading
 
 ## [v1.2.18b1] - 2026-10-13
 

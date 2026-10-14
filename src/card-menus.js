@@ -4,7 +4,7 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, normalizeLineMode } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";

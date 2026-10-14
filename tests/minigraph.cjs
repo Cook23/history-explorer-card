@@ -87,6 +87,19 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Every option in its one form from its reading: what the card keeps and saves ──
+    t = await openCard(card({ graphs: [{ type: 'bar', entities: [
+        { entity: 'sensor.power', y_axis: 'secondary', smoothing: false, line_style: '10, 5', decimals: '1', tap_action: 'none', interval: 'daily', showStats: 'avg',
+          color_thresholds: [{ value: 0, color: '#0000ff' }, '#00ff00', { value: 1000, color: '#ff0000' }], interpolation: 'Catmull-Rom' }] }] }),
+        { mock: { series: true }, height: 700 });
+    await t.wait(1000);
+    await t.step('the aliases of names and values resolved where the YAML is read: the entry holds only the card\'s own forms', async () => {
+        const v = await t.E(`(()=>{ const e=el.instance.store.list.find(x=>x.entity==='sensor.power');
+            return JSON.stringify([e.yAxis, e.lineMode, e.dashMode, e.rounding, e.tapAction, e.interval, e.showStats, e.color, e.interpolation]); })()`);
+        return v === JSON.stringify(['right', 'lines', [10, 5], 1, { action: 'none' }, 2, ['average'], { 0: '#0000ff', 500: '#00ff00', 1000: '#ff0000' }, 'catmullrom']) ? true : v;
+    });
+    done(await t.close());
+
     // ── tap_action: a click on a value ──
     const clickValue = async (t, i) => {
         const p = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;

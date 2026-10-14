@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeYAxis, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -46,15 +46,16 @@ export function getEntityOptionsPure(hass, entityOptions, entity)
         }
     }
 
-    return c ?? undefined;
+    return normalizeOptions(c) ?? undefined;
 }
 
-// The decimals of the values written (see formatNumber): `rounding` (decimals), a whole
-// number ≥ 0 — then exactly that many; undefined when it isn't set or isn't valid
-function roundingSpec(r)
+// entityOptions in their one form (see normalizeOptions): each entry's — a list (with
+// patterns) or an object keyed by entity id, device class or domain
+function normalizeEntityOptions(eo)
 {
-    const n = Number(r);
-    return ( r !== undefined && r !== null && r !== '' && Number.isInteger(n) && n >= 0 ) ? { digits: n, exact: true } : undefined;
+    if( Array.isArray(eo) ) return eo.map(normalizeOptions);
+    if( !eo || typeof eo !== 'object' ) return eo;
+    return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, normalizeOptions(v)]));
 }
 
 export class CardConfig
@@ -69,13 +70,13 @@ export class CardConfig
     applyConfig(config, { defaults = {}, fixed = {} } = {})
     {
         const P = this.pconfig;
-        // (every spelling of an option accepted — see normalizeOptionSynonyms)
-        const c = normalizeOptionSynonyms(config);
+        // (the options in their one form, whatever the user wrote — see normalizeOptions)
+        const c = normalizeOptions(config);
         const d = (k, v) => k in defaults ? defaults[k] : v;
 
         P.customStateColors = {};
         for( let i in c.stateColors ?? {} ) P.customStateColors[i] = parseColor(c.stateColors[i]);
-        P.entityOptions =          c.entityOptions;
+        P.entityOptions =          normalizeEntityOptions(c.entityOptions);
 
         P.labelAreaWidth =         c.labelAreaWidth ?? 65;
         P.labelsVisible =          c.labelsVisible ?? true;
@@ -91,11 +92,11 @@ export class CardConfig
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
         P.decimation =             c.decimation;
-        P.rounding =               roundingSpec(c.rounding) ?? { digits: 2, exact: false };
+        P.rounding =               c.rounding;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
-        P.defaultLineMode =        normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
-        P.defaultInterpolation =   normalizeInterpolation(c.interpolation) ?? 'monotone';
+        P.defaultLineMode =        c.lineMode ?? d('defaultLineMode', undefined);
+        P.defaultInterpolation =   c.interpolation ?? 'monotone';
         P.defaultLineWidth =       c.lineWidth ?? 2.0;
         P.defaultDashMode =        c.dashMode;
         P.defaultNetBars =         c.netBars;
@@ -140,11 +141,6 @@ export class CardConfig
         this.statistics.force =     c.statistics?.force ?? undefined;
 
         Object.assign(P, fixed);
-    }
-
-    parseIntervalConfig(s)
-    {
-        return BAR_INTERVALS.find(i => i.yaml && i.yaml === s)?.code;
     }
 
     // --------------------------------------------------------------------------------------
@@ -196,18 +192,18 @@ export class CardConfig
                 const key = p.match ?? p.entity;
                 if( !key ) continue;
                 if( this._matchGlob(entity, key) ) {
-                    const { match, entity: _e, ...opts } = normalizeOptionSynonyms(p);
+                    const { match, entity: _e, ...opts } = p;
                     for( const k in opts ) {
                         if( !(k in patched) ) patched[k] = opts[k];
                     }
                 }
             }
             if( Object.keys(patched).length ) {
-                c = Object.assign({}, patched, normalizeOptionSynonyms(c) ?? {});
+                c = Object.assign({}, patched, c ?? {});
             }
         }
 
-        return normalizeOptionSynonyms(c) ?? undefined;
+        return c ?? undefined;
     }
 
     // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
@@ -215,41 +211,36 @@ export class CardConfig
     resolveInterpolation(e)
     {
         return e?.interpolation
-            ?? normalizeInterpolation(this.pconfig.graphs[e?.groupId]?.interpolation)
-            ?? normalizeInterpolation(this.getEntityOptions(e?.entity)?.interpolation)
+            ?? this.pconfig.graphs[e?.groupId]?.interpolation
+            ?? this.getEntityOptions(e?.entity)?.interpolation
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
     }
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
-    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's
-    // (primary and secondary: left and right, see normalizeYAxis). Resolved when drawn,
-    // never copied onto the entity: a curve moved to another graph takes that graph's.
+    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
+    // Resolved when drawn, never copied onto the entity: a curve moved to another graph
+    // takes that graph's.
     resolveYAxis(e)
     {
-        return normalizeYAxis(e?.yAxis)
-            ?? normalizeYAxis(this.pconfig.graphs[e?.groupId]?.yAxis)
-            ?? normalizeYAxis(this.getEntityOptions(e?.entity)?.yAxis)
-            ?? normalizeYAxis(this.pconfig.defaultYAxis) ?? 'auto';
+        return e?.yAxis ?? this.pconfig.graphs[e?.groupId]?.yAxis ?? this.getEntityOptions(e?.entity)?.yAxis
+            ?? this.pconfig.defaultYAxis ?? 'auto';
     }
 
     // The decimals of entity e's values (see formatNumber): its own `rounding`, else its
-    // graph's, else entityOptions', else the card's
+    // graph's, else entityOptions', else the card's — undefined: at most 2
     roundingOf(e)
     {
-        return roundingSpec(e?.rounding)
-            ?? roundingSpec(this.pconfig.graphs[e?.groupId]?.rounding)
-            ?? roundingSpec(this.getEntityOptions(e?.entity)?.rounding)
+        return e?.rounding ?? this.pconfig.graphs[e?.groupId]?.rounding ?? this.getEntityOptions(e?.entity)?.rounding
             ?? this.pconfig.rounding;
     }
 
-    // What a click on entity e's value does (tapAction, tap_action — Home Assistant's
-    // actions: more-info, navigate, url, perform-action / call-service, none): its own, else
-    // its graph's, else entityOptions', else the card's — more-info when none is set (an
-    // action's name alone stands for it)
+    // What a click on entity e's value does (tapAction — Home Assistant's actions: more-info,
+    // navigate, url, perform-action / call-service, none): its own, else its graph's, else
+    // entityOptions', else the card's — more-info when none is set
     tapActionOf(e)
     {
-        const a = e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction ?? this.pconfig.tapAction;
-        return typeof a === 'string' ? { action: a } : ( a && typeof a === 'object' ) ? a : { action: 'more-info' };
+        return e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction
+            ?? this.pconfig.tapAction ?? { action: 'more-info' };
     }
 
     _matchGlob(str, pattern)
@@ -296,7 +287,7 @@ export class CardConfig
                      this.circularPeriodOf({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
                      _cumulative ? 'bar' :
                      ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
-        const lineMode = normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
+        const lineMode = entityOptions?.lineMode || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }
 
@@ -306,7 +297,7 @@ export class CardConfig
 
     _makeStaticEntityEntry(entity, groupId, ent, interval)
     {
-        ent = normalizeOptionSynonyms(ent);
+        ent = normalizeOptions(ent);
         return {
             entity            : entity,
             groupId           : groupId,
@@ -314,7 +305,7 @@ export class CardConfig
             colorSet          : ent.color !== undefined || undefined,
             fill              : ent.fill,
             hidden            : ent.hidden,
-            interval          : this.parseIntervalConfig(ent.interval) ?? interval,
+            interval          : ent.interval ?? interval,
             isStatic          : true,
             name              : ent.name,
             scale             : ent.scale,
@@ -391,10 +382,10 @@ export class CardConfig
             // The graph's options: under `options:`, or directly on the graph (`options:`
             // wins when both are set), with every synonym accepted
             const _gopts = graph.options && typeof graph.options === 'object' ? graph.options : {};
-            const _opts = normalizeOptionSynonyms({
+            const _opts = normalizeOptions({
                 ...Object.fromEntries(GRAPH_OPTION_KEYS.filter(k => graph[k] !== undefined).map(k => [k, graph[k]])),
                 ..._gopts });
-            const _interval = this.parseIntervalConfig(_opts.interval) ?? null;
+            const _interval = _opts.interval ?? null;
 
             // A curve once per graph; in another graph, a second curve of the same series
             // (its copy number — see keyOf)
@@ -485,7 +476,7 @@ export class CardConfig
     // The line mode an entity is drawn with
     lineModeOf(e)
     {
-        return normalizeLineMode(e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+        return e?.lineMode || this.pconfig.defaultLineMode || 'curves';
     }
 
     // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only
