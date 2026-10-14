@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeYAxis, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -49,6 +49,14 @@ export function getEntityOptionsPure(hass, entityOptions, entity)
     return c ?? undefined;
 }
 
+// The decimals of the values written (see formatNumber): `rounding` (decimals), a whole
+// number ≥ 0 — then exactly that many; undefined when it isn't set or isn't valid
+function roundingSpec(r)
+{
+    const n = Number(r);
+    return ( r !== undefined && r !== null && r !== '' && Number.isInteger(n) && n >= 0 ) ? { digits: n, exact: true } : undefined;
+}
+
 export class CardConfig
 {
     // --------------------------------------------------------------------------------------
@@ -83,7 +91,7 @@ export class CardConfig
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
         P.decimation =             c.decimation;
-        P.roundingPrecision =      c.rounding || 2;
+        P.rounding =               roundingSpec(c.rounding) ?? { digits: 2, exact: false };
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
         P.defaultLineMode =        normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
@@ -97,8 +105,10 @@ export class CardConfig
         P.cardShow =               { showState: c.showState, showStats: c.showStats };
         P.defaultShowPoints =      c.showPoints;
         P.defaultYAxis =           c.yAxis;
+        P.tapAction =              c.tapAction;
+        // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
-            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+            ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
         // barGraphHeight set their own)
         P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
@@ -211,16 +221,35 @@ export class CardConfig
     }
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
-    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
-    // Resolved when drawn, never copied onto the entity: a curve moved to another graph
-    // takes that graph's.
+    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's
+    // (primary and secondary: left and right, see normalizeYAxis). Resolved when drawn,
+    // never copied onto the entity: a curve moved to another graph takes that graph's.
     resolveYAxis(e)
     {
-        const _valid = v => ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
-        return _valid(e?.yAxis)
-            ?? _valid(this.pconfig.graphs[e?.groupId]?.yAxis)
-            ?? _valid(this.getEntityOptions(e?.entity)?.yAxis)
-            ?? _valid(this.pconfig.defaultYAxis) ?? 'auto';
+        return normalizeYAxis(e?.yAxis)
+            ?? normalizeYAxis(this.pconfig.graphs[e?.groupId]?.yAxis)
+            ?? normalizeYAxis(this.getEntityOptions(e?.entity)?.yAxis)
+            ?? normalizeYAxis(this.pconfig.defaultYAxis) ?? 'auto';
+    }
+
+    // The decimals of entity e's values (see formatNumber): its own `rounding`, else its
+    // graph's, else entityOptions', else the card's
+    roundingOf(e)
+    {
+        return roundingSpec(e?.rounding)
+            ?? roundingSpec(this.pconfig.graphs[e?.groupId]?.rounding)
+            ?? roundingSpec(this.getEntityOptions(e?.entity)?.rounding)
+            ?? this.pconfig.rounding;
+    }
+
+    // What a click on entity e's value does (tapAction, tap_action — Home Assistant's
+    // actions: more-info, navigate, url, perform-action / call-service, none): its own, else
+    // its graph's, else entityOptions', else the card's — more-info when none is set (an
+    // action's name alone stands for it)
+    tapActionOf(e)
+    {
+        const a = e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction ?? this.pconfig.tapAction;
+        return typeof a === 'string' ? { action: a } : ( a && typeof a === 'object' ) ? a : { action: 'more-info' };
     }
 
     _matchGlob(str, pattern)
@@ -317,9 +346,21 @@ export class CardConfig
             decimation        : ent.decimation,
             circular          : ent.circular,
             yAxis             : ent.yAxis,
+            rounding          : ent.rounding,
+            tapAction         : ent.tapAction,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
+    }
+
+    // The YAML's graphs: the one the card's own `entities` make, as mini-graph-card writes
+    // them — its `name` the graph's title, its `show: graph` the graph's type (line, or
+    // bar) — then `graphs` (undefined when there's none)
+    yamlGraphs(config)
+    {
+        if( !Array.isArray(config?.entities) || !config.entities.length ) return config?.graphs;
+        const _own = { type: config.show_graph === 'bar' ? 'bar' : 'line', title: config.name, entities: config.entities };
+        return [_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )];
     }
 
     // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
@@ -371,6 +412,8 @@ export class CardConfig
             };
 
             for( let e of graph.entities ) {
+                // (an entity_id alone: that entity)
+                if( typeof e === 'string' ) e = { entity: e };
                 if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
                     console.warn(`history-explorer-card: skipping invalid entity entry in graph '${graph.title ?? graph.type ?? '?'}' (expected an object with a non-empty 'entity' string, got ${JSON.stringify(e)})`);
                     continue;
@@ -433,6 +476,8 @@ export class CardConfig
                 decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
                 yAxis          : _opts.yAxis,
+                rounding       : _opts.rounding,
+                tapAction      : _opts.tapAction,
             };
         }
     }

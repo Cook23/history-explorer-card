@@ -958,7 +958,7 @@ Three more options shape the graph itself:
 - **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -997,49 +997,57 @@ The card follows its width as it changes (a screen turned, a window resized).
 
 ### Replacing mini-graph-card
 
-One mini-graph-card is one graph of a card with `look: mini` — several of them can be graphs of one card, or cards of their own. Its options translate as follows:
+**(1.2)** The card reads mini-graph-card's YAML as its own: a mini-graph-card is replaced in place, with `type: custom:history-explorer-card` and `look: mini` — its other lines unchanged.
+
+```yaml
+type: custom:history-explorer-card    # was custom:mini-graph-card
+look: mini                            # mini-graph-card's look
+name: Power
+hours_to_show: 12
+line_width: 3
+show:
+  fill: false
+entities:
+  - sensor.power
+  - entity: sensor.rain
+    y_axis: secondary
+```
+
+There is no separate mode: each mini-graph-card name is an alias of one of the card's options, valid with or without `look: mini`, at every level (card, `entityOptions`, graph, entity), and each of its values one the option accepts, with the same meaning. `look: mini` only gives defaults — mini-graph-card's look; any option set, under either name, wins. An option set under both names: the card's wins.
 
 | mini-graph-card | history-explorer-card |
 |---|---|
-| `entities: [sensor.x]` | `graphs: [{ entities: [{ entity: sensor.x }] }]` |
-| `name` | the graph's `title` |
-| `icon`, `icon_image`, `tap_action`, `group`, `font_size`, `font_size_header`, `align_header`, `align_icon`, `align_state`, `animate`, `hour24`, `cache`, `loading_indicator` | — (the card's own layout and gestures) |
-| `hours_to_show` | `defaultTimeRange` (`24h`, `7d`…) |
-| `points_per_hour` | `decimation` (curves) |
-| `aggregate_func`, `group_by` | bars: their `interval` (and long-term statistics); curves: — |
-| `update_interval` | automatic refresh (on by default: each change, at most every 2 s) |
-| `height` | `height` |
+| `entities` (on the card), an entity as its entity_id alone | one graph of those entities (`graphs: [{ entities: [...] }]`); `- sensor.x` is accepted in any graph |
+| `name` | that graph's `title` |
+| `show: { x: … }` | `show_x: …` — read as the options below |
+| `show.graph: line` / `bar`, entity `graph` | `type` |
+| `hours_to_show` | `defaultTimeRange` |
+| `height` | `height` — the graph's (the header's lines not counted) |
 | `line_width` | `lineWidth` |
-| `line_color`, entity `color` | `color` |
-| `color_thresholds` | `color` with thresholds (`{ 0: blue, 20: red }`), on the value or on another entity's |
-| `color_thresholds_transition: hard` | the default (a curve changes color on a point) |
-| `decimals` | `rounding` |
-| `unit`, entity `unit` | `unit` |
-| `lower_bound`, `upper_bound` | `ymin`, `ymax` (`ylock: true` for fixed bounds) |
-| `lower_bound_secondary`, `upper_bound_secondary` | the right axis' bounds: `ymin`, `ymax` on its curves — see [Y axis scaling](#y-axis-scaling) |
-| `min_bound_range` | — |
-| `smoothing: true` / `false` | `lineMode: smart` (or `curves`) / `lines` |
-| `logarithmic` | — |
-| `state_map` | a timeline (`type: timeline`) and its `stateColors` |
-| `value_factor` | `scale` (with `unit` for a conversion) |
-| `show.name` | the graph's `title` |
-| `show.state` | `showState` |
-| `show.graph: line` / `bar` | `type: line` / `bar` |
-| `show.fill: true` / `fade` / `false` | `fill` (a color) / `fill: fade` / `fill: rgba(0,0,0,0)` |
-| `show.points` | `showPoints` |
-| `show.legend` | `legendVisible` |
-| `show.extrema` | `showStats: [min, max]` |
-| `show.average` | `showStats: [average]` (with the others: `[min, average, max]`) |
-| `show.labels`, `show.labels_secondary` | `yLabels: inside` (`showTimeLabels` for the time axis) |
-| entity `attribute` | `attribute` |
-| entity `name` | `name` |
-| entity `y_axis: secondary` | `yAxis: right` |
-| entity `show_state` | `showState` on the entity |
-| entity `show_legend_state` | `showCurrentValues` (the value in the legend) |
-| entity `show_graph: false` | `hidden: true` (shown again from the legend) |
-| entity `show_fill`, `show_points` | `fill`, `showPoints` on the entity |
-| entity `smoothing` | `lineMode` on the entity |
-| entity `fixed_value`, `show_indicator`, `show_line`, `state_adaptive_color` | — |
+| `line_style` (`'10,10'`) | `dashMode` — a style's name, or dashes and gaps as CSS writes them |
+| entity `color` | `color` |
+| `color_thresholds` | `color` — thresholds as a list (a stop without a value spaced between its neighbours), or as an object (`{ 0: blue, 20: red }`) |
+| `decimals` | `rounding` — exactly that many decimals |
+| `unit` | `unit` (on the card: every entity's) |
+| `lower_bound`, `upper_bound` | `ymin`, `ymax` |
+| `smoothing: true` / `false` | `lineMode: true` / `false` (curves / lines) |
+| `y_axis: primary` / `secondary` | `yAxis: primary` / `secondary` (left / right) |
+| `show_state`, `show.state` | `showState` |
+| `show_points`, `show.points` (`true` / `false` / `hover`) | `showPoints` — the same values |
+| `show_fill`, `show.fill` (`true` / `false` / `fade`) | `fill` — the same values, or a color |
+| `show_legend`, `show.legend` | `legendVisible` |
+| `show_labels`, `show.labels` | `labelsVisible` |
+| `tap_action` | `tapAction` — what a click on a value does |
+| entity `attribute`, `name` | `attribute`, `name` |
+| `update_interval` | automatic refresh (on by default: each change, at most every 2 s) |
+
+Read differently, to write in the card's syntax:
+
+| mini-graph-card | history-explorer-card |
+|---|---|
+| `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
+
+Not yet in the card — they're being added, mini-graph-card's code as the example: `points_per_hour`, `aggregate_func`, `group_by`; `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` as a list; `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `group`, `loading_indicator`.
 
 ## Default view and time ranges
 

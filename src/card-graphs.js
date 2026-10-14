@@ -3,7 +3,7 @@
 // rebuilt, removed. What one graph is for Chart.js is card-charts.js's. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
-import { defaultColors, parseColorValue } from "./history-default-colors.js";
+import { defaultColors, parseColorValue, fillValue } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
@@ -475,6 +475,7 @@ export class CardGraphs
             e.color = c.color;
             e.fill = _ownFill ?? entityOptions?.fill ?? c.fill;
         }
+        e.fill = fillValue(e.fill, e.color);
         // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
         // palette's where none applies (see entityColor)
         if( !parseColorValue(e.color)?.color )
@@ -544,7 +545,7 @@ export class CardGraphs
         const _free = defaultColors.find(c => !_usedColors.includes(c.color));
         if( _free ) {
             e.color = _free.color;
-            e.fill  = ownFill ?? _free.fill;
+            e.fill  = fillValue(ownFill, e.color) ?? _free.fill;
         }
     }
 

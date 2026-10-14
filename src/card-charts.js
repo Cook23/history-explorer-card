@@ -5,7 +5,7 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { getSIFactor, areSICompatible, chooseSIUnit } from "./history-units.js";
+import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { normalizeLineMode } from "./history-options.js";
 import { parseColor } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
@@ -34,17 +34,16 @@ export class CardCharts
     // and a small arrow when it's on the right Y axis
     _legendParts(d)
     {
-        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale) : '',
+        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding) : '',
                  hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '' };
     }
 
     // An entity's value now, in its unit, as the legend shows it after its name: '(400 W)' —
     // '' when it isn't a number
-    _legendValue(entity, unit, shownScale = 1)
+    _legendValue(entity, unit, shownScale = 1, rounding)
     {
-        const p = 10 ** this.pconfig.roundingPrecision;
-        const v = Math.round(this.stateOf(entity)?.state * shownScale * p) / p;
-        return isNaN(v) ? '' : '(' + v + (unit ? ' ' + unit : '') + ')';
+        const v = Number(this.stateOf(entity)?.state) * shownScale;
+        return isNaN(v) ? '' : '(' + formatNumber(v, rounding ?? this.pconfig.rounding) + (unit ? ' ' + unit : '') + ')';
     }
 
     generateTooltipContents(label, d, mode, n = 1)
@@ -240,6 +239,7 @@ export class CardCharts
                 device_class: d.device_class,
                 entity_id: d.entity_id,
                 unit: d.unit,
+                rounding: d.rounding,
                 name: d.name,
                 arrowColor: d.bColor,
                 arrowBackground: d.fillColor,
@@ -251,13 +251,15 @@ export class CardCharts
 
     // The samples' dots of a curve of line width `width`: the entity's showPoints, else the
     // graph's — true: a diameter of the line width + 2 px, as every dot shown by default
-    // (Alt's too, see deps/chart-hec.js); a number: that radius. The hovered dot — the one
-    // the tooltip shows — 2 px wider than the dots shown (than the default ones when none is)
+    // (Alt's too, see deps/chart-hec.js); a number: that radius; hover (the default): only
+    // the hovered dot — the one the tooltip shows, 2 px wider than the dots shown (than the
+    // default ones when none is); false: none, not even the hovered one
     _pointRadii(own, graph, width)
     {
         const _v = own !== undefined ? own : graph;
         const _default = ( (+width || 0) + 2 ) / 2;
-        const _radius = ( _v === undefined || _v === null || _v === false || _v === 0 ) ? 0 : _v === true ? _default : +_v;
+        if( _v === false ) return { pointRadius: 0, pointHoverRadius: 0 };
+        const _radius = _v === true ? _default : ( +_v > 0 ? +_v : 0 );
         return { pointRadius: _radius, pointHoverRadius: ( _radius || _default ) + 1 };
     }
 
@@ -336,7 +338,10 @@ export class CardCharts
     _curveDataset(d, graphtype, config)
     {
         const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(d.showPoints, config?.showPoints, d.width);
+        // (dashMode: a style's name, or its dashes and gaps — a list, or as CSS writes them:
+        // '10,10', '10 5')
         const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
+        const _dash = m => Array.isArray(m) ? m : _dashes[m] ?? ( typeof m === 'string' && /^[\d.\s,]+$/.test(m) ? m.trim().split(/[\s,]+/).map(Number) : undefined );
         return {
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
@@ -347,7 +352,7 @@ export class CardCharts
             // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
             hecFillFade: d.fillFade && d.kind === 'line',
             borderWidth: d.width,
-            borderDash: Array.isArray(d.dashMode) ? d.dashMode : _dashes[d.dashMode],
+            borderDash: _dash(d.dashMode),
             pointRadius: _pointRadius,
             pointStyle: 'circle',
             pointBackgroundColor: d.bColor,
@@ -366,6 +371,7 @@ export class CardCharts
             domain: d.domain,
             entity_id: d.entity_id,
             unit: d.unit,
+            rounding: d.rounding,
             shownScale: d.shownScale,
             textFactor: d.shownScale / d.drawScale,
             hidden: d.hidden,
@@ -530,15 +536,15 @@ export class CardCharts
                         let label = '';
                         if( this.pconfig.tooltipShowLabel ) label = data.datasets[item.datasetIndex].name || '';
                         if( label ) label += ': ';
-                        const p = 10 ** this.pconfig.roundingPrecision;
-                        const _siFactor = data.datasets[item.datasetIndex].siConversionFactor ?? 1;
+                        const _ds = data.datasets[item.datasetIndex];
+                        const _siFactor = _ds.siConversionFactor ?? 1;
                         // (from the value drawn back to the value shown: see shownScale)
-                        const _tf = data.datasets[item.datasetIndex].textFactor ?? 1;
-                        const _circQ = data.datasets[item.datasetIndex].circularPeriod;
-                        let _v = Math.round(item.yLabel / _siFactor * _tf * p) / p;
+                        const _tf = _ds.textFactor ?? 1;
+                        const _circQ = _ds.circularPeriod;
+                        let _v = item.yLabel / _siFactor * _tf;
                         // (a circular curve shows its real value, in [0, period))
-                        if( _circQ ) _v = Math.round(this.wrapCircular(_v, _circQ * Math.abs(_tf)) * p) / p;
-                        label += _v;
+                        if( _circQ ) _v = this.wrapCircular(_v, _circQ * Math.abs(_tf));
+                        label += formatNumber(_v, _ds.rounding ?? this.pconfig.rounding);
                         label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                         return label;
                     } else if( graphtype == 'timeline' ) {
@@ -550,8 +556,7 @@ export class CardCharts
                         return this.generateTooltipContents(label, d, tooltipSize, datasets.length);
                     } else if( graphtype == 'arrowline' ) {
                         const d = data.datasets[item.datasetIndex].data[item.index];
-                        const p = 10 ** this.pconfig.roundingPrecision;
-                        let label = Math.round(d[2] * p) / p;
+                        let label = formatNumber(d[2], data.datasets[item.datasetIndex].rounding ?? this.pconfig.rounding);
                         label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                         return this.generateTooltipContents(label, d, 'slim');
                     }
@@ -654,6 +659,7 @@ export class CardCharts
                 // period, 360 when it has none)
                 "arrowPeriod": ( _kind === 'arrowline' ) ? ( this.circularPeriodOf(d) ?? 360 ) : undefined,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
+                "rounding": this.roundingOf(d),
                 // (the factor between the entity's value and the value shown in the legend and
                 // tooltip: with its own `unit`, `scale` is a conversion and the converted value
                 // is shown; without, it only changes how the curve is drawn and the entity's

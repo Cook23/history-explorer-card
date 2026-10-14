@@ -3,6 +3,7 @@
 // menu — or removes. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { formatNumber } from "./history-units.js";
 import { seriesAttributes, seriesId, attributeLabel } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
@@ -507,15 +508,14 @@ export class CardSelector
     }
 
     // The value of a state as the selector shows it: like the legend's labels, rounded to
-    // roundingPrecision, with its unit; a date as HH:MM; '' when there's none
+    // the card's decimals (rounding), with its unit; a date as HH:MM; '' when there's none
     _valueText(state)
     {
         const _stateVal = state?.state;
         const _unit = state?.attributes?.unit_of_measurement;
         if( _stateVal === undefined || _stateVal === 'unavailable' || _stateVal === 'unknown' ) return '';
-        const _p = 10 ** this.pconfig.roundingPrecision;
         const _numVal = Number(_stateVal);
-        if( !isNaN(_numVal) ) return Math.round(_numVal * _p) / _p + (_unit ? ' ' + _unit : '');
+        if( !isNaN(_numVal) ) return formatNumber(_numVal, this.pconfig.rounding) + (_unit ? ' ' + _unit : '');
         // Try to parse as date and show HH:MM
         const _d = new Date(_stateVal);
         return isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));

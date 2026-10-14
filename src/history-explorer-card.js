@@ -102,7 +102,7 @@ export class HistoryCardState {
         this.pconfig.filterEntities       = undefined;
         this.pconfig.excludeFilterEntities = undefined;
         this.pconfig.decimation           = 'fast';
-        this.pconfig.roundingPrecision    = 2;
+        this.pconfig.rounding             = { digits: 2, exact: false };
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
         this.pconfig.cardGraphDefaults    = {};
@@ -467,8 +467,9 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance.pconfig.graphs = {};
 
-        if( config.graphs )
-            this.instance.buildGraphListFromConfig(config.graphs)
+        const _graphs = this.instance.yamlGraphs(config);
+        if( _graphs )
+            this.instance.buildGraphListFromConfig(_graphs);
 
 
         this.instance.applyConfig(config);

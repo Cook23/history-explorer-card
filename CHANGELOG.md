@@ -4,6 +4,25 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.18b2] - 2026-10-14
+
+### New — mini-graph-card's YAML read by the card, as its own
+- A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini` — its options keep working. No separate mode, no translation: each of its names is an alias of one of the card's options, valid with or without `look: mini`, at every level (card, `entityOptions`, graph, entity); each of its values one the option accepts, with the same meaning
+- Names: `line_width` (`lineWidth`), `show_points` (`showPoints`), `show_state` (`showState`), `show_legend` (`legendVisible`), `show_labels` (`labelsVisible`), `hours_to_show` (`defaultTimeRange`), `decimals` (`rounding`), `smoothing` (`lineMode`), `line_style` (`dashMode`), `y_axis` (`yAxis`), `lower_bound` / `upper_bound` (`ymin` / `ymax`), `show_fill` (`fill`), `color_thresholds` (`color`), an entity's `graph` (`type`), `tap_action` (`tapAction`). An option written under both names: the card's wins
+- Its forms: `show:` (`show: { points: true }` is `show_points: true`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone (`- sensor.x`, in any graph); `unit`, `color` and `fill` on the card — every entity's
+- Values the options now accept: `lineMode: true / false` (curves / lines); `yAxis: primary / secondary` (left / right); `fill: true` (a fill in the curve's color) / `false` (none); `showPoints: hover`; `dashMode` as CSS writes dashes (`'10,10'`); `color` thresholds as a list — `[{ value: 0, color: blue }, green, { value: 20, color: red }]`, a stop without a value spaced between its neighbours
+- `look: mini` gives mini-graph-card's thick smooth lines too (`lineWidth: 5`, `lineMode: curves`); it only gives defaults — any option set, under either name, wins
+
+### New — tapAction: a click on a value
+- What a click on a curve's value does (in the legend, over the graph): `more-info` — its dialog, with the info panel when it's on — as before and by default; or Home Assistant's `navigate`, `url`, `perform-action` / `call-service`, `none`. On the card, a graph, `entityOptions` or an entity
+
+### Changed — a value's decimals, and its points
+- `rounding` (`decimals`) set: exactly that many decimals (`20.0`); not set: at most 2, as before. `rounding: 0` gave 2 decimals — now none. It can be set on an entity, a graph or in `entityOptions` too
+- `showPoints: false`: no dot at all, not even the hovered one; `hover` (the default): only the hovered dot. Points hidden from a curve's menu: back to `hover`
+
+### Tests
+- A new suite, `minigraph`: a mini-graph-card's YAML in place (its graph, its time range, its lines, axes, bounds, legend, fill, decimals); the same values in the card's syntax (points, dashes, thresholds as a list, rounding, `yAxis: primary`); `tap_action` on the card and on entities
+
 ## [v1.2.18b1] - 2026-10-13
 
 ### Changed — the entity selector sized from its list

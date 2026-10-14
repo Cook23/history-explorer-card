@@ -1,5 +1,16 @@
-// Units: SI prefixes (m, k, M) — which units can share one Y axis, and the prefix a
-// graph's axis is shown in.
+// Units and numbers: SI prefixes (m, k, M) — which units can share one Y axis, and the
+// prefix a graph's axis is shown in — and a value as the card writes it.
+
+// A number as the card writes it (legend, tooltip, values over a graph, selector):
+// rounding { digits, exact } — exact: always that many decimals (`rounding` set: 20.0);
+// else at most that many (20)
+export function formatNumber(v, rounding)
+{
+    const _d = rounding?.digits ?? 2;
+    if( rounding?.exact ) return Number(v).toFixed(_d);
+    const _p = 10 ** _d;
+    return String(Math.round(v * _p) / _p);
+}
 
 // --------------------------------------------------------------------------------------
 // SI prefix helpers

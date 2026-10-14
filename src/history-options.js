@@ -12,14 +12,24 @@ export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', 
 const _reportedInterpolations = new Set();
 
 // A line mode as the card knows it: the singular aliases accepted — 'line' → 'lines',
-// 'curve' → 'curves', 'step' → 'stepped' ('smart': curves while the source reports, flat
-// dashed plateaus over its silences — see _applySilencePlateaus)
+// 'curve' → 'curves', 'step' → 'stepped' — and mini-graph-card's `smoothing` (an alias of
+// `lineMode`): true → 'curves', false → 'lines' ('smart': curves while the source reports,
+// flat dashed plateaus over its silences — see _applySilencePlateaus)
 export function normalizeLineMode(m)
 {
-    if( m === 'line'  ) return 'lines';
-    if( m === 'curve' ) return 'curves';
+    if( m === 'line'  || m === false ) return 'lines';
+    if( m === 'curve' || m === true  ) return 'curves';
     if( m === 'step'  ) return 'stepped';
     return m;
+}
+
+// A Y axis as the card knows it: left, right or auto — mini-graph-card's primary and
+// secondary are aliases of left and right; undefined for any other value
+export function normalizeYAxis(v)
+{
+    if( v === 'primary'   ) return 'left';
+    if( v === 'secondary' ) return 'right';
+    return ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
 }
 
 // Can entities of types a and b share one graph? Lines and bars can (curves drawn over the
@@ -43,19 +53,38 @@ export function normalizeInterpolation(v)
     return undefined;
 }
 
-// Options spelled differently depending on the level they were first offered at: each
-// spelling is accepted at every level (card, entityOptions, graph, entity) — the first
-// name is the one used internally, the others are its synonyms
+// Options spelled differently depending on the level they were first offered at, or in
+// mini-graph-card's syntax: each spelling is accepted at every level (card, entityOptions,
+// graph, entity) — the first name is the one used internally, the others are its synonyms,
+// each meaning the same (an option set under both names: the first name wins)
 const OPTION_SYNONYMS = {
-    lineWidth  : ['width'],
-    showPoints : ['showSamples'],
-    ystepSize  : ['ystepsize'],
+    lineWidth        : ['width', 'line_width'],
+    showPoints       : ['showSamples', 'show_points'],
+    ystepSize        : ['ystepsize'],
+    showState        : ['show_state'],
+    legendVisible    : ['show_legend'],
+    labelsVisible    : ['show_labels'],
+    defaultTimeRange : ['hours_to_show'],
+    rounding         : ['decimals'],
+    lineMode         : ['smoothing'],
+    dashMode         : ['line_style'],
+    yAxis            : ['y_axis'],
+    ymin             : ['lower_bound'],
+    ymax             : ['upper_bound'],
+    fill             : ['show_fill'],
+    color            : ['color_thresholds'],
+    type             : ['graph'],
+    tapAction        : ['tap_action'],
 };
 
+// Options with their synonyms resolved; mini-graph-card's `show:` read as its own options
+// (show: { points: true } is show_points: true — an option set directly wins)
 export function normalizeOptionSynonyms(o)
 {
     if( !o || typeof o !== 'object' || Array.isArray(o) ) return o;
     const r = { ...o };
+    if( r.show && typeof r.show === 'object' && !Array.isArray(r.show) )
+        for( const [k, v] of Object.entries(r.show) ) if( r['show_' + k] === undefined ) r['show_' + k] = v;
     for( const [name, aliases] of Object.entries(OPTION_SYNONYMS) ) {
         if( r[name] !== undefined ) continue;
         for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
@@ -65,9 +94,10 @@ export function normalizeOptionSynonyms(o)
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', ...Object.values(OPTION_SYNONYMS).flat()];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding'];
+export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
@@ -88,23 +118,27 @@ export const BAR_INTERVALS = [
 export const RAW_INTERVAL = 4;
 export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 
-// Looks: a set of options given at once with `look:` — the card's own options still win.
-// mini: what mini-graph-card shows — no header, toolbar nor selector, each curve's value
-// now and its minimum and maximum over the window, no time labels nor grid, the Y labels
-// inside the plot, a fill fading out, a small graph
+// Looks: a set of default options given at once with `look:` — the card's own options
+// still win, whatever their spelling (a look only gives defaults: it never changes what an
+// option means).
+// mini: mini-graph-card's look — no header, toolbar nor selector, each curve's value now
+// and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
+// the plot, thick smooth lines with a fill fading out, a small graph
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
-            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150 },
+            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves' },
 };
 
-// The card's configuration with its look's options under its own
+// The card's configuration, its synonyms resolved (see normalizeOptionSynonyms), with its
+// look's options under its own
 export function withLook(config)
 {
-    if( config?.look === undefined ) return config;
-    const _look = LOOKS[config.look];
+    const c = normalizeOptionSynonyms(config);
+    if( c?.look === undefined ) return c;
+    const _look = LOOKS[c.look];
     if( !_look ) {
-        console.warn(`history-explorer-card: unknown look '${config.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
-        return config;
+        console.warn(`history-explorer-card: unknown look '${c.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
+        return c;
     }
-    return { ..._look, ...config, uiLayout: { ..._look.uiLayout, ...config.uiLayout } };
+    return { ..._look, ...c, uiLayout: { ..._look.uiLayout, ...c.uiLayout } };
 }

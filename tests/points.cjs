@@ -34,11 +34,11 @@ module.exports = async function()
     // ── With a mouse ──
     let t = await openCard(card(), { mock: { series: true } });
     await t.wait(800);
-    await t.step('a long-press on a curve shows its dots, its diameter the line width + 2 px (hovered: + 2 more), saved; again, hides them', async () => {
+    await t.step('a long-press on a curve shows its dots, its diameter the line width + 2 px (hovered: + 2 more), saved; again, hides them (back to the hovered dot only)', async () => {
         const p = await t.E('pointPt(0,0.5)');
         await t.longPress(p); const on = await dots(t, 0); const menu = await menuOpen(t);
         await t.longPress(p); const off = await dots(t, 0);
-        return shown(on) && on.saved === true && !menu && off.r === 0 && off.saved === false ? true : JSON.stringify({ on, off, menu });
+        return shown(on) && on.saved === true && !menu && off.r === 0 && off.hover > 0 && off.saved === 'hover' ? true : JSON.stringify({ on, off, menu });
     });
     await t.step('a right click on a curve: the same', async () => {
         const p = await t.E('pointPt(0,0.3)');
