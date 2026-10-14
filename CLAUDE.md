@@ -55,13 +55,13 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   part, through its contracts, documented, tested, usable in this card's own syntax too.
 - For the UI, this card's gestures and actions stay.
 
-## Every option at every level — set by the user, not negotiable
+## Every option may be at every level — set by the user, not negotiable
 
-Every option can be set at every level — the card, `entityOptions`, a graph, an entity —
+Any option may be extended to every level — the card, `entityOptions`, a graph, an entity —
 even where its use is doubtful or none: the most precise one always wins (entity, then
-graph, then `entityOptions`, then the card). Never restrict an option's scope because it
-"seems logical": one rule for all options keeps the code and the configuration standard,
-and so simpler.
+graph, then `entityOptions`, then the card). It's allowed, not a task: an option gets its
+full scope when it's touched or needed, never in a rework of all options. Never restrict an
+option's scope because it "seems logical".
 
 ## An example is a symptom — set by the user, not negotiable
 
