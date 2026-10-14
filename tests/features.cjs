@@ -288,22 +288,23 @@ module.exports = async function()
         return t.E(`(()=>{ const c=i=>graphAt(i).chart, bd=i=>c(i)._hecControlsBackdropEl, shown=e=>!!e&&e.style.display!=='none';
             const lm=c(1)._hecLinkMarkerRect();
             return { boxes: [0,1,2].map(i=>shown(bd(i))).join(), boxColor: shown(bd(0)) ? getComputedStyle(bd(0)).backgroundColor : null,
-                     chainColor: getComputedStyle(c(1)._hecLinkMarkerEl).backgroundColor, chainLeft: lm && lm.left, zone: c(1)._hecLockAndHandleWidth(),
+                     chainColor: getComputedStyle(c(1)._hecLinkMarkerEl).backgroundColor, chainLeft: lm && lm.left, zone: c(1)._hecLockAndHandleWidth(), box: (b => b && b.x + b.width)(c(1)._hecLockAndHandleRect()),
                      firstLabel: Math.round(c(0).legend.legendHitBoxes[0].left), firstTop: Math.round(c(0).legend.legendHitBoxes[0].top),
                      timelineTop: Math.round(c(1).chartArea.top), legendH: Math.round(c(0).legend.height), legendLeft: c(0).legend.leftMargin,
                      unit: c(0).options.scales.yAxes[0].scaleLabel.display, yColumn: Math.round(c(0).chartArea.left) }; })()`);
     };
-    await t.step('the chain icon takes no room: hidden or shown, nothing moves; right above the handle and the padlock, it is just right of them', async () => {
+    await t.step('the chain icon takes no room: hidden or shown, nothing moves; it stays right of the handle and the padlock\'s box, far enough for their sensitive zones never to meet', async () => {
         const tops = () => t.E(`[0,1,2].map(i=>Math.round(graphAt(i).canvas.getBoundingClientRect().top)+'/'+Math.round(graphAt(i).chart.chartArea.top)).join()`);
         const shown = await tops(), r = await controlsAt(1000);
         await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=false; c.update(); })()'); await t.wait(300);
         const hidden = await tops();
         await t.E('(()=>{ const c=graphAt(1).chart; c.options.linkMarkerVisible=true; c.update(); })()'); await t.wait(300);
-        return shown === hidden && r.chainLeft >= r.zone + 4 ? true : JSON.stringify({ shown, hidden, r });
+        const gap = await t.E(`(C => Math.max(C.hecGestures('mouse').slop, C.hecGestures('touch').slop))(graphAt(0).chart.constructor)`);
+        return shown === hidden && r.chainLeft >= r.box + gap ? true : JSON.stringify({ shown, hidden, gap, r });
     });
-    await t.step('a narrow card: the handle, the padlock and the chain icon each in a box like the Y labels\', over the legend or the rows, which keep no room for them; wider: beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept; wide again: as before', async () => {
+    await t.step('a narrow card: the handle, the padlock and the chain icon in boxes as opaque as the Y labels\', over the legend or the rows, which keep no room for them; wider: half see-through boxes, beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept; wide again: as before', async () => {
         const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
-        return wide.boxes === 'false,false,false' && wide.legendLeft === wide.zone + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
+        return wide.boxes === 'true,true,true' && wide.chainColor === wide.boxColor && wide.boxColor !== narrow.boxColor && wide.legendLeft === wide.zone + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
             && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
             && narrow.legendLeft === 4 && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
             && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
@@ -320,6 +321,25 @@ module.exports = async function()
         const lb = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width-6, y: r.top+b.top+b.height/2 }; })()`);
         await t.longPress(lb); const onLabel = await graphMenu(); await close();
         return !l0 && l1 && onBox === 'graph' && onLabel === 'entity' ? true : JSON.stringify({ l0, l1, onBox, onLabel });
+    });
+    await t.step('the handle and the padlock are a floating icon: where they are drawn, over the plot area too (no legend), a click on the padlock locks; in an oblong box, the padlock alone in a round one as the chain icon\'s; not drawn, the corner is what is under it', async () => {
+        await controlsAt(1000);
+        const set = o => t.E(`(()=>{ const c=graphAt(0).chart; Object.assign(c.options, ${JSON.stringify(o)}); c.update(); })()`);
+        await t.E('(()=>{ const c=graphAt(0).chart; c.options.legend.display=false; c.update(); })()'); await t.wait(300);
+        const top = await t.E('Math.round(graphAt(0).chart.chartArea.top)');
+        const p = await t.E('lockPt(0)'), l0 = await t.E('!!graphAt(0).chart._hecYAxisLock');
+        await t.page.mouse.click(p.x, p.y); await t.wait(400); const l1 = await t.E('!!graphAt(0).chart._hecYAxisLock');
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        await t.E('(()=>{ const c=graphAt(0).chart; c.options.legend.display=true; c.update(); })()'); await t.wait(300);
+        const box = () => t.E(`(()=>{ const s=getComputedStyle(graphAt(0).chart._hecControlsBackdropEl); return s.width+' '+s.height+' '+s.borderRadius; })()`);
+        const chain = await t.E(`(()=>{ const s=getComputedStyle(graphAt(1).chart._hecLinkMarkerEl); return s.width+' '+s.height; })()`);
+        const both = await box();
+        await set({ moveHandleVisible: false }); await t.wait(300); const lockOnly = await box();
+        await t.E('(()=>{ const c=graphAt(0).chart; c.options.yAxisLockEnabled=false; c.update(); })()'); await t.wait(300);
+        const none = await t.E('graphAt(0).chart._hecTopTargetAt(20, 14)');
+        await set({ moveHandleVisible: true, yAxisLockEnabled: true }); await t.wait(300);
+        return top < 28 && !l0 && l1 && none !== 'lockAndHandle' && lockOnly === '24px 24px 12px' && chain === '24px 24px' && /^3\dpx 24px 12px$/.test(both)
+            ? true : JSON.stringify({ top, l0, l1, none, both, lockOnly, chain });
     });
     done(await t.close());
 

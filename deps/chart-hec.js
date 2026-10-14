@@ -30,6 +30,10 @@
   // its immobility distance is the picking margin
   var pickPointerType = 'mouse';
   function _hecPickMargin() { return Chart.hecGestures(pickPointerType).slop; }
+  // The floating icons' margin (the handle and the padlock, the chain icon), around their
+  // boxes: half the largest picking margin — a finger's or a mouse's, both free settings —
+  // whatever the pointer (which one comes isn't known)
+  function _hecIconMargin() { return Math.max(Chart.hecGestures('mouse').slop, Chart.hecGestures('touch').slop) / 2; }
   function _hecPick(px, py, rects, margin) {
     return _hecPickNearest(rects.map(function (r) {
       var cx = Math.max(r.x, Math.min(px, r.x + r.width)), cy = Math.max(r.y, Math.min(py, r.y + r.height));
@@ -1752,32 +1756,29 @@
 
     // ── What is under a point: the targets, the zones, the elements, the curves (the picking rule, _hecPick) ──
 
-    // The small targets above the plot area — the chain icon, the lock+handle zone, the
-    // legend's labels (within the legend's band) — picked together (_hecPick): the one
-    // under the point, else the nearest one if near enough and clearly nearer than the
-    // next. → 'linkMarker', 'lockAndHandle', a legend label's index, -1 or PICK_BETWEEN.
-    // Never from the plot area or the Y axis column (y below the plot area's top) — but
-    // on the controls' box drawn over them (hecControlsBackdrop).
+    // The small targets at the top: the floating icons — the lock+handle zone's box (around
+    // the handle, the padlock or handleButtons shown) and the chain icon's box, where they
+    // are drawn — then the legend's labels (within the legend's band). The icons are drawn
+    // over the graph (legend, Y labels, plot area: wherever they fit), so they take the
+    // gesture first: on an icon's box or within the largest picking margin around it
+    // (_hecIconMargin: 24px boxes, 36px targets by default), the
+    // nearest icon (_hecPick, between the two); elsewhere, a label picked (_hecPick): the
+    // one under the point, else the nearest one if near enough and clearly nearer than
+    // the next. An icon not drawn takes nothing. → 'linkMarker', 'lockAndHandle', a
+    // legend label's index, -1 or PICK_BETWEEN.
     _hecTopTargetAt: function (x, y) {
-      var me = this, _a = me.chartArea;
-      // (below the plot area's top: only the controls' box drawn over it, when it is —
-      // hecControlsBackdrop: on it, the controls')
-      if (_a && y >= _a.top) {
-        var _bd = me.options.hecControlsBackdrop && me._hecHasControls();
-        return _bd && x >= 0 && x <= me._hecLockAndHandleWidth() && y <= 28 ? 'lockAndHandle' : -1;
-      }
-      var rects = [], ids = [];
+      var me = this, rects = [], ids = [];
       var _lm = me._hecLinkMarkerRect();
       if (_lm) { rects.push({ x: _lm.left, y: _lm.top, width: _lm.width, height: _lm.height }); ids.push('linkMarker'); }
-      rects.push({ x: 0, y: 0, width: me._hecLockAndHandleWidth(), height: 28 }); ids.push('lockAndHandle');
+      var _lh = me._hecLockAndHandleRect();
+      if (_lh) { rects.push(_lh); ids.push('lockAndHandle'); }
+      var _i = _hecPick(x, y, rects, _hecIconMargin());
+      if (_i !== -1) return _i >= 0 ? ids[_i] : _i;
       var legend = me.legend;
-      if (legend && legend.legendHitBoxes && y >= legend.top && y <= legend.bottom) {
-        legend.legendHitBoxes.forEach(function (b, i) {
-          rects.push({ x: b.left, y: b.top, width: b.width, height: b.height }); ids.push(i);
-        });
-      }
-      var _i = _hecPick(x, y, rects);
-      return _i >= 0 ? ids[_i] : _i;
+      if (!legend || !legend.legendHitBoxes || y < legend.top || y > legend.bottom) return -1;
+      return _hecPick(x, y, legend.legendHitBoxes.map(function (b) {
+        return { x: b.left, y: b.top, width: b.width, height: b.height };
+      }));
     },
 
     // Legend hit-test — the label picked among the small targets above the plot area
@@ -2137,8 +2138,6 @@
       if (me.options.yAxisLockEnabled === false || !me.canvas) return;
       var _yAxis = me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0];
       if (!_yAxis || me.config.type === 'timeline' || me.config.type === 'arrowline') return;
-      var _ticks = _yAxis.ticks || {};
-      var _forced = _ticks.forceMin !== undefined && _ticks.forceMax !== undefined;
 
       // Purely visual now, pointer-events:none — the click is handled by the
       // unified custClick handler on the grouped lock+handle zone, same
@@ -2155,7 +2154,7 @@
       // (its bottom on the handle's ⠿ bottom)
       _el.style.top = '7px';
       var _svg = _el.children[0];
-      var _showIcon = !(_forced && !me._hecYAxisLock) && !me._hecHandleButtons();
+      var _showIcon = me._hecLockIconShown();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
       _el.style.opacity = (me._hecYAxisLock) ? '1.0' : '0.3';
 
@@ -2232,13 +2231,33 @@
       return this.options.moveHandleVisible !== false || this._hecHasYAxisLock() || !!this._hecHandleButtons();
     },
 
-    // Grouped lock+handle zone (canvas-relative): top-left 0-33px × 0-28px — the move
-    // handle (0-15px) and the lock icon (15-33px), see _hecUpdateDragTouchOverlays; 18px
-    // per button when options.handleButtons shows more than one — picked among the small
-    // targets above the plot area (_hecTopTargetAt): on it, or just beside it. The chain
-    // icon, drawn over its top edge, wins where they overlap.
+    // Grouped lock+handle zone: around the icons shown (_hecLockAndHandleRect) — the move
+    // handle and the lock icon, see _hecUpdateDragTouchOverlays, or options.handleButtons'
+    // (18px per button when it shows more than one) — a floating icon
+    // (_hecTopTargetAt): on it, or within the picking margin around it, wherever it is
+    // drawn; none while it shows nothing (_hecHasControls).
     _hecInLockAndHandleZone: function (x, y) {
       return this._hecTopTargetAt(x, y) === 'lockAndHandle';
+    },
+
+    // The box around the icons shown in the lock+handle zone (canvas-relative), 24px high
+    // (4-28px), as the chain icon's: the padlock alone, or the handle alone, in a round one
+    // (the padlock's centered on it); two icons or more — the handle and the padlock,
+    // options.handleButtons — in an oblong one (1px to 3px past the zone); null when none
+    // is shown
+    _hecLockAndHandleRect: function () {
+      var _h = this.options.moveHandleVisible !== false, _l = this._hecLockIconShown();
+      if (this._hecHandleButtons() || (_h && _l)) return { x: 1, y: 4, width: this._hecLockAndHandleWidth() + 2, height: 24 };
+      if (_l) return { x: 12, y: 4, width: 24, height: 24 };
+      return _h ? { x: 1, y: 4, width: 24, height: 24 } : null;
+    },
+
+    // Whether the padlock is shown: the Y axis lock on, no handleButtons in its place, and
+    // not a range forced by the card (forceMin and forceMax) while unlocked
+    _hecLockIconShown: function () {
+      if (!this._hecHasYAxisLock() || this._hecHandleButtons()) return false;
+      var _t = this.options.scales.yAxes[0].ticks || {};
+      return !(_t.forceMin !== undefined && _t.forceMax !== undefined && !this._hecYAxisLock);
     },
 
     _hecLockAndHandleWidth: function () {
@@ -2253,16 +2272,12 @@
       return b && b.length ? b : null;
     },
 
-    // The button of options.handleButtons picked at (x, y) (_hecPick, on each one's icon):
-    // the button, PICK_BETWEEN about halfway between two, or null — clearly beside them, on
-    // a legend label or on the chain icon
+    // The button of options.handleButtons picked at (x, y), within the lock+handle zone
+    // (_hecTopTargetAt) — _hecPick on each one's icon: the button, PICK_BETWEEN about
+    // halfway between two, or null — clearly beside them, or outside the zone
     _hecHandleButtonAt: function (x, y) {
       var b = this._hecHandleButtons();
-      if (!b || this._hecInLinkMarkerZone(x, y)) return null;
-      var lh = this.legend && this.legend.legendHitBoxes;
-      for (var i = 0; lh && i < lh.length; i++) {
-        if (x >= lh[i].left && x <= lh[i].left + lh[i].width && y >= lh[i].top && y <= lh[i].top + lh[i].height) return null;
-      }
+      if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
       // (each icon: its slot of the zone, less 3px on each side and 4px above and below)
       var _w = this._hecLockAndHandleWidth() / b.length;
       var rects = b.map(function (btn, k) { return { x: k * _w + 3, y: 4, width: _w - 6, height: 20 }; });
@@ -2345,16 +2360,20 @@
     // true: straddling this chart's top edge, under the Y axis labels of the graph
     // above (an empty spot — centered on the top it would cover this chart's legend).
     // Canvas-relative rectangle, or null when hidden.
-    // (right above the lock+handle zone, it would sit on it — then just right of it)
+    // (two floating icons, each taking a gesture within the icons' margin around it
+    // (_hecTopTargetAt): right of the lock+handle zone, far enough for their margins never
+    // to meet — two of it apart)
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
-      var _left = Math.max(0, Math.round(this.chartArea.left / 2) - 11);
-      var _zone = this._hecHasControls() ? this._hecLockAndHandleWidth() : 0;
-      if (_zone && _left < _zone + 4) _left = _zone + 4;
-      return { left: _left, top: -23, width: 22, height: 22 };
+      var _left = Math.max(0, Math.round(this.chartArea.left / 2) - 12);
+      var _lh = this._hecLockAndHandleRect(), _zone = _lh ? _lh.x + _lh.width : 0;
+      var _gap = 2 * _hecIconMargin();
+      if (_zone && _left < _zone + _gap) _left = _zone + _gap;
+      return { left: _left, top: -25, width: 24, height: 24 };
     },
 
-    // The chain icon: on it, or just beside it (_hecTopTargetAt)
+    // The chain icon, a floating icon: on its box, or within the icons' margin around it
+    // (_hecTopTargetAt)
     _hecInLinkMarkerZone: function (x, y) {
       return this._hecTopTargetAt(x, y) === 'linkMarker';
     },
@@ -2381,9 +2400,7 @@
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
-      // (in a box like the other controls' — options.hecControlsBackdrop — else half see-through)
-      _el.style.background = me.options.hecControlsBackdrop ? hecUi.background(me.canvas, hecUi.BOX_OPACITY) :
-        'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
+      _el.style.background = me._hecControlsBoxBackground();
       _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
       _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
       _el.style.width = _r.width + 'px';
@@ -2391,29 +2408,35 @@
       _el.title = me.options.linkMarkerTitle || '';
     },
 
-    // options.hecControlsBackdrop (true): the controls at the graph's top left — the
-    // lock+handle zone, the chain icon — each drawn in a rounded box like the Y labels', over the
-    // legend's labels, which keep no room for them (a narrow card: they take no height). On
-    // the box, a gesture is the control's; beside it, on a label, the label's (_hecTopTargetAt)
+    // The floating icons' boxes (the chain icon's, the lock+handle zone's): half
+    // see-through — options.hecControlsBackdrop: as opaque as the Y labels' boxes
+    _hecControlsBoxBackground: function () {
+      return this.options.hecControlsBackdrop ? hecUi.background(this.canvas, hecUi.BOX_OPACITY) :
+        'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
+    },
+
+    // The lock+handle zone's box, like the chain icon's (_hecLockAndHandleRect): round
+    // around one icon, oblong — half circles at both ends — around more; none while no
+    // icon is shown. It takes no room; a gesture near it is the icons' (_hecTopTargetAt)
     _hecUpdateControlsBackdrop: function () {
-      var me = this, _bd = me.options.hecControlsBackdrop;
+      var me = this, _r = me.canvas && me._hecLockAndHandleRect();
       var _el = me._hecControlsBackdropEl;
-      if (!_bd || !me.canvas || !me._hecHasControls()) {
+      if (!_r) {
         if (_el) _el.style.display = 'none';
         return;
       }
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:9;border-radius:6px;pointer-events:none;';
+        _el.style.cssText = 'position:absolute;z-index:9;border-radius:12px;pointer-events:none;';
         me._hecControlsBackdropEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = '';
-      _el.style.background = hecUi.background(me.canvas, hecUi.BOX_OPACITY);
-      _el.style.left = (me.canvas.offsetLeft + 1) + 'px';
-      _el.style.top = (me.canvas.offsetTop + 2) + 'px';
-      _el.style.width = (me._hecLockAndHandleWidth() - 2) + 'px';
-      _el.style.height = '24px';
+      _el.style.background = me._hecControlsBoxBackground();
+      _el.style.left = (me.canvas.offsetLeft + _r.x) + 'px';
+      _el.style.top = (me.canvas.offsetTop + _r.y) + 'px';
+      _el.style.width = _r.width + 'px';
+      _el.style.height = _r.height + 'px';
     },
 
     // ── The legend's fonts, and texts shown in full where they're shortened or hidden ──

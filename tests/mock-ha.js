@@ -49,7 +49,7 @@ const STATES={
  // a light: its brightness from 0 to 255, shown by Home Assistant in %
  'light.salon':ent('light.salon','salon light',null,'on'),
 };
-Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, apparent_temperature: 21, hvac_action: 'heating', humidity: '45 %', led_color: 'green', visibility_unit: 'km', hvac_modes: ['heat', 'off'], supported_features: 17 });
+Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, temperature: 20, apparent_temperature: 21, hvac_action: 'heating', humidity: '45 %', led_color: 'green', visibility_unit: 'km', source: 'sensor.power', release_url: 'https://github.com/x/y/releases/v2.7.0', installed_version: 'v2.7.0', auto_update: false, hvac_modes: ['heat', 'off'], supported_features: 17 });
 Object.assign(STATES['sun.sun'].attributes, { azimuth: 200.5, elevation: 30.2, rising: false });
 Object.assign(STATES['light.salon'].attributes, { brightness: 128, color_temp_kelvin: 3000, color_mode: 'color_temp', supported_color_modes: ['color_temp'] });
 Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, apparent_temperature: 29, temperature_unit: '°C', humidity: 85, pressure: 1016.4, pressure_unit: 'hPa',

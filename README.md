@@ -147,7 +147,7 @@ gestures:
   precisionTouch: 12    # px, finger
 ```
 
-The long-press duration is also how soon a second press must follow a release to make a double-click, or a tap-then-drag. The precision is also how near a label, a button or a curve must be to be picked. The values are kept within reasonable bounds (200 to 2000 ms, 2 to 40 px). Whether set in the YAML or in the menu, the last one to speak wins, and they are kept on every device — as the info panel's switch.
+The long-press duration is also how soon a second press must follow a release to make a double-click, or a tap-then-drag. The precision is also how near a label, a button or a curve must be to be picked. The values are kept within reasonable bounds (200 to 2000 ms, 4 to 20 px). Whether set in the YAML or in the menu, the last one to speak wins, and they are kept on every device — as the info panel's switch.
 
 ## Adding entities
 
@@ -164,7 +164,7 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 Clicking an entry chooses it, as Enter does — no separate button required.
 
-For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value (an attribute `X_unit`, a unit, isn't listed); ← or Escape goes back to the list.
+For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value (an attribute `X_unit`, a unit, isn't listed, nor one naming an entity or a web address, nor one about a version or an update); ← or Escape goes back to the list.
 
 Right after the choice (click or Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 

@@ -474,9 +474,10 @@ export class CardCharts
     }
 
     // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
-    // narrow card: each in a box like the Y labels', over the legend or the rows, taking no
-    // room (Chart.js hecControlsBackdrop) — else false: beside the legend's first line, as
-    // much room as they need (the Y axes' labels and units keep theirs)
+    // narrow card: their boxes as opaque as the Y labels', over the legend or the rows,
+    // taking no room (Chart.js hecControlsBackdrop) — else false: half see-through, beside
+    // the legend's first line, as much room as they need (the Y axes' labels and units
+    // keep theirs)
     _controlsBackdrop()
     {
         return this.narrowCard();

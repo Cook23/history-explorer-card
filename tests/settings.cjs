@@ -85,7 +85,7 @@ module.exports = async function()
     await t.step('a value entered is kept within its bounds, and given to Chart.js for every chart', async () => {
         await openAll(); await enter('longPress', 99999); await enter('precision', 1);
         const v = await inputs(), g = JSON.parse(await chartG()); await closeMenus();
-        return v.longPress === 2000 && v.precision === 2 && g.mouse.longPressMs === 2000 && g.mouse.slop === 2 && g.touch.longPressMs === 500 ? true : JSON.stringify({ v, g });
+        return v.longPress === 2000 && v.precision === 4 && g.mouse.longPressMs === 2000 && g.mouse.slop === 4 && g.touch.longPressMs === 500 ? true : JSON.stringify({ v, g });
     });
     await t.step('the long press duration: 1200 ms — a press of 800 ms opens no type menu, one of 1500 ms does', async () => {
         await openAll(); await enter('longPress', 1200); await enter('precision', 10); await closeMenus();
@@ -93,34 +93,34 @@ module.exports = async function()
         await hold(1500); const long = await typeMenuOpen(); await closeMenus();
         return !short && long ? true : JSON.stringify({ short, long });
     });
-    await t.step('the precision: 40 px — a move of 25 px on the plot is no drag (the time stays), one of 80 px is', async () => {
-        await openAll(); await enter('precision', 40); await closeMenus();
+    await t.step('the precision: 20 px — a move of 15 px on the plot is no drag (the time stays), one of 60 px is', async () => {
+        await openAll(); await enter('precision', 20); await closeMenus();
         const st = () => t.E('el.instance.startTime');
         const p = await t.E('graphPtAt(0,0.6)');
-        const s0 = await st(); await t.drag(p, { x: p.x + 25, y: p.y }); await t.wait(800); const s1 = await st();
-        await t.drag(p, { x: p.x + 80, y: p.y }); await t.wait(800); const s2 = await st();
+        const s0 = await st(); await t.drag(p, { x: p.x + 15, y: p.y }); await t.wait(800); const s1 = await st();
+        await t.drag(p, { x: p.x + 60, y: p.y }); await t.wait(800); const s2 = await st();
         return s1 === s0 && s2 !== s1 ? true : JSON.stringify({ s0, s1, s2 });
     });
-    await t.step('the precision is also how near a target must be: 20 px beside a label, picked at 30 px, not at 8', async () => {
+    await t.step('the precision is also how near a target must be: 15 px beside a label, picked at 20 px, not at 8', async () => {
         const beside = async () => { const p = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[1], r=c.canvas.getBoundingClientRect();
-            return { x: r.left+b.left+b.width+20, y: r.top+b.top+b.height/2 }; })()`);
+            return { x: r.left+b.left+b.width+15, y: r.top+b.top+b.height/2 }; })()`);
             const m = t.page.mouse; await m.move(p.x, p.y); await m.down(); await t.wait(1500); await m.up(); await t.wait(400); };
-        await openAll(); await enter('precision', 30); await closeMenus();
-        await beside(); const at30 = await typeMenuOpen(); await closeMenus();
+        await openAll(); await enter('precision', 20); await closeMenus();
+        await beside(); const at20 = await typeMenuOpen(); await closeMenus();
         await openAll(); await enter('precision', 8); await closeMenus();
         await beside(); const at8 = await typeMenuOpen(); await closeMenus();
-        await openAll(); await enter('precision', 40); await closeMenus();
-        return at30 && !at8 ? true : JSON.stringify({ at30, at8 });
+        await openAll(); await enter('precision', 20); await closeMenus();
+        return at20 && !at8 ? true : JSON.stringify({ at20, at8 });
     });
     await t.step('saved on every device, without any persistence option: kept after a reload, and on a new device', async () => {
         await reload(); await openAll(); const a = await inputs(); await closeMenus();
         await newDevice(); await openAll(); const b = await inputs(); await closeMenus();
-        return a.longPress === 1200 && a.precision === 40 && b.longPress === 1200 && b.precision === 40 ? true : JSON.stringify({ a, b });
+        return a.longPress === 1200 && a.precision === 20 && b.longPress === 1200 && b.precision === 20 ? true : JSON.stringify({ a, b });
     });
     await t.step('the YAML speaks (gestures: longPress 800): it wins; the menu then speaks: it wins, the YAML unchanged', async () => {
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const a = await inputs(); await enter('longPress', 600); await closeMenus();
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const b = await inputs(); await closeMenus();
-        return a.longPress === 800 && a.precision === 40 && b.longPress === 600 ? true : JSON.stringify({ a, b });
+        return a.longPress === 800 && a.precision === 20 && b.longPress === 600 ? true : JSON.stringify({ a, b });
     });
     await t.step('another device changes it (in Home Assistant): this device takes it at its next load', async () => {
         await t.E(`window.__setUD('history-explorer-gestures', { longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20 })`);

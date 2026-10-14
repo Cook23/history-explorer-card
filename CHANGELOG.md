@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.19] - 2026-10-14
+
+### Fixed — the attributes offered
+- The entity selector's attribute submenu offered references that aren't values — an attribute naming an entity (`source: sensor.x`, as lowpass_dt gives its sensors) or a web address (an update entity's `release_url`) — and attributes about a version or an update, their name saying so (`installed_version`, `latest_version`, `auto_update`). They are no longer offered (`seriesAttributes`)
+- Test: such attributes on an entity, not in its submenu
+
+### Fixed — the padlock out of reach without a legend
+- In the info panel (and in any graph without a legend), a click on the padlock did nothing: drawn over the Y axis' labels, it was below the plot area's top, where the controls took no gesture except in their narrow card's box. The handle and the padlock, and the chain icon, are now floating icons: drawn wherever they fit, over what is under them, each takes a gesture on its box or within half the largest picking margin around it (half a finger's or a mouse's `slop`, the larger, whatever the pointer: 36 px targets by default) — whatever is under; not drawn, it takes nothing, and the gesture goes to what is under. The chain icon stays right of the handle and the padlock's box, the largest picking margin apart, so that their sensitive zones never meet (`_hecTopTargetAt`, `_hecLockAndHandleRect`, `_hecLinkMarkerRect`)
+- The handle and the padlock in a half see-through box like the chain icon's, on every card (only on a narrow one before, then as opaque as the Y labels' boxes, as it stays there): the chain icon and the padlock alone in round boxes of the same size (24 px), the handle and the padlock in an oblong one — half circles at both ends
+- The precision settings (`gestures: precision`, `precisionTouch`) within 4 to 20 px — 2 to 40 before: the floating icons' sensitive zones and the chain icon's distance grow with them, and 2 px made any tremor a drag
+- Tests: a click on the padlock in the info panel, and on a graph without a legend; the corner without a handle or a padlock; the boxes; the chain icon's distance
+
+
 ## [v1.2.18] - 2026-10-14
 
 ### New — mini-graph-card's YAML read by the card, as its own
