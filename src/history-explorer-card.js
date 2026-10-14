@@ -255,6 +255,10 @@ export class HistoryCardState {
             if( this.store.list ) this.buildGraphsFromStore();
             else this.store.reset([]);
 
+            // (the entity selector's list built once the card is drawn: until then its field
+            // reads "Loading…", sized as the list needed the last time — savedSelectorWidths)
+            requestAnimationFrame(() => setTimeout(() => this.requestEntityCollection(), 0));
+
             this.today(false);
 
             // Now that startTime/endTime are initialized, apply interval restoration if needed
@@ -430,9 +434,6 @@ class HistoryExplorerCard extends HTMLElement
 
         if( !this.instance.i18n.valid )
             this.instance.initLocalization();
-
-        if( !this.instance.entitiesPopulated )
-            this.instance.requestEntityCollection();
 
         if( !this.instance.contentValid && !this.instance.iid )
             this.instance.iid = setInterval(this.instance.updateContent.bind(this.instance), 100);

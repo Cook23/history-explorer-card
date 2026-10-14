@@ -2942,6 +2942,10 @@
               // (the segment ending at a plateau end is always a straight line)
               tension: hecPlateauEnd ? 0 : meta.dataset._model ? meta.dataset._model.tension : 0,
               steppedLine: hecPlateauEnd ? false : meta.dataset._model ? meta.dataset._model.steppedLine : false,
+              // (the segment ending here drawn as a B-spline — hecInterpolation 'bspline', a
+              // curve: see helpers.canvas.lineTo)
+              hecBspline: !hecPlateauEnd && dataset.hecInterpolation === 'bspline' && !!(meta.dataset._model && meta.dataset._model.tension) &&
+                !(meta.dataset._model && meta.dataset._model.steppedLine),
               // Tooltip
               hitRadius: hecVirtual ? 0 : custom.hitRadius || helpers.valueAtIndexOrDefault(dataset.pointHitRadius, index, pointOptions.hitRadius) };
 
@@ -3002,9 +3006,10 @@
 
             if (meta.dataset._model.cubicInterpolationMode === 'monotone') {
               // (hecInterpolation: another curve interpolation algorithm than Chart.js' own
-              // monotone one — helpers.hecSplineCurve is in deps/chart-hec.js)
+              // monotone one — helpers.hecSplineCurve is in deps/chart-hec.js; 'bspline'
+              // needs no control points, see helpers.canvas.lineTo)
               var hecAlgo = me.getDataset().hecInterpolation;
-              if (hecAlgo && hecAlgo !== 'monotone') {
+              if (hecAlgo && hecAlgo !== 'monotone' && hecAlgo !== 'bspline') {
                 helpers.hecSplineCurve(points, hecAlgo);
               } else {
                 helpers.splineCurveMonotone(points);
@@ -9507,6 +9512,7 @@
 
           // Stroke Line
           ctx.beginPath();
+          ctx.hecBsplineMid = false;
           lastDrawnIndex = -1;
           // Silence plateaus ('smart' line mode): left out of this solid pass, collected
           // and stroked dashed afterwards (a canvas path has a single dash pattern)
@@ -9529,9 +9535,13 @@
               if (!currentVM.skip) {
                 if (lastDrawnIndex !== index - 1 && !spanGaps || lastDrawnIndex === -1) {
                   // There was a gap and this is the first point after the gap
+                  if (lastDrawnIndex !== -1) {
+                    helpers.canvas.hecLineEnd(ctx, previous._view);
+                  }
                   ctx.moveTo(currentVM.x, currentVM.y);
                 } else if (currentVM.hecPlateauEnd) {
                   plateaus.push([previous._view, currentVM]);
+                  helpers.canvas.hecLineEnd(ctx, previous._view);
                   ctx.moveTo(currentVM.x, currentVM.y);
                 } else {
                   // Line to next point
@@ -9540,6 +9550,9 @@
                 lastDrawnIndex = index;
               }
             }
+          }
+          if (lastDrawnIndex !== -1) {
+            helpers.canvas.hecLineEnd(ctx, points[lastDrawnIndex]._view);
           }
 
           ctx.stroke();
@@ -10064,6 +10077,17 @@
         },
 
         lineTo: function (ctx, previous, target, flip) {
+          // (a B-spline segment — mini-graph-card's smoothing: from the middle of the
+          // segment before, or from previous at a run's start, to the middle of this one,
+          // previous as the control point; the curve passes through the middles, not
+          // through the points. Drawn backwards (flip), the segment is target's.)
+          if (flip ? previous.hecBspline : target.hecBspline) {
+            ctx.quadraticCurveTo(previous.x, previous.y, (previous.x + target.x) / 2, (previous.y + target.y) / 2);
+            ctx.hecBsplineMid = true;
+            return;
+          }
+          helpers.canvas.hecLineEnd(ctx, previous);
+
           if (target.steppedLine) {
             if (target.steppedLine === 'after' && !flip || target.steppedLine !== 'after' && flip) {
               ctx.lineTo(previous.x, target.y);
@@ -10086,6 +10110,16 @@
           flip ? target.controlPointNextY : target.controlPointPreviousY,
           target.x,
           target.y);
+        },
+
+        // A run of B-spline segments ends at its last point (the pen is at the middle of
+        // its last segment): a straight line to point — before a gap, a straight segment,
+        // the end of a curve
+        hecLineEnd: function (ctx, point) {
+          if (ctx.hecBsplineMid) {
+            ctx.hecBsplineMid = false;
+            ctx.lineTo(point.x, point.y);
+          }
         } };
 
 
@@ -11577,9 +11611,11 @@
 
           // building first area curve (normal)
           ctx.moveTo(curve0[0].x, curve0[0].y);
+          ctx.hecBsplineMid = false;
           for (i = 1; i < len0; ++i) {
             helpers.canvas.lineTo(ctx, curve0[i - 1], curve0[i]);
           }
+          helpers.canvas.hecLineEnd(ctx, curve0[len0 - 1]);
 
           // joining the two area curves
           ctx.lineTo(curve1[len1 - 1].x, curve1[len1 - 1].y);
@@ -11588,6 +11624,7 @@
           for (i = len1 - 1; i > 0; --i) {
             helpers.canvas.lineTo(ctx, curve1[i], curve1[i - 1], true);
           }
+          helpers.canvas.hecLineEnd(ctx, curve1[0]);
         }
 
         function doFill(ctx, points, mapper, view, color, loop) {

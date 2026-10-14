@@ -8,6 +8,7 @@ const lang_en =
     "ui" : {
         "label" : {
             "type_to_search" : "Add an entity",
+            "loading" : "Loading…",
             "error_retreiving" : "Entities unavailable",
             "already_exists" : "Already in graph",
             "add" : "Add",
@@ -98,6 +99,7 @@ const lang_fr =
     "ui" : {
         "label" : {
             "type_to_search" : "Ajouter une entité",
+            "loading" : "Chargement…",
             "error_retreiving" : "Entités indisponibles",
             "already_exists" : "Déjà dans un graphique",
             "add" : "Ajouter",
@@ -188,6 +190,7 @@ const lang_de =
     "ui" : {
         "label" : {
             "type_to_search" : "Entität hinzufügen",
+            "loading" : "Laden…",
             "error_retreiving" : "Entitäten nicht verfügbar",
             "already_exists" : "Bereits im Diagramm",
             "add" : "Hinzufügen",
@@ -278,6 +281,7 @@ const lang_es =
     "ui" : {
         "label" : {
             "type_to_search" : "Añadir entidad",
+            "loading" : "Cargando…",
             "error_retreiving" : "Entidades no disponibles",
             "already_exists" : "Ya en un gráfico",
             "add" : "Añadir",
@@ -368,6 +372,7 @@ const lang_nl =
     "ui" : {
         "label" : {
             "type_to_search" : "Entiteit toevoegen",
+            "loading" : "Laden…",
             "error_retreiving" : "Entiteiten niet beschikbaar",
             "already_exists" : "Al in een grafiek",
             "add" : "Toevoegen",
@@ -458,6 +463,7 @@ const lang_pl =
     "ui" : {
         "label" : {
             "type_to_search" : "Dodaj encję",
+            "loading" : "Ładowanie…",
             "error_retreiving" : "Encje niedostępne",
             "already_exists" : "Już na wykresie",
             "add" : "Dodaj",
@@ -548,6 +554,7 @@ const lang_sv =
     "ui": {
         "label": {
             "type_to_search": "Lägg till entitet",
+            "loading": "Laddar…",
             "error_retreiving": "Enheter otillgängliga",
             "already_exists" : "Redan i ett diagram",
             "add" : "Lägg till",
@@ -638,6 +645,7 @@ const lang_da =
     "ui" : {
         "label" : {
             "type_to_search" : "Tilføj entitet",
+            "loading" : "Indlæser…",
             "error_retreiving" : "Entiteter utilgængelige",
             "already_exists" : "Allerede i et diagram",
             "add" : "Tilføj",
@@ -728,6 +736,7 @@ const lang_sk =
     "ui" : {
         "label" : {
             "type_to_search" : "Pridať entitu",
+            "loading" : "Načítava sa…",
             "error_retreiving" : "Entity nedostupné",
             "already_exists" : "Už v grafe",
             "add" : "Pridať",
@@ -818,6 +827,7 @@ const lang_ru =
     "ui" : {
         "label" : {
             "type_to_search" : "Добавить объект",
+            "loading" : "Загрузка…",
             "error_retreiving" : "Объекты недоступны",
             "already_exists" : "Уже в графике",
             "add" : "Добавить",

@@ -380,7 +380,7 @@ In `curves` and `smart` modes, the curve between two values is rebuilt by an int
 
 ```yaml
 type: custom:history-explorer-card
-interpolation: makima   # monotone (default), steffen, makima, or catmullrom
+interpolation: makima   # monotone (default), steffen, makima, catmullrom, or bspline
 ```
 
 | `interpolation` | How the curve looks |
@@ -389,6 +389,7 @@ interpolation: makima   # monotone (default), steffen, makima, or catmullrom
 | `steffen` | Never overshoots; flat only at the real peaks and troughs; takes the irregular spacing of the values into account |
 | `makima` | Follows the local trend, flat over flat stretches, no break at each small peak; hardly any overshoot |
 | `catmullrom` | The smoothest; may overshoot a little around sharp changes |
+| `bspline` | mini-graph-card's smoothing: never overshoots, the softest, but passes between the values, not through them (a peak drawn lower); `look: mini`'s default |
 
 `smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
 
@@ -636,7 +637,7 @@ graphs:
 | `showStats` | | | ✓ | ✓ | ✓ | Its `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
 | `lineWidth` | `width`, `line_width` | | ✓ | ✓ | ✓ | Line width in pixels |
 | `lineMode` | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
-| `interpolation` | | `akima` = `makima`, `catmull-rom` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` |
+| `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |

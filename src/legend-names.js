@@ -20,7 +20,6 @@ const ARTICLES = {
     nl: ['de', 'het', 'een', 'van'],
 };
 
-const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 const clean = s => s.replace(/\s+/g, ' ').trim();
 
 // A name's qualifiers in parentheses carried by many entities (frequent(q), q: '(Filtered)')
@@ -63,10 +62,14 @@ function withoutArticles(name, lang)
 export function shortNames(curves, { frequent = () => false, lang = 'en' } = {})
 {
     const _names = curves.map(c => String(c.name ?? ''));
+    // (whether a name is another one's too, case aside — counted once for the whole list, not
+    // name by name against every other: a selector's list holds thousands)
+    const twice = list => { const _n = new Map(); for( const m of list ) { const k = m.toLowerCase(); _n.set(k, (_n.get(k) ?? 0) + 1); } return n => _n.get(n.toLowerCase()) > 1; };
     // A step applied to every curve, each kept as it was where it would make two curves the same
     const step = (prev, fn) => {
         const _next = prev.map((n, i) => clean(fn(n, i)) || n);
-        return _next.map((n, i) => _next.some((m, j) => j !== i && same(m, n)) && !prev.some((m, j) => j !== i && same(m, prev[i])) ? prev[i] : n);
+        const _nextTwice = twice(_next), _prevTwice = twice(prev);
+        return _next.map((n, i) => _nextTwice(n) && !_prevTwice(prev[i]) ? prev[i] : n);
     };
     const s1 = step(_names, n => initialsOfQualifiers(n, frequent));
     // (the device removed; where that makes two curves the same, abbreviated instead)
@@ -75,9 +78,10 @@ export function shortNames(curves, { frequent = () => false, lang = 'en' } = {})
         return d && s1[i].toLowerCase().startsWith(d.toLowerCase() + ' ') ? d : null;
     };
     const _removed = s1.map((n, i) => _device(i) ? clean(n.slice(_device(i).length)) : n);
+    const _removedTwice = twice(_removed);
     const s2 = s1.map((n, i) => {
         if( !_device(i) ) return n;
-        const _clash = _removed.some((m, j) => j !== i && same(m, _removed[i]));
+        const _clash = _removedTwice(_removed[i]);
         return _clash ? abbreviateDevice(_device(i)) + ' ' + _removed[i] : _removed[i];
     });
     const s3 = step(s2, n => withoutArticles(n, lang));

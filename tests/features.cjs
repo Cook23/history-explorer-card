@@ -395,13 +395,27 @@ module.exports = async function()
                 return r.most > 0 && _layout && _width && Math.abs(r.menu - r.field) <= 2 && !r.out && !r.twice && !r.tall ? true : JSON.stringify(r);
             });
         }
+        if( ln === 'real' ) await t.step('the widths its list needs and its lines\' shorter forms kept on this device: the field sized from them, reading "Loading…", before the list is built again; the forms ready before the menu opens', async () => {
+            const r = await t.E(`(()=>{ const I=el.instance, k=Object.keys(localStorage).find(k=>k.startsWith('history-explorer_selector_') && !k.includes('_forms_'));
+                const saved=k && JSON.parse(localStorage.getItem(k)), now=I.entityLineWidths();
+                const fk=Object.keys(localStorage).find(k=>k.startsWith('history-explorer_selector_forms_')), f=fk && JSON.parse(localStorage.getItem(fk));
+                const forms = f && f['sensor.l54'];
+                const L=I._entityList; I._entityList=null; I.insertUIHtmlText(0); const before=I.entityLineWidths(), ph=el.querySelector('#b7_0').placeholder;
+                I._entityList=L; I.insertUIHtmlText(0);
+                return { saved, now, before, ph, after: el.querySelector('#b7_0').placeholder, forms, ready: !!I._entityList.forms }; })()`);
+            return r.saved && r.saved.all >= r.saved.most && r.saved.most > 0 && JSON.stringify(r.saved) === JSON.stringify(r.now) && JSON.stringify(r.before) === JSON.stringify(r.saved)
+                && /^(Loading|Chargement)…$/.test(r.ph) && r.after !== r.ph
+                && r.forms?.name === 'Salle de bain Prise (Filtered)' && r.forms.forms[2] === 'Salle bain Prise (F)' && r.ready ? true : JSON.stringify(r);
+        });
         if( ln === 'real' ) await t.step('a line shortened in the menu is still found by its full name', async () => {
             await t.page.setViewportSize({ width: 364, height: 900 });
             await t.E(`(()=>{ document.body.style.width='344px'; document.getElementById('host').style.width='344px'; })()`); await t.wait(1200);
+            // (the lines fitted to the field when the menu opens)
+            const p = await t.E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+10,y:r.top+r.height/2}; })()`);
+            await t.page.mouse.click(p.x, p.y); await t.wait(300);
             const full = await t.E(`(()=>{ const a=[...el.querySelector('#es_0').children].find(a => a.textContent !== a.dataset.name + a.dataset.tail); return a ? a.dataset.name : null; })()`);
             if( !full ) return 'no line shortened at 344 px';
-            const p = await t.E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+10,y:r.top+r.height/2}; })()`);
-            await t.page.mouse.click(p.x, p.y); await t.page.keyboard.type(full.slice(0, 18)); await t.wait(400);
+            await t.page.keyboard.type(full.slice(0, 18)); await t.wait(400);
             const shown = await t.E(`[...el.querySelector('#es_0').children].filter(a => a.style.display !== 'none').map(a => a.dataset.name)`);
             return shown.includes(full) ? true : JSON.stringify({ full, shown: shown.slice(0, 5) });
         });

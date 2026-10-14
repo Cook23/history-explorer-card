@@ -24,6 +24,7 @@ export class CardSelector
         if( show ) {
             // (as wide as the field — its lines fitted to it, fitEntityLines)
             dropdown.style.width = input.getBoundingClientRect().width + 'px';
+            this.fitEntityLines(input_idx, input.getBoundingClientRect().width);
             // Position relative to input: below if top selector (idx=0), above if bottom selector (idx=1)
             const inputRect = input.getBoundingClientRect();
             // #tb_N directly, not dropdown.offsetParent — offsetParent of a display:none
@@ -419,23 +420,75 @@ export class CardSelector
 
         for( let i of this.ui.inputField )
             if( i ) i.placeholder = i18n("ui.label.type_to_search");
-        // (ready: the toolbar shows the selector, sized from its lines — measured once)
+        // (ready: the selector sized from its lines — measured once, kept on this device for
+        // the next time the card is shown, before its list is built)
         this._entityList = { ready: true, widths: null, forms: null };
+        const _w = this.entityLineWidths();
+        if( _w.all ) this.keepSelectorWidths(_w);
         this.resizeSelector();
+        this._prepareEntityForms();
     }
 
-    // Is the entity list ready — the selector shown only then?
+    // The lines' shorter forms (fitEntityLines) prepared out of the way, once the list is
+    // built, before the menu opens: those kept on this device for the same names used at
+    // once (savedEntityForms), then computed again (shortNameForms) and kept — the menu's
+    // lines fitted again if it's open and they changed
+    _prepareEntityForms()
+    {
+        const L = this._entityList, _lines = [...( this._this.querySelector('#es_0')?.children ?? [] )];
+        if( !_lines.length ) return;
+        const _later = f => setTimeout(() => { if( L === this._entityList ) f(); }, 0);
+        const _refit = () => {
+            for( let i = 0; i < 2; i++ ) {
+                const _in = this._this.querySelector(`#b7_${i}`);
+                if( _in && this._this.querySelector(`#es_${i}`)?.style.display === 'block' ) this.fitEntityLines(i, _in.getBoundingClientRect().width);
+            }
+        };
+        const _saved = this.savedEntityForms() ?? {};
+        const _restored = _lines.map(a => _saved[a.dataset.entity]?.name === a.dataset.name ? _saved[a.dataset.entity].forms : null);
+        const _now = () => _later(() => {
+            const _forms = this._computeEntityForms(_lines);
+            if( !L.forms || JSON.stringify(_forms) !== JSON.stringify(_restored) ) { L.forms = null; if( this._setEntityForms(_lines, _forms) ) _refit(); }
+        });
+        if( _restored.every(Boolean) ) _later(() => { if( !L.forms && this._setEntityForms(_lines, _restored) ) _refit(); _now(); });
+        else _now();
+    }
+
+    // The shorter forms of the lines' names (shortNameForms), kept on this device
+    // (keepEntityForms) with the names they're for
+    _computeEntityForms(_lines)
+    {
+        const _forms = this.shortNameForms(_lines.map(a => ({ name: a.dataset.name, entity_id: a.dataset.entity })));
+        this.keepEntityForms(Object.fromEntries(_lines.map((a, k) => [a.dataset.entity, { name: a.dataset.name, forms: _forms[k] }])));
+        return _forms;
+    }
+
+    // Each line's forms — its name, then its shorter forms, each with what follows it (its
+    // value, ▸) — and their widths (px): the list's forms; false when nothing can be
+    // measured yet (not shown)
+    _setEntityForms(_lines, forms)
+    {
+        const _all = _lines.map((a, k) => [a.dataset.name, ...forms[k]].map(n => n + a.dataset.tail));
+        const _w = this._textWidths(_all.flat());
+        if( !_w.some(x => x > 0) ) return false;
+        let _n = 0;
+        this._entityList.forms = _all.map(f => f.map(text => ({ text, width: _w[_n++] })));
+        return true;
+    }
+
+    // Is the entity list ready — its menu filled? (until then, the field reads "Loading…")
     entityListReady()
     {
         return !!this._entityList?.ready;
     }
 
     // The widths the selector's lines need (px, the list's border and scrollbar included):
-    // { most: 90 % of them, all: every one } — measured once, on the whole list
+    // { most: 90 % of them, all: every one } — measured once, on the whole list; until it's
+    // built, as measured the last time on this device (savedSelectorWidths)
     entityLineWidths()
     {
         const L = this._entityList;
-        if( !L?.ready ) return { most: 0, all: 0 };
+        if( !L?.ready ) return this.savedSelectorWidths() ?? { most: 0, all: 0 };
         if( !L.widths ) {
             const _lines = [...( this._this.querySelector('#es_0')?.children ?? [] )];
             const _w = this._textWidths(_lines.map(a => a.dataset.name + a.dataset.tail)).sort((a, b) => a - b);
@@ -457,16 +510,10 @@ export class CardSelector
         {
             const _lines = [...( this._this.querySelector(`#es_${i}`)?.children ?? [] )];
             if( !_lines.length ) return;
-            // (each line's forms, and their widths, measured once — the two lists hold the same lines)
-            if( !L.forms ) {
-                const _forms = this.shortNameForms(_lines.map(a => ({ name: a.dataset.name, entity_id: a.dataset.entity })));
-                const _all = _lines.map((a, k) => [a.dataset.name, ..._forms[k]].map(n => n + a.dataset.tail));
-                const _w = this._textWidths(_all.flat());
-                // (not shown yet: nothing measured — fitted at the next layout)
-                if( !Math.max(0, ..._w) ) return;
-                let _n = 0;
-                L.forms = _all.map(f => f.map(text => ({ text, width: _w[_n++] })));
-            }
+            // (each line's forms, and their widths, measured once — the two lists hold the same
+            // lines; prepared out of the way once the list is built, see _prepareEntityForms;
+            // the menu opened before: here)
+            if( !L.forms && !this._setEntityForms(_lines, this._computeEntityForms(_lines)) ) return;
             // (the first form that fits; then, two lines the same, the more shortened one back
             // a step, until none are)
             const _step = L.forms.map(f => { const k = f.findIndex(x => x.width <= _room); return k < 0 ? f.length - 1 : k; });

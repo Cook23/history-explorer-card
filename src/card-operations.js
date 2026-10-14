@@ -448,6 +448,22 @@ export class CardOperations
         this.updateHistoryWithClearCache();
     }
 
+    // Another device spoke — Home Assistant's user data changed since this device last saw
+    // it, read after the card was shown from this device's own (see readLocalState): what's
+    // shown taken again from the saved state, as restore merges it
+    async reloadSaved(restore)
+    {
+        this.removeGraphs([...this.graphs]);
+        // (merged again from the YAML as it is, not from what the first merge made of it)
+        this.store.reset(JSON.parse(JSON.stringify(this._pureYamlEntities ?? [])));
+        await restore();
+        this.showInfoPanelSwitch();
+        this.setPresentWindow();
+        this.buildGraphsFromStore();
+        this.refreshGraphControls();
+        this.updateHistoryWithClearCache();
+    }
+
     // --------------------------------------------------------------------------------------
 
     // The entries of one group put in the order they're displayed in (graph by graph down

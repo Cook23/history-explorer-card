@@ -50,7 +50,7 @@ module.exports = async function()
     await t.step('keyboard: ← back to the menu, ↓ ↓ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
         for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
         await t.wait(200);
-        const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom' ? true : v;
+        const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom | B-spline' ? true : v;
     });
     await t.step('Escape goes back to the type menu, still open', async () => {
         await t.page.keyboard.press('Escape'); await t.wait(300);
@@ -106,7 +106,7 @@ module.exports = async function()
         const v = await t.E(`[...inst()._this.querySelectorAll('#et_0_interp_sub a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
         await t.E(`inst()._this.querySelector('#et_0_algo_catmullrom').click()`); await t.wait(300);
         const d = await t.E(`inst().graphs[0].chart.data.datasets[0].hecInterpolation`);
-        return v === 'Monotone | Steffen* | Makima | Catmull-Rom' && d === 'catmullrom' ? true : v + ' ; ' + d;
+        return v === 'Monotone | Steffen* | Makima | Catmull-Rom | B-spline' && d === 'catmullrom' ? true : v + ' ; ' + d;
     });
     done(await t.close());
 

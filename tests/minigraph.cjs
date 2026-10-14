@@ -45,6 +45,10 @@ module.exports = async function()
         const v = await t.E(`[...el.instance.graphsInDisplayOrder()[0].chart._hecValuesEl.querySelectorAll('.hec-state')].map(s=>s.textContent.trim())`);
         return v.length && v.every(x => /\d\.\d(\D|$)/.test(x)) ? true : JSON.stringify(v);
     });
+    await t.step('look: mini — mini-graph-card\'s interpolation by default (bspline)', async () => {
+        const v = await ds(t, 'hecInterpolation');
+        return v.join() === '"bspline","bspline"' ? true : v.join();
+    });
     done(await t.close());
 
     // ── The same values in the card's own syntax ──
@@ -123,6 +127,25 @@ module.exports = async function()
         for( const i of [0, 1, 2] ) await clickValue(t, i);
         const mi = await t.E('__mi'), sv = await t.E('__services');
         return mi.join() === 'sensor.rain' && sv.length === 1 && sv[0][0] === 'light.toggle' && sv[0][1].entity_id === 'light.x' ? true : JSON.stringify({ mi, sv });
+    });
+    done(await t.close());
+
+    // ── interpolation: bspline, drawn by Chart.js: a peak [0, 100, 0] on a chart of its own ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.step('bspline: the curve through the middles — a peak drawn at three quarters of its value, its dot kept on the value; picked on its arc, not on the value; the others through the value', async () => {
+        const r = await t.E(`(()=>{ const C=el.instance.graphs[0].chart.constructor, out={};
+            for( const algo of ['monotone', 'bspline'] ) {
+                const cv=document.createElement('canvas'); cv.width=300; cv.height=200; cv.style.cssText='width:300px;height:200px'; document.body.appendChild(cv);
+                const c=new C(cv.getContext('2d'), { type: 'line', data: { labels: ['a','b','c','d'], datasets: [{ data: [0,100,0,0], borderColor: '#f00', borderWidth: 2,
+                    fill: 'origin', backgroundColor: 'rgba(0,0,255,0.3)', pointRadius: 0, cubicInterpolationMode: 'monotone', hecInterpolation: algo, lineTension: 0.4 }] },
+                    options: { responsive: false, animation: false, legend: { display: false }, scales: { yAxes: [{ ticks: { min: 0, max: 100 } }] } } });
+                const m=c.getDatasetMeta(0).data[1]._view, d=cv.getContext('2d').getImageData(Math.round(m.x), 0, 1, 200).data;
+                let top=-1; for( let y=0; y<200; y++ ) if( d[y*4] > 200 && d[y*4+1] < 80 && d[y*4+3] > 200 ) { top=y; break; }
+                out[algo]={ peak: m.y, top, bottom: c.chartArea.bottom, onArc: c._hecCurveAt(m.x, top), onValue: c._hecCurveAt(m.x, m.y) };
+                c.destroy(); cv.remove();
+            } return out; })()`);
+        const b = r.bspline, mo = r.monotone, expected = b.peak + (b.bottom - b.peak) / 4;
+        return Math.abs(mo.top - mo.peak) <= 2 && Math.abs(b.top - expected) <= 2 && b.onArc === 0 && b.onValue === -1 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
