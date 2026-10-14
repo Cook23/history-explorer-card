@@ -55,6 +55,14 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   part, through its contracts, documented, tested, usable in this card's own syntax too.
 - For the UI, this card's gestures and actions stay.
 
+## Every option at every level — set by the user, not negotiable
+
+Every option can be set at every level — the card, `entityOptions`, a graph, an entity —
+even where its use is doubtful or none: the most precise one always wins (entity, then
+graph, then `entityOptions`, then the card). Never restrict an option's scope because it
+"seems logical": one rule for all options keeps the code and the configuration standard,
+and so simpler.
+
 ## An example is a symptom — set by the user, not negotiable
 
 An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
