@@ -71,6 +71,13 @@ the extreme. Past sessions turned "can" into "must" and a guideline into a rewor
 everything — the user had to correct it each time. Do what is asked, at the scale asked;
 when the scale is unclear, ask.
 
+## No patch for a special case — set by the user, not negotiable
+
+A special case that looks like a problem (an old saved state, compatibility with a former
+version…) is reported to the user, and decided together — never handled on one's own by a
+patch. A compatibility problem at a version change happens once; ugly code stays forever.
+Keep the code clean.
+
 ## An example is a symptom — set by the user, not negotiable
 
 An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
