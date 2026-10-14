@@ -399,7 +399,8 @@ export class CardSelector
                 const _label = _valStr ? `${friendly} (${_valStr})` : friendly;
                 const o = document.createElement('a');
                 o.href = `#s_${i}`;
-                o.id = entity;
+                // (its entity in dataset, never as its id: an id is the card's own name — an
+                // entity_id isn't a valid CSS identifier when a part starts with a digit)
                 o.dataset.entity = entity;
                 o.style = `display:block;padding:2px ${LINE_PAD_X}px;text-decoration:none;color:inherit;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden`;
                 // (an entity with attributes that can be shown opens their submenu: marked ▸,

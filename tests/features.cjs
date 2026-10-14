@@ -148,6 +148,18 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The search, with an entity_id that isn't a valid CSS identifier (a part starting with a digit) ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, extraStates: {
+        'binary_sensor.434110536434007616_bsh_common_setting_childlock': { entity_id: 'binary_sensor.434110536434007616_bsh_common_setting_childlock', state: 'off',
+            attributes: { friendly_name: 'Lave-vaisselle Sécurité enfants' }, last_changed: new Date().toISOString(), last_updated: new Date().toISOString() } } } });
+    await t.wait(800);
+    await t.step('entity selector: typing filters the list, whatever the entity_ids listed', async () => {
+        await t.page.click('#b7_0'); await t.page.keyboard.type('power'); await t.wait(500);
+        const e = await openEntries(), errors = t.errors.filter(m => /selector/.test(m));
+        return e.includes('sensor.power') && !e.includes('sensor.rain') && !errors.length ? true : JSON.stringify({ e, errors });
+    });
+    done(await t.close());
+
     // ── recordedEntitiesOnly: only the entities recorded in the last hour are listed ──
     t = await openCard(card({ statistics: { enabled: false }, recordedEntitiesOnly: true, graphs: [] }), { mock: { series: true } });
     await t.wait(800);
