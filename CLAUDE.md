@@ -27,6 +27,9 @@ history-explorer-card is one versatile product: its YAML is read in its own synt
 [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s, indifferently, so that a
 mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`.
 
+- **The main goal:** a mini-graph-card's YAML works, with a similar look, and every
+  capability of this card in addition. Small differences after the migration don't
+  matter much; details of the look are dealt with later.
 - **No separate mode, no translation layer.** Every mini-graph-card option is an option of
   this card, valid with or without `look: mini`: a name meaning the same as one of ours is
   an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the
