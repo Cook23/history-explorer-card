@@ -148,12 +148,19 @@ function _seriesValue(entity, attribute, v)
     return _f !== 1 && typeof _r.value === 'number' ? { ..._r, value: _r.value * _f } : _r;
 }
 
+// Is attribute value v a reference to something else, not a value: an entity_id
+// (domain.object_id — a domain starts with a letter, so 1.5 isn't one) or a web address
+const _isReference = v => typeof v === 'string' && /^([a-z][a-z0-9_]*\.[a-z0-9_]+|[a-z][a-z0-9+.-]*:\/\/\S+)$/.test(v.trim());
+
 // The attributes of state s that can be shown as a series: a number, a text or a yes/no —
-// not Home Assistant's own, not a list or an object, not a unit (X_unit)
+// not Home Assistant's own, not a list or an object, not a unit (X_unit), not a reference
+// to something else (an entity, a web address), not about a version or an update (its
+// name says so: installed_version, auto_update…)
 export function seriesAttributes(s)
 {
     const _a = s?.attributes ?? {};
-    return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]) && !_isUnit(k, _a[k]));
+    return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]) && !_isUnit(k, _a[k])
+        && !_isReference(_a[k]) && !/version|update/i.test(k));
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:

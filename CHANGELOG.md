@@ -29,6 +29,10 @@ Changelog for the HA History Explorer Card.
 - The pinch applied once per frame, both fingers' positions known — each finger's event comes on its own, and one finger moved alone looked like a change of spread
 - Tests: a pinch rather horizontal (the Y axis untouched, not locked), rather vertical (the time span unchanged), nearly centred (zoomed as a centred one, not panned) and off centre (panned too), two fingers moving diagonally (both panned)
 
+### Fixed — the attributes offered
+- The entity selector's attribute submenu offered references that aren't values — an attribute naming an entity (`source: sensor.x`, as lowpass_dt gives its sensors) or a web address (an update entity's `release_url`) — and attributes about a version or an update, their name saying so (`installed_version`, `latest_version`, `auto_update`). They are no longer offered (`seriesAttributes`)
+- Test: such attributes on an entity, not in its submenu
+
 ### Fixed — the entity selector's search (#141)
 - Typing in the entity selector filtered nothing — the list stayed whole — as soon as one entity listed had an entity_id with a part starting with a digit (`binary_sensor.4341…`, Zigbee's `sensor.0x00158d…`): each line had its entity_id as its id, and the menu's layout looked a line's submenu up by it, an invalid CSS selector then. A line's entity is now in its `dataset` only; `architecture` test: a new rule, `element-ids` — an element's id is the card's own name, never a piece of data
 - Test: the search with such an entity listed
