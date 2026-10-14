@@ -28,6 +28,27 @@ export const HA_ATTRIBUTES = [
     "token",
 ];
 
+// Attributes that are no value to follow, never offered as a series (seriesAttributes): an
+// entity's settings, limits and descriptions — from Home Assistant's domains (its frontend's
+// lists, the entities' documentation). Shown in a curve when written in the YAML all the same
+const NOT_SERIES_ATTRIBUTES = [
+    // display and identity
+    "display_precision", "id", "unique_id", "user_id", "device_id", "area_id", "platform", "integration", "configuration_url",
+    // the device
+    "manufacturer", "model", "model_name", "model_id", "brand", "serial_number", "hw_version",
+    // an update
+    "title", "release_summary", "release_notes", "in_progress",
+    // the limits and settings of input_*, number, counter, timer
+    "min", "max", "step", "mode", "pattern", "initial", "has_date", "has_time", "restore", "duration",
+    // the limits of a thermostat, a humidifier, a light
+    "min_temp", "max_temp", "target_temp_step", "min_humidity", "max_humidity", "target_humidity_step",
+    "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin",
+    // cameras and media players
+    "frontend_stream_type", "entity_picture_local", "media_content_id", "media_image_url", "media_image_remotely_accessible", "media_position_updated_at",
+    // alarms, locks, zones
+    "code_format", "code_arm_required", "passive", "radius",
+];
+
 // Series id → { entity, attribute (null for the entity's state) }
 export function seriesOf(id)
 {
@@ -152,15 +173,20 @@ function _seriesValue(entity, attribute, v)
 // (domain.object_id — a domain starts with a letter, so 1.5 isn't one) or a web address
 const _isReference = v => typeof v === 'string' && /^([a-z][a-z0-9_]*\.[a-z0-9_]+|[a-z][a-z0-9+.-]*:\/\/\S+)$/.test(v.trim());
 
+// Is attribute value v a date, with or without its time (last_triggered, next_rising,
+// last_seen, a birthday…): a moment, different each time, nothing to follow
+const _isDateTime = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}|$)/.test(v.trim());
+
 // The attributes of state s that can be shown as a series: a number, a text or a yes/no —
 // not Home Assistant's own, not a list or an object, not a unit (X_unit), not a reference
 // to something else (an entity, a web address), not about a version or an update (its
-// name says so: installed_version, auto_update…)
+// name says so: installed_version, auto_update…), not a setting, a limit or a description
+// (NOT_SERIES_ATTRIBUTES), not a date (with or without its time)
 export function seriesAttributes(s)
 {
     const _a = s?.attributes ?? {};
     return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]) && !_isUnit(k, _a[k])
-        && !_isReference(_a[k]) && !/version|update/i.test(k));
+        && !_isReference(_a[k]) && !/version|update/i.test(k) && !NOT_SERIES_ATTRIBUTES.includes(k) && !_isDateTime(_a[k]));
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:

@@ -76,7 +76,7 @@ module.exports = async function()
         await search('power'); r.push(...await list()); await closeAll();
         return r.includes('climate.salon=true') && r.some(x => /^sensor\..*=false$/.test(x)) ? true : JSON.stringify(r);
     });
-    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, a unit (X_unit: visibility_unit, even with no visibility), nor a reference to an entity or a web address, nor about a version or an update (installed_version, auto_update); a temperature in Home Assistant\'s unit system', async () => {
+    await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, a unit (X_unit: visibility_unit, even with no visibility), nor a reference to an entity or a web address, nor about a version or an update (installed_version, auto_update), nor a setting, a limit or a description (display_precision, min_temp, max_temp, target_temp_step, manufacturer), nor a date, with or without its time (last_seen, next_service); a temperature in Home Assistant\'s unit system', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
         return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });

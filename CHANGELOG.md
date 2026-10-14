@@ -4,6 +4,21 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.20] - 2026-10-14
+
+### Fixed — the attributes offered: no setting, no limit, no date
+- The entity selector's attribute submenu no longer offers what is no value to follow: an entity's settings, limits and descriptions, from Home Assistant's domains — `display_precision`, ids (`unique_id`, `device_id`, `area_id`…), the device (`manufacturer`, `model`, `serial_number`, `hw_version`…), an update's texts (`title`, `release_summary`, `release_notes`, `in_progress`), the limits and settings of `input_*`, `number`, `counter`, `timer` (`min`, `max`, `step`, `mode`, `pattern`, `initial`…), of a thermostat, a humidifier, a light (`min_temp`, `max_temp`, `target_temp_step`, `min_mireds`…), of cameras and media players (`frontend_stream_type`, `media_content_id`…), of alarms, locks and zones (`code_format`, `passive`, `radius`) — `NOT_SERIES_ATTRIBUTES`; nor an attribute holding a date, with or without its time (`last_triggered`, `next_rising`, `last_seen`…), different each time. The modes and what varies stay offered (`hvac_mode`, `preset_mode`, `effect`, `media_title`, `latitude`…). Any of them can still be shown, written in the YAML
+- Test: such attributes on an entity, not in its submenu
+
+### Changed — the time range centred in its field
+- The toolbar's time range (`1 H`, `1 D`…) is centred in its field, between the − and + buttons
+
+### To do — the date and the magnifier (decided, not done yet)
+- A click on the date opens the browser's calendar (`<input type="date">`, `showPicker()`): the range shown is kept, the window ending at the end of the day chosen. `<` and `>` stay as they are
+- A double-click on the date: back to real time, the range kept (what a click on it does today). The calendar opens only once the double-click's delay has passed (the gesture settings' long press), so that a double-click doesn't open it
+- A double-click on the magnifier: back to the default range (`defaultTimeRange`) — what a double-click on the date does today. Its click still toggles the zoom selection mode (a double-click toggling it twice, it ends as it was)
+- README_Full: the date selector's paragraph ("Clicking the date selector…") to update
+
 ## [v1.2.19] - 2026-10-14
 
 ### New — mini-graph-card's interpolation
