@@ -441,7 +441,7 @@ export class CardOperations
     {
         this.removeGraphs([...this.graphs]);
         this.store.reset(JSON.parse(JSON.stringify(this._pureYamlEntities ?? [])));
-        this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+        this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
         this.setPresentWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();

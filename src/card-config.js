@@ -125,7 +125,7 @@ export class CardConfig
         P.filterEntities =         c.filterEntities;
         P.excludeFilterEntities =  c.excludeFilterEntities;
         P.combineSameUnits =       c.combineSameUnits === true;
-        P.defaultTimeRange =       c.defaultTimeRange ?? '24';
+        P.defaultTimeRange =       c.defaultTimeRange ?? '24h';
         P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
         P.timeTickDensity =        c.timeTicks?.density ?? c.timeTickDensity ?? 'high';
         P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;

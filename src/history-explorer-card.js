@@ -118,7 +118,7 @@ export class HistoryCardState {
         this.pconfig.showCurrentValues    = false;
         this.pconfig.axisAddMarginMin     = true;
         this.pconfig.axisAddMarginMax     = true;
-        this.pconfig.defaultTimeRange     = '24';
+        this.pconfig.defaultTimeRange     = '24h';
         this.pconfig.defaultTimeOffset    = undefined;
         this.pconfig.timeTickDensity      = 'high';
         this.pconfig.timeTickOverride     = undefined;

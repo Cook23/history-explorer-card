@@ -1,6 +1,8 @@
 // The card's options: the curve interpolation algorithms, the synonyms of the option
 // names, and which options can be set at which level (card, entityOptions, graph, entity).
 
+import { normalizeColor } from "./history-default-colors.js";
+
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js
 export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
@@ -83,24 +85,6 @@ export const STATS = ['min', 'average', 'max'];
 // A dashMode written as CSS writes dashes and gaps ('10,10', '10 5'): as a list
 const _dashList = v => ( typeof v === 'string' && /^[\d.\s,]+$/.test(v) && /\d/.test(v) ) ? v.trim().split(/[\s,]+/).map(Number) : v;
 
-// Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
-// as an object of thresholds ({ value: color }); a stop without a value (or a color alone)
-// between two that have one gets its value spaced evenly between them. Any other color
-// value as it is (an RGB triplet, [r, g, b], is a color)
-function _colorValue(v)
-{
-    if( !Array.isArray(v) || v.every(x => typeof x === 'number' || ( typeof x === 'string' && x.trim() !== '' && !isNaN(Number(x)) )) ) return v;
-    const _stops = v.map(x => typeof x === 'string' ? { color: x } : ( x && typeof x === 'object' ) ? { value: x.value === undefined || x.value === null || x.value === '' ? NaN : Number(x.value), color: x.color } : null)
-                    .filter(x => x && x.color !== undefined);
-    for( let i = 0; i < _stops.length; i++ ) {
-        if( !isNaN(_stops[i].value) ) continue;
-        const a = i - 1, b = _stops.findIndex((x, j) => j > i && !isNaN(x.value));
-        if( a < 0 || isNaN(_stops[a].value) || b < 0 ) continue;
-        _stops[i].value = _stops[a].value + ( _stops[b].value - _stops[a].value ) / ( b - a );
-    }
-    return Object.fromEntries(_stops.filter(x => !isNaN(x.value)).map(x => [x.value, x.color]));
-}
-
 // Each option's value in its one form, whatever the user wrote — the rest of the card only
 // ever sees that form
 const OPTION_VALUES = {
@@ -108,7 +92,9 @@ const OPTION_VALUES = {
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
     dashMode      : _dashList,
-    color         : _colorValue,
+    color         : normalizeColor,
+    // (a color, or fade, true — the curve's color, light — or false)
+    fill          : v => ( v === true || v === false || v === 'fade' ) ? v : normalizeColor(v),
     // (the decimals: a whole number ≥ 0, else not set)
     rounding      : v => ( v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 ) ? Number(v) : undefined,
     // (an action's name alone stands for it)
@@ -121,6 +107,24 @@ const OPTION_VALUES = {
     },
     // (a bar interval's YAML name: its code — see BAR_INTERVALS)
     interval      : v => typeof v === 'number' ? v : BAR_INTERVALS.find(i => i.yaml && i.yaml === v)?.code,
+    // (a number and its unit — m, h, d, w, o, y; a number alone is in hours: 24 is 24h)
+    defaultTimeRange : v => {
+        const t = String(v).replace(/\s+/g, '');
+        return /^\d+(\.\d+)?$/.test(t) ? t + 'h' : t;
+    },
+    // (true is statistics, states is history)
+    showMinMax    : v => v === true ? 'statistics' : v === 'states' ? 'history' : v,
+    // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
+    // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
+    circular      : v => {
+        if( v === false ) return false;
+        const t = String(v).replace(/\s+/g, '').toLowerCase();
+        if( t === 'none' ) return undefined;
+        const P = t === '2pi' ? 2 * Math.PI : t === '' ? NaN : Number(t);
+        if( isFinite(P) && P > 0 ) return P;
+        console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(v)} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
+        return false;
+    },
 };
 
 // Options as the user wrote them, in their one form: every name as the card's own (its

@@ -20,7 +20,7 @@ export class CardTimeRange
         if( !this.state.loading ) {
 
             if( resetRange )
-                this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+                this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
 
             this.setPresentWindow();
             this.updateHistory();
@@ -376,6 +376,8 @@ export class CardTimeRange
         }
     }
 
+    // The time range `range` in its one form (see normalizeOptions): a number and its unit
+    // — m, h, d, w, o (months), y
     setTimeRangeFromString(range, update = false, t_center = null)
     {
         const s = range.slice(0, -1);
@@ -388,7 +390,6 @@ export class CardTimeRange
             case 'w': t = ( s <= 3 ) ? s*7*24*60 : 30*24*60; break;
             case 'o': t = ( s <= 1 ) ? 30*24*60 : ( s <= 3 ) ? 91*24*60 : ( s <= 6 ) ? 182*24*60 : 365*24*60; break;
             case 'y': t = 365*24*60; break;
-            default: t = range*60; break;
         }
 
         const h = Math.floor(t / 60);

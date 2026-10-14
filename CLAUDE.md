@@ -104,7 +104,7 @@ that session (or to the user), not made from here.
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
 |---|---|
-| `_circularPeriod` (1.2: `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
+| `_circularPeriod` (1.2: parsing in `history-options.js` `OPTION_VALUES.circular`, auto-detection in `card-datasets.js` `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
 
 - absent / `null` / `none` (trimmed, any case): automatic — state class `measurement_angle`,
   or a unit of exactly `°` (not `°C`/`°F`), gives a period of 360;

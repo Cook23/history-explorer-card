@@ -182,7 +182,7 @@ function hxHookInfoPanel()
 
         instance.databaseCallback = this._databaseCallback.bind(this);
 
-        instance.setTimeRangeFromString(String(instance.pconfig.defaultTimeRange));
+        instance.setTimeRangeFromString(instance.pconfig.defaultTimeRange);
 
         instance.today(false);
 

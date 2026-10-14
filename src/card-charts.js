@@ -6,7 +6,6 @@
 
 import { i18n } from "./languages.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
-import { parseColor } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -641,7 +640,7 @@ export class CardCharts
                 "bColor": this.entityColor(d),
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar is filled with its own color)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : parseColor(d.fill),
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill,
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
                 "mode": d.lineMode || this.pconfig.defaultLineMode,

@@ -281,7 +281,76 @@ function _parseThresholdText(s)
 const _isColor = c => typeof c === 'string' && c !== '' && ( typeof CSS === 'undefined' || !CSS.supports || CSS.supports('color', c) );
 const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.trim() !== '' ) ? Number(v) : NaN;
 
-// The fill of a curve of color `color`: `fill` as it's written — true, its color as
+// A series a color is read from (no CSS color has a dot): an entity_id, or one of its
+// attributes after it (climate.salon.hvac_action) — see colorEntityOf
+export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(s.trim());
+
+// Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
+// as an object of thresholds; a stop without a value (or a color alone) between two that
+// have one gets its value spaced evenly between them
+function _thresholdList(list)
+{
+    const _stops = list.map(x => typeof x === 'string' ? { value: NaN, color: x } : ( x && typeof x === 'object' ) ? { value: _number(x.value), color: x.color } : null)
+                       .filter(x => x && x.color !== undefined);
+    for( let i = 0; i < _stops.length; i++ ) {
+        if( !isNaN(_stops[i].value) ) continue;
+        const a = i - 1, b = _stops.findIndex((x, j) => j > i && !isNaN(x.value));
+        if( a < 0 || isNaN(_stops[a].value) || b < 0 ) continue;
+        _stops[i].value = _stops[a].value + ( _stops[b].value - _stops[a].value ) / ( b - a );
+    }
+    return Object.fromEntries(_stops.filter(x => !isNaN(x.value)).map(x => [x.value, x.color]));
+}
+
+// A color value in its one form — from the configuration (where it's read) and from an
+// entity's state (where it's used: the color an entity holds), the same forms either way:
+// - a color: any CSS color, a theme's variable (--name), an RGB triplet ([r, g, b], or as
+//   text) → a CSS color;
+// - the series it's read from (see isColorSeries) → as it is;
+// - thresholds — an object, the same as text (JSON, or a dict as a Home Assistant template
+//   writes it), or a list (see _thresholdList): a number key is a threshold, any other key a
+//   state compared as it is written, `default` the color of every value they don't cover,
+//   `entity` / `attribute` the series whose value they compare → { thresholds: [[value,
+//   color], ...] in increasing order, states: { state: color }, default, entity, attribute };
+// - anything else → undefined
+export function normalizeColor(v)
+{
+    if( v === undefined || v === null ) return undefined;
+    if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim()) ?? v;
+    if( Array.isArray(v) ) v = v.length >= 3 && v.slice(0, 3).every(x => !isNaN(_number(x))) ? parseColor(v) : _thresholdList(v);
+    if( v && typeof v === 'object' ) {
+        if( Array.isArray(v.thresholds) ) return v;
+        const spec = { thresholds: [], states: {}, default: undefined };
+        for( const [k, c0] of Object.entries(v) ) {
+            if( k === 'entity' || k === 'attribute' ) { spec[k] = c0; continue; }
+            const c = parseColor(c0);
+            if( !_isColor(c) ) continue;
+            if( k === 'default' ) spec.default = c;
+            else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
+            else spec.states[k] = c;
+        }
+        spec.thresholds.sort((a, b) => a[0] - b[0]);
+        return spec.thresholds.length || Object.keys(spec.states).length || spec.default ? spec : undefined;
+    }
+    if( isColorSeries(v) ) return v.trim();
+    const c = parseColor(v);
+    return _isColor(c) ? c : undefined;
+}
+
+// A color value in its one form (see normalizeColor) as the colors it gives: { color } for
+// a color, the thresholds as they are, null for a series or nothing
+export function colorSpec(c)
+{
+    return typeof c === 'string' ? ( isColorSeries(c) ? null : { color: c } ) : ( c && typeof c === 'object' ) ? c : null;
+}
+
+// The colors an entity's state holds (a color option read from an entity): its value in its
+// one form, the same normalization as the configuration's
+export function parseColorValue(v)
+{
+    return colorSpec(normalizeColor(v));
+}
+
+// The fill of a curve of color `color` (both in their one form): `fill` — true, its color as
 // transparent as the palette's fills (for a color that varies — thresholds, an entity's —
 // only that transparency, each point's fill taking its own color: see _fillLike); false,
 // none; any other value as it is
@@ -289,35 +358,9 @@ export function fillValue(fill, color)
 {
     if( fill === false ) return 'rgba(0,0,0,0)';
     if( fill !== true ) return fill;
-    const c = parseColorValue(color)?.color;
+    const c = colorSpec(color)?.color;
     const _c = c ? window.HXLocal_Chart?.helpers?.color(c) : null;
     return _c?.valid ? _c.alpha(0.15).rgbString() : 'rgba(0,0,0,0.15)';
-}
-
-// The value of a color option — the same forms whether it's given in the configuration or
-// read from an entity's state: a color (see parseColor), or thresholds (an object, or the
-// same as text): a number key is a threshold, any other
-// key a state compared as it is written, `default` the color of every value they don't
-// cover (`entity`, the entity whose value they compare — see colorEntityOf — is left to
-// the caller) → { color }, or { thresholds: [[value, color], ...] in increasing order,
-// states: { state: color }, default }, or null when it's neither
-export function parseColorValue(v)
-{
-    if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim());
-    if( v && typeof v === 'object' && !Array.isArray(v) ) {
-        const spec = { thresholds: [], states: {}, default: undefined };
-        for( const [k, c0] of Object.entries(v) ) {
-            const c = parseColor(c0);
-            if( k === 'entity' || k === 'attribute' || !_isColor(c) ) continue;
-            if( k === 'default' ) spec.default = c;
-            else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
-            else spec.states[k] = c;
-        }
-        spec.thresholds.sort((a, b) => a[0] - b[0]);
-        return spec.thresholds.length || Object.keys(spec.states).length || spec.default ? spec : null;
-    }
-    const c = parseColor(v);
-    return _isColor(c) ? { color: c } : null;
 }
 
 // The color a value takes (see parseColorValue): the color itself; a state listed, its

@@ -393,15 +393,15 @@ export class CardStorage
         );
         // YAML front — compared with the YAML image only
         const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
-                                 String(this.pconfig.yamlDefaultTimeRange) !== String(_yamlImage?.yaml_defaultTimeRange);
+                                 this.pconfig.yamlDefaultTimeRange !== _yamlImage?.yaml_defaultTimeRange;
 
         if( !_range.multi && !_range.local ) {
             // Nothing enabled for range — nothing persists, always the YAML default
-            this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+            this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
         } else if( _yamlTimeChanged || _haTimeChanged ) {
             // YAML wins if both changed
             if( _yamlTimeChanged ) {
-                this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+                this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
             } else {
                 // HA user wins (only reachable when enable_multidevice_persistence covers range)
                 if( _haCard.timeRangeHours > 0 )
