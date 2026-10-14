@@ -465,13 +465,13 @@ export class CardHistory
                     // Issue history retrieval call, initiate async cache loading
                     this.historyCall(l, t0, t1).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
 
-                    // Parallel statistics query for entities with showMinMax:'history'/'states'
+                    // Parallel statistics query for entities with showMinMax
                     const lmm = [];
                     for( const g of this.graphs )
                         for( const e of g.entities ) {
                             const v = e.showMinMax;
                             // (an attribute has no statistics)
-                            if( ( v === 'history' || v === 'states' || v === true || v === 'statistics' ) && !seriesOf(e.entity).attribute )
+                            if( ( v === 'history' || v === 'statistics' ) && !seriesOf(e.entity).attribute )
                                 lmm.push(e.entity);
                         }
                     if( lmm.length ) {

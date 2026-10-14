@@ -107,9 +107,11 @@ function statistics(d){
   return r;
 }
 function mkHass(){ return {
-  states:{...STATES}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   user:{id:'u1',name:'u'}, localize:(k)=>k,
+  // (the actions performed: [domain.service, data, target])
+  callService:(d,sv,data,target)=>{ (window.__services=window.__services||[]).push([d+'.'+sv, data, target]); return Promise.resolve(); },
   // the entity and device registries (an entity's device: its name)
   entities:{ 'sensor.power':{entity_id:'sensor.power',device_id:'d_ecowitt'}, 'sensor.power2':{entity_id:'sensor.power2',device_id:'d_mf'}, 'sensor.rain':{entity_id:'sensor.rain',device_id:'d_ecowitt'} },
   devices:{ d_ecowitt:{id:'d_ecowitt',name:'Ecowitt'}, d_mf:{id:'d_mf',name:'Météo-France Villeveyrac'} },

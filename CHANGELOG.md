@@ -4,6 +4,40 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.18] - 2026-10-14
+
+### New — mini-graph-card's YAML read by the card, as its own
+- A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini` — its options keep working. No separate mode, no translation: each of its names is an alias of one of the card's options, valid with or without `look: mini`, at every level (card, `entityOptions`, graph, entity); each of its values one the option accepts, with the same meaning
+- Names: `line_width` (`lineWidth`), `show_points` (`showPoints`), `show_state` (`showState`), `show_legend` (`legendVisible`), `show_labels` (`labelsVisible`), `hours_to_show` (`defaultTimeRange`), `decimals` (`rounding`), `smoothing` (`lineMode`), `line_style` (`dashMode`), `y_axis` (`yAxis`), `lower_bound` / `upper_bound` (`ymin` / `ymax`), `show_fill` (`fill`), `color_thresholds` (`color`), an entity's `graph` (`type`), `tap_action` (`tapAction`). An option written under both names: the card's wins
+- Its forms: `show:` (`show: { points: true }` is `show_points: true`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone (`- sensor.x`, in any graph); `unit`, `color` and `fill` on the card — every entity's
+- Values the options now accept: `lineMode: true / false` (curves / lines); `yAxis: primary / secondary` (left / right); `fill: true` (a fill in the curve's color) / `false` (none); `showPoints: hover`; `dashMode` as CSS writes dashes (`'10,10'`); `color` thresholds as a list — `[{ value: 0, color: blue }, green, { value: 20, color: red }]`, a stop without a value spaced between its neighbours
+- `look: mini` gives mini-graph-card's thick smooth lines too (`lineWidth: 5`, `lineMode: curves`); it only gives defaults — any option set, under either name, wins
+
+### New — tapAction: a click on a value
+- What a click on a curve's value does (in the legend, over the graph): `more-info` — its dialog, with the info panel when it's on — as before and by default; or Home Assistant's `navigate`, `url`, `perform-action` / `call-service`, `none`. On the card, a graph, `entityOptions` or an entity
+
+### Changed — a value's decimals, and its points
+- `rounding` (`decimals`) set: exactly that many decimals (`20.0`); not set: at most 2, as before. `rounding: 0` gave 2 decimals — now none. It can be set on an entity, a graph or in `entityOptions` too
+- `showPoints: false`: no dot at all, not even the hovered one; `hover` (the default): only the hovered dot. Points hidden from a curve's menu: back to `hover`
+
+### Changed — every option in its one form where it's read
+- Every spelling the user may write — a synonym, mini-graph-card's names and values, `show:`, a bar interval's name, `showStats` as a name, an interpolation's case, a color (an RGB triplet, a theme's variable, thresholds as text or as a list), `defaultTimeRange` without its unit (`24` is `24h`), `showMinMax: true` / `states` (`statistics` / `history`), `circular: none` / `2pi` / a period as text — is resolved once, where the card, `entityOptions`, a graph and an entity are read (`history-options.js` `normalizeOptions`, called by `card-config.js`); the rest of the card only tests that form, and that form is what is saved — an alias written instead of its value is no longer a change. Before, each part read some of them again (`lineMode` in five places, the bar interval in four, the time range in five, a color at each point drawn, `entityOptions` on each read). A color an entity holds (`color: sensor.x`) is put in its one form by the same function, when it's read from the entity
+- ARCHITECTURE.md rule 7; `architecture` test: a new rule, `options-read`
+
+### Changed — the entity selector sized from its list
+- The field goes between the date and the range when 90 % of the menu's lines fit there; else on a line of its own (three lines on a narrow card). It then takes the room there, up to what its longest line needs — no fixed 150 / 400 / 500 px any more. Measured once, on the whole list
+- Its menu as wide as the field: a line too long shortened as the legend does (a frequent qualifier as its initials, the device's name removed or abbreviated, the articles), only the lines that need it, never two the same; the search still on the full names. Still too long: on two lines
+- The field shown once its list is ready — with `recordedEntitiesOnly`, no *Loading…* any more (the text removed)
+- The shorter forms of names shared by the legend and the selector (`card-config.js` `shortNameForms`); ARCHITECTURE.md rule 6: an element is shown only once its data is ready
+- Tests: two lists (short names, a realistic installation), five card widths — the layout, the field's width, the menu as wide, every line fitted, none twice, nothing out of the card; a shortened line found by its full name
+
+### Changed — shorter texts
+- The entity selector's placeholder: *Add an entity* (was *Type to search for an entity to add*), in every language
+- *Loading…*, *Entities unavailable*, *Second curve*, *Linked graphs: inseparable*, a graph's menu *Delete*, and in French *Affichage* (was *Représentation*) — every language
+
+### Tests
+- A new suite, `minigraph`: a mini-graph-card's YAML in place (its graph, its time range, its lines, axes, bounds, legend, fill, decimals); the same values in the card's syntax (points, dashes, thresholds as a list, rounding, `yAxis: primary`); `tap_action` on the card and on entities; every option in its one form from its reading
+
 ## [v1.2.17] - 2026-10-13
 
 ### New — a hover over a graph, as mini-graph-card: the value it's on, the Y labels it's near

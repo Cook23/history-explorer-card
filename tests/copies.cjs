@@ -52,7 +52,7 @@ module.exports = async function()
     await t.step('an entity already shown: said so, its graph outlined, then a choice — cancel first, marked', async () => {
         await pick('power two');
         const r = { c: await choice(), tip: await t.E('tip()'), outl: await t.E(`el.instance.graphs[0].canvas.parentNode.style.outline`), menu: await typeMenuOpen() };
-        return r.c === 'Cancel* | Create a second curve' && /Already/.test(r.tip || '') && /dashed/.test(r.outl) && !r.menu ? true : JSON.stringify(r);
+        return r.c === 'Cancel* | Second curve' && /Already/.test(r.tip || '') && /dashed/.test(r.outl) && !r.menu ? true : JSON.stringify(r);
     });
     await t.step('Enter: cancelled — nothing added, the field emptied', async () => {
         await t.page.keyboard.press('Enter'); await t.wait(500);

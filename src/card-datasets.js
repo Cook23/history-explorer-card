@@ -2,22 +2,21 @@
 // shown — line modes (smart, stepped...), bars by interval, circular values, timelines.
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { parseColor, parseColorValue, colorForValue } from "./history-default-colors.js";
+import { parseColorValue, colorSpec, colorForValue, isColorSeries } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
-import { barInterval, RAW_INTERVAL, normalizeLineMode } from "./history-options.js";
+import { barInterval, RAW_INTERVAL } from "./history-options.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
-// The series an entity's `color` reads, or null: an entity_id (no CSS color has a dot) —
-// or one of its attributes, after it (climate.salon.hvac_action) — whose state then holds
-// the color, in any form `color` itself accepts; or the `entity` (and `attribute`) of
-// thresholds, whose value they then compare instead of the value shown
-const _SERIES_ID = /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/;
+// The series an entity's `color` (in its one form, see normalizeColor) reads, or null: an
+// entity_id — or one of its attributes, after it (climate.salon.hvac_action) — whose state
+// then holds the color, in any form `color` itself accepts; or the `entity` (and
+// `attribute`) of thresholds, whose value they then compare instead of the value shown
 export function colorEntityOf(e)
 {
     const c = e?.color;
-    const id = ( typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? seriesId(c.entity, c.attribute) : '' ).trim();
-    return _SERIES_ID.test(id) ? id : null;
+    const id = typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? seriesId(c.entity, c.attribute) : '';
+    return isColorSeries(id) ? id : null;
 }
 
 export class CardDatasets
@@ -35,7 +34,7 @@ export class CardDatasets
     _colorFunction(e, colorHistory)
     {
         const _ce = colorEntityOf(e);
-        const _spec = typeof e.color === 'object' ? parseColorValue(e.color) : null;
+        const _spec = typeof e.color === 'object' ? e.color : null;
         if( !_ce ) return _spec && !_spec.color ? (t, v) => colorForValue(_spec, v) : null;
         // The color entity's states over time, each read once (the calls come in increasing
         // time): thresholds compare them; else each holds a color value
@@ -56,8 +55,8 @@ export class CardDatasets
     {
         const _ce = colorEntityOf(e);
         const _state = id => this.stateOf(id)?.state;
-        if( _ce && typeof e.color === 'object' ) return colorForValue(parseColorValue(e.color), _state(_ce)) ?? e.paletteColor;
-        const _spec = parseColorValue(_ce ? _state(_ce) : e.color);
+        if( _ce && typeof e.color === 'object' ) return colorForValue(e.color, _state(_ce)) ?? e.paletteColor;
+        const _spec = _ce ? parseColorValue(_state(_ce)) : colorSpec(e.color);
         return colorForValue(_spec, Number(_state(e.entity))) ?? e.paletteColor;
     }
 
@@ -234,7 +233,7 @@ export class CardDatasets
                         s = this._lineSamples(e, result[id], process, scale, w);
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
                         const _colorFn = this._colorFunction(e, colorHistory);
-                        if( _colorFn ) this._applyPointColors(_dataset, e, s, _colorFn, scale, parseColor(e.fill));
+                        if( _colorFn ) this._applyPointColors(_dataset, e, s, _colorFn, scale, e.fill);
                     } else if( _kind == 'bar' && result[id].length > 0 ) {
                         ({ s, bcol } = this._barSamples(g, e, result[id], process, w, this._colorFunction(e, colorHistory)));
                     } else if( g.type == 'timeline' || g.type == 'arrowline' ) {
@@ -260,7 +259,7 @@ export class CardDatasets
     }
 
     // A point's min/max band (showMinMax): the sample's own (long-term statistics), else —
-    // for 'history' / 'states' — the hour's from the min/max cache
+    // for 'history' — the hour's from the min/max cache
     _withMinMax(pt, e, sample, scale, fromCache = true)
     {
         const showMM = e.showMinMax;
@@ -268,7 +267,7 @@ export class CardDatasets
         if( sample.yMin != null ) {
             pt.yMin = sample.yMin * scale;
             pt.yMax = sample.yMax * scale;
-        } else if( fromCache && (showMM === 'history' || showMM === 'states') && this.minmaxCache?.[e.entity] ) {
+        } else if( fromCache && showMM === 'history' && this.minmaxCache?.[e.entity] ) {
             const mm = this.minmaxCache[e.entity];
             const ts = moment(sample.last_changed).valueOf();
             const bucket = Math.floor(ts / 3600000) * 3600000;
@@ -340,7 +339,7 @@ export class CardDatasets
             }
         }
 
-        if( (normalizeLineMode(e.lineMode) || this.pconfig.defaultLineMode) === 'smart' ) {
+        if( (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
             // Silences are detected on every recorded value (before decimation)
             const _raw = [];
             for( let i = 0; i < n; i++ ) {
@@ -496,37 +495,20 @@ export class CardDatasets
         return ( g.type === 'bar' && e?.type === 'bar' && g.interval != RAW_INTERVAL ) ? 'bar' : 'line';
     }
 
-    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null.
-    // `circular` (per entity, same values as lowpass_dt): absent / null / 'none' auto-detects
-    // (state_class measurement_angle, or a unit of exactly '°' — not °C/°F — gives 360; for an
-    // attribute, the unit ° only when its name says it's a direction: see isDirectionAttribute), false
-    // never, a number or numeric string gives the period, '2pi' gives 2π. Anything else, or a
-    // period <= 0, disables it with a warning.
+    // Period of a circular entity (an angle: 0 and 360 are the same direction), or null —
+    // `circular` in its one form (see normalizeOptions): false never; a period; absent
+    // auto-detects (state_class measurement_angle, or a unit of exactly '°' — not °C/°F —
+    // gives 360; for an attribute, the unit ° only when its name says it's a direction: see
+    // isDirectionAttribute)
     circularPeriodOf(e)
     {
         const c = e?.circular;
         if( c === false ) return null;
-        if( c === undefined || c === null || ( typeof c === 'string' && c.trim().toLowerCase() === 'none' ) ) {
-            if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
-            if( this.getUnitOfMeasure(e.entity, e.unit) !== '°' ) return null;
-            const { attribute } = seriesOf(e.entity);
-            return ( !attribute || isDirectionAttribute(attribute) ) ? 360 : null;
-        }
-        let P = NaN;
-        if( typeof c === 'number' ) P = c;
-        else if( typeof c === 'string' ) {
-            const t = c.replace(/\s+/g, '').toLowerCase();
-            P = ( t === '2pi' ) ? 2 * Math.PI : ( t === '' ? NaN : Number(t) );
-        }
-        if( !isFinite(P) || P <= 0 ) {
-            this._circularWarned = this._circularWarned ?? new Set();
-            if( !this._circularWarned.has(e.entity) ) {
-                this._circularWarned.add(e.entity);
-                console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(c)} for ${e.entity} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
-            }
-            return null;
-        }
-        return P;
+        if( typeof c === 'number' ) return c;
+        if( this.getStateClass(e.entity) === 'measurement_angle' ) return 360;
+        if( this.getUnitOfMeasure(e.entity, e.unit) !== '°' ) return null;
+        const { attribute } = seriesOf(e.entity);
+        return ( !attribute || isDirectionAttribute(attribute) ) ? 360 : null;
     }
 
     // Circular values (period P) made into a continuous curve, on a copy of the samples (they

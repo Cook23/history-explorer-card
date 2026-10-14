@@ -1,6 +1,8 @@
 // The card's options: the curve interpolation algorithms, the synonyms of the option
 // names, and which options can be set at which level (card, entityOptions, graph, entity).
 
+import { normalizeColor } from "./history-default-colors.js";
+
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js
 export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom'];
@@ -12,14 +14,24 @@ export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', 
 const _reportedInterpolations = new Set();
 
 // A line mode as the card knows it: the singular aliases accepted — 'line' → 'lines',
-// 'curve' → 'curves', 'step' → 'stepped' ('smart': curves while the source reports, flat
-// dashed plateaus over its silences — see _applySilencePlateaus)
-export function normalizeLineMode(m)
+// 'curve' → 'curves', 'step' → 'stepped' — and mini-graph-card's `smoothing` (an alias of
+// `lineMode`): true → 'curves', false → 'lines' ('smart': curves while the source reports,
+// flat dashed plateaus over its silences — see _applySilencePlateaus)
+function normalizeLineMode(m)
 {
-    if( m === 'line'  ) return 'lines';
-    if( m === 'curve' ) return 'curves';
+    if( m === 'line'  || m === false ) return 'lines';
+    if( m === 'curve' || m === true  ) return 'curves';
     if( m === 'step'  ) return 'stepped';
     return m;
+}
+
+// A Y axis as the card knows it: left, right or auto — mini-graph-card's primary and
+// secondary are aliases of left and right; undefined for any other value
+function normalizeYAxis(v)
+{
+    if( v === 'primary'   ) return 'left';
+    if( v === 'secondary' ) return 'right';
+    return ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
 }
 
 // Can entities of types a and b share one graph? Lines and bars can (curves drawn over the
@@ -30,7 +42,7 @@ export function typesCompatible(a, b)
     return a === b || ( _xy(a) && _xy(b) );
 }
 
-export function normalizeInterpolation(v)
+function normalizeInterpolation(v)
 {
     if( v === undefined || v === null ) return undefined;
     const k = String(v).toLowerCase().replace(/[-_ ]/g, '');
@@ -43,31 +55,103 @@ export function normalizeInterpolation(v)
     return undefined;
 }
 
-// Options spelled differently depending on the level they were first offered at: each
-// spelling is accepted at every level (card, entityOptions, graph, entity) — the first
-// name is the one used internally, the others are its synonyms
+// Options spelled differently depending on the level they were first offered at, or in
+// mini-graph-card's syntax: each spelling is accepted at every level (card, entityOptions,
+// graph, entity) — the first name is the one used internally, the others are its synonyms,
+// each meaning the same (an option set under both names: the first name wins)
 const OPTION_SYNONYMS = {
-    lineWidth  : ['width'],
-    showPoints : ['showSamples'],
-    ystepSize  : ['ystepsize'],
+    lineWidth        : ['width', 'line_width'],
+    showPoints       : ['showSamples', 'show_points'],
+    ystepSize        : ['ystepsize'],
+    showState        : ['show_state'],
+    legendVisible    : ['show_legend'],
+    labelsVisible    : ['show_labels'],
+    defaultTimeRange : ['hours_to_show'],
+    rounding         : ['decimals'],
+    lineMode         : ['smoothing'],
+    dashMode         : ['line_style'],
+    yAxis            : ['y_axis'],
+    ymin             : ['lower_bound'],
+    ymax             : ['upper_bound'],
+    fill             : ['show_fill'],
+    color            : ['color_thresholds'],
+    type             : ['graph'],
+    tapAction        : ['tap_action'],
 };
 
-export function normalizeOptionSynonyms(o)
+// The statistics a curve can show over its graph (showStats), in the order they're shown
+export const STATS = ['min', 'average', 'max'];
+
+// A dashMode written as CSS writes dashes and gaps ('10,10', '10 5'): as a list
+const _dashList = v => ( typeof v === 'string' && /^[\d.\s,]+$/.test(v) && /\d/.test(v) ) ? v.trim().split(/[\s,]+/).map(Number) : v;
+
+// Each option's value in its one form, whatever the user wrote — the rest of the card only
+// ever sees that form
+const OPTION_VALUES = {
+    lineMode      : normalizeLineMode,
+    interpolation : normalizeInterpolation,
+    yAxis         : normalizeYAxis,
+    dashMode      : _dashList,
+    color         : normalizeColor,
+    // (a color, or fade, true — the curve's color, light — or false)
+    fill          : v => ( v === true || v === false || v === 'fade' ) ? v : normalizeColor(v),
+    // (the decimals: a whole number ≥ 0, else not set)
+    rounding      : v => ( v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 ) ? Number(v) : undefined,
+    // (an action's name alone stands for it)
+    tapAction     : v => typeof v === 'string' ? { action: v } : ( v && typeof v === 'object' ) ? v : undefined,
+    // (true: all of them; a name or a list of names — avg for average)
+    showStats     : v => {
+        if( v === true ) return STATS;
+        const _l = ( Array.isArray(v) ? v : typeof v === 'string' ? [v] : [] ).map(x => String(x).toLowerCase());
+        return STATS.filter(x => _l.includes(x) || ( x === 'average' && _l.includes('avg') ));
+    },
+    // (a bar interval's YAML name: its code — see BAR_INTERVALS)
+    interval      : v => typeof v === 'number' ? v : BAR_INTERVALS.find(i => i.yaml && i.yaml === v)?.code,
+    // (a number and its unit — m, h, d, w, o, y; a number alone is in hours: 24 is 24h)
+    defaultTimeRange : v => {
+        const t = String(v).replace(/\s+/g, '');
+        return /^\d+(\.\d+)?$/.test(t) ? t + 'h' : t;
+    },
+    // (true is statistics, states is history)
+    showMinMax    : v => v === true ? 'statistics' : v === 'states' ? 'history' : v,
+    // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
+    // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
+    circular      : v => {
+        if( v === false ) return false;
+        const t = String(v).replace(/\s+/g, '').toLowerCase();
+        if( t === 'none' ) return undefined;
+        const P = t === '2pi' ? 2 * Math.PI : t === '' ? NaN : Number(t);
+        if( isFinite(P) && P > 0 ) return P;
+        console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(v)} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
+        return false;
+    },
+};
+
+// Options as the user wrote them, in their one form: every name as the card's own (its
+// synonyms resolved, mini-graph-card's `show:` read as its options — show: { points: true }
+// is show_points: true, an option set directly winning), every value too (OPTION_VALUES).
+// Called where the options are read (card-config.js), never later: the rest of the card
+// only knows these forms
+export function normalizeOptions(o)
 {
     if( !o || typeof o !== 'object' || Array.isArray(o) ) return o;
     const r = { ...o };
+    if( r.show && typeof r.show === 'object' && !Array.isArray(r.show) )
+        for( const [k, v] of Object.entries(r.show) ) if( r['show_' + k] === undefined ) r['show_' + k] = v;
     for( const [name, aliases] of Object.entries(OPTION_SYNONYMS) ) {
         if( r[name] !== undefined ) continue;
         for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
     }
+    for( const [name, fn] of Object.entries(OPTION_VALUES) ) if( r[name] !== undefined && r[name] !== null ) r[name] = fn(r[name]);
     return r;
 }
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-export const GRAPH_OPTION_KEYS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'decimation', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', ...Object.values(OPTION_SYNONYMS).flat()];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding'];
+export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
@@ -88,23 +172,27 @@ export const BAR_INTERVALS = [
 export const RAW_INTERVAL = 4;
 export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 
-// Looks: a set of options given at once with `look:` — the card's own options still win.
-// mini: what mini-graph-card shows — no header, toolbar nor selector, each curve's value
-// now and its minimum and maximum over the window, no time labels nor grid, the Y labels
-// inside the plot, a fill fading out, a small graph
+// Looks: a set of default options given at once with `look:` — the card's own options
+// still win, whatever their spelling (a look only gives defaults: it never changes what an
+// option means).
+// mini: mini-graph-card's look — no header, toolbar nor selector, each curve's value now
+// and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
+// the plot, thick smooth lines with a fill fading out, a small graph
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
-            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150 },
+            showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves' },
 };
 
-// The card's configuration with its look's options under its own
+// The card's configuration, in its one form (see normalizeOptions), with its
+// look's options under its own
 export function withLook(config)
 {
-    if( config?.look === undefined ) return config;
-    const _look = LOOKS[config.look];
+    const c = normalizeOptions(config);
+    if( c?.look === undefined ) return c;
+    const _look = LOOKS[c.look];
     if( !_look ) {
-        console.warn(`history-explorer-card: unknown look '${config.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
-        return config;
+        console.warn(`history-explorer-card: unknown look '${c.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
+        return c;
     }
-    return { ..._look, ...config, uiLayout: { ..._look.uiLayout, ...config.uiLayout } };
+    return { ..._look, ...c, uiLayout: { ..._look.uiLayout, ...c.uiLayout } };
 }

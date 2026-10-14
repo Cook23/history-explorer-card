@@ -71,7 +71,7 @@ module.exports = async function()
     await t.step('a struck-through button says why, and the cut goes on', async () => {
         await pressButton(0, 0);
         const r = { msg: await t.E(`el.instance.graphs[0].canvas.getRootNode()._hecMessageEl?.textContent ?? ''`), b: await buttons() };
-        return /separated/.test(r.msg) && r.b.includes('cancel') ? true : JSON.stringify(r);
+        return /inseparable/.test(r.msg) && r.b.includes('cancel') ? true : JSON.stringify(r);
     });
     await t.step('↑ on another graph: the cut one inserted above it, the zones back to normal', async () => {
         await pressButton(await gi('rain'), 2);
@@ -120,7 +120,7 @@ module.exports = async function()
         await swipeOn(await gi('a'), -40);
         const r = { msg: await t.E(`el.instance.graphs[0].canvas.getRootNode()._hecMessageEl?.textContent ?? ''`), b: await buttons(), layout: await layout() };
         await t.page.keyboard.press('Escape'); await t.wait(400);
-        return /separated/.test(r.msg) && r.b.includes('cancel') && r.layout === L0 ? true : JSON.stringify(r);
+        return /inseparable/.test(r.msg) && r.b.includes('cancel') && r.layout === L0 ? true : JSON.stringify(r);
     });
     await t.step('a click outside the graphs cancels the cut, Escape too, ✂ too', async () => {
         await graphMenu('tank'); await click('cut');
@@ -151,7 +151,7 @@ module.exports = async function()
         await graphMenu('wind_rad'); await click('layout');
         const m = await menu(); await click('gdelete');
         const r = { m, layout: await layout(), stored: await t.E(`el.instance.store.has('sensor.wind_rad')`) };
-        return r.m.endsWith('Cut | Delete the graph') && !r.layout.includes('wind_rad') && !r.stored ? true : JSON.stringify(r);
+        return r.m.endsWith('Cut | Delete') && !r.layout.includes('wind_rad') && !r.stored ? true : JSON.stringify(r);
     });
     done(await t.close());
 

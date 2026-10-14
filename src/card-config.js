@@ -3,8 +3,9 @@
 // from the YAML. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColor } from "./history-default-colors.js";
-import { seriesState, seriesId } from "./history-series.js";
-import { INTERPOLATIONS, normalizeInterpolation, normalizeLineMode, normalizeOptionSynonyms, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS } from "./history-options.js";
+import { seriesState, seriesId, seriesOf } from "./history-series.js";
+import { shortNames } from "./legend-names.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -45,7 +46,16 @@ export function getEntityOptionsPure(hass, entityOptions, entity)
         }
     }
 
-    return c ?? undefined;
+    return normalizeOptions(c) ?? undefined;
+}
+
+// entityOptions in their one form (see normalizeOptions): each entry's — a list (with
+// patterns) or an object keyed by entity id, device class or domain
+function normalizeEntityOptions(eo)
+{
+    if( Array.isArray(eo) ) return eo.map(normalizeOptions);
+    if( !eo || typeof eo !== 'object' ) return eo;
+    return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, normalizeOptions(v)]));
 }
 
 export class CardConfig
@@ -60,13 +70,13 @@ export class CardConfig
     applyConfig(config, { defaults = {}, fixed = {} } = {})
     {
         const P = this.pconfig;
-        // (every spelling of an option accepted — see normalizeOptionSynonyms)
-        const c = normalizeOptionSynonyms(config);
+        // (the options in their one form, whatever the user wrote — see normalizeOptions)
+        const c = normalizeOptions(config);
         const d = (k, v) => k in defaults ? defaults[k] : v;
 
         P.customStateColors = {};
         for( let i in c.stateColors ?? {} ) P.customStateColors[i] = parseColor(c.stateColors[i]);
-        P.entityOptions =          c.entityOptions;
+        P.entityOptions =          normalizeEntityOptions(c.entityOptions);
 
         P.labelAreaWidth =         c.labelAreaWidth ?? 65;
         P.labelsVisible =          c.labelsVisible ?? true;
@@ -82,11 +92,11 @@ export class CardConfig
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
         P.decimation =             c.decimation;
-        P.roundingPrecision =      c.rounding || 2;
+        P.rounding =               c.rounding;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
-        P.defaultLineMode =        normalizeLineMode(c.lineMode) ?? d('defaultLineMode', undefined);
-        P.defaultInterpolation =   normalizeInterpolation(c.interpolation) ?? 'monotone';
+        P.defaultLineMode =        c.lineMode ?? d('defaultLineMode', undefined);
+        P.defaultInterpolation =   c.interpolation ?? 'monotone';
         P.defaultLineWidth =       c.lineWidth ?? 2.0;
         P.defaultDashMode =        c.dashMode;
         P.defaultNetBars =         c.netBars;
@@ -96,8 +106,10 @@ export class CardConfig
         P.cardShow =               { showState: c.showState, showStats: c.showStats };
         P.defaultShowPoints =      c.showPoints;
         P.defaultYAxis =           c.yAxis;
+        P.tapAction =              c.tapAction;
+        // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
-            ['fill', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+            ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
         // barGraphHeight set their own)
         P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
@@ -113,7 +125,7 @@ export class CardConfig
         P.filterEntities =         c.filterEntities;
         P.excludeFilterEntities =  c.excludeFilterEntities;
         P.combineSameUnits =       c.combineSameUnits === true;
-        P.defaultTimeRange =       c.defaultTimeRange ?? '24';
+        P.defaultTimeRange =       c.defaultTimeRange ?? '24h';
         P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
         P.timeTickDensity =        c.timeTicks?.density ?? c.timeTickDensity ?? 'high';
         P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;
@@ -129,11 +141,6 @@ export class CardConfig
         this.statistics.force =     c.statistics?.force ?? undefined;
 
         Object.assign(P, fixed);
-    }
-
-    parseIntervalConfig(s)
-    {
-        return BAR_INTERVALS.find(i => i.yaml && i.yaml === s)?.code;
     }
 
     // --------------------------------------------------------------------------------------
@@ -185,18 +192,18 @@ export class CardConfig
                 const key = p.match ?? p.entity;
                 if( !key ) continue;
                 if( this._matchGlob(entity, key) ) {
-                    const { match, entity: _e, ...opts } = normalizeOptionSynonyms(p);
+                    const { match, entity: _e, ...opts } = p;
                     for( const k in opts ) {
                         if( !(k in patched) ) patched[k] = opts[k];
                     }
                 }
             }
             if( Object.keys(patched).length ) {
-                c = Object.assign({}, patched, normalizeOptionSynonyms(c) ?? {});
+                c = Object.assign({}, patched, c ?? {});
             }
         }
 
-        return normalizeOptionSynonyms(c) ?? undefined;
+        return c ?? undefined;
     }
 
     // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
@@ -204,8 +211,8 @@ export class CardConfig
     resolveInterpolation(e)
     {
         return e?.interpolation
-            ?? normalizeInterpolation(this.pconfig.graphs[e?.groupId]?.interpolation)
-            ?? normalizeInterpolation(this.getEntityOptions(e?.entity)?.interpolation)
+            ?? this.pconfig.graphs[e?.groupId]?.interpolation
+            ?? this.getEntityOptions(e?.entity)?.interpolation
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
     }
 
@@ -215,11 +222,25 @@ export class CardConfig
     // takes that graph's.
     resolveYAxis(e)
     {
-        const _valid = v => ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
-        return _valid(e?.yAxis)
-            ?? _valid(this.pconfig.graphs[e?.groupId]?.yAxis)
-            ?? _valid(this.getEntityOptions(e?.entity)?.yAxis)
-            ?? _valid(this.pconfig.defaultYAxis) ?? 'auto';
+        return e?.yAxis ?? this.pconfig.graphs[e?.groupId]?.yAxis ?? this.getEntityOptions(e?.entity)?.yAxis
+            ?? this.pconfig.defaultYAxis ?? 'auto';
+    }
+
+    // The decimals of entity e's values (see formatNumber): its own `rounding`, else its
+    // graph's, else entityOptions', else the card's — undefined: at most 2
+    roundingOf(e)
+    {
+        return e?.rounding ?? this.pconfig.graphs[e?.groupId]?.rounding ?? this.getEntityOptions(e?.entity)?.rounding
+            ?? this.pconfig.rounding;
+    }
+
+    // What a click on entity e's value does (tapAction — Home Assistant's actions: more-info,
+    // navigate, url, perform-action / call-service, none): its own, else its graph's, else
+    // entityOptions', else the card's — more-info when none is set
+    tapActionOf(e)
+    {
+        return e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction
+            ?? this.pconfig.tapAction ?? { action: 'more-info' };
     }
 
     _matchGlob(str, pattern)
@@ -266,7 +287,7 @@ export class CardConfig
                      this.circularPeriodOf({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
                      _cumulative ? 'bar' :
                      ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
-        const lineMode = normalizeLineMode(entityOptions?.lineMode) || this.pconfig.defaultLineMode || 'smart';
+        const lineMode = entityOptions?.lineMode || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }
 
@@ -276,7 +297,7 @@ export class CardConfig
 
     _makeStaticEntityEntry(entity, groupId, ent, interval)
     {
-        ent = normalizeOptionSynonyms(ent);
+        ent = normalizeOptions(ent);
         return {
             entity            : entity,
             groupId           : groupId,
@@ -284,7 +305,7 @@ export class CardConfig
             colorSet          : ent.color !== undefined || undefined,
             fill              : ent.fill,
             hidden            : ent.hidden,
-            interval          : this.parseIntervalConfig(ent.interval) ?? interval,
+            interval          : ent.interval ?? interval,
             isStatic          : true,
             name              : ent.name,
             scale             : ent.scale,
@@ -316,9 +337,21 @@ export class CardConfig
             decimation        : ent.decimation,
             circular          : ent.circular,
             yAxis             : ent.yAxis,
+            rounding          : ent.rounding,
+            tapAction         : ent.tapAction,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
+    }
+
+    // The YAML's graphs: the one the card's own `entities` make, as mini-graph-card writes
+    // them — its `name` the graph's title, its `show: graph` the graph's type (line, or
+    // bar) — then `graphs` (undefined when there's none)
+    yamlGraphs(config)
+    {
+        if( !Array.isArray(config?.entities) || !config.entities.length ) return config?.graphs;
+        const _own = { type: config.show_graph === 'bar' ? 'bar' : 'line', title: config.name, entities: config.entities };
+        return [_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )];
     }
 
     // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
@@ -349,10 +382,10 @@ export class CardConfig
             // The graph's options: under `options:`, or directly on the graph (`options:`
             // wins when both are set), with every synonym accepted
             const _gopts = graph.options && typeof graph.options === 'object' ? graph.options : {};
-            const _opts = normalizeOptionSynonyms({
+            const _opts = normalizeOptions({
                 ...Object.fromEntries(GRAPH_OPTION_KEYS.filter(k => graph[k] !== undefined).map(k => [k, graph[k]])),
                 ..._gopts });
-            const _interval = this.parseIntervalConfig(_opts.interval) ?? null;
+            const _interval = _opts.interval ?? null;
 
             // A curve once per graph; in another graph, a second curve of the same series
             // (its copy number — see keyOf)
@@ -370,6 +403,8 @@ export class CardConfig
             };
 
             for( let e of graph.entities ) {
+                // (an entity_id alone: that entity)
+                if( typeof e === 'string' ) e = { entity: e };
                 if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
                     console.warn(`history-explorer-card: skipping invalid entity entry in graph '${graph.title ?? graph.type ?? '?'}' (expected an object with a non-empty 'entity' string, got ${JSON.stringify(e)})`);
                     continue;
@@ -432,6 +467,8 @@ export class CardConfig
                 decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
                 yAxis          : _opts.yAxis,
+                rounding       : _opts.rounding,
+                tapAction      : _opts.tapAction,
             };
         }
     }
@@ -439,7 +476,7 @@ export class CardConfig
     // The line mode an entity is drawn with
     lineModeOf(e)
     {
-        return normalizeLineMode(e?.lineMode) || this.pconfig.defaultLineMode || 'curves';
+        return e?.lineMode || this.pconfig.defaultLineMode || 'curves';
     }
 
     // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only
@@ -448,5 +485,28 @@ export class CardConfig
     {
         const _mode = this.lineModeOf(e);
         return ( e.type ?? g.type ) === 'line' && ( _mode === 'curves' || _mode === 'smart' );
+    }
+
+    // The shorter forms of names (legend-names.js) — items: [{ name, entity_id }] — from
+    // what Home Assistant knows: each entity's device, and how many entities carry a
+    // qualifier. For a legend too narrow for its curves' names, and the entity selector's
+    // lines too long for its field
+    shortNameForms(items)
+    {
+        const _hass = this._hass;
+        const _device = id => {
+            const _did = _hass?.entities?.[seriesOf(id ?? '').entity]?.device_id;
+            const _d = _did ? _hass?.devices?.[_did] : null;
+            return _d ? ( _d.name_by_user || _d.name || null ) : null;
+        };
+        // (a qualifier carried by 3 entities or more, counted once per states object)
+        if( this._qualifierCount?.states !== _hass?.states ) this._qualifierCount = { states: _hass?.states, n: new Map() };
+        const _frequent = q => {
+            const _n = this._qualifierCount.n;
+            if( !_n.has(q) ) _n.set(q, Object.values(_hass?.states ?? {}).filter(st => String(st.attributes?.friendly_name ?? '').includes(q)).length);
+            return _n.get(q) >= 3;
+        };
+        return shortNames(items.map(d => ({ name: d.name, device: _device(d.entity_id) })),
+                          { frequent: _frequent, lang: String(_hass?.language ?? 'en').slice(0, 2) });
     }
 }

@@ -21,6 +21,71 @@ it each time. So:
   its kind;
 - split code only when it reads better split — never for its size.
 
+## mini-graph-card — the product's direction, set by the user, not negotiable
+
+history-explorer-card is one versatile product: its YAML is read in its own syntax or in
+[mini-graph-card](https://github.com/kalkih/mini-graph-card)'s, indifferently, so that a
+mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`.
+
+- **The main goal:** a mini-graph-card's YAML works, with a similar look, and every
+  capability of this card in addition. Small differences after the migration don't
+  matter much; details of the look are dealt with later.
+- **No separate mode, no translation layer.** Every mini-graph-card option is an option of
+  this card, valid with or without `look: mini`: a name meaning the same as one of ours is
+  an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the
+  same levels; its structured forms (`show:`, root `entities`, `color_thresholds`…) are read
+  by the card natively, as its own options.
+- **Aliases, never conversions.** A mini-graph-card name is an alias of one of our names; a
+  mini-graph-card value is an alias of one of our values (`y_axis: secondary` is
+  `yAxis: right`), or a value our option accepts in addition, with the same meaning. Never
+  convert a value, never rescale, never change what a parameter means. An option with no
+  exact equivalent (`value_factor`…) is a function to add under its own name.
+- **`look: mini` = defaults of parameters, nothing else.** If it has to change an aspect no
+  parameter sets, a parameter is missing: add it to the card (usable without `look`), and
+  `look: mini` only gives its default.
+- **A conversion that would remain** is described in the migration doc, never done in the
+  code. The aim is none.
+- An aspect that is unclear: ask the user.
+- **`look: mini` only switches defaults** — mini-graph-card's look instead of ours. It
+  never changes what an option means: an option means one thing, whatever the look (an
+  option whose meaning would depend on the look is an ergonomic nightmare). A name that
+  means something else on each side is a conflict to settle once for all, not by the look.
+- **A mini-graph-card function this card lacks is added to it**, mini-graph-card's code
+  (MIT) taken as the example, and becomes a function of this card like any other: in its
+  part, through its contracts, documented, tested, usable in this card's own syntax too.
+- For the UI, this card's gestures and actions stay.
+
+## Every option may be at every level — set by the user, not negotiable
+
+Any option may be extended to every level — the card, `entityOptions`, a graph, an entity —
+even where its use is doubtful or none: the most precise one always wins (entity, then
+graph, then `entityOptions`, then the card). It's allowed, not a task: an option gets its
+full scope when it's touched or needed, never in a rework of all options. Never restrict an
+option's scope because it "seems logical".
+
+## Words have a meaning — set by the user, not negotiable
+
+Read the user's words as they are, with their nuance: a possibility is not an obligation
+("may" is not "must"), an example is not a rule, a guideline is not a mandate to push to
+the extreme. Past sessions turned "can" into "must" and a guideline into a rework of
+everything — the user had to correct it each time. Do what is asked, at the scale asked;
+when the scale is unclear, ask.
+
+## No patch for a special case — set by the user, not negotiable
+
+A special case that looks like a problem (an old saved state, compatibility with a former
+version…) is reported to the user, and decided together — never handled on one's own by a
+patch. A compatibility problem at a version change happens once; ugly code stays forever.
+Keep the code clean.
+
+## An example is a symptom — set by the user, not negotiable
+
+An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
+the thing to fix. Never patch for it: no value tuned to it, no special case, no test built
+around it. Search globally for the general cause it shows — which rule, in which part,
+produces it for every case — explain that cause to the user, and propose the general rule
+that fixes it. The example then only checks that the rule holds.
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
@@ -39,7 +104,7 @@ that session (or to the user), not made from here.
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
 |---|---|
-| `_circularPeriod` (1.2: `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
+| `_circularPeriod` (1.2: parsing in `history-options.js` `OPTION_VALUES.circular`, auto-detection in `card-datasets.js` `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
 
 - absent / `null` / `none` (trimmed, any case): automatic — state class `measurement_angle`,
   or a unit of exactly `°` (not `°C`/`°F`), gives a period of 360;

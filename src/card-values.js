@@ -5,18 +5,9 @@
 // may be decimated). Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { formatNumber } from "./history-units.js";
 const moment = window.HXLocal_moment;
 
-// The statistics a curve can show, in the order they're shown (left to right)
-export const STATS = ['min', 'average', 'max'];
-
-// showStats as a list of STATS: true for all of them, a name or a list of names, else none
-export function normalizeStats(v)
-{
-    if( v === true ) return STATS;
-    const _l = ( Array.isArray(v) ? v : typeof v === 'string' ? [v] : [] ).map(s => String(s).toLowerCase());
-    return STATS.filter(s => _l.includes(s) || ( s === 'average' && _l.includes('avg') ));
-}
 
 // A curve's minimum, average (weighted by time: each value counts for as long as it lasted)
 // and maximum over [t0, t1] (ms) — samples: { t, v } in time order, the first one possibly
@@ -65,7 +56,7 @@ export class CardValues
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
             .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
-        const _stats = _entities.map(x => ({ ...x, which: normalizeStats(this._resolveShow(x.e, 'showStats')) })).filter(x => x.which.length);
+        const _stats = _entities.map(x => ({ ...x, which: this._resolveShow(x.e, 'showStats') ?? [] })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
         const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
         const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
@@ -73,12 +64,12 @@ export class CardValues
         const states = _states.map(x => {
             const s = this.stateOf(x.e.entity)?.state;
             return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '',
-                     text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 )) };
+                     text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 ), x.d) };
         });
         const stats = _stats.map(x => {
             const st = curveStats(g.valueSamples?.[x.j] ?? [], t0, t1);
             return st && { curve: x.j, key: x.e.entity, color: _color(x), name: _stats.length > 1 ? ( x.d.name ?? x.e.entity ) : null,
-                           cells: x.which.map(k => ({ stat: k, label: i18n('ui.values.' + k), value: this._roundedValue(st[k].v) + ( x.d.unit ? ' ' + x.d.unit : '' ),
+                           cells: x.which.map(k => ({ stat: k, label: i18n('ui.values.' + k), value: this._roundedValue(st[k].v, x.d) + ( x.d.unit ? ' ' + x.d.unit : '' ),
                                                       time: k !== 'average' ? _time(st[k].t) : null })) };
         }).filter(x => x);
         // (a value at a point of curve j — the point hovered: as its value now, with its time;
@@ -86,15 +77,15 @@ export class CardValues
         const format = (j, y, x) => {
             const d = g.chart.data.datasets[j], p = d?.circularPeriod;
             const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
-            return { text: this._roundedValue(v), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
+            return { text: this._roundedValue(v, d), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
         };
         g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format });
     }
 
-    // A value as the values over a graph show it: rounded (roundingPrecision)
-    _roundedValue(v)
+    // A value of dataset d as the values over a graph show it: its curve's decimals (see
+    // roundingOf)
+    _roundedValue(v, d)
     {
-        const _p = 10 ** this.pconfig.roundingPrecision;
-        return String(Math.round(v * _p) / _p);
+        return formatNumber(v, d?.rounding);
     }
 }

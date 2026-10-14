@@ -3,11 +3,11 @@
 // rebuilt, removed. What one graph is for Chart.js is card-charts.js's. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
-import { defaultColors, parseColorValue } from "./history-default-colors.js";
+import { defaultColors, colorSpec, fillValue } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
-import { normalizeInterpolation, normalizeLineMode, typesCompatible, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { typesCompatible, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import { baseTypePure } from "./card-config.js";
 import { INTERVAL_SELECTOR_RIGHT_PX } from "./card-charts.js";
 const Chart = window.HXLocal_Chart;
@@ -387,7 +387,7 @@ export class CardGraphs
         // configured one. Needed before the graph is built: it decides how bar entities
         // are drawn (bars, or raw curves for interval 4).
         const _graphInterval = interval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
-            ?? this.parseIntervalConfig(entityOptions?.interval ?? this.pconfig.defaultInterval) ?? 1;
+            ?? entityOptions?.interval ?? this.pconfig.defaultInterval ?? 1;
         entityOptions._graphInterval = _graphInterval;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
@@ -475,18 +475,18 @@ export class CardGraphs
             e.color = c.color;
             e.fill = _ownFill ?? entityOptions?.fill ?? c.fill;
         }
+        e.fill = fillValue(e.fill, e.color);
         // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
         // palette's where none applies (see entityColor)
-        if( !parseColorValue(e.color)?.color )
+        if( !colorSpec(e.color)?.color )
             e.paletteColor = e.paletteColor ?? this.getNextDefaultColor().color;
 
         e.dashMode   = e.dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
         e.width      = e.width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
-        e.lineMode   = normalizeLineMode(e.lineMode ?? entityOptions?.lineMode) ?? this.pconfig.defaultLineMode;
-        // (interpolation: only an explicit choice is kept on the entity — its YAML entry or
-        // the Interpolation submenu — so that changing it on the card, a graph or in
-        // entityOptions still applies to it; see resolveInterpolation)
-        e.interpolation = normalizeInterpolation(e.interpolation);
+        e.lineMode   = e.lineMode    ?? entityOptions?.lineMode ?? this.pconfig.defaultLineMode;
+        // (interpolation: not defaulted here — only an explicit choice is kept on the entity,
+        // its YAML entry or the Interpolation submenu, so that changing it on the card, a
+        // graph or in entityOptions still applies to it; see resolveInterpolation)
         e.scale      = e.scale       ?? entityOptions?.scale;
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
         e.netBars    = e.netBars     ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
@@ -501,7 +501,7 @@ export class CardGraphs
 
         if( type == 'bar' ) {
             e.fill = e.color;
-            e.lineMode = normalizeLineMode(e.lineMode ?? entityOptions?.lineMode) ?? 'lines';
+            e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? 'lines';
         }
 
         return _ownFill;
@@ -544,7 +544,7 @@ export class CardGraphs
         const _free = defaultColors.find(c => !_usedColors.includes(c.color));
         if( _free ) {
             e.color = _free.color;
-            e.fill  = ownFill ?? _free.fill;
+            e.fill  = fillValue(ownFill, e.color) ?? _free.fill;
         }
     }
 

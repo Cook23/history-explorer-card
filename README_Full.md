@@ -11,6 +11,8 @@
 
 > For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md).
 
+> **(1.2) Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in the [complete list of options](#complete-list-of-entityoptions-properties).
+
 This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
@@ -823,22 +825,22 @@ Custom pattern: an array of pixel lengths `[on, off, on, off, ...]` following th
 
 ### Displaying individual samples
 
-Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. **(1.2)** A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints`; so does *Show the points* in the *Layout* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
+Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. **(1.2)** A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints` (hidden: `hover`); so does *Show the points* in the *Layout* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-To show them permanently, use `showPoints` (or its synonym `showSamples`) — on the card, in `entityOptions`, on a graph or on an entity. It accepts a boolean (`true`: the line width + 2 px wide) or a radius in pixels:
+To show them permanently, use `showPoints` — on the card, in `entityOptions`, on a graph or on an entity: `true` (the line width + 2 px wide) or a radius in pixels; `hover`, the default, shows only the one hovered; `false` none, not even that one:
 
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
   humidity:
-    showSamples: true    # always show sample dots for humidity graphs
-                         # or a number: the dot radius in pixels (showSamples: 6)
+    showPoints: true     # always show sample dots for humidity graphs
+                         # or a number: the dot radius in pixels (showPoints: 6)
 graphs:
   - type: line
     options:
-      showSamples: true  # show samples for this entire manually defined graph
+      showPoints: true   # show samples for this entire manually defined graph
     entities:
       - entity: sensor.outside_temperature
         showPoints: 3     # show dots on this entity only, radius 3px
@@ -958,7 +960,7 @@ Three more options shape the graph itself:
 - **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`. Every option set on the card itself still wins over the look's (`look: mini` with `showGrid: true` keeps the grid). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -997,49 +999,30 @@ The card follows its width as it changes (a screen turned, a window resized).
 
 ### Replacing mini-graph-card
 
-One mini-graph-card is one graph of a card with `look: mini` — several of them can be graphs of one card, or cards of their own. Its options translate as follows:
+**(1.2)** A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini` — its other lines unchanged.
+
+```yaml
+type: custom:history-explorer-card    # was custom:mini-graph-card
+look: mini                            # mini-graph-card's look
+name: Power
+hours_to_show: 12
+show:
+  fill: false
+entities:
+  - sensor.power
+  - entity: sensor.rain
+    y_axis: secondary
+```
+
+Its options are aliases of the card's — names and values, each in the [complete list of options](#complete-list-of-entityoptions-properties) — mixed freely with the card's own names. `look: mini` only gives defaults: any option set, under either name, wins. Its forms are read as they are: `show:` (`show: { fill: false }` is `show_fill: false`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone; `unit`, `color` and `fill` on the card — every entity's. `height` is the graph's (the header's lines not counted); `update_interval` is the card's automatic refresh (on by default: each change, at most every 2 s).
+
+Written differently in the card's syntax:
 
 | mini-graph-card | history-explorer-card |
 |---|---|
-| `entities: [sensor.x]` | `graphs: [{ entities: [{ entity: sensor.x }] }]` |
-| `name` | the graph's `title` |
-| `icon`, `icon_image`, `tap_action`, `group`, `font_size`, `font_size_header`, `align_header`, `align_icon`, `align_state`, `animate`, `hour24`, `cache`, `loading_indicator` | — (the card's own layout and gestures) |
-| `hours_to_show` | `defaultTimeRange` (`24h`, `7d`…) |
-| `points_per_hour` | `decimation` (curves) |
-| `aggregate_func`, `group_by` | bars: their `interval` (and long-term statistics); curves: — |
-| `update_interval` | automatic refresh (on by default: each change, at most every 2 s) |
-| `height` | `height` |
-| `line_width` | `lineWidth` |
-| `line_color`, entity `color` | `color` |
-| `color_thresholds` | `color` with thresholds (`{ 0: blue, 20: red }`), on the value or on another entity's |
-| `color_thresholds_transition: hard` | the default (a curve changes color on a point) |
-| `decimals` | `rounding` |
-| `unit`, entity `unit` | `unit` |
-| `lower_bound`, `upper_bound` | `ymin`, `ymax` (`ylock: true` for fixed bounds) |
-| `lower_bound_secondary`, `upper_bound_secondary` | the right axis' bounds: `ymin`, `ymax` on its curves — see [Y axis scaling](#y-axis-scaling) |
-| `min_bound_range` | — |
-| `smoothing: true` / `false` | `lineMode: smart` (or `curves`) / `lines` |
-| `logarithmic` | — |
-| `state_map` | a timeline (`type: timeline`) and its `stateColors` |
-| `value_factor` | `scale` (with `unit` for a conversion) |
-| `show.name` | the graph's `title` |
-| `show.state` | `showState` |
-| `show.graph: line` / `bar` | `type: line` / `bar` |
-| `show.fill: true` / `fade` / `false` | `fill` (a color) / `fill: fade` / `fill: rgba(0,0,0,0)` |
-| `show.points` | `showPoints` |
-| `show.legend` | `legendVisible` |
-| `show.extrema` | `showStats: [min, max]` |
-| `show.average` | `showStats: [average]` (with the others: `[min, average, max]`) |
-| `show.labels`, `show.labels_secondary` | `yLabels: inside` (`showTimeLabels` for the time axis) |
-| entity `attribute` | `attribute` |
-| entity `name` | `name` |
-| entity `y_axis: secondary` | `yAxis: right` |
-| entity `show_state` | `showState` on the entity |
-| entity `show_legend_state` | `showCurrentValues` (the value in the legend) |
-| entity `show_graph: false` | `hidden: true` (shown again from the legend) |
-| entity `show_fill`, `show_points` | `fill`, `showPoints` on the entity |
-| entity `smoothing` | `lineMode` on the entity |
-| entity `fixed_value`, `show_indicator`, `show_line`, `state_adaptive_color` | — |
+| `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
+
+Not yet in the card — they're being added, mini-graph-card's code as the example: `points_per_hour`, `aggregate_func`, `group_by`; `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` as a list; `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `group`, `loading_indicator`.
 
 ## Default view and time ranges
 
@@ -1143,11 +1126,11 @@ showCurrentValues: false
 
 ### Rounding
 
-The rounding precision used for displaying data point values on the tooltip in line charts can be defined globally through the `rounding` key followed by the amount of fractional digits. The default is 2 digits.
+`rounding` (alias `decimals`) sets how many decimals the values are written with — in the legend, the tooltip, over the graph and in the entity selector: exactly that many (`rounding: 1` gives `20.0`, `rounding: 0` none). Not set, the values have at most 2 decimals (`20`, `20.5`, `20.25`). **(1.2)** It can be set on the card, in `entityOptions`, on a graph or on an entity — the most specific one wins.
 
 ```yaml
 type: custom:history-explorer-card
-rounding: 4
+rounding: 1
 ```
 
 ### Data decimation
@@ -1219,46 +1202,50 @@ entityOptions:
 
 All of the following properties can be used under `entityOptions` (keyed by entity id, device class or domain), and directly on entities in manually defined `graphs`.
 
-| Property | Type | Description |
-|---|---|---|
-| `type` | string | Graph type: `line`, `bar`, `timeline`, `arrowline` |
-| `color` | string, list or object | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors) |
-| `fill` | string | Fill color under the line |
-| `lineWidth` | number | Line width in pixels |
-| `lineMode` | string | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
-| `interpolation` | string | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
-| `dashMode` | string or array | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
-| `showPoints` | boolean or number | Show a dot at each measurement point. `true`: the line width + 2 px wide, or a radius in px. `showSamples` is a synonym |
-| `yAxis` | string | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
-| `scale` | number | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
-| `unit` | string | Unit shown instead of the entity's own (see `scale`) |
-| `hidden` | boolean | Hide this entity by default in the legend |
-| `ymin` | number | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked) |
-| `ymax` | number | Set the initial Y axis maximum (can still be modified interactively; restored when padlock is unlocked) |
-| `ystepSize` | number | Fix the Y axis tick step size (`ystepsize` is a synonym) |
-| `ylock` | boolean | Disable all interactive Y axis pan and zoom for this graph |
-| `height` | number | Graph height in pixels (overrides global height settings) |
-| `decimation` | string or false | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
-| `interval` | string | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
-| `circular` | `null`, `false`, number or `2pi` | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
-| `netBars` | boolean | Enable net metering mode for bar graphs |
-| `stacked` | boolean | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
-| `process` | string | Javascript expression to transform state values before display |
-| `showMinMax` | string or boolean | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
-| `showTimeLabels` | boolean | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
-| `showState` | boolean | **(1.2)** The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `showStats` | boolean, string or list | **(1.2)** The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
-| `showGrid` | boolean | **(1.2)** `false`: no grid lines on the graph |
-| `yLabels` | string | **(1.2)** `inside`: the Y labels inside the plot, which takes the whole width |
-| `exclude` | string, list, or `{entity: ...}` | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
+| Property | Type | Name aliases | Value aliases | Description |
+|---|---|---|---|---|
+| `type` | string | `graph` | | Graph type: `line`, `bar`, `timeline`, `arrowline` |
+| `color` | string, list or object | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` — a stop without a value spaced between its neighbours | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors) |
+| `fill` | string or boolean | `show_fill` | `true`: the curve's color, light; `false`: none | Fill color under the line, or `fade`: the curve's color fading out downwards |
+| `lineWidth` | number | `width`, `line_width` | | Line width in pixels |
+| `lineMode` | string or boolean | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
+| `interpolation` | string | | `akima` = `makima`, `catmull-rom` | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom` — see [Curve interpolation](#curve-interpolation) |
+| `dashMode` | string or array | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
+| `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
+| `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
+| `rounding` | number | `decimals` | | **(1.2)** The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
+| `tapAction` | string or object | `tap_action` | an action's name alone: `tapAction: none` | **(1.2)** What a click on its value does (in the legend, over the graph): Home Assistant's actions — `more-info` (default: its dialog, with the info panel when it's on), `navigate` (`navigation_path`), `url` (`url_path`), `perform-action` (`perform_action`, `data`, `target`), `call-service` (`service`, `service_data`), `none` |
+| `scale` | number | | | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
+| `unit` | string | | | Unit shown instead of the entity's own (see `scale`) |
+| `hidden` | boolean | | | Hide this entity by default in the legend |
+| `ymin` | number | `lower_bound` | | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked) |
+| `ymax` | number | `upper_bound` | | Set the initial Y axis maximum (can still be modified interactively; restored when padlock is unlocked) |
+| `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size |
+| `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
+| `height` | number | | | Graph height in pixels (overrides global height settings) |
+| `decimation` | string or false | | | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
+| `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
+| `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
+| `netBars` | boolean | | | Enable net metering mode for bar graphs |
+| `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
+| `process` | string | | | Javascript expression to transform state values before display |
+| `showMinMax` | string or boolean | | | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
+| `showTimeLabels` | boolean | | | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
+| `showState` | boolean | `show_state` | | **(1.2)** The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `showStats` | boolean, string or list | | | **(1.2)** The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
+| `showGrid` | boolean | | | **(1.2)** `false`: no grid lines on the graph |
+| `yLabels` | string | | | **(1.2)** `inside`: the Y labels inside the plot, which takes the whole width |
+| `exclude` | string, list, or `{entity: ...}` | | | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
+
+Options of the card only, with aliases: `defaultTimeRange` (`hours_to_show`), `legendVisible` (`show_legend`), `labelsVisible` (`show_labels`). mini-graph-card's `show:` is read as its options: `show: { points: true }` is `show_points: true`.
 
 #### The same options at every level
 
-Every option above, except the ones that only make sense for a single entity (`type`, `color`, `name`, `hidden`, `scale`, `unit`, `process`, `circular`), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
+Every option above, except `type`, `name`, `hidden`, `scale`, `process` and `circular` (an entity's only), and `color` and `unit` (an entity's or the card's — the card's: every entity's), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
 The options of the graph itself — `ymin`, `ymax`, `ystepSize`, `ylock`, `stacked`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
-An option is spelled the same at every level, and its synonyms are accepted everywhere: `width` for `lineWidth`, `showSamples` for `showPoints`, `ystepsize` for `ystepSize`. A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
+An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 
 ```yaml
 type: custom:history-explorer-card

@@ -1,4 +1,7 @@
 ---
+# (1.2) mini-graph-card's names and values are accepted too, as aliases of these options (line_width,
+# show_points, decimals, y_axis, tap_action…, its `show:`, its `entities` on the card) — see README_Full.md,
+# "Replacing mini-graph-card"
 type: custom:history-explorer-card
 cardName: 'default'
 
@@ -40,12 +43,12 @@ graphs:
       name: null
 
       # Colour of the line/bar in the graph, defaults to automatically assigning a colour:
-      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, with `entity:` — and `attribute:` — on that
-      # entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
+      # a colour, thresholds ({ 0: blue, 20: red, default: grey }, or a list: [{ value: 0, color: blue }, ...],
+      # with `entity:` — and `attribute:` — on that entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
       color: null
 
       # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color';
-      # fade: the line's colour fading out downwards
+      # fade: the line's colour fading out downwards; true: the line's colour, light; false: none
       fill: null
 
       # The value now, in large, over the graph (the curve's colour and unit)
@@ -55,6 +58,7 @@ graphs:
       showStats: null
 
       # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
+      # — or dashes and gaps in px, as CSS writes them ('10,5')
       dashMode: "solid"
 
       # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
@@ -70,8 +74,8 @@ graphs:
       # If true, hide this entity from the graph
       hidden: False
 
-      # (line and bar entities) The Y axis of this curve: left, right, or auto — by its unit: the second group
-      # of units of a graph goes on the right. Wins over the graph's, $.entityOptions' and the card's
+      # (line and bar entities) The Y axis of this curve: left (primary), right (secondary), or auto — by its
+      # unit: the second group of units of a graph goes on the right. Wins over the graph's, $.entityOptions' and the card's
       yAxis: auto
 
       # Can be used to scale this entity's value by the given factor
@@ -90,8 +94,9 @@ graphs:
       showMinMax: False
 
       # (line graph only) If true, show permanent dots at each measurement point making up the line — the line
-      # width + 2 px wide (a number: their radius in px). A long-press near the curve shows or hides them
-      showPoints: False
+      # width + 2 px wide (a number: their radius in px); hover: only the hovered one; false: none at all.
+      # A long-press near the curve shows or hides them
+      showPoints: hover
 
       # (bar graph only) If true, this entity is treated as net-metering — its value can go down as
       # well as up, rather than a decrease being interpreted as the state having been reset
@@ -175,9 +180,9 @@ graphs:
     # combines with (does not override) each entity's own `exclude`
     exclude: null
 
-    # (line graph only) If true, show permanent dots at each measurement point making up the line, for every
-    # entity in this graph (unless overridden per entity — see $.graphs.entities above). `showSamples` is a synonym
-    showPoints: False
+    # (line graph only) The dots at the measurement points of every entity in this graph (unless overridden per
+    # entity — see $.graphs.entities above): true, all; hover, only the hovered one; false, none
+    showPoints: hover
 
     # If true, show the time labels on graph
     showTimeLabels: True
@@ -201,7 +206,7 @@ graphs:
     # Maximum value of the Y-axis (initial bound — automatically calculated by default)
     ymax: null
 
-    # Step size to display on the Y-axis (automatically calculated by default). `ystepsize` is a synonym
+    # Step size to display on the Y-axis (automatically calculated by default). See its aliases in README_Full.md
     ystepSize: null
 
     # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
@@ -232,8 +237,8 @@ entityOptions:
     # If true, hide the entity in the graphs
     hidden: False
     
-    # (line graph only) If true, show permanent dots at each measurement point making up the line
-    showPoints: False
+    # (line graph only) The dots at the measurement points: true, all; hover, only the hovered one; false, none
+    showPoints: hover
 
     # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
     showMinMax: False
@@ -339,10 +344,18 @@ stateTextMode: "auto"
 # Decimation is simplifying the history when viewing wider time ranges, for faster loading times and clearer data. Can be set to False (to disable decimation), "fast" (to do fast approximate decimation), or "accurate" (for accurate minmax preserving at all scales)
 decimation: "fast"
 
-# How many decimal places to round values to, in tool tips and labels
-rounding: 2
+# How many decimals the values are written with, in tool tips, labels and over the graph: set, exactly that
+# many (1: 20.0); not set, at most 2. Also on a graph, an entity or in entityOptions
+rounding: null
 
-# Line interpolation mode. Can be: curves, lines, stepped, or smart (curves, with silences drawn as flat dashed plateaus).
+# What a click on a curve's value does (in the legend, over the graph): Home Assistant's actions — more-info
+# (its dialog, with the info panel when it's on), navigate (navigation_path), url (url_path), perform-action
+# (perform_action, data, target) or call-service (service, service_data), none. Also on a graph, an entity or
+# in entityOptions
+tapAction:
+  action: more-info
+
+# Line interpolation mode. Can be: curves (or true), lines (or false), stepped, or smart (curves, with silences drawn as flat dashed plateaus).
 # When not set (null), YAML graphs are drawn as curves and entities added from the UI are pre-selected as smart.
 # When set, it applies to both: e.g. "curves" also pre-selects curves for entities added from the UI. To set a mode
 # for YAML graphs only, set it under each graph's `options:` instead
@@ -370,9 +383,10 @@ yAxis: auto
 # yLabels, showState, showStats — and height, the height of every line and bar graph ($.lineGraphHeight /
 # $.barGraphHeight win over it)
 
-# A set of options at once — the card's own options still win. mini: what mini-graph-card shows (header: hide,
-# no toolbar nor selector, showState: true, showStats: [min, max], showTimeLabels: false, showGrid: false,
-# yLabels: inside, fill: fade, height: 150)
+# A set of default options at once — the card's own options still win, under any of their names. mini:
+# mini-graph-card's look (header: hide, no toolbar nor selector, showState: true, showStats: [min, max],
+# showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
+# lineMode: curves)
 look: null
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
@@ -384,8 +398,8 @@ dashMode: "solid"
 showMinMax: False
 
 # (line graph only) Default "show sample points" setting for every line graph on the card, unless
-# overridden at the graph or entity level
-showPoints: False
+# overridden at the graph or entity level: true, all; hover, only the hovered one; false, none
+showPoints: hover
 
 # (bar graph only) Default net-metering setting for every bar graph on the card, unless overridden at
 # the graph or entity level — see $.graphs.entities.netBars above

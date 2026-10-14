@@ -106,6 +106,15 @@ show it, and the conductor starts the card and wires the parts together.
    - what Chart.js keeps for itself (its layout, a dataset's meta) is never read; a field
      the card and Chart.js exchange is documented in `deps/Chart Custom.js.md`; a name
      starting with `hec` or `_hec` is Chart.js's — the card's own fields don't use it.
+6. **An element is shown only once its data is ready**, sized from it once: a menu's list
+   is complete before the menu or the field that opens it shows (the entity selector waits
+   for its list); nothing moves under the user afterwards, but for the card's own resize.
+7. **An option is put in its one form where it's read**, never later. Every spelling the
+   user may write — a synonym, mini-graph-card's names and values, `show:`, a case — is
+   resolved once by `history-options.js` `normalizeOptions`, called by `card-config.js`
+   where the card, `entityOptions`, a graph and an entity are read; the rest of the card
+   only ever tests the one form, and that form is what is saved (so an alias written
+   instead of its value isn't a change).
 
 ## Where a change goes
 

@@ -327,5 +327,54 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The entity selector sized from its list: the layout chosen from the width 90 % of its
+    // lines need, the field then as wide as the room, up to the width every line needs; the
+    // menu as wide as the field, a line too long shortened (else on two lines) ──
+    const _st = (k, name, val) => ({ entity_id: 'sensor.l' + k, state: val, last_changed: new Date().toISOString(), last_updated: new Date().toISOString(), attributes: { friendly_name: name } });
+    const LISTS = {
+        short: Object.fromEntries(['Salon', 'Cuisine', 'Bureau', 'Entrée', 'Garage'].map((n, k) => ['sensor.l' + k, _st(k, n, String(k))])),
+        // (a realistic installation: names from usual Home Assistant patterns, a device's name
+        // in front of some of them, a few much longer)
+        real: (() => { const r = {}, rooms = ['Salon', 'Cuisine', 'Chambre parents', 'Bureau', 'Salle de bain', 'Garage', 'Jardin', 'Piscine'],
+            things = ['Température', 'Humidité', 'Luminosité', 'Mouvement', 'Porte', 'Lampe', 'Prise', 'Volet', 'Puissance', 'Énergie', 'Batterie', 'Signal Wi-Fi'],
+            devs = ['Shelly Plus 1PM ', 'Aqara ', 'Zigbee2MQTT ', 'Philips Hue ']; let k = 0;
+            for( const room of rooms ) for( const th of things ) { r['sensor.l' + k] = _st(k, ( k % 5 === 0 ? devs[k % 4] : '' ) + room + ' ' + th + ( k % 9 === 0 ? ' (Filtered)' : '' ), String(k % 50)); k++; }
+            for( const n of ['Shelly Pro 3EM Compteur Général Maison Phase A Puissance Active', 'Météo-France Villeveyrac Probabilité de pluie dans la prochaine heure'] ) { r['sensor.l' + k] = _st(k, n, '1'); k++; }
+            return r; })(),
+    };
+    for( const [ln, states] of Object.entries(LISTS) ) {
+        t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, language: 'fr', extraStates: states } });
+        for( const w of [344, 480, 683, 1000, 1600] ) {
+            await t.page.setViewportSize({ width: w + 20, height: 900 });
+            await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1200);
+            await t.step(`the selector, ${ln} names, a ${w} px card: on the date's line when 90 % of its lines fit there, as wide as the room up to every line's width; its menu as wide, its lines fitted, none twice, nothing out of the card`, async () => {
+                const p = await t.E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+10,y:r.top+r.height/2}; })()`);
+                await t.page.mouse.click(p.x, p.y); await t.wait(400);
+                const r = await t.E(`(()=>{ const I=el.instance, q=s=>el.querySelector(s), card=q('#maincard').getBoundingClientRect(), f=q('#b7_0').getBoundingClientRect(),
+                    dl=q('#dl_0').getBoundingClientRect(), dr=q('#dr_0').getBoundingClientRect(), bo=q('#bo_0').getBoundingClientRect(), es=q('#es_0'), m=es.getBoundingClientRect(), W=I.entityLineWidths();
+                    const lines=[...es.children], lh=parseFloat(getComputedStyle(lines[0]).lineHeight)||16;
+                    return { most: W.most, all: W.all, field: Math.round(f.width), oneLine: Math.abs(f.top-dl.top) < 20 && f.left > dl.right && f.right < dr.left,
+                        gap: Math.round(dr.left - dl.right - bo.width), menu: Math.round(m.width), out: f.right > card.right + 1 || m.right > card.right + 1 || f.left < card.left - 1,
+                        twice: lines.length - new Set(lines.map(a=>a.textContent)).size, tall: lines.filter(a => a.scrollHeight > 2.5 * lh).length,
+                        short: lines.filter(a => a.textContent !== a.dataset.name + a.dataset.tail).map(a => a.dataset.name).slice(0, 1) }; })()`);
+                await t.page.keyboard.press('Escape'); await t.page.mouse.click(2, 2); await t.wait(200);
+                const _layout = r.oneLine ? r.gap >= r.most - 30 : r.gap < r.most + 30;
+                const _width = r.field <= r.all + 4 && ( r.field >= r.all - 4 || r.field >= Math.min(r.most, w - 80) - 4 );
+                return r.most > 0 && _layout && _width && Math.abs(r.menu - r.field) <= 2 && !r.out && !r.twice && !r.tall ? true : JSON.stringify(r);
+            });
+        }
+        if( ln === 'real' ) await t.step('a line shortened in the menu is still found by its full name', async () => {
+            await t.page.setViewportSize({ width: 364, height: 900 });
+            await t.E(`(()=>{ document.body.style.width='344px'; document.getElementById('host').style.width='344px'; })()`); await t.wait(1200);
+            const full = await t.E(`(()=>{ const a=[...el.querySelector('#es_0').children].find(a => a.textContent !== a.dataset.name + a.dataset.tail); return a ? a.dataset.name : null; })()`);
+            if( !full ) return 'no line shortened at 344 px';
+            const p = await t.E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+10,y:r.top+r.height/2}; })()`);
+            await t.page.mouse.click(p.x, p.y); await t.page.keyboard.type(full.slice(0, 18)); await t.wait(400);
+            const shown = await t.E(`[...el.querySelector('#es_0').children].filter(a => a.style.display !== 'none').map(a => a.dataset.name)`);
+            return shown.includes(full) ? true : JSON.stringify({ full, shown: shown.slice(0, 5) });
+        });
+        done(await t.close());
+    }
+
     return { passed, failed };
 };

@@ -54,7 +54,7 @@ export class CardGestures
         // click; the curve stays as it is)
         if( info.zone === 'value' || info.legendPart === 'value' ) {
             const _curve = info.zone === 'value' ? info.curveIndex : info.legendIndex;
-            if( info.gestureType === 'click' ) this.openEntityInfo(g.entities[_curve]?.entity);
+            if( info.gestureType === 'click' ) this._onValueClick(g.entities[_curve]);
             return;
         }
         const idx = info.legendIndex;
@@ -62,8 +62,35 @@ export class CardGestures
         this.toggleCurveHidden(g, idx);
     }
 
+    // A click on entity e's value (in the legend, over the graph): its tapAction (see
+    // tapActionOf) — more-info, the default: its dialog (openEntityInfo)
+    _onValueClick(e)
+    {
+        const a = this.tapActionOf(e);
+        switch( a.action ?? 'more-info' ) {
+            case 'none':
+                return;
+            case 'navigate':
+                if( !a.navigation_path ) return;
+                history.pushState(null, '', a.navigation_path);
+                window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }));
+                return;
+            case 'url':
+                if( a.url_path ?? a.url ) window.open(a.url_path ?? a.url);
+                return;
+            case 'perform-action':
+            case 'call-service': {
+                const [_domain, _service] = String(a.perform_action ?? a.service ?? '').split('.');
+                if( _domain && _service ) this._hass.callService(_domain, _service, a.data ?? a.service_data ?? {}, a.target);
+                return;
+            }
+            default:
+                this.openEntityInfo(e?.entity);
+        }
+    }
+
     // Home Assistant's dialog of an entity — with the card's info panel in it, when it's on —
-    // from a click on its value (in the legend, over the graph) or its menu's Info
+    // from a click on its value (its tapAction, by default) or its menu's Info
     openEntityInfo(entityId)
     {
         if( !entityId ) return;

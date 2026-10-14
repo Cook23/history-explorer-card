@@ -376,7 +376,8 @@ export class CardOperations
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
         if( !_curves.length ) return;
-        const _show = !this.curvesShowPoints(g, _curves);
+        // (hidden: back to the hovered dot only — see _pointRadii)
+        const _show = this.curvesShowPoints(g, _curves) ? 'hover' : true;
         for( const e of _curves ) e.showPoints = _show;
         this.showCurvePoints(g, _curves, _show);
         this.writeLocalState();
@@ -440,7 +441,7 @@ export class CardOperations
     {
         this.removeGraphs([...this.graphs]);
         this.store.reset(JSON.parse(JSON.stringify(this._pureYamlEntities ?? [])));
-        this.setTimeRangeFromString(String(this.pconfig.defaultTimeRange));
+        this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
         this.setPresentWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();

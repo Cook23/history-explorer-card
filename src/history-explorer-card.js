@@ -102,7 +102,7 @@ export class HistoryCardState {
         this.pconfig.filterEntities       = undefined;
         this.pconfig.excludeFilterEntities = undefined;
         this.pconfig.decimation           = 'fast';
-        this.pconfig.roundingPrecision    = 2;
+        this.pconfig.rounding             = undefined;
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
         this.pconfig.cardGraphDefaults    = {};
@@ -118,7 +118,7 @@ export class HistoryCardState {
         this.pconfig.showCurrentValues    = false;
         this.pconfig.axisAddMarginMin     = true;
         this.pconfig.axisAddMarginMax     = true;
-        this.pconfig.defaultTimeRange     = '24';
+        this.pconfig.defaultTimeRange     = '24h';
         this.pconfig.defaultTimeOffset    = undefined;
         this.pconfig.timeTickDensity      = 'high';
         this.pconfig.timeTickOverride     = undefined;
@@ -467,8 +467,9 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance.pconfig.graphs = {};
 
-        if( config.graphs )
-            this.instance.buildGraphListFromConfig(config.graphs)
+        const _graphs = this.instance.yamlGraphs(config);
+        if( _graphs )
+            this.instance.buildGraphListFromConfig(_graphs);
 
 
         this.instance.applyConfig(config);
