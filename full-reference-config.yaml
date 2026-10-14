@@ -180,9 +180,9 @@ graphs:
     # combines with (does not override) each entity's own `exclude`
     exclude: null
 
-    # (line graph only) If true, show permanent dots at each measurement point making up the line, for every
-    # entity in this graph (unless overridden per entity — see $.graphs.entities above). `showSamples` is a synonym
-    showPoints: False
+    # (line graph only) The dots at the measurement points of every entity in this graph (unless overridden per
+    # entity — see $.graphs.entities above): true, all; hover, only the hovered one; false, none
+    showPoints: hover
 
     # If true, show the time labels on graph
     showTimeLabels: True
@@ -206,7 +206,7 @@ graphs:
     # Maximum value of the Y-axis (initial bound — automatically calculated by default)
     ymax: null
 
-    # Step size to display on the Y-axis (automatically calculated by default). `ystepsize` is a synonym
+    # Step size to display on the Y-axis (automatically calculated by default). See its aliases in README_Full.md
     ystepSize: null
 
     # If true, disables all interactive Y axis changes for this graph (pan, pinch zoom, Shift+drag) on every
@@ -237,8 +237,8 @@ entityOptions:
     # If true, hide the entity in the graphs
     hidden: False
     
-    # (line graph only) If true, show permanent dots at each measurement point making up the line
-    showPoints: False
+    # (line graph only) The dots at the measurement points: true, all; hover, only the hovered one; false, none
+    showPoints: hover
 
     # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
     showMinMax: False
@@ -398,8 +398,8 @@ dashMode: "solid"
 showMinMax: False
 
 # (line graph only) Default "show sample points" setting for every line graph on the card, unless
-# overridden at the graph or entity level
-showPoints: False
+# overridden at the graph or entity level: true, all; hover, only the hovered one; false, none
+showPoints: hover
 
 # (bar graph only) Default net-metering setting for every bar graph on the card, unless overridden at
 # the graph or entity level — see $.graphs.entities.netBars above
