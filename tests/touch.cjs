@@ -160,6 +160,53 @@ module.exports = async function()
         const r1 = await E(`yRange(${li})`);
         return r1[0] > r0[0] && r1[1] > r0[1] && (await t.scrollY()) === 0 ? true : `y ${r0} -> ${r1} scrollY=${await t.scrollY()}`;
     });
+    // (a pinch is never exactly horizontal, vertical or centred: the way it's mostly made in
+    // first, another only beyond the dead band — 10 % of the plot area's smaller side)
+    const unlockY = async li => E(`(()=>{ const c=graphAt(${li}).chart; if( c._hecYAxisLock ) c._hecToggleYAxisLock(); return c._hecYAxisLock; })()`);
+    const band = li => E(`(()=>{ const a=graphAt(${li}).chart.chartArea; return 0.1*Math.min(a.right-a.left, a.bottom-a.top); })()`);
+    // (a pinch of n steps from the graph's point at frac, from the default window, the Y axis
+    // released: the window and the Y range after it)
+    const pinchFrom = async (li, d1, d2, n, frac = 0.6) => {
+        await E('el.instance.today(true)'); await unlockY(li); await t.wait(800);
+        await t.pinch(await E(`graphPtAt(${li},${frac})`), d1, d2, n);
+        return { t: (await E('timeRange()')).map(Date.parse), y: await E(`yRange(${li})`), locked: !!(await E(`graphAt(${li}).chart._hecYAxisLock`)) };
+    };
+    const span = r => r.t[1] - r.t[0];
+    await step('pinch rather horizontal (a little vertical too): the time zoomed only, the Y axis untouched and not locked', async () => {
+        const li = await lineGraph(); const r0 = await pinchFrom(li, { x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+        const r = await pinchFrom(li, { x: -10, y: 1 }, { x: 10, y: 1 }, 12);
+        return span(r) < span(r0) && !r.locked ? true : JSON.stringify({ r0, r, band: await band(li) });
+    });
+    await step('pinch rather vertical (a little horizontal too): the Y axis zoomed only, the time span unchanged', async () => {
+        const li = await lineGraph(); const r0 = await pinchFrom(li, { x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+        const r = await pinchFrom(li, { x: -0.5, y: -6 }, { x: 0.5, y: 6 }, 10);
+        return r.locked && r.y.join() !== r0.y.join() && Math.abs(span(r) - span(r0)) < 60e3 ? true : JSON.stringify({ r0, r });
+    });
+    await step('pinch nearly centred horizontally (its centre within the dead band): zoomed as a centred one, the time not panned', async () => {
+        const li = await lineGraph(), b = await band(li);
+        const c = await pinchFrom(li, { x: -10, y: 0 }, { x: 10, y: 0 }, 12);
+        const n = await pinchFrom(li, { x: -10 + 0.75 * b / 12, y: 0 }, { x: 10 + 0.75 * b / 12, y: 0 }, 12);   // (its centre moved 0.75 band)
+        return span(n) === span(c) && Math.abs(n.t[0] - c.t[0]) < 0.01 * span(c) + 5e3 ? true : JSON.stringify({ c: c.t, n: n.t, b });
+    });
+    await step('pinch off centre horizontally (its centre beyond the dead band): zoomed and the time panned too', async () => {
+        const li = await lineGraph(), b = await band(li);
+        const c = await pinchFrom(li, { x: -10, y: 0 }, { x: 10, y: 0 }, 12);
+        const o = await pinchFrom(li, { x: -10 + 3 * b / 12, y: 0 }, { x: 10 + 3 * b / 12, y: 0 }, 12);         // (3 bands)
+        return span(o) === span(c) && Math.abs(o.t[0] - c.t[0]) > 0.02 * span(c) ? true : JSON.stringify({ c: c.t, o: o.t, b });
+    });
+    await step('pinch nearly centred vertically: zoomed as a centred one, the Y axis not panned; off centre: panned too', async () => {
+        const li = await lineGraph(), b = await band(li);
+        const c = await pinchFrom(li, { x: 0, y: -6 }, { x: 0, y: 6 }, 10, 0.5);
+        const n = await pinchFrom(li, { x: 0, y: -6 + 0.75 * b / 10 }, { x: 0, y: 6 + 0.75 * b / 10 }, 10, 0.5);
+        const o = await pinchFrom(li, { x: 0, y: -6 + 3 * b / 10 }, { x: 0, y: 6 + 3 * b / 10 }, 10, 0.5);
+        const near = (a, z) => Math.abs(a[0] - z[0]) + Math.abs(a[1] - z[1]) < 0.02 * (z[1] - z[0]);
+        return near(n.y, c.y) && !near(o.y, c.y) ? true : JSON.stringify({ c: c.y, n: n.y, o: o.y, b });
+    });
+    await step('two fingers moving diagonally pan the time and the Y axis', async () => {
+        const li = await lineGraph(); const r0 = await pinchFrom(li, { x: 0, y: 0 }, { x: 0, y: 0 }, 1, 0.5);
+        const r = await pinchFrom(li, { x: 8, y: 6 }, { x: 8, y: 6 }, 8, 0.5);
+        return r.t[0] < r0.t[0] - 60e3 && r.y[0] > r0.y[0] ? true : JSON.stringify({ r0, r });
+    });
     await step('entity selector: tapping an entry of the list opens the type menu for it', async () => {
         const inp = await E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+20,y:r.top+r.height/2}; })()`);
         await t.tap(inp); await t.wait(400);

@@ -4776,6 +4776,7 @@
             // (the long-press duration and the immobility distance are the pointer
             // type's: Chart.defaults.global.gestures, see deps/chart-hec.js)
             var _HEC_PINCH_MIN_DIST = 5; // px — below this, spread change is noise, not zoom
+            var _HEC_PINCH_DEAD_BAND = 0.1; // of the plot area's smaller side: a pinch's change one way within it does nothing
             var _HEC_WHEEL_DEBOUNCE_MS = 150;
             var _HEC_CONTEXTMENU_AFTER_MS = 2500; // a contextmenu this soon after a contact released from its long press is that one's
 
@@ -4787,6 +4788,7 @@
               me._hecGesture = me._hecGesture || { pointers: {}, count: 0 };
               me._hecGestureHandler(e, {
                 pinchMinDist: _HEC_PINCH_MIN_DIST,
+                pinchDeadBand: _HEC_PINCH_DEAD_BAND,
                 wheelDebounceMs: _HEC_WHEEL_DEBOUNCE_MS,
                 contextMenuAfterMs: _HEC_CONTEXTMENU_AFTER_MS });
             }

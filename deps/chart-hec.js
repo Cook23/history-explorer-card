@@ -795,53 +795,9 @@
       onMove: function (c, p, e) {
         var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
         var pinch = gs.pinch;
-        var prevCenterX = (pinch.p1.x + pinch.p2.x) / 2;
-        var prevCenterY = (pinch.p1.y + pinch.p2.y) / 2;
         if (pid == pinch.p1id) pinch.p1 = { x: e.x, y: e.y };
         else pinch.p2 = { x: e.x, y: e.y };
-        var newDistX = Math.abs(pinch.p2.x - pinch.p1.x);
-        var newDistY = Math.abs(pinch.p2.y - pinch.p1.y);
-        var newCenterX = (pinch.p1.x + pinch.p2.x) / 2;
-        var newCenterY = (pinch.p1.y + pinch.p2.y) / 2;
-        var panDX = newCenterX - prevCenterX;
-        var panDY = newCenterY - prevCenterY;
-        var _zoomXActive = pinch.distX > cfg.pinchMinDist && newDistX > cfg.pinchMinDist;
-        var _zoomScaleX = _zoomXActive ? pinch.distX / newDistX : undefined;
-        if (panDX !== 0 || panDY !== 0 || _zoomXActive) {
-          // All three (pan center-move X/Y, zoom X spread-change) happen
-          // at the same instant — one mousemove with 2 fingers — so this
-          // is a single fused event, not three.
-          fire(c, 'pinch', undefined, undefined, {
-            panDeltaX: panDX, panDeltaY: panDY,
-            zoomScaleX: _zoomScaleX, centerPixelsX: newCenterX, centerPixelsY: newCenterY });
-        }
-        // Time axis (the card's): the fingers' common horizontal movement pans it;
-        // their horizontal spread zooms it by steps, one each time the spread
-        // accumulated since the last step reaches x1.5 either way
-        if (panDX !== 0) panX(c, 'move', panDX, 'pinch');
-        if (_zoomXActive) {
-          pinch.zoomAcc = (pinch.zoomAcc || 1) * _zoomScaleX;
-          var _zStep = pinch.zoomAcc < 2 / 3 ? 1 : pinch.zoomAcc > 1.5 ? -1 : 0;
-          if (_zStep) { pinch.zoomAcc = 1; zoomX(c, _zStep, newCenterX, 'pinch', pinchFactors(me, pinch), pinch.startFactors); }
-        }
-        // Y pan by the vertical movement of the fingers' centre — the content follows
-        // the fingers, as with the one-finger Y axis pan (yAxisPan) — and Y zoom by
-        // their vertical spread, each axis around its own middle: every Y axis of the
-        // chart moves together (pinch.yRanges, tracked from the pinch's start)
-        var _yRange = me.chartArea ? me.chartArea.bottom - me.chartArea.top : 0;
-        var _yr = pinch.yRanges;
-        if (panDY !== 0 && _yRange > 0 && _yr.length && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
-          _yr.forEach(function (r) { var _sh = panDY * (r[1] - r[0]) / _yRange; r[0] += _sh; r[1] += _sh; });
-          me._hecSetYRanges(_yr);
-        }
-        if (me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false && _yr.length &&
-            pinch.distY > cfg.pinchMinDist && newDistY > cfg.pinchMinDist) {
-          var _pScale = pinch.distY / newDistY;
-          _yr.forEach(function (r) { var _mid = (r[0] + r[1]) / 2, _half = (r[1] - r[0]) / 2 * _pScale; r[0] = _mid - _half; r[1] = _mid + _half; });
-          me._hecSetYRanges(_yr);
-        }
-        pinch.distX = newDistX;
-        pinch.distY = newDistY;
+        schedulePinch(c, pinch);
       }
     },
     {
@@ -1265,6 +1221,102 @@
     me.options.panX.call(me, _info);
   }
 
+  // A pinch's change since it started (pinch.start) in each of its four ways — its spread
+  // along X (the time's zoom) and Y (the Y axis' zoom), its centre along X (the time's pan)
+  // and Y (the Y axis' pan). A pinch is never exactly horizontal, vertical or centred: the
+  // way it's mostly made in — the first to go beyond the finger's precision (dragSlop, as
+  // a drag), the largest then — is its way (pinch.main), the only one counted until
+  // another goes beyond a dead band of pinchDeadBand (10 %) of the plot area's smaller
+  // side. Each counts only beyond its threshold (no jump), back within it nothing
+  // → the spread and centre counted { distX, distY, centerX, centerY }
+  function pinchCounted(me, pinch, distX, distY, centerX, centerY, cfg) {
+    var s = pinch.start, a = me.chartArea;
+    var _now = { distX: distX, distY: distY, centerX: centerX, centerY: centerY };
+    var _change = function (k) { return Math.abs(_now[k] - s[k]); };
+    if (!pinch.main) {
+      var _max = Object.keys(_now).reduce(function (m, k) { return _change(k) > _change(m) ? k : m; });
+      if (_change(_max) > cfg.dragSlop) pinch.main = _max;
+    }
+    var _band = a ? cfg.pinchDeadBand * Math.min(a.right - a.left, a.bottom - a.top) : 0;
+    var _out = {};
+    Object.keys(_now).forEach(function (k) {
+      if (!pinch.main) { _out[k] = s[k]; return; }
+      var d = _now[k] - s[k], t = k === pinch.main ? cfg.dragSlop : _band;
+      _out[k] = s[k] + Math.sign(d) * Math.max(0, Math.abs(d) - t);
+    });
+    return _out;
+  }
+
+  // A pinch's fingers' moves applied once per frame, once both fingers have given their
+  // position (each finger's event comes on its own: one finger moved alone isn't the
+  // gesture) — and what's left applied before it ends (flushPinch)
+  function schedulePinch(c, pinch) {
+    pinch.c = c;
+    if (pinch.frame) return;
+    pinch.frame = requestAnimationFrame(function () {
+      pinch.frame = null;
+      if (c.gs.pinch === pinch) applyPinch(pinch.c, pinch);
+    });
+  }
+
+  function flushPinch(pinch) {
+    if (!pinch || !pinch.frame) return;
+    cancelAnimationFrame(pinch.frame);
+    pinch.frame = null;
+    applyPinch(pinch.c, pinch);
+  }
+
+  // A pinch's fingers where they are now: the time and the Y axes moved and zoomed
+  function applyPinch(c, pinch) {
+    var me = c.me, cfg = c.cfg, s = pinch.start;
+    var newDistX = Math.abs(pinch.p2.x - pinch.p1.x);
+    var newDistY = Math.abs(pinch.p2.y - pinch.p1.y);
+    var newCenterX = (pinch.p1.x + pinch.p2.x) / 2;
+    var newCenterY = (pinch.p1.y + pinch.p2.y) / 2;
+    // What the whole gesture does now, in the ways it's made in (pinchCounted) — each axis
+    // given the difference with what it was given already (pinch.applied): a change back
+    // within its threshold is brought back
+    var _n = pinchCounted(me, pinch, newDistX, newDistY, newCenterX, newCenterY, cfg);
+    var _min = cfg.pinchMinDist, _ap = pinch.applied;
+    var _want = {
+      panX: _n.centerX - s.centerX,
+      panY: _n.centerY - s.centerY,
+      // (the time zoomed by steps: one each time the spread changes by x1.5; a spread
+      // too small to measure — the fingers crossing — keeps what's given)
+      stepsX: s.distX > _min && _n.distX > _min ? -Math.trunc(Math.log(s.distX / _n.distX) / Math.log(1.5)) : _ap.stepsX,
+      scaleY: s.distY > _min && _n.distY > _min ? s.distY / _n.distY : _ap.scaleY };
+    var panDX = _want.panX - _ap.panX, panDY = _want.panY - _ap.panY;
+    var _stepX = _want.stepsX - _ap.stepsX, _scaleY = _want.scaleY / _ap.scaleY;
+    pinch.applied = _want;
+    if (panDX !== 0 || panDY !== 0 || _stepX !== 0) {
+      // (one fused event for the moves of this instant — informative)
+      fire(c, 'pinch', undefined, undefined, {
+        panDeltaX: panDX, panDeltaY: panDY,
+        zoomScaleX: _stepX ? Math.pow(1.5, -_stepX) : undefined, centerPixelsX: newCenterX, centerPixelsY: newCenterY });
+    }
+    // Time axis (the card's): the fingers' common horizontal movement pans it; their
+    // horizontal spread zooms it by steps, around their centre as counted (a centre that
+    // hasn't moved beyond its threshold zooms where the pinch started)
+    if (panDX !== 0) panX(c, 'move', panDX, 'pinch');
+    for (var _k = 0; _k < Math.abs(_stepX); _k++)
+      zoomX(c, Math.sign(_stepX), _n.centerX, 'pinch', pinchFactors(me, pinch), pinch.startFactors);
+    // Y pan by the vertical movement of the fingers' centre — the content follows
+    // the fingers, as with the one-finger Y axis pan (yAxisPan) — and Y zoom by
+    // their vertical spread, each axis around its own middle: every Y axis of the
+    // chart moves together (pinch.yRanges, tracked from the pinch's start)
+    var _yRange = me.chartArea ? me.chartArea.bottom - me.chartArea.top : 0;
+    var _yr = pinch.yRanges, _yChanged = false;
+    if (panDY !== 0 && _yRange > 0 && _yr.length && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
+      _yr.forEach(function (r) { var _sh = panDY * (r[1] - r[0]) / _yRange; r[0] += _sh; r[1] += _sh; });
+      _yChanged = true;
+    }
+    if (_scaleY !== 1 && me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false && _yr.length) {
+      _yr.forEach(function (r) { var _mid = (r[0] + r[1]) / 2, _half = (r[1] - r[0]) / 2 * _scaleY; r[0] = _mid - _half; r[1] = _mid + _half; });
+      _yChanged = true;
+    }
+    if (_yChanged) me._hecSetYRanges(_yr);
+  }
+
   // Where a pinch's fingers are along the plot area (0 at its left edge, 1 at its right edge)
   function pinchFactors(me, pinch) {
     return [me._hecPlotFactor(pinch.p1.x), me._hecPlotFactor(pinch.p2.x)];
@@ -1474,8 +1526,11 @@
         p1id: _p1id, p2id: _p2id,
         p1: { x: gs.pointers[_p1id].x, y: gs.pointers[_p1id].y },
         p2: { x: gs.pointers[_p2id].x, y: gs.pointers[_p2id].y } };
-      gs.pinch.distX = Math.abs(gs.pinch.p2.x - gs.pinch.p1.x);
-      gs.pinch.distY = Math.abs(gs.pinch.p2.y - gs.pinch.p1.y);
+      // (its spread and centre at its start — its change counted from them, see
+      // pinchCounted — and what it gave each axis so far)
+      gs.pinch.start = { distX: Math.abs(gs.pinch.p2.x - gs.pinch.p1.x), distY: Math.abs(gs.pinch.p2.y - gs.pinch.p1.y),
+        centerX: ( gs.pinch.p1.x + gs.pinch.p2.x ) / 2, centerY: ( gs.pinch.p1.y + gs.pinch.p2.y ) / 2 };
+      gs.pinch.applied = { panX: 0, panY: 0, stepsX: 0, scaleY: 1 };
       gs.pinch.startFactors = pinchFactors(me, gs.pinch);
       panX(c, 'start', 0, 'pinch', { pointerFactors: gs.pinch.startFactors });
       // The Y ranges tracked from pinch start — needed for the direct Y zoom, which
@@ -1559,6 +1614,7 @@
       // restart tracking from once this returns to a single pointer.
       var _remainingId = (pid == gs.pinch.p1id) ? gs.pinch.p2id : gs.pinch.p1id;
       var _remainingPt = gs.pointers[_remainingId];
+      flushPinch(gs.pinch);
       var _ended = gs.pinch;
       gs.pinch = null;
       panX(c, 'end', 0, 'pinch', { pointerFactors: pinchFactors(me, _ended), startFactors: _ended.startFactors });
@@ -1634,6 +1690,7 @@
         _hecEndDrag(c, gs.pending);
       }
       if (gs.pinch && (pid == gs.pinch.p1id || pid == gs.pinch.p2id)) {
+        flushPinch(gs.pinch);
         var _endedPinch = gs.pinch;
         gs.pinch = null;
         panX(c, 'end', 0, 'pinch', { pointerFactors: pinchFactors(me, _endedPinch), startFactors: _endedPinch.startFactors });
