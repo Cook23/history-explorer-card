@@ -8,6 +8,8 @@
 //   fail        WS message types that fail
 //   language    Home Assistant's language ('en')
 //   dark        dark theme
+//   historyDelay, userDataDelay   ms Home Assistant takes to answer for the history and the
+//               statistics, and for the user data (none: at once)
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids}).
@@ -118,8 +120,10 @@ function mkHass(){ return {
   callWS:(d)=>{
     __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
-    if(d.type==='history/history_during_period') return Promise.resolve(history(d));
-    if(d.type==='recorder/statistics_during_period') return Promise.resolve(statistics(d));
-    if(d.type==='frontend/get_user_data') return window.__getUD(d.key).then(v=>({value:v}));
+    // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
+    const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();
+    if(d.type==='history/history_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(history(d)));
+    if(d.type==='recorder/statistics_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(statistics(d)));
+    if(d.type==='frontend/get_user_data') return later(MOCK.userDataDelay, ()=>window.__getUD(d.key).then(v=>({value:v})));
     if(d.type==='frontend/set_user_data'){ return window.__setUD(d.key, d.value===null?null:JSON.parse(JSON.stringify(d.value))).then(()=>({})); }
     return Promise.resolve({}); } }; }

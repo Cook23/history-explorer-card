@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.21] - 2026-10-15
+
+### Fixed — the last one to speak: a change made on another device could be ignored, and overwritten
+- Since 1.2.19 the card is shown at once from what this device saved, Home Assistant's user data read meanwhile. When another device had changed the time range, the change was seen — its image updated — but not applied: the range was set through the toolbar's way, which does nothing while the history loads, and Home Assistant answered while it did. The image then said "done", and this device's own range was written back over the other device's
+- The rule, as it was meant: each source (the YAML, Home Assistant's user data, this device) is compared with its own image; a change is applied and its image updated together, always. The merge is now synchronous and can't be refused: the time range set whatever is loading (`applyTimeRange`), the history then loaded again, superseding a load in progress (`reloadHistory`). When Home Assistant answers, the same merge runs again with the images as they now are — only its own change can show there — and what's shown is rebuilt only when that changed something (`showSaved`). The card is still shown at once, before Home Assistant answers
+- Home Assistant's image is what it holds: updated once this device's write to it succeeded (the card, the gesture settings, the info panel's switch), left as it was when the write failed. This device's own write no longer comes back as a change from another device, which could undo a newer change made here meanwhile
+- Tests (`persistence`), Home Assistant answering as a real one does — the mocked history and user data now take their time (`historyDelay`, `userDataDelay`): another device's range taken while the history loads, Home Assistant not overwritten (failed in 1.2.20); nothing changed elsewhere: the graphs shown before it answers, and not rebuilt; a change made on the card before it answers kept, and saved there
+
+### New — the calendar, real time, the default range
+- A click on the date opens the browser's calendar (`openCalendar`): the day chosen ends the window shown, the range kept (`showDay`); the last day shown preselected, no later than today. It opens once a double-click can't follow any more (the gesture settings' long press)
+- A double-click on the date: back to real time, the range kept — what a click on it did. A double-click on the magnifier: back to the default range (`defaultTimeRange`, `defaultRange`) — what a double-click on the date did; its click still toggles the zoom selection mode (a double-click toggles it twice: as it was)
+- Tests (`features`): the calendar opened by a click only once the double-click's delay has passed, the day chosen ending the window, the range kept; a double-click on the date back to real time, no calendar; a double-click on the magnifier, the default range back, the zoom mode as it was
+
 ## [v1.2.20] - 2026-10-14
 
 ### Fixed — the attributes offered: no setting, no limit, no date
@@ -21,12 +34,6 @@ Changelog for the HA History Explorer Card.
 
 ### Tests — the same curves whatever the time
 - The mocked history follows the time of day, and the `points` suite measures what is drawn (the hover dot's pixels, the tooltip's place): two of its tests passed or failed depending on when they ran. The harness can now open a page at a given time, which then flows as usual (`openCard`'s `clock`, Playwright's `page.clock`); the `points` suite always starts at the same one
-
-### To do — the date and the magnifier (decided, not done yet)
-- A click on the date opens the browser's calendar (`<input type="date">`, `showPicker()`): the range shown is kept, the window ending at the end of the day chosen. `<` and `>` stay as they are
-- A double-click on the date: back to real time, the range kept (what a click on it does today). The calendar opens only once the double-click's delay has passed (the gesture settings' long press), so that a double-click doesn't open it
-- A double-click on the magnifier: back to the default range (`defaultTimeRange`) — what a double-click on the date does today. Its click still toggles the zoom selection mode (a double-click toggling it twice, it ends as it was)
-- README_Full: the date selector's paragraph ("Clicking the date selector…") to update
 
 ## [v1.2.19] - 2026-10-14
 

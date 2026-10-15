@@ -114,10 +114,18 @@ export class CardToolbar
         this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
         this._this.querySelector(`#b4_${i}`)?.addEventListener('click', this.decZoom.bind(this), false);
         this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
-        this._this.querySelector(`#bx_${i}`)?.addEventListener('click', this.todayNoReset.bind(this), false);
-        this._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', this.todayReset.bind(this), false);
+        // (the date: a click opens the calendar, a double-click goes back to real time — the
+        // calendar only once a double-click can't follow any more: the long press' delay)
+        this._this.querySelector(`#bx_${i}`)?.addEventListener('click', () => {
+            clearTimeout(this._dateClickTimer);
+            this._dateClickTimer = setTimeout(() => this.openCalendar(i), Chart.hecGestures('mouse').longPressMs);
+        }, false);
+        this._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', () => { clearTimeout(this._dateClickTimer); this.todayNoReset(); }, false);
         this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
+        // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
+        // back to the default range)
+        this._this.querySelector(`#bz_${i}`)?.addEventListener('dblclick', this.defaultRange.bind(this), false);
         this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
         this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
@@ -429,6 +437,29 @@ export class CardToolbar
         const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
         const g = this.graphs.find(gr => gr.id == id);
         if( g ) this.setBarInterval(g, parseInt(event.target.value));
+    }
+
+    // The browser's calendar, under toolbar i's date: the day chosen ends the window shown
+    // (showDay), the last day shown preselected, no later than today
+    openCalendar(i)
+    {
+        const _bx = this._this.querySelector(`#bx_${i}`);
+        if( !_bx ) return;
+        let _in = ( this._calendarInputs ??= [] )[i];
+        if( !_in?.isConnected ) {
+            _in = this._calendarInputs[i] = document.createElement('input');
+            _in.type = 'date';
+            _in.tabIndex = -1;
+            _in.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0';
+            _in.addEventListener('change', () => this.showDay(_in.value));
+            _bx.parentNode.style.position = 'relative';
+            _bx.parentNode.appendChild(_in);
+        }
+        _in.style.left = _bx.offsetLeft + 'px';
+        _in.style.top = ( _bx.offsetTop + _bx.offsetHeight ) + 'px';
+        _in.max = moment().format('YYYY-MM-DD');
+        _in.value = moment(this.endTime).subtract(1, 'ms').format('YYYY-MM-DD');
+        try { _in.showPicker(); } catch( e ) { _in.focus(); _in.click(); }
     }
 
     // The toolbar's date: the time window's start, as long as its room allows (resizeSelector)

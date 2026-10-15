@@ -456,6 +456,8 @@ export class CardHistory
             if( n > 0 ) {
 
                 this.state.loading = true;
+                // (the answers of this load only, not of one superseded since — reloadHistory)
+                const _gen = this._loadGen, _now = f => r => { if( _gen === this._loadGen ) f.call(this, r); };
 
                 if( this.statistics.force )
                     this.limitSlot = this.cacheSize + 1;
@@ -463,7 +465,7 @@ export class CardHistory
                 if( !this.statistics.enabled || l0 > this.limitSlot ) {
 
                     // Issue history retrieval call, initiate async cache loading
-                    this.historyCall(l, t0, t1).then(this.loaderCallbackWS.bind(this), this.loaderFailed.bind(this));
+                    this.historyCall(l, t0, t1).then(_now(this.loaderCallbackWS), _now(this.loaderFailed));
 
                     // Parallel statistics query for entities with showMinMax
                     const lmm = [];
@@ -475,13 +477,13 @@ export class CardHistory
                                 lmm.push(e.entity);
                         }
                     if( lmm.length ) {
-                        this._hass.callWS(this.statisticsRequest(lmm, t0, t1, this.statistics.period ?? 'hour')).then(this.minmaxCallback.bind(this), () => {});
+                        this._hass.callWS(this.statisticsRequest(lmm, t0, t1, this.statistics.period ?? 'hour')).then(_now(this.minmaxCallback), () => {});
                     }
 
                 } else {
 
                     // Issue statistics retrieval call (an attribute has none: no curve there)
-                    this._hass.callWS(this.statisticsRequest(l.filter(id => !seriesOf(id).attribute), t0, t1, this.statistics.period)).then(this.loaderCallbackStats.bind(this), this.loaderFailed.bind(this));
+                    this._hass.callWS(this.statisticsRequest(l.filter(id => !seriesOf(id).attribute), t0, t1, this.statistics.period)).then(_now(this.loaderCallbackStats), _now(this.loaderFailed));
 
                 }
 
@@ -518,6 +520,16 @@ export class CardHistory
         } else {
             this.updateHistory();
         }
+    }
+
+    // The history loaded again, now, whatever is loading: a load in progress is superseded —
+    // its answer, when it comes, ignored (_loadGen)
+    reloadHistory()
+    {
+        this._loadGen = ( this._loadGen ?? 0 ) + 1;
+        this.state.loading = false;
+        this.cache.length = 0;
+        this.updateHistory();
     }
 
     updateHistoryWithClearCache()
