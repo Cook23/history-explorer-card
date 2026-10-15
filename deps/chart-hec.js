@@ -2260,12 +2260,12 @@
 
     // The box around the icons shown in the lock+handle zone (canvas-relative), 24px high
     // (4-28px), as the chain icon's: the padlock alone, or the handle alone, in a round one
-    // (the padlock's centered on it); two icons or more — the handle and the padlock,
-    // options.handleButtons — in an oblong one (1px to 3px past the zone); null when none
-    // is shown
+    // (each centered on it, see _hecUpdateMoveHandleIcon); two icons or more — the handle
+    // and the padlock, options.handleButtons — in an oblong one (from the canvas' edge to
+    // 4px past the zone); null when none is shown
     _hecLockAndHandleRect: function () {
       var _h = this.options.moveHandleVisible !== false, _l = this._hecLockIconShown();
-      if (this._hecHandleButtons() || (_h && _l)) return { x: 1, y: 4, width: this._hecLockAndHandleWidth() + 2, height: 24 };
+      if (this._hecHandleButtons() || (_h && _l)) return { x: 0, y: 4, width: this._hecLockAndHandleWidth() + 4, height: 24 };
       if (_l) return { x: 12, y: 4, width: 24, height: 24 };
       return _h ? { x: 1, y: 4, width: 24, height: 24 } : null;
     },
@@ -2327,8 +2327,13 @@
         me._hecMoveHandleIconEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
-      _el.style.left = me.canvas.offsetLeft + 'px';
+      // (alone — no padlock beside it —: centered in its round box, 1-25px, _hecLockAndHandleRect)
+      var _alone = !me._hecLockIconShown();
+      _el.style.left = (me.canvas.offsetLeft + (_alone ? 1 : 0)) + 'px';
       _el.style.top = me.canvas.offsetTop + 'px';
+      _el.style.width = _alone ? '24px' : '15px';
+      _el.style.paddingLeft = _alone ? '0px' : '2px';
+      _el.style.justifyContent = _alone ? 'center' : '';
       _el.style.display = me.options.moveHandleVisible === false || me._hecHandleButtons() ? 'none' : 'flex';
     },
 
@@ -3043,6 +3048,14 @@
         };
         ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerout', 'contextmenu'].forEach(function (t) {
           _el.addEventListener(t, _forward);
+        });
+        // A touch on the zone while it takes the gesture (touch-action: none) is the card's
+        // alone: no element around the card gets it — Home Assistant's bottom sheet (its
+        // entity dialog on a phone) would follow it in JavaScript, whatever touch-action
+        // says, and close; a card that swipes, change page. Else it goes on as usual (a
+        // drag on the curves scrolls the page, or moves the sheet)
+        ['touchstart', 'touchmove'].forEach(function (t) {
+          _el.addEventListener(t, function (ev) { if (_el.style.touchAction === 'none') ev.stopPropagation(); });
         });
         _el._hecChart = me;
         me[key] = _el;

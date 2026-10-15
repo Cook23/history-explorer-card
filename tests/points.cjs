@@ -32,7 +32,10 @@ module.exports = async function()
         const y=Math.min(...ys)-A.top > A.bottom-Math.max(...ys) ? A.top+4 : A.bottom-4; return {x:r.left+x, y:r.top+y}; })()`);
 
     // ── With a mouse ──
-    let t = await openCard(card(), { mock: { series: true } });
+    // (the curves drawn the same whenever the suite runs: the hover dot and the tooltip's
+    // place are measured on them)
+    const CLOCK = '2026-10-14T14:00:00Z';
+    let t = await openCard(card(), { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     await t.step('a long-press on a curve shows its dots, its diameter the line width + 2 px (hovered: + 2 more), saved; again, hides them (back to the hovered dot only)', async () => {
         const p = await t.E('pointPt(0,0.5)');
@@ -276,7 +279,7 @@ module.exports = async function()
 
     // ── Points shown from the YAML ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: true }] }] }, { mock: { series: true } });
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: true }] }] }, { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     await t.step('points shown by the YAML: once the tooltip\'s reading time is over, the point clicked is small again', async () => {
         const r = await afterReading(0, 4);
@@ -287,7 +290,7 @@ module.exports = async function()
     // ── The YAML and the long-press: the last one to speak wins ──
     const yamlCard = sp => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, enable_persistence: 'entities',
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: sp }] }] });
-    t = await openCard(yamlCard(true), { mock: { series: true } });
+    t = await openCard(yamlCard(true), { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     await t.step('showPoints: true in the YAML, hidden by a long-press: still hidden after a reload; the YAML changed (showPoints: 4): shown, radius 4', async () => {
         const p = await valuePt(0, 3); await t.longPress(p);
@@ -301,7 +304,7 @@ module.exports = async function()
     done(await t.close());
 
     // ── Saved on this device only ──
-    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false } }, { mock: { series: true } });
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false } }, { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     await t.step('a curve added from the card, its points shown by a long-press: kept after a reload, not on another device', async () => {
         await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power'], 'line', 'curves'); })()`); await t.wait(1500);
@@ -315,7 +318,7 @@ module.exports = async function()
     done(await t.close());
 
     // ── With a finger ──
-    t = await openCard(card(), { touch: true, mock: { series: true } });
+    t = await openCard(card(), { touch: true, mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     await t.step('a long-press of a finger on a curve shows its dots; again, hides them', async () => {
         const p = await t.E('pointPt(0,0.5)');
@@ -327,7 +330,7 @@ module.exports = async function()
 
     // ── The hover dot: the curve the pointer is on, then its value nearest along the time ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false },
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true } });
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true }, clock: CLOCK });
     await t.step('a hover on a curve between two values far apart: the dot of the one nearest along the time', async () => {
         // (a point of the drawn path, a third of the way from a value to the next, away from both)
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;

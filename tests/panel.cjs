@@ -40,6 +40,29 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── On a phone, Home Assistant's entity dialog is a bottom sheet following every touch
+    // that reaches it (touchstart, in JavaScript: touch-action can't stop it) — downwards, it
+    // closes. A sheet listening as it does: what the card takes never reaches it ──
+    t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800, touch: true });
+    await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+    await t.E(`(()=>{ window.__sheet=0; document.addEventListener('touchstart', () => __sheet++); })()`);
+    await t.step('a tap then drag down on the Y axis: the axis moves, the sheet gets the tap only, not the drag', async () => {
+        const c = 'inst().graphs[0].chart';
+        const p = await t.E(`(()=>{ const c=${c}, r=c.canvas.getBoundingClientRect(); return { x: r.left+c.chartArea.left/2, y: r.top+(c.chartArea.top+c.chartArea.bottom)/2 }; })()`);
+        const y0 = await t.E(`${c}.scales[${c}.options.scales.yAxes[0].id].min`);
+        await t.tapDrag(p, { x: p.x, y: p.y + 80 });
+        const y1 = await t.E(`${c}.scales[${c}.options.scales.yAxes[0].id].min`), n = await t.E('__sheet');
+        return y1 !== y0 && n === 1 ? true : JSON.stringify({ y0, y1, sheet: n });
+    });
+    await t.step('a drag on the curves: the sheet gets it, as before (the page scrolled, or the sheet moved)', async () => {
+        const p = await t.E(`(()=>{ const c=inst().graphs[0].chart, r=c.canvas.getBoundingClientRect(); return { x: r.left+(c.chartArea.left+c.chartArea.right)/2, y: r.top+(c.chartArea.top+c.chartArea.bottom)/2 }; })()`);
+        await t.wait(800); const n0 = await t.E('__sheet');
+        await t.swipe(p, { x: p.x, y: p.y + 60 });
+        const n1 = await t.E('__sheet');
+        return n1 === n0 + 1 ? true : JSON.stringify({ n0, n1 });
+    });
+    done(await t.close());
+
     t = await open('sensor.wind');
     await t.step('an angle (unit °) is drawn as circular, period 360', async () => {
         const d = await t.E('datasets(0)');

@@ -10,8 +10,17 @@ Changelog for the HA History Explorer Card.
 - The entity selector's attribute submenu no longer offers what is no value to follow: an entity's settings, limits and descriptions, from Home Assistant's domains — `display_precision`, ids (`unique_id`, `device_id`, `area_id`…), the device (`manufacturer`, `model`, `serial_number`, `hw_version`…), an update's texts (`title`, `release_summary`, `release_notes`, `in_progress`), the limits and settings of `input_*`, `number`, `counter`, `timer` (`min`, `max`, `step`, `mode`, `pattern`, `initial`…), of a thermostat, a humidifier, a light (`min_temp`, `max_temp`, `target_temp_step`, `min_mireds`…), of cameras and media players (`frontend_stream_type`, `media_content_id`…), of alarms, locks and zones (`code_format`, `passive`, `radius`) — `NOT_SERIES_ATTRIBUTES`; nor an attribute holding a date, with or without its time (`last_triggered`, `next_rising`, `last_seen`…), different each time. The modes and what varies stay offered (`hvac_mode`, `preset_mode`, `effect`, `media_title`, `latitude`…). Any of them can still be shown, written in the YAML
 - Test: such attributes on an entity, not in its submenu
 
-### Changed — the time range centred in its field
+### Fixed — a tap then drag down on the Y axis closed the entity dialog (phone)
+- On a phone, Home Assistant's entity dialog is a bottom sheet that follows every touch reaching it and closes when pulled down — in JavaScript, which `touch-action` can't stop. A tap then drag down on the Y axis in the info panel moved the sheet down instead of the axis (up, nothing happened: nothing to scroll). A touch zone of the chart that takes the gesture (`touch-action: none`: the Y axis armed or locked, a label or the handle being dragged, `handleButtons`) now keeps its `touchstart` and `touchmove` to itself (`stopPropagation`): no element around the card gets them. A drag on the curves goes on as before
+- Test: a sheet listening as Home Assistant's does: a tap then drag down on the Y axis moves the axis, the sheet gets the tap only; a drag on the curves still reaches it
+
+### Changed — the time range centred in its field, the controls' boxes
 - The toolbar's time range (`1 H`, `1 D`…) is centred in its field, between the − and + buttons
+- The box behind the handle and the padlock 2 px wider (from the graph's edge to 4 px past the padlock)
+- The handle alone (no padlock beside it) centred in its round box — it sat in its left part
+
+### Tests — the same curves whatever the time
+- The mocked history follows the time of day, and the `points` suite measures what is drawn (the hover dot's pixels, the tooltip's place): two of its tests passed or failed depending on when they ran. The harness can now open a page at a given time, which then flows as usual (`openCard`'s `clock`, Playwright's `page.clock`); the `points` suite always starts at the same one
 
 ### To do — the date and the magnifier (decided, not done yet)
 - A click on the date opens the browser's calendar (`<input type="date">`, `showPicker()`): the range shown is kept, the window ending at the end of the day chosen. `<` and `>` stay as they are
