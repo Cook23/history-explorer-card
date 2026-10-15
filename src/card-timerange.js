@@ -67,6 +67,27 @@ export class CardTimeRange
         this.today(true);
     }
 
+    // The window ending at the end of day (YYYY-MM-DD, the calendar — openCalendar), the
+    // range kept
+    showDay(day)
+    {
+        if( this.state.loading || !day ) return;
+        const _ms = this.activeRange.timeRangeHours ? this.activeRange.timeRangeHours * 3600e3 : this.activeRange.timeRangeMinutes * 60e3;
+        const t1 = moment(day).add(1, 'day').startOf('day');
+        this.startTime = moment(t1).subtract(_ms, 'ms').format("YYYY-MM-DDTHH:mm:ss");
+        this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+        this.applyTimeAxes();
+        this.updateHistory();
+    }
+
+    // Back to the default range (defaultTimeRange) — a double-click on the magnifier
+    defaultRange()
+    {
+        if( this.state.loading ) return;
+        this.setTimeRangeFromString(this.pconfig.defaultTimeRange, true);
+        this.writeLocalState();
+    }
+
     subDay()
     {
         if( !this.state.loading ) {
@@ -262,9 +283,17 @@ export class CardTimeRange
         return ranges[i];
     }
 
+    // (asked from the toolbar, a gesture: not while the history loads)
     setTimeRange(range, update, t_center = null, t_position = 0.5)
     {
         if( this.state.loading ) return;
+        this.applyTimeRange(range, update, t_center, t_position);
+    }
+
+    // The time range set, whatever is loading — the saved state applied (card-storage.js):
+    // a change taken is never dropped
+    applyTimeRange(range, update, t_center = null, t_position = 0.5)
+    {
 
         this.timeCache.clear();
 
@@ -340,6 +369,12 @@ export class CardTimeRange
     setTimeRangeMinutes(range, update, t_center, t_position = 0.5)
     {
         if( this.state.loading ) return;
+        this.applyTimeRangeMinutes(range, update, t_center, t_position);
+    }
+
+    // (as applyTimeRange)
+    applyTimeRangeMinutes(range, update, t_center, t_position = 0.5)
+    {
 
         t_position = Math.min(Math.max(t_position, 0.0), 1.0);
 
@@ -395,9 +430,9 @@ export class CardTimeRange
         const h = Math.floor(t / 60);
 
         if( h > 0 )
-            this.setTimeRange(this.validateRange(h, true), update, t_center);
+            this.applyTimeRange(this.validateRange(h, true), update, t_center);
         else
-            this.setTimeRangeMinutes(t, update, t_center);
+            this.applyTimeRangeMinutes(t, update, t_center);
     }
 
     // Real time followed (the window moving with the present) only when the window shows the

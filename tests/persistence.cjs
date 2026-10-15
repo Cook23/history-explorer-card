@@ -290,5 +290,39 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Home Assistant answers as a real one does, not at once: the card is shown from this
+    // device's own state, its user data read meanwhile, the history loading ──
+    t = await openCard(YAML({ enable_multidevice_persistence: 'all' }), { mock: { series: true, historyDelay: 2000, userDataDelay: 800 }, height: 1200 });
+    await t.wait(2500);
+    const key = await t.E(`'history-explorer_card_' + el.instance.id`);
+    const saved = () => t.E(`(async()=>{ const ha=(await el.instance._hass.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value, l=JSON.parse(localStorage.getItem('${key}'));
+        return { shown: el.instance.activeRange.timeRangeHours, ha: ha?.timeRangeHours, local: l?.timeRangeHours, image: l?.ha_timeRangeHours }; })()`);
+    const anotherDevice = h => t.E(`(async()=>{ const hs=el.instance._hass, v=(await hs.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value;
+        v.timeRangeHours=${h}; v.timeRangeMinutes=0; await hs.callWS({ type: 'frontend/set_user_data', key: '${key}', value: v }); })()`);
+    await t.step('slow Home Assistant: another device changed the range, it answers while the history loads — the range taken, Home Assistant not overwritten', async () => {
+        await t.E('(()=>{ el.instance.setTimeRange(6, true); el.instance.writeLocalState(); })()'); await t.wait(3500);
+        await anotherDevice(12);
+        await t.page.reload(); await t.wait(6000);
+        const s = await saved();
+        return s.shown === 12 && s.ha === 12 && s.local === 12 && s.image === 12 ? true : JSON.stringify(s);
+    });
+    await t.step('slow Home Assistant, nothing changed elsewhere (this device\'s own last write coming back): the graphs shown before it answers, and not rebuilt', async () => {
+        await t.page.reload(); await t.wait(400);
+        const early = await t.E('el.instance.graphs.length > 0 && !!el.instance.graphs[0]?.chart');
+        await t.E('window.__chart = el.instance.graphs[0]?.chart');
+        await t.wait(5000);
+        const same = await t.E('!!window.__chart && window.__chart === el.instance.graphs[0]?.chart'), s = await saved();
+        return early && same && s.shown === 12 && s.ha === 12 ? true : JSON.stringify({ early, same, s });
+    });
+    await t.step('slow Home Assistant: a change made on the card before it answers is kept, and saved there', async () => {
+        await t.page.reload(); await t.wait(400);
+        await t.E(`(()=>{ const I=el.instance, g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.setInterpolation(g, g.entities.filter(e=>e.entity==='sensor.power'), 'makima'); })()`);
+        await t.wait(5000);
+        const b = await entry('sensor.power');
+        const ha = await t.E(`(async()=>{ const v=(await el.instance._hass.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value; return (v.entities||[]).find(e=>(e.entity??e)==='sensor.power')?.interpolation; })()`);
+        return b.interpolation === 'makima' && ha === 'makima' ? true : JSON.stringify({ b, ha });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

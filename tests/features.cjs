@@ -343,6 +343,37 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The date: a click opens the calendar, a double-click goes back to real time; the
+    // magnifier: a double-click brings the default range back ──
+    t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    const win = () => t.E(`[el.instance.startTime, el.instance.endTime, el.instance.activeRange.timeRangeHours]`);
+    const at = sel => t.E(`(()=>{ const r=el.querySelector('${sel}').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
+    await t.step('a click on the date: the browser\'s calendar, once a double-click can\'t follow; the day chosen ends the window, the range kept', async () => {
+        await t.E(`(()=>{ window.__picker=0; HTMLInputElement.prototype.showPicker = function(){ __picker++; }; })()`);
+        const d = await at('#bx_0'); await t.page.mouse.click(d.x, d.y);
+        const soon = await t.E('__picker'); await t.wait(900); const later = await t.E('__picker');
+        // (three days ago, and the next day's midnight: local dates)
+        const [day, end] = await t.E(`(()=>{ const f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+            const d=new Date(); d.setDate(d.getDate()-3); const n=new Date(d); n.setDate(n.getDate()+1); return [f(d), f(n)+'T00:00:00']; })()`);
+        await t.E(`(()=>{ const i=el.instance._calendarInputs[0]; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
+        const [t0, t1, h] = await win();
+        return soon === 0 && later === 1 && t1 === end && h === 24 ? true : JSON.stringify({ soon, later, t0, t1, end, h });
+    });
+    await t.step('a double-click on the date: back to real time, the range kept, no calendar', async () => {
+        await t.E('__picker=0');
+        const d = await at('#bx_0'); await t.page.mouse.dblclick(d.x, d.y); await t.wait(900);
+        const [, t1, h] = await win(), p = await t.E('__picker');
+        const late = await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime())`);
+        return late < 3 * 3600e3 && h === 24 && p === 0 ? true : JSON.stringify({ t1, late, h, p });
+    });
+    await t.step('a double-click on the magnifier: the default range back, the zoom mode as it was', async () => {
+        await t.E('(()=>{ el.instance.setTimeRange(6, true); })()'); await t.wait(1200);
+        const z = await at('#bz_0'); await t.page.mouse.dblclick(z.x, z.y); await t.wait(1200);
+        const [, , h] = await win(), mode = await t.E('!!el.instance.state.zoomMode');
+        return h === 24 && mode === false ? true : JSON.stringify({ h, mode });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {
