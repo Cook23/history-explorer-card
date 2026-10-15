@@ -421,6 +421,14 @@ you don't know yet whether it's a scroll or a chart interaction.
 
 ---
 
+
+While one of these zones is in `touch-action: none`, it also stops its `touchstart` and
+`touchmove` from going further up (`stopPropagation`): the gesture is the chart's alone.
+`touch-action` only rules the browser's own scrolling, not what another element does in
+JavaScript with the touches it gets — Home Assistant's bottom sheet (its entity dialog on
+a phone) follows every touch that reaches it and closes when pulled down, a swiping card
+changes page. Otherwise, a zone lets its touches go on as the canvas does.
+
 ## 6. What stays deliberately private
 
 Every `_hec`-prefixed property or method is internal, those listed in §4 and §5

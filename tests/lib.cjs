@@ -11,7 +11,9 @@ const pageUrl = name => 'file://' + path.join(__dirname, name);
 // below the card, so the page can scroll), mock (the mocked Home Assistant's settings, see
 // page.html), page ('panel.html': the info panel instead
 // of a card), panel (the info panel's config — null: the panel off), userData (Home
-// Assistant's user data to start with), init (more of the page's init script) }
+// Assistant's user data to start with), init (more of the page's init script), clock (the
+// page's time when it opens, then flowing as usual: the mocked history follows the time of
+// day — a test measuring the curves drawn sees the same ones whenever it runs) }
 async function openCard(cfg, opts = {})
 {
     const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
@@ -29,6 +31,7 @@ async function openCard(cfg, opts = {})
     if( opts.init ) init += opts.init;
     if( opts.scrollRoom ) init += `document.addEventListener("DOMContentLoaded",()=>{ const s=document.createElement("div"); s.style.height="${opts.scrollRoom}px"; document.body.appendChild(s); });`;
     await page.addInitScript(init);
+    if( opts.clock ) { await page.clock.install({ time: new Date(opts.clock) }); await page.clock.resume(); }
     await page.goto(pageUrl(opts.page || 'page.html'));
     await page.waitForTimeout(2500);
     const cdp = opts.touch ? await ctx.newCDPSession(page) : null;
