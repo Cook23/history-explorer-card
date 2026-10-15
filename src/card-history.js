@@ -261,7 +261,8 @@ export class CardHistory
 
         this.state.loading = false;
 
-        if( reload ) this.updateHistory();
+        // (the next days of the window — see updateHistory —, or statistics instead)
+        if( reload || this.loader.more ) this.updateHistory();
     }
 
     loaderFailed(error)
@@ -313,8 +314,9 @@ export class CardHistory
     {
         // Store hourly min/max keyed by entity then by hour-aligned timestamp (ms)
         if( !this.minmaxCache ) this.minmaxCache = {};
+        // (asked with each part of the window loaded: added to what's there)
         for( const entity in result ) {
-            this.minmaxCache[entity] = {};
+            this.minmaxCache[entity] ??= {};
             for( const pt of result[entity] ) {
                 if( pt.min != null ) {
                     const ts = moment(pt.start).valueOf();
@@ -441,6 +443,13 @@ export class CardHistory
             }
 
             //console.log(`Slots ${l0} to ${l1} need loading`);
+
+            // (from the most recent, a few days at a time — at most 8 requests for the window:
+            // each one drawn as it comes, the curves growing back in time, then the next one
+            // asked — loaderCallback)
+            const _days = Math.max(1, Math.ceil((c1 - c0 + 1) / 8));
+            this.loader.more = l1 - _days + 1 > l0;
+            l0 = Math.max(l0, l1 - _days + 1);
 
             this.loader.startTime = this.cache[l0].start;
             this.loader.endTime = this.cache[l1].end;

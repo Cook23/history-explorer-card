@@ -24,9 +24,10 @@ module.exports = async function()
         const v = await t.E(`el.instance.graphs[0].chart.data.datasets.map(d=>d.name+' / '+d.unit).join(', ')`);
         return v === 'salon : Current temperature / °C, salon : Temperature / °C' ? true : v;
     });
-    await t.step('their history asked once per entity, with its attributes and every change; the states as usual', async () => {
-        const r = await t.E(`__ws.filter(w=>w.type==='history/history_during_period').map(w=>w.ids.join()+':'+w.attributes+':'+w.allChanges).join(' ; ')`);
-        return r === 'climate.salon:false:false ; climate.salon:true:true' ? true : r;
+    await t.step('their history asked once per entity in each part of the window loaded, with its attributes and every change; the states as usual', async () => {
+        const r = await t.E(`(()=>{ const by={}; __ws.filter(w=>w.type==='history/history_during_period').forEach(w=>{ (by[w.start] ??= []).push(w.ids.join()+':'+w.attributes+':'+w.allChanges); });
+            return Object.values(by).map(l=>l.sort().join(' ; ')); })()`);
+        return r.length && r.every(x => x === 'climate.salon:false:false ; climate.salon:true:true') ? true : JSON.stringify(r);
     });
     done(await t.close());
 

@@ -374,6 +374,80 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A long window loaded a few days at a time, the most recent first: each part drawn as
+    // it comes (Home Assistant taking its time, as a real one does) ──
+    const growing = async (range, samples, every) => {
+        const t = await openCard(card({ defaultTimeRange: range, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyDelay: 400 } });
+        await t.E('__ws.length = 0'); await t.page.reload();
+        const firsts = [];
+        for( let k = 0; k < samples; k++ ) { await t.wait(every); firsts.push(await t.E(`(()=>{ const d=el.instance.graphs[0]?.chart.data.datasets[0]?.data||[]; return d.length ? +new Date(d[0].x) : null; })()`)); }
+        const seen = [...new Set(firsts.filter(x => x !== null))];
+        const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period').map(w=>[w.start, w.end])`);
+        const starts = ws.map(w => Date.parse(w[0])), newestFirst = starts.every((v, i) => !i || v < starts[i - 1]);
+        const once = new Set(ws.map(w => w[0])).size === ws.length && ws.every((w, i) => !i || w[1] === ws[i - 1][0]);
+        const covered = await t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data; return +new Date(d[0].x) <= +new Date(el.instance.startTime) + 86400e3; })()`);
+        await t.close();
+        return seen.length >= 4 && seen.every((v, i) => !i || v < seen[i - 1]) && ws.length <= 8 && newestFirst && once && covered
+            ? true : JSON.stringify({ seen: seen.length, ws, newestFirst, once, covered });
+    };
+    t = await openCard(card(), { mock: { series: true } });
+    await t.step('a window of 7 days: the curve grows back in time as each day arrives; each day asked once, the most recent first; the whole window at the end', () => growing('7d', 16, 250));
+    await t.step('a window of 6 months: at most 8 requests, the most recent first, the curve growing back in time; the whole window at the end', () => growing('6o', 30, 300));
+    done(await t.close());
+
+    // ── The parts of a window, whatever the history holds: a counter rising with time (each
+    // older part lower), loaded as Home Assistant takes its time — sampled as it grows ──
+    const watch = async (range, cfg, mock, samples, every, lockAfterFirst = false) => {
+        const t = await openCard(card({ defaultTimeRange: range, graphs: [{ type: 'line', entities: [{ entity: 'sensor.energy', type: 'line' }] }], ...cfg }), { mock: { series: true, historyDelay: 400, ...mock } });
+        await t.E('__ws.length = 0'); await t.page.reload();
+        const trace = [];
+        for( let k = 0; k < samples; k++ ) {
+            await t.wait(every);
+            if( lockAfterFirst && trace.length === 1 && !trace.locked ) { await t.E('el.instance.graphs[0].chart._hecToggleYAxisLock()'); trace.locked = true; await t.wait(50); }
+            trace.push(await t.E(`(()=>{ const c=el.instance.graphs[0]?.chart, d=c?.data.datasets[0]?.data||[]; if( !d.length ) return null;
+                const y=c.scales[c.options.scales.yAxes[0].id], v=d.map(p=>+p.y).filter(Number.isFinite);
+                return { first: +new Date(d[0].x), n: d.length, min: y.min, max: y.max, vmin: Math.min(...v), vmax: Math.max(...v) }; })()`));
+        }
+        const pts = await t.E(`el.instance.graphs[0].chart.data.datasets[0].data.map(p=>[+new Date(p.x), +p.y])`);
+        const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period'||w.type==='recorder/statistics_during_period').map(w=>[w.type[0], w.start, w.end])`);
+        const start = await t.E('+new Date(el.instance.startTime)');
+        await t.close();
+        const seen = trace.filter(Boolean);
+        // (the parts joined: in time order, no point twice, no gap much longer than the usual one)
+        const gaps = pts.slice(1).map((p, i) => p[0] - pts[i][0]).sort((a, b) => a - b);
+        const joined = gaps.every(g => g > 0) && gaps[gaps.length - 1] <= 3 * gaps[gaps.length >> 1] + 1;
+        // (each request's period asked once; history then statistics, each the most recent first)
+        const once = new Set(ws.map(w => w[0] + w[1])).size === ws.length;
+        // (the Y scale holding the values loaded each time — or kept as it was, locked)
+        const fits = seen.every(x => x.min <= x.vmin && x.max >= x.vmax);
+        return { seen, pts, ws, start, joined, once, fits };
+    };
+    t = await openCard(card(), { mock: { series: true } });
+    await t.step('little history (2 days, no statistics) in a window of 7: the days held shown, nothing asked twice, it ends; the parts joined; the Y scale following', async () => {
+        const r = await watch('7d', { statistics: { enabled: false } }, { historyDays: 2 }, 14, 300);
+        const last = r.seen[r.seen.length - 1], firstShown = r.seen[0];
+        const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
+        return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
+    });
+    await t.step('a window across the history (10 days) and the statistics (older): the recent part from the history, the older from the statistics, the most recent first; the whole window, joined; nothing asked twice; the Y scale widening as the older, lower values come', async () => {
+        const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 26, 300);
+        const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
+        const historyFirst = /^h+r+$/.test(types), covered = last.first <= r.start + 86400e3;
+        const widened = r.seen[0].min > last.min;
+        return r.joined && r.once && r.fits && historyFirst && covered && widened ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, covered, widened, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
+    });
+    await t.step('a lot of history (6 months): the parts joined, the Y scale widening as each older, lower part comes', async () => {
+        const r = await watch('6o', { statistics: { enabled: false } }, {}, 30, 300);
+        const last = r.seen[r.seen.length - 1], widened = r.seen[0].min > last.min;
+        return r.joined && r.once && r.fits && widened ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, widened, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
+    });
+    await t.step('the Y axis locked once the first part is shown: its scale kept as the older parts come', async () => {
+        const r = await watch('7d', { statistics: { enabled: false } }, {}, 16, 250, true);
+        const after = r.seen.slice(1), kept = after.every(x => x.min === after[0].min && x.max === after[0].max);
+        return kept && r.joined ? true : JSON.stringify({ kept, seen: r.seen.map(x => [x.n, x.min, x.max]) });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {
