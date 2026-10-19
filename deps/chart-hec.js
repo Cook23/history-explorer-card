@@ -1322,8 +1322,9 @@
       zoomX(c, Math.sign(_stepX), _n.centerX, 'pinch', pinchFactors(me, pinch), pinch.startFactors);
     // Y pan by the vertical movement of the fingers' centre — the content follows
     // the fingers, as with the one-finger Y axis pan (yAxisPan) — and Y zoom by
-    // their vertical spread, each axis around its own middle: every Y axis of the
-    // chart moves together (pinch.yRanges, tracked from the pinch's start)
+    // their vertical spread, around the fingers' centre as counted: what is under the
+    // fingers stays there, on every Y axis of the chart — they move together
+    // (pinch.yRanges, tracked from the pinch's start)
     var _yRange = me.chartArea ? me.chartArea.bottom - me.chartArea.top : 0;
     var _yr = pinch.yRanges, _yChanged = false;
     if (panDY !== 0 && _yRange > 0 && _yr.length && me.options.panEnabled !== false && me.options.yAxisPanEnabled !== false) {
@@ -1331,7 +1332,9 @@
       _yChanged = true;
     }
     if (_scaleY !== 1 && me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false && _yr.length) {
-      _yr.forEach(function (r) { var _mid = (r[0] + r[1]) / 2, _half = (r[1] - r[0]) / 2 * _scaleY; r[0] = _mid - _half; r[1] = _mid + _half; });
+      // (where the fingers' centre is along the plot area's height: 0 at its bottom, 1 at its top)
+      var _f = Math.min(Math.max((me.chartArea.bottom - _n.centerY) / _yRange, 0), 1);
+      _yr.forEach(function (r) { var _at = r[0] + _f * (r[1] - r[0]); r[0] = _at + (r[0] - _at) * _scaleY; r[1] = _at + (r[1] - _at) * _scaleY; });
       _yChanged = true;
     }
     if (_yChanged) me._hecSetYRanges(_yr);
@@ -1773,21 +1776,23 @@
     // ── What is under a point: the targets, the zones, the elements, the curves (the picking rule, _hecPick) ──
 
     // The small targets at the top: the floating icons — the lock+handle zone's box (around
-    // the handle, the padlock or handleButtons shown) and the chain icon's box, where they
-    // are drawn — then the legend's labels (within the legend's band). The icons are drawn
+    // the handle, the padlock or handleButtons shown), the chain icon's box and the close
+    // button's, where they are drawn — then the legend's labels (within the legend's band). The icons are drawn
     // over the graph (legend, Y labels, plot area: wherever they fit), so they take the
     // gesture first: on an icon's box or within the largest picking margin around it
     // (_hecIconMargin: 24px boxes, 36px targets by default), the
     // nearest icon (_hecPick, between the two); elsewhere, a label picked (_hecPick): the
     // one under the point, else the nearest one if near enough and clearly nearer than
-    // the next. An icon not drawn takes nothing. → 'linkMarker', 'lockAndHandle', a
-    // legend label's index, -1 or PICK_BETWEEN.
+    // the next. An icon not drawn takes nothing. → 'linkMarker', 'lockAndHandle',
+    // 'closeButton', a legend label's index, -1 or PICK_BETWEEN.
     _hecTopTargetAt: function (x, y) {
       var me = this, rects = [], ids = [];
       var _lm = me._hecLinkMarkerRect();
       if (_lm) { rects.push({ x: _lm.left, y: _lm.top, width: _lm.width, height: _lm.height }); ids.push('linkMarker'); }
       var _lh = me._hecLockAndHandleRect();
       if (_lh) { rects.push(_lh); ids.push('lockAndHandle'); }
+      var _cb = me._hecCloseButtonRect();
+      if (_cb) { rects.push(_cb); ids.push('closeButton'); }
       var _i = _hecPick(x, y, rects, _hecIconMargin());
       if (_i !== -1) return _i >= 0 ? ids[_i] : _i;
       var legend = me.legend;
@@ -1880,11 +1885,11 @@
 
     // The zone of this chart a canvas-relative point is in — the payload's `zone`
     // (Chart Custom.js.md §2), so the card never reads this chart's layout itself:
-    // 'linkMarker', 'lockAndHandle', 'legend' (its band, whole width), 'yAxis' (left of
-    // the plot area), 'plot', or 'other'
+    // 'linkMarker', 'lockAndHandle', 'closeButton', 'legend' (its band, whole width),
+    // 'yAxis' (left of the plot area), 'plot', or 'other'
     _hecZoneAt: function (x, y) {
-      if (this._hecInLinkMarkerZone(x, y)) return 'linkMarker';
-      if (this._hecInLockAndHandleZone(x, y)) return 'lockAndHandle';
+      var _t = this._hecTopTargetAt(x, y);
+      if (_t === 'linkMarker' || _t === 'lockAndHandle' || _t === 'closeButton') return _t;
       var _l = this.legend, _a = this.chartArea;
       if (_l && _l.height > 0 && y >= _l.top && y <= _l.bottom) return 'legend';
       if (_a && y >= _a.top && y <= _a.bottom) {
@@ -2038,11 +2043,11 @@
       return payload;
     },
 
-    // On one of the controls drawn over the graph's top left corner (lock+handle, chain
-    // icon), as picked (_hecTopTargetAt): never a label's
+    // On one of the floating icons drawn over the graph's top (lock+handle, chain icon,
+    // close button), as picked (_hecTopTargetAt): never a label's
     _hecOnControl: function (x, y) {
       var _t = this._hecTopTargetAt(x, y);
-      return _t === 'lockAndHandle' || _t === 'linkMarker';
+      return _t === 'lockAndHandle' || _t === 'linkMarker' || _t === 'closeButton';
     },
 
     /**
@@ -2395,12 +2400,6 @@
       return { left: _left, top: -25, width: 24, height: 24 };
     },
 
-    // The chain icon, a floating icon: on its box, or within the icons' margin around it
-    // (_hecTopTargetAt)
-    _hecInLinkMarkerZone: function (x, y) {
-      return this._hecTopTargetAt(x, y) === 'linkMarker';
-    },
-
     // The chain icon itself: a relay zone like the others (_hecTouchOverlay) — its
     // gestures reach customEvent like any other on this chart, with zone 'linkMarker'
     // (the card merges the two graphs on a double-click). options.linkMarkerTitle:
@@ -2431,7 +2430,48 @@
       _el.title = me.options.linkMarkerTitle || '';
     },
 
-    // The floating icons' boxes (the chain icon's, the lock+handle zone's): half
+    // The close button (options.closeButtonVisible): a floating icon like the lock+handle
+    // zone's, mirrored at the top right — a round box of 24px, 4-28px high, 1px from the
+    // graph's right edge (canvas-relative); null when hidden
+    _hecCloseButtonRect: function () {
+      if (this.options.closeButtonVisible !== true || !this.width) return null;
+      return { x: this.width - 25, y: 4, width: 24, height: 24 };
+    },
+
+    // The close button itself (×): a relay zone like the chain icon (_hecTouchOverlay) —
+    // its gestures reach customEvent with zone 'closeButton' (the card removes the graph
+    // on a click). options.closeButtonTitle: its hover text, given by the card
+    _hecUpdateCloseButton: function () {
+      var me = this;
+      var _r = me.canvas && me._hecCloseButtonRect();
+      var _el = me._hecCloseButtonEl;
+      if (!_r) {
+        if (_el) _el.style.display = 'none';
+        return;
+      }
+      if (!_el) {
+        _el = me._hecTouchOverlay('_hecCloseButtonEl', 'pointer');
+        _el.style.zIndex = '10';
+        _el.style.alignItems = 'center';
+        _el.style.justifyContent = 'center';
+        _el.style.borderRadius = '50%';
+        _el.style.color = 'var(--primary-text-color)';
+        _el.style.fontSize = '16px';
+        _el.style.userSelect = 'none';
+        _el.textContent = '\u00D7';
+      }
+      me._hecAttachToCanvasParent(_el);
+      _el.style.display = 'flex';
+      _el.style.background = me._hecControlsBoxBackground();
+      _el.style.left = (me.canvas.offsetLeft + _r.x) + 'px';
+      _el.style.top = (me.canvas.offsetTop + _r.y) + 'px';
+      _el.style.width = _r.width + 'px';
+      _el.style.height = _r.height + 'px';
+      _el.title = me.options.closeButtonTitle || '';
+    },
+
+    // The floating icons' boxes (the chain icon's, the lock+handle zone's, the close
+    // button's): half
     // see-through — options.hecControlsBackdrop: as opaque as the Y labels' boxes
     _hecControlsBoxBackground: function () {
       return this.options.hecControlsBackdrop ? hecUi.background(this.canvas, hecUi.BOX_OPACITY) :
@@ -2536,6 +2576,13 @@
     _hecUpdateReveal: function (e) {
       if (this.options.labelTooltipEnabled === false) return;
       this._hecShowReveal(e && e.x !== null && e.y !== null ? this._hecRevealAt(e.x, e.y, false) : null, true);
+    },
+
+    // The width of the plot area in pixels — the chart's whole width before its first
+    // layout: the time axis' columns of pixels (the card decimates a curve to them)
+    hecPlotWidth: function () {
+      var A = this.chartArea;
+      return Math.round(A ? A.right - A.left : this.width || 0);
     },
 
     // ── The values over the graph (hecSetValues) ──

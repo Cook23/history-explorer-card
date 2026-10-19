@@ -4,6 +4,44 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.22] - 2026-10-19
+
+### Fixed — the page frozen by a long window, many graphs, the real time
+- Measured on a real setup (23 graphs, 37 entities, 6 months, `decimation: false`, Firefox): Home Assistant's answers were small (at most 6 MB) and the page free while it answered them. But each time the graphs were drawn again, the page froze for about 4 s — half of it the card working the values out, half Chart.js drawing every value — and that happened 25 times in 4 minutes: after each part of the window loaded, after each automatic refresh, and after each change of a shown entity. A click on the time range waited its turn for up to a minute
+- A change of a shown entity drew all the graphs again from their whole history, just to show its value next to its name (`showCurrentValues`, on by default). Its value, next to its name and over the graph (`showState`), is now updated alone, at once (`refreshCurrentValues`); the curves follow at the refresh
+- The automatic refresh is no sooner than 2 s after a change, as before, and now no sooner than five times what drawing the graphs again last took: the page is never kept busy by it more than a fifth of the time, however many graphs and values
+- The values' times are worked on as numbers — a date object was made for each value: the curves of a month of a value every 30 s worked out 4 times faster (0.6 s instead of 2.5 s)
+- A curve keeps at most four values for each column of pixels of its graph: the first, the lowest, the highest and the last (M4) — every value the screen can show: the curve drawn exactly as with all of them, to the pixel, every peak kept (`fast` kept one value now and then), on a grid of time that stays the same from one refresh, or one part of a long window, to the next. Whatever `decimation` says: with `false`, Chart.js drew hundreds of thousands of values onto the same pixels, 120 ms each time the graph was drawn for a month of two entities; 4 ms now, and that month shown in 1.4 s instead of 6.8 s.
+- A timeline merged into one *multiple* block every run of states shorter than a fixed length, set by the window: 1 h over a week, 4 h over a month — some 5 pixels, a state of 40 minutes over a week hidden though plainly visible; nothing below 2 days. It now merges only states following each other that are each narrower than 2 pixels — too thin to tell apart or to point at —, over any window; wider ones are always drawn, a short state alone keeps its color
+- `decimation` is now ignored (still accepted, on the card, a graph, an entity or in `entityOptions`): the card draws what the screen can show, and only that — no option needed, nothing to choose
+- Chart.js: `hecPlotWidth()` — the plot area's width, the card's columns of pixels
+- Tests (`features`): at most four values per column of pixels, the lowest and the highest of the window kept, in time order, with `decimation` `fast` and `false` alike; a timeline over a week — a state of 40 minutes drawn, states of 30 s in a row merged, one alone kept, the same with `decimation: false`; the parts of a long window joined (no gap longer than two columns); a change, its value in the legend at once, the curves not drawn again until the refresh; the refresh after 2 s, and after five times the last drawing's time when that's longer
+
+### New — Tests (beta) ▸ Performance
+- In the type menu's *Tests (beta)*: what the card costs on this device, with its entities and its window as they are — the graphs drawn again (3 times: the card's part and Chart.js', each chart's update), the window loaded again from Home Assistant (each request: its entities, the values it gave, how long it took to answer; each part put in the graphs), then 30 s of real time (the refreshes, what they cost); and the page's freezes all along (a pulse every 50 ms late by more than 250 ms). A report to copy, or to send as a GitHub issue. The card times its own steps only while the test runs (`setPerfRecorder`)
+- Test (`cards`): the test run from the menu, each part of its report
+
+### Fixed — the abbreviations of the legend
+- A name was shortened by removing the entity's device name, abbreviated only where two curves would then read the same — and only when the name started with it: a filtered sensor (lowpass_dt), with no device, kept `Météo-France Villeveyrac` whole, while its source, whose device is `Météo-France`, lost it. The start of a name is now abbreviated first, then removed: the device's name, or the first words it shares with another curve of the graph, whichever is longer — `Météo-France Villeveyrac Temperature (F)` and `Météo-France Villeveyrac Temperature` read `M-F V… Temperature (F)` and `M-F V… Temperature`, then `Temperature (F)` and `Temperature`. Four steps now: the frequent qualifiers' initials (`(F)`), the start abbreviated (its articles left out: `Salle de bain` → `S B…`), the articles removed, the start removed where two curves don't then read the same. The entity selector's lines are shortened the same way
+- Tests (`legend`): the screenshots' graph; a start never the whole name, a qualifier aside; thousands of names in linear time
+
+### Fixed — a legend's first line left empty
+- The first label was fitted to the room beside the controls without its value: `Ecowitt Pression absolue (Filtered)` fitted, `… (1015 hPa)` did not, and the label went to the second line, the first left empty. Its value is now counted: a shorter form that fits there is taken
+- Test (`features`): at every width from 260 to 520 px, every graph's first label on the first line
+
+### Changed — the close button, a floating icon
+- A graph's × was a button of the card, keeping 45 px on the right of the legend's first line. It is now drawn by Chart.js as the handle and the padlock are, mirrored at the top right: a round box of 24 px, taking the room it needs beside the legend's first line (29 px), none on a narrow card (over the labels); a gesture within its picking margin is its own (`closeButtonVisible`, `closeButtonTitle`, zone `closeButton`). `uiColors.closeButton` now only colors the bar interval selector
+- Test (`features`): on a graph added from the card only, where it's drawn, its room, a click removes the graph
+
+### Changed — the calendar starts the window; real time kept on every range change
+- The calendar now preselects the window's first day, as the date reads, and the day chosen starts the window, the range kept; a day whose window reaches the present brings real time back
+- Every change of the range without a point of its own keeps the window where one rule says (`applyTimeRange`, `_rangeAnchor`): in real time its end — the present on the right —, else its middle. The duration menu and the ± buttons did; the default range (a double-click on the magnifier) centred the window, leaving real time
+- Tests (`features`): the calendar's day starting the window; a day reaching the present, real time; the magnifier, the duration, the ± buttons in real time, the present kept; in the history, the middle kept
+
+### Fixed — a pinch zoomed the Y axis around its middle ([#142](https://github.com/Cook23/history-explorer-card/issues/142))
+- A vertical pinch zoomed each Y axis around its own middle: a point above it, under the fingers, went up and off the graph. It now zooms around the fingers' centre: what is under them stays there
+- Test (`touch`): a pinch near the top, the value under the fingers kept
+
 ## [v1.2.21] - 2026-10-15
 
 ### Fixed — the last one to speak: a change made on another device could be ignored, and overwritten

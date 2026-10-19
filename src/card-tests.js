@@ -1,7 +1,8 @@
 // Tests (beta): diagnostics opened from the type menu's Tests ▸ submenu. Each one runs in
 // the card's own context — the browser, or the Home Assistant app's web view, the card
-// is shown in — so that a user can report what that system really gives the card: a
-// dialog over the page, its report copied, or sent as a GitHub issue.
+// is shown in, with the user's own entities — so that a user can report what that system
+// really gives the card: a dialog over the page, its report copied, or sent as a GitHub
+// issue.
 
 import { Version } from "./version.js";
 
@@ -10,9 +11,10 @@ const ISSUE_URL = 'https://github.com/Cook23/history-explorer-card/issues/new';
 const ISSUE_BODY_MAX = 6000;
 
 // The tests, in the submenu's order: its entry (i18n key), its dialog's title, and
-// build(body), which fills the dialog's body and returns { report(), dispose() }
+// build(body, card), which fills the dialog's body and returns { report(), dispose() }
 export const CARD_TESTS = {
     pen: { label: 'ui.menu.test_pen', title: 'Pen events', build: buildPenEventsTest },
+    perf: { label: 'ui.menu.test_perf', title: 'Performance', build: buildPerformanceTest },
 };
 
 // ──────────────────────────────────────────────────────────────────────────────────────
@@ -40,7 +42,7 @@ button, a.btn { font: inherit; font-size: .9rem; padding: 6px 14px; border-radiu
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .76rem; font-variant-numeric: tabular-nums; }
 `;
 
-export function openCardTest(key)
+export function openCardTest(key, card)
 {
     const def = CARD_TESTS[key];
     if( !def ) return;
@@ -64,7 +66,7 @@ export function openCardTest(key)
         </div>`;
     const $ = id => root.getElementById(id);
     $('title').textContent = def.title;
-    const test = def.build(root.querySelector('.body'));
+    const test = def.build(root.querySelector('.body'), card);
     const report = () => `${def.title} — history-explorer-card ${Version}\n${navigator.userAgent}\n\n${test.report()}`;
 
     $('copy').addEventListener('click', () => {
@@ -279,5 +281,120 @@ function buildPenEventsTest(body)
             for( const t of PEN_PAGE_EVENTS ) document.removeEventListener(t, onEvent);
             document.removeEventListener('selectionchange', onSelectionChange);
         },
+    };
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────────
+// Performance: what the card costs on this device, with these entities — drawing the
+// graphs again, loading the window from Home Assistant, the real time — and when the page
+// froze meanwhile. The card times its own steps while it runs (setPerfRecorder)
+// ──────────────────────────────────────────────────────────────────────────────────────
+
+const PERF_REDRAWS = 3;            // the graphs drawn again that many times
+const PERF_LOAD_MAX_S = 300;       // a load given up after that long
+const PERF_REALTIME_S = 30;        // the real time watched that long
+const PERF_TICK_MS = 50;           // the page's pulse: a pulse late by more than
+const PERF_FREEZE_MS = 250;        // this is a freeze
+
+function buildPerformanceTest(body, card)
+{
+    body.insertAdjacentHTML('beforeend', `
+        <p class="lead">Measures what this card costs on this device, with its entities and its time window as they are now: the graphs drawn again (${PERF_REDRAWS} times), the window loaded again from Home Assistant, then ${PERF_REALTIME_S} s of real time. A freeze is a moment the page couldn't answer. Set the time window you want to measure first (the one that is slow); the test takes a minute or more — the page may freeze while it runs.</p>
+        <section class="box"><div class="row"><button id="start" type="button">Start</button><span class="hint" id="step"></span></div></section>
+        <section class="box"><h2>Results</h2><pre class="log mono" id="out" style="max-height:none;white-space:pre-wrap">— not run yet —</pre></section>`);
+    const $ = id => body.querySelector(`#${id}`);
+    const lines = [];
+    const out = text => { lines.push(text); $('out').textContent = lines.join('\n'); };
+    const ms = x => Math.round(x) + ' ms';
+    const sec = x => ( x / 1000 ).toFixed(1) + ' s';
+    let stopped = false, pulse = 0;
+
+    // (what is recorded: the card's steps, and the freezes of the page)
+    let rec = null;
+    const recorder = { add: (kind, t, info) => rec && rec.events.push({ kind, ms: t, info, at: performance.now() }) };
+    const record = () => {
+        rec = { events: [], freezes: [], t0: performance.now() };
+        let _last = performance.now();
+        clearInterval(pulse);
+        pulse = setInterval(() => { const n = performance.now(); if( n - _last > PERF_FREEZE_MS + PERF_TICK_MS ) rec.freezes.push(n - _last - PERF_TICK_MS); _last = n; }, PERF_TICK_MS);
+        card.setPerfRecorder(recorder);
+    };
+    const stop = () => { const r = rec; card.setPerfRecorder(null); clearInterval(pulse); rec = null; if( r ) r.ms = performance.now() - r.t0; return r; };
+    const of = (r, kind) => r.events.filter(e => e.kind === kind);
+    const sum = l => l.reduce((a, e) => a + ( e.ms ?? e ), 0);
+    const max = l => l.reduce((a, e) => Math.max(a, e.ms ?? e), 0);
+    const freezes = r => `${r.freezes.length} freezes, ${sec(sum(r.freezes))} in all (${Math.round(100 * sum(r.freezes) / r.ms)} % of the time), the longest ${ms(max(r.freezes))}`;
+    const wait = t => new Promise(res => setTimeout(res, t));
+    const step = text => { $('step').textContent = text; };
+
+    const setup = () => {
+        const P = card.pconfig, g = card.graphs;
+        const points = x => card.pointsShown(x);
+        out(`Window: ${card.startTime} → ${card.endTime}`);
+        out(`Options: refresh ${P.refreshEnabled ? 'automatic' : 'off'}, statistics ${card.statistics?.enabled ? 'on' : 'off'}`);
+        out(`Device: ${navigator.hardwareConcurrency ?? '?'} cores, ${window.innerWidth}×${window.innerHeight} px, pixel ratio ${window.devicePixelRatio}`);
+        out(`Graphs: ${g.length}, entities: ${g.reduce((a, x) => a + x.entities.length, 0)}, points drawn: ${g.reduce((a, x) => a + points(x), 0)}`);
+        for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points`);
+    };
+
+    const redraws = async () => {
+        out(`\n== The graphs drawn again (${PERF_REDRAWS} times)`);
+        for( let k = 0; k < PERF_REDRAWS && !stopped; k++ ) {
+            step(`Drawing again (${k + 1}/${PERF_REDRAWS})…`);
+            await wait(300);
+            record();
+            card.generateGraphDataFromCache();
+            const r = stop();
+            const _all = sum(of(r, 'redraw')), _chart = sum(of(r, 'chart'));
+            out(`  ${ms(_all)}: the card ${ms(_all - _chart)}, Chart.js ${ms(_chart)} (${of(r, 'chart').length} updates, the longest ${ms(max(of(r, 'chart')))})`);
+        }
+    };
+
+    const load = async () => {
+        out('\n== The window loaded again from Home Assistant');
+        step('Loading…');
+        record();
+        card.reloadHistory();
+        // (done once nothing has loaded for a second: the window's parts and its statistics)
+        let _idle = 0;
+        while( !stopped && _idle < 1000 && performance.now() - rec.t0 < PERF_LOAD_MAX_S * 1000 ) {
+            await wait(200);
+            _idle = card.state.loading || card.loader?.more ? 0 : _idle + 200;
+        }
+        const r = stop();
+        if( !r ) return;
+        const _req = of(r, 'request'), _parts = of(r, 'part');
+        out(`  ${sec(r.ms - _idle)} in all`);
+        for( const q of _req ) out(`  ${q.info.type}: ${q.info.entities} entities, ${q.info.values} values, answered in ${sec(q.ms)}`);
+        out(`  ${_parts.length} parts put in the graphs: ${ms(sum(_parts))} in all, the longest ${ms(max(_parts))} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
+        out(`  ${freezes(r)}`);
+    };
+
+    const realtime = async () => {
+        out(`\n== ${PERF_REALTIME_S} s of real time`);
+        step(`Watching the real time (${PERF_REALTIME_S} s)…`);
+        record();
+        for( let k = 0; k < PERF_REALTIME_S && !stopped; k++ ) await wait(1000);
+        const r = stop();
+        if( !r ) return;
+        const _d = of(r, 'redraw');
+        out(`  ${of(r, 'request').length} refreshes asked, the graphs drawn again ${_d.length} times: ${ms(sum(_d))} in all, the longest ${ms(max(_d))}`);
+        out(`  ${freezes(r)}`);
+    };
+
+    $('start').addEventListener('click', async () => {
+        $('start').disabled = true;
+        lines.length = 0;
+        setup();
+        await redraws();
+        if( !stopped ) await load();
+        if( !stopped ) await realtime();
+        step(stopped ? 'Stopped.' : 'Done: copy the report below.');
+        $('start').disabled = false;
+    });
+
+    return {
+        report: () => lines.join('\n'),
+        dispose: () => { stopped = true; stop(); },
     };
 }

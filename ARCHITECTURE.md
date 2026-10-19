@@ -70,7 +70,7 @@ show it, and the conductor starts the card and wires the parts together.
 | `src/legend-names.js` | The shorter forms of the curves' names, for a legend too narrow for them. |
 | `src/gesture-settings.js` | The gesture settings (long-press duration, precision, for a mouse or a pen and for a finger): their bounds, given to Chart.js (`Chart.defaults.global.gestures`). Saved by `card-storage.js`. |
 | `src/history-default-colors.js` | The default colors: the palette of the curves, the colors of the timeline states, the toolbar buttons'. |
-| `src/history-csv-exporter.js`, `src/languages.js`, `src/card-tests.js` | The CSV export; the card's texts in each language; *Tests (beta)* in the type menu (what a browser reports of a pen). |
+| `src/history-csv-exporter.js`, `src/languages.js`, `src/card-tests.js` | The CSV export; the card's texts in each language; *Tests (beta)* in the type menu (what a browser reports of a pen; what the card costs on this device). |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
 | **Toolbox** | |
 | `deps/chart-hec.js` | Everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, the legend's layout, the values over a graph, texts shown in full, `Chart.hecUi`. |

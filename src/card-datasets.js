@@ -3,10 +3,14 @@
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { parseColorValue, colorSpec, colorForValue, isColorSeries } from "./history-default-colors.js";
-import { seriesId, seriesOf, isDirectionAttribute } from "./history-series.js";
+import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL } from "./history-options.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
+
+// Pixels under which a timeline's states following each other are merged ('multiple',
+// _timelineRows)
+const MERGE_PX = 2;
 
 // The series an entity's `color` (in its one form, see normalizeColor) reads, or null: an
 // entity_id — or one of its attributes, after it (climate.salon.hvac_action) — whose state
@@ -96,19 +100,6 @@ export class CardDatasets
     // Graph data generation
     // --------------------------------------------------------------------------------------
 
-    momentCache(tc)
-    {
-        let r;
-        if( tc !== undefined ) {
-            if( !this.timeCache.has(tc) ) {
-                r = moment(tc);
-                this.timeCache.set(tc, r);
-            } else
-                r = this.timeCache.get(tc);
-        }
-        return r;
-    }
-
     // 'smart' line mode: a curve while the source reports, and a flat plateau — the last
     // known value held — over each of its silences, instead of a diagonal or a spline
     // bridging the gap to the next value. Same rules as the lowpass_dt integration:
@@ -160,7 +151,7 @@ export class CardDatasets
             m2   = 0.9 * m2   + 0.1 * dtStat * dtStat;
         }
 
-        const tOf = p => moment(p.x).valueOf();
+        const tOf = p => msOf(p.x);
         const out = s.slice();
 
         // Inserts the plateau start point (the last value before the silence) right before
@@ -191,6 +182,7 @@ export class CardDatasets
         return out;
     }
 
+    // The graphs' datasets from the history (result: each entity's, in the graphs' order)
     buildChartData(result, colorHistory)
     {
         // The time window drawn: now, its start and end, and which states are drawn
@@ -230,7 +222,7 @@ export class CardDatasets
 
                     if( _kind == 'line' ) {
                         const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
-                        s = this._lineSamples(e, result[id], process, scale, w);
+                        s = this._lineSamples(e, result[id], process, scale, w, g.chart.hecPlotWidth());
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
                         const _colorFn = this._colorFunction(e, colorHistory);
                         if( _colorFn ) this._applyPointColors(_dataset, e, s, _colorFn, scale, e.fill);
@@ -269,7 +261,7 @@ export class CardDatasets
             pt.yMax = sample.yMax * scale;
         } else if( fromCache && showMM === 'history' && this.minmaxCache?.[e.entity] ) {
             const mm = this.minmaxCache[e.entity];
-            const ts = moment(sample.last_changed).valueOf();
+            const ts = msOf(sample.last_changed);
             const bucket = Math.floor(ts / 3600000) * 3600000;
             const slot = mm[bucket] ?? mm[bucket - 3600000];
             if( slot ) { pt.yMin = slot.yMin * scale; pt.yMax = slot.yMax * scale; }
@@ -277,64 +269,55 @@ export class CardDatasets
         return pt;
     }
 
-    // A curve's points: its samples (decimated to the cluster size, 'fast' or 'accurate'),
-    // its last value carried to the end of the window (or now), its silences as plateaus in
-    // smart mode
-    _lineSamples(e, data, process, scale, w)
+    // A curve's points: its samples — when more than four for each column of pixels of the
+    // plot area (columns), in each column, on a grid of time fixed from 1970 (the same
+    // columns from one refresh, one part of a long window, to the next), its first, lowest,
+    // highest and last values (M4): every value the screen can show — the curve drawn as
+    // with all of them, to the pixel, every peak kept (the `decimation` option is ignored)
+    // —, its last value carried to the end of the window (or now), its silences as plateaus
+    // in smart mode
+    _lineSamples(e, data, process, scale, w, columns)
     {
         const n = data.length;
         let s = [];
-        const clusterMode = e.decimation ?? this.pconfig.decimation ?? 'fast';
+        const _width = ( w.end.valueOf() - w.start.valueOf() ) / columns;
 
-        if( n > 2 && clusterMode && this.activeRange.dataClusterSize > 0 ) {
+        // (each valid value, its time in ms, its sample's index)
+        const _values = [];
+        for( let i = 0; i < n; i++ ) {
+            const state = this.process(data[i].state, process);
+            if( w.isValid(state) ) _values.push({ t: msOf(data[i].last_changed), y: state * scale, i });
+        }
+        const _point = v => this._withMinMax({ x: v.t, y: v.y }, e, data[v.i], scale);
 
-            let last_time = this.momentCache(data[0].last_changed);
-            let max_state = null, max_time = null;
-            let min_state = null, min_time = null;
-
-            for( let i = 0; i < n; i++ ) {
-                let state = this.process(data[i].state, process);
-                if( w.isValid(state) ) {
-                    state *= scale;
-                    let this_time = this.momentCache(data[i].last_changed);
-                    if( clusterMode == 'accurate' ) {
-                        if( max_state === null || state > max_state ) { max_state = state; max_time = this_time; }
-                        if( min_state === null || state < min_state ) { min_state = state; min_time = this_time; }
-                    }
-                    if( !i || this_time.diff(last_time) >= this.activeRange.dataClusterSize ) {
-                        if( clusterMode == 'accurate' ) {
-                            if( min_time < max_time ) {
-                                s.push({ x: min_time, y: min_state});
-                                s.push({ x: max_time, y: max_state});
-                            } else {
-                                s.push({ x: max_time, y: max_state});
-                                s.push({ x: min_time, y: min_state});
-                            }
-                        } else
-                            s.push({ x: this_time, y: state});
-                        last_time = this_time;
-                        max_state = min_state = null;
-                    }
-                }
+        if( columns > 0 && _width > 0 && _values.length > 4 * columns ) {
+            let key = null, first, low, high, last;
+            const flush = () => {
+                if( key === null ) return;
+                for( const v of [first, low, high, last].sort((a, b) => a.t - b.t || a.i - b.i) )
+                    if( !s.length || s[s.length - 1]._i !== v.i ) { const p = _point(v); p._i = v.i; s.push(p); }
+            };
+            for( const v of _values ) {
+                const k = Math.floor(v.t / _width);
+                if( k !== key ) { flush(); key = k; first = low = high = last = v; continue; }
+                if( v.y < low.y ) low = v;
+                if( v.y > high.y ) high = v;
+                last = v;
             }
-
+            flush();
+            for( const p of s ) delete p._i;
         } else {
-
-            for( let i = 0; i < n; i++ ) {
-                const state = this.process(data[i].state, process);
-                if( w.isValid(state) )
-                    s.push(this._withMinMax({ x: data[i].last_changed, y: state * scale }, e, data[i], scale));
-            }
+            s = _values.map(_point);
         }
 
         // The last value carried to the end of the window, or to now when the window
         // reaches it
         let _extended = false;
         const _until = ( w.now > w.end ) ? w.end : w.now;
-        if( s.length > 0 && moment(s[s.length-1].x) < _until ) {
+        if( s.length > 0 && s[s.length-1].x < _until.valueOf() ) {
             const state = this.process(data[n-1].state, process);
             if( w.isValid(state) ) {
-                s.push(this._withMinMax({ x: _until, y: state * scale }, e, data[n-1], scale, false));
+                s.push(this._withMinMax({ x: _until.valueOf(), y: state * scale }, e, data[n-1], scale, false));
                 _extended = true;
             }
         }
@@ -346,7 +329,7 @@ export class CardDatasets
                 const state = this.process(data[i].state, process);
                 if( !w.isValid(state) ) continue;
                 const y = state * scale;
-                if( !isNaN(y) ) _raw.push({ t: moment(data[i].last_changed).valueOf(), y });
+                if( !isNaN(y) ) _raw.push({ t: msOf(data[i].last_changed), y });
             }
             s = this._applySilencePlateaus(s, _raw, _extended);
         }
@@ -375,7 +358,7 @@ export class CardDatasets
         let t = moment(w.start).startOf(_interval.start);
 
         // Search for the first state in the time range
-        while( i < n && moment(data[i].last_changed) <= t ) {
+        while( i < n && msOf(data[i].last_changed) <= t.valueOf() ) {
             y0 = this.process(data[i++].state, process) * 1.0;
         }
 
@@ -383,9 +366,10 @@ export class CardDatasets
         // Add them to the graph with a half interval time offset, so that the stacks align at the center of their respective intervals
         for( ; t <= w.end + td; ) {
             let te = moment(t).add(td);
+            const _te = te.valueOf();
             y1 = y0;
             let d = 0;
-            while( i < n && this.momentCache(data[i].last_changed) < te ) {
+            while( i < n && msOf(data[i].last_changed) < _te ) {
                 const state = this.process(data[i].state, process) * 1.0;
                 if( !isNaN(state) ) {
                     if( !netBars && state < y1 ) {
@@ -407,16 +391,17 @@ export class CardDatasets
         return { s, bcol };
     }
 
-    // A timeline's or arrowline's rows: [start, end, state] blocks within the window, the
-    // blocks shorter than the cluster size merged into one ('multiple') on a timeline
+    // A timeline's or arrowline's rows: [start, end, state] blocks within the window — on a
+    // timeline, states following each other that are each narrower than MERGE_PX pixels
+    // merged into one block ('multiple'): too thin to tell apart or to point at, unlike a
+    // wider one, always drawn; a short state alone keeps its own. Never on an arrowline,
+    // nor with a process function (its states aren't shown as such)
     _timelineRows(g, e, data, process, w)
     {
         const n = data.length;
         const s = [];
-        const clusterMode = e.decimation ?? this.pconfig.decimation ?? 'fast';
-        let enableClustering = clusterMode != false;
-
-        if( g.type == 'arrowline' || process ) enableClustering = false;
+        const _start = w.start.valueOf(), _end = w.end.valueOf();
+        const _merge = g.type == 'arrowline' || process ? 0 : MERGE_PX * ( _end - _start ) / Math.max(1, g.chart.hecPlotWidth());
 
         let merged = 0;
         let mt0, mt1;
@@ -444,21 +429,16 @@ export class CardDatasets
 
             }
 
-            let moment_t0 = this.momentCache(t0);
-            let moment_t1 = ( t1 === m_max ) ? moment(t1) : this.momentCache(t1);
-
-            if( !enableClustering || moment_t1.diff(moment_t0) >= this.activeRange.dataClusterSize || i == n-1 ) {
-                // Larger than merge limit, finish a potential current merge before proceeding with new block
+            if( msOf(t1) - msOf(t0) >= _merge || i == n-1 ) {
+                // Wide enough, finish a potential current merge before proceeding with new block
                 // Also stop merging when hitting the last state block regardless of size, otherwise it wont be committed
                 if( merged > 0 ) {
                     t0 = mt0;
                     t1 = mt1;
-                    moment_t0 = moment(t0);
-                    moment_t1 = moment(t1);
                     i--;
                 }
             } else {
-                // Below merge limit, start merge (keep the first state for possible single block merges) or extend current one
+                // Too narrow, start merge (keep the first state for possible single block merges) or extend current one
                 if( !merged ) { mt0 = t0; state = this.processRaw(data[i].state, process); }
                 mt1 = t1;
                 merged++;
@@ -466,10 +446,10 @@ export class CardDatasets
             }
 
             // Add the current block to the graph
-            if( moment_t1 >= w.start ) {
-                if( moment_t1 > w.end ) t1 = this.endTime;
-                if( moment_t0 > w.end ) break;
-                if( moment_t0 < w.start ) t0 = this.startTime;
+            if( msOf(t1) >= _start ) {
+                if( msOf(t1) > _end ) t1 = this.endTime;
+                if( msOf(t0) > _end ) break;
+                if( msOf(t0) < _start ) t0 = this.startTime;
                 s.push([t0, t1, ( merged > 1 ) ? 'multiple' : String(state)]);
             }
 

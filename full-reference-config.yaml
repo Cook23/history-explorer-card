@@ -105,9 +105,6 @@ graphs:
       # Default interval that a bar graph containing this entity is summarised over. See $.graphs.options.interval
       interval: "hourly"
 
-      # Overrides $.decimation for this entity specifically
-      decimation: "fast"
-
       # Can be used to define a custom JS expression to post-process the state data before it goes into the graph.
       # Should be defined as a JS expression taking one argument called `state` containing the value of the data
       # series at a given point
@@ -168,9 +165,6 @@ graphs:
 
     # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode), for every entity in this graph
     showMinMax: False
-
-    # Overrides $.decimation for every entity in this graph
-    decimation: "fast"
 
     # (bar graph only) If true, every entity in this graph is treated as net-metering — see $.graphs.entities.netBars above
     netBars: False
@@ -292,9 +286,6 @@ entityOptions:
     # Default interval of the graph created when a user adds this entity. See $.graphs.options.interval
     interval: "hourly"
 
-    # Overrides $.decimation for this entity specifically
-    decimation: "fast"
-
 # Width of the Y-axis label area on the left side of the graph
 labelAreaWidth: 65
 
@@ -341,8 +332,9 @@ stateColorSeed: 137
 # Whether to use device-class dependent state names (e.g. Open/Closed, Detected/Clear) for state labels in timeline charts, or use the raw state values, or just hide the state labels. Can be 'auto', 'raw', or 'hide'
 stateTextMode: "auto"
 
-# Decimation is simplifying the history when viewing wider time ranges, for faster loading times and clearer data. Can be set to False (to disable decimation), "fast" (to do fast approximate decimation), or "accurate" (for accurate minmax preserving at all scales)
-decimation: "fast"
+# decimation: ignored since 1.2.22 (still accepted) — the card draws what the screen can show, and only that:
+# a curve's first, lowest, highest and last values in each column of pixels (M4), a timeline's
+# states narrower than 2 pixels in a row merged ('multiple')
 
 # How many decimals the values are written with, in tool tips, labels and over the graph: set, exactly that
 # many (1: 20.0); not set, at most 2. Also on a graph, an entity or in entityOptions
@@ -537,7 +529,8 @@ statistics:
 
 # Settings related to the colours of the UI
 uiColors:
-  # Which colour should the close button be, at the top of user-added graphs
+  # The background of the bar interval selector, at the top right of bar graphs (the close
+  # button of user-added graphs is drawn in a box like the handle's)
   closeButton: '#0000001f'
   # Color of the buttons. Page's '--primary-color' at 1f transparency
   buttons: '#03a9f41f'

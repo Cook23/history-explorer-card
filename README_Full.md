@@ -13,7 +13,7 @@
 
 > **(1.2) Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in the [complete list of options](#complete-list-of-entityoptions-properties).
 
-This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
+This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation (only what the screen can show is drawn) to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
@@ -77,7 +77,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Adding entities
 
 - **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry chooses it, as Enter does. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined — **(1.2)** then cancelled, or added as a second curve in another graph (the same entity in several YAML graphs too). `excludeFilterEntities` removes entities from what `filterEntities` lets through.
-- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*), sent as a report.
+- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*) and of what the card costs on the device (*Performance*), sent as a report.
 - **Attributes (1.2)** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes); a number followed by a unit read as that number in that unit; an attribute can also hold or pick a curve's `color`.
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
 
@@ -118,7 +118,7 @@ What is changed from the card is saved in your Home Assistant user account and s
 
 ### Interface
 
-The toolbar adapts its layout to the card's width — on a narrow card (a grid or a horizontal stack), the date, the range and the entity search each on a line of their own; menus and tooltips stay within the card and the screen, a tooltip's arrow on its point; the graph tooltip is an HTML element, readable at any size, closed as soon as a menu opens. **(1.2)** A legend too narrow for its labels shortens the names, all of a graph's alike, and keeps each value: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the entity's device name removed (abbreviated — `M-F V…` — where two curves would then read the same), the articles removed, then '…' before the value; the full name stays in the tooltip. The time labels that wouldn't fit side by side are skipped.
+The toolbar adapts its layout to the card's width — on a narrow card (a grid or a horizontal stack), the date, the range and the entity search each on a line of their own; menus and tooltips stay within the card and the screen, a tooltip's arrow on its point; the graph tooltip is an HTML element, readable at any size, closed as soon as a menu opens. **(1.2)** A legend too narrow for its labels shortens the names, all of a graph's alike, and keeps each value: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`); then the start of the name abbreviated — the entity's device name, or the first words it shares with another curve of the graph (`Météo-France Villeveyrac Temperature (F)` and `Météo-France Villeveyrac Temperature` → `M-F V… Temperature (F)` and `M-F V… Temperature`); the articles removed; that start removed, where two curves don't then read the same; then '…' before the value. The legend's first line, beside the graph's handle and close button, is never left empty: its first label too wide there, a shorter form that fits. The full name stays in the tooltip. The time labels that wouldn't fit side by side are skipped.
 
 ### Info panel
 
@@ -157,14 +157,14 @@ https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-
 When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown or plus / minus buttons) to zoom into or out of the history. You can also use the interactive zoom mode (magnifying glass icon) to select a region on a graph to zoom into. Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
 
 **(1.2)** Where a zoom keeps the time window depends on what you're doing:
-- **In real time** — the present shown, the window following it: the time range selector and the plus / minus buttons keep the present on the right. The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
+- **In real time** — the present shown, the window following it: every change of the range keeps the present on the right — the time range selector, the plus / minus buttons, the default range (a double click on the magnifier). The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
 - **Looking at the history**: the time range selector and the plus / minus buttons keep the middle of the window, whatever the duration; the wheel and a pinch zoom around the pointer or the fingers.
 
 Click or tap on a graph and drag left or right to slide it through time. The card will stream in the database as you move along. If you have a slow DB (like on an SD card), you may see empty parts on the chart that will progressively fill as the data comes in. The larger the shown time range, the more the effect is visible. So scrolling through entire weeks will generate more database accesses than scrolling through days or hours at a time, especially on slower CPUs, like phones.
 
 Once you release the mouse button after dragging (or release your finger from the chart), the card will automatically readjust the y axes on all charts to better reflect the new data. The card will also synchronize all other charts in the history to the same point in time. That way you will always see the same time range on all your data and everything will be aligned.
 
-**(1.2)** Clicking the date selector opens your browser's calendar: the day you choose ends the window shown, the range kept. A double click on the date selector brings you back to the current date and time (real time), without changing your zoom level. A double click on the magnifier brings the range back to the configured default range (`defaultTimeRange`).
+**(1.2)** The date shown is the window's first day. Clicking it opens your browser's calendar, that day preselected: the day you choose starts the window shown, the range kept — a day whose window reaches the present brings you back to real time. A double click on the date selector brings you back to the current date and time (real time), without changing your zoom level. A double click on the magnifier brings the range back to the configured default range (`defaultTimeRange`), in real time kept there.
 
 Click or tap a chart line or a state timeline to get a tooltip of the selected values or state. **(1.2)** A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip: its value nearest the pointer is shown, and follows the pointer; a click near another curve adds it, so several curves can show their values together. Leaving the curves, or a click outside them, closes it; a click beside the curves changes nothing. On bars and timelines, the bar or the state under the click (or just beside it). A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`: the YAML's value or the long-press, the last one to speak winning, kept on this device only (as the card's persistence options say for its fields — never synced across devices). Alt shows every point of the graph hovered on top of that, until it's released or the pointer leaves the graph. Outside the tooltip, hovering a curve (a mouse, or a pen above the screen) shows its value nearest the pointer along the time, its point alone, when the curve's points aren't shown — the curve picked as a click picks it, on its line or just beside it. **(1.2)** A text shortened or hidden — a legend's label shortened, a timeline's row name cut, a timeline's state too long for its bar — is shown in full where it is while hovered; a click or a tap on a row name or on a legend label shows it too, for a while.
 
@@ -226,7 +226,7 @@ excludeFilterEntities:
   - 'sensor.power_supply_test'
 ```
 
-Dynamically added entities can be individually removed by clicking the `x` close button next to them or all together using the option in the entity action dropdown menu:
+Dynamically added entities can be individually removed by clicking the `×` close button at the top right of their graph — **(1.2)** a round button drawn over the graph, like the handle — or all together using the option in the entity action dropdown menu:
 
 ![image](https://user-images.githubusercontent.com/60828821/186549959-cd3705b6-229a-46c5-abcf-6a9f3b675f0b.png)
 
@@ -238,7 +238,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
-- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
+- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; **(1.2.22)** *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
@@ -632,7 +632,7 @@ stateColors:
   input_text.air_quality: yellow        # Fallback, catches all states from this entity that are not 'good' or 'bad'
 ```
 
-There is a special virtual state that is added to all entities, the *multiple* state. This state substitutes an aggregation of multiple states on the timeline when they were merged due to data decimation. Like normal states, you can specify the color for this special state for individual entities, device classes, domains or globally.
+There is a special virtual state that is added to all entities, the *multiple* state. This state substitutes an aggregation of multiple states on the timeline when they were merged, each too thin to be seen (see [Data decimation](#data-decimation)). Like normal states, you can specify the color for this special state for individual entities, device classes, domains or globally.
 
 The random colors assigned to states not covered by `stateColors` are generated from a fixed seed. You can change this seed to get a different set of automatic colors:
 
@@ -663,11 +663,11 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **On desktop**, you can also drag directly on the Y axis label area (the left 65px of the graph) to pan the Y scale — the cursor changes to `↕` when hovering over that zone.
 
-**With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together, each around its own middle, so the curves keep their positions relative to each other; the padlock locks and releases both.
+**With two Y axes** (see [Grouping multiple entities into a single graph](#grouping-multiple-entities-into-a-single-graph)), dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together — Shift + wheel each around its own middle, the pinch around the fingers —, so the curves keep their positions relative to each other; the padlock locks and releases both.
 
 **(1.2) Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
 
-**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side.
+**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side.
 
 You can override the automatic y axis range with your own values for both fixed graphs defined in the YAML, as well as for dynamically added entities or device classes. The minimum and maximum Y values, as well as the tick step size can be manually overridden. Each setting works independently. You can, for example override the step size only, but leave the range on automatic.
 
@@ -988,9 +988,9 @@ graphs:
 **(1.2) A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen. In detail:
 - the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
 - the Y labels inside the plot, each in a box of the card's background 80 % opaque (opaque while the pointer is near them), at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
-- the handle, the padlock and the chain icon each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
+- the handle, the padlock, the chain icon and the close button each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
 - the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
-- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the device's name removed (abbreviated, `M-F V…`, where two curves would then read the same), the articles removed, then '…' before the value;
+- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the start of the name — the device's name, or the words shared with another curve — abbreviated (`M-F V…`), the articles removed, that start removed where two curves don't then read the same, then '…' before the value;
 - the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
 - a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
 
@@ -1101,7 +1101,7 @@ See [Persistence for specific entities](#persistence-for-specific-entities) for 
 
 The card can reflect changing values on the fly in two ways. Both can be combined if needed.
 
-Automatic refresh monitors the entities that are displayed in your graphs for changes and reloads their recent history — at most once every 2 seconds, however often they change. It's on by default; turn it off with `automatic: false` (the card then refreshes only when the page is reloaded, or at the interval below):
+Automatic refresh monitors the entities that are displayed in your graphs for changes and reloads their recent history — at most once every 2 seconds, however often they change, and **(1.2)** never sooner than five times what drawing the graphs again last took: many graphs over a long window are refreshed less often, the page never kept busy. Their current values (next to their names, `showCurrentValues`, and over the graph, `showState`) follow each change at once. It's on by default; turn it off with `automatic: false` (the card then refreshes only when the page is reloaded, or at the interval below):
 ```yaml
 type: custom:history-explorer-card
 refresh:
@@ -1136,33 +1136,18 @@ rounding: 1
 
 ### Data decimation
 
-The card will automatically reduce the data shown in the charts and remove details that would not be visible or useful at a given time range. For example, if you view a per-hour history, nothing will be removed and you will be able to explore the raw data, point by point. If you view an entire week at once, there's no need to show data that changed every few seconds, you couldn't even see it. The card will simplify the curves and make the experience a lot faster that way. 
+**(1.2.22)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance. It is still accepted, on the card, a graph, an entity or in `entityOptions` — your configuration keeps working —, and has no effect any more.
 
-This feature can be turned off in the options if you want, either globally or by entity. Two different decimation algorithms are available. By default, a fast approximate one is used, offering highest rendering performance and a relatively good approximation of the graph shape at lower zoom levels. Optionally, an accurate decimation mode can be enabled. It offers accurate representation of local minima and maxima, at all zoom ranges. But rendering will be slower. Decimation mode can be selected globally at the card level, or per entity via `entityOptions`.
+A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. The card keeps what the screen can show, and only that:
 
-```yaml
-type: custom:history-explorer-card
-decimation: fast        # Fast approximate decimation, good balance between speed and accuracy. The default.
-                        # or: accurate — accurate minmax preserving at all scales
-                        # or: false — no decimation, the raw sensor data at all scales (very slow)
-```
+- **Curves — M4.** The graph's width is cut into columns of one pixel each, on a grid of time fixed once and for all (the same columns from one refresh, or one part of a long window, to the next). In each column with more than four values, the card keeps four of them: the **first**, the **lowest**, the **highest** and the **last**. A line drawn through them covers exactly the same pixels as one drawn through every value: the vertical extent of each column (its lowest and highest), and how it joins the column before and the one after (its first and last). Every peak and every dip is kept, even a single value. A column with four values or fewer keeps them all: zoomed in, every value is there, point by point. Over a week on 900 pixels, at most some 3 600 values per curve are drawn, whatever the sensor's rate.
+- **Timelines — merged under 2 pixels.** States following each other that are each narrower than 2 pixels — too thin to tell apart, or to point at — are merged into one *multiple* block; zoom in and they appear. A state 2 pixels wide or more is always drawn, and a short state alone, between two longer ones, keeps its own color. A timeline of directions (`arrowline`), or with a `process` function, is never merged.
 
 ![image](https://user-images.githubusercontent.com/60828821/203882385-461d3376-58e1-4344-861f-852c150bd01a.png)
 
-Decimation works on state timelines by merging very small state changes into 'multiple' sections when they can't be seen individually anymore. Zoom into the timeline and the details will appear. The color used for the multiple sections can be adjusted per graph.
+The color used for the *multiple* sections can be adjusted per graph.
 
 ![history-panel-timeline-multiple](https://github.com/alexarch21/history-explorer-card/raw/main/images/screenshots/history-panel-timeline-multiple.png)
-
-Per-entity decimation example:
-
-```yaml
-type: custom:history-explorer-card
-entityOptions:
-  sensor.fast_sensor:
-    decimation: false    # always show raw data for this entity
-  temperature:
-    decimation: accurate # minmax preserving for all temperature sensors
-```
 
 ---
 
@@ -1224,7 +1209,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size |
 | `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | | | Graph height in pixels (overrides global height settings) |
-| `decimation` | string or false | | | Per-entity decimation mode: `fast`, `accurate`, or `false` to disable |
+| `decimation` | | | | **(1.2.22)** Ignored: see [Data decimation](#data-decimation) |
 | `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |
@@ -1263,7 +1248,7 @@ graphs:
         interpolation: steffen # this curve only
 ```
 
-`fill`, `showMinMax`, `showState`, `showStats`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `decimation`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
+`fill`, `showMinMax`, `showState`, `showStats`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1306,7 +1291,6 @@ entityOptions:
 
   - match: "sensor.*_energy*"
     type: bar
-    decimation: accurate
 
   - match: ["sensor.pressure*", "sensor.humidity*"]
     lineMode: lines
@@ -1390,7 +1374,7 @@ uiColors:
   labels: green
   buttons: '#80f00050'
   selector: 'rgba(255,255,255,255)'
-  closeButton: '#0000001f'
+  closeButton: '#0000001f'  # the bar interval selector's background
   cursorline: '#ff000080'   # Color of the vertical cursor line on line and bar graphs
 ```
 
@@ -1652,7 +1636,6 @@ uimode: dark
 stateColors:
   person.home: blue
   person.not_home: yellow
-decimation: false
 header: 'My sample history'
 entityOptions:
   - match: "sensor.*_power"
@@ -1722,7 +1705,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `decimation`, `circular`, `groupId`. `hidden` and `showPoints` are never synced across devices: `enable_multidevice_persistence` keeps them on this device only, as `enable_persistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden` and `showPoints` are never synced across devices: `enable_multidevice_persistence` keeps them on this device only, as `enable_persistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 

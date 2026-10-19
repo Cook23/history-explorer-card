@@ -67,20 +67,20 @@ export class CardTimeRange
         this.today(true);
     }
 
-    // The window ending at the end of day (YYYY-MM-DD, the calendar — openCalendar), the
-    // range kept
+    // The window starting at the start of day (YYYY-MM-DD, the calendar — openCalendar), as
+    // the toolbar's date shows it, the range kept; reaching the present, real time
     showDay(day)
     {
         if( this.state.loading || !day ) return;
-        const _ms = this.activeRange.timeRangeHours ? this.activeRange.timeRangeHours * 3600e3 : this.activeRange.timeRangeMinutes * 60e3;
-        const t1 = moment(day).add(1, 'day').startOf('day');
-        this.startTime = moment(t1).subtract(_ms, 'ms').format("YYYY-MM-DDTHH:mm:ss");
-        this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+        const t0 = moment(day).startOf('day');
+        if( moment(t0).add(this.timeRangeSeconds(), 'second') >= moment() ) return this.todayNoReset();
+        this.state.autoScroll = false;
+        this.moveTimeWindow(t0);
         this.applyTimeAxes();
-        this.updateHistory();
     }
 
-    // Back to the default range (defaultTimeRange) — a double-click on the magnifier
+    // Back to the default range (defaultTimeRange) — a double-click on the magnifier; in real
+    // time, kept there (applyTimeRange)
     defaultRange()
     {
         if( this.state.loading ) return;
@@ -131,24 +131,22 @@ export class CardTimeRange
             if( g.chart ) g.chart.options.zoomSelectMode = this.state.zoomMode;
     }
 
-    // The zoom buttons and the duration menu: in real time (the present shown, see isLive)
-    // the window keeps its end — the present stays on the right; looking at the history, it
-    // keeps its middle
+    // The zoom buttons and the duration menu: where the window goes, applyTimeRange's rule
     decZoom()
     {
-        this.decZoomStep(...this._zoomAnchor());
+        this.decZoomStep();
         this.writeLocalState();
     }
 
     incZoom()
     {
-        this.incZoomStep(...this._zoomAnchor());
+        this.incZoomStep();
         this.writeLocalState();
     }
 
     timeRangeSelected(event)
     {
-        this.setTimeRange(event.target.value, true, ...this._zoomAnchor());
+        this.setTimeRange(event.target.value, true);
         this.writeLocalState();
     }
 
@@ -158,11 +156,14 @@ export class CardTimeRange
         return !!this.state.autoScroll && moment() >= moment(this.startTime);
     }
 
-    // Where a zoom without a point of its own keeps the window: [time, position along it] —
-    // its end in real time, its middle (null) otherwise
-    _zoomAnchor()
+    // Where a range change without a point of its own keeps the window: [time, position
+    // along it] — its end in real time: the present stays on the right; its middle when
+    // looking at the history. The one rule of every range change (applyTimeRange,
+    // applyTimeRangeMinutes): the buttons, the duration menu, the magnifier's default range,
+    // a zoom gesture in real time keeping the present (onTimeZoom)
+    _rangeAnchor()
     {
-        return this.isLive() ? [this.endTime, 1.0] : [null, 0.5];
+        return this.isLive() ? [this.endTime, 1.0] : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
     }
 
     // --------------------------------------------------------------------------------------
@@ -291,20 +292,15 @@ export class CardTimeRange
     }
 
     // The time range set, whatever is loading — the saved state applied (card-storage.js):
-    // a change taken is never dropped
+    // a change taken is never dropped. update: the window changed too — around t_center, at
+    // t_position along it, else where _rangeAnchor keeps it
     applyTimeRange(range, update, t_center = null, t_position = 0.5)
     {
-
-        this.timeCache.clear();
+        if( update && !t_center ) [t_center, t_position] = this._rangeAnchor();
 
         t_position = Math.min(Math.max(t_position, 0.0), 1.0);
 
         range = Math.max(range, 1);
-
-        const dataClusterSizes = { '48': 2, '72': 5, '96': 10, '120': 30, '144': 30, '168': 60, '336': 60, '504': 120, '720': 240, '2184': 240, '4368': 240, '8760': 360 };
-        const minute = 60000;
-
-        this.activeRange.dataClusterSize = ( range >= 48 ) ? dataClusterSizes[range] * minute : 0;
 
         this.activeRange.timeRangeHours = range;
         this.activeRange.timeRangeMinutes = 0;
@@ -317,22 +313,10 @@ export class CardTimeRange
 
             const _end0 = this.endTime;
 
-            if( t_center ) {
-
-                let t1 = moment(t_center).add(this.activeRange.timeRangeHours * (1.0 - t_position), "hour");
-                let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
-                this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-
-            } else {
-
-                let tm = (moment(this.endTime) + moment(this.startTime)) / 2;
-                let t1 = moment(tm).add(this.activeRange.timeRangeHours / 2, "hour");
-                let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
-                this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-                this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-
-            }
+            let t1 = moment(t_center).add(this.activeRange.timeRangeHours * (1.0 - t_position), "hour");
+            let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
+            this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
+            this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
 
             // (a window whose end moved follows the present only if it shows it)
             if( this.endTime !== _end0 ) this.followPresentIfShown();
@@ -358,7 +342,9 @@ export class CardTimeRange
         _time.stepSize = this.activeRange.tickStepSize;
         _time.min = this.startTime;
         _time.max = this.endTime;
+        const _t = performance.now();
         g.chart.update();
+        this.perf?.add('chart', performance.now() - _t);
     }
 
     applyTimeAxes()
@@ -373,14 +359,13 @@ export class CardTimeRange
     }
 
     // (as applyTimeRange)
-    applyTimeRangeMinutes(range, update, t_center, t_position = 0.5)
+    applyTimeRangeMinutes(range, update, t_center = null, t_position = 0.5)
     {
+        if( update && !t_center ) [t_center, t_position] = this._rangeAnchor();
 
         t_position = Math.min(Math.max(t_position, 0.0), 1.0);
 
         range = Math.max(range, 1);
-
-        this.activeRange.dataClusterSize = 0;
 
         this.activeRange.timeRangeHours = 0;
         this.activeRange.timeRangeMinutes = range;
@@ -392,9 +377,6 @@ export class CardTimeRange
         if( update ) {
 
             const _end0 = this.endTime;
-
-            if( !t_center )
-                t_center = (moment(this.startTime) + moment(this.endTime)) / 2;
 
             let t1 = moment(t_center).add(this.activeRange.timeRangeMinutes * (1.0 - t_position), "minute");
             let t0 = moment(t1).subtract(this.activeRange.timeRangeMinutes, "minute");

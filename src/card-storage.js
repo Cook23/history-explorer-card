@@ -93,7 +93,6 @@ const ENTITY_FIELD_SCOPE = {
     unit          : 'devices',
     process       : 'devices',
     netBars       : 'devices',
-    decimation    : 'devices',
     circular      : 'devices',
     groupId       : 'devices',
 };

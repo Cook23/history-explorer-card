@@ -4332,6 +4332,7 @@
             me._hecUpdateHandleButtons();
             me._hecUpdateControlsBackdrop();
             me._hecUpdateLinkMarker();
+            me._hecUpdateCloseButton();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
           },
@@ -11991,7 +11992,11 @@
                 var _ch = me.chart;
                 me.leftMargin = _ch && _ch.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
                   _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
-                me.rightMargin = me.options.rightMargin !== undefined ? me.options.rightMargin : 25;
+                // on the right, the close button's (closeButtonVisible), mirrored — none in a box
+                // over the labels, or without it — at least options.rightMargin, the room the
+                // card needs there
+                var _cb = _ch && !_ch.options.hecControlsBackdrop && _ch._hecCloseButtonRect && _ch._hecCloseButtonRect();
+                me.rightMargin = Math.max(me.options.rightMargin || 0, _cb ? me.width - _cb.x + 4 : 4);
                 // (fork) the margins of a line: the first one's, for what is drawn at both ends
                 // of the legend's top (the controls, the card's buttons — no taller than it);
                 // below it, 4 px — the whole width for the labels
@@ -12025,11 +12030,12 @@
                   var _items = me.legendItems.map(function (it) {
                     return { name: it.text, tail: Chart.hecLegendTail(it), forms: _shortNames[it.datasetIndex] };
                   });
-                  // (to a whole line below the first; the first label not fitting the first line,
-                  // between its margins, to that one if a shorter form fits there — rather than a
-                  // first line left empty — never cut for it)
+                  // (to a whole line below the first; the first label — its name and what follows
+                  // it, its value — not fitting the first line, between its margins, to that one
+                  // if a shorter form fits there — rather than a first line left empty — never
+                  // cut for it)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
-                  if (ctx.measureText(_fitted[0]).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
+                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
                   // (its name shortened, its full name kept: shown in place on a hover or a click
                   // — _hecRevealAt)
                   me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
