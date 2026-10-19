@@ -105,6 +105,19 @@ around it. Search globally for the general cause it shows — which rule, in whi
 produces it for every case — explain that cause to the user, and propose the general rule
 that fixes it. The example then only checks that the rule holds.
 
+## README structure — set by the user
+
+- The header holds the title, the links (README_Full, FORK_DESCRIPTION) and the disclaimer,
+  nothing else.
+- The table of contents is the list of the headings, each under its parent, with their own
+  titles — one entry per section, every section listed, no two entries to one place.
+- Each paragraph goes in the section of its subject (a color in Colors, an axis in the Y
+  axis section, a mini-graph-card option in mini-graph-card compatibility…), never where
+  it was convenient to add it.
+- After a README edit, check every link and every table-of-contents entry against the
+  anchors of GitHub's rendering (`gh api repos/…/contents/README.md?ref=<branch>` with
+  `Accept: application/vnd.github.html`).
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
