@@ -250,87 +250,86 @@ export class CardDatasets
         }
     }
 
-    // A point's min/max band (showMinMax): the sample's own (long-term statistics), else —
-    // for 'history' — the hour's from the min/max cache
-    _withMinMax(pt, e, sample, scale, fromCache = true)
+    // Whether entity e's band (showMinMax) is drawn for a point of a column with count
+    // values — stat: statistics in it: true, everywhere; 'statistics', on the statistics
+    // only; 'history' ('states'), on the history only; nowhere else (a single value of the
+    // history has no band: what's shown is what was recorded)
+    _bandWanted(e, stat, count)
     {
-        const showMM = e.showMinMax;
-        if( !showMM ) return pt;
-        if( sample.yMin != null ) {
-            pt.yMin = sample.yMin * scale;
-            pt.yMax = sample.yMax * scale;
-        } else if( fromCache && showMM === 'history' && this.minmaxCache?.[e.entity] ) {
-            const mm = this.minmaxCache[e.entity];
-            const ts = msOf(sample.last_changed);
-            const bucket = Math.floor(ts / 3600000) * 3600000;
-            const slot = mm[bucket] ?? mm[bucket - 3600000];
-            if( slot ) { pt.yMin = slot.yMin * scale; pt.yMax = slot.yMax * scale; }
-        }
-        return pt;
+        const m = e.showMinMax;
+        if( !m ) return false;
+        if( !stat && count < 2 ) return false;
+        return m === true || ( m === 'statistics' ? stat : ( m === 'history' || m === 'states' ) ? !stat : false );
     }
 
-    // A curve's points: its samples — when more than four for each column of pixels of the
-    // plot area (columns), in each column, on a grid of time fixed from 1970 (the same
-    // columns from one refresh, one part of a long window, to the next), its first, lowest,
-    // highest and last values (M4): every value the screen can show — the curve drawn as
-    // with all of them, to the pixel, every peak kept (the `decimation` option is ignored)
-    // —, its last value carried to the end of the window (or now), its silences as plateaus
-    // in smart mode
+    // A curve's points: its values — or, in each column of pixels of the plot area
+    // (columns) holding more than one (or an hour of statistics, its rows marked statistics),
+    // one point: their mean (weighted by how long each lasted) at the middle of the time
+    // they cover, with their min and max (columnMin, columnMax), that time (columnFrom, columnTo) and
+    // whether statistics are in it (statistics) — what the screen can show of them, the
+    // columns on a grid of time fixed from 1970 (the same from one refresh, or one part of
+    // a long window, to the next); the band between their min and max (yMin, yMax) where
+    // showMinMax wants it (_bandWanted) —, its last value carried to the end of the window
+    // (or now), its silences as plateaus in smart mode
     _lineSamples(e, data, process, scale, w, columns)
     {
         const n = data.length;
         let s = [];
-        const _width = ( w.end.valueOf() - w.start.valueOf() ) / columns;
+        const _width = columns > 0 ? ( w.end.valueOf() - w.start.valueOf() ) / columns : 0;
+        const _until = ( w.now > w.end ? w.end : w.now ).valueOf();
+        const _num = v => { const x = this.process(v, process); return w.isValid(x) ? x * scale : NaN; };
 
-        // (each valid value, its time in ms, its sample's index)
+        // (each valid value: its time, the time it lasts until, its value — statistics: its
+        // mean, min and max)
         const _values = [];
         for( let i = 0; i < n; i++ ) {
-            const state = this.process(data[i].state, process);
-            if( w.isValid(state) ) _values.push({ t: msOf(data[i].last_changed), y: state * scale, i });
+            const y = _num(data[i].state);
+            if( isNaN(y) ) continue;
+            const st = data[i].statistics;
+            const v = { t: msOf(data[i].last_changed), y, min: y, max: y, stat: !!st };
+            if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); }
+            _values.push(v);
         }
-        const _point = v => this._withMinMax({ x: v.t, y: v.y }, e, data[v.i], scale);
+        _values.forEach((v, k) => { v.end ??= k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t); });
 
-        if( columns > 0 && _width > 0 && _values.length > 4 * columns ) {
-            let key = null, first, low, high, last;
-            const flush = () => {
-                if( key === null ) return;
-                for( const v of [first, low, high, last].sort((a, b) => a.t - b.t || a.i - b.i) )
-                    if( !s.length || s[s.length - 1]._i !== v.i ) { const p = _point(v); p._i = v.i; s.push(p); }
-            };
-            for( const v of _values ) {
-                const k = Math.floor(v.t / _width);
-                if( k !== key ) { flush(); key = k; first = low = high = last = v; continue; }
-                if( v.y < low.y ) low = v;
-                if( v.y > high.y ) high = v;
-                last = v;
+        const _flush = group => {
+            if( group.length === 1 && !group[0].stat ) { s.push({ x: group[0].t, y: group[0].y }); return; }
+            // (a value of the history counts until the column's end at most; an hour of
+            // statistics, whole — it belongs to the column where it starts)
+            const _colEnd = ( Math.floor(group[0].t / _width) + 1 ) * _width;
+            const _end = v => v.stat || !_width ? v.end : Math.min(v.end, _colEnd);
+            let sum = 0, span = 0, min = Infinity, max = -Infinity, stat = false;
+            for( const v of group ) {
+                const d = Math.max(0, _end(v) - v.t) || 1;
+                sum += v.y * d; span += d;
+                min = Math.min(min, v.min); max = Math.max(max, v.max); stat ||= v.stat;
             }
-            flush();
-            for( const p of s ) delete p._i;
-        } else {
-            s = _values.map(_point);
+            const _from = group[0].t, _to = Math.max(_from, _end(group[group.length - 1]));
+            const p = { x: ( _from + _to ) / 2, y: sum / span, columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
+            if( this._bandWanted(e, stat, group.length) ) { p.yMin = min; p.yMax = max; }
+            s.push(p);
+        };
+        let group = [], key = null;
+        for( const v of _values ) {
+            const k = _width > 0 ? Math.floor(v.t / _width) : v.t;
+            if( k !== key && group.length ) { _flush(group); group = []; }
+            key = k;
+            group.push(v);
         }
+        if( group.length ) _flush(group);
 
         // The last value carried to the end of the window, or to now when the window
         // reaches it
         let _extended = false;
-        const _until = ( w.now > w.end ) ? w.end : w.now;
-        if( s.length > 0 && s[s.length-1].x < _until.valueOf() ) {
-            const state = this.process(data[n-1].state, process);
-            if( w.isValid(state) ) {
-                s.push(this._withMinMax({ x: _until.valueOf(), y: state * scale }, e, data[n-1], scale, false));
-                _extended = true;
-            }
+        if( s.length > 0 && s[s.length-1].x < _until && _values.length ) {
+            s.push({ x: _until, y: _values[_values.length - 1].y });
+            _extended = true;
         }
 
         if( (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
-            // Silences are detected on every recorded value (before decimation)
-            const _raw = [];
-            for( let i = 0; i < n; i++ ) {
-                const state = this.process(data[i].state, process);
-                if( !w.isValid(state) ) continue;
-                const y = state * scale;
-                if( !isNaN(y) ) _raw.push({ t: msOf(data[i].last_changed), y });
-            }
+            // Silences are detected on every value recorded (not on the columns, nor on the
+            // statistics: an hour of them is no silence)
+            const _raw = _values.filter(v => !v.stat).map(v => ({ t: v.t, y: v.y }));
             s = this._applySilencePlateaus(s, _raw, _extended);
         }
 

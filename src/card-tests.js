@@ -359,7 +359,7 @@ function buildPerformanceTest(body, card)
         let _idle = 0;
         while( !stopped && _idle < 1000 && performance.now() - rec.t0 < PERF_LOAD_MAX_S * 1000 ) {
             await wait(200);
-            _idle = card.state.loading || card.loader?.more ? 0 : _idle + 200;
+            _idle = card.state.loading ? 0 : _idle + 200;
         }
         const r = stop();
         if( !r ) return;

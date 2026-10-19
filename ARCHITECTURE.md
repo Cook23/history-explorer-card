@@ -57,8 +57,8 @@ show it, and the conductor starts the card and wires the parts together.
 | `src/card-config.js` | The YAML options applied, what Home Assistant and the entity options say of an entity (domain, device class, unit, default type, line mode, interpolated), the graphs built from the YAML. |
 | `src/card-storage.js` | What is kept between sessions and devices, and the "last one to speak wins" merge of local state, HA user data and YAML — the only part reading or writing either. What the whole page shares, read before any card exists, too: the gesture settings (`localGestures`), the info panel's switch and config (`infoPanelEnabled`, `infoPanelData`, `fetchInfoPanelData`). |
 | **Data** | |
-| `src/card-history.js` | The history data: the cache of what Home Assistant returned, filled on demand for the time window shown, refreshed; the graphs updated from it. |
-| `src/card-datasets.js` | From history data to what the graphs draw: line modes, bars by interval, circular values, timelines, colors. |
+| `src/card-history.js` | The history data: the cache of what Home Assistant returned (history and statistics, by day), filled on demand for the time window shown — the statistics first, the history where it tells more —, refreshed; the graphs updated from it. |
+| `src/card-datasets.js` | From history data to what the graphs draw: one point per column of pixels (mean, min, max) and the min/max band, line modes, bars by interval, circular values, timelines, colors. |
 | `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum (`showStats`) — computed and formatted, given to the chart to show (`hecSetValues`). |
 | **Outputs** | |
 | `src/card-graphs.js` | The graphs on the page: built from the store (each entity's defaults, the graph it joins), placed in the display order, rebuilt, removed, their controls (the handle, the chain icon). |

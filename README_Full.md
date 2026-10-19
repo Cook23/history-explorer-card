@@ -13,7 +13,7 @@
 
 > **(1.2) Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in the [complete list of options](#complete-list-of-entityoptions-properties).
 
-This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching and adaptive data decimation (only what the screen can show is drawn) to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
+This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching, long-term statistics first and the history only where it shows more, and draws only what the screen can show to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
@@ -92,7 +92,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 - **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among four algorithms. Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
 - **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — **(1.2)** for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
 - **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
-- **Display options** — `showMinMax` (min/max band from long-term statistics, or over the whole graph), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. **(1.2)** Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
+- **Display options** — `showMinMax` (a lighter min/max band around the mean curve: everywhere, or only where it comes from the statistics, or from the history), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. **(1.2)** Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
 - **Colors (1.2)** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
 
@@ -163,7 +163,7 @@ When the card is opened, it will display the history of the configured entities 
 
 Click or tap on a graph and drag left or right to slide it through time. The card will stream in the database as you move along. If you have a slow DB (like on an SD card), you may see empty parts on the chart that will progressively fill as the data comes in. The larger the shown time range, the more the effect is visible. So scrolling through entire weeks will generate more database accesses than scrolling through days or hours at a time, especially on slower CPUs, like phones.
 
-**(1.2)** A long time window is loaded a few days at a time, the most recent first: each part is drawn as it comes, the curves growing back in time. The next part is asked as soon as one arrives, so Home Assistant prepares it while the card draws; parts that arrive meanwhile are drawn together. The long-term statistics, beyond what the recorder keeps, are asked in one request: they are light, and each request costs Home Assistant about a second whatever its length.
+**(1.2.25)** The long-term statistics of the whole window are asked first, in one request, and drawn at once; the history is asked only where it shows more than them, at the window's resolution (see [Long term statistics](#long-term-statistics)). It is loaded a few days at a time, the most recent first, two parts at once: each part is drawn as it comes, replacing the statistics; parts that arrive meanwhile are drawn together.
 
 Once you release the mouse button after dragging (or release your finger from the chart), the card will automatically readjust the y axes on all charts to better reflect the new data. The card will also synchronize all other charts in the history to the same point in time. That way you will always see the same time range on all your data and everything will be aligned.
 
@@ -172,6 +172,8 @@ Once you release the mouse button after dragging (or release your finger from th
 Click or tap a chart line or a state timeline to get a tooltip of the selected values or state. **(1.2)** A click or a tap near a curve — not necessarily on one of its values — puts that curve in the tooltip: its value nearest the pointer is shown, and follows the pointer; a click near another curve adds it, so several curves can show their values together. Leaving the curves, or a click outside them, closes it; a click beside the curves changes nothing. On bars and timelines, the bar or the state under the click (or just beside it). A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`: the YAML's value or the long-press, the last one to speak winning, kept on this device only (as the card's persistence options say for its fields — never synced across devices). Alt shows every point of the graph hovered on top of that, until it's released or the pointer leaves the graph. Outside the tooltip, hovering a curve (a mouse, or a pen above the screen) shows its value nearest the pointer along the time, its point alone, when the curve's points aren't shown — the curve picked as a click picks it, on its line or just beside it. **(1.2)** A text shortened or hidden — a legend's label shortened, a timeline's row name cut, a timeline's state too long for its bar — is shown in full where it is while hovered; a click or a tap on a row name or on a legend label shows it too, for a while.
 
 The tooltip then follows the mouse — or a pen held above the screen, in the browsers that report it — as you move over the curves, until the pointer leaves the curves (or the pen moves away from the screen); hovering alone never opens it.
+
+**(1.2.25)** On a curve, the tooltip's first line tells where the value comes from: *History* and its time, or *Statistics* and the hour it covers. A point standing for several values (see [Data decimation](#data-decimation)) shows the interval of time it covers, `from – to` (the end's date only when it's another day), and `min / mean / max` with the unit.
 
 **With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same. To see what your browser or app reports of a pen, and report it: type menu, *Tests (beta) ▸ Pen events*.
 
@@ -437,7 +439,7 @@ Entities that represent a total (monotonically increasing or net metering) can b
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When adding an entity from the card, the type menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly` (**1.2**) or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at — **(1.2.25)** on the legend's first line, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly` (**1.2**) or `monthly`.
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`, so that the entity is shown as bars without picking it in the type menu.
 
@@ -801,7 +803,7 @@ How it's drawn:
 
 On an arrowline, `circular` sets what a full turn of the arrows is: with `circular: 2pi`, a value of 1.5708 points east, as 90 does by default; without a period (no `circular`, or `false`) a full turn is 360. An entity with state class `measurement_angle` and no unit is shown as a line, like a `measurement`.
 
-Limitations: Home Assistant's long-term statistics average angles as plain numbers (the mean of 359 and 1 is 180), which the card can't correct; the hourly min/max band of `showMinMax: history` isn't unwrapped.
+Limitations: Home Assistant's long-term statistics average angles as plain numbers (the mean of 359 and 1 is 180): **(1.2.25)** an angle is always drawn from its history, never from the statistics — past the history retention limit, its curve is blank.
 
 ### Line stroke style
 
@@ -889,39 +891,41 @@ entityOptions:
 
 ## Long term statistics
 
-When this setting is enabled, the card will try to pull in long term statistics for an entity once the limit of the history data is reached. The integration of both history sources is entirely seamless. You keep scrolling and zooming in or out of your data, as usual. The statistics and history data will be combined on the fly at all time ranges. This only works for entities that have long term statistics available. Graphs for all other entities will just become blank as soon as the history data limit is reached.
+**(1.2.25)** The card loads the long-term statistics first, and the history only where it shows more. The integration of both sources is entirely seamless: you keep scrolling and zooming in or out of your data, as usual, and they are combined on the fly at all time ranges.
+
+- **The statistics first.** The hourly statistics of the whole time window shown are asked in one request — light, whatever the window's length — and drawn at once.
+- **The history where it shows more.** A graph can't draw anything narrower than a column of pixels. When a column lasts an hour or more, an hour of statistics (its minimum, its mean, its maximum) tells as much as the history would, to the pixel, and the history isn't asked. When a column is shorter than an hour — a window of fewer hours than the graph has pixels, some five weeks on a graph 900 pixels wide —, the history is asked as well, a few days at a time, the most recent first, and replaces the statistics as it comes.
+- **The last two hours, always from the history.** Home Assistant writes an hour's statistics a few minutes after it ends: the days the last two hours fall on are always asked from the history, at the same time as the statistics — just after midnight, the day before too.
+- **Entities without statistics** — timelines, attributes, angles (`circular`: Home Assistant averages angles as plain numbers), entities without a state class — always come from the history: past the history retention limit, their graph is blank.
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-In the screenshot above, the blue graph is the outdoor temperature, the red graph is the temperature of a barn. The outdoor temperature has statistics available, the barn temperature does not. So you see the red line stopping where the history database retention period ends (Oct 11th). The outdoor temperature continues way past this point, as the card will turn to long term statistics. Note that the card will always prefer history data over long term statistics data if available, because it's more precise.
+In the screenshot above, the blue graph is the outdoor temperature, the red graph is the temperature of a barn. The outdoor temperature has statistics available, the barn temperature does not. So you see the red line stopping where the history database retention period ends (Oct 11th). The outdoor temperature continues way past this point, from its long term statistics.
 
-Long term statistics support is enabled by default and is configured to use average values and hourly intervals. You can optionally configure the feature (or turn it off) or even force the use of statistics only, effectively turning off the use of the short term history state DB, by adding the following to the card YAML:
+Long term statistics support is enabled by default, with hourly statistics. You can optionally configure the feature (or turn it off) or even force the use of statistics only, effectively turning off the use of the short term history state DB, by adding the following to the card YAML:
 
 ```yaml
 type: custom:history-explorer-card
 statistics:
-  enabled: true    # true is the default, use false to turn LTS support off.
-  mode: mean
+  enabled: true    # true is the default, use false to turn LTS support off (history only)
   period: hour     # reporting period. hour, day or month. Default is hour.
-  force: false     # set to true if you want to use long term statistics only
-  retention: 90    # optional: override the history retention period in days used to decide when to switch to LTS
+  force: false     # set to true if you want to use long term statistics only (still the history for the last two hours, and for entities without statistics)
 ```
 
-The (optional) mode parameter controls how the statistics data is processed before being integrated into the history stream. `mean` = use the average value, `min` = minimum value, `max` = max value. The default if the option is not present is mean. This setting does not apply to total_increasing values like energy sensors, which are calculated differently.
+**(1.2.25)** `mode` and `retention` are ignored (still accepted): a curve is always drawn through the mean, the minimum and maximum shown by the band (`showMinMax`) and in the tooltip; the card no longer needs to know the history retention, the statistics covering the whole window. A `total_increasing` sensor (energy…) is drawn from its state, as before.
 
 ### Showing the min/max statistical range
 
-The `showMinMax` option draws a shaded band between the min and max values available for an entity, using the entity's line color at low opacity — similar to the confidence band shown in the standard HA history panel. The mean or raw curve is always drawn on top of the band.
+The `showMinMax` option draws a lighter band, in the curve's color, between the minimum and the maximum of each column of pixels, around the curve of their mean — similar to the confidence band shown in the standard HA history panel.
 
-Three modes are available:
+| Value | Band |
+|---|---|
+| `false` / absent | No band (default) |
+| `true` | Everywhere: on the statistics (each hour's min and max) and on the history (the min and max of the values in each column) |
+| `statistics` | Only where the curve comes from the long-term statistics |
+| `history` / `states` | Only where the curve comes from the history |
 
-| Value | Band source | Description |
-|---|---|---|
-| `false` / absent | — | No band drawn (default) |
-| `true` / `statistics` | Long term statistics only | Band visible only on the portion of the graph fed by LTS (hourly/daily/monthly min and max). No band on the short term history portion. |
-| `history` / `states` | Statistics + history | Band visible on the full graph. On the statistics portion the LTS min/max is used. On the short term history portion, an additional statistics query is made in parallel to retrieve the corresponding hourly min/max, which is overlaid as a background band even while raw data points are shown in the foreground. |
-
-The `history` / `states` mode is more informative but requires an extra statistics API call for the visible time window, even when short term history data is available.
+**(1.2.25)** No extra request is made: the band comes from the data drawn. Where a column of pixels holds a single value of the history, it's drawn as is, without band — zoomed in, every value is there, point by point.
 
 ```yaml
 type: custom:history-explorer-card
@@ -930,10 +934,10 @@ graphs:
     entities:
       - entity: sensor.outside_temperature
         color: '#3e95cd'
-        showMinMax: statistics   # band on LTS portion only
+        showMinMax: true         # band everywhere
       - entity: sensor.outside_pressure
         color: '#3ecd95'
-        showMinMax: history      # band on full graph, including history portion
+        showMinMax: statistics   # band where the curve comes from the statistics only
 ```
 
 `showMinMax` is also available in `entityOptions`:
@@ -942,9 +946,9 @@ graphs:
 type: custom:history-explorer-card
 entityOptions:
   - match: "sensor.*temperature*"
-    showMinMax: statistics   # LTS band for every sensor with temperature in its id
+    showMinMax: true         # band for every sensor with temperature in its id
   - match: "sensor.*_power"
-    showMinMax: history      # full band for all power sensors
+    showMinMax: history      # band where the curve comes from the history, for all power sensors
     lineMode: lines
 ```
 
@@ -1018,7 +1022,7 @@ entities:
     y_axis: secondary
 ```
 
-Its options are aliases of the card's — names and values, each in the [complete list of options](#complete-list-of-entityoptions-properties) — mixed freely with the card's own names. `look: mini` only gives defaults: any option set, under either name, wins. Its forms are read as they are: `show:` (`show: { fill: false }` is `show_fill: false`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone; `unit`, `color` and `fill` on the card — every entity's. `height` is the graph's (the header's lines not counted); `update_interval` is the card's automatic refresh (on by default: each change, at most every 2 s). `smoothing: true` draws curves (`lineMode: curves`), with mini-graph-card's interpolation under `look: mini` (`interpolation: bspline`).
+Its options are aliases of the card's — names and values, each in the [complete list of options](#complete-list-of-entityoptions-properties) — mixed freely with the card's own names. `look: mini` only gives defaults: any option set, under either name, wins. Its forms are read as they are: `show:` (`show: { fill: false }` is `show_fill: false`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone; `unit`, `color` and `fill` on the card — every entity's. `height` is the graph's (the header's lines not counted); `update_interval` is the card's automatic refresh (on by default: each change, at most every 2 s). An entity's `attribute:` is the card's own (an attribute shown instead of the state, see [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)); `tap_action` is `tapAction`; a hover on a curve shows the value it's on over the graph, as mini-graph-card does (`showState`). `smoothing: true` draws curves (`lineMode: curves`), with mini-graph-card's interpolation under `look: mini` (`interpolation: bspline`).
 
 Written differently in the card's syntax:
 
@@ -1026,7 +1030,7 @@ Written differently in the card's syntax:
 |---|---|
 | `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
 
-Not yet in the card — they're being added, mini-graph-card's code as the example: `points_per_hour`, `aggregate_func`, `group_by`; `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` as a list; `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `group`, `loading_indicator`.
+Not yet in the card — they're being added, mini-graph-card's code as the example: `points_per_hour`, `aggregate_func`, `group_by`; `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` (a color, or a list of them in the entities' order — set `color` on each entity); `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`, `show.labels_secondary`; a sub-attribute (`attribute: forecast.0.temperature`); `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `compress`, `group`, `loading_indicator`.
 
 ## Default view and time ranges
 
@@ -1139,11 +1143,11 @@ rounding: 1
 
 ### Data decimation
 
-**(1.2.23)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance. It is still accepted, on the card, a graph, an entity or in `entityOptions` — your configuration keeps working —, and has no effect any more.
+**(1.2.23)** `decimation` is ignored: History Explorer draws what the screen can show, and only that, for a faithful drawing with the best display performance. It is still accepted, on the card, a graph, an entity or in `entityOptions` — your configuration keeps working —, and has no effect any more.
 
-A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. The card keeps what the screen can show, and only that:
+A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. So:
 
-- **Curves — M4.** The graph's width is cut into columns of one pixel each, on a grid of time fixed once and for all (the same columns from one refresh, or one part of a long window, to the next). In each column with more than four values, the card keeps four of them: the **first**, the **lowest**, the **highest** and the **last**. A line drawn through them covers exactly the same pixels as one drawn through every value: the vertical extent of each column (its lowest and highest), and how it joins the column before and the one after (its first and last). Every peak and every dip is kept, even a single value. A column with four values or fewer keeps them all: zoomed in, every value is there, point by point. Over a week on 900 pixels, at most some 3 600 values per curve are drawn, whatever the sensor's rate.
+- **Curves — one point per column of pixels.** **(1.2.25)** The graph's width is cut into columns of one pixel each. A column holding several values — of the history, or an hour of statistics — is drawn as one point: their **mean**, each value weighted by how long it lasted. Their **minimum** and **maximum** are kept with it: `showMinMax` draws them as a lighter band around the curve, and the tooltip shows `min / mean / max`, with the interval of time the point covers. A column holding a single value of the history draws it as is: zoomed in, every value is there, point by point. Whether the values come from the statistics or the history, see [Long term statistics](#long-term-statistics).
 - **Timelines — merged under 2 pixels.** States following each other that are each narrower than 2 pixels — too thin to tell apart, or to point at — are merged into one *multiple* block; zoom in and they appear. A state 2 pixels wide or more is always drawn, and a short state alone, between two longer ones, keeps its own color. A timeline of directions (`arrowline`), or with a `process` function, is never merged.
 
 ![image](https://user-images.githubusercontent.com/60828821/203882385-461d3376-58e1-4344-861f-852c150bd01a.png)
@@ -1218,7 +1222,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |
 | `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
 | `process` | string | | | Javascript expression to transform state values before display |
-| `showMinMax` | string or boolean | | | Display a shaded band between min and max values. See the *Showing the min/max statistical range* section for accepted values. |
+| `showMinMax` | string or boolean | | | A lighter band between the min and max of each column of pixels: `true` (everywhere), `statistics`, `history`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
 | `showTimeLabels` | boolean | | | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
 | `showState` | boolean | `show_state` | | **(1.2)** The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `showStats` | boolean, string or list | | | **(1.2)** The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |

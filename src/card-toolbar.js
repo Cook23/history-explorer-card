@@ -475,9 +475,11 @@ export class CardToolbar
         return this.ui.wideInterval ? 100 : 80;
     }
 
-    createIntervalSelectorHtml(gid, h, selected, optionStyle, rightOffset = 50)
+    // A bar graph's interval selector — placed by its chart, in its top row (Chart.js
+    // hecTopControl)
+    createIntervalSelectorHtml(gid, selected, optionStyle)
     {
-        return `<select id='bd-${gid}' style="position:absolute;right:${rightOffset}px;width:${this.intervalSelectorWidth()}px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
+        return `<select id='bd-${gid}' style="position:absolute;left:0;top:0;width:${this.intervalSelectorWidth()}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">
                     ${BAR_INTERVALS.map(i => `<option value="${i.code}" ${optionStyle} ${selected == i.code ? 'selected' : ''}>${i18n('ui.interval.' + i.label)}</option>`).join('')}
                 </select>`;
     }

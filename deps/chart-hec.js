@@ -436,8 +436,9 @@
 
   // ---------------------------------------------------------------------------
   // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
-  // points (those that have them, within the plot area), an area shaded in the
-  // dataset's line color, on the dataset's own Y axis
+  // points (those that have them, within the plot area — each run of them following each
+  // other an area of its own), shaded in the dataset's line color, on the dataset's own Y
+  // axis
   // (any CSS color — a name, #rgb, #rrggbb(aa), rgb(a)(), hsl(a)() — with that alpha; black otherwise)
   function hecColorWithAlpha(color, alpha) {
     var c = typeof color === 'string' ? helpers.color(color) : null;
@@ -456,23 +457,25 @@
         // (a dataset not filled yet holds {}, not a list)
         if (!yScale || !Array.isArray(points) || points.length < 2) return;
         var _clampY = function (v) { return Math.max(_a.top, Math.min(_a.bottom, yScale.getPixelForValue(v))); };
-        var band = [];
+        var runs = [], band = null;
         points.forEach(function (pt) {
-          if (pt.yMin == null || pt.yMax == null) return;
-          var px = xScale.getPixelForValue(pt.x);
-          if (px < _a.left - 1 || px > _a.right + 1) return;
+          var px = pt && pt.yMin != null && pt.yMax != null ? xScale.getPixelForValue(pt.x) : null;
+          if (px === null || px < _a.left - 1 || px > _a.right + 1) { band = null; return; }
+          if (!band) runs.push(band = []);
           band.push({ px: px, pyMin: _clampY(pt.yMin), pyMax: _clampY(pt.yMax) });
         });
-        if (band.length < 2) return;
         ctx.save();
-        ctx.beginPath();
-        // (yMax from left to right, then yMin back: a closed polygon)
-        ctx.moveTo(band[0].px, band[0].pyMax);
-        for (var i = 1; i < band.length; i++) ctx.lineTo(band[i].px, band[i].pyMax);
-        for (var j = band.length - 1; j >= 0; j--) ctx.lineTo(band[j].px, band[j].pyMin);
-        ctx.closePath();
         ctx.fillStyle = hecColorWithAlpha(dataset.borderColor, 0.15);
-        ctx.fill();
+        runs.forEach(function (b) {
+          if (b.length < 2) return;
+          ctx.beginPath();
+          // (yMax from left to right, then yMin back: a closed polygon)
+          ctx.moveTo(b[0].px, b[0].pyMax);
+          for (var i = 1; i < b.length; i++) ctx.lineTo(b[i].px, b[i].pyMax);
+          for (var j = b.length - 1; j >= 0; j--) ctx.lineTo(b[j].px, b[j].pyMin);
+          ctx.closePath();
+          ctx.fill();
+        });
         ctx.restore();
       });
     } });
@@ -2466,6 +2469,33 @@
       _el.style.width = _r.width + 'px';
       _el.style.height = _r.height + 'px';
       _el.title = me.options.closeButtonTitle || '';
+    },
+
+    // The width of the top control (options.hecTopControl: an element of the chart's owner,
+    // the bar interval selector) — 0 without one, or not shown
+    _hecTopControlWidth: function () {
+      var el = this.options.hecTopControl;
+      return el && el.isConnected && el.style.display !== 'none' ? el.offsetWidth : 0;
+    },
+
+    // The top control placed in the top row, between the floating icons, level with them:
+    // right before the close button (or the right edge) when the legend's first label fits
+    // beside it, else centred between the lock+handle zone and the close button, the first
+    // line left to them (_hecTopRowReserved, see the legend's fit)
+    _hecUpdateTopControl: function () {
+      var me = this, el = me.options.hecTopControl;
+      if (!el || !me.canvas || !me._hecTopControlWidth()) return;
+      me._hecAttachToCanvasParent(el);
+      var _w = el.offsetWidth, _h = el.offsetHeight;
+      var _lh = me._hecLockAndHandleRect(), _cb = me._hecCloseButtonRect();
+      var _right = _cb ? _cb.x - 8 : me.width - 4;
+      var _left = me._hecTopRowReserved ? ((_lh ? _lh.x + _lh.width : 0) + _right - _w) / 2 : _right - _w;
+      el.style.position = 'absolute';
+      el.style.margin = '0';
+      el.style.right = 'auto';
+      el.style.zIndex = '10';
+      el.style.left = (me.canvas.offsetLeft + Math.max(0, _left)) + 'px';
+      el.style.top = (me.canvas.offsetTop + 16 - _h / 2) + 'px';
     },
 
     // The floating icons' boxes (the chain icon's, the lock+handle zone's, the close

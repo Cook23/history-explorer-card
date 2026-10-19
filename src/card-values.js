@@ -20,9 +20,9 @@ export function curveStats(samples, t0, t1)
         const a = Math.max(samples[i].t, t0);
         const b = Math.min(i + 1 < samples.length ? samples[i + 1].t : t1, t1);
         if( b < a || ( b === a && samples[i].t < t0 ) ) continue;
-        const v = samples[i].v;
-        if( min === null || v < min.v ) min = { v, t: a };
-        if( max === null || v > max.v ) max = { v, t: a };
+        const v = samples[i].v, lo = samples[i].vMin ?? v, hi = samples[i].vMax ?? v;
+        if( min === null || lo < min.v ) min = { v: lo, t: a };
+        if( max === null || hi > max.v ) max = { v: hi, t: a };
         sum += v * ( b - a ); span += b - a;
     }
     return min === null ? null : { min, max, average: { v: span > 0 ? sum / span : min.v } };
@@ -43,7 +43,10 @@ export class CardValues
     {
         g.valueSamples ??= [];
         const _scale = g.chart.data.datasets[j]?.shownScale ?? 1;
-        g.valueSamples[j] = ( rows ?? [] ).map(r => ({ t: msOf(r.last_changed), v: Number(this.process(r.state, process)) * _scale }))
+        const _num = x => Number(this.process(x, process)) * _scale;
+        // (an hour of statistics: its mean, with its min and max)
+        g.valueSamples[j] = ( rows ?? [] ).map(r => r.statistics ? { t: msOf(r.last_changed), v: _num(r.state), vMin: _num(r.statistics.min), vMax: _num(r.statistics.max) }
+                                                              : { t: msOf(r.last_changed), v: _num(r.state) })
                                           .filter(p => !isNaN(p.v));
     }
 

@@ -71,6 +71,7 @@ export class HistoryCardState {
         this.i18n.styleTimeTicks       = '';
         this.i18n.styleDateTicks       = '';
         this.i18n.styleDateTimeTooltip = '';
+        this.i18n.styleTimeTooltip     = '';
 
         this.pconfig = {};
         this.pconfig.graphLabelColor      = '#333';
@@ -133,12 +134,7 @@ export class HistoryCardState {
         this.pconfig.defaultInfoPanel     = undefined;
         this.pconfig.gestures             = {};
 
-        this.loader = {};
-        this.loader.startTime    = 0;
-        this.loader.endTime      = 0;
-        this.loader.startIndex   = -1;
-        this.loader.endIndex     = -1;
-        this.loader.loadingStats = false;
+        this._requests = [];     // the requests to Home Assistant under way (card-history.js _ask)
 
         this.state = {};
         this.state.drag          = false;
@@ -174,7 +170,6 @@ export class HistoryCardState {
         this.startTime;
         this.endTime;
 
-        this.limitSlot = 0;
 
         this.cacheSize = 365 + 1;
         this.cache = [];
@@ -317,7 +312,8 @@ export class HistoryCardState {
         if( this._hass.locale?.time_format === '12' ) locale = 'en-US';
 
         this.i18n.styleTimeTicks = getLocalizedDateString(locale, { timeStyle: 'short' });
-        this.i18n.styleDateTimeTooltip = this.i18n.styleDateTicks + ', ' + getLocalizedDateString(locale, { timeStyle: 'medium' });
+        this.i18n.styleTimeTooltip = getLocalizedDateString(locale, { timeStyle: 'medium' });
+        this.i18n.styleDateTimeTooltip = this.i18n.styleDateTicks + ', ' + this.i18n.styleTimeTooltip;
 
         this.i18n.valid = true;
     }

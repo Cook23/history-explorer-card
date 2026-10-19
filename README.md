@@ -424,8 +424,8 @@ entityOptions:
 ```yaml
 entities:
   - entity: sensor.outside_temperature
-    showMinMax: statistics   # band on long-term statistics portion only
-                             # or: history — band on full graph including recent history
+    showMinMax: true         # a lighter min/max band around the mean curve, everywhere
+                             # or: statistics / history — only where the curve comes from them
 ```
 
 ### Unavailable data
@@ -535,15 +535,13 @@ entityOptions:
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default.
+The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. **(1.2.25)** The hourly statistics of the whole window come first, in one request, and are drawn at once; the history is loaded only where it shows more — when a column of pixels lasts less than an hour —, and always for the last two hours. `mode` and `retention` are ignored.
 
 ```yaml
 statistics:
   enabled: true
-  mode: mean       # mean, min, or max
   period: hour     # hour, day, or month
-  force: false     # true = use statistics only, no short-term history
-  retention: 90    # optional: override history retention period in days
+  force: false     # true = use statistics only (still the history for the last two hours)
 ```
 
 > For full details → [README_Full.md — Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics)
@@ -640,8 +638,8 @@ graphs:
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
-| `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
-| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.23)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
+| `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `true` (everywhere), `statistics` or `history` (only where the curve comes from them) |
+| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.23)** `decimation` is ignored: History Explorer draws one point per column of pixels — the mean of its values, their min and max kept for the band and the tooltip (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
@@ -750,10 +748,8 @@ timeTicks:
 
 statistics:
   enabled: true
-  mode: mean              # mean, min, max
   period: hour            # hour, day, month
   force: false
-  retention: 90           # optional: override history retention period in days
 ```
 
 The **cursor line** — a vertical line following the pointer over a graph — is drawn on timelines by default. `cursor.mode`: `auto` (the graph under the pointer), `all` (every graph of the card at once, to line events up) or `hide`; `cursor.types`: the graph types that show it (`timeline`, `line`, `bar`, `arrowline` or `all`). Details: [The cursor line](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#the-cursor-line).

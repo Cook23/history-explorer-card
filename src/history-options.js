@@ -113,8 +113,8 @@ const OPTION_VALUES = {
         const t = String(v).replace(/\s+/g, '');
         return /^\d+(\.\d+)?$/.test(t) ? t + 'h' : t;
     },
-    // (true is statistics, states is history)
-    showMinMax    : v => v === true ? 'statistics' : v === 'states' ? 'history' : v,
+    // (true: everywhere; states is history)
+    showMinMax    : v => v === 'states' ? 'history' : v,
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
     circular      : v => {

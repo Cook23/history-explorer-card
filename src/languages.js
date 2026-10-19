@@ -9,6 +9,8 @@ const lang_en =
         "label" : {
             "type_to_search" : "Add an entity",
             "loading" : "Loading…",
+            "source_history" : "History",
+            "source_statistics" : "Statistics",
             "error_retreiving" : "Entities unavailable",
             "already_exists" : "Already in graph",
             "add" : "Add",
@@ -101,6 +103,8 @@ const lang_fr =
         "label" : {
             "type_to_search" : "Ajouter une entité",
             "loading" : "Chargement…",
+            "source_history" : "Historique",
+            "source_statistics" : "Statistique",
             "error_retreiving" : "Entités indisponibles",
             "already_exists" : "Déjà dans un graphique",
             "add" : "Ajouter",
@@ -193,6 +197,8 @@ const lang_de =
         "label" : {
             "type_to_search" : "Entität hinzufügen",
             "loading" : "Laden…",
+            "source_history" : "Verlauf",
+            "source_statistics" : "Statistik",
             "error_retreiving" : "Entitäten nicht verfügbar",
             "already_exists" : "Bereits im Diagramm",
             "add" : "Hinzufügen",
@@ -285,6 +291,8 @@ const lang_es =
         "label" : {
             "type_to_search" : "Añadir entidad",
             "loading" : "Cargando…",
+            "source_history" : "Historial",
+            "source_statistics" : "Estadística",
             "error_retreiving" : "Entidades no disponibles",
             "already_exists" : "Ya en un gráfico",
             "add" : "Añadir",
@@ -377,6 +385,8 @@ const lang_nl =
         "label" : {
             "type_to_search" : "Entiteit toevoegen",
             "loading" : "Laden…",
+            "source_history" : "Geschiedenis",
+            "source_statistics" : "Statistiek",
             "error_retreiving" : "Entiteiten niet beschikbaar",
             "already_exists" : "Al in een grafiek",
             "add" : "Toevoegen",
@@ -469,6 +479,8 @@ const lang_pl =
         "label" : {
             "type_to_search" : "Dodaj encję",
             "loading" : "Ładowanie…",
+            "source_history" : "Historia",
+            "source_statistics" : "Statystyka",
             "error_retreiving" : "Encje niedostępne",
             "already_exists" : "Już na wykresie",
             "add" : "Dodaj",
@@ -561,6 +573,8 @@ const lang_sv =
         "label": {
             "type_to_search": "Lägg till entitet",
             "loading": "Laddar…",
+            "source_history" : "Historik",
+            "source_statistics" : "Statistik",
             "error_retreiving": "Enheter otillgängliga",
             "already_exists" : "Redan i ett diagram",
             "add" : "Lägg till",
@@ -653,6 +667,8 @@ const lang_da =
         "label" : {
             "type_to_search" : "Tilføj entitet",
             "loading" : "Indlæser…",
+            "source_history" : "Historik",
+            "source_statistics" : "Statistik",
             "error_retreiving" : "Entiteter utilgængelige",
             "already_exists" : "Allerede i et diagram",
             "add" : "Tilføj",
@@ -745,6 +761,8 @@ const lang_sk =
         "label" : {
             "type_to_search" : "Pridať entitu",
             "loading" : "Načítava sa…",
+            "source_history" : "História",
+            "source_statistics" : "Štatistika",
             "error_retreiving" : "Entity nedostupné",
             "already_exists" : "Už v grafe",
             "add" : "Pridať",
@@ -837,6 +855,8 @@ const lang_ru =
         "label" : {
             "type_to_search" : "Добавить объект",
             "loading" : "Загрузка…",
+            "source_history" : "История",
+            "source_statistics" : "Статистика",
             "error_retreiving" : "Объекты недоступны",
             "already_exists" : "Уже в графике",
             "add" : "Добавить",

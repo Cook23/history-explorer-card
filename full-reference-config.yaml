@@ -90,7 +90,7 @@ graphs:
       # Overrides the unit of measurement shown for this entity, instead of the one reported by HA
       unit: null
 
-      # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
+      # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them)
       showMinMax: False
 
       # (line graph only) If true, show permanent dots at each measurement point making up the line — the line
@@ -163,7 +163,7 @@ graphs:
     # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
     lineWidth: null
 
-    # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode), for every entity in this graph
+    # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them), for every entity in this graph
     showMinMax: False
 
     # (bar graph only) If true, every entity in this graph is treated as net-metering — see $.graphs.entities.netBars above
@@ -234,7 +234,7 @@ entityOptions:
     # (line graph only) The dots at the measurement points: true, all; hover, only the hovered one; false, none
     showPoints: hover
 
-    # (line graph only) If true, show a shaded band for the min/max statistical range (statistics or history mode)
+    # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them)
     showMinMax: False
 
     # Can be used to define a custom JS expression to post-process the state data before it goes into the graph. Should be defined as a JS expression taking one argument called `state` containing the value of the data series at a given point.
@@ -333,8 +333,8 @@ stateColorSeed: 137
 stateTextMode: "auto"
 
 # decimation: ignored since 1.2.23 (still accepted) — the card draws what the screen can show, and only that:
-# a curve's first, lowest, highest and last values in each column of pixels (M4), a timeline's
-# states narrower than 2 pixels in a row merged ('multiple')
+# one point per column of pixels for a curve (the mean of its values, their min and max kept for
+# showMinMax and the tooltip), a timeline's states narrower than 2 pixels in a row merged ('multiple')
 
 # How many decimals the values are written with, in tool tips, labels and over the graph: set, exactly that
 # many (1: 20.0); not set, at most 2. Also on a graph, an entity or in entityOptions
@@ -386,7 +386,8 @@ look: null
 dashMode: "solid"
 
 # (line graph only) Default min/max statistical band setting for every line graph on the card, unless
-# overridden at the graph or entity level. Can be: statistics, history, or False to disable
+# overridden at the graph or entity level. Can be: True (everywhere), statistics or history (only where
+# the curve comes from them), or False to disable
 showMinMax: False
 
 # (line graph only) Default "show sample points" setting for every line graph on the card, unless
@@ -518,13 +519,13 @@ csv:
 statistics:
   # Enabled by default, but you can use this setting to disable long term statistics.
   enabled: True
-  # Which type of processing to do on the long term statistics. Can be mean, min, or max
-  mode: 'mean'
-  # The card will attempt to automatically work out the retention time of your HA history recorder, but you can manually set it here. It must be less than the HA retention time. Data older than this will use the statistics API
-  retention: undefined
+  # The statistics of the whole window are loaded first; the history only where it shows more (a column
+  # of pixels shorter than the period), and always for the last two hours. mode and retention: ignored
+  # since 1.2.25 (still accepted)
   # Reporting period that statistics are averaged over. Can be hour, day, or month
   period: 'hour'
-  # If set to true, graph will use long term statistics only, forgoing normal history data
+  # If set to true, graph will use long term statistics only, forgoing normal history data (except the
+  # last two hours, and entities without statistics)
   force: undefined
 
 # Settings related to the colours of the UI
