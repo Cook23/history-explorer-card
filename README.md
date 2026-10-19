@@ -42,23 +42,41 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 
 ## Table of contents
 
-- [Version highlights](#-version-highlights)
+- [📋 Version highlights](#-version-highlights)
 - [Install](#install)
+  - [HACS (recommended)](#hacs-recommended)
+  - [Manual install](#manual-install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
 - [The options menu and the gesture settings](#the-options-menu-and-the-gesture-settings)
 - [Adding entities](#adding-entities)
 - [Choosing an entity's display type](#choosing-an-entitys-display-type)
 - [Interactive graph management](#interactive-graph-management)
+  - [Line graphs](#line-graphs)
+  - [Linked graphs](#linked-graphs)
+  - [Reordering graphs](#reordering-graphs)
+  - [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)
+  - [Timeline and arrowline graphs](#timeline-and-arrowline-graphs)
 - [Y axis control](#y-axis-control)
 - [Time range and display defaults](#time-range-and-display-defaults)
+  - [Real time](#real-time)
+  - [Default range and persistence](#default-range-and-persistence)
 - [Auto refresh](#auto-refresh)
 - [Line chart appearance](#line-chart-appearance)
+  - [Line mode](#line-mode)
+  - [Curve interpolation](#curve-interpolation)
+  - [Angles](#angles)
+  - [Stroke style](#stroke-style)
+  - [Individual sample dots](#individual-sample-dots)
+  - [Min/max statistical band](#minmax-statistical-band)
+  - [Unavailable data](#unavailable-data)
 - [Bar charts](#bar-charts)
 - [Timeline charts](#timeline-charts)
 - [Compass arrow graphs](#compass-arrow-graphs)
+- [Colors of curves and bars](#colors-of-curves-and-bars)
 - [Long term statistics](#long-term-statistics)
-- [Values over a graph, a compact look — replacing mini-graph-card](#values-over-a-graph-a-compact-look--replacing-mini-graph-card)
+- [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)
+- [mini-graph-card compatibility](#mini-graph-card-compatibility)
 - [Entity options](#entity-options)
 - [Card, graph, and entity-level options](#card-graph-and-entity-level-options)
 - [CSV export](#csv-export)
@@ -87,13 +105,13 @@ Add this repository as a custom repository in HACS: `https://github.com/Cook23/h
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
 - **Pan**: click and drag left or right on any graph
-- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region; double-click the magnifying glass to get the default range back. In real time (the present shown), every change of the range keeps the present on the right — the selector, the + / − buttons, the default range —, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; looking at the history, the selector and the buttons keep the middle of the window. The wheel and a pinch elsewhere zoom around the pointer or the fingers, and leave real time
+- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region; double-click the magnifying glass to get the default range back. In real time, a zoom keeps the present on the right — see [Real time](#real-time)
 - **Date navigation**: use the `<` `>` buttons top left. The date is the first day shown: click it to pick another one in your browser's calendar (a day whose window reaches the present: real time); double-click it to return to the present (real time again)
 - **Tooltip**: click or tap near a curve — not necessarily on one of its values — to see its value under the pointer; click near another one to see both. The tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves, or a click outside them. On bars and timelines, click or tap a bar or a state
 - **Points**: a long-press (or a right click) near a curve shows all its points, or hides them; hovering a curve's value (mouse, or a pen above the screen) shows its point alone
 - **Right click** on a label: opens its type menu, as a long-press does
 - **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
-- **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again right away (within the long-press duration) and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis around them; move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side
+- **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again right away (within the long-press duration) and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis around them; move them together to pan the time and the Y axis.
 
 ---
 
@@ -119,7 +137,7 @@ frontend:
 
 The `?hacstag=…` part isn't required — the file works without it — but with the exact URL of the card's dashboard resource (*Settings → Dashboards → ⋮ → Resources*) the browser loads the file once instead of twice, and gets the new version after each update. HACS changes it at each update: copy it again then.
 
-> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#overriding-the-ha-more-info-history-info-panel)
+> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
 
 ---
 
@@ -142,6 +160,8 @@ gestures:
 ```
 
 The long-press duration is also how soon a second press must follow a release to make a double-click, or a tap-then-drag. The precision is also how near a label, a button or a curve must be to be picked. The values are kept within reasonable bounds (200 to 2000 ms, 4 to 20 px). Whether set in the YAML or in the menu, the last one to speak wins, and they are kept on every device — as the info panel's switch.
+
+---
 
 ## Adding entities
 
@@ -203,7 +223,7 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 - on a long-press (or a right click) of a legend label (line/bar graphs) or of a timeline/arrowline label;
 - after choosing *Create a second curve* for an entity that's already shown (see below).
 
-Selecting an entity (or attribute) that's already shown says so and outlines its graph, then offers *Cancel* (pre-selected) or *Create a second curve*: the same curve can be shown in several graphs, each one set on its own — never twice in one graph from the card. In the YAML, the same entity written several times is a curve each time, in several graphs or in one (each with its own options — mini-graph-card's way of showing a sensor's highest, lowest and mean values).
+Selecting an entity (or attribute) that's already shown says so and outlines its graph, then offers *Cancel* (pre-selected) or *Create a second curve*: the same curve can be shown in several graphs, each one set on its own — never twice in one graph from the card.
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -257,7 +277,7 @@ A drop is saved only when both graphs are: a graph defined in YAML saves nothing
 
 ### Linked graphs
 
-A graph defined in YAML always shows all its entities together, whatever their units. With two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side, and `yAxis: left` on the graph (or the card) keeps all its curves on one axis. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
+A graph defined in YAML always shows all its entities together, whatever their units. Two groups of units get a Y axis each (see [Y axis control](#y-axis-control)). Curves and bars share the same graph too (curves drawn over the bars). Only timeline and arrowline entities end up in separate graphs, which stay *linked* (chain icon 🔗 between them).
 
 - **Double-click** a curve label of a YAML graph to show it in its own graph right below — whatever its unit, it stays linked to its YAML graph
 - **Drag** a curve label onto another graph of the same linked group to put it back
@@ -267,7 +287,7 @@ Linked graphs can always be merged back as long as their display types can share
 
 ### Reordering graphs
 
-Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On a touch screen, tap the ⠿ symbol, then press it again right away and drag. The handle, the padlock and the chain icon keep only the room they need beside the legend's first line; on a narrow card, none — each in a small box over the legend's labels: on the box a gesture is theirs, beside it the label's.
+Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
 
 Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
@@ -298,7 +318,9 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both. Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
+The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
+
+**Two Y axes** — with two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side, and `yAxis: left` on the graph (or the card) keeps all its curves on one axis. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Dragging the labels of one axis moves that one; Shift, the pinch and the padlock act on both.
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -318,6 +340,12 @@ graphs:
 ---
 
 ## Time range and display defaults
+
+### Real time
+
+The window showing the present, on its right, is in real time: the curves grow and slide as new values come, and the window never goes past the present (the date's `>` is greyed). Every change of the range keeps the present on the right — the selector, the + / − buttons, the default range —, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; elsewhere, the wheel and a pinch zoom around the pointer or the fingers, and leave real time (a double-click on the date brings it back). Looking at the history, the selector and the buttons keep the middle of the window.
+
+### Default range and persistence
 
 ```yaml
 type: custom:history-explorer-card
@@ -368,6 +396,10 @@ lineMode: lines    # curves, lines, stepped, or smart
 
 Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
 
+`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+
+![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
+
 ### Curve interpolation
 
 In `curves` and `smart` modes, the curve between two values is rebuilt by an interpolation algorithm, chosen with `interpolation` (on the card, a graph, an entity or in `entityOptions`) or from the type menu (**Interpolation ▸**):
@@ -385,11 +417,9 @@ interpolation: makima   # monotone (default), steffen, makima, catmullrom, or bs
 | `catmullrom` | The smoothest; may overshoot a little around sharp changes |
 | `bspline` | mini-graph-card's smoothing: never overshoots, the softest, but passes between the values, not through them (a peak drawn lower); `look: mini`'s default |
 
-`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+### Angles
 
 Angles (a wind direction, for example) are drawn without jumping across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`; an attribute in `°` only when its name says it's a direction, like a weather entity's `wind_bearing`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#circular-values-angles).
-
-![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
 ### Stroke style
 
@@ -429,7 +459,7 @@ By default the card interpolates over unavailable states. To show gaps instead:
 showUnavailable: true
 ```
 
-> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-interpolation-modes)
+> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-appearance)
 
 ---
 
@@ -446,41 +476,6 @@ entityOptions:
   sensor.rain_amount:
     type: bar
     interval: 10m
-```
-
-Colors that change with the value — thresholds, for curves and bars alike:
-```yaml
-entityOptions:
-  energy:
-    type: bar
-    color:
-      0: blue
-      1: green
-      1.5: red
-```
-
-Or with another entity: thresholds with an `entity` compare its value (a number or a state) at each point; `default` colors what they don't list. The legend shows the color now:
-```yaml
-graphs:
-  - type: line
-    entities:
-      - entity: sensor.heat_pump_power
-        color:
-          entity: sensor.heat_pump_mode
-          heat: red
-          cool: blue
-          default: grey
-```
-
-Or with one of an entity's attributes: `attribute` next to `entity` — or, for an attribute holding the color itself, the attribute written after the entity id (`color: climate.salon.led_color`):
-```yaml
-      - entity: climate.salon
-        attribute: current_temperature
-        color:
-          entity: climate.salon
-          attribute: hvac_action
-          heating: red
-          idle: blue
 ```
 
 > For full details (stacked bars, net metering) → [README_Full.md — Bar graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#bar-graphs-for-total-increasing-entities)
@@ -525,6 +520,47 @@ entityOptions:
 
 ---
 
+## Colors of curves and bars
+
+`color` takes a color, or colors that change with the value — thresholds, for curves and bars alike:
+```yaml
+entityOptions:
+  energy:
+    type: bar
+    color:
+      0: blue
+      1: green
+      1.5: red
+```
+
+Or with another entity: thresholds with an `entity` compare its value (a number or a state) at each point; `default` colors what they don't list. The legend shows the color now:
+```yaml
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.heat_pump_power
+        color:
+          entity: sensor.heat_pump_mode
+          heat: red
+          cool: blue
+          default: grey
+```
+
+Or with one of an entity's attributes: `attribute` next to `entity` — or, for an attribute holding the color itself, the attribute written after the entity id (`color: climate.salon.led_color`):
+```yaml
+      - entity: climate.salon
+        attribute: current_temperature
+        color:
+          entity: climate.salon
+          attribute: hvac_action
+          heating: red
+          idle: blue
+```
+
+> For full details → [README_Full.md — Colors of curves and bars](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#colors-of-curves-and-bars)
+
+---
+
 ## Long term statistics
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
@@ -550,7 +586,7 @@ statistics:
 
 ---
 
-## Values over a graph, a compact look — replacing mini-graph-card
+## Values over a graph, a compact look
 
 A graph can show, over its plot, each curve's value now (`showState`) and its minimum, average and maximum over the time window shown (`showStats`, the minimum and maximum with their time) — recomputed as the window moves: unlike mini-graph-card, the time can still be panned and zoomed. `look: mini` gives the look of mini-graph-card at once; any option set on the card still wins:
 
@@ -578,13 +614,17 @@ graphs:
 
 *Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
 
-**A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the handle, the padlock and the chain icon in boxes over the legend, taking no room; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen.
+**A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the handle, the padlock and the chain icon in boxes over the legend, taking no room (on the box a gesture is theirs, beside it the label's); the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen.
 
 > Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
-mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+---
 
-> A mini-graph-card replaced in place — `type: custom:history-explorer-card` and `look: mini`, its options kept → [README_Full.md — Replacing mini-graph-card](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#replacing-mini-graph-card)
+## mini-graph-card compatibility
+
+A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+
+> For full details, and what isn't implemented yet → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
 ---
 
@@ -601,7 +641,7 @@ entityOptions:
     type: arrowline
 ```
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#entity-options)
 
 ---
 
@@ -668,7 +708,7 @@ graphs:
 | `defaultTimeRange` | `hours_to_show` | | ✓ | | | The time range shown when the card opens — see [Time range](#time-range-and-display-defaults) |
 | `legendVisible` | `show_legend` | | ✓ | | | `false`: no legend |
 | `labelsVisible` | `show_labels` | | ✓ | | | `false`: no Y labels |
-| `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-a-compact-look--replacing-mini-graph-card) |
+| `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `entityOptions` | | | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
 | `filterEntities` / `excludeFilterEntities` | | | ✓ | | | Limit which entities appear in the entity picker — see *4 |
 | `exclude` | | | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
@@ -689,7 +729,7 @@ Every option is spelled the same at every level where it's accepted, and its ali
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml).
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#entity-options)
 
 ---
 
@@ -743,20 +783,13 @@ timelineBarSpacing: 40
 
 showCurrentValues: false  # live values next to legend labels are shown by default; set false to hide
 legendVisible: false       # hide the legend entirely
-rounding: 2               # decimal digits in tooltips
 
-lineWidth: 2              # default line width in pixels
 stateColorSeed: 137       # seed for automatic state colors
 
 timeTicks:
   density: high           # base density: low, medium, high, higher, highest
   densityOverride: higher # skip auto-density and force this level
   dateFormat: short       # normal (default) or short
-
-statistics:
-  enabled: true
-  period: hour            # hour, day, month
-  force: false
 ```
 
 The **cursor line** — a vertical line following the pointer over a graph — is drawn on timelines by default. `cursor.mode`: `auto` (the graph under the pointer), `all` (every graph of the card at once, to line events up) or `hide`; `cursor.types`: the graph types that show it (`timeline`, `line`, `bar`, `arrowline` or `all`). Details: [The cursor line](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#the-cursor-line).
@@ -810,9 +843,11 @@ An entity's attribute is shown with `attribute:` — a number as a curve (a numb
         unit: °C
 ```
 
-> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs)
-
 A graph's `options:` (or the graph itself) can also carry the entity options marked ✓ in the **Graph** column of [Card, graph, and entity-level options](#card-graph-and-entity-level-options), as a default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
+
+The same entity written several times is a curve each time, in several graphs or in one (each with its own options — mini-graph-card's way of showing a sensor's highest, lowest and mean values).
+
+> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs)
 
 ---
 
