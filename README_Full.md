@@ -44,7 +44,9 @@ This card offers a highly interactive and configurable way to view the history o
   - [Custom data processing](#custom-data-processing-functions)
 - [Long term statistics](#long-term-statistics)
 - [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)
+- [mini-graph-card compatibility](#mini-graph-card-compatibility)
   - [Replacing mini-graph-card](#replacing-mini-graph-card)
+  - [Not yet in the card](#not-yet-in-the-card)
 - [Display defaults](#default-view-and-time-ranges)
   - [Time range and offset](#default-view-and-time-ranges)
   - [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
@@ -1025,6 +1027,10 @@ The card follows its width as it changes (a screen turned, a window resized).
 
 > Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
+---
+
+## mini-graph-card compatibility
+
 ### Replacing mini-graph-card
 
 A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini` — its other lines unchanged.
@@ -1052,7 +1058,9 @@ Written differently in the card's syntax:
 
 `points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it.
 
-Not yet in the card — they're being added, mini-graph-card's code as the example: `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` (a color, or a list of them in the entities' order — set `color` on each entity); `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`, `show.labels_secondary`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `compress`, `group`, `loading_indicator`.
+### Not yet in the card
+
+These mini-graph-card options are being added, its code as the example: `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` (a color, or a list of them in the entities' order — set `color` on each entity); `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`, `show.labels_secondary`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `compress`, `group`, `loading_indicator`.
 
 ## Default view and time ranges
 
