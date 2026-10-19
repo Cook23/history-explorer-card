@@ -390,6 +390,14 @@ dashMode: "solid"
 # the curve comes from them), or False to disable
 showMinMax: False
 
+# (1.2.28) Aggregation (mini-graph-card's points_per_hour, group_by, aggregate_func), also on a graph,
+# an entity or in entityOptions: a point per group of time instead of one per column of pixels.
+# pointsPerHour: groups of 1 / pointsPerHour hours; groupBy: interval, hour or date; aggregateFunc: avg,
+# median, min, max, first, last, sum, delta or diff (avg: the mean weighted by how long each value lasted)
+# pointsPerHour: 0.5
+# groupBy: date
+# aggregateFunc: max
+
 # (line graph only) Default "show sample points" setting for every line graph on the card, unless
 # overridden at the graph or entity level: true, all; hover, only the hovered one; false, none
 showPoints: hover

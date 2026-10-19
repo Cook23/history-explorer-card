@@ -61,7 +61,9 @@ Object.assign(STATES['climate.salon'].attributes, { current_temperature: 19.5, t
 Object.assign(STATES['sun.sun'].attributes, { azimuth: 200.5, elevation: 30.2, rising: false });
 Object.assign(STATES['light.salon'].attributes, { brightness: 128, color_temp_kelvin: 3000, color_mode: 'color_temp', supported_color_modes: ['color_temp'] });
 Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, apparent_temperature: 29, temperature_unit: '°C', humidity: 85, pressure: 1016.4, pressure_unit: 'hPa',
-    wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3 });
+    wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3,
+    // (sub-attributes: a list of dictionaries)
+    forecast: [{ datetime: '2026-10-20T12:00:00+00:00', condition: 'sunny', temperature: 23.5, templow: 14 }, { datetime: '2026-10-21T12:00:00+00:00', condition: 'rainy', temperature: 18, templow: 12 }] });
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
@@ -94,13 +96,17 @@ function attributesAt(id,t){
 function history(d){
   // (nothing after now: Home Assistant has no future)
   const t0=Date.parse(d.start_time)/1000, t1=Math.min(d.end_time ? Date.parse(d.end_time)/1000 : Infinity, Date.now()/1000), r={};
-  const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
+  // (d.compiling: the statistics compiled when the history was still there — no retention)
+  const kept=MOCK.historyDays && !d.compiling ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
     if(!STATES[e]) continue;
     if(MOCK.rows?.[e]){ const now=Date.now()/1000, all=MOCK.rows[e].map(([ago,s])=>({s,lu:now-ago})).sort((a,b)=>a.lu-b.lu);
       const before=all.filter(p=>p.lu<t0).pop(), pts=all.filter(p=>p.lu>=t0 && p.lu<t1); if(before) pts.unshift({s:before.s,lu:t0}); if(pts.length) r[e]=pts; continue; }
     if(!MOCK.series){ const lu=Math.max(t0,kept); r[e]=[{s:STATES[e].state,lu,...(d.no_attributes?{}:{a:attributesAt(e,lu)})}]; continue; }
-    const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/(MOCK.historyStep||600))*(MOCK.historyStep||600); t<t1; t+=(MOCK.historyStep||600)) pts.push({s:valueAt(e,t),lu:t});
+    const st=MOCK.historyStep||600, from=Math.max(t0,kept);
+    const pts=[]; for(let t=Math.ceil(from/st)*st; t<t1; t+=st) pts.push({s:valueAt(e,t),lu:t});
+    // (the state in force at the start, as Home Assistant gives it: at the start's time)
+    if(from<t1 && (!pts.length || pts[0].lu>from)) pts.unshift({s:valueAt(e,Math.floor(from/st)*st),lu:from});
     // (a state the test set is the history from its time on)
     const tSet=STATES[e].setAt; if(tSet>=t0 && tSet<t1){ while(pts.length && pts[pts.length-1].lu>=tSet) pts.pop(); pts.push({s:STATES[e].state,lu:tSet}); }
     if(!d.no_attributes) for(const p of pts) p.a=attributesAt(e,p.lu);
@@ -110,22 +116,28 @@ function history(d){
 }
 // The statistics as Home Assistant compiles them: for an entity with a state_class, a
 // period (an hour; 5 minutes, d.period '5minute') once it has ended (and a few minutes for
-// the compiling, MOCK.statsLag, 10 min by default), from the mocked history's values in it
-// — a measurement its mean, min and max, a total its state at the period's end and its
-// sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
+// the compiling, MOCK.statsLag, 10 min by default), from the mocked history — a
+// measurement its mean (weighted by time, the state in force at its start included), min
+// and max, a total its state at the period's end and its sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
 // long as the history (historyDays). MOCK.noStatistics: entities without any
 function statistics(d){
   const P=d.period==='5minute'?300e3:3600e3;
   const kept=P<3600e3&&MOCK.historyDays ? Date.now()-MOCK.historyDays*86400e3 : -Infinity;
   const t0=Math.max(Date.parse(d.start_time), kept), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
-  const step=(MOCK.historyStep||600)*1000;
   for(const e of d.statistic_ids){
     const sc=STATES[e]?.attributes.state_class;
     if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
     const pts=[]; for(let t=Math.ceil(t0/P)*P; t+P<=t1; t+=P){
-      if(sc==='measurement'){ const v=[]; for(let u=Math.ceil(t/step)*step; u<t+P; u+=step) v.push(Number(valueAt(e,u/1000)));
-        if(!v.length) v.push(Number(valueAt(e,t/1000)));
-        pts.push({start:t,end:t+P,mean:v.reduce((a,b)=>a+b,0)/v.length,min:Math.min(...v),max:Math.max(...v)}); }
+      if(sc==='measurement'){
+        // (as Home Assistant compiles them — sensor/recorder.py: the history's states over
+        // the period, the one in force at its start included; the mean weighted by how long
+        // each lasted, from the start to the end; their min and max)
+        const h=(history({entity_ids:[e], start_time:new Date(t).toISOString(), end_time:new Date(t+P).toISOString(), no_attributes:true, compiling:true})[e]||[])
+          .map(x=>({t:x.lu*1000, v:Number(x.s)})).filter(x=>!isNaN(x.v));
+        if(!h.length) continue;
+        let acc=0; h.forEach((x,i)=>{ acc+=x.v*((i+1<h.length?h[i+1].t:t+P)-x.t); });
+        const v=h.map(x=>x.v);
+        pts.push({start:t,end:t+P,mean:acc/(t+P-h[0].t),min:Math.min(...v),max:Math.max(...v)}); }
       else { const v=Number(valueAt(e,(t+P)/1000)); pts.push({start:t,end:t+P,state:v,sum:v}); } }
     if(pts.length) r[e]=pts;
   }

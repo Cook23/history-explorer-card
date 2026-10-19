@@ -4,7 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { formatNumber } from "./history-units.js";
-import { seriesAttributes, seriesId, attributeLabel } from "./history-series.js";
+import { seriesAttributes, isAttributeGroup, seriesId, attributeLabel } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
 // A line of the entity list: its padding on each side (px)
@@ -248,19 +248,35 @@ export class CardSelector
     {
         const _sub = this._this.querySelector(`#es_${idx}_series`);
         if( !_sub ) return;
-        const entity_id = entryEl.dataset.entity;
-        const _state = this._hass.states[entity_id];
-        const _label = (name, state) => { const v = this._valueText(state); return v ? `${name} (${v})` : name; };
-        const _item = (id, name) => ({ label: _label(name, this.stateOf(id)), series: id,
-            choose: () => this._selectSeries(idx, id, this.stateOf(id)?.attributes?.friendly_name || id) });
-        const _items = [{ ..._item(entity_id, i18n('ui.menu.series_value')), marked: true },
-                        ...seriesAttributes(_state).map(k => _item(seriesId(entity_id, k), attributeLabel(k)))];
         this.hideSeriesMenu(idx);
-        this._fillSelectorMenu(idx, _sub, _items, () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); });
+        this._fillSeriesLevel(idx, _sub, entryEl.dataset.entity, null);
         entryEl.style.fontWeight = 'bold';
         _sub._subEntry = entryEl;
         this.openSubmenu(_sub, entryEl);
         _sub.focus();
+    }
+
+    // The series submenu _sub at one level: the entity's value and its attributes (path
+    // null), or the sub-attributes of the dictionary or the list at path — each with its
+    // current value; one holding sub-attributes (isAttributeGroup) marked ▸, opening them in
+    // the same submenu, over this level (back to the attributes: the entity's line again in
+    // the dropdown; ← or Escape: the level before)
+    _fillSeriesLevel(idx, _sub, entity_id, path)
+    {
+        const _state = this._hass.states[entity_id];
+        const _label = (name, state) => { const v = this._valueText(state); return v ? `${name} (${v})` : name; };
+        const _item = (id, name) => ({ label: _label(name, this.stateOf(id)), series: id,
+            choose: () => this._selectSeries(idx, id, this.stateOf(id)?.attributes?.friendly_name || id) });
+        const _group = (k, name) => ({ label: name + ' ▸',
+            choose: () => { this._fillSeriesLevel(idx, _sub, entity_id, k); _sub.focus(); } });
+        const _name = k => attributeLabel(path === null ? k : k.slice(path.length + 1));
+        const _items = [ ...( path === null ? [{ ..._item(entity_id, i18n('ui.menu.series_value')), marked: true }] : [] ),
+                         ...seriesAttributes(_state, path).map(k => isAttributeGroup(_state, k) ? _group(k, _name(k)) : _item(seriesId(entity_id, k), _name(k))) ];
+        if( path !== null && _items.length ) _items[0].marked = true;
+        const _up = path === null ? null : ( path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : null );
+        this._fillSelectorMenu(idx, _sub, _items, path === null
+            ? () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); }
+            : () => { this._fillSeriesLevel(idx, _sub, entity_id, _up); _sub.focus(); });
     }
 
     hideSeriesMenu(idx)

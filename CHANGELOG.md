@@ -4,6 +4,41 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.28] - 2026-10-19
+
+### New — aggregation (mini-graph-card's points_per_hour, aggregate_func, group_by)
+- A point per group of time, instead of a point per column of pixels: `pointsPerHour` (`points_per_hour`) — groups of 1 / `pointsPerHour` hours, on the day's grid (0:00, 2:00… for 0.5: the points don't move at each refresh) —, `groupBy` (`group_by`) — `hour`, `date` (a day, midnight to midnight) —, on the card, a graph, an entity or in `entityOptions`
+- `aggregateFunc` (`aggregate_func`): each group's value — `avg` (default: the mean, each value weighted by how long it lasted), `median`, `min`, `max`, `first`, `last`, `sum`, `delta` (highest less lowest), `diff` (last less first). A group without values carries the one before (`delta`, `diff`: 0). A group never narrower than a column of pixels. The min/max band: each group's lowest and highest
+- A bar graph: each bar the function over its interval (`max`: a daily counter's total); `groupBy` `date` or `hour` sets its interval (daily, hourly) unless set
+- Where the long-term statistics are drawn, an hour of them counts as one value, its mean: `median`, `first`, `last`, `sum`, `diff` approximate there, exact where the history is loaded
+- `resolveAggregation` (card-config.js), `_groupsOf` and `_aggregate` (card-datasets.js)
+
+### Fixed — the history's points computed as Home Assistant computes its statistics
+- A group of the history (a column of pixels, or an aggregation's group) only counted the values that changed in it: the value in force when it started was left out — of its mean (weighted from its first change on), its minimum and its maximum. Home Assistant counts it (sensor/recorder.py: the state at the period's start, weighted from the start; its min and max over those states). Where the history met the statistics, the same hour gave two different means and bands. Now computed the same way: an hour of the history gives exactly the hour's statistics; a group with no change of its own has the value in force (its min and max that value). Bars by `aggregateFunc` the same (the value in force when the interval starts counts in it)
+- A single value of the history in a column of pixels is still drawn as recorded
+- The mock Home Assistant compiles its statistics as Home Assistant does (from its history, the state at the period's start included), and gives the state in force at a history request's start
+- Test (`features`): values every 28 min 20 s, an hour of the history (pointsPerHour 1) — the same mean, min and max as the hour's statistics
+
+### Fixed — a window drawn from the history showed the statistics first
+- A column of pixels shorter than 5 minutes (a day on a graph 900 pixels wide): the curves showed the statistics while the history came, then the history — not what the window is drawn from. A day whose history hasn't come yet now shows nothing; the statistics only where the history no longer is (past its retention)
+- Test (`features`): a day with Home Assistant slow — no point of the statistics while the history comes, nor after
+
+### Changed — the same entity several times in one graph, in the YAML
+- mini-graph-card's way of showing a sensor's highest, lowest and mean values: the same entity written several times in one YAML graph, each with its own `aggregateFunc` (or name, color…). Each is a curve of its own (a copy, saved on its own); it was shown once, with a warning. Only in the YAML: the card's own gestures still never put a curve twice in a graph (a drop there is refused)
+- Test (`copies`): the same entity three times in a YAML graph — three curves, each its function and name, max above mean above min
+
+### New — sub-attributes
+- `attribute: forecast.0.temperature` (or after the entity id), read as mini-graph-card reads it: the attribute, then each level's key or index in a dictionary or a list. Named after each level (`Villeveyrac : Forecast › 0 › Temperature`), its unit and whether it's a direction from its last name (`temperature`: the weather's temperature unit)
+- In the entity selector, an attribute holding some — a dictionary, or a list of dictionaries (a forecast) — marked ▸: a click shows them in the same submenu, over the attributes; ← or Escape: the level before; the entity's line again: its attributes. A list of plain values (`hvac_modes`) is not offered
+
+### Changed — the tooltip's source
+- A separator after the source: `History: 18:10`, `Statistics 1 h: 14:00 – 15:00` — in French with the space French puts before a colon: `Historique : 18:10`, `Statistique 5 min : …` (`source_separator`, in every language)
+
+### Tests
+- `minigraph`: group_by date — a point a day, max the day's highest value, min its lowest, the mean between; points_per_hour 0.5 — a point every 2 h on whole hours, delta, diff, median; a bar graph grouped by date with max — a bar a day; the card's own names at every level (pointsPerHour on a graph, aggregateFunc in entityOptions)
+- `attributes`: a sub-attribute in the YAML, its name, unit and history; the selector's sub-attribute levels, back, the entity's line again
+- The mock weather entity has a forecast (a list of dictionaries)
+
 ## [v1.2.27] - 2026-10-19
 
 ### Fixed — the refresh drawing the statistics for a moment

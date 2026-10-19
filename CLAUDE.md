@@ -30,6 +30,12 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
 - **The main goal:** a mini-graph-card's YAML works, with a similar look, and every
   capability of this card in addition. Small differences after the migration don't
   matter much; details of the look are dealt with later.
+- **Not a clone (said twice by the user).** Compatible with mini-graph-card — its YAML
+  works — and a similar look: similar, not identical. A logical improvement over what
+  mini-graph-card does is welcome and needs no special care (its `avg` taken as the
+  time-weighted mean rather than the plain mean of the values recorded; its groups on a
+  fixed grid of time rather than one sliding with the present). Never copy one of its
+  behaviours only to be identical to it.
 - **No separate mode, no translation layer.** Every mini-graph-card option is an option of
   this card, valid with or without `look: mini`: a name meaning the same as one of ours is
   an alias of it, in the card's existing synonym mechanism (`history-options.js`), at the

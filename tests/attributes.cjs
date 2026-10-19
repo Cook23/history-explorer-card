@@ -31,6 +31,16 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A sub-attribute (mini-graph-card's attribute: forecast.0.temperature) ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'weather.villeveyrac', attribute: 'forecast.0.temperature' }, { entity: 'weather.villeveyrac.forecast.1.templow' }] }] }),
+        { mock: { series: true }, height: 900 });
+    await t.wait(1500);
+    await t.step('a sub-attribute (attribute: forecast.0.temperature, or after the entity id): its curve, its history, named by each level, in the unit of its name (temperature_unit)', async () => {
+        const v = await t.E(`el.instance.graphs[0].chart.data.datasets.map(d=>d.name+' / '+d.unit+' / '+d.data.length+' / '+d.data[d.data.length-1]?.y).join(', ')`);
+        return /^Villeveyrac : Forecast › 0 › Temperature \/ °C \/ [1-9]\d* \/ 23\.5, Villeveyrac : Forecast › 1 › Templow \/ °C \/ [1-9]\d* \/ 12$/.test(v) ? true : v;
+    });
+    done(await t.close());
+
     // ── A number followed by a unit; an attribute holding a curve's color ──
     t = await openCard(card({ graphs: [
         { type: 'line', entities: [{ entity: 'climate.salon', attribute: 'humidity' },
@@ -85,7 +95,21 @@ module.exports = async function()
     await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %, wind_bearing in °), no X_unit offered', async () => {
         await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
         const v = await sub(); await closeAll();
-        return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130 °) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h)' ? true : v;
+        return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130 °) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h) | Forecast ▸' ? true : v;
+    });
+    await t.step('sub-attributes: a list of dictionaries marked ▸, opening its items over the attributes, each ▸ too, then their values (a date not offered, a temperature in its unit); ← back one level; the entity\'s line again: its attributes', async () => {
+        await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
+        await t.page.click('#es_0_series a:last-child'); await t.wait(300); const l1 = await sub();
+        await t.page.click('#es_0_series a:first-child'); await t.wait(300); const l2 = await sub();
+        await t.page.keyboard.press('ArrowLeft'); await t.wait(300); const back = await sub();
+        // (the entity's line: on its left, the submenu over the rest of it)
+        await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]', { position: { x: 4, y: 6 } }); await t.wait(400); const again = await sub();
+        await t.page.click('#es_0_series a:last-child'); await t.wait(300); await t.page.click('#es_0_series a:first-child'); await t.wait(300);
+        await t.page.click('#es_0_series a[data-series="weather.villeveyrac.forecast.0.temperature"]'); await t.wait(500);
+        const m = await typeMenuFor(); await closeAll();
+        const ok = l1 === '0 ▸* | 1 ▸' && l2 === 'Condition (sunny)* | Temperature (23.5 °C) | Templow (14 °C)' && back === l1 && /^Value \(rainy\)\*/.test(again) && /Forecast ▸$/.test(again)
+            && m === 'weather.villeveyrac.forecast.0.temperature';
+        return ok ? true : JSON.stringify({ l1, l2, back, again, m });
     });
     await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
     await t.step('an attribute in ° is circular — and pre-selected as arrowline — only when it is a direction: wind_bearing, the sun\'s azimuth; not the sun\'s elevation', async () => {

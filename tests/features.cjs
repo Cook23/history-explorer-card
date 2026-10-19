@@ -57,7 +57,7 @@ module.exports = async function()
         const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], cb=c.options.tooltips.callbacks;
             const i=ds.data.findIndex(p=>p.statisticsPeriod===300e3); if( i<0 ) return null;
             return cb.title([{ datasetIndex:0, index:i, xLabel:'X', yLabel:ds.data[i].y }], c.data); })()`);
-        return /^Statistics 5 min .+ – /.test(r ?? '') ? true : JSON.stringify(r);
+        return /^Statistics 5 min: .+ – /.test(r ?? '') ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -77,7 +77,7 @@ module.exports = async function()
             const tip=i=>{ const p=ds.data[i], it={ datasetIndex:0, index:i, xLabel:'X', yLabel:p.y }; return [cb.title([it], c.data), cb.label(it, c.data)]; };
             const si=ds.data.findIndex(p=>p.statistics && p.columnFrom!=null), hi=ds.data.map((p,i)=>!p.statistics?i:-1).filter(i=>i>=0).pop();
             return { s: si>=0 ? tip(si) : null, h: hi!=null ? tip(hi) : null, unit: ds.unit }; })()`);
-        const ok = r.s && /^Statistics 1 h .+ – [\d:]+:00(\s?[ap]m)?$/i.test(r.s[0]) && new RegExp('^(.+: )?-?[\\d.,]+ / -?[\\d.,]+ / -?[\\d.,]+ ' + r.unit + '$').test(r.s[1]) && r.h && /^History /.test(r.h[0]);
+        const ok = r.s && /^Statistics 1 h: .+ – [\d:]+:00(\s?[ap]m)?$/i.test(r.s[0]) && new RegExp('^(.+: )?-?[\\d.,]+ / -?[\\d.,]+ / -?[\\d.,]+ ' + r.unit + '$').test(r.s[1]) && r.h && /^History: /.test(r.h[0]);
         return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -532,6 +532,22 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The history's groups computed as Home Assistant compiles its statistics (the value in
+    // force at a group's start counts in it): an hour of the history, the hour's statistics ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, pointsPerHour: 1, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true, historyStep: 1700 } });
+    await t.wait(2500);
+    await t.step('an hour of the history (pointsPerHour 1, values every 28 min 20 s): the same mean, min and max as Home Assistant\'s statistics of that hour', async () => {
+        const r = await t.E(`(async()=>{ const I=el.instance, d=I.graphs[0].chart.data.datasets[0].data.filter(p=>p.columnFrom!=null);
+            const t0=d[0].columnFrom, t1=Date.now()-3*3600e3;
+            const st=(await I._hass.callWS({ type:'recorder/statistics_during_period', start_time:new Date(t0).toISOString(), end_time:new Date(t1).toISOString(), period:'hour', statistic_ids:['sensor.power'] }))['sensor.power'];
+            const byStart=Object.fromEntries(st.map(x=>[x.start, x]));
+            const cmp=d.filter(p=>byStart[p.columnFrom]).map(p=>{ const x=byStart[p.columnFrom]; return [p.y-x.mean, p.columnMin-x.min, p.columnMax-x.max]; });
+            return { n: cmp.length, worst: Math.max(0, ...cmp.flat().map(Math.abs)) }; })()`);
+        return r.n >= 15 && r.worst < 1e-6 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── The real time paced by what drawing the graphs costs ──
     t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
     await t.E(`setState('sensor.power', '1')`); await t.wait(3000);   // (the card's first look at the states)
@@ -723,6 +739,18 @@ module.exports = async function()
         const after = await pts(), asked = await t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
         const ok = before.stat === 0 && during.every(x => x.stat === 0 && x.n >= before.n * 0.9) && after.stat === 0 && asked >= 2;
         return ok ? true : JSON.stringify({ before, during, after, asked });
+    });
+    done(await t.close());
+
+    // ── A column of pixels shorter than 5 minutes: the history only, never the statistics
+    // first (Home Assistant slow) — they're there only for what the history no longer keeps ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true, historyDelay: 2000 } });
+    await t.step('a day on 900 pixels (a column of 1.6 min), Home Assistant slow: no point of the statistics while the history comes, nor after', async () => {
+        const seen = [];
+        for( let k = 0; k < 12; k++ ) { await t.wait(400); seen.push(await t.E(`(()=>{ const d=el.instance.graphs[0]?.chart.data.datasets[0]?.data ?? []; return [d.length, d.filter(p=>p.statistics).length]; })()`)); }
+        const r = { seen, stats: await t.E(`__ws.filter(w=>w.type==='recorder/statistics_during_period').length`) };
+        return seen.every(x => x[1] === 0) && seen[seen.length - 1][0] > 50 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

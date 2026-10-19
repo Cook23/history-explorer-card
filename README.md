@@ -580,6 +580,8 @@ graphs:
 
 > Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
+**(1.2.28)** Its aggregation too: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation). A sub-attribute: `attribute: forecast.0.temperature`.
+
 > A mini-graph-card replaced in place — `type: custom:history-explorer-card` and `look: mini`, its options kept → [README_Full.md — Replacing mini-graph-card](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#replacing-mini-graph-card)
 
 ---
@@ -638,6 +640,9 @@ graphs:
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
+| `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | **(1.2.28)** Points an hour (groups of 1 / `pointsPerHour` hours) |
+| `groupBy` | `group_by` | | ✓ | ✓ | ✓ | **(1.2.28)** `interval`, `hour`, `date` |
+| `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | **(1.2.28)** `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `true` (everywhere), `statistics` or `history` (only where the curve comes from them) |
 | `decimation` | | | ✓ | ✓ | ✓ | **(1.2.23)** `decimation` is ignored: History Explorer draws one point per column of pixels — the mean of its values, their min and max kept for the band and the tooltip (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |

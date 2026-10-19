@@ -101,6 +101,10 @@ export class CardConfig
         P.defaultNetBars =         c.netBars;
         P.defaultInterval =        c.interval;
         P.defaultShowMinMax =      c.showMinMax;
+        // (aggregation — see resolveAggregation)
+        P.defaultPointsPerHour =   c.pointsPerHour;
+        P.defaultAggregateFunc =   c.aggregateFunc;
+        P.defaultGroupBy =         c.groupBy;
         // (the values over a graph — see card-values.js)
         P.cardShow =               { showState: c.showState, showStats: c.showStats };
         P.defaultShowPoints =      c.showPoints;
@@ -213,6 +217,19 @@ export class CardConfig
             ?? this.pconfig.graphs[e?.groupId]?.interpolation
             ?? this.getEntityOptions(e?.entity)?.interpolation
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
+    }
+
+    // How an entity's values are grouped into points (mini-graph-card's aggregation):
+    // { pointsPerHour, aggregateFunc as func, groupBy, explicit — any of them set }, each its
+    // own, else its graph's, else entityOptions', else the card's. None set: a point per
+    // column of pixels, their mean (see card-datasets.js _lineSamples)
+    resolveAggregation(e)
+    {
+        const _of = k => e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k]
+            ?? this.pconfig['default' + k.charAt(0).toUpperCase() + k.slice(1)];
+        const r = { pointsPerHour: _of('pointsPerHour'), func: _of('aggregateFunc'), groupBy: _of('groupBy') };
+        r.explicit = !!( r.pointsPerHour || r.func || ( r.groupBy && r.groupBy !== 'interval' ) );
+        return r;
     }
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
@@ -337,6 +354,9 @@ export class CardConfig
             yAxis             : ent.yAxis,
             rounding          : ent.rounding,
             tapAction         : ent.tapAction,
+            pointsPerHour     : ent.pointsPerHour,
+            aggregateFunc     : ent.aggregateFunc,
+            groupBy           : ent.groupBy,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
@@ -385,15 +405,11 @@ export class CardConfig
                 ..._gopts });
             const _interval = _opts.interval ?? null;
 
-            // A curve once per graph; in another graph, a second curve of the same series
-            // (its copy number — see keyOf)
-            const _inGraph = new Set();
+            // A series written again — in another graph, or in this one (mini-graph-card's
+            // way: the same sensor's max, min and mean, each its aggregate_func; in the YAML
+            // only, the card's own gestures never put a curve twice in a graph) —: a second
+            // curve of it (its copy number — see keyOf)
             const _addStatic = (id, ent) => {
-                if( _inGraph.has(id) ) {
-                    console.warn(`history-explorer-card: '${id}' is twice in graph '${graph.title ?? graph.type ?? '?'}' — shown once`);
-                    return;
-                }
-                _inGraph.add(id);
                 const _entry = this._makeStaticEntityEntry(id, _groupId, ent, _interval);
                 const _copy = this.store.newCopy(id);
                 if( _copy ) _entry.copy = _copy;
@@ -466,6 +482,9 @@ export class CardConfig
                 yAxis          : _opts.yAxis,
                 rounding       : _opts.rounding,
                 tapAction      : _opts.tapAction,
+                pointsPerHour  : _opts.pointsPerHour,
+                aggregateFunc  : _opts.aggregateFunc,
+                groupBy        : _opts.groupBy,
             };
         }
     }

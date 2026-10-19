@@ -597,9 +597,10 @@ export class CardCharts
         // (statistics: their period too — 5 min, 1 h)
         const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : moment.duration(ms).humanize();
         const _source = p.statistics ? `${i18n('ui.label.source_statistics')}${p.statisticsPeriod ? ' ' + _period(p.statisticsPeriod) : ''}` : i18n('ui.label.source_history');
-        if( p.columnFrom == null ) return `${_source} ${xLabel}`;
+        const _sep = i18n('ui.label.source_separator');
+        if( p.columnFrom == null ) return `${_source}${_sep}${xLabel}`;
         const _fmt = this.i18n.styleDateTimeTooltip, _from = moment(p.columnFrom), _to = moment(p.columnTo);
-        return `${_source} ${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}`;
+        return `${_source}${_sep}${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}`;
     }
 
     // Graph g's top control (Chart.js hecTopControl): its bar interval selector, placed by

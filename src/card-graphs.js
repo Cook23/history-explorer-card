@@ -505,12 +505,15 @@ export class CardGraphs
     // - Dynamic with no groupId (brand-new entity from the UI): only the last graph is
     //   considered, joined if it has the same type and, for curves, compatible units
     //   (combineSameUnits)
-    // Never a graph already showing its series (a curve once per graph)
+    // Never a graph already showing its series (a curve once per graph) — but in its own
+    // group, one already showing another curve of it (a copy: the same series several times
+    // in a YAML graph, mini-graph-card's way — see keyOf)
     _combineTarget(e, type, groupId)
     {
         const _free = g => !g.entities.some(x => x.entity === e.entity);
+        const _freeOfCurve = g => !g.entities.some(x => keyOf(x) === keyOf(e));
         if( groupId !== null )
-            return this.graphs.filter(g => g.groupId === groupId && _free(g) && typesCompatible(g.type, type) && g.entities[0]?.graphKey === e.graphKey && this._sameSavedGraph(g.entities[0], e)).pop() ?? null;
+            return this.graphs.filter(g => g.groupId === groupId && _freeOfCurve(g) && typesCompatible(g.type, type) && g.entities[0]?.graphKey === e.graphKey && this._sameSavedGraph(g.entities[0], e)).pop() ?? null;
 
         const _last = this.graphs[this.graphs.length - 1];
         return _last && _free(_last) && _last.type === type &&

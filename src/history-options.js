@@ -78,7 +78,15 @@ const OPTION_SYNONYMS = {
     color            : ['color_thresholds'],
     type             : ['graph'],
     tapAction        : ['tap_action'],
+    pointsPerHour    : ['points_per_hour'],
+    aggregateFunc    : ['aggregate_func'],
+    groupBy          : ['group_by'],
 };
+
+// How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
+// and how values are grouped (groupBy) — mini-graph-card's
+export const AGGREGATE_FUNCS = ['avg', 'median', 'min', 'max', 'first', 'last', 'sum', 'delta', 'diff'];
+export const GROUP_BY = ['interval', 'hour', 'date'];
 
 // The statistics a curve can show over its graph (showStats), in the order they're shown
 export const STATS = ['min', 'average', 'max'];
@@ -115,6 +123,10 @@ const OPTION_VALUES = {
     },
     // (true: everywhere; states is history)
     showMinMax    : v => v === 'states' ? 'history' : v,
+    // (a number of points an hour > 0, else not set)
+    pointsPerHour : v => Number(v) > 0 ? Number(v) : undefined,
+    aggregateFunc : v => AGGREGATE_FUNCS.find(f => f === String(v).trim().toLowerCase()),
+    groupBy       : v => GROUP_BY.find(f => f === String(v).trim().toLowerCase()),
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
     circular      : v => {
@@ -143,6 +155,9 @@ export function normalizeOptions(o)
         if( r[name] !== undefined ) continue;
         for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
     }
+    // (grouped by day or by hour: a bar graph's interval too, unless set — as mini-graph-card
+    // draws its bars)
+    if( r.interval === undefined && ( r.groupBy === 'date' || r.groupBy === 'hour' ) ) r.interval = r.groupBy === 'date' ? 'daily' : 'hourly';
     for( const [name, fn] of Object.entries(OPTION_VALUES) ) if( r[name] !== undefined && r[name] !== null ) r[name] = fn(r[name]);
     return r;
 }
@@ -151,7 +166,7 @@ export function normalizeOptions(o)
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding'];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy'];
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
