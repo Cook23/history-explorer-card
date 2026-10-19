@@ -11,8 +11,6 @@
 
 > For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md). The main versions and what each one brought: [Version highlights](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md#-version-highlights).
 
-> **Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in the [complete list of options](#complete-list-of-entityoptions-properties).
-
 This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching, long-term statistics first and the history only where it shows more, and draws only what the screen can show to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
