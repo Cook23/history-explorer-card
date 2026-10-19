@@ -4,6 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.23] - 2026-10-19
+
+### Fixed — the 1.2.22 release built on the wrong branch
+- The 1.2.22 release was published on `main` (the 1.1 line) instead of `v1.2-dev`: its tag points to 1.1 code. 1.2.23 is the same as 1.2.22 below, released on the right branch
+
 ## [v1.2.22] - 2026-10-19
 
 ### Fixed — the page frozen by a long window, many graphs, the real time
