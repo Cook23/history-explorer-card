@@ -7,7 +7,7 @@
 
 # History explorer card
 
-> **(1.2) Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in [Card, graph, and entity-level options](#card-graph-and-entity-level-options).
+> **Two syntaxes, mixed freely.** The card reads its own YAML and [mini-graph-card](https://github.com/kalkih/mini-graph-card)'s: each mini-graph-card name is an alias of one of the card's options, each of its values an alias of one of the option's values (`y_axis: secondary` is `yAxis: right`). Both can be mixed freely, in one card, at any level. This documentation uses the card's own names; each option's aliases are in [Card, graph, and entity-level options](#card-graph-and-entity-level-options).
 
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
 > For the complete reference documentation, see [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md).
@@ -35,7 +35,9 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **colors that change**: `color` takes thresholds on curves too, or an entity or one of its attributes — holding the color, or whose value (a mode, a temperature, a thermostat's `hvac_action`) picks it, point by point;
 > - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
 > - **values over a graph**, as [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
-> - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page.
+> - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page;
+> - **loading** (1.2.23 to 1.2.28): the long-term statistics first, finer data — the 5-minute statistics, then the history — only where the screen can show more; one point per column of pixels, with a min/max band; every action taken at once, whatever is loading; real time always ending at the present;
+> - **mini-graph-card's YAML** (1.2.8, 1.2.28): its options read as the card's own — its aggregation (`points_per_hour`, `aggregate_func`, `group_by`) and sub-attributes included.
 >
 > If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
 >
@@ -164,7 +166,7 @@ The entity selector shows friendly names and filters on both friendly name and e
 
 Clicking an entry chooses it, as Enter does — no separate button required.
 
-For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value (an attribute `X_unit`, a unit, isn't listed, nor one naming an entity or a web address, nor one about a version or an update); ← or Escape goes back to the list.
+For an entity with attributes that can be shown (a thermostat's measured temperature, its setpoint, what it's doing…), the selection opens a submenu over the list first: *Value* — the entity's own state, pre-selected, Enter takes it — then each attribute with its current value (an attribute `X_unit`, a unit, isn't listed, nor one naming an entity or a web address, nor one about a version or an update); ← or Escape goes back to the list. An attribute holding others — a dictionary, or a list of them like a weather forecast — is marked ▸: a click shows them in the same submenu, over the attributes (← or Escape: the level before; the entity's line again: its attributes).
 
 Right after the choice (click or Enter), the [display type menu](#choosing-an-entitys-display-type) opens, the most fitting type pre-selected: nothing is added before a type is picked, so you can check how the entity will be shown first. For an entity whose state isn't a number (on/off, text…), the menu only offers *Timeline*, the only way to show it.
 
@@ -209,7 +211,7 @@ An entity whose state is a number can be shown as a line (*Smart*, *Curve*, *Str
 - on a long-press (or a right click) of a legend label (line/bar graphs) or of a timeline/arrowline label;
 - after choosing *Create a second curve* for an entity that's already shown (see below).
 
-Selecting an entity (or attribute) that's already shown says so and outlines its graph, then offers *Cancel* (pre-selected) or *Create a second curve*: the same curve can be shown in several graphs, each one set on its own — never twice in one graph. In the YAML, the same entity in several graphs is a curve in each.
+Selecting an entity (or attribute) that's already shown says so and outlines its graph, then offers *Cancel* (pre-selected) or *Create a second curve*: the same curve can be shown in several graphs, each one set on its own — never twice in one graph from the card. In the YAML, the same entity written several times is a curve each time, in several graphs or in one (each with its own options — mini-graph-card's way of showing a sensor's highest, lowest and mean values).
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
@@ -217,7 +219,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
-- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; **(1.2.23)** *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
+- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than its submenus, so its lines stay readable beside the one open; on a card too narrow for that, it opens without any submenu, and a submenu opened leaves at least the start of its lines.
 
@@ -251,7 +253,7 @@ combineSameUnits: true
 
 When multiple curves share a graph, the Y axis and tooltips always show each entity's value in its original unit. SI unit conversion also applies to graphs defined in YAML containing mixed units.
 
-- **Single-click** a curve label's name to show/hide it (its name struck through when hidden); **(1.2)** a click on its value — `(400 W)` — or on a value shown over the graph opens the entity's dialog (with the [info panel](#info-panel--replacing-the-ha-more-info-popup) when it's on); its menu's *Info* does the same
+- **Single-click** a curve label's name to show/hide it (its name struck through when hidden); a click on its value — `(400 W)` — or on a value shown over the graph opens the entity's dialog (with the [info panel](#info-panel--replacing-the-ha-more-info-popup) when it's on); its menu's *Info* does the same
 - **Double-click** a curve label to extract it into its own graph
 - **Long-press** (or right click) a curve label to open the [display type menu](#choosing-an-entitys-display-type)
 - **Drag** a curve label left or right to reorder curves within the same graph (on a touch screen, tap it, then press it again right away and drag)
@@ -273,7 +275,7 @@ Linked graphs can always be merged back as long as their display types can share
 
 ### Reordering graphs
 
-Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On a touch screen, tap the ⠿ symbol, then press it again right away and drag. **(1.2)** The handle, the padlock and the chain icon keep only the room they need beside the legend's first line; on a narrow card, none — each in a small box over the legend's labels: on the box a gesture is theirs, beside it the label's.
+Drag the ⠿ symbol at the top left of any graph to reorder it. Drop above the midpoint of a target to insert before it, below to insert after. A simple click on the same area toggles the Y axis lock. On a touch screen, tap the ⠿ symbol, then press it again right away and drag. The handle, the padlock and the chain icon keep only the room they need beside the legend's first line; on a narrow card, none — each in a small box over the legend's labels: on the box a gesture is theirs, beside it the label's.
 
 Linked graphs always stay together: moving one of them elsewhere moves the whole block, and no other graph can be dropped between them.
 
@@ -304,7 +306,7 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both. **(1.2)** Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
+The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. With two Y axes, Shift, the pinch and the padlock act on both. Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -359,7 +361,7 @@ refresh:
   interval: 30       # Or refresh every 30 seconds (combine both if needed)
 ```
 
-The automatic refresh reloads the recent history at most once every 2 seconds, however often the entities change.
+The automatic refresh reloads the recent history at most once every 2 seconds, however often the entities change — less often on a device slow to draw the graphs (never sooner than five times what drawing them takes). A value's change is shown next to its name at once.
 
 ---
 
@@ -535,7 +537,7 @@ entityOptions:
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. **(1.2.25)** The hourly statistics of the whole window come first, in one request, and are drawn at once; finer data is loaded only where it shows more — **(1.2.26)** the 5-minute statistics when a column of pixels lasts less than an hour, the history when it lasts less than 5 minutes —, and the history always for the last two hours. `mode` and `retention` are ignored.
+The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. It loads what the screen can show, and no more — by how long a column of pixels lasts: an hour or more, the hourly statistics of the whole window, in one request; between 5 minutes and an hour, the 5-minute statistics too; less than 5 minutes, the history (the statistics only where the history no longer is). The last two hours always come from the history. Computed from the history, a point has the same mean, minimum and maximum as Home Assistant's statistics. `mode` and `retention` are accepted, without effect.
 
 ```yaml
 statistics:
@@ -567,7 +569,7 @@ graphs:
         showStats: false
 ```
 
-`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`.
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
@@ -576,11 +578,11 @@ graphs:
 
 *Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
 
-**(1.2) A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the handle, the padlock and the chain icon in boxes over the legend, taking no room; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen.
+**A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the handle, the padlock and the chain icon in boxes over the legend, taking no room; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen.
 
 > Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
-**(1.2.28)** Its aggregation too: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation). A sub-attribute: `attribute: forecast.0.temperature`.
+mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
 
 > A mini-graph-card replaced in place — `type: custom:history-explorer-card` and `look: mini`, its options kept → [README_Full.md — Replacing mini-graph-card](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#replacing-mini-graph-card)
 
@@ -640,11 +642,11 @@ graphs:
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
-| `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | **(1.2.28)** Points an hour (groups of 1 / `pointsPerHour` hours) |
-| `groupBy` | `group_by` | | ✓ | ✓ | ✓ | **(1.2.28)** `interval`, `hour`, `date` |
-| `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | **(1.2.28)** `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
+| `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
+| `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
+| `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `true` (everywhere), `statistics` or `history` (only where the curve comes from them) |
-| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.23)** `decimation` is ignored: History Explorer draws one point per column of pixels — the mean of its values, their min and max kept for the band and the tooltip (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
+| `decimation` | | | ✓ | ✓ | ✓ | Accepted, without effect: the card draws one point per column of pixels — the mean of its values, their min and max kept for the band and the tooltip (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
@@ -801,7 +803,7 @@ graphs:
         color: black
 ```
 
-An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Its unit: the one its value holds, else the one Home Assistant shows it in (a thermostat's temperatures in your temperature unit, a light's `brightness` in % — converted from 0–255, a weather entity's `wind_gust_speed` in its `wind_speed_unit`), else, for other integrations, an attribute `X_unit` holding the unit of every attribute with `X` in its name — else `unit:`. Home Assistant keeps only its history (no long-term statistics):
+An entity's attribute is shown with `attribute:` — a number as a curve (a number followed by a unit, `45.2 %`, as that number in that unit), anything else as a timeline. Its curve is named `entity : attribute` (`salon : Current temperature`). Its unit: the one its value holds, else the one Home Assistant shows it in (a thermostat's temperatures in your temperature unit, a light's `brightness` in % — converted from 0–255, a weather entity's `wind_gust_speed` in its `wind_speed_unit`), else, for other integrations, an attribute `X_unit` holding the unit of every attribute with `X` in its name — else `unit:`. Home Assistant keeps only its history (no long-term statistics). One inside a dictionary or a list is written by its path, as mini-graph-card writes it: `attribute: forecast.0.temperature`.
 ```yaml
       - entity: climate.salon
         attribute: current_temperature

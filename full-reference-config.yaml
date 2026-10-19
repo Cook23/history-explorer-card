@@ -1,5 +1,5 @@
 ---
-# (1.2) mini-graph-card's names and values are accepted too, as aliases of these options (line_width,
+# mini-graph-card's names and values are accepted too, as aliases of these options (line_width,
 # show_points, decimals, y_axis, tap_action…, its `show:`, its `entities` on the card) — see README_Full.md,
 # "Replacing mini-graph-card"
 type: custom:history-explorer-card
@@ -332,7 +332,7 @@ stateColorSeed: 137
 # Whether to use device-class dependent state names (e.g. Open/Closed, Detected/Clear) for state labels in timeline charts, or use the raw state values, or just hide the state labels. Can be 'auto', 'raw', or 'hide'
 stateTextMode: "auto"
 
-# decimation: ignored since 1.2.23 (still accepted) — the card draws what the screen can show, and only that:
+# decimation: accepted, without effect — the card draws what the screen can show, and only that:
 # one point per column of pixels for a curve (the mean of its values, their min and max kept for
 # showMinMax and the tooltip), a timeline's states narrower than 2 pixels in a row merged ('multiple')
 
@@ -390,7 +390,7 @@ dashMode: "solid"
 # the curve comes from them), or False to disable
 showMinMax: False
 
-# (1.2.28) Aggregation (mini-graph-card's points_per_hour, group_by, aggregate_func), also on a graph,
+# Aggregation (mini-graph-card's points_per_hour, group_by, aggregate_func), also on a graph,
 # an entity or in entityOptions: a point per group of time instead of one per column of pixels.
 # pointsPerHour: groups of 1 / pointsPerHour hours; groupBy: interval, hour or date; aggregateFunc: avg,
 # median, min, max, first, last, sum, delta or diff (avg: the mean weighted by how long each value lasted)
@@ -529,7 +529,7 @@ statistics:
   enabled: True
   # The statistics of the whole window are loaded first; finer data only where it shows more: the 5-minute
   # statistics for a column of pixels shorter than the period, the history for one shorter than 5 minutes
-  # (and always for the last two hours). mode and retention: ignored since 1.2.25 (still accepted)
+  # (and always for the last two hours). mode and retention: accepted, without effect
   # Reporting period that statistics are averaged over. Can be hour, day, or month
   period: 'hour'
   # If set to true, graph will use long term statistics only (5-minute ones included), forgoing normal
