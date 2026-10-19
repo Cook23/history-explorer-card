@@ -11,7 +11,7 @@
 
 > For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md). The main versions and what each one brought: [Version highlights](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md#-version-highlights).
 
-This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching, long-term statistics first and the history only where it shows more, and draws only what the screen can show to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
+This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching, loads only what the screen can show — the hourly statistics, the 5-minute statistics or the history — and draws no more to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
@@ -99,7 +99,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 
 ### Loading
 
-- **What the screen can show, and no more** — the long-term statistics of the whole window in one request; finer data — the 5-minute statistics, then the history — only where a column of pixels is short enough to show more; one point per column, its mean with its min and max (computed from the history as Home Assistant compiles its statistics); a min/max band (`showMinMax`).
+- **What the screen can show, and no more** — the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts (an hour or more, 5 minutes or more, less — see [Long term statistics](#long-term-statistics)); one point per column, its mean with its min and max (computed from the history as Home Assistant compiles its statistics); a min/max band (`showMinMax`).
 - **Every action taken at once**, whatever is loading; real time always ending at the present; a page left open past midnight going on with the new day.
 - **mini-graph-card's aggregation** — `pointsPerHour`, `groupBy`, `aggregateFunc` (`points_per_hour`, `group_by`, `aggregate_func`).
 
