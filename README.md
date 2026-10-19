@@ -22,7 +22,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **touch, pen and mouse reworked**: a swipe on a graph always scrolls the page, a drag starts with a tap; gesture settings; every gesture also in a menu (the type menu in submenus, a graph's menu, cut and paste);
 > - **two Y axes** on a graph, and **colors** from thresholds or from another entity;
 > - **an entity's attributes**, sub-attributes included, as curves or timelines;
-> - **faster loading**: the long-term statistics first, the history only where the screen can show more;
+> - **faster loading**: only what the screen can show — the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts;
 > - **mini-graph-card compatibility**: its YAML read as the card's own, `look: mini`, values over a graph, aggregation;
 > - **the info panel on every page** of Home Assistant.
 >
