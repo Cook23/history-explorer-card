@@ -6,11 +6,6 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.23] - 2026-10-19
 
-### Fixed — the 1.2.22 release built on the wrong branch
-- The 1.2.22 release was published on `main` (the 1.1 line) instead of `v1.2-dev`: its tag points to 1.1 code. 1.2.23 is the same as 1.2.22 below, released on the right branch
-
-## [v1.2.22] - 2026-10-19
-
 ### Fixed — the page frozen by a long window, many graphs, the real time
 - Measured on a real setup (23 graphs, 37 entities, 6 months, `decimation: false`, Firefox): Home Assistant's answers were small (at most 6 MB) and the page free while it answered them. But each time the graphs were drawn again, the page froze for about 4 s — half of it the card working the values out, half Chart.js drawing every value — and that happened 25 times in 4 minutes: after each part of the window loaded, after each automatic refresh, and after each change of a shown entity. A click on the time range waited its turn for up to a minute
 - A change of a shown entity drew all the graphs again from their whole history, just to show its value next to its name (`showCurrentValues`, on by default). Its value, next to its name and over the graph (`showState`), is now updated alone, at once (`refreshCurrentValues`); the curves follow at the refresh

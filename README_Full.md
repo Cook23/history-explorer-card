@@ -239,7 +239,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
-- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; **(1.2.22)** *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
+- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; **(1.2.23)** *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
@@ -1137,7 +1137,7 @@ rounding: 1
 
 ### Data decimation
 
-**(1.2.22)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance. It is still accepted, on the card, a graph, an entity or in `entityOptions` — your configuration keeps working —, and has no effect any more.
+**(1.2.23)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance. It is still accepted, on the card, a graph, an entity or in `entityOptions` — your configuration keeps working —, and has no effect any more.
 
 A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. The card keeps what the screen can show, and only that:
 
@@ -1210,7 +1210,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size |
 | `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | | | Graph height in pixels (overrides global height settings) |
-| `decimation` | | | | **(1.2.22)** Ignored: see [Data decimation](#data-decimation) |
+| `decimation` | | | | **(1.2.23)** Ignored: see [Data decimation](#data-decimation) |
 | `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |

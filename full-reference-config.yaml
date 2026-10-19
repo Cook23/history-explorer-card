@@ -332,7 +332,7 @@ stateColorSeed: 137
 # Whether to use device-class dependent state names (e.g. Open/Closed, Detected/Clear) for state labels in timeline charts, or use the raw state values, or just hide the state labels. Can be 'auto', 'raw', or 'hide'
 stateTextMode: "auto"
 
-# decimation: ignored since 1.2.22 (still accepted) — the card draws what the screen can show, and only that:
+# decimation: ignored since 1.2.23 (still accepted) — the card draws what the screen can show, and only that:
 # a curve's first, lowest, highest and last values in each column of pixels (M4), a timeline's
 # states narrower than 2 pixels in a row merged ('multiple')
 
