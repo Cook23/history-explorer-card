@@ -4,6 +4,23 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.24] - 2026-10-19
+
+### Changed — a long window loaded sooner
+- Measured on a real setup with 1.2.23 (23 graphs, 37 entities, 6 months): the freezes were down to under a second, but the window took some 16 s to load: its parts were asked one after the other, each only once the one before was drawn — about 11 s waiting for Home Assistant, plus 5 s drawing, end to end
+- Each part is now asked as soon as the one before is answered, before it's drawn: Home Assistant works on it while the page draws. The parts that come while the graphs are drawn are drawn together, once (`_drawSoon`)
+- The long-term statistics are asked in one request for all they cover, instead of up to 8: light (a value an hour), while each request cost Home Assistant about a second whatever its length (5 requests, 7 s on that setup)
+- Tests (`features`): the next part asked before the one answered is drawn, the last drawing after the last answer; a window across the history and the statistics: the statistics in one request
+- Tests (beta) ▸ Performance: the load's report gives the parts put in the cache and the graphs' drawings apart
+
+### Fixed — the floating icons over the page's header
+- Scrolled up, a graph's handle, padlock and close button stayed shown over the card's sticky toolbar and over Home Assistant's header, the graph itself hidden under them: their z-index ordered them on the whole page. The chart's container is now a stacking context of its own (`isolation: isolate`, `_hecAttachToCanvasParent`): they're ordered within the chart only, and hidden with it
+- Test (`features`): the close button scrolled under the sticky toolbar, hidden by it (over it before)
+
+### Fixed — a legend's first line still left empty
+- When no shorter form of the first label fitted beside the handle and the close button, the label still went to the second line, the first left empty (the room for the icons kept whatever). The icons now keep room only when the first label fits beside them; else they float over the labels, in opaque boxes as on a narrow card (`_hecIconsOverLegend`), and the label takes the whole first line — shortened, else cut, if it's wider than that
+- Test (`features`): a long first label at 350 px, on the first line, the icons over it in opaque boxes; at 1000 px, beside it
+
 ## [v1.2.23] - 2026-10-19
 
 ### Fixed — the page frozen by a long window, many graphs, the real time

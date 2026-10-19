@@ -11986,17 +11986,22 @@
                 // Cook23: ratchet + marges fixes pour ca-N et bc-N
                 // (options.legend.leftMargin / rightMargin: room kept free at both ends of
                 // the legend's lines, for what the card draws there)
-                // (fork) on the left, the room the controls at the graph's top left need (the
-                // lock+handle zone, 4 px apart) — none when they're drawn in boxes over the
-                // labels (hecControlsBackdrop) or there's none
+                // (fork) the floating icons at the legend's top (lock+handle, close button) beside
+                // its first line, the room they need kept there — or drawn over the labels, no
+                // room kept, in boxes as opaque as the Y labels' (hecControlsBackdrop, or the
+                // first label not fitting beside them: _hecIconsOverLegend, decided below)
                 var _ch = me.chart;
-                me.leftMargin = _ch && _ch.options.hecControlsBackdrop ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
-                  _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
-                // on the right, the close button's (closeButtonVisible), mirrored — none in a box
-                // over the labels, or without it — at least options.rightMargin, the room the
-                // card needs there
-                var _cb = _ch && !_ch.options.hecControlsBackdrop && _ch._hecCloseButtonRect && _ch._hecCloseButtonRect();
-                me.rightMargin = Math.max(me.options.rightMargin || 0, _cb ? me.width - _cb.x + 4 : 4);
+                var _setMargins = function (over) {
+                  if (_ch) _ch._hecIconsOverLegend = over;
+                  // on the left, the room the lock+handle zone needs (4 px apart)
+                  me.leftMargin = over ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
+                    _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
+                  // on the right, the close button's (closeButtonVisible), mirrored — at least
+                  // options.rightMargin, the room the card needs there
+                  var _cb = !over && _ch && _ch._hecCloseButtonRect && _ch._hecCloseButtonRect();
+                  me.rightMargin = Math.max(me.options.rightMargin || 0, _cb ? me.width - _cb.x + 4 : 4);
+                };
+                _setMargins(!!(_ch && _ch.options.hecControlsBackdrop));
                 // (fork) the margins of a line: the first one's, for what is drawn at both ends
                 // of the legend's top (the controls, the card's buttons — no taller than it);
                 // below it, 4 px — the whole width for the labels
@@ -12031,11 +12036,11 @@
                     return { name: it.text, tail: Chart.hecLegendTail(it), forms: _shortNames[it.datasetIndex] };
                   });
                   // (to a whole line below the first; the first label — its name and what follows
-                  // it, its value — not fitting the first line, between its margins, to that one
-                  // if a shorter form fits there — rather than a first line left empty — never
-                  // cut for it)
+                  // it, its value — not fitting the first line beside the icons: the icons over
+                  // the labels, no room kept for them — never a first line left empty; a label
+                  // wider than a whole line, shortened, else cut)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
-                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(0), { formsOnly: true }) || _fitted;
+                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) _setMargins(true);
                   // (its name shortened, its full name kept: shown in place on a hover or a click
                   // — _hecRevealAt)
                   me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
