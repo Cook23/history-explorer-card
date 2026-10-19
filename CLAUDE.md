@@ -3,13 +3,24 @@
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
 
+## A README is not a changelog — set by the user, not negotiable (said ten times)
+
+README.md and README_Full.md describe how to use the latest version, as it is now: never
+what changed, when, or what it was before. No version number in them — no "(1.2.25)",
+"since 1.2.23", "now", "no longer", "was", "is ignored since" — except in the Highlights
+paragraph, which alone names the main versions that brought the main evolutions. What
+changed and when goes to the CHANGELOG (and the release notes). An option kept only for
+compatibility is described as it is today ("accepted, no effect"), without its history.
+Before any README edit, check the whole file against this rule.
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
-Python) is a different project by the same author. The card reuses two pieces of its logic,
-and the READMEs and CHANGELOGs of both projects say the two are "the same". A change to
-either piece here must be mirrored there (and vice versa), or the docs on both sides become
-wrong. lowpass_dt is worked on in its own Claude session and has a matching `CLAUDE.md`;
+Python) is a different project by the same author. The card applies three of its rules
+(below), and the documentation of both projects says they are the same — the card's
+README_Full gives the silences as "the rules of the lowpass_dt integration" and `circular`
+as "the same values as the `circular` option of lowpass_dt". A rule changed on one side
+must be changed on the other, or that documentation becomes wrong. lowpass_dt is worked on in its own Claude session and has a matching `CLAUDE.md`;
 tell the user when a change here needs a matching change there.
 
 Rule set by the user: each session manages its own repository's code. A session may write
@@ -21,15 +32,13 @@ that session (or to the user), not made from here.
 
 | card (1.1: `src/history-explorer-card.js`, 1.2: `src/card-datasets.js`) | lowpass_dt |
 |---|---|
-| `_circularPeriod` | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
+| `_circularPeriod` (1.2: parsing in `history-options.js` `OPTION_VALUES.circular`, auto-detection in `card-datasets.js` `circularPeriodOf`) | `config.py` (parsing), `sensor.py` `_resolve_auto_circular` (auto-detection) |
 
 - absent / `null` / `none` (trimmed, any case): automatic — state class `measurement_angle`,
   or a unit of exactly `°` (not `°C`/`°F`), gives a period of 360;
 - `false`: never circular;
 - a number or numeric string: that period; `2pi` (any case, all spaces removed): 2π;
 - anything else (including `true`), or a period ≤ 0 or non-finite: off, with a warning.
-
-Introduced in card v1.1.46 / lowpass_dt v1.3.17.
 
 ### 2. Silence detection (`lineMode: smart`) — same rule, with known, deliberate differences
 
@@ -52,7 +61,7 @@ Differences (keep them in mind before calling the two "identical"):
   drives the injection of synthetic samples. The card has no `tau`.
 - lowpass_dt's end-of-silence marker and `silence` option have no equivalent in the card.
 
-Review of the silence detection (October 2026), decided by the user:
+Decided by the user about the silence detection:
 - After a Home Assistant restart, lowpass_dt already keeps the downtime out of the EMA: on
   restore, `sensor.py` sets `source_just_resumed`, so the first sample counts as the limit
   (same as after a silence). Not an issue, nothing to do.
@@ -67,13 +76,17 @@ Review of the silence detection (October 2026), decided by the user:
 
 | card 1.2 | lowpass_dt |
 |---|---|
-| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `_circularPeriod` | `attributes.py` |
+| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `circularPeriodOf` | `attributes.py` |
 
 - An attribute's unit: the one its value holds (`45 %`), else Home Assistant frontend's tables
   (weather units, units by domain, temperatures in the system unit; a light's `brightness`
   and a media player's `volume_level` converted into %), else an `X_unit` attribute for every
   attribute with `X` in its name; `X_unit` attributes are units, never series.
 - A weather entity's `wind_bearing` is in `°` (Home Assistant gives no unit).
+- A sub-attribute (a path: `forecast.0.temperature`, each level's key or index — read by the
+  card, not by lowpass_dt): its unit and whether it's a direction from its last name that
+  isn't an index (`temperature`). lowpass_dt reading sub-attributes one day would take the
+  same rule.
 - Automatic `circular` for an attribute: `measurement_angle`, or a unit of `°` only when the
   attribute's name is a direction (`bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir`);
   the sun's `elevation` is not circular. An entity's own state keeps rule 1.
