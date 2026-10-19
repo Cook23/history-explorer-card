@@ -46,9 +46,6 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   `yAxis: right`), or a value our option accepts in addition, with the same meaning. Never
   convert a value, never rescale, never change what a parameter means. An option with no
   exact equivalent (`value_factor`…) is a function to add under its own name.
-- **`look: mini` = defaults of parameters, nothing else.** If it has to change an aspect no
-  parameter sets, a parameter is missing: add it to the card (usable without `look`), and
-  `look: mini` only gives its default.
 - **A conversion that would remain** is described in the migration doc, never done in the
   code. The aim is none.
 - An aspect that is unclear: ask the user.
@@ -56,6 +53,8 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   never changes what an option means: an option means one thing, whatever the look (an
   option whose meaning would depend on the look is an ergonomic nightmare). A name that
   means something else on each side is a conflict to settle once for all, not by the look.
+  If it has to change an aspect no parameter sets, a parameter is missing: add it to the
+  card (usable without `look`), and `look: mini` only gives its default.
 - **A mini-graph-card function this card lacks is added to it**, mini-graph-card's code
   (MIT) taken as the example, and becomes a function of this card like any other: in its
   part, through its contracts, documented, tested, usable in this card's own syntax too.
@@ -105,10 +104,11 @@ that fixes it. The example then only checks that the rule holds.
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
-Python) is a different project by the same author. The card reuses two pieces of its logic,
-and the READMEs and CHANGELOGs of both projects say the two are "the same". A change to
-either piece here must be mirrored there (and vice versa), or the docs on both sides become
-wrong. lowpass_dt is worked on in its own Claude session and has a matching `CLAUDE.md`;
+Python) is a different project by the same author. The card applies three of its rules
+(below), and the documentation of both projects says they are the same — the card's
+README_Full gives the silences as "the rules of the lowpass_dt integration" and `circular`
+as "the same values as the `circular` option of lowpass_dt". A rule changed on one side
+must be changed on the other, or that documentation becomes wrong. lowpass_dt is worked on in its own Claude session and has a matching `CLAUDE.md`;
 tell the user when a change here needs a matching change there.
 
 Rule set by the user: each session manages its own repository's code. A session may write
@@ -127,8 +127,6 @@ that session (or to the user), not made from here.
 - `false`: never circular;
 - a number or numeric string: that period; `2pi` (any case, all spaces removed): 2π;
 - anything else (including `true`), or a period ≤ 0 or non-finite: off, with a warning.
-
-Introduced in card v1.1.46 / lowpass_dt v1.3.17.
 
 ### 2. Silence detection (`lineMode: smart`) — same rule, with known, deliberate differences
 
@@ -151,7 +149,7 @@ Differences (keep them in mind before calling the two "identical"):
   drives the injection of synthetic samples. The card has no `tau`.
 - lowpass_dt's end-of-silence marker and `silence` option have no equivalent in the card.
 
-Review of the silence detection (October 2026), decided by the user:
+Decided by the user about the silence detection:
 - After a Home Assistant restart, lowpass_dt already keeps the downtime out of the EMA: on
   restore, `sensor.py` sets `source_just_resumed`, so the first sample counts as the limit
   (same as after a silence). Not an issue, nothing to do.
@@ -173,6 +171,10 @@ Review of the silence detection (October 2026), decided by the user:
   and a media player's `volume_level` converted into %), else an `X_unit` attribute for every
   attribute with `X` in its name; `X_unit` attributes are units, never series.
 - A weather entity's `wind_bearing` is in `°` (Home Assistant gives no unit).
+- A sub-attribute (a path: `forecast.0.temperature`, each level's key or index — read by the
+  card, not by lowpass_dt): its unit and whether it's a direction from its last name that
+  isn't an index (`temperature`). lowpass_dt reading sub-attributes one day would take the
+  same rule.
 - Automatic `circular` for an attribute: `measurement_angle`, or a unit of `°` only when the
   attribute's name is a direction (`bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir`);
   the sun's `elevation` is not circular. An entity's own state keeps rule 1.
