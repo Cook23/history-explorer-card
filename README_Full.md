@@ -7,7 +7,7 @@
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant. It is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54. — see [Differences from upstream](#differences-from-upstream).
+> **This is a custom history card for Home Assistant. It is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54 — see [Differences from upstream](#differences-from-upstream).
 
 > For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md).
 
