@@ -46,17 +46,30 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 
 ## Table of contents
 
-- [Version highlights](#-version-highlights)
+- [📋 Version highlights](#-version-highlights)
 - [Install](#install)
+  - [HACS (recommended)](#hacs-recommended)
+  - [Manual install](#manual-install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
 - [Adding entities](#adding-entities)
 - [Choosing an entity's display type](#choosing-an-entitys-display-type)
 - [Interactive graph management](#interactive-graph-management)
+  - [Line graphs](#line-graphs)
+  - [Linked graphs](#linked-graphs)
+  - [Reordering graphs](#reordering-graphs)
+  - [Timeline and arrowline graphs](#timeline-and-arrowline-graphs)
 - [Y axis control](#y-axis-control)
 - [Time range and display defaults](#time-range-and-display-defaults)
 - [Auto refresh](#auto-refresh)
 - [Line chart appearance](#line-chart-appearance)
+  - [Line mode](#line-mode)
+  - [Curve interpolation](#curve-interpolation)
+  - [Angles](#angles)
+  - [Stroke style](#stroke-style)
+  - [Individual sample dots](#individual-sample-dots)
+  - [Min/max statistical band](#minmax-statistical-band)
+  - [Unavailable data](#unavailable-data)
 - [Bar charts](#bar-charts)
 - [Timeline charts](#timeline-charts)
 - [Compass arrow graphs](#compass-arrow-graphs)
@@ -107,7 +120,7 @@ defaultInfoPanel: true   # set default enabled state; user preference is otherwi
 
 Once enabled, clicking any entity anywhere on your dashboard opens the history explorer graph instead. Ungrouping, drag & drop and CSV export are not available in the popup.
 
-> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#overriding-the-ha-more-info-history-info-panel)
+> For full details → [README_Full.md — Info panel](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
 
 ---
 
@@ -318,6 +331,10 @@ lineMode: lines    # curves, lines, stepped, or smart
 
 Without `lineMode`, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). Setting `lineMode` here applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep `curves` for your YAML graphs only, set it under each graph's `options:` instead.
 
+`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+
+![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
+
 ### Curve interpolation
 
 In `curves` and `smart` modes, the curve between two values is rebuilt by an interpolation algorithm, chosen with `interpolation` (on the card, a graph, an entity or in `entityOptions`) or from the type menu (**Interpolation ▸**):
@@ -334,11 +351,9 @@ interpolation: makima   # monotone (default), steffen, makima, or catmullrom
 | `makima` | Follows the local trend, flat over flat stretches, no break at each small peak; hardly any overshoot |
 | `catmullrom` | The smoothest; may overshoot a little around sharp changes |
 
-`smart` draws a curve while the sensor reports values at its usual rhythm, and a flat dashed line — the last known value held — over each silence, instead of a curve or a diagonal bridging the gap to the next value. See [README_Full.md — Smart mode](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#smart-mode-silences-shown-as-flat-dashed-plateaus).
+### Angles
 
 Angles (a wind direction, for example) are drawn without jumping across the whole graph when they cross 0/360: a wind oscillating around the north is drawn around 0, its values just below 0 shown as such on the curve, while the tooltip and the Y axis labels show the real values (-2 shows 358). Detected automatically (unit `°` or state class `measurement_angle`); see [README_Full.md — Circular values](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#circular-values-angles).
-
-![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
 ### Stroke style
 
@@ -378,7 +393,7 @@ By default the card interpolates over unavailable states. To show gaps instead:
 showUnavailable: true
 ```
 
-> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#line-interpolation-modes)
+> For full details → [README_Full.md — Line appearance](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#line-appearance)
 
 ---
 
@@ -482,7 +497,7 @@ entityOptions:
     type: arrowline
 ```
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#entity-options)
 
 ---
 
@@ -558,7 +573,7 @@ Every option is spelled the same at every level where it's accepted, and its syn
 
 > Every YAML option, at every level, with its default value, is listed in [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/main/full-reference-config.yaml).
 
-> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#customizing-dynamically-added-graphs)
+> For full details and priority rules → [README_Full.md — Entity options](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#entity-options)
 
 ---
 
@@ -614,20 +629,12 @@ showCurrentValues: false  # live values next to legend labels are shown by defau
 legendVisible: false       # hide the legend entirely
 rounding: 2               # decimal digits in tooltips
 
-lineWidth: 2              # default line width in pixels
 stateColorSeed: 137       # seed for automatic state colors
 
 timeTicks:
   density: high           # base density: low, medium, high, higher, highest
   densityOverride: higher # skip auto-density and force this level
   dateFormat: short       # normal (default) or short
-
-statistics:
-  enabled: true
-  mode: mean              # mean, min, max
-  period: hour            # hour, day, month
-  force: false
-  retention: 90           # optional: override history retention period in days
 ```
 
 > For full details → [README_Full.md — Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#configuring-the-ui)
@@ -666,9 +673,9 @@ graphs:
         color: black
 ```
 
-> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
-
 A graph's `options:` (or the graph itself) can also carry the entity options marked ✓ in the **Graph** column of [Card, graph, and entity-level options](#card-graph-and-entity-level-options), as a default for every entity in that graph — useful when combining several wildcard `entity:` patterns onto the same graph.
+
+> For full details and advanced examples → [README_Full.md — YAML configuration](https://github.com/Cook23/history-explorer-card/blob/main/README_Full.md#yaml-configuration-for-preconfigured-graphs)
 
 ---
 
