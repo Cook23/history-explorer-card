@@ -124,7 +124,7 @@ module.exports = async function()
         const recording = await t.E('el.instance.perf');
         await t.page.keyboard.press('Escape'); await t.wait(200);
         return title === 'Performance' && /Graphs: \d+, entities: \d+, points drawn: \d+/.test(out) && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms, Chart\.js \d+ ms/.test(out)
-            && /history\/history_during_period: \d+ entities, \d+ values, answered in/.test(out) && /parts put in the graphs/.test(out) && /s of real time\n.*refreshes asked/.test(out) && /freezes, /.test(out) && recording === null
+            && /history\/history_during_period: \d+ entities, \d+ values, answered in/.test(out) && /parts put in the cache/.test(out) && /the graphs drawn again \d+ times/.test(out) && /s of real time\n.*refreshes asked/.test(out) && /freezes, /.test(out) && recording === null
             ? true : JSON.stringify({ title, out, recording });
     });
     done(await t.close());

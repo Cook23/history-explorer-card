@@ -301,8 +301,7 @@
   // same step — the first one at which they all fit; else, at the last step, the names
   // that still don't fit cut, '…' at their end — before a qualifier in parentheses at their
   // end ('(F)'), kept when there's room for it: it often is what tells two curves apart.
-  // opts.formsOnly: null rather than a name cut
-  Chart.hecFitLegendTexts = function (ctx, items, room, opts) {
+  Chart.hecFitLegendTexts = function (ctx, items, room) {
     var fits = function (t) { return ctx.measureText(t).width <= room; };
     var parts = items.map(function (it) {
       return { tail: it.tail || '', steps: [String(it.name === undefined || it.name === null ? '' : it.name)].concat(it.forms || []) };
@@ -312,7 +311,6 @@
     for (var k = 0; k <= _last; k++) {
       if (parts.every(function (p) { return fits(at(p, k) + p.tail); })) return parts.map(function (p) { return at(p, k); });
     }
-    if (opts && opts.formsOnly) return null;
     // (the longest start of base that fits with '…' then end then tail, or null)
     var cut = function (base, end, tail) {
       if (!fits(base.slice(0, 1) + '…' + end + tail)) return null;
@@ -2471,10 +2469,10 @@
     },
 
     // The floating icons' boxes (the chain icon's, the lock+handle zone's, the close
-    // button's): half
-    // see-through — options.hecControlsBackdrop: as opaque as the Y labels' boxes
+    // button's): half see-through — over the legend's labels (options.hecControlsBackdrop, or its first label
+    // not fitting beside them: _hecIconsOverLegend): as opaque as the Y labels' boxes
     _hecControlsBoxBackground: function () {
-      return this.options.hecControlsBackdrop ? hecUi.background(this.canvas, hecUi.BOX_OPACITY) :
+      return this.options.hecControlsBackdrop || this._hecIconsOverLegend ? hecUi.background(this.canvas, hecUi.BOX_OPACITY) :
         'color-mix(in srgb, var(--primary-background-color) 50%, transparent)';
     },
 
@@ -3064,6 +3062,10 @@
       var _parent = this.canvas && this.canvas.parentNode;
       if (!_parent) return null;
       if (getComputedStyle(_parent).position === 'static') _parent.style.position = 'relative';
+      // (the icons' z-index only orders them within the chart: the chart as a whole stays
+      // under what covers it — a sticky toolbar, the page's header — when it's scrolled
+      // there, as its canvas does)
+      _parent.style.isolation = 'isolate';
       if (el.parentNode !== _parent) _parent.appendChild(el);
       return _parent;
     },

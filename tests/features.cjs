@@ -368,6 +368,33 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The floating icons: under what covers the graph when scrolled there; over the legend's
+    // labels when its first label doesn't fit beside them ──
+    t = await openCard(card({ uiLayout: { sticky: 'top' }, statistics: { enabled: false }, graphs: [
+            { type: 'line', entities: [{ entity: 'sensor.power', name: 'Mesure Thermostat Bureau Ma Lin (Filtered)' }] },
+            { type: 'line', entities: [{ entity: 'sensor.power2', name: 'Consigne Thermostat Mezzanine' }] }] }),
+        { mock: { series: true }, scrollRoom: 3000, height: 700, init: "document.addEventListener('DOMContentLoaded',()=>document.documentElement.style.setProperty('--header-height','0px'));" });
+    await t.step('the floating icons scrolled under the sticky toolbar: hidden by it, as the graph is (never over the page\'s header)', async () => {
+        await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
+        const last = 'el.instance.graphsInDisplayOrder().slice(-1)[0]';
+        const top = await t.E(`${last}.canvas.getBoundingClientRect().top`);
+        await t.E(`window.scrollBy(0, ${top} - 10)`); await t.wait(500);
+        const r = await t.E(`(()=>{ const c=${last}.chart, tb=el.querySelector('div[style*="position:sticky"]'), b=c._hecCloseButtonEl.getBoundingClientRect();
+            const hit=document.elementFromPoint(b.left+b.width/2, b.top+b.height/2), t2=tb.getBoundingClientRect();
+            return { under: b.top < t2.bottom, hidden: !!hit && tb.contains(hit) }; })()`);
+        await t.E('window.scrollTo(0, 0)'); await t.wait(300);
+        return r.under && r.hidden ? true : JSON.stringify(r);
+    });
+    await t.step('a first label too wide beside the handle and the close button: no room kept for them, the icons over the labels in opaque boxes — the label on the first line; wide enough: room kept beside it, half see-through boxes', async () => {
+        const at = async w => { await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1200);
+            return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend, b=L.legendHitBoxes[0];
+                return { line: Math.round(b.top - L.top), margins: L.leftMargin+'/'+L.rightMargin, box: getComputedStyle(c._hecControlsBackdropEl).backgroundColor }; })()`); };
+        const narrowish = await at(350), wide = await at(1000);
+        return narrowish.line < 14 && narrowish.margins === '4/4' && /rgba\(.*, 0\.8\)$/.test(narrowish.box) && wide.line < 14 && wide.margins === '37/4' && wide.box !== narrowish.box
+            ? true : JSON.stringify({ narrowish, wide });
+    });
+    done(await t.close());
+
     // ── The date: a click opens the calendar, a double-click goes back to real time; the
     // magnifier: a double-click brings the default range back ──
     t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
@@ -500,6 +527,21 @@ module.exports = async function()
     t = await openCard(card(), { mock: { series: true } });
     await t.step('a window of 7 days: the curve grows back in time as each day arrives; each day asked once, the most recent first; the whole window at the end', () => growing('7d', 16, 250));
     await t.step('a window of 6 months: at most 8 requests, the most recent first, the curve growing back in time; the whole window at the end', () => growing('6o', 30, 300));
+    await t.step('each part of a long window asked as soon as the one before is answered — before it is drawn; the parts that came meanwhile drawn once', async () => {
+        const p = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+            { mock: { series: true, historyDelay: 300 }, init: `document.addEventListener('DOMContentLoaded', ()=>setTimeout(()=>{ const I=el.instance; window.__trace=[];
+                const asked=()=>__ws.filter(w=>w.type==='history/history_during_period').length;
+                const a=I.loaderCallback, d=I.generateGraphDataFromCache;
+                I.loaderCallback=function(){ const r=a.apply(this, arguments); __trace.push('answer:'+asked()); return r; };
+                I.generateGraphDataFromCache=function(){ __trace.push('draw'); return d.apply(this, arguments); }; }, 0));` });
+        await p.E('__ws.length = 0; __trace.length = 0; el.instance.reloadHistory()'); await p.wait(4500);
+        const trace = await p.E('__trace.join(" ")'), asked = await p.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        await p.close();
+        // (each answer but the last: the next part already asked — answer:k+1 — when it's put in the cache, before its drawing)
+        const answers = trace.split(' ').filter(x => x.startsWith('answer:')).map(x => +x.slice(7));
+        const ahead = answers.slice(0, -1).every((n, k) => n === k + 2);
+        return asked > 2 && answers.length === asked && ahead && trace.endsWith('draw') ? true : JSON.stringify({ trace, asked });
+    });
     done(await t.close());
 
     // ── The parts of a window, whatever the history holds: a counter rising with time (each
@@ -539,10 +581,10 @@ module.exports = async function()
         const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
         return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
     });
-    await t.step('a window across the history (10 days) and the statistics (older): the recent part from the history, the older from the statistics, the most recent first; the whole window, joined; nothing asked twice; the Y scale widening as the older, lower values come', async () => {
+    await t.step('a window across the history (10 days) and the statistics (older): the recent part from the history, the older from the statistics in one request, the most recent first; the whole window, joined; nothing asked twice; the Y scale widening as the older, lower values come', async () => {
         const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 26, 300);
         const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
-        const historyFirst = /^h+r+$/.test(types), covered = last.first <= r.start + 86400e3;
+        const historyFirst = /^h+r$/.test(types), covered = last.first <= r.start + 86400e3;
         const widened = r.seen[0].min > last.min;
         return r.joined && r.once && r.fits && historyFirst && covered && widened ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, covered, widened, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
     });

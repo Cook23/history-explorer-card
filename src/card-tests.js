@@ -366,7 +366,9 @@ function buildPerformanceTest(body, card)
         const _req = of(r, 'request'), _parts = of(r, 'part');
         out(`  ${sec(r.ms - _idle)} in all`);
         for( const q of _req ) out(`  ${q.info.type}: ${q.info.entities} entities, ${q.info.values} values, answered in ${sec(q.ms)}`);
-        out(`  ${_parts.length} parts put in the graphs: ${ms(sum(_parts))} in all, the longest ${ms(max(_parts))} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
+        const _draws = of(r, 'redraw');
+        out(`  ${_parts.length} parts put in the cache: ${ms(sum(_parts))} in all`);
+        out(`  the graphs drawn again ${_draws.length} times: ${ms(sum(_draws))} in all, the longest ${ms(max(_draws))} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
         out(`  ${freezes(r)}`);
     };
 

@@ -293,12 +293,24 @@ export class CardHistory
             }
         }
 
-        this.generateGraphDataFromCache();
-
         this.state.loading = false;
 
-        // (the next days of the window — see updateHistory —, or statistics instead)
+        // (the next days of the window — see updateHistory —, or statistics instead — asked
+        // at once, before this part is drawn: Home Assistant works on it meanwhile)
         if( reload || this.loader.more ) this.updateHistory();
+        this._drawSoon();
+    }
+
+    // The graphs drawn again from the cache as soon as the page is free — once for all the
+    // parts of the window that came meanwhile (each answer is a task of its own: those that
+    // came while the graphs were drawn are put in the cache before the next drawing)
+    _drawSoon()
+    {
+        if( this._drawTid ) return;
+        this._drawTid = setTimeout(() => {
+            this._drawTid = 0;
+            this.generateGraphDataFromCache();
+        }, 0);
     }
 
     loaderFailed(error)
@@ -481,11 +493,14 @@ export class CardHistory
             //console.log(`Slots ${l0} to ${l1} need loading`);
 
             // (from the most recent, a few days at a time — at most 8 requests for the window:
-            // each one drawn as it comes, the curves growing back in time, then the next one
-            // asked — loaderCallback)
+            // each one drawn as it comes, the curves growing back in time, the next one asked
+            // as soon as one is answered — loaderCallback. The statistics, light — a value an
+            // hour —, asked at once for all they cover: a request costs Home Assistant about a
+            // second whatever its length)
             const _days = Math.max(1, Math.ceil((c1 - c0 + 1) / 8));
-            this.loader.more = l1 - _days + 1 > l0;
-            l0 = Math.max(l0, l1 - _days + 1);
+            const _stats = this.statistics.enabled && ( this.statistics.force || l1 <= this.limitSlot );
+            this.loader.more = !_stats && l1 - _days + 1 > l0;
+            if( !_stats ) l0 = Math.max(l0, l1 - _days + 1);
 
             this.loader.startTime = this.cache[l0].start;
             this.loader.endTime = this.cache[l1].end;
