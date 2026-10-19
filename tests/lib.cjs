@@ -13,11 +13,13 @@ const pageUrl = name => 'file://' + path.join(__dirname, name);
 // of a card), panel (the info panel's config — null: the panel off), userData (Home
 // Assistant's user data to start with), init (more of the page's init script), clock (the
 // page's time when it opens, then flowing as usual: the mocked history follows the time of
-// day — a test measuring the curves drawn sees the same ones whenever it runs) }
+// day — a test measuring the curves drawn sees the same ones whenever it runs), timezone (the
+// browser's time zone, e.g. 'Europe/Paris': UTC otherwise, where a day starts at the same time
+// for the card and for Home Assistant's timestamps) }
 async function openCard(cfg, opts = {})
 {
     const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
-    const ctx = await browser.newContext({ viewport: { width: 1000, height: opts.height || 1400 }, hasTouch: !!opts.touch });
+    const ctx = await browser.newContext({ viewport: { width: 1000, height: opts.height || 1400 }, hasTouch: !!opts.touch, ...( opts.timezone ? { timezoneId: opts.timezone } : {} ) });
     const page = await ctx.newPage();
     // Home Assistant's user data (the card's saved state), kept for the page's lifetime
     const userData = { ...(opts.userData || {}) };

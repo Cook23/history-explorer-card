@@ -92,7 +92,8 @@ function attributesAt(id,t){
 // (no end_time: until now, as Home Assistant; with no_attributes false, each row with its
 // attributes — a)
 function history(d){
-  const t0=Date.parse(d.start_time)/1000, t1=d.end_time ? Date.parse(d.end_time)/1000 : Date.now()/1000, r={};
+  // (nothing after now: Home Assistant has no future)
+  const t0=Date.parse(d.start_time)/1000, t1=Math.min(d.end_time ? Date.parse(d.end_time)/1000 : Infinity, Date.now()/1000), r={};
   const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
     if(!STATES[e]) continue;

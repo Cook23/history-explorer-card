@@ -266,7 +266,7 @@ export class CardDatasets
     // (columns) holding more than one (or an hour of statistics, its rows marked statistics),
     // one point: their mean (weighted by how long each lasted) at the middle of the time
     // they cover, with their min and max (columnMin, columnMax), that time (columnFrom, columnTo) and
-    // whether statistics are in it (statistics) — what the screen can show of them, the
+    // whether statistics are in it (statistics: their period, statisticsPeriod) — what the screen can show of them, the
     // columns on a grid of time fixed from 1970 (the same from one refresh, or one part of
     // a long window, to the next); the band between their min and max (yMin, yMax) where
     // showMinMax wants it (_bandWanted) —, its last value carried to the end of the window
@@ -287,7 +287,7 @@ export class CardDatasets
             if( isNaN(y) ) continue;
             const st = data[i].statistics;
             const v = { t: msOf(data[i].last_changed), y, min: y, max: y, stat: !!st };
-            if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); }
+            if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); v.period = v.end - v.t; }
             _values.push(v);
         }
         _values.forEach((v, k) => { v.end ??= k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t); });
@@ -298,14 +298,17 @@ export class CardDatasets
             // statistics, whole — it belongs to the column where it starts)
             const _colEnd = ( Math.floor(group[0].t / _width) + 1 ) * _width;
             const _end = v => v.stat || !_width ? v.end : Math.min(v.end, _colEnd);
-            let sum = 0, span = 0, min = Infinity, max = -Infinity, stat = false;
+            let sum = 0, span = 0, min = Infinity, max = -Infinity, stat = false, period = 0;
             for( const v of group ) {
                 const d = Math.max(0, _end(v) - v.t) || 1;
                 sum += v.y * d; span += d;
                 min = Math.min(min, v.min); max = Math.max(max, v.max); stat ||= v.stat;
+                if( v.period ) period = Math.max(period, v.period);
             }
             const _from = group[0].t, _to = Math.max(_from, _end(group[group.length - 1]));
             const p = { x: ( _from + _to ) / 2, y: sum / span, columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
+            // (the statistics' period: 5 minutes, an hour — the coarsest in the column)
+            if( period ) p.statisticsPeriod = period;
             if( this._bandWanted(e, stat, group.length) ) { p.yMin = min; p.yMax = max; }
             s.push(p);
         };

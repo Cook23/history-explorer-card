@@ -106,12 +106,26 @@ export class CardToolbar
         return html;
     }
 
+    // Real time shown in the toolbars: their '>' greyed and inactive — the window ends at the
+    // present, there's nothing after it (see _settleWindow)
+    showRealTime()
+    {
+        for( let i = 0; i < 2; i++ ) {
+            const _b = this._this?.querySelector(`#b2_${i}`);
+            if( !_b ) continue;
+            _b.disabled = !!this.state.autoScroll;
+            _b.style.opacity = this.state.autoScroll ? '0.38' : '';
+            _b.style.cursor = this.state.autoScroll ? 'default' : '';
+        }
+    }
+
     // Wires toolbar i's controls (the card has two toolbars, top and bottom; the info panel
     // one, with fewer controls — those it lacks are skipped)
     wireToolbar(i)
     {
         this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
         this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
+        this.showRealTime();
         this._this.querySelector(`#b4_${i}`)?.addEventListener('click', this.decZoom.bind(this), false);
         this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
         // (the date: a click opens the calendar, a double-click goes back to real time — the

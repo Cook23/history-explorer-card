@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.27] - 2026-10-19
+
+### Fixed — the refresh drawing the statistics for a moment
+- In real time, each refresh drew today's curves from the statistics — smoothed, with their band — until today's history came back: 1.2.26 draws the graphs at once, and the refresh had emptied today's history to ask it again. An entity without statistics had nothing for today meanwhile, its last value carried
+- The refresh no longer empties anything: today's history (yesterday's too, after midnight) is marked to be asked again (stale), kept and drawn meanwhile, replaced by each entity's answer as it comes
+- Test (`features`): a refresh with Home Assistant slow — the curve drawn from the history all along, never from the statistics, as many points
+
+### Fixed — the evening's end missing after midnight
+- A page opened before midnight and still open after it: the first refresh after midnight asked again the new day's history only — the history since the last refresh before midnight (since the page was opened, when no value came in between) was never asked, the curve stopping there, then joined to the new day's first value at midnight. Each day's history now remembers when it was asked (askedAt): asked before the day ended, it's asked again at the next refresh — today's, and yesterday's after midnight, however long ago it was asked
+- The refresh, whatever starts it, moves the window to the present in real time (`refresh`)
+- Tests (`features`), in Paris time (the browser's time zone set: the tests ran in UTC, where the card's days and Home Assistant's timestamps start at the same time): a change at 23:10 drawn at 23:10, the day after joined at midnight, in time order, before and after a refresh; the page opened at 23:40, still open at 0:10 — the evening's end asked again with the new day, no gap
+- The mock Home Assistant gives no history after now; `openCard` takes a time zone
+
+### Changed — real time: the present always on the right, never past it
+- Real time is the window showing the present, on its right: the curves grow and slide as values come. Every window set — a drag, a zoom (buttons, wheel, pinch, the zoom selection), the range, the day before or after, the calendar, the default range — goes no further than the present: past it, it's moved back to end there, and is in real time again (`_settleWindow`); ending before it, it's the history: the window stays where it is while new values come
+- A zoom in real time keeps the present itself on the right (it kept the window's end, a few seconds old at times — the window could then leave real time)
+- The date selector's `>` greyed and inactive in real time (`showRealTime`)
+- With `defaultTimeOffset`, the present is the time it gives (an hour after now with `1h`, the end of the day with `1D`): it was already where the window ended in real time
+- Tests (`features`): dragged towards the future, the day after — still at the present, `>` greyed; zoomed out and in — the present on the right; dragged back — the history, `>` active, the window kept as values come; dragged forward past the present — real time again; the day before then the day after twice — back at the present
+
+### Changed — the statistics' period in the tooltip
+- A point of the statistics says which: *Statistics 5 min*, *Statistics 1 h*
+- Test (`features`): a point of the 5-minute statistics, of the hourly ones
+
 ## [v1.2.26] - 2026-10-19
 
 ### Fixed — an action while the card was loading, lost for good

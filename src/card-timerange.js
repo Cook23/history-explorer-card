@@ -8,6 +8,8 @@ const moment = window.HXLocal_moment;
 
 // Valid time ranges in hours
 const ranges = [1, 2, 6, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368, 8760];
+// A window ending this close to the present shows it (its end is set to the second)
+const PRESENT_MS = 1000;
 
 export class CardTimeRange
 {
@@ -22,15 +24,11 @@ export class CardTimeRange
 
         this.setPresentWindow();
         this.updateHistory();
-
-        // Allow auto scroll if auto refresh is enabled
-        this.state.autoScroll = true;
     }
 
-    // The time window ending at the present (moved by defaultTimeOffset), over the active
-    // range — set before the graphs are first built, so their time axis has it from the
-    // start
-    setPresentWindow()
+    // The present, as the window shows it: now, moved by defaultTimeOffset (an empty space
+    // after now, or the end of the hour, the day…) — no window goes past it
+    presentTime()
     {
         let endTime = moment();
         if( this.pconfig.defaultTimeOffset ) {
@@ -48,9 +46,32 @@ export class CardTimeRange
                 case 'Y': endTime = moment(endTime.format('YYYY-01-01T00:00:00')).add(s, 'year'); break;
             }
         }
+        return endTime;
+    }
 
-        this.endTime = endTime.format('YYYY-MM-DDTHH:mm:ss');
+    // The time window ending at the present (presentTime), over the active range — real
+    // time; set before the graphs are first built, so their time axis has it from the start
+    setPresentWindow()
+    {
+        this.endTime = this.presentTime().format('YYYY-MM-DDTHH:mm:ss');
         this.startTime = moment(this.endTime).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute").format('YYYY-MM-DDTHH:mm:ss');
+        this._settleWindow();
+    }
+
+    // Every window set (a range, a zoom, a drag, a day before or after, the calendar, the
+    // present): never past the present — moved back to end there, whatever asked it —, and
+    // real time exactly when it ends there (the present on the right, the window following
+    // it as new values come); else the history, the window staying where it is. The toolbar
+    // shows it ('>' greyed in real time: there's nothing after)
+    _settleWindow()
+    {
+        const _present = this.presentTime(), _over = moment(this.endTime).diff(_present);
+        if( _over > 0 ) {
+            this.startTime = moment(this.startTime).subtract(_over, 'ms').format('YYYY-MM-DDTHH:mm:ss');
+            this.endTime = _present.format('YYYY-MM-DDTHH:mm:ss');
+        }
+        this.state.autoScroll = moment(this.endTime).diff(_present) > -PRESENT_MS;
+        this.showRealTime();
     }
 
     todayNoReset()
@@ -69,8 +90,7 @@ export class CardTimeRange
     {
         if( !day ) return;
         const t0 = moment(day).startOf('day');
-        if( moment(t0).add(this.timeRangeSeconds(), 'second') >= moment() ) return this.todayNoReset();
-        this.state.autoScroll = false;
+        if( moment(t0).add(this.timeRangeSeconds(), 'second') >= this.presentTime() ) return this.todayNoReset();
         this.moveTimeWindow(t0);
         this.applyTimeAxes();
     }
@@ -91,6 +111,7 @@ export class CardTimeRange
         let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
         this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
         this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
+        this._settleWindow();
 
         this.updateHistory();
     }
@@ -103,6 +124,7 @@ export class CardTimeRange
         let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
         this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
         this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
+        this._settleWindow();
 
         this.updateHistory();
     }
@@ -144,13 +166,13 @@ export class CardTimeRange
     }
 
     // Where a range change without a point of its own keeps the window: [time, position
-    // along it] — its end in real time: the present stays on the right; its middle when
-    // looking at the history. The one rule of every range change (applyTimeRange,
+    // along it] — the present in real time: it stays on the right; its middle when looking
+    // at the history. The one rule of every range change (applyTimeRange,
     // applyTimeRangeMinutes): the buttons, the duration menu, the magnifier's default range,
     // a zoom gesture in real time keeping the present (onTimeZoom)
     _rangeAnchor()
     {
-        return this.isLive() ? [this.endTime, 1.0] : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
+        return this.isLive() ? [this.presentTime(), 1.0] : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
     }
 
     // --------------------------------------------------------------------------------------
@@ -292,15 +314,11 @@ export class CardTimeRange
 
         if( update ) {
 
-            const _end0 = this.endTime;
-
             let t1 = moment(t_center).add(this.activeRange.timeRangeHours * (1.0 - t_position), "hour");
             let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
             this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
             this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-
-            // (a window whose end moved follows the present only if it shows it)
-            if( this.endTime !== _end0 ) this.followPresentIfShown();
+            this._settleWindow();
 
             this.applyTimeAxes();
 
@@ -351,15 +369,11 @@ export class CardTimeRange
 
         if( update ) {
 
-            const _end0 = this.endTime;
-
             let t1 = moment(t_center).add(this.activeRange.timeRangeMinutes * (1.0 - t_position), "minute");
             let t0 = moment(t1).subtract(this.activeRange.timeRangeMinutes, "minute");
             this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
             this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-
-            // (a window whose end moved follows the present only if it shows it)
-            if( this.endTime !== _end0 ) this.followPresentIfShown();
+            this._settleWindow();
 
             this.applyTimeAxes();
 
@@ -392,13 +406,6 @@ export class CardTimeRange
             this.applyTimeRangeMinutes(t, update, t_center);
     }
 
-    // Real time followed (the window moving with the present) only when the window shows the
-    // present
-    followPresentIfShown()
-    {
-        this.state.autoScroll = moment() <= moment(this.endTime);
-    }
-
     // Moves the time window (same length) to start at t0, then redraws, what it newly shows
     // asked (whatever is loading)
     moveTimeWindow(t0)
@@ -406,6 +413,7 @@ export class CardTimeRange
         const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
         this.startTime = moment(t0).format("YYYY-MM-DDTHH:mm:ss");
         this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
+        this._settleWindow();
         this.updateHistory();
     }
 

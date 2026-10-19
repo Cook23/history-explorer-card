@@ -29,7 +29,8 @@ module.exports = async function()
         const w0 = await win(t);
         await t.page.click('#b5_0'); await t.wait(800); const w1 = await win(t);
         await select(t, '48'); await t.wait(800); const w2 = await win(t);
-        return w0.live && w1.live && w2.live && w1.e === w0.e && w2.e === w0.e && w1.e - w1.s < w0.e - w0.s ? true : JSON.stringify({ w0, w1, w2 });
+        // (the present itself on the right — not the window's end as it was, a few seconds old)
+        return w0.live && w1.live && w2.live && Math.abs(w1.fromNow) <= 2 && Math.abs(w2.fromNow) <= 2 && w1.e - w1.s < w0.e - w0.s ? true : JSON.stringify({ w0, w1, w2 });
     });
     await t.step('the history: the zoom buttons and the duration menu keep the middle — whatever the duration, 48 h as 3 h', async () => {
         await toHistory(t);
@@ -44,7 +45,7 @@ module.exports = async function()
     await t.step('real time: the wheel in the right 10 % of the plot area keeps the present on the right', async () => {
         await t.E('el.instance.today()'); await t.wait(800);
         const w0 = await win(t); await wheel(0.95); const w1 = await win(t);
-        return w0.live && w1.live && w1.e === w0.e && w1.e - w1.s < w0.e - w0.s ? true : JSON.stringify({ w0, w1 });
+        return w0.live && w1.live && Math.abs(w1.fromNow) <= 2 && w1.e - w1.s < w0.e - w0.s ? true : JSON.stringify({ w0, w1 });
     });
     await t.step('real time: the wheel elsewhere zooms around the pointer, and leaves real time', async () => {
         await t.E('el.instance.today()'); await t.wait(800);
