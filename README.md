@@ -49,8 +49,22 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
+## 📋 Version highlights
+
+A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
+
+- **v1.2.28** — mini-graph-card compatibility: its aggregation (`points_per_hour`, `aggregate_func`, `group_by`), sub-attributes, the same entity several times in one graph.
+- **v1.2.27** — Loading reworked: the long-term statistics first, then the 5-minute statistics, the history only where the screen can show more; every action taken at once, whatever is loading.
+- **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
+- **v1.2.9** — Values over a graph and `look: mini`; an entity's attributes shown as curves.
+- **v1.2.4** — Two Y axes on a graph; the info panel on every page of Home Assistant.
+- **v1.2.0** — Beta, alongside the 1.1 line: dragging on touch screens reworked (a swipe always scrolls the page), the code reorganized.
+
+---
+
 ## Table of contents
 
+- [Version highlights](#-version-highlights)
 - [Install](#install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
