@@ -33,8 +33,11 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 - **v1.2.28** — mini-graph-card compatibility: its aggregation (`points_per_hour`, `aggregate_func`, `group_by`), sub-attributes, the same entity several times in one graph.
 - **v1.2.27** — Loading reworked: the long-term statistics first, then the 5-minute statistics, the history only where the screen can show more; every action taken at once, whatever is loading.
 - **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
+- **v1.2.15** — Gesture settings for every card (long-press duration, pointer precision, for a mouse or a pen and for a finger); the options menu in submenus.
 - **v1.2.9** — Values over a graph and `look: mini`; an entity's attributes shown as curves.
-- **v1.2.4** — Two Y axes on a graph; the info panel on every page of Home Assistant.
+- **v1.2.6** — A graph's menu, cut and paste: every gesture also in a menu.
+- **v1.2.4** — Two Y axes on a graph; colors from thresholds or from another entity; the info panel on every page of Home Assistant.
+- **v1.2.2** — The type menu in submenus (*Display*, *Interpolation*, *Layout*); the tooltip opens on a click or a tap.
 - **v1.2.0** — Beta, alongside the 1.1 line: dragging on touch screens reworked (a swipe always scrolls the page), the code reorganized.
 
 ---
