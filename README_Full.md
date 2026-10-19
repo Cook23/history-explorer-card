@@ -46,7 +46,7 @@ This card offers a highly interactive and configurable way to view the history o
 - [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)
 - [mini-graph-card compatibility](#mini-graph-card-compatibility)
   - [Replacing mini-graph-card](#replacing-mini-graph-card)
-  - [Not yet in the card](#not-yet-in-the-card)
+  - [Not yet implemented](#not-yet-implemented)
 - [Display defaults](#default-view-and-time-ranges)
   - [Time range and offset](#default-view-and-time-ranges)
   - [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
@@ -1058,7 +1058,7 @@ Written differently in the card's syntax:
 
 `points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it.
 
-### Not yet in the card
+### Not yet implemented
 
 These mini-graph-card options are being added, its code as the example: `state_map`; `logarithmic`; soft bounds (`~50`), `min_bound_range` and the `_secondary` options; `value_factor`; `color_thresholds_transition` (the card changes color on a point: `hard`); `line_color` (a color, or a list of them in the entities' order — set `color` on each entity); `hour24`, `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`, `show_line`, an entity's `show_legend`, `show.labels_secondary`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`, `animate`, `cache`, `compress`, `group`, `loading_indicator`.
 
