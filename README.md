@@ -42,8 +42,21 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
+## 📋 Version highlights
+
+A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/main/CHANGELOG.md) for the complete, version-by-version detail.
+
+- **v1.1.49** — Curve interpolation: `interpolation` chooses how *Curve* and *Smart* lines are drawn between values (monotone, steffen, makima, catmullrom), also from the type menu; the same options at every level.
+- **v1.1.46** — Angles drawn without jumps at 0/360 (`circular`), automatic for `°` and `measurement_angle`.
+- **v1.1.45** — Bars and curves on the same graph.
+- **v1.1.43** — `smart` line mode: silences drawn as flat dashed plateaus.
+- **v1.1.32** — Persistence opt-in: nothing persists by default, except the entities added from the card.
+
+---
+
 ## Table of contents
 
+- [Version highlights](#-version-highlights)
 - [Install](#install)
 - [Basic usage](#basic-usage)
 - [Info panel — replacing the HA more info popup](#info-panel--replacing-the-ha-more-info-popup)
