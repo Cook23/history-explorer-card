@@ -8,6 +8,11 @@ const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period: 'hour' unless set)
 const PERIOD_MS = { '5minute': 300e3, hour: 3600e3, day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3 };
+// Home Assistant's short-term statistics: every 5 minutes, kept as long as the history
+// (recorder purge_keep_days) — what it returns is taken, nothing assumed
+const FINE_PERIOD = '5minute';
+// Where each kind of request goes in a cache slot
+const LAYER = { stats: 'stats', fine: 'fine', history: 'hist' };
 // History parts asked at once (Home Assistant answers two together a quarter sooner)
 const HISTORY_REQUESTS = 2;
 // The recent time always taken from the history, the statistics not compiled for it yet
@@ -16,15 +21,16 @@ const RECENT_MS = 2 * 3600e3;
 export class CardHistory
 {
     // --------------------------------------------------------------------------------------
-    // The cache: a slot a day, from cacheSize days ago to today (the last one). In each, by
-    // entity, its history (hist) and its hourly statistics (stats), as rows — { last_changed,
-    // state }, a statistics row also statistics: { end, min, mean, max } —, an entity's rows
-    // there only once loaded (an empty list: loaded, nothing in it)
+    // The cache: a slot a day, from cacheSize days ago to today (the last one — more added
+    // as the days pass, _extendToNow). In each, by entity, its history (hist), its 5-minute
+    // statistics (fine) and its statistics of the period, hourly by default (stats), as rows
+    // — { last_changed, state }, a statistics row also statistics: { end, min, mean, max } —,
+    // an entity's rows there only once loaded (an empty list: loaded, nothing in it)
     // --------------------------------------------------------------------------------------
 
     _slot(d, e)
     {
-        return { start: d, end: e, start_m: moment(d), end_m: moment(e), hist: new Map(), stats: new Map() };
+        return { start: d, end: e, start_m: moment(d), end_m: moment(e), hist: new Map(), fine: new Map(), stats: new Map() };
     }
 
     initCache()
@@ -56,6 +62,17 @@ export class CardHistory
         for( const q of this._requests ) { q.c0 += growSize; q.c1 += growSize; }
 
         console.log(`Cache grown from ${this.cacheSize - growSize} to ${this.cacheSize} days`);
+    }
+
+    // Slots added for the days begun since the cache was made (a page left open past
+    // midnight: today is a new slot)
+    _extendToNow()
+    {
+        while( msOf(this.cache[this.cache.length - 1].end) <= Date.now() ) {
+            const d = this.cache[this.cache.length - 1].end;
+            this.cache.push(this._slot(d, moment(d).add(1, "day").format("YYYY-MM-DD") + "T00:00:00"));
+            this.cacheSize++;
+        }
     }
 
     mapStartTimeToCacheSlot(t)
@@ -119,34 +136,40 @@ export class CardHistory
         return [...ids];
     }
 
-    // Does the history tell more than the statistics, at the window's resolution — a column
-    // of pixels shorter than the statistics' period? (the statistics give each column its
-    // min, mean and max as exactly as the history then — to 1 px). Always, the statistics
-    // off; never, forced (statistics.force)
-    _historyTellsMore()
+    // The coarsest source that gives each column of pixels its min, mean and max as exactly
+    // as the history (to 1 px): 'stats' — the statistics of the period (hourly) — while a
+    // column lasts that long or more; else 'fine' — the 5-minute statistics — while it lasts
+    // 5 minutes or more; else 'history'. Always 'history', the statistics off; never,
+    // forced (statistics.force: 'fine' at most)
+    _sourceNeeded()
     {
-        if( !this.statistics.enabled ) return true;
-        if( this.statistics.force ) return false;
+        if( !this.statistics.enabled ) return 'history';
         const _px = Math.max(0, ...this.graphs.map(g => g.chart.hecPlotWidth()));
         const _column = moment(this.endTime).diff(moment(this.startTime)) / ( _px || 1000 );
-        return _column < ( PERIOD_MS[this.statistics.period] ?? PERIOD_MS.hour );
+        const _period = PERIOD_MS[this.statistics.period] ?? PERIOD_MS.hour;
+        if( _column >= _period ) return 'stats';
+        if( _column >= PERIOD_MS[FINE_PERIOD] || this.statistics.force ) return _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats';
+        return 'history';
     }
 
-    // An entity's rows over cache slots c0 to c1 — each slot's history, and its statistics
-    // before the history's first value (where the recorder no longer keeps it: a day past its
-    // retention, or the day it begins) — with, first, its last value before c0 when an earlier slot has it, so that the
-    // graphs have one value just before the start of their own data (no interpolation issue
-    // at the start of a curve, no state disappearing at the start of a timeline). Empty when
-    // the cache has none
+    // An entity's rows over cache slots c0 to c1 — in each slot, the finest it has: its
+    // history, else its 5-minute statistics, else its statistics of the period; and before
+    // the first row of a finer one, the coarser ones (where the recorder no longer keeps
+    // the history or the 5-minute statistics: a day past their retention, or the day it
+    // begins) — with, first, its last value before c0 when an earlier slot has it, so that
+    // the graphs have one value just before the start of their own data (no interpolation
+    // issue at the start of a curve, no state disappearing at the start of a timeline).
+    // Empty when the cache has none
     cachedHistory(entity, c0, c1)
     {
-        const _rows = s => {
-            const h = s.hist.get(entity), st = s.stats.get(entity);
-            if( !h || !st?.length ) return h ?? st;
-            const _first = h.length ? msOf(h[0].last_changed) : Infinity;
-            const _before = st.filter(x => msOf(x.statistics.end) <= _first);
-            return _before.length ? _before.concat(h) : h;
-        };
+        const _end = x => msOf(x.statistics?.end ?? x.last_changed);
+        const _rows = s => ['hist', 'fine', 'stats'].reduceRight((coarser, layer) => {
+            const a = s[layer].get(entity);
+            if( !a || !coarser?.length ) return a ?? coarser;
+            const _first = a.length ? msOf(a[0].last_changed) : Infinity;
+            const _before = coarser.filter(x => _end(x) <= _first);
+            return _before.length ? _before.concat(a) : a;
+        }, undefined);
         let r = [];
         for( let i = c0; i <= c1; i++ ) {
             const a = _rows(this.cache[i]);
@@ -203,32 +226,36 @@ export class CardHistory
     // Loading the window: what the cache lacks asked to Home Assistant
     // --------------------------------------------------------------------------------------
 
-    // What the window shown needs from Home Assistant, asked — the statistics first, the
-    // history only where it tells more:
+    // What the window shown needs from Home Assistant, asked — the statistics first, a finer
+    // source only where it tells more (_sourceNeeded):
     // - the hourly statistics of the window, in one request, for the entities that have
     //   some (_statisticsIds): drawn at once, the whole window;
+    // - their 5-minute statistics, in one request too, when a column of pixels is shorter
+    //   than an hour (and 5 minutes or longer): as far back as Home Assistant keeps them;
     // - meanwhile the history of the days of the last two hours — what the statistics
     //   don't have yet (an hour's are compiled once it's ended): today, and yesterday until
     //   2:00 —, of yesterday too when its statistics stop before its end (Home Assistant late
     //   with them); and the history of the entities without statistics, everywhere;
-    // - the history of the whole window when it tells more than the statistics
-    //   (_historyTellsMore: a column of pixels shorter than an hour), a few days at a
-    //   time, the most recent first, two parts at once; each part replaces the statistics
-    //   over its days as it comes.
+    // - the history of the whole window when it tells more than the statistics (a column
+    //   of pixels shorter than 5 minutes), a few days at a time, the most recent first, two
+    //   parts at once — two for the window shown: those still under way for another one
+    //   don't hold it back; each part replaces the statistics over its days as it comes.
     // Nothing is asked twice: what the cache has, or a request under way will bring. The
-    // graphs are drawn once everything is there; each answer draws them again meanwhile
+    // graphs are drawn at once, from what the cache has — the window asked is the window
+    // shown, whatever is loading —; each answer draws them again
     updateHistory()
     {
         this.showDate();
-        if( !this._askMissing() ) this.generateGraphDataFromCache();
+        this._askMissing();
+        this.generateGraphDataFromCache();
     }
 
-    // What the window lacks asked (see updateHistory) → whether anything is missing
+    // What the window lacks asked (see updateHistory)
     _askMissing()
     {
-
-        // Prime the cache on first call
+        // Prime the cache on first call; a slot for each day begun since
         if( !this.cache.length ) this.initCache();
+        this._extendToNow();
 
         // Check if we need to grow the cache due to an overflow
         if( moment(this.startTime) < this.cache[0].start_m ) this.growCache(365);
@@ -236,21 +263,24 @@ export class CardHistory
         const c0 = this.mapStartTimeToCacheSlot(this.startTime);
         const c1 = this.mapEndTimeToCacheSlot(this.endTime);
         const _ids = this.historyEntityIds();
-        if( c0 < 0 || c1 < 0 || !_ids.length ) return false;
+        if( c0 < 0 || c1 < 0 || !_ids.length ) return;
         const _statIds = this._statisticsIds(), _hasStats = new Set(_statIds);
         const _asked = (kind, i, id) => this._requests.some(q => q.kind === kind && q.c0 <= i && i <= q.c1 && q.ids.has(id));
-        let _missing = false;
+        const _source = this._sourceNeeded();
 
-        // The statistics of the window, in one request
-        const _stats = [];
-        for( let i = c0; i <= c1; i++ )
-            for( const id of _statIds ) if( !this.cache[i].stats.has(id) ) { _missing = true; if( !_asked('stats', i, id) ) _stats.push([i, id]); }
-        if( _stats.length ) this._ask('stats', Math.min(..._stats.map(x => x[0])), Math.max(..._stats.map(x => x[0])), new Set(_stats.map(x => x[1])));
+        // The statistics of the window — and its 5-minute ones when they tell more —, each
+        // in one request
+        for( const kind of _source === 'fine' ? ['stats', 'fine'] : ['stats'] ) {
+            const _l = [];
+            for( let i = c0; i <= c1; i++ )
+                for( const id of _statIds ) if( !this.cache[i][LAYER[kind]].has(id) && !_asked(kind, i, id) ) _l.push([i, id]);
+            if( _l.length ) this._ask(kind, Math.min(..._l.map(x => x[0])), Math.max(..._l.map(x => x[0])), new Set(_l.map(x => x[1])));
+        }
 
         // The history each day needs: everything when it tells more; else the entities
         // without statistics, and the most recent days' (today, yesterday when its
         // statistics stop early)
-        const _all = this._historyTellsMore();
+        const _all = _source === 'history';
         // (the history of the last two hours — the statistics of an hour come once it's
         // ended — asked with them, not after: today's day, and yesterday's too until 2:00;
         // yesterday's as well when its statistics stop before its end)
@@ -259,12 +289,12 @@ export class CardHistory
         const _needs = i => _ids.filter(id => !this.cache[i].hist.has(id) && ( _all || !_hasStats.has(id) || _recent(i, id) ));
         // (a few days at a time — at most 8 parts for the window —, the most recent first)
         const _days = Math.max(1, Math.ceil(( c1 - c0 + 1 ) / 8));
+        const _underWay = () => this._requests.filter(q => q.kind === 'history' && q.c0 <= c1 && q.c1 >= c0).length;
         let i = c1;
         while( i >= c0 ) {
             const _n = _needs(i).filter(id => !_asked('history', i, id));
-            if( _needs(i).length ) _missing = true;
             if( !_n.length ) { i--; continue; }
-            if( this._requests.filter(q => q.kind === 'history').length >= HISTORY_REQUESTS ) break;
+            if( _underWay() >= HISTORY_REQUESTS ) break;
             // (the days before it needing exactly the same entities, up to a part's length: a
             // curve's recent days never asked with weeks of a timeline's)
             const _key = k => _needs(k).filter(id => !_asked('history', k, id)).join();
@@ -275,7 +305,6 @@ export class CardHistory
         }
 
         this.state.loading = this._requests.length > 0;
-        return _missing;
     }
 
     // Do entity id's statistics stop before the end of slot s — loaded, its last hour ending
@@ -288,51 +317,64 @@ export class CardHistory
         return _end < Math.min(msOf(s.end), Date.now());
     }
 
-    // A request to Home Assistant for slots c0 to c1 and entities ids — kind 'stats' or
-    // 'history' —, kept under way until it's answered; the answer put in the cache, what's
-    // still missing asked, the graphs drawn again
+    // A request to Home Assistant for slots c0 to c1 and entities ids — kind 'stats',
+    // 'fine' (5-minute statistics) or 'history' —, kept under way until it's answered, or
+    // fails (even before it's sent); the answer put in the cache, what's still missing
+    // asked, the graphs drawn again
     _ask(kind, c0, c1, ids)
     {
         const q = { kind, c0, c1, ids, gen: this._loadGen };
         this._requests.push(q);
         const t0 = this.cache[c0].start, t1 = this.cache[c1].end, l = [...ids];
-        const _p = kind === 'stats'
-            ? this._askHA(this.statisticsRequest(l, t0, t1, this.statistics.period ?? 'hour'))
-            : this.historyCall(l, t0, t1);
+        const _period = kind === 'fine' ? FINE_PERIOD : this.statistics.period ?? 'hour';
+        let _p;
+        try {
+            _p = kind === 'history' ? this.historyCall(l, t0, t1) : this._askHA(this.statisticsRequest(l, t0, t1, _period));
+        } catch( e ) {
+            _p = Promise.reject(e);
+        }
         _p.then(r => this._answered(q, r), e => this._answered(q, null, e));
     }
 
+    // Request q answered (result), or failed (error). Whatever happens in between, the
+    // request is no longer under way, the loading state says so, and the graphs are drawn
+    // again: never a request left waiting for good, nor a loading state that never ends
     _answered(q, result, error)
     {
         this._requests = this._requests.filter(x => x !== q);
-        // (an answer for a cache since cleared — reloadHistory —: ignored)
-        if( q.gen !== this._loadGen ) return;
-        if( error ) {
-            console.log("Database request failure");
-            console.log(error);
-        }
-        const _t = performance.now();
-        if( this.databaseCallback ) this.databaseCallback(!error);
-        // (what each entity asked got, split by day: an entity absent from the answer has
-        // nothing there — kept as such, not asked again; a failure: nothing kept)
-        if( !error ) for( const id of q.ids ) {
-            const a = result?.[id] ?? [];
-            const rows = q.kind === 'stats' ? a.map(x => this._statisticsRow(x)) : a.map(x => ({ last_changed: x.lu * 1000, state: x.s }));
-            let p = 0;
-            for( let i = q.c0; i <= q.c1; i++ ) {
-                const _end = msOf(this.cache[i].end);
-                let k = p;
-                while( k < rows.length && msOf(rows[k].last_changed) < _end ) k++;
-                this.cache[i][q.kind === 'stats' ? 'stats' : 'hist'].set(id, rows.slice(p, k));
-                p = k;
+        try {
+            // (an answer for a cache since cleared — reloadHistory —: ignored)
+            if( q.gen !== this._loadGen ) return;
+            if( error ) {
+                console.log("Database request failure");
+                console.log(error);
             }
+            const _t = performance.now();
+            if( this.databaseCallback ) this.databaseCallback(!error);
+            // (what each entity asked got, split by day: an entity absent from the answer has
+            // nothing there — kept as such, not asked again; a failure: nothing kept, asked
+            // again at the next update)
+            if( !error ) for( const id of q.ids ) {
+                const a = result?.[id] ?? [];
+                const _period = PERIOD_MS[q.kind === 'fine' ? FINE_PERIOD : this.statistics.period] ?? PERIOD_MS.hour;
+                const rows = q.kind === 'history' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period));
+                let p = 0;
+                for( let i = q.c0; i <= q.c1; i++ ) {
+                    const _end = msOf(this.cache[i].end);
+                    let k = p;
+                    while( k < rows.length && msOf(rows[k].last_changed) < _end ) k++;
+                    this.cache[i][LAYER[q.kind]].set(id, rows.slice(p, k));
+                    p = k;
+                }
+            }
+            this.perf?.add('part', performance.now() - _t);
+            // (what's still missing asked at once, before this answer is drawn: Home Assistant
+            // works on it meanwhile)
+            if( !error ) this._askMissing();
+        } finally {
+            this.state.loading = this._requests.length > 0;
+            this._drawSoon();
         }
-        this.perf?.add('part', performance.now() - _t);
-        this.state.loading = this._requests.length > 0;
-        // (what's still missing asked at once, before this answer is drawn: Home Assistant
-        // works on it meanwhile)
-        if( !error ) this._askMissing();
-        this._drawSoon();
     }
 
     // A request of the history or the statistics to Home Assistant — timed, with how many
@@ -359,11 +401,11 @@ export class CardHistory
 
     // A row of the cache from an hour of Home Assistant's statistics: its mean — or, for a
     // total, its state —, with its end, min, mean and max (statistics)
-    _statisticsRow(x)
+    _statisticsRow(x, period)
     {
         const _v = x.mean ?? x.state ?? x.sum;
         return { last_changed: x.start, state: _v,
-                 statistics: { end: x.end ?? msOf(x.start) + 3600e3, min: x.min ?? _v, mean: _v, max: x.max ?? _v } };
+                 statistics: { end: x.end ?? msOf(x.start) + period, min: x.min ?? _v, mean: _v, max: x.max ?? _v } };
     }
 
     // --------------------------------------------------------------------------------------
@@ -447,29 +489,15 @@ export class CardHistory
         this.updateHistory();
     }
 
-    updateHistoryWithClearCache()
-    {
-        if( !this.state.loading ) {
-            this.cache.length = 0;
-            this.updateHistory();
-        }
-    }
-
-    // Today's history forgotten, to be asked again — what's new since (the refresh). Its
-    // statistics aren't: today is drawn from its history
+    // The history of the days since the last refresh forgotten, to be asked again — what's
+    // new since (the refresh): today's, and yesterday's too after midnight. Their statistics
+    // aren't: the recent days are drawn from their history
     _forgetToday()
     {
-        this.cache[this.cacheSize]?.hist.clear();
-    }
-
-    updateAxes()
-    {
-        for( let g of this.graphs ) {
-            if( !this.state.updateCanvas || this.state.updateCanvas === g.canvas ) {
-                this.applyTimeAxis(g);
-                this.showValues(g);
-            }
-        }
+        if( this.cache.length ) this._extendToNow();
+        const _since = this._refreshedAt || Date.now();
+        for( const s of this.cache ) if( msOf(s.end) > _since ) s.hist.clear();
+        this._refreshedAt = Date.now();
     }
 
     // --------------------------------------------------------------------------------------

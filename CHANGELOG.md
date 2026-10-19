@@ -4,6 +4,23 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.26] - 2026-10-19
+
+### Fixed — an action while the card was loading, lost for good
+- A range chosen while the history was loading — the browser busy, Home Assistant slow — was ignored: the range selector showed the new value, the window stayed as it was, until the range was changed again. The same for the zoom (buttons, wheel, pinch), the day before or after, the calendar, the default range, a curve added; a drag only moved the axes, the days it then showed never asked; adding, removing a curve or changing its type, or a new entity in the info panel, didn't draw the graphs again. Every user action began with "nothing while loading" (`state.loading`), left from the former loader, which couldn't follow two windows at once
+- The last one to speak wins, whatever is loading: each action is taken at once — what it shows and what it does always together —, the window drawn with what the cache has, what it lacks asked. The loader follows the window shown: what was asked for another one keeps coming and is kept, and doesn't hold the new one back (two history parts at once for the window shown). Nothing clears the cache any more for a curve added or changed (`updateHistoryWithClearCache` removed): the cache is by entity, what's new is simply missing
+- A request that failed, or threw before being sent, could leave the loading state on for good — every action then ignored: the request is now always taken off what's under way, the loading state and the graphs updated, whatever happens in between
+- A page left open past midnight: the cache, made for the days until the day it was opened, had no slot for the new day — its history was never asked, the curves stopped at midnight. Slots are added for the days begun since; the refresh asks again the history of every day since the last one (today's, and yesterday's after midnight)
+
+### New — the 5-minute statistics
+- Between the hourly statistics and the history, Home Assistant's 5-minute statistics: asked in one request when a column of pixels lasts between 5 minutes and an hour (a window of some three days to five weeks on 900 pixels) — as exact to the pixel as the history, far lighter for a sensor reporting every few seconds. Home Assistant keeps them as long as the history (`purge_keep_days`): what it returns is taken, however far back, the hourly statistics before that; nothing assumed about the retention
+- With `statistics.force`, the 5-minute statistics too (no history but for the last two hours)
+- In each day of the cache, the finest data it has: the history, else the 5-minute statistics, else the hourly ones — and before the first value of a finer one, the coarser ones
+
+### Tests
+- `features`: the range chosen while Home Assistant is slow — the selector, the range, the window and its data the new ones; the window dragged back while loading — its days asked and drawn; a curve added while loading; a request failing — the loading ends, asked again at the next update; a page left open past midnight — a day added, its history asked; 30 days with 10 of history — hourly then 5-minute statistics, the history only for the recent days, the hourly statistics past 10 days; 6 months — no 5-minute statistics; `force` — hourly and 5-minute statistics
+- The mock Home Assistant gives 5-minute statistics, kept as long as its history
+
 ## [v1.2.25] - 2026-10-19
 
 ### Changed — the statistics first, the history only where it shows more

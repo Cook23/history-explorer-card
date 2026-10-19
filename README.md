@@ -535,7 +535,7 @@ entityOptions:
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. **(1.2.25)** The hourly statistics of the whole window come first, in one request, and are drawn at once; the history is loaded only where it shows more — when a column of pixels lasts less than an hour —, and always for the last two hours. `mode` and `retention` are ignored.
+The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. **(1.2.25)** The hourly statistics of the whole window come first, in one request, and are drawn at once; finer data is loaded only where it shows more — **(1.2.26)** the 5-minute statistics when a column of pixels lasts less than an hour, the history when it lasts less than 5 minutes —, and the history always for the last two hours. `mode` and `retention` are ignored.
 
 ```yaml
 statistics:

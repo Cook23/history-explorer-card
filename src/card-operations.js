@@ -233,7 +233,7 @@ export class CardOperations
         for( const e of g.entities ) this.store.remove(e, true);
         this.removeGraphs([g]);
         this.refreshGraphControls();
-        this.updateHistoryWithClearCache();
+        this.updateHistory();
         this.writeLocalState();
     }
 
@@ -251,7 +251,7 @@ export class CardOperations
             const _det = _numeric && type === 'default' ? this.detectDefaultType(id) : null;
             return this._addCurve(id, !_numeric ? 'timeline' : _det ? _det.type : type, !_numeric ? null : _det ? _det.lineMode : lineMode);
         });
-        this.updateHistoryWithClearCache();
+        this.updateHistory();
         this.writeLocalState();
         return _names;
     }
@@ -315,7 +315,7 @@ export class CardOperations
             this.addGraph(_entity.entity, { color: _entry?.color ?? _entity.color, before: _nextG, interval: _entity.interval, groupId: _groupId, entry: _entry ?? _entity });
             this._keepFill([_entity]);
             this.refreshGraphControls();
-            this.updateHistoryWithClearCache();
+            this.updateHistory();
         }
         this.writeLocalState();
     }
@@ -337,7 +337,7 @@ export class CardOperations
             this.rebuildGraph(_entities, g.groupId, _nextG, { fill: null });
             this._keepFill(_entities);
             this.refreshGraphControls();
-            this.updateHistoryWithClearCache();
+            this.updateHistory();
         }
         this.writeLocalState();
     }
@@ -445,7 +445,7 @@ export class CardOperations
         this.setPresentWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();
-        this.updateHistoryWithClearCache();
+        this.updateHistory();
     }
 
     // What's shown taken again from the saved state as it now is — another device spoke,

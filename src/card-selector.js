@@ -648,7 +648,6 @@ export class CardSelector
 
     addEntitySelected(ii)
     {
-        if( this.state.loading ) return;
         if( ii < 0 || ii === undefined ) return;
 
         // Resolve entity_id: only if something was actually selected
