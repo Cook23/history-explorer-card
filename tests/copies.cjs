@@ -1,5 +1,6 @@
 // The same curve in several graphs: in the YAML, or from the entity selector after a choice
-// (cancel, or a second curve) — each its own, saved on its own; never twice in one graph
+// (cancel, or a second curve) — each its own, saved on its own; twice in one graph only from
+// the YAML (mini-graph-card's way), never by a gesture
 const { openCard } = require('./lib.cjs');
 
 const card = (o) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, ...o });
@@ -16,12 +17,11 @@ module.exports = async function()
     // ── In the YAML ──
     const YAML = { graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] },
-        { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power', color: 'red' }] }] };
+        { type: 'line', entities: [{ entity: 'sensor.power' }] }] };
     let t = await openCard(card({ ...YAML, enable_persistence: 'entities' }), { mock: { series: true }, height: 900 });
     await t.wait(1500);
-    await t.step('the same entity in two YAML graphs: a curve in each, with its history; twice in one graph: once, said in the console', async () => {
-        const r = { shown: await shown(t), keys: await keys(t), n: await t.E(`el.instance.graphsInDisplayOrder()[1].chart.data.datasets[0].data.length`),
-                    warned: await t.E(`logs.some(l=>/twice in graph/.test(l))`) };
+    await t.step('the same entity in two YAML graphs: a curve in each, with its history', async () => {
+        const r = { shown: await shown(t), keys: await keys(t), n: await t.E(`el.instance.graphsInDisplayOrder()[1].chart.data.datasets[0].data.length`) };
         return r.shown === 'power+rain | power' && r.keys === 'power rain power#1' && r.n > 100 ? true : JSON.stringify(r);
     });
     await t.step('each curve its own: one hidden, one changed to stepped — the other unchanged, both kept after a reload', async () => {
@@ -81,6 +81,22 @@ module.exports = async function()
         await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power2'], 'line', 'smart'); })()`); await t.wait(1200);
         const again = await keys(t);
         return a === 'power2 power2#1' && other === a && left === 'power2#1' && again === 'power2#1 power2' ? true : JSON.stringify({ a, other, left, again });
+    });
+    done(await t.close());
+
+    // ── The same entity several times in one graph, in the YAML (mini-graph-card's max, min
+    // and mean of a sensor): a curve each, each its own options ──
+    t = await openCard(card({ defaultTimeRange: '168', groupBy: 'date', graphs: [{ type: 'line', entities: [
+        { entity: 'sensor.power', aggregateFunc: 'max', name: 'Max' }, { entity: 'sensor.power', aggregateFunc: 'min', name: 'Min' }, { entity: 'sensor.power', name: 'Mean' }] }] }),
+        { mock: { series: true }, height: 900 });
+    await t.wait(2500);
+    await t.step('the same entity three times in one YAML graph: three curves — copies, each its own aggregateFunc and name —, the max above the mean above the min', async () => {
+        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], d=g.chart.data.datasets;
+            return { names: d.map(x=>x.name).join(), keys: el.instance.store.list.map(e=>e.entity.split('.')[1]+(e.copy?'#'+e.copy:'')).join(' '),
+                     ys: d.map(x=>x.data.map(p=>p.y)) }; })()`);
+        const [mx, mn, av] = r.ys;
+        const ok = r.names === 'Max,Min,Mean' && r.keys === 'power power#1 power#2' && mx.length > 5 && mx.every((y, i) => y >= av[i] - 1e-9 && av[i] >= mn[i] - 1e-9) && mx.some((y, i) => y > mn[i]);
+        return ok ? true : JSON.stringify({ names: r.names, keys: r.keys, n: r.ys.map(a => a.length) });
     });
     done(await t.close());
 

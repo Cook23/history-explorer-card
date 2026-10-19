@@ -1,6 +1,8 @@
 // The series a curve shows: an entity's state, or one of its attributes. A series is named
 // by its id: the entity id for its state; for an attribute, the entity id, a dot and the
-// attribute (an entity id has a single dot: what follows a second one is an attribute).
+// attribute (an entity id has a single dot: what follows a second one is an attribute) —
+// or a sub-attribute: its path, the attribute then, in a dictionary or a list, the key or
+// the index of each level (forecast.0.temperature), as mini-graph-card reads it.
 
 // Home Assistant's own attributes: what describes an entity, never a value to show
 export const HA_ATTRIBUTES = [
@@ -62,11 +64,29 @@ export function seriesId(entity, attribute)
     return attribute ? entity + '.' + attribute : entity;
 }
 
-// An attribute as people read it: current_temperature → Current temperature
+// An attribute as people read it: current_temperature → Current temperature; a
+// sub-attribute, each level so: forecast.0.temperature → Forecast › 0 › Temperature
 export function attributeLabel(attribute)
 {
-    const _s = attribute.replace(/_/g, ' ');
-    return _s.charAt(0).toUpperCase() + _s.slice(1);
+    return attribute.split('.').map(k => { const _s = k.replace(/_/g, ' '); return _s.charAt(0).toUpperCase() + _s.slice(1); }).join(' › ');
+}
+
+// The value of attributes at path — an attribute, or a sub-attribute (see above), each
+// level's key or index in turn; an attribute whose own name holds a dot taken as is.
+// undefined when there's none
+export function attributeAt(attributes, path)
+{
+    if( !attributes ) return undefined;
+    if( path in attributes ) return attributes[path];
+    return path.split('.').reduce((v, k) => v !== null && typeof v === 'object' ? v[k] : undefined, attributes);
+}
+
+// The name a value at path goes by, for its unit and whether it's a direction: its last key
+// that isn't an index (forecast.0.temperature: temperature)
+function _leafName(path)
+{
+    const _k = path.split('.').filter(k => !/^\d+$/.test(k));
+    return _k.length ? _k[_k.length - 1] : path;
 }
 
 // An attribute's value as a series': a number followed by a text that isn't one (12.5 °C,
@@ -110,7 +130,7 @@ const WEATHER_UNITS = { temperature: 'temperature', apparent_temperature: 'tempe
 // from -90 to 90) is not circular. Same rule as lowpass_dt's attribute sources.
 export function isDirectionAttribute(attribute)
 {
-    return /bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir/.test(attribute);
+    return /bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir/.test(_leafName(attribute));
 }
 
 // The units Home Assistant knows an entity's attributes are in, by domain (its frontend's
@@ -146,8 +166,9 @@ function _domainUnit(entity, attribute)
 // temperature, the temperature unit of hass (its unit system); else, as some integrations
 // give them, the X_unit of the longest X its name contains (see _unitsOf); or undefined —
 // a unit has none
-function attributeUnitOf(hass, s, attribute)
+function attributeUnitOf(hass, s, path)
 {
+    const attribute = _leafName(path);
     const _units = _unitsOf(s?.attributes);
     if( attribute.endsWith('_unit') ) return undefined;
     if( s.entity_id.startsWith('weather.') && WEATHER_UNITS[attribute] ) return WEATHER_UNITS[attribute].unit ?? _units[WEATHER_UNITS[attribute]];
@@ -165,7 +186,7 @@ function attributeUnitOf(hass, s, attribute)
 function _seriesValue(entity, attribute, v)
 {
     const _r = attributeValue(v);
-    const _f = _domainUnit(entity, attribute)?.factor ?? 1;
+    const _f = _domainUnit(entity, _leafName(attribute))?.factor ?? 1;
     return _f !== 1 && typeof _r.value === 'number' ? { ..._r, value: _r.value * _f } : _r;
 }
 
@@ -177,16 +198,40 @@ const _isReference = v => typeof v === 'string' && /^([a-z][a-z0-9_]*\.[a-z0-9_]
 // last_seen, a birthday…): a moment, different each time, nothing to follow
 const _isDateTime = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}|$)/.test(v.trim());
 
-// The attributes of state s that can be shown as a series: a number, a text or a yes/no —
-// not Home Assistant's own, not a list or an object, not a unit (X_unit), not a reference
-// to something else (an entity, a web address), not about a version or an update (its
-// name says so: installed_version, auto_update…), not a setting, a limit or a description
-// (NOT_SERIES_ATTRIBUTES), not a date (with or without its time)
-export function seriesAttributes(s)
+// Can value v, of key k, be shown as a series: a number, a text or a yes/no — not a unit
+// (X_unit), not a reference to something else (an entity, a web address), not about a
+// version or an update (its name says so: installed_version, auto_update…), not a setting,
+// a limit or a description (NOT_SERIES_ATTRIBUTES), not a date (with or without its time)?
+// Or, a dictionary or a list of dictionaries (a forecast), does it hold one, down to depth
+// levels? (a list of plain values is a set of choices — hvac_modes —, nothing to follow)
+function _offered(k, v, depth = 4)
+{
+    if( Array.isArray(v) )
+        return depth > 0 && v.some((x, i) => x !== null && typeof x === 'object' && _offered(String(i), x, depth - 1));
+    if( v !== null && typeof v === 'object' )
+        return depth > 0 && Object.entries(v).some(([k2, v2]) => _offered(k2, v2, depth - 1));
+    return ['number', 'string', 'boolean'].includes(typeof v) && !_isUnit(k, v) && !_isReference(v)
+        && !/version|update/i.test(k) && !NOT_SERIES_ATTRIBUTES.includes(k) && !_isDateTime(v);
+}
+
+// The attributes of state s that can be shown as a series (see _offered) — not Home
+// Assistant's own —, as paths; with path, the sub-attributes of the dictionary or the list
+// there, each by its key or index. A dictionary or a list among them holds some
+// (isAttributeGroup): a submenu of its own
+export function seriesAttributes(s, path = null)
 {
     const _a = s?.attributes ?? {};
-    return Object.keys(_a).filter(k => !HA_ATTRIBUTES.includes(k) && ['number', 'string', 'boolean'].includes(typeof _a[k]) && !_isUnit(k, _a[k])
-        && !_isReference(_a[k]) && !/version|update/i.test(k) && !NOT_SERIES_ATTRIBUTES.includes(k) && !_isDateTime(_a[k]));
+    const _base = path === null ? _a : attributeAt(_a, path);
+    if( _base === null || typeof _base !== 'object' ) return [];
+    return Object.keys(_base).filter(k => ( path !== null || !HA_ATTRIBUTES.includes(k) ) && _offered(k, _base[k]))
+        .map(k => path === null ? k : path + '.' + k);
+}
+
+// Is the attribute of state s at path a dictionary or a list (of sub-attributes)?
+export function isAttributeGroup(s, path)
+{
+    const _v = attributeAt(s?.attributes, path);
+    return _v !== null && typeof _v === 'object';
 }
 
 // The state of series id in hass, as Home Assistant gives an entity's — for an attribute:
@@ -201,8 +246,9 @@ export function seriesState(hass, id)
     const { entity, attribute } = seriesOf(id);
     const _s = hass?.states[entity];
     if( !attribute || !_s ) return attribute ? undefined : _s;
-    if( !_s.attributes || !( attribute in _s.attributes ) ) return undefined;
-    const { value: _v, unit: _valueUnit } = _seriesValue(entity, attribute, _s.attributes[attribute]);
+    const _raw = attributeAt(_s.attributes, attribute);
+    if( _raw === undefined ) return undefined;
+    const { value: _v, unit: _valueUnit } = _seriesValue(entity, attribute, _raw);
     const _unit = _valueUnit ?? attributeUnitOf(hass, _s, attribute);
     return { entity_id: id, state: _v === null ? 'unknown' : String(_v), last_changed: _s.last_updated, last_updated: _s.last_updated,
              attributes: { friendly_name: ( _s.attributes.friendly_name ?? entity ) + ' : ' + attributeLabel(attribute),
@@ -220,8 +266,9 @@ export function attributeHistories(ids, entityHistories)
         const { entity, attribute } = seriesOf(id);
         const _rows = [];
         for( const x of entityHistories[entity] ?? [] ) {
-            if( !x.a || !( attribute in x.a ) ) continue;
-            const _v = _seriesValue(entity, attribute, x.a[attribute]).value;
+            const _raw = attributeAt(x.a, attribute);
+            if( _raw === undefined ) continue;
+            const _v = _seriesValue(entity, attribute, _raw).value;
             if( _rows.length && _rows[_rows.length - 1].s === _v ) continue;
             _rows.push({ s: _v, lu: x.lu });
         }

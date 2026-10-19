@@ -149,5 +149,63 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Aggregation: points_per_hour, aggregate_func, group_by (mini-graph-card's) ──
+    // (each curve's points: [time, value], and its groups' start and end)
+    const pts = (i = 0) => t.E(`el.instance.graphsInDisplayOrder()[0].chart.data.datasets.map(d=>d.data.map(p=>[+new Date(p.x), p.y, p.columnFrom, p.columnTo]))`);
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 168, group_by: 'date',
+        entities: [{ entity: 'sensor.power', aggregate_func: 'max', name: 'Max' }, { entity: 'sensor.power2', aggregate_func: 'min', name: 'Min' }, { entity: 'sensor.watering_cycle', name: 'Avg' }] },
+        { mock: { series: true, historyStep: 600 }, height: 700 });
+    await t.wait(3000);
+    await t.step('group_by: date — a point a day, from midnight to midnight; aggregate_func max: the day\'s highest value, min: its lowest, none: its mean (time-weighted), between them', async () => {
+        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0];
+            return g.chart.data.datasets.map((d,k)=>{ const raw=(g.valueSamples?.[k]??[]);
+                return d.data.map(p=>{ const v=raw.filter(x=>x.t>=p.columnFrom && x.t<p.columnTo).map(x=>x.v);
+                    return { from: p.columnFrom, to: p.columnTo, y: p.y, lo: v.length?Math.min(...v):null, hi: v.length?Math.max(...v):null }; }); }); })()`);
+        const [mx, mn, av] = r;
+        const midnight = x => new Date(x).getHours() === 0 && new Date(x).getMinutes() === 0;
+        const days = mx.length >= 7 && mx.length <= 9 && mx.every(p => midnight(p.from)) && mx.slice(0, -1).every(p => p.to - p.from >= 23 * 3600e3);
+        const near = (a, b) => Math.abs(a - b) < 1e-6;
+        const full = a => a.filter(p => p.lo !== null);
+        const ok = days && full(mx).every(p => near(p.y, p.hi)) && full(mn).every(p => near(p.y, p.lo)) && full(av).every(p => p.y >= p.lo - 1e-9 && p.y <= p.hi + 1e-9 && p.hi > p.lo);
+        return ok ? true : JSON.stringify({ n: [mx.length, mn.length, av.length], mx: mx.slice(0, 2), mn: mn.slice(0, 2), av: av.slice(0, 2) });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, points_per_hour: 0.5,
+        entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2', aggregate_func: 'delta' }, { entity: 'sensor.watering_cycle', aggregate_func: 'diff' }, { entity: 'sensor.days_to_watering', aggregate_func: 'median' }] },
+        { mock: { series: true, historyStep: 300 }, height: 700 });
+    await t.wait(3000);
+    await t.step('points_per_hour: 0.5 — a point every 2 h, on whole hours of the day (0:00, 2:00…); delta its max less its min, diff its last less its first, median between them', async () => {
+        const start = await t.E('+new Date(el.instance.startTime)');
+        const [av, de, di, me] = ( await pts() ).map(a => a.filter(x => x[3] > start));
+        const even = av.every(p => new Date(p[2]).getMinutes() === 0 && new Date(p[2]).getHours() % 2 === 0) && av.slice(0, -1).every(p => p[3] - p[2] === 2 * 3600e3);
+        const r = { n: av.length, even, delta: de.every(p => p[1] >= 0), diff: di.some(p => p[1] < 0) && di.some(p => p[1] > 0),
+                    median: me.every(p => p[1] >= Math.min(...me.map(x => x[1]))) };
+        return av.length >= 12 && av.length <= 14 && even && r.delta && r.diff && de.length === av.length ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 168, aggregate_func: 'max', group_by: 'date', show: { graph: 'bar' },
+        entities: ['sensor.power'] }, { mock: { series: true, historyStep: 600 }, height: 700 });
+    await t.wait(3000);
+    await t.step('show: graph: bar, group_by: date, aggregate_func: max — a bar a day (the interval daily), each the day\'s highest value', async () => {
+        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], d=g.chart.data.datasets[0].data, v=g.valueSamples?.[0] ?? [];
+            return { type: g.type, interval: g.interval, n: d.length, ys: d.map(p=>p.y) }; })()`);
+        const ok = r.type === 'bar' && r.interval === 2 && r.n >= 7 && r.n <= 9 && r.ys.every(y => y > 0);
+        return ok ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, defaultTimeRange: '24',
+        entityOptions: [{ match: 'sensor.rain', aggregateFunc: 'max' }],
+        graphs: [{ type: 'line', options: { pointsPerHour: 1 }, entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }, { mock: { series: true, historyStep: 300 }, height: 700 });
+    await t.wait(3000);
+    await t.step('in the card\'s own syntax, at every level: pointsPerHour on a graph (a point an hour), aggregateFunc in entityOptions', async () => {
+        const start = await t.E('+new Date(el.instance.startTime)');
+        // (the points of the window: the day before it, loaded too, has its own)
+        const [p, r] = ( await pts() ).map(a => a.filter(x => x[3] > start));
+        const hourly = p.slice(0, -1).every(x => x[3] - x[2] === 3600e3) && p.length >= 24 && p.length <= 26;
+        const maxed = await t.E(`el.instance.resolveAggregation(el.instance.graphsInDisplayOrder()[0].entities[1]).func`);
+        return hourly && maxed === 'max' && r.length === p.length ? true : JSON.stringify({ n: p.length, maxed, rn: r.length });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

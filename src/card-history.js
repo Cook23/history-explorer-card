@@ -162,11 +162,13 @@ export class CardHistory
     // begins) — with, first, its last value before c0 when an earlier slot has it, so that
     // the graphs have one value just before the start of their own data (no interpolation
     // issue at the start of a curve, no state disappearing at the start of a timeline).
-    // Empty when the cache has none
-    cachedHistory(entity, c0, c1)
+    // Empty when the cache has none. history: the window drawn from the history
+    // (_sourceNeeded) — a day whose history hasn't come yet shows nothing, not its
+    // statistics meanwhile: they're there only for what the history no longer keeps
+    cachedHistory(entity, c0, c1, history = false)
     {
         const _end = x => msOf(x.statistics?.end ?? x.last_changed);
-        const _rows = s => ['hist', 'fine', 'stats'].reduceRight((coarser, layer) => {
+        const _rows = s => history && !s.hist.has(entity) ? undefined : ['hist', 'fine', 'stats'].reduceRight((coarser, layer) => {
             const a = s[layer].get(entity);
             if( !a || !coarser?.length ) return a ?? coarser;
             const _first = a.length ? msOf(a[0].last_changed) : Infinity;
@@ -200,10 +202,10 @@ export class CardHistory
         let c1 = this.mapEndTimeToCacheSlot(this.endTime);
 
         if( c0 >= 0 && c1 >= 0 ) {
-            const result = [];
-            for( const g of this.graphs ) for( const e of g.entities ) result.push(this.cachedHistory(e.entity, c0, c1));
+            const result = [], _history = this._sourceNeeded() === 'history';
+            for( const g of this.graphs ) for( const e of g.entities ) result.push(this.cachedHistory(e.entity, c0, c1, _history));
             const colorHistory = {};
-            for( const id of this.colorEntityIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1);
+            for( const id of this.colorEntityIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1, _history);
             this.buildChartData(result, colorHistory);
         } else
             this.buildChartData(null);

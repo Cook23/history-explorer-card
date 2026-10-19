@@ -292,44 +292,73 @@ export class CardDatasets
         }
         _values.forEach((v, k) => { v.end ??= k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t); });
 
-        const _flush = group => {
-            if( group.length === 1 && !group[0].stat ) { s.push({ x: group[0].t, y: group[0].y }); return; }
-            // (a value of the history counts until the column's end at most; an hour of
-            // statistics, whole — it belongs to the column where it starts)
-            const _colEnd = ( Math.floor(group[0].t / _width) + 1 ) * _width;
-            const _end = v => v.stat || !_width ? v.end : Math.min(v.end, _colEnd);
-            let sum = 0, span = 0, min = Infinity, max = -Infinity, stat = false, period = 0;
+        // (the groups the values are put in: each column of pixels — or, aggregated
+        // (_groupsOf), the groups asked, never narrower than a column)
+        const _agg = this.resolveAggregation(e);
+        const _groups = this._groupsOf(_agg, _width);
+        // (as Home Assistant compiles its statistics: the value of the history in force when a
+        // group starts counts in it — from its start, in its mean, its min, its max —, a group
+        // with no value of its own has that one; see _carried)
+        const _carried = (prev, gs) => prev && !prev.stat && prev.end > gs ? { t: gs, y: prev.y, min: prev.y, max: prev.y, end: prev.end, stat: false, carried: true } : null;
+        const _flush = (group, gs, ge) => {
+            // (a single value of its own drawn as recorded, unless aggregated)
+            const _own = group.filter(v => !v.carried);
+            if( !_agg.explicit && _own.length === 1 && !_own[0].stat ) { s.push({ x: _own[0].t, y: _own[0].y }); return; }
+            // (a value of the history counts until the group's end at most; an hour of
+            // statistics, whole — it belongs to the group where it starts)
+            const _end = v => v.stat || !_width ? v.end : Math.min(v.end, ge);
+            let min = Infinity, max = -Infinity, stat = false, period = 0;
             for( const v of group ) {
-                const d = Math.max(0, _end(v) - v.t) || 1;
-                sum += v.y * d; span += d;
                 min = Math.min(min, v.min); max = Math.max(max, v.max); stat ||= v.stat;
                 if( v.period ) period = Math.max(period, v.period);
             }
-            const _from = group[0].t, _to = Math.max(_from, _end(group[group.length - 1]));
-            const p = { x: ( _from + _to ) / 2, y: sum / span, columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
+            const _from = _agg.explicit ? gs : group[0].t;
+            const _to = _agg.explicit ? Math.min(ge, Math.max(_until, gs)) : Math.max(_from, _end(group[group.length - 1]));
+            const p = { x: ( _from + _to ) / 2, y: this._aggregate(_agg.func, group, _end, min, max), columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
             // (the statistics' period: 5 minutes, an hour — the coarsest in the column)
             if( period ) p.statisticsPeriod = period;
-            if( this._bandWanted(e, stat, group.length) ) { p.yMin = min; p.yMax = max; }
+            if( this._bandWanted(e, stat, _agg.explicit ? 2 : group.length) ) { p.yMin = min; p.yMax = max; }
             s.push(p);
         };
-        let group = [], key = null;
+        // (aggregated, a group without values of its own: the value in force (_carried) — or,
+        // after statistics, the point before; none for a difference: delta, diff —, as
+        // mini-graph-card does)
+        const _empty = (prev, gs, ge) => {
+            const _c = _carried(prev, gs);
+            if( _c ) return _flush([_c], gs, ge);
+            const _y = _agg.func === 'delta' || _agg.func === 'diff' ? 0 : s[s.length - 1]?.y;
+            if( _y !== undefined ) s.push({ x: ( gs + Math.min(ge, Math.max(_until, gs)) ) / 2, y: _y });
+        };
+        let group = [], gs = null, prev = null;
         for( const v of _values ) {
-            const k = _width > 0 ? Math.floor(v.t / _width) : v.t;
-            if( k !== key && group.length ) { _flush(group); group = []; }
-            key = k;
+            const _gs = _groups.start(v.t);
+            if( _gs !== gs ) {
+                if( group.length ) {
+                    _flush(group, gs, _groups.next(gs));
+                    if( _agg.explicit ) for( let g = _groups.next(gs); g < _gs; g = _groups.next(g) ) _empty(prev, g, _groups.next(g));
+                }
+                group = [];
+                gs = _gs;
+                const _c = v.t > gs ? _carried(prev, gs) : null;
+                if( _c ) group.push(_c);
+            }
             group.push(v);
+            prev = v;
         }
-        if( group.length ) _flush(group);
+        if( group.length ) {
+            _flush(group, gs, _groups.next(gs));
+            if( _agg.explicit ) for( let g = _groups.next(gs); g < _until; g = _groups.next(g) ) _empty(prev, g, _groups.next(g));
+        }
 
         // The last value carried to the end of the window, or to now when the window
-        // reaches it
+        // reaches it (aggregated: its groups go there)
         let _extended = false;
-        if( s.length > 0 && s[s.length-1].x < _until && _values.length ) {
+        if( !_agg.explicit && s.length > 0 && s[s.length-1].x < _until && _values.length ) {
             s.push({ x: _until, y: _values[_values.length - 1].y });
             _extended = true;
         }
 
-        if( (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
+        if( !_agg.explicit && (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
             // Silences are detected on every value recorded (not on the columns, nor on the
             // statistics: an hour of them is no silence)
             const _raw = _values.filter(v => !v.stat).map(v => ({ t: v.t, y: v.y }));
@@ -339,11 +368,59 @@ export class CardDatasets
         return s;
     }
 
+    // The groups a curve's values are put in, each one point: { start(t) — the start of the
+    // group of time t —, next(start) — the start of the one after }. A column of pixels each,
+    // on a grid of time fixed from 1970 (the same from one refresh, or one part of a long
+    // window, to the next) — or, aggregated (resolveAggregation): a day (date), an hour
+    // (hour), 1 / pointsPerHour hours on the local day's grid (2 h: 0:00, 2:00…); never
+    // narrower than a column, nothing is drawn under a pixel
+    _groupsOf(agg, width)
+    {
+        const _columns = { start: t => width > 0 ? Math.floor(t / width) * width : t, next: t => width > 0 ? t + width : t + 1 };
+        if( agg.groupBy === 'date' && width <= 86400e3 )
+            return { start: t => moment(t).startOf('day').valueOf(), next: t => moment(t).add(1, 'day').valueOf() };
+        const _w = agg.groupBy === 'hour' ? 3600e3 : agg.pointsPerHour > 0 ? 3600e3 / agg.pointsPerHour : 0;
+        if( !_w || _w < width ) return _columns;
+        const _local = t => moment(t).utcOffset() * 60e3;
+        return { start: t => Math.floor(( t + _local(t) ) / _w) * _w - _local(t), next: t => t + _w };
+    }
+
+    // A group's value (func — aggregateFunc; none: avg): avg its mean, each value weighted by
+    // how long it lasted (end: until when, within the group); min, max its lowest, highest
+    // (the statistics' own); median the middle of its values; first, last; sum their sum;
+    // delta its highest less its lowest; diff its last less its first. An hour of statistics
+    // counts as one value, its mean
+    _aggregate(func, group, end, min, max)
+    {
+        const _ys = group.map(v => v.y);
+        switch( func ) {
+            case 'min': return min;
+            case 'max': return max;
+            case 'first': return _ys[0];
+            case 'last': return _ys[_ys.length - 1];
+            case 'sum': return _ys.reduce((a, b) => a + b, 0);
+            case 'delta': return max - min;
+            case 'diff': return _ys[_ys.length - 1] - _ys[0];
+            case 'median': {
+                const _s = [..._ys].sort((a, b) => a - b), _m = _s.length >> 1;
+                return _s.length % 2 ? _s[_m] : ( _s[_m - 1] + _s[_m] ) / 2;
+            }
+        }
+        let sum = 0, span = 0;
+        for( const v of group ) { const d = Math.max(0, end(v) - v.t) || 1; sum += v.y * d; span += d; }
+        return sum / span;
+    }
+
     // A bar entity's bars: what it added over each interval of the graph (10 minutes, an
     // hour, a day, a week — from Monday — a month: BAR_INTERVALS) — a counter reset starting again from its new value, unless
-    // netBars — each bar at the middle of its interval; its colors when they vary (colorFn)
+    // netBars — each bar at the middle of its interval; its colors when they vary (colorFn).
+    // With aggregateFunc, each bar its function over the interval's values (_aggregate:
+    // max, a daily counter's total) — an interval without values carrying the bar before (a
+    // difference, 0)
     _barSamples(g, e, data, process, w, colorFn)
     {
+        const _func = this.resolveAggregation(e).func;
+        if( _func ) return this._aggregatedBars(g, e, data, process, w, colorFn, _func);
         const n = data.length;
         const s = [], bcol = [];
         const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
@@ -390,6 +467,47 @@ export class CardDatasets
             y0 = y1;
         }
 
+        return { s, bcol };
+    }
+
+    // A bar entity's bars by aggregateFunc (see _barSamples)
+    _aggregatedBars(g, e, data, process, w, colorFn, func)
+    {
+        const s = [], bcol = [];
+        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+        const _interval = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1);
+        const td = moment.duration(..._interval.length);
+        const _values = [];
+        for( let i = 0; i < data.length; i++ ) {
+            const y = this.process(data[i].state, process) * 1.0;
+            if( isNaN(y) ) continue;
+            const st = data[i].statistics;
+            _values.push({ t: msOf(data[i].last_changed), y, min: st ? Math.min(st.min * 1.0, y) : y, max: st ? Math.max(st.max * 1.0, y) : y });
+        }
+        _values.forEach((v, k) => { v.end = k + 1 < _values.length ? _values[k + 1].t : Math.max(w.now.valueOf(), v.t); });
+        let k = 0, last;
+        for( let t = moment(w.start).startOf(_interval.start); t <= w.end + td; ) {
+            const te = moment(t).add(td), _t0 = t.valueOf(), _te = te.valueOf();
+            while( k < _values.length && _values[k].t < _t0 ) k++;
+            const group = [];
+            // (the value in force when the interval starts counts in it, as Home Assistant
+            // compiles its statistics — see _lineSamples)
+            const _prev = k > 0 ? _values[k - 1] : null;
+            if( _prev && _prev.end > _t0 && !( k < _values.length && _values[k].t === _t0 ) )
+                group.push({ t: _t0, y: _prev.y, min: _prev.y, max: _prev.y, end: _prev.end });
+            for( let j = k; j < _values.length && _values[j].t < _te; j++ ) group.push(_values[j]);
+            let y;
+            if( group.length ) {
+                y = this._aggregate(func, group, v => Math.min(v.end, _te), Math.min(...group.map(v => v.min)), Math.max(...group.map(v => v.max)));
+                last = y;
+            } else
+                y = func === 'delta' || func === 'diff' ? 0 : last;
+            if( y !== undefined ) {
+                s.push({ x: t + td / 2.0, y: y * scale });
+                if( colorFn ) bcol.push(colorFn(t + td / 2.0, y) ?? e.paletteColor);
+            }
+            t = te;
+        }
         return { s, bcol };
     }
 
