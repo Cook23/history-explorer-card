@@ -36,8 +36,8 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
 > - **values over a graph**, as [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
 > - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page;
-> - **loading** (1.2.23 to 1.2.28): the long-term statistics first, finer data — the 5-minute statistics, then the history — only where the screen can show more; one point per column of pixels, with a min/max band; every action taken at once, whatever is loading; real time always ending at the present;
-> - **mini-graph-card's YAML** (1.2.8, 1.2.28): its options read as the card's own — its aggregation (`points_per_hour`, `aggregate_func`, `group_by`) and sub-attributes included.
+> - **loading**: the long-term statistics first, finer data — the 5-minute statistics, then the history — only where the screen can show more; one point per column of pixels, with a min/max band; every action taken at once, whatever is loading; real time always ending at the present;
+> - **mini-graph-card's YAML**: its options read as the card's own — its aggregation (`points_per_hour`, `aggregate_func`, `group_by`) and sub-attributes included.
 >
 > If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
 >
