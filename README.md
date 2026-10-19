@@ -537,7 +537,15 @@ entityOptions:
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
 
-The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. It loads what the screen can show, and no more — by how long a column of pixels lasts: an hour or more, the hourly statistics of the whole window, in one request; between 5 minutes and an hour, the 5-minute statistics too; less than 5 minutes, the history (the statistics only where the history no longer is). The last two hours always come from the history. Computed from the history, a point has the same mean, minimum and maximum as Home Assistant's statistics. `mode` and `retention` are accepted, without effect.
+The card seamlessly extends graphs beyond the history retention limit using long term statistics. Enabled by default. It loads what the screen can show, by how long a column of pixels lasts:
+
+| A column of pixels lasts | Loaded |
+|---|---|
+| an hour or more | the hourly statistics |
+| between 5 minutes and an hour | the hourly, then the 5-minute statistics |
+| less than 5 minutes | the history (the statistics only where there's no more history) |
+
+The last two hours always come from the history. A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics. `mode` and `retention` are accepted, without effect.
 
 ```yaml
 statistics:
