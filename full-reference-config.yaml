@@ -295,11 +295,11 @@ labelsVisible: True
 # Whether to display the list of entity labels at the top of the graph
 legendVisible: True
 
-# Configuration of the vertical line drawn on the graph under the user's cursor (for non-mobile users only)
+# The vertical line following the pointer over a graph's plot area (a mouse, or a pen held above the screen)
 cursor:
-  # Whether to show the vertical line on all graphs in the card (all), just the hovered graph (auto), or hide it on all graphs (hide). Possible options: auto, all, or hide
+  # Whether to show the vertical line on all graphs in the card at once (all), just the hovered graph (auto), or never (hide). Possible options: auto, all, or hide
   mode: auto
-  # Which types of graph show the vertical line. Defaults to just timeline charts, but bar, line, and arrowline graphs can be specified here.
+  # Which types of graph show the vertical line. Defaults to just timeline charts, but bar, line, and arrowline graphs can be specified here, or all.
   types: ['timeline']
 
 # Configuration related to the tooltip displaying

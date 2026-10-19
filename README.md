@@ -641,7 +641,7 @@ graphs:
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
-| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.22)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance (see [Data decimation](README_Full.md#data-decimation)) |
+| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.22)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance (see [Data decimation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#data-decimation)) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
@@ -754,6 +754,14 @@ statistics:
   period: hour            # hour, day, month
   force: false
   retention: 90           # optional: override history retention period in days
+```
+
+The **cursor line** — a vertical line following the pointer over a graph — is drawn on timelines by default. `cursor.mode`: `auto` (the graph under the pointer), `all` (every graph of the card at once, to line events up) or `hide`; `cursor.types`: the graph types that show it (`timeline`, `line`, `bar`, `arrowline` or `all`). Details: [The cursor line](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#the-cursor-line).
+
+```yaml
+cursor:
+  mode: all
+  types: [line, timeline]
 ```
 
 > For full details → [README_Full.md — Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
