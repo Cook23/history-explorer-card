@@ -59,6 +59,7 @@ This card offers a highly interactive and configurable way to view the history o
   - [The options menu](#the-options-menu)
   - [Gesture settings](#gesture-settings)
   - [Header, dark mode, colors, layout](#configuring-the-ui)
+  - [The cursor line](#the-cursor-line)
   - [Graph sizes](#configuring-the-ui)
   - [Tooltip](#configuring-the-tooltip-popup)
   - [Time tick density](#changing-the-horizontal-time-tick-density)
@@ -1375,7 +1376,32 @@ uiColors:
   buttons: '#80f00050'
   selector: 'rgba(255,255,255,255)'
   closeButton: '#0000001f'  # the bar interval selector's background
-  cursorline: '#ff000080'   # Color of the vertical cursor line on line and bar graphs
+  cursorline: '#ff000080'   # Color of the vertical cursor line (see The cursor line below)
+```
+
+### The cursor line
+
+While the pointer is over a graph's plot area (a mouse, or a pen held above the screen), a thin vertical line follows it: an easy way to read the time of a change, and to compare it across graphs. By default it's drawn on timelines only. `cursor` sets where:
+
+```yaml
+type: custom:history-explorer-card
+cursor:
+  mode: auto          # auto (the default): on the graph under the pointer only
+                      # all: on every graph of the card at once, at the same time — to line events up
+                      # hide: never
+  types: [timeline]   # the graphs that show it, by type: timeline (the default), line, bar,
+                      # arrowline — or all
+uiColors:
+  cursorline: '#ff000080'   # its color (the gridlines' color by default)
+```
+
+With `mode: all`, the line follows the pointer on every graph of the card as soon as the pointer is over a graph whose type is listed in `types`. For example, to line up a heating timeline with the temperature curves:
+
+```yaml
+type: custom:history-explorer-card
+cursor:
+  mode: all
+  types: [line, timeline]
 ```
 
 ### Changing the UI layout

@@ -42,6 +42,9 @@ Changelog for the HA History Explorer Card.
 - A vertical pinch zoomed each Y axis around its own middle: a point above it, under the fingers, went up and off the graph. It now zooms around the fingers' centre: what is under them stays there
 - Test (`touch`): a pinch near the top, the value under the fingers kept
 
+### Docs — the cursor line ([#150](https://github.com/Cook23/history-explorer-card/issues/150))
+- The cursor line — a vertical line following the pointer over a graph — had only its color documented. README_Full has its own section now (`cursor.mode`: `auto`, `all`, `hide`; `cursor.types`: the graph types that show it; `uiColors.cursorline`), with an example lining a timeline up with curves; the README a short paragraph
+
 ## [v1.2.21] - 2026-10-15
 
 ### Fixed — the last one to speak: a change made on another device could be ignored, and overwritten
