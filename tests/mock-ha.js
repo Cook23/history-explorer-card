@@ -18,7 +18,7 @@
 //               JSON text parsed by the page
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
-// Every WS request is logged in window.__ws ({type, start, end, ids}).
+// Every WS request is logged in window.__ws ({type, start, end, ids, period}).
 // setState(id, value) pushes the change to every element in window.hassTargets.
 window.logs=[]; window.onerror=(m)=>{logs.push('ERR '+m)};
 const _ce=console.error; console.error=(...a)=>{logs.push('CE '+a.join(' '));_ce(...a)};
@@ -107,22 +107,25 @@ function history(d){
   }
   return r;
 }
-// The long-term statistics as Home Assistant compiles them: for an entity with a state_class,
-// an hour once it has ended (and a few minutes for the compiling, MOCK.statsLag, 10 min by
-// default), from the mocked history's values in it — a measurement its mean, min and max, a
-// total its state at the hour's end and its sum; none for an hour not ended. Kept for ever
-// (historyDays aside). MOCK.noStatistics: entities without any
+// The statistics as Home Assistant compiles them: for an entity with a state_class, a
+// period (an hour; 5 minutes, d.period '5minute') once it has ended (and a few minutes for
+// the compiling, MOCK.statsLag, 10 min by default), from the mocked history's values in it
+// — a measurement its mean, min and max, a total its state at the period's end and its
+// sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
+// long as the history (historyDays). MOCK.noStatistics: entities without any
 function statistics(d){
-  const t0=Date.parse(d.start_time), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
+  const P=d.period==='5minute'?300e3:3600e3;
+  const kept=P<3600e3&&MOCK.historyDays ? Date.now()-MOCK.historyDays*86400e3 : -Infinity;
+  const t0=Math.max(Date.parse(d.start_time), kept), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
   const step=(MOCK.historyStep||600)*1000;
   for(const e of d.statistic_ids){
     const sc=STATES[e]?.attributes.state_class;
     if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
-    const pts=[]; for(let t=Math.ceil(t0/3600e3)*3600e3; t+3600e3<=t1; t+=3600e3){
-      if(sc==='measurement'){ const v=[]; for(let u=Math.ceil(t/step)*step; u<t+3600e3; u+=step) v.push(Number(valueAt(e,u/1000)));
+    const pts=[]; for(let t=Math.ceil(t0/P)*P; t+P<=t1; t+=P){
+      if(sc==='measurement'){ const v=[]; for(let u=Math.ceil(t/step)*step; u<t+P; u+=step) v.push(Number(valueAt(e,u/1000)));
         if(!v.length) v.push(Number(valueAt(e,t/1000)));
-        pts.push({start:t,end:t+3600e3,mean:v.reduce((a,b)=>a+b,0)/v.length,min:Math.min(...v),max:Math.max(...v)}); }
-      else { const v=Number(valueAt(e,(t+3600e3)/1000)); pts.push({start:t,end:t+3600e3,state:v,sum:v}); } }
+        pts.push({start:t,end:t+P,mean:v.reduce((a,b)=>a+b,0)/v.length,min:Math.min(...v),max:Math.max(...v)}); }
+      else { const v=Number(valueAt(e,(t+P)/1000)); pts.push({start:t,end:t+P,state:v,sum:v}); } }
     if(pts.length) r[e]=pts;
   }
   return r;
@@ -137,7 +140,7 @@ function mkHass(){ return {
   entities:{ 'sensor.power':{entity_id:'sensor.power',device_id:'d_ecowitt'}, 'sensor.power2':{entity_id:'sensor.power2',device_id:'d_mf'}, 'sensor.rain':{entity_id:'sensor.rain',device_id:'d_ecowitt'} },
   devices:{ d_ecowitt:{id:'d_ecowitt',name:'Ecowitt'}, d_mf:{id:'d_mf',name:'Météo-France Villeveyrac'} },
   callWS:(d)=>{
-    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
+    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, period:d.period, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
     // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
     const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();

@@ -147,6 +147,7 @@ export class HistoryCardState {
         this._drag = null;   // label or graph being dragged (_onDragStart)
         this._lastBuildMs = 0;   // what drawing the graphs again last took (scheduleAutoRefresh)
         this._drawTid = 0;       // the graphs to be drawn again from the cache (_drawSoon)
+        this._refreshedAt = 0;   // when the recent history was last forgotten, to be asked again (_forgetToday)
         this.perf = null;        // the performance test's recorder (setPerfRecorder)
 
         this.activeRange = {};
@@ -257,7 +258,7 @@ export class HistoryCardState {
             this.today(false);
 
             // Now that startTime/endTime are initialized, apply interval restoration if needed
-            if( _needsIntervalRedraw ) this.updateHistoryWithClearCache();
+            if( _needsIntervalRedraw ) this.updateHistory();
 
             // Register observer to resize the graphs whenever the maincard dimensions change
             let ro = new ResizeObserver(() => { this.resize(); });

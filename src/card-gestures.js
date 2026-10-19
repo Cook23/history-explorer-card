@@ -268,7 +268,7 @@ export class CardGestures
     // the window's end; otherwise around its own point.
     onTimeZoom(info)
     {
-        if( this.state.loading || info.centerFactor === undefined ) return;
+        if( info.centerFactor === undefined ) return;
         const _live = info.source === 'pinch' ? this._pinchLive : this.isLive();
         const [tc, tp] = ( _live && this._keepsPresent(info) ) ? [this.endTime, 1.0] : [this.factorToTimecode(info.centerFactor), info.centerFactor];
         if( info.step > 0 ) this.incZoomStep(tc, tp); else this.decZoomStep(tc, tp);

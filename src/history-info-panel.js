@@ -235,7 +235,7 @@ function hxHookInfoPanel()
             if( this._recreate ) {
                 this._recreate = false;
                 this._setEntityOptions(this.hec_instance);
-                this.hec_instance.updateHistoryWithClearCache();
+                this.hec_instance.updateHistory();
             }
 
             // New states, as for the card

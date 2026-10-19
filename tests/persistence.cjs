@@ -277,7 +277,7 @@ module.exports = async function()
     await t.step('Default display confirmed: back to the YAML — added graphs, changes, hidden curves, time range — on another device too (hidden: this device\'s own)', async () => {
         await add2('sensor.tank'); await t.wait(1200);
         await setType('sensor.power2', 'line', 'stepped'); await toggleHidden('sensor.power');
-        await t.E(`(()=>{ el.instance.setTimeRange(48, true); el.instance.writeLocalState(); })()`); await t.wait(800);
+        await t.E(`(()=>{ el.instance.applyTimeRange(48, true); el.instance.writeLocalState(); })()`); await t.wait(800);
         const before = { ids: await ids(), mode: (await entry('sensor.power2')).lineMode, range: await t.E('el.instance.activeRange.timeRangeHours') };
         await cardAction('defdisplay'); await t.E(`el.querySelector('#eo_0_defdisplay_ok').click()`); await t.wait(1500);
         const here = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, mode: (await entry('sensor.power2')).lineMode,
@@ -300,7 +300,7 @@ module.exports = async function()
     const anotherDevice = h => t.E(`(async()=>{ const hs=el.instance._hass, v=(await hs.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value;
         v.timeRangeHours=${h}; v.timeRangeMinutes=0; await hs.callWS({ type: 'frontend/set_user_data', key: '${key}', value: v }); })()`);
     await t.step('slow Home Assistant: another device changed the range, it answers while the history loads — the range taken, Home Assistant not overwritten', async () => {
-        await t.E('(()=>{ el.instance.setTimeRange(6, true); el.instance.writeLocalState(); })()'); await t.wait(3500);
+        await t.E('(()=>{ el.instance.applyTimeRange(6, true); el.instance.writeLocalState(); })()'); await t.wait(3500);
         await anotherDevice(12);
         await t.page.reload(); await t.wait(6000);
         const s = await saved();

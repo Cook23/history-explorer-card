@@ -47,11 +47,11 @@ module.exports = async function()
 
     t = await openCard(card({ defaultTimeRange: '2d', statistics: { enabled: true, period: 'hour', force: true },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
-    await t.step('statistics forced: the statistics only — the history only for the day(s) of the last two hours', async () => {
+    await t.step('statistics forced: the statistics only — hourly and 5-minute ones (a column of pixels shorter than 5 minutes), the history only for the day(s) of the last two hours', async () => {
         const st = await wsOf(t, 'recorder/statistics_during_period'); const h = await wsOf(t, 'history/history_during_period');
         const d = (await t.E('datasets(0)'))[0];
         const recent = h.every(w => Date.parse(w.start) >= Date.now() - 26 * HOUR);
-        return st.length === 1 && h.length <= 1 && recent && d.n > 20 ? true : JSON.stringify({ st: st.length, h, d });
+        return st.map(w => w.period).sort().join() === '5minute,hour' && h.length <= 1 && recent && d.n > 20 ? true : JSON.stringify({ st, h, d });
     });
     done(await t.close());
 
@@ -458,7 +458,7 @@ module.exports = async function()
     await t.step('a double-click on the magnifier: the default range back, the zoom mode as it was; in real time, kept there — as every range change: the buttons, the duration menu', async () => {
         const live = async () => { const [, t1] = await win(); return await t.E('el.instance.isLive()') && await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime()) < 120e3`); };
         await t.E('el.instance.todayNoReset()'); await t.wait(1200);
-        await t.E('(()=>{ el.instance.setTimeRange(6, true); })()'); await t.wait(1200);
+        await t.E('(()=>{ el.instance.applyTimeRange(6, true); })()'); await t.wait(1200);
         const l6 = await live();
         const z = await at('#bz_0'); await t.page.mouse.dblclick(z.x, z.y); await t.wait(1200);
         const [, , h] = await win(), mode = await t.E('!!el.instance.state.zoomMode'), l24 = await live();
@@ -602,7 +602,7 @@ module.exports = async function()
                 return { first: +new Date(d[0].x), n: d.length, min: y.min, max: y.max, vmin: Math.min(...v), vmax: Math.max(...v) }; })()`));
         }
         const pts = await t.E(`el.instance.graphs[0].chart.data.datasets[0].data.map(p=>[+new Date(p.x), +p.y])`);
-        const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period'||w.type==='recorder/statistics_during_period').map(w=>[w.type[0], w.start, w.end])`);
+        const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period'||w.type==='recorder/statistics_during_period').map(w=>[w.period==='5minute'?'f':w.type[0], w.start, w.end])`);
         const start = await t.E('+new Date(el.instance.startTime)');
         // (the time of a column of pixels: a curve has at most one point in each)
         const column = await t.E(`(()=>{ const c=el.instance.graphs[0].chart, A=c.chartArea; return ( +new Date(el.instance.endTime) - +new Date(el.instance.startTime) ) / ( A.right - A.left ); })()`);
@@ -625,17 +625,23 @@ module.exports = async function()
         const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
         return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
     });
-    await t.step('a window of 30 days, 10 of history: the statistics of the whole window first, in one request; then the history (a column of pixels shorter than an hour), the most recent first; past its 10 days, the statistics; the whole window, joined; nothing asked twice', async () => {
-        const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 26, 300);
+    await t.step('a window of 30 days, 10 of history (a column of pixels of some 50 minutes): the hourly statistics of the whole window, then its 5-minute ones, each in one request; the history only for the recent day(s); past the 10 days the 5-minute statistics are kept, the hourly ones; the whole window, joined; nothing asked twice', async () => {
+        const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 12, 300);
         const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
-        const statisticsFirst = /^rh+$/.test(types), covered = last.first <= r.start + 86400e3;
-        return r.joined && r.once && r.fits && statisticsFirst && covered ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, covered, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
+        const recent = r.ws.filter(w => w[0] === 'h').every(w => Date.parse(w[1]) >= Date.now() - 26 * HOUR);
+        const order = /^rfh{1,2}$/.test(types), covered = last.first <= r.start + 86400e3;
+        // (past 10 days, an hour a point at most — the hourly statistics; within them, finer)
+        const old = r.pts.filter(p => p[0] < Date.now() - 11 * 86400e3), recentPts = r.pts.filter(p => p[0] > Date.now() - 9 * 86400e3 && p[0] < Date.now() - 86400e3);
+        const gap = a => a.length > 1 ? ( a[a.length - 1][0] - a[0][0] ) / ( a.length - 1 ) : 0;
+        const finer = gap(recentPts) < gap(old);
+        return r.joined && r.once && r.fits && order && recent && covered && finer ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, recent, covered, gaps: [gap(old), gap(recentPts)] });
     });
     await t.step('a window of 6 months: the statistics in one request, drawn at once; the history only for the day(s) of the last two hours', async () => {
         const r = await watch('6o', { statistics: { enabled: true } }, {}, 8, 300);
         const st = r.ws.filter(w => w[0] === 'r'), h = r.ws.filter(w => w[0] === 'h'), last = r.seen[r.seen.length - 1];
         const recent = h.every(w => Date.parse(w[1]) >= Date.now() - 26 * HOUR), covered = last.first <= r.start + 86400e3;
-        return st.length === 1 && h.length >= 1 && h.length <= 2 && recent && covered && r.joined ? true : JSON.stringify({ ws: r.ws, covered, joined: r.joined });
+        const fine = r.ws.some(w => w[0] === 'f');
+        return st.length === 1 && !fine && h.length >= 1 && h.length <= 2 && recent && covered && r.joined ? true : JSON.stringify({ ws: r.ws, covered, joined: r.joined });
     });
     await t.step('a lot of history (6 months): the parts joined, the Y scale widening as each older, lower part comes', async () => {
         const r = await watch('6o', { statistics: { enabled: false } }, {}, 30, 300);
@@ -646,6 +652,53 @@ module.exports = async function()
         const r = await watch('7d', { statistics: { enabled: false } }, {}, 16, 250, true);
         const after = r.seen.slice(1), kept = after.every(x => x.min === after[0].min && x.max === after[0].max);
         return kept && r.joined ? true : JSON.stringify({ kept, seen: r.seen.map(x => [x.n, x.min, x.max]) });
+    });
+    done(await t.close());
+
+    // ── The last one to speak wins, whatever is loading: an action taken at once — what it
+    // shows (the range selector) and what's done (the window, its data) always together ──
+    const slowCard = () => openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true, historyDelay: 1500 } });
+    const firstShown = p => p.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data; return { first: d.length ? +new Date(d[0].x) : null, last: d.length ? +new Date(d[d.length-1].x) : null,
+        start: +new Date(el.instance.startTime), end: +new Date(el.instance.endTime), loading: el.instance.state.loading }; })()`);
+    t = await slowCard();
+    await t.step('the range chosen while the history loads (Home Assistant slow): the selector, the range and the window the new one at once; its data asked, and drawn', async () => {
+        await t.wait(500);
+        await t.E('el.instance.reloadHistory()'); await t.wait(100);
+        const loading = await t.E('el.instance.state.loading');
+        await t.E(`(()=>{ const s=el.querySelector('#by_0'); s.value='168'; s.dispatchEvent(new Event('change')); })()`); await t.wait(200);
+        const now = await t.E(`({ h: el.instance.activeRange.timeRangeHours, sel: el.querySelector('#by_0').value, span: Math.round((+new Date(el.instance.endTime) - +new Date(el.instance.startTime)) / 36e5) })`);
+        await t.wait(8000);
+        const r = await firstShown(t);
+        return loading && now.h === 168 && now.sel === '168' && now.span === 168 && r.first !== null && r.first <= r.start + 86400e3 && !r.loading ? true : JSON.stringify({ loading, now, r });
+    });
+    await t.step('the window dragged back while the history loads: the days it now shows asked, and drawn', async () => {
+        await t.E('el.instance.reloadHistory()'); await t.wait(100);
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 5 * 864e5))`); await t.wait(8000);
+        const r = await firstShown(t);
+        return r.first !== null && r.first <= r.start + 3600e3 && r.last >= r.end - 3600e3 && !r.loading ? true : JSON.stringify(r);
+    });
+    await t.step('a curve added while the history loads: drawn, its history asked', async () => {
+        await t.E('el.instance.reloadHistory()'); await t.wait(100);
+        await t.E(`el.instance.addCurves(['sensor.rain'], 'default', null)`); await t.wait(8000);
+        const r = await t.E(`(()=>{ const g=el.instance.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.rain')); return { shown: !!g, n: g?.chart.data.datasets.find(d=>d.entity_id==='sensor.rain')?.data.length ?? g?.chart.data.datasets[0]?.data.length ?? 0,
+            asked: __ws.some(w=>w.type==='history/history_during_period'&&w.ids.includes('sensor.rain')), loading: el.instance.state.loading }; })()`);
+        return r.shown && r.n > 10 && r.asked && !r.loading ? true : JSON.stringify(r);
+    });
+    await t.step('a request failing (Home Assistant down for a moment): no longer under way, the loading ends; asked again at the next update', async () => {
+        await t.E(`(()=>{ MOCK.fail=['history/history_during_period']; el.instance.reloadHistory(); })()`); await t.wait(2500);
+        const failed = await t.E('({ loading: el.instance.state.loading, requests: el.instance._requests.length })');
+        await t.E(`(()=>{ MOCK.fail=[]; el.instance.updateHistory(); })()`); await t.wait(10000);
+        const r = await firstShown(t);
+        return !failed.loading && failed.requests === 0 && r.first !== null && !r.loading ? true : JSON.stringify({ failed, r });
+    });
+    await t.step('a page left open past midnight: a day added to the cache, the new day\'s history asked at the refresh', async () => {
+        // (the cache as made yesterday: its last day ending today at 0:00)
+        await t.E('el.instance.today()'); await t.wait(4000);
+        await t.E(`(()=>{ const I=el.instance; I.cache.pop(); I.cacheSize--; __ws.length=0; I.refresh(); })()`); await t.wait(3000);
+        const r = await t.E(`(()=>{ const I=el.instance, last=I.cache[I.cache.length-1]; return { size: I.cacheSize === I.cache.length - 1, lastEnd: +new Date(last.end) > Date.now(),
+            today: __ws.some(w=>w.type==='history/history_during_period' && Date.parse(w.end) > Date.now()) }; })()`);
+        return r.size && r.lastEnd && r.today ? true : JSON.stringify(r);
     });
     done(await t.close());
 

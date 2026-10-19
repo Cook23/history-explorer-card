@@ -17,15 +17,11 @@ export class CardTimeRange
 
     today(resetRange = false)
     {
-        if( !this.state.loading ) {
+        if( resetRange )
+            this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
 
-            if( resetRange )
-                this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
-
-            this.setPresentWindow();
-            this.updateHistory();
-
-        }
+        this.setPresentWindow();
+        this.updateHistory();
 
         // Allow auto scroll if auto refresh is enabled
         this.state.autoScroll = true;
@@ -71,7 +67,7 @@ export class CardTimeRange
     // the toolbar's date shows it, the range kept; reaching the present, real time
     showDay(day)
     {
-        if( this.state.loading || !day ) return;
+        if( !day ) return;
         const t0 = moment(day).startOf('day');
         if( moment(t0).add(this.timeRangeSeconds(), 'second') >= moment() ) return this.todayNoReset();
         this.state.autoScroll = false;
@@ -83,41 +79,32 @@ export class CardTimeRange
     // time, kept there (applyTimeRange)
     defaultRange()
     {
-        if( this.state.loading ) return;
         this.setTimeRangeFromString(this.pconfig.defaultTimeRange, true);
         this.writeLocalState();
     }
 
     subDay()
     {
-        if( !this.state.loading ) {
+        if( this.activeRange.timeRangeHours < 24 ) this.applyTimeRange(24, false);
 
-            if( this.activeRange.timeRangeHours < 24 ) this.setTimeRange(24, false);
+        let t0 = moment(this.startTime).subtract(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
+        let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
+        this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
+        this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
 
-            let t0 = moment(this.startTime).subtract(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
-            let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
-            this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
-            this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
-
-            this.updateHistory();
-
-        }
+        this.updateHistory();
     }
 
     addDay()
     {
-        if( !this.state.loading ) {
+        if( this.activeRange.timeRangeHours < 24 ) this.applyTimeRange(24, false);
 
-            if( this.activeRange.timeRangeHours < 24 ) this.setTimeRange(24, false);
+        let t0 = moment(this.startTime).add(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
+        let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
+        this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
+        this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
 
-            let t0 = moment(this.startTime).add(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
-            let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
-            this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
-            this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
-
-            this.updateHistory();
-
-        }
+        this.updateHistory();
     }
 
     toggleZoom()
@@ -146,7 +133,7 @@ export class CardTimeRange
 
     timeRangeSelected(event)
     {
-        this.setTimeRange(event.target.value, true);
+        this.applyTimeRange(event.target.value, true);
         this.writeLocalState();
     }
 
@@ -186,21 +173,21 @@ export class CardTimeRange
             if( i >= 0 ) {
                 if( ranges[i] > this.activeRange.timeRangeHours ) i--;
                 if( i < ranges.length-1 )
-                    this.setTimeRange(ranges[i+1], true, t_center, t_position);
+                    this.applyTimeRange(ranges[i+1], true, t_center, t_position);
             }
 
         } else
 
-            this.setTimeRangeMinutes(this.activeRange.timeRangeMinutes, true, t_center, t_position);
+            this.applyTimeRangeMinutes(this.activeRange.timeRangeMinutes, true, t_center, t_position);
     }
 
     incZoomStep(t_center = null, t_position = 0.5)
     {
         const i = ranges.findIndex(e => e >= this.activeRange.timeRangeHours);
         if( i > 0 )
-            this.setTimeRange(ranges[i-1], true, t_center, t_position);
+            this.applyTimeRange(ranges[i-1], true, t_center, t_position);
         else
-            this.setTimeRangeMinutes((this.activeRange.timeRangeHours * 60 + this.activeRange.timeRangeMinutes) / 2, true, t_center, t_position);
+            this.applyTimeRangeMinutes((this.activeRange.timeRangeHours * 60 + this.activeRange.timeRangeMinutes) / 2, true, t_center, t_position);
     }
 
     // --------------------------------------------------------------------------------------
@@ -284,15 +271,9 @@ export class CardTimeRange
         return ranges[i];
     }
 
-    // (asked from the toolbar, a gesture: not while the history loads)
-    setTimeRange(range, update, t_center = null, t_position = 0.5)
-    {
-        if( this.state.loading ) return;
-        this.applyTimeRange(range, update, t_center, t_position);
-    }
-
-    // The time range set, whatever is loading — the saved state applied (card-storage.js):
-    // a change taken is never dropped. update: the window changed too — around t_center, at
+    // The time range set — from the toolbar, a gesture, the saved state (card-storage.js),
+    // whatever is loading: a change asked is always applied, never dropped (the last one to
+    // speak wins; the loading follows the window shown). update: the window changed too — around t_center, at
     // t_position along it, else where _rangeAnchor keeps it
     applyTimeRange(range, update, t_center = null, t_position = 0.5)
     {
@@ -350,12 +331,6 @@ export class CardTimeRange
     applyTimeAxes()
     {
         for( let g of this.graphs ) this.applyTimeAxis(g);
-    }
-
-    setTimeRangeMinutes(range, update, t_center, t_position = 0.5)
-    {
-        if( this.state.loading ) return;
-        this.applyTimeRangeMinutes(range, update, t_center, t_position);
     }
 
     // (as applyTimeRange)
@@ -424,17 +399,14 @@ export class CardTimeRange
         this.state.autoScroll = moment() <= moment(this.endTime);
     }
 
-    // Moves the time window (same length) to start at t0, then redraws — fetching the newly
-    // visible data, or only the axes while a fetch is already under way
+    // Moves the time window (same length) to start at t0, then redraws, what it newly shows
+    // asked (whatever is loading)
     moveTimeWindow(t0)
     {
         const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
         this.startTime = moment(t0).format("YYYY-MM-DDTHH:mm:ss");
         this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-        if( !this.state.loading )
-            this.updateHistory();
-        else
-            this.updateAxes();
+        this.updateHistory();
     }
 
     // Length of the time window, in seconds
@@ -467,27 +439,27 @@ export class CardTimeRange
         if( d < 12 ) {
 
             if( d < 1 )
-                this.setTimeRangeMinutes(Math.ceil(dt), true, tm);
+                this.applyTimeRangeMinutes(Math.ceil(dt), true, tm);
             else
-                this.setTimeRange(d, true, tm);
+                this.applyTimeRange(d, true, tm);
 
         } else {
 
             d = Math.ceil(d / 24.0);
 
-            if( d < 1 ) this.setTimeRange(12, true, tm); else       // 12 hours
-            if( d < 2 ) this.setTimeRange(24, true, tm); else       // 1 day
-            if( d < 3 ) this.setTimeRange(48, true, tm); else       // 2 days
-            if( d < 4 ) this.setTimeRange(72, true, tm); else       // 3 days
-            if( d < 5 ) this.setTimeRange(96, true, tm); else       // 4 days
-            if( d < 6 ) this.setTimeRange(120, true, tm); else      // 5 days
-            if( d < 7 ) this.setTimeRange(144, true, tm); else      // 6 days
-            if( d < 13 ) this.setTimeRange(168, true, tm); else     // 1 week
-            if( d < 20 ) this.setTimeRange(336, true, tm); else     // 2 weeks
-            if( d < 28 ) this.setTimeRange(504, true, tm); else     // 3 weeks
-            if( d < 45 ) this.setTimeRange(720, true, tm); else     // 1 month
-            if( d < 105 ) this.setTimeRange(2184, true, tm); else   // 3 months
-                          this.setTimeRange(4368, true, tm);        // 6 months
+            if( d < 1 ) this.applyTimeRange(12, true, tm); else       // 12 hours
+            if( d < 2 ) this.applyTimeRange(24, true, tm); else       // 1 day
+            if( d < 3 ) this.applyTimeRange(48, true, tm); else       // 2 days
+            if( d < 4 ) this.applyTimeRange(72, true, tm); else       // 3 days
+            if( d < 5 ) this.applyTimeRange(96, true, tm); else       // 4 days
+            if( d < 6 ) this.applyTimeRange(120, true, tm); else      // 5 days
+            if( d < 7 ) this.applyTimeRange(144, true, tm); else      // 6 days
+            if( d < 13 ) this.applyTimeRange(168, true, tm); else     // 1 week
+            if( d < 20 ) this.applyTimeRange(336, true, tm); else     // 2 weeks
+            if( d < 28 ) this.applyTimeRange(504, true, tm); else     // 3 weeks
+            if( d < 45 ) this.applyTimeRange(720, true, tm); else     // 1 month
+            if( d < 105 ) this.applyTimeRange(2184, true, tm); else   // 3 months
+                          this.applyTimeRange(4368, true, tm);        // 6 months
 
         }
 
