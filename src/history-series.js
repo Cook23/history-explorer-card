@@ -229,3 +229,7 @@ export function attributeHistories(ids, entityHistories)
     }
     return r;
 }
+
+// A time of the history in ms, in whatever form it comes: ms (Home Assistant's websocket), a
+// date text, a Date or a moment
+export const msOf = tc => typeof tc === 'number' ? tc : typeof tc === 'string' ? Date.parse(tc) : +tc;

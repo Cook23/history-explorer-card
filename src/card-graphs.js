@@ -210,14 +210,6 @@ export class CardGraphs
     // Adding and removing graphs from the view
     // --------------------------------------------------------------------------------------
 
-    // The close button (×) of a graph added from the card
-    _onCloseButton(event)
-    {
-        const id = event.target.id.substr(event.target.id.indexOf("-") + 1);
-        const g = this.graphs.find(g => g.id == id);
-        if( g ) this.removeGraph(g);
-    }
-
     // No graph yet (the card's content made again): none on the page, the default colors
     // given from the palette's start
     clearGraphs()
@@ -394,7 +386,7 @@ export class CardGraphs
         // (a mixed bar/line graph is sized like a line graph, plus the interval selector)
         const h = _mixed ? this.calcGraphHeight('line', entities.length, _graphHeight) + 24 : this.calcGraphHeight(type, entities.length, _graphHeight);
 
-        const e = this._graphElement(type, h, _graphIndex, _graphInterval, _graphProps.title, isStatic);
+        const e = this._graphElement(type, h, _graphIndex, _graphInterval, _graphProps.title);
 
         let gl = this._this.querySelector('#graphlist');
         const _tgtDiv = ( before && before.canvas?.parentNode ) ? this.graphDiv(before) : null;
@@ -425,10 +417,6 @@ export class CardGraphs
             const _bd = this._this.querySelector(`#bd-${_dynGid}`);
             if( _bd ) _bd.value = interval;
         }
-
-        // Connect the close button event listener (only for dynamic graphs)
-        if( !isStatic )
-            this._this.querySelector(`#bc-${_dynGid}`)?.addEventListener('click', this._onCloseButton.bind(this));
 
         // Update legend margins now that elements are in the DOM with real widths
         if( _dynG ) this.updateLegendMargins(_dynG);
@@ -491,7 +479,6 @@ export class CardGraphs
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
         e.netBars    = e.netBars     ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
         e.showPoints = e.showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
-        e.decimation = e.decimation  ?? entityOptions?.decimation;
         e.showMinMax = e.showMinMax  ?? entityOptions?.showMinMax ?? this.pconfig.defaultShowMinMax;
         e.name       = e.name        ?? entityOptions?.name;
         e.siConversionFactor = e.siConversionFactor ?? entityOptions?.siConversionFactor;
@@ -567,9 +554,9 @@ export class CardGraphs
         return _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
     }
 
-    // The element of a new graph (its title, canvas, close button, interval selector),
+    // The element of a new graph (its title, canvas, interval selector),
     // not yet in the page
-    _graphElement(type, h, graphIndex, graphInterval, title, isStatic)
+    _graphElement(type, h, graphIndex, graphInterval, title)
     {
         let html = '';
         // Spacing between graphs: a margin-top on this graph's own container unless it's
@@ -590,8 +577,6 @@ export class CardGraphs
         if( title !== undefined ) html += `<div style='text-align:center;'>${title}</div>`;
         html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
-        if( !isStatic )
-            html += `<button id='bc-${this.g_id}' style="position:absolute;right:10px;margin-top:${-h+5}px;color:var(--primary-text-color);background-color:${this.pconfig.closeButtonColor};border:0px solid black;">×</button>`;
         if( type == 'bar' && !this.ui.hideInterval )
             html += this.createIntervalSelectorHtml(this.g_id, h, graphInterval, this.ui.optionStyle, INTERVAL_SELECTOR_RIGHT_PX);
         html += `</div>`;

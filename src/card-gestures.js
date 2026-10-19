@@ -47,9 +47,14 @@ export class CardGestures
         }
     }
 
-    // Click on a legend label: shows/hides its curve, persisted
+    // Click on a legend label: shows/hides its curve, persisted; on the close button, the
+    // graph removed
     _onGraphClick(info, g)
     {
+        if( info.zone === 'closeButton' ) {
+            if( info.gestureType === 'click' ) this.removeGraph(g);
+            return;
+        }
         // (a value — over the graph, or at the end of a legend label: the entity's dialog, on a
         // click; the curve stays as it is)
         if( info.zone === 'value' || info.legendPart === 'value' ) {

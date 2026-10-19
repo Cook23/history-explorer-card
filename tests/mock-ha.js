@@ -10,6 +10,10 @@
 //   dark        dark theme
 //   historyDelay, userDataDelay   ms Home Assistant takes to answer for the history and the
 //               statistics, and for the user data (none: at once)
+//   historyStep seconds between two values of a series (600)
+//   rows        an entity's history as given: { id: [[seconds before now, state], …] }
+//   json        the history and statistics answered as Home Assistant's websocket does: a
+//               JSON text parsed by the page
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids}).
@@ -90,8 +94,10 @@ function history(d){
   const kept=MOCK.historyDays ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
     if(!STATES[e]) continue;
+    if(MOCK.rows?.[e]){ const now=Date.now()/1000, all=MOCK.rows[e].map(([ago,s])=>({s,lu:now-ago})).sort((a,b)=>a.lu-b.lu);
+      const before=all.filter(p=>p.lu<t0).pop(), pts=all.filter(p=>p.lu>=t0 && p.lu<t1); if(before) pts.unshift({s:before.s,lu:t0}); if(pts.length) r[e]=pts; continue; }
     if(!MOCK.series){ const lu=Math.max(t0,kept); r[e]=[{s:STATES[e].state,lu,...(d.no_attributes?{}:{a:attributesAt(e,lu)})}]; continue; }
-    const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/600)*600; t<t1; t+=600) pts.push({s:valueAt(e,t),lu:t});
+    const pts=[]; for(let t=Math.ceil(Math.max(t0,kept)/(MOCK.historyStep||600))*(MOCK.historyStep||600); t<t1; t+=(MOCK.historyStep||600)) pts.push({s:valueAt(e,t),lu:t});
     // (a state the test set is the history from its time on)
     const tSet=STATES[e].setAt; if(tSet>=t0 && tSet<t1){ while(pts.length && pts[pts.length-1].lu>=tSet) pts.pop(); pts.push({s:STATES[e].state,lu:tSet}); }
     if(!d.no_attributes) for(const p of pts) p.a=attributesAt(e,p.lu);
@@ -122,8 +128,9 @@ function mkHass(){ return {
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
     // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
     const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();
-    if(d.type==='history/history_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(history(d)));
-    if(d.type==='recorder/statistics_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(statistics(d)));
+    const wire=v=> MOCK.json ? JSON.parse(JSON.stringify(v)) : v;
+    if(d.type==='history/history_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(wire(history(d))));
+    if(d.type==='recorder/statistics_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(wire(statistics(d))));
     if(d.type==='frontend/get_user_data') return later(MOCK.userDataDelay, ()=>window.__getUD(d.key).then(v=>({value:v})));
     if(d.type==='frontend/set_user_data'){ return window.__setUD(d.key, d.value===null?null:JSON.parse(JSON.stringify(d.value))).then(()=>({})); }
     return Promise.resolve({}); } }; }

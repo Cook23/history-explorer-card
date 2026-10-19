@@ -210,11 +210,11 @@ module.exports = async function()
         return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend;
             return { texts: L.legendItems.map(legendText), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
-    await t.step('a legend too narrow: every name at the same step (the device removed for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
+    await t.step('a legend too narrow: every name at the same step (the device abbreviated for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
         const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);
         await legendAt(1000);
         return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
-            && mid.texts[0] === 'Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)'
+            && mid.texts[0] === 'E Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'M-F V… Vitesse du vent (300 W)'
             && narrow.texts.every((x, i) => x.endsWith(i ? '(300 W)' : '(400 W)') && x !== wide.texts[i]) && narrow.texts.some(x => /…/.test(x)) && narrow.within ? true : JSON.stringify({ wide, mid, narrow });
     });
     await t.step('a qualifier many entities of Home Assistant carry ((Filtered), 3 of them): its initials first, (F); the other curve at the same step', async () => {
@@ -224,7 +224,7 @@ module.exports = async function()
         const mid = await legendAt(300);
         await legendAt(1000);
         return mid.texts[0] === 'Ecowitt Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
-            || mid.texts[0] === 'Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
+            || mid.texts[0] === 'E Vitesse du vent (F) (400 W)' && mid.texts[1] === 'M-F V… Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
     });
     done(await t.close());
 
@@ -341,6 +341,31 @@ module.exports = async function()
         return top < 28 && !l0 && l1 && none !== 'lockAndHandle' && lockOnly === '24px 24px 12px' && chain === '24px 24px' && /^3\dpx 24px 12px$/.test(both)
             ? true : JSON.stringify({ top, l0, l1, none, both, lockOnly, chain });
     });
+    await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it removes the graph', async () => {
+        await controlsAt(1000);
+        await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
+        const look = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, e=c._hecCloseButtonEl, s=e&&getComputedStyle(e), r=c._hecCloseButtonRect(), cr=c.canvas.getBoundingClientRect(), er=e.getBoundingClientRect();
+            return { yaml: g.slice(0,-1).map(x=>!!x.chart._hecCloseButtonRect()||!!(x.chart._hecCloseButtonEl&&x.chart._hecCloseButtonEl.style.display!=='none')).join(), text: e.textContent, box: s.width+' '+s.height+' '+s.borderRadius,
+                     right: Math.round(cr.right-er.right), top: Math.round(er.top-cr.top), margin: c.legend.rightMargin, zone: c._hecTopTargetAt(r.x+12, r.y+12), old: !!el.querySelector('[id^="bc-"]') }; })()`);
+        const wide = await look();
+        await controlsAt(168); const narrow = await look(); await controlsAt(1000);
+        const p = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, r=c._hecCloseButtonRect(), b=c.canvas.getBoundingClientRect(); return { x: b.left+r.x+12, y: b.top+r.y+12 }; })()`);
+        const n0 = await t.E('el.instance.graphs.length');
+        await t.page.mouse.click(p.x, p.y); await t.wait(1200);
+        const n1 = await t.E('el.instance.graphs.length'), stored = await t.E(`el.instance.store.has('sensor.wind_rad')`);
+        return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '24px 24px 50%' && wide.right === 1 && wide.top === 4 && wide.margin === 29 && wide.zone === 'closeButton' && !wide.old
+            && narrow.margin === 4 && narrow.zone === 'closeButton' && n1 === n0 - 1 && !stored ? true : JSON.stringify({ wide, narrow, n0, n1, stored });
+    });
+    await t.step('the legend\'s first line never left empty: its first label, value included, too wide beside the controls — a shorter form there', async () => {
+        await t.E(`el.instance.addCurves(['sensor.power2'], 'default')`); await t.wait(1500);
+        const lines = [];
+        for( let w = 260; w <= 520; w += 20 ) {
+            await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(500);
+            lines.push(await t.E(`el.instance.graphsInDisplayOrder().map(g=>{ const l=g.chart.legend, b=l.legendHitBoxes[0]; return b ? Math.round(b.top - l.top) : 0; }).join()`));
+        }
+        await controlsAt(1000);
+        return lines.every(l => l.split(',').every(v => +v < 14)) ? true : JSON.stringify(lines);
+    });
     done(await t.close());
 
     // ── The date: a click opens the calendar, a double-click goes back to real time; the
@@ -348,29 +373,111 @@ module.exports = async function()
     t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
     const win = () => t.E(`[el.instance.startTime, el.instance.endTime, el.instance.activeRange.timeRangeHours]`);
     const at = sel => t.E(`(()=>{ const r=el.querySelector('${sel}').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
-    await t.step('a click on the date: the browser\'s calendar, once a double-click can\'t follow; the day chosen ends the window, the range kept', async () => {
+    await t.step('a click on the date: the browser\'s calendar, once a double-click can\'t follow, the window\'s first day preselected; the day chosen starts the window, the range kept', async () => {
         await t.E(`(()=>{ window.__picker=0; HTMLInputElement.prototype.showPicker = function(){ __picker++; }; })()`);
         const d = await at('#bx_0'); await t.page.mouse.click(d.x, d.y);
         const soon = await t.E('__picker'); await t.wait(900); const later = await t.E('__picker');
-        // (three days ago, and the next day's midnight: local dates)
-        const [day, end] = await t.E(`(()=>{ const f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-            const d=new Date(); d.setDate(d.getDate()-3); const n=new Date(d); n.setDate(n.getDate()+1); return [f(d), f(n)+'T00:00:00']; })()`);
+        const shown = await t.E(`[el.instance._calendarInputs[0].value, el.instance.startTime.slice(0, 10)]`);
+        // (three days ago: a local date)
+        const day = await t.E(`(()=>{ const d=new Date(); d.setDate(d.getDate()-3); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })()`);
         await t.E(`(()=>{ const i=el.instance._calendarInputs[0]; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
-        const [t0, t1, h] = await win();
-        return soon === 0 && later === 1 && t1 === end && h === 24 ? true : JSON.stringify({ soon, later, t0, t1, end, h });
+        const [t0, t1, h] = await win(), live = await t.E('el.instance.isLive()');
+        return soon === 0 && later === 1 && shown[0] === shown[1] && t0 === day + 'T00:00:00' && h === 24 && !live ? true : JSON.stringify({ soon, later, shown, t0, t1, day, h, live });
+    });
+    await t.step('the calendar: a day whose window reaches the present — real time, the range kept', async () => {
+        const day = await t.E(`(()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })()`);
+        await t.E(`(()=>{ const i=el.instance._calendarInputs[0]; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
+        const [, t1, h] = await win(), live = await t.E('el.instance.isLive()');
+        const late = await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime())`);
+        return live && late < 3 * 3600e3 && h === 24 ? true : JSON.stringify({ t1, late, h, live });
     });
     await t.step('a double-click on the date: back to real time, the range kept, no calendar', async () => {
+        await t.E('el.instance.showDay("2026-01-10")'); await t.wait(1200);
         await t.E('__picker=0');
         const d = await at('#bx_0'); await t.page.mouse.dblclick(d.x, d.y); await t.wait(900);
         const [, t1, h] = await win(), p = await t.E('__picker');
         const late = await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime())`);
         return late < 3 * 3600e3 && h === 24 && p === 0 ? true : JSON.stringify({ t1, late, h, p });
     });
-    await t.step('a double-click on the magnifier: the default range back, the zoom mode as it was', async () => {
+    await t.step('a double-click on the magnifier: the default range back, the zoom mode as it was; in real time, kept there — as every range change: the buttons, the duration menu', async () => {
+        const live = async () => { const [, t1] = await win(); return await t.E('el.instance.isLive()') && await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime()) < 120e3`); };
+        await t.E('el.instance.todayNoReset()'); await t.wait(1200);
         await t.E('(()=>{ el.instance.setTimeRange(6, true); })()'); await t.wait(1200);
+        const l6 = await live();
         const z = await at('#bz_0'); await t.page.mouse.dblclick(z.x, z.y); await t.wait(1200);
-        const [, , h] = await win(), mode = await t.E('!!el.instance.state.zoomMode');
-        return h === 24 && mode === false ? true : JSON.stringify({ h, mode });
+        const [, , h] = await win(), mode = await t.E('!!el.instance.state.zoomMode'), l24 = await live();
+        await t.E('el.instance.incZoom()'); await t.wait(1200); const lInc = await live();
+        await t.E('el.instance.decZoom()'); await t.wait(1200); const lDec = await live();
+        // (looking at the history: the window keeps its middle)
+        await t.E('el.instance.showDay("2026-01-10")'); await t.wait(1200);
+        await t.E('el.instance.decZoom()'); await t.wait(1200);
+        const [h0, h1] = await win();
+        return h === 24 && mode === false && l6 && l24 && lInc && lDec && h0 === '2026-01-09T12:00:00' && h1 === '2026-01-11T12:00:00' ? true : JSON.stringify({ h, mode, l6, l24, lInc, lDec, h0, h1 });
+    });
+    done(await t.close());
+
+    // ── Decimation (M4): many values for each column of pixels — each column's first, lowest,
+    // highest and last, whatever decimation says ──
+    const decimated = async dec => {
+        const t = await openCard(card({ defaultTimeRange: '7d', decimation: dec, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+            { mock: { series: true, historyStep: 60 } });
+        await t.wait(4000);
+        const r = await t.E(`(()=>{ const g=graphAt(0), c=g.chart, d=c.data.datasets[0].data, A=c.chartArea, v=g.valueSamples[0].map(p=>p.v), y=d.map(p=>p.y);
+            return { n: d.length, values: v.length, cols: Math.round(A.right-A.left), numbers: d.every(p=>typeof p.x==='number'),
+                     extremes: Math.min(...y)===Math.min(...v) && Math.max(...y)===Math.max(...v), ordered: d.every((p,i)=>!i||p.x>=d[i-1].x) }; })()`);
+        await t.close();
+        return r;
+    };
+    // (the steps below on a page of their own: each test opens its card)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }));
+    for( const dec of ['fast', false] )
+        await t.step(`decimation ${dec}: at most four values for each column of pixels — its first, lowest, highest, last: the lowest and highest of the window kept, in time order`, async () => {
+            const r = await decimated(dec);
+            return r.values > 4 * r.cols && r.n <= 4 * r.cols + 2 && r.n > r.cols && r.extremes && r.ordered && r.numbers ? true : JSON.stringify(r);
+        });
+
+    // ── A timeline over a week: only states too thin to see merged (narrower than 2 px) ──
+    const H = 3600, D = 86400;
+    const rows = [[7 * D + H, 'off'],
+        [5 * D, 'on'], [5 * D - 40 * 60, 'off'],                                          // 40 min: some 4 px
+        ...Array.from({ length: 6 }, (_, k) => [3 * D - k * 30, k % 2 ? 'off' : 'on']),   // 30 s each, in a row
+        [2 * D, 'off'], [D, 'on'], [D - 30, 'off']];                                         // 30 s alone
+    const timeline = async dec => {
+        const t = await openCard(card({ defaultTimeRange: '7d', ...( dec === undefined ? {} : { decimation: dec } ), statistics: { enabled: false },
+            graphs: [{ type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true, rows: { 'binary_sensor.a': rows } } });
+        await t.wait(1500);
+        const r = await t.E(`graphAt(0).chart.data.datasets[0].data.map(b=>b[2]).join()`);
+        await t.close();
+        return r;
+    };
+    await t.step('a timeline over a week: a state some 4 px wide drawn; states of 30 s in a row merged (multiple); a short one alone keeps its state; decimation: false, the same (ignored)', async () => {
+        const auto = await timeline(), off = await timeline(false);
+        return auto === 'off,on,off,multiple,off,on,off' && off === auto ? true : JSON.stringify({ auto, off });
+    });
+    done(await t.close());
+
+    // ── The real time paced by what drawing the graphs costs ──
+    t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.E(`setState('sensor.power', '1')`); await t.wait(3000);   // (the card's first look at the states)
+    await t.step('a change: its value in the legend at once, the curves not worked out again until the refresh', async () => {
+        await t.E(`(()=>{ window.__k=[]; el.instance.setPerfRecorder({ add: k => __k.push(k) }); })()`);
+        await t.E(`setState('sensor.power', '777')`); await t.wait(500);
+        const r = { legend: await t.E('legendText(graphAt(0).chart.legend.legendItems[0])'), soon: await t.E(`__k.filter(k=>k==='redraw').length`) };
+        await t.wait(2500);
+        r.later = await t.E(`__k.filter(k=>k==='redraw').length`);
+        await t.E('el.instance.setPerfRecorder(null)');
+        return /777/.test(r.legend) && r.soon === 0 && r.later >= 1 ? true : JSON.stringify(r);
+    });
+    await t.step('a refresh no sooner than 2 s after a change — and than five times what drawing the graphs again last took', async () => {
+        const asked = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        const after = async () => { const n0 = await asked(); await t.E(`setState('sensor.power', String(Math.random()*100))`);
+            const r = []; for( let k = 0; k < 4; k++ ) { await t.wait(1500); r.push(await asked() - n0); } return r.join(); };
+        await t.wait(3000);
+        const quick = await after();
+        await t.wait(3000);
+        await t.E('el.instance._lastBuildMs = 1000');
+        const slow = await after();
+        return quick === '0,1,1,1' && slow === '0,0,0,1' ? true : JSON.stringify({ quick, slow });
     });
     done(await t.close());
 
@@ -411,11 +518,14 @@ module.exports = async function()
         const pts = await t.E(`el.instance.graphs[0].chart.data.datasets[0].data.map(p=>[+new Date(p.x), +p.y])`);
         const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period'||w.type==='recorder/statistics_during_period').map(w=>[w.type[0], w.start, w.end])`);
         const start = await t.E('+new Date(el.instance.startTime)');
+        // (the time of a column of pixels: decimated, a curve keeps at most four values in each — M4)
+        const column = await t.E(`(()=>{ const c=el.instance.graphs[0].chart, A=c.chartArea; return ( +new Date(el.instance.endTime) - +new Date(el.instance.startTime) ) / ( A.right - A.left ); })()`);
         await t.close();
         const seen = trace.filter(Boolean);
-        // (the parts joined: in time order, no point twice, no gap much longer than the usual one)
+        // (the parts joined: in time order, no point twice, no gap much longer than the usual one
+        // — or than two columns of pixels)
         const gaps = pts.slice(1).map((p, i) => p[0] - pts[i][0]).sort((a, b) => a - b);
-        const joined = gaps.every(g => g > 0) && gaps[gaps.length - 1] <= 3 * gaps[gaps.length >> 1] + 1;
+        const joined = gaps.every(g => g > 0) && gaps[gaps.length - 1] <= Math.max(3 * gaps[gaps.length >> 1], 2 * column) + 1;
         // (each request's period asked once; history then statistics, each the most recent first)
         const once = new Set(ws.map(w => w[0] + w[1])).size === ws.length;
         // (the Y scale holding the values loaded each time — or kept as it was, locked)
@@ -510,7 +620,7 @@ module.exports = async function()
                 return { saved, now, before, ph, after: el.querySelector('#b7_0').placeholder, forms, ready: !!I._entityList.forms }; })()`);
             return r.saved && r.saved.all >= r.saved.most && r.saved.most > 0 && JSON.stringify(r.saved) === JSON.stringify(r.now) && JSON.stringify(r.before) === JSON.stringify(r.saved)
                 && /^(Loading|Chargement)…$/.test(r.ph) && r.after !== r.ph
-                && r.forms?.name === 'Salle de bain Prise (Filtered)' && r.forms.forms[2] === 'Salle bain Prise (F)' && r.ready ? true : JSON.stringify(r);
+                && r.forms?.name === 'Salle de bain Prise (Filtered)' && r.forms.forms[2] === 'S B… Prise (F)' && r.ready ? true : JSON.stringify(r);
         });
         if( ln === 'real' ) await t.step('a line shortened in the menu is still found by its full name', async () => {
             await t.page.setViewportSize({ width: 364, height: 900 });

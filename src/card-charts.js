@@ -287,11 +287,18 @@ export class CardCharts
         return _ds.hidden;
     }
 
-    // Entity i of graph g's legend label brought up to date (its value now)
-    refreshLegendParts(g, i)
+    // Graph g's values now brought up to date after its entities `indices` changed: their
+    // legend labels' ('(400 W)') and the values over the graph (showValues) — the graph
+    // redrawn as it is, its curves not worked out again (the refresh does, paced:
+    // scheduleAutoRefresh)
+    refreshCurrentValues(g, indices)
     {
-        const d = g.chart.data.datasets[i];
-        if( d ) Object.assign(d, this._legendParts(d));
+        for( const i of indices ) {
+            const d = g.chart.data.datasets[i];
+            if( d ) Object.assign(d, this._legendParts(d));
+        }
+        g.chart.update();
+        this.showValues(g);
     }
 
     // How a curve drawn in line mode `mode` bends
@@ -575,20 +582,20 @@ export class CardCharts
         };
     }
 
-    // The legend keeps clear of the buttons drawn over the graph's top right corner (bar
-    // interval selector, close button) — Chart.js legend.rightMargin
+    // The legend keeps clear of the bar interval selector, drawn over the graph's top right
+    // corner — Chart.js legend.rightMargin (the close button is Chart.js' own floating icon,
+    // closeButtonVisible: it keeps its room itself)
     updateLegendMargins(g)
     {
-        const _isStatic = g.isStatic;
-        const _legend = g.chart.options.legend;
-        if( g.type === 'bar' && !this.ui.hideInterval ) {
-            // (from where the card puts the interval selector — not against the graph's right
-            // edge: its left edge, a gap before it)
-            _legend.rightMargin = Math.max(INTERVAL_SELECTOR_RIGHT_PX + this.intervalSelectorWidth() + 8, _isStatic ? 25 : 45);
-        } else {
-            // (nothing over a YAML graph's top right: no room kept there)
-            _legend.rightMargin = _isStatic ? 4 : 45;
-        }
+        // (from where the card puts the interval selector — not against the graph's right
+        // edge: its left edge, a gap before it)
+        g.chart.options.legend.rightMargin = g.type === 'bar' && !this.ui.hideInterval ? INTERVAL_SELECTOR_RIGHT_PX + this.intervalSelectorWidth() + 8 : undefined;
+    }
+
+    // How many points graph g draws, all its datasets together (the performance test)
+    pointsShown(g)
+    {
+        return g.chart.data.datasets.reduce((a, d) => a + ( d.data?.length ?? 0 ), 0);
     }
 
     // Each curve's Y axis (line and bar graphs): one per group of compatible units, at most
@@ -679,6 +686,10 @@ export class CardCharts
         }
 
         const chart = this.newGraph(canvas, type, datasets, config);
+        // (a graph added from the card: its close button, Chart.js' floating icon — a click on
+        // it removes the graph, _onGraphClick)
+        chart.options.closeButtonVisible = !isStatic;
+        chart.options.closeButtonTitle = i18n('ui.menu.graph_delete');
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 

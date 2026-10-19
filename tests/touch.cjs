@@ -182,6 +182,15 @@ module.exports = async function()
         const r = await pinchFrom(li, { x: -0.5, y: -6 }, { x: 0.5, y: 6 }, 10);
         return r.locked && r.y.join() !== r0.y.join() && Math.abs(span(r) - span(r0)) < 60e3 ? true : JSON.stringify({ r0, r });
     });
+    await step('pinch vertical near the top: zoomed around the fingers — the value under them stays under them (issue #142)', async () => {
+        const li = await lineGraph();
+        const at = () => E(`(()=>{ const g=graphAt(${li}), c=g.chart, r=g.canvas.getBoundingClientRect(), p=graphPtAt(${li},0.3); return c.scales['y-axis-0'].getValueForPixel(p.y-r.top); })()`);
+        await E('el.instance.today(true)'); await unlockY(li); await t.wait(800);
+        const v0 = await at(), r0 = await E(`yRange(${li})`);
+        await t.pinch(await E(`graphPtAt(${li},0.3)`), { x: 0, y: -6 }, { x: 0, y: 6 }, 10);
+        const v1 = await at(), r1 = await E(`yRange(${li})`);
+        return r1[1] - r1[0] < r0[1] - r0[0] && Math.abs(v1 - v0) < 0.03 * (r0[1] - r0[0]) ? true : JSON.stringify({ v0, v1, r0, r1 });
+    });
     await step('pinch nearly centred horizontally (its centre within the dead band): zoomed as a centred one, the time not panned', async () => {
         const li = await lineGraph(), b = await band(li);
         const c = await pinchFrom(li, { x: -10, y: 0 }, { x: 10, y: 0 }, 12);

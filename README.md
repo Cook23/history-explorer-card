@@ -28,7 +28,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **gesture settings** for every card: how long a long-press lasts and how precise a pointer is — how far it moves before it drags, how near a target it must be — for a mouse or a pen and for a finger — in the options menu or in the YAML;
 > - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
 > - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
-> - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, and sends it as a report;
+> - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, *Performance* what the card costs on your device, each sent as a report;
 > - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
 > - **a label, a button, a curve** is picked when touched just beside it, never when the touch is about halfway between two;
 > - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
@@ -93,13 +93,13 @@ Add this repository as a custom repository in HACS: `https://github.com/Cook23/h
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
 - **Pan**: click and drag left or right on any graph
-- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region. In real time (the present shown), the selector and the + / − buttons keep the present on the right, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; looking at the history, the selector and the buttons keep the middle of the window. The wheel and a pinch elsewhere zoom around the pointer or the fingers, and leave real time
-- **Date navigation**: use the `<` `>` buttons top left. Click the date to return to the present (real time again); double-click to also reset zoom
+- **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region; double-click the magnifying glass to get the default range back. In real time (the present shown), every change of the range keeps the present on the right — the selector, the + / − buttons, the default range —, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; looking at the history, the selector and the buttons keep the middle of the window. The wheel and a pinch elsewhere zoom around the pointer or the fingers, and leave real time
+- **Date navigation**: use the `<` `>` buttons top left. The date is the first day shown: click it to pick another one in your browser's calendar (a day whose window reaches the present: real time); double-click it to return to the present (real time again)
 - **Tooltip**: click or tap near a curve — not necessarily on one of its values — to see its value under the pointer; click near another one to see both. The tooltip then follows the mouse (or a pen held above the screen, in the browsers that report it) until the pointer leaves the curves, or a click outside them. On bars and timelines, click or tap a bar or a state
 - **Points**: a long-press (or a right click) near a curve shows all its points, or hides them; hovering a curve's value (mouse, or a pen above the screen) shows its point alone
 - **Right click** on a label: opens its type menu, as a long-press does
 - **With a pen**: the tip works as a finger. Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does. What your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*
-- **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again right away (within the long-press duration) and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis; move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side
+- **On a touch screen**: a swipe on a graph always scrolls the page. To drag a curve or timeline label, the ⠿ handle of a graph or the Y axis labels, tap it, then press it again right away (within the long-press duration) and drag. With two fingers on a graph: spread or pinch them horizontally to zoom the time, vertically to zoom the Y axis around them; move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side
 
 ---
 
@@ -217,7 +217,7 @@ The type menu has four items, each opening its submenu over the menu, level with
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
-- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
+- **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; **(1.2.22)** *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than its submenus, so its lines stay readable beside the one open; on a card too narrow for that, it opens without any submenu, and a submenu opened leaves at least the start of its lines.
 
@@ -641,7 +641,7 @@ graphs:
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band: `statistics` or `history` |
-| `decimation` | | | ✓ | ✓ | ✓ | `fast` (default), `accurate`, or `false` |
+| `decimation` | | | ✓ | ✓ | ✓ | **(1.2.22)** `decimation` is now ignored: History Explorer picks the right decimation by itself, for a perfectly faithful drawing with the best display performance (see [Data decimation](README_Full.md#data-decimation)) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
@@ -719,7 +719,7 @@ uiColors:
   buttons: '#80f00050'
   cursorline: '#ff000080'  # vertical cursor line color
   selector: 'rgba(255,255,255,255)'
-  closeButton: '#0000001f'
+  closeButton: '#0000001f'  # the bar interval selector's background
 
 uiLayout:
   toolbar: top         # top, bottom, both, hide

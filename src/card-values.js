@@ -6,6 +6,7 @@
 
 import { i18n } from "./languages.js";
 import { formatNumber } from "./history-units.js";
+import { msOf } from "./history-series.js";
 const moment = window.HXLocal_moment;
 
 
@@ -42,7 +43,7 @@ export class CardValues
     {
         g.valueSamples ??= [];
         const _scale = g.chart.data.datasets[j]?.shownScale ?? 1;
-        g.valueSamples[j] = ( rows ?? [] ).map(r => ({ t: moment(r.last_changed).valueOf(), v: Number(this.process(r.state, process)) * _scale }))
+        g.valueSamples[j] = ( rows ?? [] ).map(r => ({ t: msOf(r.last_changed), v: Number(this.process(r.state, process)) * _scale }))
                                           .filter(p => !isNaN(p.v));
     }
 

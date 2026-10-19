@@ -43,7 +43,6 @@ export class HistoryCardState {
     {
 
         this.colorMap = new Map();
-        this.timeCache = new Map();
         this.stateTexts = new Map();
         this.stateMap = new Map();
 
@@ -101,7 +100,6 @@ export class HistoryCardState {
         this.pconfig.recordedEntitiesOnly = false;
         this.pconfig.filterEntities       = undefined;
         this.pconfig.excludeFilterEntities = undefined;
-        this.pconfig.decimation           = 'fast';
         this.pconfig.rounding             = undefined;
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
@@ -151,13 +149,14 @@ export class HistoryCardState {
         this.state.autoScroll    = false;
 
         this._drag = null;   // label or graph being dragged (_onDragStart)
+        this._lastBuildMs = 0;   // what drawing the graphs again last took (scheduleAutoRefresh)
+        this.perf = null;        // the performance test's recorder (setPerfRecorder)
 
         this.activeRange = {};
         this.activeRange.timeRangeHours  = 24;
         this.activeRange.timeRangeMinutes= 0;
         this.activeRange.tickStepSize    = 1;
         this.activeRange.tickStepUnit    = 'hour';
-        this.activeRange.dataClusterSize = 0;
 
         this.statistics = {};
         this.statistics.enabled = false;
@@ -327,14 +326,12 @@ export class HistoryCardState {
     // On demand refresh handling
     // --------------------------------------------------------------------------------------
 
-    // Home Assistant pushed new states: if a shown entity changed, its current value in the
-    // legend is updated and the recent history refreshed (scheduleAutoRefresh) — for the card
-    // and the info panel alike
+    // Home Assistant pushed new states: if a shown entity changed, its current value is
+    // updated at once (handleChangedEntities) and the recent history refreshed, paced
+    // (scheduleAutoRefresh) — for the card and the info panel alike
     onStatesChanged()
     {
         if( !this.contentValid || !this.handleChangedEntities() ) return;
-        if( this.pconfig.showCurrentValues )
-            this.updateHistory();
         if( this.pconfig.refreshEnabled )
             this.scheduleAutoRefresh();
     }
@@ -346,16 +343,15 @@ export class HistoryCardState {
         let changed = false;
 
         for( let g of this.graphs ) {
-            let i = 0;
-            for( let e of g.entities ) {
+            const _changed = [];
+            g.entities.forEach((e, i) => {
                 const lc = this.stateOf(e.entity)?.last_changed;
-                if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) {
-                    if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this.refreshLegendParts(g, i);
-                    changed = true;
-                }
+                if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) _changed.push(i);
                 this.stateMap.set(e.entity, lc);
-                i++;
-            }
+            });
+            if( !_changed.length ) continue;
+            changed = true;
+            if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this.refreshCurrentValues(g, _changed);
         }
         // (an entity giving a shown entity its color: that curve changes too)
         for( const id of this.colorEntityIds() ) {

@@ -439,8 +439,8 @@ export class CardToolbar
         if( g ) this.setBarInterval(g, parseInt(event.target.value));
     }
 
-    // The browser's calendar, under toolbar i's date: the day chosen ends the window shown
-    // (showDay), the last day shown preselected, no later than today
+    // The browser's calendar, under toolbar i's date: the day chosen starts the window shown
+    // (showDay), as the date reads; the first day shown preselected, no later than today
     openCalendar(i)
     {
         const _bx = this._this.querySelector(`#bx_${i}`);
@@ -458,7 +458,7 @@ export class CardToolbar
         _in.style.left = _bx.offsetLeft + 'px';
         _in.style.top = ( _bx.offsetTop + _bx.offsetHeight ) + 'px';
         _in.max = moment().format('YYYY-MM-DD');
-        _in.value = moment(this.endTime).subtract(1, 'ms').format('YYYY-MM-DD');
+        _in.value = moment(this.startTime).format('YYYY-MM-DD');
         try { _in.showPicker(); } catch( e ) { _in.focus(); _in.click(); }
     }
 

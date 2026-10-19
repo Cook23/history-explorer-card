@@ -123,6 +123,7 @@ export class CardHistory
     // indices stay in step with buildChartData), and the color entities' by entity_id
     generateGraphDataFromCache()
     {
+        const _t = performance.now();
         let c0 = this.mapStartTimeToCacheSlot(this.startTime);
         let c1 = this.mapEndTimeToCacheSlot(this.endTime);
 
@@ -134,8 +135,34 @@ export class CardHistory
             this.buildChartData(result, colorHistory);
         } else
             this.buildChartData(null);
+        // (how long the graphs took to be drawn again: the pace of the refreshes, see
+        // scheduleAutoRefresh)
+        this._lastBuildMs = performance.now() - _t;
+        this.perf?.add('redraw', this._lastBuildMs);
     }
 
+
+    // A request of the history or the statistics to Home Assistant — timed, with how many
+    // values it gave, while a performance test records (perf)
+    _askHA(request)
+    {
+        const _p = this._hass.callWS(request);
+        if( !this.perf ) return _p;
+        const _t = performance.now(), _perf = this.perf;
+        return _p.then(r => {
+            const _values = Object.values(r ?? {}).reduce((n, a) => n + ( Array.isArray(a) ? a.length : 0 ), 0);
+            _perf.add('request', performance.now() - _t, { type: request.type, entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, values: _values });
+            return r;
+        });
+    }
+
+    // What the card does, timed while a performance test records it (card-tests.js): the
+    // requests to Home Assistant, each part of the window answered, the graphs drawn again
+    // and each chart's update — recorder: { add(kind, ms, info) }, null: nothing recorded
+    setPerfRecorder(recorder)
+    {
+        this.perf = recorder;
+    }
 
     // --------------------------------------------------------------------------------------
     // Search the first cache slot that contains data for the required timecode (full or partial)
@@ -154,7 +181,16 @@ export class CardHistory
     // On demand history retrieval
     // --------------------------------------------------------------------------------------
 
+    // A part of the window answered: put in the cache, the graphs drawn again (timed for the
+    // performance test, see setPerfRecorder)
     loaderCallback(result)
+    {
+        const _t = performance.now();
+        this._loaderCallback(result);
+        this.perf?.add('part', performance.now() - _t);
+    }
+
+    _loaderCallback(result)
     {
         //console.log("database retrieval OK");
         //console.log(result);
@@ -486,27 +522,32 @@ export class CardHistory
                                 lmm.push(e.entity);
                         }
                     if( lmm.length ) {
-                        this._hass.callWS(this.statisticsRequest(lmm, t0, t1, this.statistics.period ?? 'hour')).then(_now(this.minmaxCallback), () => {});
+                        this._askHA(this.statisticsRequest(lmm, t0, t1, this.statistics.period ?? 'hour')).then(_now(this.minmaxCallback), () => {});
                     }
 
                 } else {
 
                     // Issue statistics retrieval call (an attribute has none: no curve there)
-                    this._hass.callWS(this.statisticsRequest(l.filter(id => !seriesOf(id).attribute), t0, t1, this.statistics.period)).then(_now(this.loaderCallbackStats), _now(this.loaderFailed));
+                    this._askHA(this.statisticsRequest(l.filter(id => !seriesOf(id).attribute), t0, t1, this.statistics.period)).then(_now(this.loaderCallbackStats), _now(this.loaderFailed));
 
                 }
 
             }
 
-        } else
+        } else {
 
             // All needed slots already in the cache, generate the chart data
+            this.loader.more = false;
             this.generateGraphDataFromCache();
+
+        }
     }
 
     // A shown entity changed: refresh its recent history — at most once every 2 s, however
     // often the entities change (the next refresh is never postponed by a further change,
-    // and the recent history is only reloaded then, not at each change)
+    // and the recent history is only reloaded then, not at each change), and never sooner
+    // than five times what drawing the graphs again last took: the page is never kept busy
+    // by the refreshes more than a fifth of the time, however many curves and values it shows
     scheduleAutoRefresh()
     {
         if( this._autoRefreshTid ) return;
@@ -514,7 +555,7 @@ export class CardHistory
             this._autoRefreshTid = 0;
             this.cache[this.cacheSize].valid = false;
             this.updateHistoryAutoRefresh();
-        }, 2000);
+        }, Math.max(2000, 5 * ( this._lastBuildMs ?? 0 )));
     }
 
     updateHistoryAutoRefresh()
@@ -588,7 +629,7 @@ export class CardHistory
         const _attrs = ids.filter(id => seriesOf(id).attribute);
         const _entities = [...new Set(_attrs.map(id => seriesOf(id).entity))];
         const _ask = (l, attributes) => l.length
-            ? this._hass.callWS({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) })
+            ? this._askHA({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) })
             : Promise.resolve({});
         return Promise.all([_ask(_states, false), _ask(_entities, true)])
             .then(([r, ra]) => ({ ...r, ...attributeHistories(_attrs, ra) }));

@@ -109,8 +109,23 @@ module.exports = async function()
         const menuOpen = await t.E('menuOpen()');
         await t.page.keyboard.press('Escape'); await t.wait(200);
         const gone = await t.E(`!${dlg}`);
-        return entries === 'Pen events' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
+        return entries === 'Pen events,Performance' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
             ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
+    });
+    await t.step('Tests ▸ Performance: the graphs drawn again, the window loaded again, the real time — each timed in its report, the page\'s freezes counted', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_test_perf').click()`); await t.wait(300);
+        const title = await t.E(`${dlg}?.shadowRoot.getElementById('title').textContent`);
+        await t.E(`${dlg}.shadowRoot.getElementById('start').click()`);
+        let out = '';
+        for( let k = 0; k < 90 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('step').textContent`)); k++ ) await t.wait(1000);
+        out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
+        const recording = await t.E('el.instance.perf');
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        return title === 'Performance' && /Graphs: \d+, entities: \d+, points drawn: \d+/.test(out) && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms, Chart\.js \d+ ms/.test(out)
+            && /history\/history_during_period: \d+ entities, \d+ values, answered in/.test(out) && /parts put in the graphs/.test(out) && /s of real time\n.*refreshes asked/.test(out) && /freezes, /.test(out) && recording === null
+            ? true : JSON.stringify({ title, out, recording });
     });
     done(await t.close());
 

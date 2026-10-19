@@ -91,7 +91,6 @@ export class CardConfig
         P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? 'auto';
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
-        P.decimation =             c.decimation;
         P.rounding =               c.rounding;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
@@ -334,7 +333,6 @@ export class CardConfig
             unit              : ent.unit,
             process           : ent.process,
             netBars           : ent.netBars,
-            decimation        : ent.decimation,
             circular          : ent.circular,
             yAxis             : ent.yAxis,
             rounding          : ent.rounding,
@@ -436,7 +434,7 @@ export class CardConfig
                 }
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.
-            // fill/showMinMax/dashMode/lineMode/width/showPoints/decimation/netBars act as
+            // fill/showMinMax/dashMode/lineMode/width/showPoints/netBars act as
             // per-entity defaults here (see addGraph's entityOptions merge) — same role as
             // entityOptions matched by entity_id/device_class/domain, but scoped to entities
             // sharing this graph instead. Deliberately excluded: color/name/scale/
@@ -464,7 +462,6 @@ export class CardConfig
                 interpolation  : _opts.interpolation,
                 lineWidth      : _opts.lineWidth,
                 showPoints     : _opts.showPoints,
-                decimation     : _opts.decimation,
                 netBars        : _opts.netBars,
                 yAxis          : _opts.yAxis,
                 rounding       : _opts.rounding,
