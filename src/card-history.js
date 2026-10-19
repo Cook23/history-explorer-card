@@ -25,12 +25,15 @@ export class CardHistory
     // as the days pass, _extendToNow). In each, by entity, its history (hist), its 5-minute
     // statistics (fine) and its statistics of the period, hourly by default (stats), as rows
     // — { last_changed, state }, a statistics row also statistics: { end, min, mean, max } —,
-    // an entity's rows there only once loaded (an empty list: loaded, nothing in it)
+    // an entity's rows there only once loaded (an empty list: loaded, nothing in it); when
+    // each entity's history was asked (askedAt: before the day's end, it lacks what came
+    // since); the entities whose history is to be asked again (stale: the refresh), kept
+    // until it comes
     // --------------------------------------------------------------------------------------
 
     _slot(d, e)
     {
-        return { start: d, end: e, start_m: moment(d), end_m: moment(e), hist: new Map(), fine: new Map(), stats: new Map() };
+        return { start: d, end: e, start_m: moment(d), end_m: moment(e), hist: new Map(), fine: new Map(), stats: new Map(), askedAt: new Map(), stale: new Set() };
     }
 
     initCache()
@@ -286,7 +289,7 @@ export class CardHistory
         // yesterday's as well when its statistics stop before its end)
         const _recentFrom = Date.now() - RECENT_MS;
         const _recent = (i, id) => msOf(this.cache[i].end) > _recentFrom || ( i === this.cacheSize - 1 && this._statisticsStopEarly(this.cache[i], id) );
-        const _needs = i => _ids.filter(id => !this.cache[i].hist.has(id) && ( _all || !_hasStats.has(id) || _recent(i, id) ));
+        const _needs = i => _ids.filter(id => ( !this.cache[i].hist.has(id) || this.cache[i].stale.has(id) ) && ( _all || !_hasStats.has(id) || _recent(i, id) ));
         // (a few days at a time — at most 8 parts for the window —, the most recent first)
         const _days = Math.max(1, Math.ceil(( c1 - c0 + 1 ) / 8));
         const _underWay = () => this._requests.filter(q => q.kind === 'history' && q.c0 <= c1 && q.c1 >= c0).length;
@@ -323,7 +326,7 @@ export class CardHistory
     // asked, the graphs drawn again
     _ask(kind, c0, c1, ids)
     {
-        const q = { kind, c0, c1, ids, gen: this._loadGen };
+        const q = { kind, c0, c1, ids, gen: this._loadGen, at: Date.now() };
         this._requests.push(q);
         const t0 = this.cache[c0].start, t1 = this.cache[c1].end, l = [...ids];
         const _period = kind === 'fine' ? FINE_PERIOD : this.statistics.period ?? 'hour';
@@ -364,6 +367,7 @@ export class CardHistory
                     let k = p;
                     while( k < rows.length && msOf(rows[k].last_changed) < _end ) k++;
                     this.cache[i][LAYER[q.kind]].set(id, rows.slice(p, k));
+                    if( q.kind === 'history' ) { this.cache[i].stale.delete(id); this.cache[i].askedAt.set(id, q.at); }
                     p = k;
                 }
             }
@@ -459,8 +463,7 @@ export class CardHistory
         if( this._autoRefreshTid ) return;
         this._autoRefreshTid = setTimeout(() => {
             this._autoRefreshTid = 0;
-            this._forgetToday();
-            this.updateHistoryAutoRefresh();
+            this.refresh();
         }, Math.max(2000, 5 * ( this._lastBuildMs ?? 0 )));
     }
 
@@ -489,15 +492,18 @@ export class CardHistory
         this.updateHistory();
     }
 
-    // The history of the days since the last refresh forgotten, to be asked again — what's
-    // new since (the refresh): today's, and yesterday's too after midnight. Their statistics
-    // aren't: the recent days are drawn from their history
+    // The history asked before its day ended to be asked again — what came since (the
+    // refresh): today's, and yesterday's too when it was asked before midnight, however long
+    // ago. Kept meanwhile, and drawn: replaced as each entity's answer comes (stale), never
+    // the statistics in between
     _forgetToday()
     {
-        if( this.cache.length ) this._extendToNow();
-        const _since = this._refreshedAt || Date.now();
-        for( const s of this.cache ) if( msOf(s.end) > _since ) s.hist.clear();
-        this._refreshedAt = Date.now();
+        if( !this.cache.length ) return;
+        this._extendToNow();
+        for( const s of this.cache ) {
+            const _end = msOf(s.end);
+            for( const [id, at] of s.askedAt ) if( at < _end ) s.stale.add(id);
+        }
     }
 
     // --------------------------------------------------------------------------------------
@@ -547,10 +553,11 @@ export class CardHistory
         };
     }
 
-    // The automatic refresh: the newest part of the cache asked again
+    // The automatic refresh: the newest part of the cache asked again, the window moved to
+    // the present in real time
     refresh()
     {
         this._forgetToday();
-        this.updateHistory();
+        this.updateHistoryAutoRefresh();
     }
 }

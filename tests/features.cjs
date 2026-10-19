@@ -53,6 +53,12 @@ module.exports = async function()
         const recent = h.every(w => Date.parse(w.start) >= Date.now() - 26 * HOUR);
         return st.map(w => w.period).sort().join() === '5minute,hour' && h.length <= 1 && recent && d.n > 20 ? true : JSON.stringify({ st, h, d });
     });
+    await t.step('the tooltip of a point of the 5-minute statistics: "Statistics 5 min" and the time it covers', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], cb=c.options.tooltips.callbacks;
+            const i=ds.data.findIndex(p=>p.statisticsPeriod===300e3); if( i<0 ) return null;
+            return cb.title([{ datasetIndex:0, index:i, xLabel:'X', yLabel:ds.data[i].y }], c.data); })()`);
+        return /^Statistics 5 min .+ – /.test(r ?? '') ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     // ── 6 months: the statistics for the curves; an entity without statistics (a timeline)
@@ -71,7 +77,7 @@ module.exports = async function()
             const tip=i=>{ const p=ds.data[i], it={ datasetIndex:0, index:i, xLabel:'X', yLabel:p.y }; return [cb.title([it], c.data), cb.label(it, c.data)]; };
             const si=ds.data.findIndex(p=>p.statistics && p.columnFrom!=null), hi=ds.data.map((p,i)=>!p.statistics?i:-1).filter(i=>i>=0).pop();
             return { s: si>=0 ? tip(si) : null, h: hi!=null ? tip(hi) : null, unit: ds.unit }; })()`);
-        const ok = r.s && /^Statistics .+ – [\d:]+:00(\s?[ap]m)?$/i.test(r.s[0]) && new RegExp('^(.+: )?-?[\\d.,]+ / -?[\\d.,]+ / -?[\\d.,]+ ' + r.unit + '$').test(r.s[1]) && r.h && /^History /.test(r.h[0]);
+        const ok = r.s && /^Statistics 1 h .+ – [\d:]+:00(\s?[ap]m)?$/i.test(r.s[0]) && new RegExp('^(.+: )?-?[\\d.,]+ / -?[\\d.,]+ / -?[\\d.,]+ ' + r.unit + '$').test(r.s[1]) && r.h && /^History /.test(r.h[0]);
         return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -699,6 +705,100 @@ module.exports = async function()
         const r = await t.E(`(()=>{ const I=el.instance, last=I.cache[I.cache.length-1]; return { size: I.cacheSize === I.cache.length - 1, lastEnd: +new Date(last.end) > Date.now(),
             today: __ws.some(w=>w.type==='history/history_during_period' && Date.parse(w.end) > Date.now()) }; })()`);
         return r.size && r.lastEnd && r.today ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The refresh: today's history kept, and drawn, until its new answer replaces it —
+    // never the statistics in between (Home Assistant slow) ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true, historyDelay: 1500 } });
+    await t.wait(5000);
+    await t.step('a refresh with Home Assistant slow: the curve stays drawn from the history all along — never from the statistics —, as many points', async () => {
+        const pts = () => t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data; return { n: d.length, stat: d.filter(p=>p.statistics).length }; })()`);
+        const before = await pts();
+        await t.E('el.instance.refresh()');
+        const during = [];
+        for( let k = 0; k < 6; k++ ) { await t.wait(250); during.push(await pts()); }
+        await t.wait(2500);
+        const after = await pts(), asked = await t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        const ok = before.stat === 0 && during.every(x => x.stat === 0 && x.n >= before.n * 0.9) && after.stat === 0 && asked >= 2;
+        return ok ? true : JSON.stringify({ before, during, after, asked });
+    });
+    done(await t.close());
+
+    // ── Real time: the present always on the right, never past it; the history: the window
+    // staying where it is; '>' greyed in real time ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    const liveWin = () => t.E(`(()=>{ const I=el.instance, b=el.querySelector('#b2_0'); return { live: !!I.state.autoScroll, toNow: Math.round((+new Date(I.endTime) - Date.now()) / 1000),
+        span: Math.round((+new Date(I.endTime) - +new Date(I.startTime)) / 1000), next: b.disabled }; })()`);
+    await t.step('real time: the window ends at the present, \'>\' greyed; dragged towards the future, it stays there', async () => {
+        const r0 = await liveWin();
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 3 * 3600e3))`);
+        const r1 = await liveWin();
+        await t.E('el.instance.addDay()');
+        const r2 = await liveWin();
+        // (the window set when the card opened: the present then, a few seconds ago)
+        const ok = r0.live && r0.next && r0.toNow <= 1 && [r1, r2].every(r => r.live && r.next && r.toNow <= 1 && r.toNow >= -2 && r.span === 86400);
+        return ok ? true : JSON.stringify({ r0, r1, r2 });
+    });
+    await t.step('zoomed out or in, in real time: the present kept on the right', async () => {
+        await t.E('el.instance.decZoom()'); const out = await liveWin();
+        await t.E('el.instance.incZoom()'); const back = await liveWin();
+        return out.live && back.live && Math.abs(out.toNow) <= 2 && Math.abs(back.toNow) <= 2 && out.span === 2 * 86400 && back.span === 86400 ? true : JSON.stringify({ out, back });
+    });
+    await t.step('dragged back: the history — \'>\' active, the window kept as new values come; dragged forward past the present: real time again, on the right', async () => {
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 2 * 3600e3))`);
+        const past = await liveWin(), end0 = await t.E('el.instance.endTime');
+        await t.E(`setState('sensor.power', '321')`); await t.wait(3500);
+        const kept = await t.E('el.instance.endTime') === end0;
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 5 * 3600e3))`);
+        const again = await liveWin();
+        const ok = !past.live && !past.next && past.toNow <= -7000 && kept && again.live && again.next && Math.abs(again.toNow) <= 2;
+        return ok ? true : JSON.stringify({ past, kept, again });
+    });
+    await t.step('the day before then the day after: back in real time when it reaches the present, never past it', async () => {
+        await t.E('el.instance.today()');
+        await t.E('el.instance.subDay()'); const before = await liveWin();
+        await t.E('el.instance.addDay()'); const after = await liveWin();
+        await t.E('el.instance.addDay()'); const again = await liveWin();
+        const ok = !before.live && !before.next && after.toNow <= 2 && again.live && again.next && Math.abs(again.toNow) <= 2;
+        return ok ? true : JSON.stringify({ before, after, again });
+    });
+    done(await t.close());
+
+    // ── Midnight, in the browser's time zone (Paris: a day starting 2 h before UTC's) ──
+    {
+        const now = Date.parse('2026-10-19T18:19:00+02:00') / 1000, ago = iso => now - Date.parse(iso) / 1000;
+        const rows = [['2026-10-18T10:00:00+02:00', '17'], ['2026-10-18T22:40:00+02:00', '14'], ['2026-10-18T23:10:00+02:00', '13'], ['2026-10-19T01:00:00+02:00', '14'], ['2026-10-19T02:00:00+02:00', '13']]
+            .map(([iso, v]) => [ago(iso), v]);
+        t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+            { mock: { series: true, rows: { 'sensor.power': rows } }, clock: '2026-10-19T18:19:00+02:00', timezone: 'Europe/Paris' });
+        await t.wait(1500);
+        const around = () => t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data, x=d.map(p=>+new Date(p.x));
+            const at=iso=>{ const t0=Date.parse(iso); let v; for( let i=0; i<x.length && x[i]<=t0; i++ ) v=d[i].y; return v; };
+            return { ordered: x.every((v,i)=>!i||v>=x[i-1]), at2300: at('2026-10-18T23:00:00+02:00'), at2330: at('2026-10-18T23:30:00+02:00'), at0030: at('2026-10-19T00:30:00+02:00'), at0130: at('2026-10-19T01:30:00+02:00') }; })()`);
+        await t.step('Paris time: a change at 23:10 drawn at 23:10, the day after joined at midnight, in time order — before and after a refresh', async () => {
+            const a = await around();
+            await t.E('el.instance.refresh()'); await t.wait(1500);
+            const b = await around();
+            const ok = r => r.ordered && r.at2300 == 14 && r.at2330 == 13 && r.at0030 == 13 && r.at0130 == 14;
+            return ok(a) && ok(b) ? true : JSON.stringify({ a, b });
+        });
+        done(await t.close());
+    }
+    t = await openCard(card({ defaultTimeRange: '2h', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { series: true, historyStep: 300 }, clock: '2026-10-18T23:40:00+02:00', timezone: 'Europe/Paris' });
+    await t.wait(3000);
+    await t.step('Paris time, the page opened at 23:40 and still open at 0:10: the evening\'s end asked again at the first refresh after midnight, with the new day; the curve without a gap', async () => {
+        await t.page.clock.fastForward('30:00'); await t.wait(500);
+        await t.E('__ws.length = 0; el.instance.refresh()'); await t.wait(2500);
+        const r = await t.E(`(()=>{ const I=el.instance, d=I.graphs[0].chart.data.datasets[0].data, x=d.map(p=>+new Date(p.x));
+            const h=__ws.filter(w=>w.type==='history/history_during_period').map(w=>w.start);
+            const evening=x.filter(v=>v>Date.parse('2026-10-18T23:41:00+02:00') && v<Date.parse('2026-10-19T00:00:00+02:00')).length;
+            return { h, evening, live: I.state.autoScroll, slots: I.cache.length - 1 === I.cacheSize }; })()`);
+        const ok = r.h.includes('2026-10-18T00:00:00+02:00') && r.h.includes('2026-10-19T00:00:00+02:00') && r.evening >= 3 && r.live && r.slots;
+        return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
 
