@@ -76,13 +76,13 @@ This card offers a highly interactive and configurable way to view the history o
 
 ## Differences from upstream
 
-This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card); its first version is 1.1.0. Here is what it adds or changes compared with that version — each point is detailed in the sections below. This is the documentation of the **1.2** line, a rewrite of the card's code: what it adds over the 1.1 line is marked **(1.2)**.
+This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card). Here is what it adds or changes compared with that version — each point is detailed in the sections below.
 
 ### Adding entities
 
 - **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry chooses it, as Enter does. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined — **(1.2)** then cancelled, or added as a second curve in another graph (the same entity in several YAML graphs too). `excludeFilterEntities` removes entities from what `filterEntities` lets through.
 - **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. **(1.2)** Its items open submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*) and of what the card costs on the device (*Performance*), sent as a report.
-- **Attributes (1.2)** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes); a number followed by a unit read as that number in that unit; an attribute can also hold or pick a curve's `color`; **(1.2.28)** a sub-attribute too, by its path (`forecast.0.temperature`).
+- **Attributes** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes); a number followed by a unit read as that number in that unit; an attribute can also hold or pick a curve's `color`; **(1.2.28)** a sub-attribute too, by its path (`forecast.0.temperature`).
 - **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
 
 ### Organizing graphs
@@ -93,23 +93,23 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 ### Drawing
 
 - **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among five algorithms: `monotone`, `steffen`, `makima`, `catmullrom` and `bspline` (mini-graph-card's smoothing). Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
-- **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — **(1.2)** for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
+- **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
 - **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
 - **Display options** — `showMinMax` (a lighter min/max band around the mean curve: everywhere, or only where it comes from the statistics, or from the history), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. **(1.2)** Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
-- **Colors (1.2)** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
+- **Colors** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
 
-### Loading (1.2.23 to 1.2.28)
+### Loading
 
 - **What the screen can show, and no more** — the long-term statistics of the whole window in one request; finer data — the 5-minute statistics, then the history — only where a column of pixels is short enough to show more; one point per column, its mean with its min and max (computed from the history as Home Assistant compiles its statistics); a min/max band (`showMinMax`).
 - **Every action taken at once**, whatever is loading; real time always ending at the present; a page left open past midnight going on with the new day.
-- **mini-graph-card's aggregation** (**1.2.28**) — `pointsPerHour`, `groupBy`, `aggregateFunc` (`points_per_hour`, `group_by`, `aggregate_func`).
+- **mini-graph-card's aggregation** — `pointsPerHour`, `groupBy`, `aggregateFunc` (`points_per_hour`, `group_by`, `aggregate_func`).
 
 ### Y axis
 
 Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a horizontal one zooms the time); `ylock` locks it against any interactive change; `axisAddMarginMin` / `axisAddMarginMax` add a margin below and above the curves. **(1.2)** With two Y axes, dragging the labels of one moves that one; Shift, the pinch and the padlock act on both.
 
-### Touch, pen and mouse (1.2)
+### Touch, pen and mouse
 
 - **Touch** — a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away (within the long-press duration) and drag; a pinch zooms the time and the Y axis, and pans both.
 - **Tooltip** — a click or a tap near a curve opens it for that curve (several curves can show theirs), then it follows the mouse (or a pen held above the screen) until the pointer leaves the curves, or a click outside them; hovering alone no longer opens it. A long-press (or a right click) near a curve shows or hides its points.
@@ -132,7 +132,7 @@ The toolbar adapts its layout to the card's width — on a narrow card (a grid o
 
 ### Info panel
 
-**(1.2)** Loaded through `frontend: extra_module_url`, the card's file puts the info panel in an entity's popup on every page of Home Assistant, not only once a dashboard was shown; switching the panel on or off no longer reloads the page, and a new browser or device takes the choice from your Home Assistant user data.
+Loaded through `frontend: extra_module_url`, the card's file puts the info panel in an entity's popup on every page of Home Assistant; switching the panel on or off doesn't reload the page, and a new browser or device takes the choice from your Home Assistant user data.
 
 ---
 
