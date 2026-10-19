@@ -47,10 +47,32 @@ module.exports = async function()
 
     t = await openCard(card({ defaultTimeRange: '2d', statistics: { enabled: true, period: 'hour', force: true },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
-    await t.step('statistics forced: statistics only, no history request', async () => {
+    await t.step('statistics forced: the statistics only — the history only for the day(s) of the last two hours', async () => {
         const st = await wsOf(t, 'recorder/statistics_during_period'); const h = await wsOf(t, 'history/history_during_period');
         const d = (await t.E('datasets(0)'))[0];
-        return st.length >= 1 && h.length === 0 && d.n > 20 ? true : JSON.stringify({ st: st.length, h: h.length, d });
+        const recent = h.every(w => Date.parse(w.start) >= Date.now() - 26 * HOUR);
+        return st.length === 1 && h.length <= 1 && recent && d.n > 20 ? true : JSON.stringify({ st: st.length, h, d });
+    });
+    done(await t.close());
+
+    // ── 6 months: the statistics for the curves; an entity without statistics (a timeline)
+    // from the history; the tooltip telling where a point comes from ──
+    t = await openCard(card({ defaultTimeRange: '6o', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true } });
+    await t.wait(3000);
+    await t.step('6 months: the statistics asked for the curve only; the timeline (no statistics) from the history, over the whole window; the curve\'s history only for its recent day(s)', async () => {
+        const st = await wsOf(t, 'recorder/statistics_during_period'), h = await wsOf(t, 'history/history_during_period');
+        const old = h.filter(w => Date.parse(w.start) < Date.now() - 26 * HOUR);
+        const ok = st.length === 1 && st[0].ids.join() === 'sensor.power' && old.length >= 1 && old.every(w => !w.ids.includes('sensor.power') && w.ids.includes('binary_sensor.a'));
+        return ok ? true : JSON.stringify({ st, h: h.map(w => [w.start, w.ids]) });
+    });
+    await t.step('the tooltip: "Statistics" and the time a point covers, from – to, min / mean / max with the unit; "History" on the recent points', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], cb=c.options.tooltips.callbacks;
+            const tip=i=>{ const p=ds.data[i], it={ datasetIndex:0, index:i, xLabel:'X', yLabel:p.y }; return [cb.title([it], c.data), cb.label(it, c.data)]; };
+            const si=ds.data.findIndex(p=>p.statistics && p.columnFrom!=null), hi=ds.data.map((p,i)=>!p.statistics?i:-1).filter(i=>i>=0).pop();
+            return { s: si>=0 ? tip(si) : null, h: hi!=null ? tip(hi) : null, unit: ds.unit }; })()`);
+        const ok = r.s && /^Statistics .+ – [\d:]+:00(\s?[ap]m)?$/i.test(r.s[0]) && new RegExp('^(.+: )?-?[\\d.,]+ / -?[\\d.,]+ / -?[\\d.,]+ ' + r.unit + '$').test(r.s[1]) && r.h && /^History /.test(r.h[0]);
+        return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -183,12 +205,6 @@ module.exports = async function()
     await t.step('cursor auto: the line drawn on the graph under the pointer only', async () => {
         const d = await cursorDrawn(); return d === '100' ? true : d;
     });
-    await t.step('min/max band: drawn between the points\' min and max (showMinMax: history)', async () => {
-        const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0]; const withMM=ds.data.filter(p=>p.yMin!=null).length;
-            const count=()=>{ let n=0; const f=c.ctx.fill; c.ctx.fill=function(){ n++; return f.apply(this,arguments); }; c.draw(); c.ctx.fill=f; return n; };
-            const on=count(); ds.showMinMax=false; const off=count(); ds.showMinMax=true; return { withMM, on, off }; })()`);
-        return r.withMM > 1 && r.on > r.off ? true : JSON.stringify(r);
-    });
     done(await t.close());
     t = await openCard(cursorCard('all'), { height: 1200, mock: { series: true } }); await t.wait(800);
     await t.step('cursor all: the line drawn on every graph of the card at once', async () => {
@@ -255,6 +271,19 @@ module.exports = async function()
                 return c.legend.legendHitBoxes.some(h => cr.left+h.left+h.width > bd.left && cr.left+h.left < bd.right && cr.top+h.top < bd.bottom && cr.top+h.top+h.height > bd.top) ? '${w}: under' : ''; })()`));
         }
         return r.every(x => x === '') ? true : JSON.stringify(r);
+    });
+    await t.step('the interval selector in the top row: on the right (before the ×, if any) when the first label fits beside it (1000 px); else centred between the handle and the right, the legend starting below it (340 px)', async () => {
+        const r = {};
+        for( const w of [1000, 340] ) {
+            await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1500);
+            r[w] = await t.E(`(()=>{ const g=el.instance.graphs[0], c=g.chart, cr=c.canvas.getBoundingClientRect(), bd=el.querySelector('#bd-'+g.id).getBoundingClientRect();
+                const cb=c._hecCloseButtonRect(), lh=c._hecLockAndHandleRect(), h=c.legend.legendHitBoxes[0], R=cb?cb.x-8:c.width-4;
+                return { reserved: !!c._hecTopRowReserved, right: Math.round(cr.left+R-bd.right), mid: Math.round((bd.left+bd.right)/2-(cr.left+((lh?lh.x+lh.width:0)+R)/2)),
+                         top: Math.round((bd.top+bd.bottom)/2-(cr.top+16)), below: cr.top+h.top >= bd.bottom-1 }; })()`);
+        }
+        const wide = r[1000], narrow = r[340];
+        const ok = !wide.reserved && Math.abs(wide.right) <= 1 && Math.abs(wide.top) <= 1 && narrow.reserved && Math.abs(narrow.mid) <= 1 && Math.abs(narrow.top) <= 1 && narrow.below;
+        return ok ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -443,25 +472,39 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── Decimation (M4): many values for each column of pixels — each column's first, lowest,
-    // highest and last, whatever decimation says ──
-    const decimated = async dec => {
-        const t = await openCard(card({ defaultTimeRange: '7d', decimation: dec, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+    // ── One point per column of pixels: the mean of its values (weighted by how long each
+    // lasted), their min and max kept — whatever decimation says ──
+    const columns = async (dec, showMinMax) => {
+        const t = await openCard(card({ defaultTimeRange: '7d', decimation: dec, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax }] }] }),
             { mock: { series: true, historyStep: 60 } });
         await t.wait(4000);
-        const r = await t.E(`(()=>{ const g=graphAt(0), c=g.chart, d=c.data.datasets[0].data, A=c.chartArea, v=g.valueSamples[0].map(p=>p.v), y=d.map(p=>p.y);
-            return { n: d.length, values: v.length, cols: Math.round(A.right-A.left), numbers: d.every(p=>typeof p.x==='number'),
-                     extremes: Math.min(...y)===Math.min(...v) && Math.max(...y)===Math.max(...v), ordered: d.every((p,i)=>!i||p.x>=d[i-1].x) }; })()`);
+        const r = await t.E(`(()=>{ const g=graphAt(0), c=g.chart, ds=c.data.datasets[0], d=ds.data, A=c.chartArea, v=g.valueSamples[0].map(p=>p.v);
+            const agg=d.filter(p=>p.columnFrom!=null);
+            const count=()=>{ let n=0; const f=c.ctx.fill; c.ctx.fill=function(){ n++; return f.apply(this,arguments); }; c.draw(); c.ctx.fill=f; return n; };
+            const on=count(); const _m=ds.showMinMax; ds.showMinMax=false; const off=count(); ds.showMinMax=_m;
+            const t0=+new Date(el.instance.startTime), t1=+new Date(el.instance.endTime);
+            return { n: d.filter(p=>p.x>=t0&&p.x<=t1).length, values: v.length, cols: Math.round(A.right-A.left), numbers: d.every(p=>typeof p.x==='number'),
+                     agg: agg.length, inside: agg.every(p=>p.columnMin<=p.y+1e-9 && p.y<=p.columnMax+1e-9 && p.columnFrom<=p.x && p.x<=p.columnTo),
+                     extremes: Math.min(...agg.map(p=>p.columnMin))===Math.min(...v) && Math.max(...agg.map(p=>p.columnMax))===Math.max(...v),
+                     band: d.filter(p=>p.yMin!=null).length, on, off, ordered: d.every((p,i)=>!i||p.x>=d[i-1].x) }; })()`);
         await t.close();
         return r;
     };
     // (the steps below on a page of their own: each test opens its card)
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }));
     for( const dec of ['fast', false] )
-        await t.step(`decimation ${dec}: at most four values for each column of pixels — its first, lowest, highest, last: the lowest and highest of the window kept, in time order`, async () => {
-            const r = await decimated(dec);
-            return r.values > 4 * r.cols && r.n <= 4 * r.cols + 2 && r.n > r.cols && r.extremes && r.ordered && r.numbers ? true : JSON.stringify(r);
+        await t.step(`decimation ${dec} (ignored): one point per column of pixels — the mean of its values, between their min and max; the lowest and highest of the window kept; no band without showMinMax`, async () => {
+            const r = await columns(dec);
+            return r.values > 4 * r.cols && r.n <= r.cols + 2 && r.agg > r.cols / 2 && r.inside && r.extremes && r.ordered && r.numbers && r.band === 0 ? true : JSON.stringify(r);
         });
+    await t.step('showMinMax: true — the band drawn between each column\'s min and max', async () => {
+        const r = await columns(undefined, true);
+        return r.band === r.agg && r.agg > 0 && r.on > r.off ? true : JSON.stringify(r);
+    });
+    await t.step('showMinMax: history — the band on the history\'s columns; statistics — none (the statistics off)', async () => {
+        const h = await columns(undefined, 'history'), st = await columns(undefined, 'statistics');
+        return h.band === h.agg && h.agg > 0 && st.band === 0 ? true : JSON.stringify({ h, st });
+    });
 
     // ── A timeline over a week: only states too thin to see merged (narrower than 2 px) ──
     const H = 3600, D = 86400;
@@ -527,19 +570,20 @@ module.exports = async function()
     t = await openCard(card(), { mock: { series: true } });
     await t.step('a window of 7 days: the curve grows back in time as each day arrives; each day asked once, the most recent first; the whole window at the end', () => growing('7d', 16, 250));
     await t.step('a window of 6 months: at most 8 requests, the most recent first, the curve growing back in time; the whole window at the end', () => growing('6o', 30, 300));
-    await t.step('each part of a long window asked as soon as the one before is answered — before it is drawn; the parts that came meanwhile drawn once', async () => {
+    await t.step('two parts of a long window asked at once; the next one asked as soon as one is answered — before it is drawn; the parts that came meanwhile drawn once', async () => {
         const p = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
             { mock: { series: true, historyDelay: 300 }, init: `document.addEventListener('DOMContentLoaded', ()=>setTimeout(()=>{ const I=el.instance; window.__trace=[];
                 const asked=()=>__ws.filter(w=>w.type==='history/history_during_period').length;
-                const a=I.loaderCallback, d=I.generateGraphDataFromCache;
-                I.loaderCallback=function(){ const r=a.apply(this, arguments); __trace.push('answer:'+asked()); return r; };
+                const a=I._answered, d=I.generateGraphDataFromCache;
+                I._answered=function(){ const r=a.apply(this, arguments); __trace.push('answer:'+asked()); return r; };
                 I.generateGraphDataFromCache=function(){ __trace.push('draw'); return d.apply(this, arguments); }; }, 0));` });
         await p.E('__ws.length = 0; __trace.length = 0; el.instance.reloadHistory()'); await p.wait(4500);
         const trace = await p.E('__trace.join(" ")'), asked = await p.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
         await p.close();
-        // (each answer but the last: the next part already asked — answer:k+1 — when it's put in the cache, before its drawing)
+        // (each answer but the last two: the part after the next already asked — answer:k+3 —
+        // when it's put in the cache, before its drawing)
         const answers = trace.split(' ').filter(x => x.startsWith('answer:')).map(x => +x.slice(7));
-        const ahead = answers.slice(0, -1).every((n, k) => n === k + 2);
+        const ahead = answers.slice(0, -2).every((n, k) => n === k + 3);
         return asked > 2 && answers.length === asked && ahead && trace.endsWith('draw') ? true : JSON.stringify({ trace, asked });
     });
     done(await t.close());
@@ -560,7 +604,7 @@ module.exports = async function()
         const pts = await t.E(`el.instance.graphs[0].chart.data.datasets[0].data.map(p=>[+new Date(p.x), +p.y])`);
         const ws = await t.E(`__ws.filter(w=>w.type==='history/history_during_period'||w.type==='recorder/statistics_during_period').map(w=>[w.type[0], w.start, w.end])`);
         const start = await t.E('+new Date(el.instance.startTime)');
-        // (the time of a column of pixels: decimated, a curve keeps at most four values in each — M4)
+        // (the time of a column of pixels: a curve has at most one point in each)
         const column = await t.E(`(()=>{ const c=el.instance.graphs[0].chart, A=c.chartArea; return ( +new Date(el.instance.endTime) - +new Date(el.instance.startTime) ) / ( A.right - A.left ); })()`);
         await t.close();
         const seen = trace.filter(Boolean);
@@ -581,12 +625,17 @@ module.exports = async function()
         const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
         return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
     });
-    await t.step('a window across the history (10 days) and the statistics (older): the recent part from the history, the older from the statistics in one request, the most recent first; the whole window, joined; nothing asked twice; the Y scale widening as the older, lower values come', async () => {
+    await t.step('a window of 30 days, 10 of history: the statistics of the whole window first, in one request; then the history (a column of pixels shorter than an hour), the most recent first; past its 10 days, the statistics; the whole window, joined; nothing asked twice', async () => {
         const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 26, 300);
         const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
-        const historyFirst = /^h+r$/.test(types), covered = last.first <= r.start + 86400e3;
-        const widened = r.seen[0].min > last.min;
-        return r.joined && r.once && r.fits && historyFirst && covered && widened ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, covered, widened, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
+        const statisticsFirst = /^rh+$/.test(types), covered = last.first <= r.start + 86400e3;
+        return r.joined && r.once && r.fits && statisticsFirst && covered ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, covered, seen: r.seen.map(x => [x.n, x.min, x.vmin]) });
+    });
+    await t.step('a window of 6 months: the statistics in one request, drawn at once; the history only for the day(s) of the last two hours', async () => {
+        const r = await watch('6o', { statistics: { enabled: true } }, {}, 8, 300);
+        const st = r.ws.filter(w => w[0] === 'r'), h = r.ws.filter(w => w[0] === 'h'), last = r.seen[r.seen.length - 1];
+        const recent = h.every(w => Date.parse(w[1]) >= Date.now() - 26 * HOUR), covered = last.first <= r.start + 86400e3;
+        return st.length === 1 && h.length >= 1 && h.length <= 2 && recent && covered && r.joined ? true : JSON.stringify({ ws: r.ws, covered, joined: r.joined });
     });
     await t.step('a lot of history (6 months): the parts joined, the Y scale widening as each older, lower part comes', async () => {
         const r = await watch('6o', { statistics: { enabled: false } }, {}, 30, 300);

@@ -105,7 +105,7 @@ module.exports = async function()
             return JSON.stringify([e.color, e.circular, e.showMinMax, el.instance.store.list.find(x=>x.entity==='sensor.power').showMinMax, el.instance.pconfig.defaultTimeRange]); })()`);
         const want = JSON.stringify(['right', 'lines', [10, 5], 1, { action: 'none' }, 2, ['average'],
             { thresholds: [[0, '#0000ff'], [500, '#00ff00'], [1000, '#ff0000']], states: {} }, 'catmullrom']);
-        const want2 = JSON.stringify(['rgb(255,0,0)', 2 * Math.PI, 'history', 'statistics', '12h']);
+        const want2 = JSON.stringify(['rgb(255,0,0)', 2 * Math.PI, 'history', true, '12h']);
         return v === want && r === want2 ? true : v + ' | ' + r;
     });
     done(await t.close());

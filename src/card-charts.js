@@ -17,7 +17,6 @@ export const RIGHT_Y_AXIS = 'y-axis-1';
 // _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
 export const NARROW_CARD_PX = 300;
 // Where a bar graph's interval selector is: this far from the graph's right edge (px)
-export const INTERVAL_SELECTOR_RIGHT_PX = 40;
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
 // labels' calc(.15em + 8.5px) of its 14 px — see _textSizes
@@ -544,10 +543,14 @@ export class CardCharts
                         // (from the value drawn back to the value shown: see shownScale)
                         const _tf = _ds.textFactor ?? 1;
                         const _circQ = _ds.circularPeriod;
-                        let _v = item.yLabel / _siFactor * _tf;
-                        // (a circular curve shows its real value, in [0, period))
-                        if( _circQ ) _v = this.wrapCircular(_v, _circQ * Math.abs(_tf));
-                        label += formatNumber(_v, _ds.rounding);
+                        const _shown = y => {
+                            const v = y / _siFactor * _tf;
+                            // (a circular curve shows its real value, in [0, period))
+                            return formatNumber(_circQ ? this.wrapCircular(v, _circQ * Math.abs(_tf)) : v, _ds.rounding);
+                        };
+                        // (a column of values: their min, mean and max — see _lineSamples)
+                        const _p = _ds.data[item.index];
+                        label += _p?.columnFrom != null ? `${_shown(_p.columnMin)} / ${_shown(item.yLabel)} / ${_shown(_p.columnMax)}` : _shown(item.yLabel);
                         label += ' ' + (data.datasets[item.datasetIndex].unit || '');
                         return label;
                     } else if( graphtype == 'timeline' ) {
@@ -564,11 +567,14 @@ export class CardCharts
                         return this.generateTooltipContents(label, d, 'slim');
                     }
                 },
-                title: function(tooltipItems, data) {
+                title: (tooltipItems, data) => {
                     let title = '';
                     if( tooltipItems.length > 0 ) {
                         if( graphtype == 'line' || graphtype == 'bar' ) {
-                            title = tooltipItems[0].xLabel;
+                            const _ds = data.datasets[tooltipItems[0].datasetIndex];
+                            // (a curve: every dataset of a line graph, a bar graph's of type line)
+                            const _curve = graphtype == 'line' || _ds?.type === 'line';
+                            title = _curve ? this._pointTitle(_ds.data[tooltipItems[0].index], tooltipItems[0].xLabel) : tooltipItems[0].xLabel;
                         } else {
                             title = ( tooltipSize !== 'slim' ) ? ( data.datasets[tooltipItems[0].datasetIndex]?.name ?? '' ) : '';
                         }
@@ -582,14 +588,24 @@ export class CardCharts
         };
     }
 
-    // The legend keeps clear of the bar interval selector, drawn over the graph's top right
-    // corner — Chart.js legend.rightMargin (the close button is Chart.js' own floating icon,
-    // closeButtonVisible: it keeps its room itself)
-    updateLegendMargins(g)
+    // The first line of a curve's tooltip: where its point comes from — the history or the
+    // statistics — and its time: a column of values, the time they cover (its end's date
+    // only when it's another day); a value, its own (xLabel)
+    _pointTitle(p, xLabel)
     {
-        // (from where the card puts the interval selector — not against the graph's right
-        // edge: its left edge, a gap before it)
-        g.chart.options.legend.rightMargin = g.type === 'bar' && !this.ui.hideInterval ? INTERVAL_SELECTOR_RIGHT_PX + this.intervalSelectorWidth() + 8 : undefined;
+        if( !p || typeof p !== 'object' || p.x === undefined ) return xLabel;
+        const _source = i18n(p.statistics ? 'ui.label.source_statistics' : 'ui.label.source_history');
+        if( p.columnFrom == null ) return `${_source} ${xLabel}`;
+        const _fmt = this.i18n.styleDateTimeTooltip, _from = moment(p.columnFrom), _to = moment(p.columnTo);
+        return `${_source} ${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}`;
+    }
+
+    // Graph g's top control (Chart.js hecTopControl): its bar interval selector, placed by
+    // its chart in its top row, between the handle and the close button — none: null
+    setTopControl(g, el)
+    {
+        g.chart.options.hecTopControl = el ?? null;
+        g.chart.update();
     }
 
     // How many points graph g draws, all its datasets together (the performance test)

@@ -9,7 +9,6 @@ import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
 import { typesCompatible, GRAPH_SCOPE_KEYS } from "./history-options.js";
 import { baseTypePure } from "./card-config.js";
-import { INTERVAL_SELECTOR_RIGHT_PX } from "./card-charts.js";
 const Chart = window.HXLocal_Chart;
 
 export class CardGraphs
@@ -418,8 +417,8 @@ export class CardGraphs
             if( _bd ) _bd.value = interval;
         }
 
-        // Update legend margins now that elements are in the DOM with real widths
-        if( _dynG ) this.updateLegendMargins(_dynG);
+        // (the interval selector placed by the chart, in its top row)
+        if( _dynG ) this.setTopControl(_dynG, this._this.querySelector(`#bd-${_dynGid}`));
 
         // Update mo/ca visibility based on graph count
         this._updateMoVisibility();
@@ -578,7 +577,7 @@ export class CardGraphs
         html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
         if( type == 'bar' && !this.ui.hideInterval )
-            html += this.createIntervalSelectorHtml(this.g_id, h, graphInterval, this.ui.optionStyle, INTERVAL_SELECTOR_RIGHT_PX);
+            html += this.createIntervalSelectorHtml(this.g_id, graphInterval, this.ui.optionStyle);
         html += `</div>`;
 
         const e = document.createElement('div');

@@ -4,6 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.25] - 2026-10-19
+
+### Changed — the statistics first, the history only where it shows more
+- What a window costs Home Assistant grows with the number of values it sends: six months of history were millions of values, for some 900 columns of pixels. The hourly long-term statistics of the whole window are now asked first, in one request, and drawn at once
+- The history is asked only where it shows more than them: when a column of pixels lasts less than the statistics' period (an hour by default) — a window of fewer hours than the graph has pixels, some five weeks on 900 pixels. It is then loaded a few days at a time, the most recent first, two parts at once, and replaces the statistics as it comes; past the history's retention, the statistics stay
+- The days the last two hours fall on are always asked from the history (Home Assistant writes an hour's statistics once it's over), with the statistics — just after midnight, the day before too; asked on their own, never with weeks of another entity's history
+- Entities without statistics — timelines, attributes, angles (`circular`), entities without a state class — always come from the history
+- `statistics.mode` and `statistics.retention` are ignored (still accepted); `period`, `force` and `enabled` keep their meaning (`force`: the history still for the last two hours)
+
+### Changed — one point per column of pixels, a min/max band
+- A curve has at most one point per column of pixels (M4 is gone): the mean of the values in it, each weighted by how long it lasted (an hour of statistics, its mean, whole), with their minimum and maximum; a single value of the history is drawn as is — zoomed in, every value is there
+- `showMinMax` draws a lighter band between each column's minimum and maximum, around the curve: `true` everywhere (it meant `statistics` before), `statistics` only where the curve comes from the statistics, `history` (or `states`) only where it comes from the history; default: no band. No extra request any more
+- The tooltip's first line tells where a point comes from — *History* or *Statistics* — and the time it covers, `from – to` (the end's date only when it's another day); its second line, for a column of values, `min / mean / max` with the unit
+
+### Changed — the bar interval selector in the legend's first line
+- A bar graph's interval selector is drawn by its chart in the top row (`hecTopControl`): on the right, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line
+
+### Tests
+- `features`: one point per column (the mean between the column's min and max, the window's extremes kept) whatever `decimation`; the band with `showMinMax: true`, `history` and `statistics`; 30 days with 10 of history: the statistics first in one request, then the history, past it the statistics; 6 months: one statistics request, the curve's history only for its recent day, a timeline's from the history over the whole window; the tooltip's source, interval and min / mean / max; two history parts asked at once; `statistics.force`: the history only for the last two hours; the interval selector right-aligned at 1000 px, centred above the legend at 340 px
+- The mock Home Assistant gives real hourly statistics (mean, min, max; state and sum for totals) of what its history holds
+
 ## [v1.2.24] - 2026-10-19
 
 ### Changed — a long window loaded sooner

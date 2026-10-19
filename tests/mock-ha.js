@@ -12,6 +12,8 @@
 //               statistics, and for the user data (none: at once)
 //   historyStep seconds between two values of a series (600)
 //   rows        an entity's history as given: { id: [[seconds before now, state], …] }
+//   statsLag    seconds after an hour's end before its statistics exist (600)
+//   noStatistics entities without long-term statistics (whatever their state_class)
 //   json        the history and statistics answered as Home Assistant's websocket does: a
 //               JSON text parsed by the page
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
@@ -105,11 +107,22 @@ function history(d){
   }
   return r;
 }
+// The long-term statistics as Home Assistant compiles them: for an entity with a state_class,
+// an hour once it has ended (and a few minutes for the compiling, MOCK.statsLag, 10 min by
+// default), from the mocked history's values in it — a measurement its mean, min and max, a
+// total its state at the hour's end and its sum; none for an hour not ended. Kept for ever
+// (historyDays aside). MOCK.noStatistics: entities without any
 function statistics(d){
-  const t0=Date.parse(d.start_time), t1=Date.parse(d.end_time), r={};
+  const t0=Date.parse(d.start_time), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
+  const step=(MOCK.historyStep||600)*1000;
   for(const e of d.statistic_ids){
-    if(!STATES[e]||!isNum(e)) continue;
-    const pts=[]; for(let t=Math.ceil(t0/3600e3)*3600e3; t<t1; t+=3600e3){ const v=Number(valueAt(e,t/1000)); pts.push({start:t,end:t+3600e3,mean:v,min:v*0.9,max:v*1.1,state:v,sum:v}); }
+    const sc=STATES[e]?.attributes.state_class;
+    if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
+    const pts=[]; for(let t=Math.ceil(t0/3600e3)*3600e3; t+3600e3<=t1; t+=3600e3){
+      if(sc==='measurement'){ const v=[]; for(let u=Math.ceil(t/step)*step; u<t+3600e3; u+=step) v.push(Number(valueAt(e,u/1000)));
+        if(!v.length) v.push(Number(valueAt(e,t/1000)));
+        pts.push({start:t,end:t+3600e3,mean:v.reduce((a,b)=>a+b,0)/v.length,min:Math.min(...v),max:Math.max(...v)}); }
+      else { const v=Number(valueAt(e,(t+3600e3)/1000)); pts.push({start:t,end:t+3600e3,state:v,sum:v}); } }
     if(pts.length) r[e]=pts;
   }
   return r;

@@ -4333,6 +4333,7 @@
             me._hecUpdateControlsBackdrop();
             me._hecUpdateLinkMarker();
             me._hecUpdateCloseButton();
+            me._hecUpdateTopControl();
 
             plugins.notify(me, 'afterDraw', [easingValue]);
           },
@@ -11996,11 +11997,20 @@
                   // on the left, the room the lock+handle zone needs (4 px apart)
                   me.leftMargin = over ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
                     _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
-                  // on the right, the close button's (closeButtonVisible), mirrored — at least
-                  // options.rightMargin, the room the card needs there
+                  // on the right, the close button's (closeButtonVisible), mirrored, and the top
+                  // control's (hecTopControl) before it — at least options.rightMargin
                   var _cb = !over && _ch && _ch._hecCloseButtonRect && _ch._hecCloseButtonRect();
-                  me.rightMargin = Math.max(me.options.rightMargin || 0, _cb ? me.width - _cb.x + 4 : 4);
+                  var _tc = _ch && _ch._hecTopControlWidth ? _ch._hecTopControlWidth() : 0;
+                  me.rightMargin = Math.max(me.options.rightMargin || 0, ( _cb ? me.width - _cb.x + 4 : 4 ) + ( _tc ? _tc + 8 : 0 ));
                 };
+                // (the first line left to the top row — the icons, the top control between
+                // them —, the legend from the second one)
+                var _reserveFirstLine = function () {
+                  if (_ch) { _ch._hecIconsOverLegend = false; _ch._hecTopRowReserved = true; }
+                  me.leftMargin = me.width;
+                  me.rightMargin = 0;
+                };
+                if (_ch) _ch._hecTopRowReserved = false;
                 _setMargins(!!(_ch && _ch.options.hecControlsBackdrop));
                 // (fork) the margins of a line: the first one's, for what is drawn at both ends
                 // of the legend's top (the controls, the card's buttons — no taller than it);
@@ -12039,8 +12049,12 @@
                   // it, its value — not fitting the first line beside the icons: the icons over
                   // the labels, no room kept for them — never a first line left empty; a label
                   // wider than a whole line, shortened, else cut)
+                  // — or, with a top control (hecTopControl), which can't be under a label: the
+                  // first line left to the top row, the control centred between the icons)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
-                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) _setMargins(true);
+                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) {
+                    if (_ch && _ch._hecTopControlWidth && _ch._hecTopControlWidth()) _reserveFirstLine(); else _setMargins(true);
+                  }
                   // (its name shortened, its full name kept: shown in place on a hover or a click
                   // — _hecRevealAt)
                   me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
