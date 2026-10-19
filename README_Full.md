@@ -172,7 +172,7 @@ Where a zoom keeps the time window depends on what you're doing:
 
 Click or tap on a graph and drag left or right to slide it through time. The card will stream in the database as you move along. If you have a slow DB (like on an SD card), you may see empty parts on the chart that will progressively fill as the data comes in. The larger the shown time range, the more the effect is visible. So scrolling through entire weeks will generate more database accesses than scrolling through days or hours at a time, especially on slower CPUs, like phones.
 
-What the window needs is asked by how long a column of pixels lasts (see [Long term statistics](#long-term-statistics)): the long-term statistics of the whole window in one request, drawn at once — and finer data, the 5-minute statistics, then the history, only where it shows more than them. The history is loaded a few days at a time, the most recent first, two parts at once: each part is drawn as it comes (the statistics only where the history no longer is); parts that arrive meanwhile are drawn together.
+What is loaded depends on how long a column of pixels lasts — the hourly statistics, the 5-minute statistics or the history, see [Long term statistics](#long-term-statistics). The history is loaded a few days at a time, the most recent first, two parts at once: each part is drawn as it comes; parts that arrive meanwhile are drawn together.
 
 The last one to speak wins, whatever is loading: a range chosen, a zoom, a drag, a day before or after, a curve added while the card is still loading is taken at once — the window is the new one, drawn with what's already there, and what it lacks is asked; what was asked for the window before keeps coming and is kept. A page left open past midnight goes on with the new day.
 
@@ -902,11 +902,20 @@ entityOptions:
 
 ## Long term statistics
 
-The card loads the long-term statistics first, and the history only where it shows more. The integration of both sources is entirely seamless: you keep scrolling and zooming in or out of your data, as usual, and they are combined on the fly at all time ranges.
+The card loads what the screen can show, and no more. A graph can't draw anything narrower than a column of pixels: what it loads depends on how long a column lasts — the window's duration divided by the width of the plot area, in CSS pixels (the widest graph's). Both sources are combined on the fly: you keep scrolling and zooming in or out of your data, as usual.
 
-- **The statistics first.** The hourly statistics of the whole time window shown are asked in one request — light, whatever the window's length — and drawn at once, unless the window is drawn from the history (below).
-- **Finer data where it shows more.** A graph can't draw anything narrower than a column of pixels. When a column lasts an hour or more, an hour of statistics (its minimum, its mean, its maximum) tells as much as the history would, to the pixel, and nothing finer is asked. When a column lasts between 5 minutes and an hour — a window of fewer hours than the graph has pixels, some five weeks on a graph 900 pixels wide, down to some three days —, Home Assistant's 5-minute statistics are asked, in one request too: far lighter than the history for a sensor reporting every few seconds, and as exact to the pixel. Home Assistant keeps them as long as the history (the recorder's `purge_keep_days`): the card takes what it returns, however far back, and keeps the hourly statistics before that. When a column is shorter than 5 minutes, the history is asked, a few days at a time, the most recent first, each day drawn as it comes — from its history only, never its statistics first: they're kept for what the history no longer has.
+| A column of pixels lasts | Loaded |
+|---|---|
+| an hour or more | the hourly statistics of the whole window, in one request |
+| between 5 minutes and an hour | the hourly statistics of the whole window, then its 5-minute statistics, in one request each (the hourly ones kept where Home Assistant no longer has 5-minute ones) |
+| less than 5 minutes | the history, a few days at a time, the most recent first, each day drawn as it comes (the hourly statistics only where there's no more history) |
+
+For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h). The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500.
+
 - **The last two hours, always from the history.** Home Assistant writes an hour's statistics a few minutes after it ends: the days the last two hours fall on are always asked from the history, at the same time as the statistics — just after midnight, the day before too.
+- **The same values from both.** A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics over the same time (see [Data decimation](#data-decimation)): nothing shows where the history meets the statistics.
+- **`statistics.period`** (below) is the table's first threshold — an hour by default, a day with `period: day`; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last two hours.
+- **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever: the card takes what it returns, however far back.
 - **Entities without statistics** — timelines, attributes, angles (`circular`: Home Assistant averages angles as plain numbers), entities without a state class — always come from the history: past the history retention limit, their graph is blank.
 
 ![image](https://user-images.githubusercontent.com/60828821/203880897-6f634e95-cb5d-484c-a9c0-d97b58321557.png)
