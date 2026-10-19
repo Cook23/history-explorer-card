@@ -20,32 +20,9 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 ---
 
 > [!IMPORTANT]
-> **This is version 1.2, a beta**
->
-> The **1.2** line is published as a beta (pre-release) alongside the **1.1** line, which remains the recommended version. It is a rewrite of the card's code, where the interactions on phones, tablets and with a pen are being reworked, and the line that gets the new features. What 1.2 changes today:
-> - **touch**: a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away and drag; a pinch also zooms the time;
-> - **the tooltip** opens on a click or a tap near a curve, for that curve — several curves can show theirs — then follows the mouse, until the pointer leaves the curves — hovering alone no longer opens it; a long-press (or a right click) near a curve shows or hides its points;
-> - **gesture settings** for every card: how long a long-press lasts and how precise a pointer is — how far it moves before it drags, how near a target it must be — for a mouse or a pen and for a finger — in the options menu or in the YAML;
-> - **a pen**: the tip works as a finger, and the tooltip follows the pen held above the screen, in the browsers that report it;
-> - **the type menu** in submenus — *Display*, *Interpolation*, *Layout* (*Separate*, *Merge back*, *Cut*, *Delete*) — so that every action of a gesture is also in a menu; it also opens with a right click on a label;
-> - **Tests (beta)**, at the end of the type menu: *Pen events* shows what your browser or app reports of a pen, *Performance* what the card costs on your device, each sent as a report;
-> - **a graph's menu**, from a long-press or a right click on its ⠿ zone: *Display* and *Interpolation* for all its curves, the Y axis lock, *Cut* and *Delete*; with *Cut* — of a graph or a curve — every graph's ⠿ zone shows where it can go, so nothing needs a drag;
-> - **a label, a button, a curve** is picked when touched just beside it, never when the touch is about halfway between two;
-> - **two Y axes** on a graph mixing two groups of units (a power and a temperature), each one moved by dragging its labels;
-> - **colors that change**: `color` takes thresholds on curves too, or an entity or one of its attributes — holding the color, or whose value (a mode, a temperature, a thermostat's `hvac_action`) picks it, point by point;
-> - **an entity's attributes** as curves or timelines (a thermostat's temperature, its setpoint, what it's doing…) — `attribute:` in the YAML, or a submenu of the entity selector; and **the same curve in several graphs**, each set on its own;
-> - **values over a graph**, as [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows them — each curve's value now, its minimum, average and maximum over the window shown — and `look: mini` for its compact look, the time still moved and zoomed;
-> - **the info panel on every page** of Home Assistant (Settings, History…), switched on or off without reloading the page;
-> - **loading**: the long-term statistics first, finer data — the 5-minute statistics, then the history — only where the screen can show more; one point per column of pixels, with a min/max band; every action taken at once, whatever is loading; real time always ending at the present;
-> - **mini-graph-card's YAML**: its options read as the card's own — its aggregation (`points_per_hour`, `aggregate_func`, `group_by`) and sub-attributes included.
->
-> If another setting in the type menu would help you — the Y axis of a curve, left or right, its color, or anything else — your feedback is welcome: with the menu now in submenus, adding one is easy.
->
-> In its code, everything that handles the graphs and the interaction with them (gestures, touch zones, drag feedback, Y axis lock) is separated from the card's own processing (entities, groups, time range, Home Assistant data, saving), through a documented contract.
->
-> **To try it**, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way. Feedback from real devices — phones, tablets, pens, iOS especially — is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues), with the device and browser used — for a pen, the report of *Tests (beta) ▸ Pen events*.
->
-> *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
+> **This is a beta.** The history explorer part of the card is relatively stable; the mini-graph-card part — its YAML, `look: mini`, the values over a graph, the aggregation — is in beta. Feedback is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues).
+
+*Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
 ---
 
