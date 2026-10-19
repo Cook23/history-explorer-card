@@ -61,6 +61,16 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   part, through its contracts, documented, tested, usable in this card's own syntax too.
 - For the UI, this card's gestures and actions stay.
 
+## A README is not a changelog — set by the user, not negotiable (said ten times)
+
+README.md and README_Full.md describe how to use the latest version, as it is now: never
+what changed, when, or what it was before. No version number in them — no "(1.2.25)",
+"since 1.2.23", "now", "no longer", "was", "is ignored since" — except in the Highlights
+paragraph, which alone names the main versions that brought the main evolutions. What
+changed and when goes to the CHANGELOG (and the release notes). An option kept only for
+compatibility is described as it is today ("accepted, no effect"), without its history.
+Before any README edit, check the whole file against this rule.
+
 ## Every option may be at every level — set by the user, not negotiable
 
 Any option may be extended to every level — the card, `entityOptions`, a graph, an entity —
