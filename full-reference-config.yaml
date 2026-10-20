@@ -214,7 +214,11 @@ graphs:
     # A logarithmic Y axis (a line graph)
     logarithmic: False
 
-    # False hides the right Y axis' labels
+    # The left Y axis' labels (mini-graph-card's show_labels): True, False (none, the plot taking their room) or
+    # hover (shown while the pointer is over the graph; on a touch screen, for 3 s after a tap)
+    labelsLeft: True
+
+    # The right Y axis' labels (show_labels_secondary), the same way
     labelsRight: True
 
     # Step size to display on the Y-axis (automatically calculated by default). See its aliases in README_Full.md
@@ -306,10 +310,10 @@ entityOptions:
 # Width of the Y-axis label area on the left side of the graph
 labelAreaWidth: 65
 
-# Whether to display the Y-axis labels on the left side of the graph, or hide them. For state timelines, this will show or hide the state labels.
+# Whether to show the names left of the timelines' rows (the Y axes' labels: labelsLeft, labelsRight)
 labelsVisible: True
 
-# Whether to display the list of entity labels at the top of the graph
+# Whether to display the list of entity labels at the top of the graph; auto: only for a graph of several labels
 legendVisible: True
 
 # The vertical line following the pointer over a graph's plot area (a mouse, or a pen held above the screen)
@@ -396,7 +400,8 @@ yAxis: auto
 # mini-graph-card's look (header: hide, no toolbar nor selector, showState: true, showStats: [min, max],
 # showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
 # lineMode: curves, interpolation: bspline, colorTransition: smooth, showName: true, showIcon: true,
-# alignHeader: default, fontSizeHeader: 14, showCurrentValues: false)
+# alignHeader: default, fontSizeHeader: 14, showCurrentValues: false, legendVisible: auto, labelsLeft: hover,
+# labelsRight: hover)
 look: null
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.

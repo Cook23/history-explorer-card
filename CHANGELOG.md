@@ -14,6 +14,13 @@ Changelog for the HA History Explorer Card.
 - `look: mini`: `showName`, `showIcon`, `alignHeader: default`, `fontSizeHeader: 14`, `showCurrentValues: false` — mini-graph-card's header, its legend's names alone
 - Tests (`minigraph`): the header with `look: mini`, its options, the icon with the values, an image; the card's own title centered, no header without one; the legend's values
 
+### New — mini-graph-card's Y labels and legend
+- `labelsLeft` (`show.labels`, `show_labels`) for the left Y axis' labels, as `labelsRight` (`show.labels_secondary`) for the right one's — on the card, in `entityOptions`, on a graph or an entity: `true`, `false` (no labels nor unit, the plot taking their room — the left axis' too) or `hover`: shown while the pointer is over the graph, faded in and out in 0.25 s; a touch shows them for 3 s (Chart.js `ticks.hecShowOnHover`, `_hecSetPointerOver`). `hover` was read as `true`, and `show_labels` was `labelsVisible`'s alias, which only hides the names left of the timelines' rows: `show.labels: false` hid nothing on a curve
+- `legendVisible: auto` on the card: a graph's legend only when it has several labels in it, as mini-graph-card's
+- `look: mini`: `labelsLeft: hover`, `labelsRight: hover`, `legendVisible: auto` — mini-graph-card's defaults
+- Docs: `labelsVisible` described as it is (the names left of the timelines' rows); mini-graph-card has no `below`, removed from what isn't implemented yet
+- Tests (`minigraph`): `look: mini` with one curve — no legend, the labels faded in over the graph and out when the pointer leaves, shown for a while after a tap; `show.labels: false`, `labels_secondary: true`, `legendVisible: auto` with two curves
+
 ### Changed — the min/max band easier to see
 - `showMinMax`: the band at opacity 0.3 (0.15 before: the same as a light fill, `fill: true`, so it hardly showed, over a fill above all)
 

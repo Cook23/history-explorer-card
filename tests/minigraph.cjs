@@ -210,7 +210,7 @@ module.exports = async function()
     // ── The Y axis: soft bounds, a smallest range, the right axis' own, logarithmic ──
     // (graph i's Y axis k: its range drawn, its options)
     const axis = (t, k = 0, i = 0) => t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[${i}].chart, o=c.options.scales.yAxes[${k}], s=c.scales[o.id];
-        return { min: s.min, max: s.max, type: o.type ?? 'linear', display: o.display !== false, tmin: o.ticks.min, tmax: o.ticks.max }; })()`);
+        return { min: s.min, max: s.max, type: o.type ?? 'linear', display: o.display !== false && o.ticks.display !== false, tmin: o.ticks.min, tmax: o.ticks.max }; })()`);
     t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24,
         lower_bound: '~0', upper_bound: '~10', lower_bound_secondary: 0, upper_bound_secondary: 50, show: { labels_secondary: false },
         entities: ['sensor.power', { entity: 'sensor.rain', y_axis: 'secondary' }] }, { mock: { series: true }, height: 700 });
@@ -362,6 +362,47 @@ module.exports = async function()
         const a = await header(t, 0), b = await header(t, 1);
         const v = await t.E(`el.instance.graphsInDisplayOrder()[0].chart.legend.legendItems.map(x=>x.hecValue)`);
         return a.shown && a.name === 'Titled' && a.justify === 'center' && !a.icon && !b.shown && /^\(\d+ W\)$/.test(v[0]) ? true : JSON.stringify({ a, b, v });
+    });
+    done(await t.close());
+
+    // ── The Y labels: shown, hidden, shown on a hover; the legend only for several curves ──
+    // (graph i's Y axes: their labels shown, their width, how opaque they're drawn; its legend)
+    const labels = (t, i = 0) => t.E(`(()=>{ const c=graphAt(${i}).chart; return { legend: c.options.legend.display, axes: c.options.scales.yAxes.map(o=>{ const s=c.scales[o.id];
+        return { shown: o.ticks.display !== false, hover: !!o.ticks.hecShowOnHover, width: Math.round(s.width), alpha: +c._hecLabelsAlphaOf(s).toFixed(2) }; }) }; })()`);
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24,
+        entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini — one curve: no legend; the Y labels shown on a hover, not drawn while the pointer is elsewhere', async () => {
+        const l = await labels(t);
+        return l.legend === false && l.axes[0].shown && l.axes[0].hover && l.axes[0].alpha === 0 ? true : JSON.stringify(l);
+    });
+    await t.step('show.labels: hover — the pointer over the graph: the labels faded in; leaving it: faded out', async () => {
+        const p = await t.E('graphPtAt(0, 0.5)');
+        await t.page.mouse.move(p.x, p.y); await t.page.mouse.move(p.x + 5, p.y); await t.wait(400);
+        const on = await labels(t);
+        await t.page.mouse.move(2, 2); await t.wait(400);
+        const off = await labels(t);
+        return on.axes[0].alpha === 1 && off.axes[0].alpha === 0 ? true : JSON.stringify({ on, off });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24,
+        entities: ['sensor.power'] }, { mock: { series: true }, height: 700, touch: true });
+    await t.wait(1500);
+    await t.step('show.labels: hover — a tap on the graph (no hover on a touch screen): the labels shown a while, then faded out', async () => {
+        await t.tap(await t.E('graphPtAt(0, 0.5)')); await t.wait(500);
+        const on = await labels(t);
+        await t.wait(3200);
+        const off = await labels(t);
+        return on.axes[0].alpha === 1 && off.axes[0].alpha === 0 ? true : JSON.stringify({ on, off });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, show: { labels: false, labels_secondary: true },
+        legendVisible: 'auto', entities: ['sensor.power', { entity: 'sensor.rain', y_axis: 'secondary' }] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('show.labels: false — no labels on the left, the plot taking their room; labels_secondary: true — the right one\'s shown; legendVisible: auto with two curves — the legend', async () => {
+        const l = await labels(t);
+        return l.legend === true && !l.axes[0].shown && l.axes[0].width === 0 && l.axes[1].shown && !l.axes[1].hover && l.axes[1].alpha === 1 && l.axes[1].width > 0
+            ? true : JSON.stringify(l);
     });
     done(await t.close());
 

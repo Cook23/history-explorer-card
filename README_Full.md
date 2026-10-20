@@ -407,6 +407,8 @@ type: custom:history-explorer-card
 legendVisible: false
 ```
 
+`legendVisible: auto` (on the card; `look: mini`'s default) shows a graph's legend only when it has several labels in it, as mini-graph-card does: a graph of one curve has none — its name is in the graph's header (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)).
+
 On an entity (mini-graph-card's `show_legend: false`), `legendVisible: false` leaves only that entity out of the legend: its curve is drawn, the other labels take its room.
 
 #### Showing current sensor values
@@ -777,6 +779,8 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
 
+**Showing the labels** — `labelsLeft` (mini-graph-card's `show.labels`) for the left axis, `labelsRight` (`show.labels_secondary`) for the right one, on the card, in `entityOptions`, on a graph or on an entity (for its graph): `true` (the default), `false` — no labels nor unit, the plot taking their room, no drag there to move the axis —, or `hover` — shown while the pointer is over the graph, fading in and out; on a touch screen, a tap on the graph shows them for 3 s; hidden by `hover`, they keep their place, and a drag there still moves the axis. `look: mini` gives `hover` to both.
+
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side.
 
 By default, the Y axis of a line chart fits its curves exactly. A small margin can be added below and above them, to give some headroom (bar charts never get it):
@@ -827,7 +831,7 @@ graphs:
 
 Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale and title, and the curves of the right axis are marked with a small arrow ▸ in the legend. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit; on a graph or on the card it applies to every curve that doesn't set its own — `yAxis: left` on a graph keeps it on one axis, and `yAxis: auto` on an entity brings back the choice by unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned. With more than two groups of units, the curves share one Y axis whose title is left empty; the legend and the tooltip still show each entity's value in its own unit. When their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options).
 
-The right axis takes `yminRight`, `ymaxRight` and `yrangeRight` when they're set, else `ymin`, `ymax` and `yrange` like the left one; `labelsRight: false` hides its labels.
+The right axis takes `yminRight`, `ymaxRight` and `yrangeRight` when they're set, else `ymin`, `ymax` and `yrange` like the left one; `labelsRight` shows its labels, as `labelsLeft` the left one's (see [Y axis scaling](#y-axis-scaling)).
 
 Dragging the label area of one axis — left or right — pans that axis only. Shift + drag, Shift + wheel and the two-finger pinch move and zoom both axes together — Shift + wheel each around its own middle, the pinch around the fingers —, so the curves keep their positions relative to each other; the padlock locks and releases both.
 
@@ -1179,7 +1183,7 @@ Three more options shape the graph itself:
 - **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`, `interpolation: bspline`, `colorTransition: smooth`, `showName: true`, `showIcon: true`, `alignHeader: default`, `fontSizeHeader: 14`, `showCurrentValues: false`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`, `interpolation: bspline`, `colorTransition: smooth`, `showName: true`, `showIcon: true`, `alignHeader: default`, `fontSizeHeader: 14`, `showCurrentValues: false`, `legendVisible: auto`, `labelsLeft: hover`, `labelsRight: hover`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1245,11 +1249,11 @@ Written differently in the card's syntax:
 |---|---|
 | `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
 
-`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels_secondary` (see [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line` and `show_legend`, and `hour24` (see [The clock](#the-clock)); the header's options — `show.name`, `show.icon`, `icon`, `icon_image`, `align_header`, `align_icon`, `align_state`, `font_size`, `font_size_header`, `show.name_adaptive_color`, `show.icon_adaptive_color` — and an entity's `show_indicator` and `show_legend_state` (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)); the values are always in their curve's color (`state_adaptive_color`). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
+`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover` (see [Y axis scaling](#y-axis-scaling), [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `show.legend` (shown only for several curves under `look: mini`, see [Legend / entity labels](#legend--entity-labels)), `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line` and `show_legend`, and `hour24` (see [The clock](#the-clock)); the header's options — `show.name`, `show.icon`, `icon`, `icon_image`, `align_header`, `align_icon`, `align_state`, `font_size`, `font_size_header`, `show.name_adaptive_color`, `show.icon_adaptive_color` — and an entity's `show_indicator` and `show_legend_state` (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)); the values are always in their curve's color (`state_adaptive_color`). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
 
 ### Not yet implemented
 
-These mini-graph-card options are being added, its code as the example: `datetime_format`; `hover` and `below` for the labels and the legend; `show.graph: false`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`.
+These mini-graph-card options are being added, its code as the example: `datetime_format`; `show.graph: false`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`.
 
 ---
 
@@ -1405,13 +1409,14 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `valueFactor` | integer | `value_factor` | | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see [Scaling values](#scaling-values-scale-unit-and-valuefactor) |
 | `stateMap` | list | `state_map` | | A text state drawn as a curve: each state (`off`, or `{ value: off, label: Off }`) at its place in the list — 0, 1, 2… —, its label shown in the legend, the tooltip and on the Y axis — see [Text states as a curve](#text-states-as-a-curve) |
 | `hidden` | boolean | | | Hide this entity by default in the legend |
-| `legendVisible` | boolean | `show_legend` | | `false` on an entity: no label for it in the legend (on the card: no legend) |
+| `legendVisible` | boolean or `auto` | `show_legend` | | `false` on an entity: no label for it in the legend (on the card: no legend); `auto` on the card: a graph's legend only for several labels |
 | `ymin` | number or `~`number | `lower_bound` | | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked); `~0`: soft — the minimum unless the values go below it — see [Bounds](#bounds) |
 | `ymax` | number or `~`number | `upper_bound` | | Set the initial Y axis maximum, the same way |
 | `yminRight`, `ymaxRight` | number or `~`number | `lower_bound_secondary`, `upper_bound_secondary` | | The right Y axis' own bounds (else `ymin` / `ymax`) — see [Two Y axes](#two-y-axes) |
 | `yrange`, `yrangeRight` | number | `min_bound_range`, `min_bound_range_secondary` | | The smallest range the Y axis (the right one) shows — see [Bounds](#bounds) |
 | `logarithmic` | boolean | | | A logarithmic Y axis (a line graph) |
-| `labelsRight` | boolean | `show_labels_secondary` | `hover` = `true` | `false`: the right Y axis' labels hidden |
+| `labelsLeft` | boolean or `hover` | `show_labels` | | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see [Y axis scaling](#y-axis-scaling) |
+| `labelsRight` | boolean or `hover` | `show_labels_secondary` | | The right Y axis' labels, the same way |
 | `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size |
 | `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | | | Graph height in pixels (overrides global height settings) |
@@ -1439,13 +1444,13 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `yLabels` | string | | | `inside`: the Y labels inside the plot, which takes the whole width |
 | `exclude` | string, list, or `{entity: ...}` | | | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
 
-Options of the card only, with aliases: `defaultTimeRange` (`hours_to_show`), `labelsVisible` (`show_labels`); and `hour24` — see [The clock](#the-clock). mini-graph-card's `show:` is read as its options: `show: { points: true }` is `show_points: true`.
+Options of the card only, with aliases: `defaultTimeRange` (`hours_to_show`), `labelsVisible`; and `hour24` — see [The clock](#the-clock). mini-graph-card's `show:` is read as its options: `show: { points: true }` is `show_points: true`.
 
 #### The same options at every level
 
 Every option above, except `type`, `name`, `hidden`, `legendVisible`, `scale`, `process` and `circular` (an entity's only), `color` and `unit` (an entity's or the card's — the card's: every entity's), and `lineColor` (a graph's or the card's), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
-The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsRight`, `stacked`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
+The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
 An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 
@@ -1647,11 +1652,11 @@ uiLayout:
   invertZoom: true
 ```
 
-The width of the label area to the left of the graphs can be customized and the labels optionally hidden with the following YAML:
+The width of the label area to the left of the graphs can be customized, and the names left of the timelines' rows hidden, with the following YAML (the Y axes' labels: `labelsLeft` and `labelsRight`, see [Y axis scaling](#y-axis-scaling)):
 
 ```yaml
 type: custom:history-explorer-card
-labelsVisible: false   # this will hide the unit of measure labels and the entity names left of the graphs or timelines
+labelsVisible: false   # this will hide the entity names left of the timelines' rows
 labelAreaWidth: 10     # the width of the label area in pixels, default is 65
 ```
 

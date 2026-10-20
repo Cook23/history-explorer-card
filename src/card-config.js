@@ -81,6 +81,8 @@ export class CardConfig
         P.labelAreaWidth =         c.labelAreaWidth ?? 65;
         P.labelsVisible =          c.labelsVisible ?? true;
         P.hideLegend =           ( c.legendVisible == false ) ? true : undefined;
+        // (auto: a graph's legend only when it has several labels — see card-charts.js newGraph)
+        P.legendAuto =             c.legendVisible === 'auto';
         P.cursorMode =             c.cursor?.mode ?? d('cursorMode', 'auto');
         P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', ['timeline']);
         P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? c.showTooltipColorsLine ?? true;
@@ -405,6 +407,7 @@ export class CardConfig
             yrange            : ent.yrange,
             yrangeRight       : ent.yrangeRight,
             logarithmic       : ent.logarithmic,
+            labelsLeft        : ent.labelsLeft,
             labelsRight       : ent.labelsRight,
             valueFactor       : ent.valueFactor,
             stateMap          : ent.stateMap,
@@ -557,6 +560,7 @@ export class CardConfig
                 yrange         : _opts.yrange,
                 yrangeRight    : _opts.yrangeRight,
                 logarithmic    : _opts.logarithmic,
+                labelsLeft     : _opts.labelsLeft,
                 labelsRight    : _opts.labelsRight,
                 valueFactor    : _opts.valueFactor,
                 stateMap       : _opts.stateMap,
