@@ -437,9 +437,13 @@
   // ---------------------------------------------------------------------------
   // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
   // points (those that have them, within the plot area — each run of them following each
-  // other an area of its own), shaded in the dataset's line color, on the dataset's own Y
-  // axis
+  // other an area of its own), shaded in the dataset's line color at MINMAX_BAND_ALPHA, on
+  // the dataset's own Y axis — the line's color as drawn: a color, or a gradient where it
+  // varies (colorSteps along the time, hecValueGradient along the Y axis), each part of the
+  // band in the color of the line there
   // (any CSS color — a name, #rgb, #rrggbb(aa), rgb(a)(), hsl(a)() — with that alpha; black otherwise)
+  // (the band's opacity: twice the light fill's — fill: true —, so it shows over it)
+  var MINMAX_BAND_ALPHA = 0.3;
   function hecColorWithAlpha(color, alpha) {
     var c = typeof color === 'string' ? helpers.color(color) : null;
     return c && c.valid ? c.alpha(alpha).rgbString() : 'rgba(0,0,0,' + alpha + ')';
@@ -465,7 +469,9 @@
           band.push({ px: px, pyMin: _clampY(pt.yMin), pyMax: _clampY(pt.yMax) });
         });
         ctx.save();
-        ctx.fillStyle = hecColorWithAlpha(dataset.borderColor, 0.15);
+        var _line = chart.getDatasetMeta(di).dataset, _col = _line && _line._model && _line._model.borderColor || dataset.borderColor;
+        ctx.globalAlpha = MINMAX_BAND_ALPHA;
+        ctx.fillStyle = typeof _col === 'string' ? hecColorWithAlpha(_col, 1) : _col;
         runs.forEach(function (b) {
           if (b.length < 2) return;
           ctx.beginPath();

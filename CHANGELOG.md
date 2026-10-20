@@ -4,6 +4,15 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.30] - 2026-10-20
+
+### Changed — the min/max band easier to see
+- `showMinMax`: the band at opacity 0.3 (0.15 before: the same as a light fill, `fill: true`, so it hardly showed, over a fill above all)
+
+### Fixed — the min/max band of a curve whose color varies
+- A curve colored by thresholds on another entity or on states (its color along the time), or by blended thresholds (`colorTransition: smooth`, along the Y axis): its band was drawn in black. It's now drawn with the line's own colors, each part of the band in the color of the line there
+- Tests (`features`): the band in the curve's color at opacity 0.3; with blended thresholds, the line's gradient
+
 ## [v1.2.29] - 2026-10-20
 
 ### New — mini-graph-card's Y axis options
