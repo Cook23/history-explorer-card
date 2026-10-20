@@ -608,7 +608,7 @@ graphs:
         showStats: false
 ```
 
-`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`; `colorTransition: smooth` (thresholds blended from one to the next).
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`; `colorTransition: smooth` (thresholds blended from one to the next); a header with the graph's name on the left and its icon on the right (`showName`, `showIcon`, `alignHeader: default`, `fontSizeHeader: 14`); the legend's names without their values (`showCurrentValues: false`).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
@@ -625,7 +625,7 @@ graphs:
 
 ## mini-graph-card compatibility
 
-A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`), `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend` and `hour24` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`), `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend`, `hour24`, the header's options (`show.name`, `show.icon`, `icon`, `align_*`, `font_size`…), `show_indicator` and `show_legend_state` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
 
 > For full details, and what isn't implemented yet → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
@@ -681,6 +681,12 @@ graphs:
 | `color` | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` | ✓ | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
 | `fill` | `show_fill` | `true`: the curve's color, light; `false`: none | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards |
 | `showState` | `show_state` | | ✓ | ✓ | ✓ | The curve's value now, in large, over the graph |
+| `showIndicator` | `show_indicator` | | ✓ | ✓ | ✓ | A dot in its color before its value over the graph |
+| `showCurrentValues` | `show_legend_state` | | ✓ | ✓ | ✓ | `false`: its value now left out of its legend label |
+| `showName` / `showIcon` / `icon` / `iconImage` | `show_name` / `show_icon` / — / `icon_image` | | ✓ | ✓ | | The graph's header: its name, its icon — see [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) |
+| `alignHeader` / `alignIcon` / `alignState` | `align_header` / `align_icon` / `align_state` | | ✓ | ✓ | | The header's layout, the icon's place, the values' place |
+| `fontSizeHeader` / `fontSize` | `font_size_header` / `font_size` | | ✓ | ✓ | | The header's size (px); the values' size (%) |
+| `nameAdaptiveColor` / `iconAdaptiveColor` | `show_name_adaptive_color` / `show_icon_adaptive_color` | | ✓ | ✓ | | The header's name, its icon in the first curve's color now |
 | `showStats` | | | ✓ | ✓ | ✓ | Its `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
 | `lineWidth` | `width`, `line_width` | | ✓ | ✓ | ✓ | Line width in pixels |
 | `lineMode` | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |

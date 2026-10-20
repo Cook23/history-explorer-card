@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -112,7 +112,7 @@ export class CardConfig
         P.tapAction =              c.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine'].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
@@ -229,6 +229,22 @@ export class CardConfig
     resolveOption(e, k)
     {
         return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k];
+    }
+
+    // Option k of the graph of group groupId (its header, its values — GRAPH_HEADER_KEYS):
+    // the graph's, else the card's
+    graphOption(groupId, k)
+    {
+        return this.pconfig.graphs[groupId]?.[k] ?? this.pconfig.cardOptions?.[k];
+    }
+
+    // Whether entity e's value now is shown after its name in the legend: its own
+    // showCurrentValues (mini-graph-card's show_legend_state), else its graph's, else
+    // entityOptions', else the card's
+    showsCurrentValue(e)
+    {
+        return ( e?.showCurrentValues ?? this.pconfig.graphs[e?.groupId]?.showCurrentValues ?? this.getEntityOptions(e?.entity)?.showCurrentValues
+            ?? this.pconfig.showCurrentValues ) !== false;
     }
 
     // The factor entity e's values are drawn with: its scale, times 10 to the power of its
@@ -395,6 +411,8 @@ export class CardConfig
             colorTransition   : ent.colorTransition,
             showLine          : ent.showLine,
             legendVisible     : ent.legendVisible,
+            showIndicator     : ent.showIndicator,
+            showCurrentValues : ent.showCurrentValues,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
@@ -544,6 +562,10 @@ export class CardConfig
                 stateMap       : _opts.stateMap,
                 colorTransition: _opts.colorTransition,
                 showLine       : _opts.showLine,
+                showIndicator  : _opts.showIndicator,
+                showCurrentValues: _opts.showCurrentValues,
+                // (its header and its values: see graphOption)
+                ...Object.fromEntries(GRAPH_HEADER_KEYS.map(k => [k, _opts[k]])),
             };
         }
     }

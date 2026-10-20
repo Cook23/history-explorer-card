@@ -28,11 +28,12 @@ export class CardCharts
 
     // A curve's legend label, as distinct parts Chart.js lays out (legend.labels): its name
     // (dataset.label — what's shortened, struck through when hidden, clicked to hide it),
-    // its value now ('(400 W)', showCurrentValues — clicked to open its entity's dialog)
+    // its value now ('(400 W)', showCurrentValues: its own, else its graph's… — clicked to
+    // open its entity's dialog)
     // and a small arrow when it's on the right Y axis
     _legendParts(d)
     {
-        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding, d.stateMap) : '',
+        return { label: d.name, hecLegendValue: d.showCurrentValue !== false ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding, d.stateMap) : '',
                  hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '', hecLegendHidden: !!d.legendHidden };
     }
 
@@ -365,6 +366,7 @@ export class CardCharts
             hitRadius: 5,
             showLine: d.showLine !== false,
             stateMap: d.stateMap,
+            showCurrentValue: d.showCurrentValue,
             ...this._legendParts(d),
             yAxisID: d.yAxisID,
             // (stacked bars: those of each Y axis in their own column — stacking
@@ -727,6 +729,8 @@ export class CardCharts
                 "showLine": this.resolveOption(d, 'showLine') !== false,
                 // (show_legend: false on the entity — no label in the legend)
                 "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false,
+                // (its value now after its name in the legend: see showsCurrentValue)
+                "showCurrentValue": this.showsCurrentValue(d),
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
                 "hidden": d.hidden,

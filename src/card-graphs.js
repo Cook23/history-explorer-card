@@ -8,6 +8,11 @@ import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
 import { typesCompatible, GRAPH_SCOPE_KEYS } from "./history-options.js";
+
+// The icon of an entity without its own, by its device class (mini-graph-card's)
+const DEVICE_CLASS_ICONS = { humidity: 'mdi:water-percent', illuminance: 'mdi:brightness-5', temperature: 'mdi:thermometer',
+    battery: 'mdi:battery', pressure: 'mdi:gauge', power: 'mdi:flash', signal_strength: 'mdi:wifi', motion: 'mdi:walk',
+    door: 'mdi:door-closed', window: 'mdi:window-closed', presence: 'mdi:account', light: 'mdi:lightbulb' };
 import { baseTypePure } from "./card-config.js";
 const Chart = window.HXLocal_Chart;
 
@@ -26,6 +31,77 @@ export class CardGraphs
                 const m = ( this.pconfig.tooltipSize == 'full' ) ? 130 : ( this.pconfig.tooltipSize == 'slim' ) ? 90 : 115;
                 return Math.max(34 + n * this.pconfig.timelineBarSpacing, m);
         }
+    }
+
+    // A graph's header (mini-graph-card's): its name — its title, else, with showName, its
+    // first curve's name — and its icon (showIcon: iconImage, else icon, else the entity's
+    // own, else one by its device class), laid out by alignHeader (center by default, the
+    // title alone; default: the name on the left, the icon on the right; left; right) and
+    // alignIcon (right, left — or state: with the values over the graph, see
+    // graphStateIcon), in fontSizeHeader px; the name and the icon in the color of the first
+    // curve now with nameAdaptiveColor, iconAdaptiveColor. Each the graph's, else the
+    // card's (graphOption). Updated with the values now (see showValues)
+    updateGraphHeader(g)
+    {
+        const _h = g?.canvas && this.graphDiv(g)?.querySelector('.hec-graph-header');
+        if( !_h ) return;
+        const o = k => this.graphOption(g.groupId, k);
+        const _first = g.entities[0];
+        const _title = this.pconfig.graphs[g.groupId]?.title;
+        const _name = o('showName') === false ? undefined : _title ?? ( o('showName') === true && _first ? _first.name ?? this.stateOf(_first.entity)?.attributes?.friendly_name ?? _first.entity : undefined );
+        const _icon = o('showIcon') === true && o('alignIcon') !== 'state' ? this._graphIconElement(g) : null;
+        _h.textContent = '';
+        _h.style.display = ( _name === undefined && !_icon ) ? 'none' : 'flex';
+        if( _h.style.display === 'none' ) return;
+        const _align = o('alignHeader') ?? 'center';
+        Object.assign(_h.style, { alignItems: 'center', gap: '0.6em', padding: '0 10px', minWidth: '0',
+            justifyContent: { center: 'center', default: 'space-between', left: 'flex-start', right: 'flex-end' }[_align],
+            fontSize: o('fontSizeHeader') ? o('fontSizeHeader') + 'px' : '' });
+        const _color = _first ? this.entityColor(_first) : undefined;
+        if( _name !== undefined ) {
+            const n = document.createElement('span');
+            n.className = 'hec-graph-name';
+            n.textContent = _name;
+            n.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0' + ( o('nameAdaptiveColor') && _color ? ';color:' + _color : '' );
+            _h.appendChild(n);
+        }
+        if( _icon ) { if( o('alignIcon') === 'left' ) _icon.style.order = '-1'; _h.appendChild(_icon); }
+    }
+
+    // The icon a graph shows with its values (alignIcon: state, with showIcon), else null
+    graphStateIcon(g)
+    {
+        const o = k => this.graphOption(g.groupId, k);
+        return o('showIcon') === true && o('alignIcon') === 'state' ? this._graphIconElement(g) : null;
+    }
+
+    // A graph's icon (see updateGraphHeader): an image, or Home Assistant's icon element
+    _graphIconElement(g)
+    {
+        const o = k => this.graphOption(g.groupId, k);
+        const _first = g.entities[0];
+        const _box = document.createElement('div');
+        _box.className = 'hec-graph-icon';
+        _box.style.cssText = 'flex:0 0 auto;display:flex;align-items:center;color:' +
+            ( o('iconAdaptiveColor') && _first ? this.entityColor(_first) : 'var(--state-icon-color, #44739e)' );
+        if( o('iconImage') ) {
+            const i = document.createElement('img');
+            i.src = o('iconImage'); i.height = 25;
+            _box.appendChild(i);
+        } else {
+            const i = document.createElement('ha-icon');
+            i.setAttribute('icon', o('icon') ?? this._entityIcon(_first?.entity));
+            _box.appendChild(i);
+        }
+        return _box;
+    }
+
+    // An entity's icon: its own, else one by its device class (mini-graph-card's), else a
+    // curve's
+    _entityIcon(entity)
+    {
+        const a = this.stateOf(entity)?.attributes ?? {};
+        return a.icon ?? DEVICE_CLASS_ICONS[a.device_class] ?? 'mdi:chart-line';
     }
 
     graphDiv(g)
@@ -385,7 +461,7 @@ export class CardGraphs
         // (a mixed bar/line graph is sized like a line graph, plus the interval selector)
         const h = _mixed ? this.calcGraphHeight('line', entities.length, _graphHeight) + 24 : this.calcGraphHeight(type, entities.length, _graphHeight);
 
-        const e = this._graphElement(type, h, _graphIndex, _graphInterval, _graphProps.title);
+        const e = this._graphElement(type, h, _graphIndex, _graphInterval);
 
         let gl = this._this.querySelector('#graphlist');
         const _tgtDiv = ( before && before.canvas?.parentNode ) ? this.graphDiv(before) : null;
@@ -411,6 +487,7 @@ export class CardGraphs
 
         // Apply interval override if provided
         const _dynG = this.graphs.find(g => g.id === _dynGid);
+        if( _dynG ) this.updateGraphHeader(_dynG);
         if( _dynG && interval !== null && interval !== undefined ) {
             _dynG.interval = interval;
             const _bd = this._this.querySelector(`#bd-${_dynGid}`);
@@ -556,9 +633,9 @@ export class CardGraphs
         return _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
     }
 
-    // The element of a new graph (its title, canvas, interval selector),
+    // The element of a new graph (its header, canvas, interval selector),
     // not yet in the page
-    _graphElement(type, h, graphIndex, graphInterval, title)
+    _graphElement(type, h, graphIndex, graphInterval)
     {
         let html = '';
         // Spacing between graphs: a margin-top on this graph's own container unless it's
@@ -575,8 +652,8 @@ export class CardGraphs
         const _prevG = _isFirstOnPage ? null : this.graphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < graphIndex).pop();
         const _prevShowTimeLabels = _prevG ? (_prevG.showTimeLabels ?? true) : true;
         const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
-        // Optional title
-        if( title !== undefined ) html += `<div style='text-align:center;'>${title}</div>`;
+        // Its header: its title, or its name and its icon (filled by updateGraphHeader)
+        html += `<div class='hec-graph-header'></div>`;
         html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;
         html += `<canvas id="graph${this.g_id}" height="${h}px"></canvas>`;
         if( type == 'bar' && !this.ui.hideInterval )

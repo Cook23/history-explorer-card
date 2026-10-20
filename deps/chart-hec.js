@@ -2655,8 +2655,9 @@
 
     // Public (Chart Custom.js.md §1): the values shown over the chart, given by its owner —
     // values null: none. { layout: 'row' | 'narrow', states: [{ curve, key, text, unit,
-    // color }], stats: [{ curve, key, name, color, cells: [{ stat, label, value, time }] }],
-    // format(curve, y, x) → { text, unit, time } }: each curve's value now (states, in a
+    // color, indicator }], stats: [{ curve, key, name, color, cells: [{ stat, label, value, time }] }],
+    // format(curve, y, x) → { text, unit, time }, align: 'left' | 'center' | 'right',
+    // fontSize: a percentage, icon: an element shown at the end of the values' row }: each curve's value now (states, in a
     // row; 'narrow': the first one large, the others small in a column on its right, each
     // cut rather than wrapped), its statistics (stats: name — null with only one curve
     // showing them —, then a cell each), all in the given colors; format: a value of curve
@@ -2687,16 +2688,20 @@
       if (_el.nextSibling !== _box || _el.parentNode !== _box.parentNode) _box.parentNode.insertBefore(_el, _box);
       var _narrow = v.layout === 'narrow';
       var _cut = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0';
+      // (a value's indicator: a dot in its color before it)
+      var _dot = function (s) { return s.indicator ? '<span class="hec-indicator" style="display:inline-block;width:0.45em;height:0.45em;border-radius:50%;background:' + s.color + ';margin-right:0.3em;vertical-align:middle"></span>' : ''; };
       var state = function (s, size) {
         return '<div class="hec-state' + (_narrow ? ' hec-cut' : '') + '" data-curve="' + s.curve + '" data-key="' + s.key + '" style="color:' + s.color +
-          ';font-size:' + size + ';line-height:1.2;cursor:pointer;' + (_narrow ? _cut : '') + '">' + _hecValueHtml(s) + '</div>';
+          ';font-size:' + size + ';line-height:1.2;cursor:pointer;' + (_narrow ? _cut : '') + '">' + _dot(s) + _hecValueHtml(s) + '</div>';
       };
+      // (where the values go along their row: align — left, the default, center, right)
+      var _justify = { center: 'space-evenly', right: 'flex-end' }[v.align] || 'space-between';
       var html = '', st = v.states || [];
       if (st.length && _narrow && st.length > 1) {
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">' + state(st[0], '2.2em') +
+        html += '<div class="hec-states" style="display:flex;justify-content:' + _justify + ';align-items:center;gap:8px">' + state(st[0], '2.2em') +
           '<div style="display:flex;flex-direction:column;align-items:flex-end;min-width:0">' + st.slice(1).map(function (s) { return state(s, '1.3em'); }).join('') + '</div></div>';
       } else if (st.length) {
-        html += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px">' + st.map(function (s) { return state(s, '2.2em'); }).join('') + '</div>';
+        html += '<div class="hec-states" style="display:flex;justify-content:' + _justify + ';align-items:center;flex-wrap:wrap;gap:4px 16px">' + st.map(function (s) { return state(s, '2.2em'); }).join('') + '</div>';
       }
       (v.stats || []).forEach(function (x) {
         var _aligns = x.cells.length === 1 ? ['left'] : x.cells.length === 2 ? ['left', 'right'] : ['left', 'center', 'right'];
@@ -2709,6 +2714,11 @@
           }).join('') + '</div>';
       });
       _el.innerHTML = html;
+      // (their size: fontSize, a percentage; an element given with them — an icon — at the
+      // end of their row)
+      _el.style.fontSize = v.fontSize > 0 ? v.fontSize + '%' : '';
+      var _row = _el.querySelector('.hec-states');
+      if (v.icon && _row) { v.icon.style.marginLeft = v.icon.style.marginLeft || '0.6em'; _row.appendChild(v.icon); }
       me._hecShowHoveredValue(me._hecHoverDot || null);
     },
 

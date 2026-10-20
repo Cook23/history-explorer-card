@@ -395,7 +395,8 @@ yAxis: auto
 # A set of default options at once — the card's own options still win, under any of their names. mini:
 # mini-graph-card's look (header: hide, no toolbar nor selector, showState: true, showStats: [min, max],
 # showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
-# lineMode: curves, interpolation: bspline, colorTransition: smooth)
+# lineMode: curves, interpolation: bspline, colorTransition: smooth, showName: true, showIcon: true,
+# alignHeader: default, fontSizeHeader: 14, showCurrentValues: false)
 look: null
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
@@ -424,6 +425,27 @@ showLine: True
 
 # The clock: true, 24 hours; false, 12 hours; not set, Home Assistant's own setting
 hour24: null
+
+# A graph's header (also on a graph): its name — its title, else, with showName, its first curve's name —
+# and its icon (showIcon: iconImage, else icon, else the entity's own, else one by its device class);
+# alignHeader: center, default (name left, icon right), left or right; alignIcon: right, left or state
+# (with the values); fontSizeHeader: its size in px; nameAdaptiveColor, iconAdaptiveColor: in the color
+# of the first curve now
+showName: null
+showIcon: False
+icon: null
+iconImage: null
+alignHeader: center
+alignIcon: right
+fontSizeHeader: null
+nameAdaptiveColor: False
+iconAdaptiveColor: False
+
+# The values over a graph (also on a graph): alignState — left, center or right; fontSize — a percentage.
+# On an entity (or a graph, $.entityOptions): showIndicator, a dot before its value
+alignState: left
+fontSize: null
+showIndicator: False
 
 # Aggregation (mini-graph-card's points_per_hour, group_by, aggregate_func), also on a graph,
 # an entity or in entityOptions: a point per group of time instead of one per column of pixels.
