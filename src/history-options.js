@@ -106,6 +106,7 @@ const OPTION_SYNONYMS = {
     showGraph        : ['show_graph'],
     barSpacing       : ['bar_spacing'],
     fixedValue       : ['fixed_value'],
+    stateAdaptiveColor: ['state_adaptive_color'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -196,6 +197,12 @@ const OPTION_VALUES = {
     barSpacing    : v => v !== null && v !== '' && Number(v) >= 0 ? Number(v) : undefined,
     // (its last value drawn flat over the whole window — see card-datasets.js _lineSamples)
     fixedValue    : v => v === true,
+    // (the values over a graph: for every curve, or for the first one and those setting their
+    // own showState / showStats — mini-graph-card's; in their curve's color, or the text's —
+    // see card-values.js showValues)
+    showStateFor  : v => ['all', 'first'].includes(v) ? v : undefined,
+    showStatsFor  : v => ['all', 'first'].includes(v) ? v : undefined,
+    stateAdaptiveColor : v => v !== false,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
@@ -250,6 +257,12 @@ export function normalizeOptions(o)
     const r = { ...o };
     if( r.show && typeof r.show === 'object' && !Array.isArray(r.show) )
         for( const [k, v] of Object.entries(r.show) ) if( r['show_' + k] === undefined ) r['show_' + k] = v;
+    // (mini-graph-card's show.extrema and show.average: the statistics shown — min and max,
+    // the average)
+    if( r.showStats === undefined && ( r.show_extrema !== undefined || r.show_average !== undefined ) ) {
+        const _l = [...( r.show_extrema === true ? ['min', 'max'] : [] ), ...( r.show_average === true ? ['average'] : [] )];
+        r.showStats = _l.length ? _l : false;
+    }
     for( const [name, aliases] of Object.entries(OPTION_SYNONYMS) ) {
         if( r[name] !== undefined ) continue;
         for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
@@ -268,12 +281,12 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
-    'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing'];
+    'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor'];
 
 // A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
 // else the card's
 export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader',
-    'nameAdaptiveColor', 'iconAdaptiveColor'];
+    'nameAdaptiveColor', 'iconAdaptiveColor', 'showStateFor', 'showStatsFor'];
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
@@ -299,14 +312,15 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // Looks: a set of default options given at once with `look:` — the card's own options
 // still win, whatever their spelling (a look only gives defaults: it never changes what an
 // option means).
-// mini: mini-graph-card's look — no header, toolbar nor selector, each curve's value now
-// and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
-// the plot, thick smooth lines with a fill fading out, a small graph, colors of thresholds
-// blended from one to the next; a header with the name on the left and the icon on the
-// right; the legend's names without their values, and only for several curves; the Y
-// labels shown on a hover
+// mini: mini-graph-card's look — no header, toolbar, selector nor bar interval selector,
+// the first curve's value now and statistics (the others' only when they set their own), in
+// the text's color, no time labels nor grid, the Y labels inside the plot, thick smooth lines with a fill
+// fading out, a small graph, colors of thresholds blended from one to the next; a header
+// with the name on the left and the icon on the right; the legend's names without their
+// values, and only for several curves; the Y labels shown on a hover
 export const LOOKS = {
-    mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
+    mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide', interval: 'hide' }, showState: true,
+            showStateFor: 'first', showStatsFor: 'first', stateAdaptiveColor: false,
             showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
             interpolation: 'bspline', colorTransition: 'smooth', showName: true, showIcon: true, alignHeader: 'default', fontSizeHeader: 14,
             showCurrentValues: false, legendVisible: 'auto', labelsLeft: 'hover', labelsRight: 'hover' },

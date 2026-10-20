@@ -450,5 +450,70 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The look of mini-graph-card's values: its first entity's, the others' set on them; their color; extrema, average ──
+    // (graph 0's values: the states' entities and colors, the statistics' entities and cells)
+    const vals = t => t.E(`(()=>{ const v=graphAt(0).chart._hecValuesEl; return { states: [...(v?.querySelectorAll('.hec-state') ?? [])].map(e=>e.dataset.key.split('.')[1]+'='+e.style.color),
+        stats: [...(v?.querySelectorAll('.hec-stats') ?? [])].map(e=>e.dataset.key.split('.')[1]+':'+[...e.querySelectorAll('.hec-stat')].map(c=>c.dataset.stat+'@'+(c.children[2]?.textContent ?? '')).join(',')) }; })()`);
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, hour24: true, show: { extrema: true, average: true },
+        entities: [{ entity: 'sensor.power', color: '#ff0000' }, { entity: 'sensor.power2', show_state: true, state_adaptive_color: true, color: '#00ff00' }, { entity: 'sensor.rain' }] },
+        { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini — the first entity\'s value, the others\' only with their own show_state; in the text\'s color, state_adaptive_color: its curve\'s', async () => {
+        const v = await vals(t);
+        return v.states.length === 2 && /^power=var\(--primary-text-color\)$/.test(v.states[0]) && /^power2=rgb\(0, 255, 0\)$/.test(v.states[1]) ? true : JSON.stringify(v);
+    });
+    await t.step('show.extrema and show.average — the first entity\'s min, average and max; hour24: their times on 24 hours', async () => {
+        const v = await vals(t);
+        return v.stats.length === 1 && /^power:min@\d{2}:\d{2},average@,max@\d{2}:\d{2}$/.test(v.stats[0]) ? true : JSON.stringify(v);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, hour24: false, show: { state: true, extrema: true },
+        entities: ['sensor.power', 'sensor.power2'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('without look: mini — every curve\'s value and statistics (showStateFor, showStatsFor: all), in its color; hour24: false — on 12 hours', async () => {
+        const v = await vals(t);
+        return v.states.length === 2 && !/primary-text/.test(v.states.join()) && v.stats.length === 2 && /^power:min@\d{1,2}:\d{2}\s?[ap]m,max@/i.test(v.stats[0]) ? true : JSON.stringify(v);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, showStateFor: 'all', showStatsFor: 'all', showStats: ['min'], entities: ['sensor.power', 'sensor.power2'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini with showStateFor: all and showStatsFor: all — every curve\'s, the look only giving defaults', async () => {
+        const v = await vals(t);
+        return v.states.length === 2 && v.stats.length === 2 ? true : JSON.stringify(v);
+    });
+    done(await t.close());
+
+    // ── Bars side by side unless stacked; the interval selector hidden by look: mini ──
+    // (graph 0's last bar of each dataset: its middle and width)
+    const bars = t => t.E(`(()=>{ const c=graphAt(0).chart; return c.data.datasets.map((d,i)=>c.getDatasetMeta(i).data.map(b=>b._model).filter(b=>b&&b.width>0).slice(-1)[0]).map(b=>({x:Math.round(b.x), w:Math.round(b.width)})); })()`);
+    t = await openCard(card({ defaultTimeRange: '3d', graphs: [{ type: 'bar', interval: 'daily', entities: [{ entity: 'sensor.energy' }, { entity: 'sensor.energy2' }] },
+        { type: 'bar', interval: 'daily', stacked: true, entities: [{ entity: 'sensor.energy' }, { entity: 'sensor.energy2' }] }] }), { mock: { series: true }, height: 900 });
+    await t.wait(1500);
+    await t.step('bars of several entities: side by side (stacked not set); stacked: true — in one column', async () => {
+        const a = await bars(t), b = await t.E(`(()=>{ const c=graphAt(1).chart; return c.data.datasets.map((d,i)=>c.getDatasetMeta(i).data.map(b=>b._model).filter(b=>b&&b.width>0).slice(-1)[0]).map(b=>Math.round(b.x)); })()`);
+        const sel = await t.E(`!!el.querySelector('select[id^="bd-"]')`);
+        return a[0].x !== a[1].x && Math.abs(a[1].x - a[0].x) >= a[0].w - 1 && b[0] === b[1] && sel ? true : JSON.stringify({ a, b, sel });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 72, show: { graph: 'bar' },
+        entities: ['sensor.energy'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini — no bar interval selector (uiLayout: interval: hide)', async () => {
+        const sel = await t.E(`!!el.querySelector('select[id^="bd-"]')`);
+        return !sel ? true : 'selector shown';
+    });
+    done(await t.close());
+
+    // ── fill: fade with thresholds by steps of time: drawn ──
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, color_thresholds_transition: 'hard',
+        color_thresholds: [{ value: 0, color: '#3498db' }, { value: 400, color: '#c0392b' }], entities: ['sensor.power', { entity: 'sensor.rain', y_axis: 'secondary' }] },
+        { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('fill: fade with color_thresholds (hard): the curves drawn, their fill fading, no error', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart; return { fade: c.getDatasetMeta(0).dataset._model.backgroundColor instanceof CanvasGradient, n: c.getDatasetMeta(1).data.length }; })()`);
+        return r.fade && r.n > 10 && !t.errors.length ? true : JSON.stringify({ r, errors: t.errors });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

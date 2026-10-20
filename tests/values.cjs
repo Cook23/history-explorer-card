@@ -66,7 +66,9 @@ module.exports = async function()
         return JSON.stringify(v) === JSON.stringify({ states: ['tank=800 L'], stats: [] }) ? true : JSON.stringify(v);
     });
     await t.step('a curve hidden from its legend: its values gone', async () => {
-        const p = await t.E('legendPt(0,0)'); await t.page.mouse.click(p.x, p.y); await t.wait(600);
+        // (on its name: a click on its value opens its entity's dialog)
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[0], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*0.3, y: r.top+b.top+b.height/2 }; })()`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(600);
         const v = await values(t); await t.page.mouse.click(p.x, p.y); await t.wait(600);
         return !v.states.some(s => s.startsWith('rain')) && !v.stats.some(s => s.startsWith('rain')) ? true : JSON.stringify(v);
     });
@@ -112,20 +114,21 @@ module.exports = async function()
     // ── look: mini ──
     t = await openCard(card({ look: 'mini', showGrid: true, graphs: [{ type: 'line', title: 'Pluie', entities: [{ entity: 'sensor.rain', color: 'orange' }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);
-    await t.step('look: mini — no header, toolbar nor selector; the value now, min and max; time labels hidden; Y labels inside; fading fill; the card\'s own showGrid kept', async () => {
+    await t.step('look: mini — no header, toolbar nor selector; the value now, no statistics (none asked); time labels hidden; Y labels inside; fading fill; the card\'s own showGrid kept', async () => {
         const r = await t.E(`(()=>{ const c=el.instance.graphs[0].chart;
             return { header: el.querySelector('ha-card').getAttribute('header'), toolbar: !!el.querySelector('#b1_0'), selector: !!el.querySelector('#b7_0'),
                      time: c.options.scales.xAxes[0].ticks.fontColor, mirror: c.options.scales.yAxes[0].ticks.mirror,
                      fade: c.data.datasets[0].backgroundColor instanceof CanvasGradient, grid: c.options.scales.yAxes[0].gridLines.color }; })()`);
         const v = await values(t);
         const ok = !r.header && !r.toolbar && !r.selector && r.time === 'rgba(0,0,0,0)' && r.mirror && r.fade && r.grid !== 'rgba(0,0,0,0)'
-            && JSON.stringify(v.states) === JSON.stringify(['rain=4 mm']) && /^rain:min=[\d.]+ mm,max=[\d.]+ mm$/.test(v.stats[0]);
+            && JSON.stringify(v.states) === JSON.stringify(['rain=4 mm']) && !v.stats.length;
         return ok ? true : JSON.stringify({ r, v });
     });
     done(await t.close());
 
     // ── A narrow card: the values as mini-graph-card keeps them ──
-    t = await openCard(card({ look: 'mini', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] }] }), { mock: { series: true }, height: 700 });
+    t = await openCard(card({ look: 'mini', showStateFor: 'all', showStatsFor: 'all', showStats: ['min', 'max'],
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);
     // Each value now: its font size (px), its row (its top, rounded); the statistics' font size
     const layout = () => t.E(`[...el.querySelectorAll('.hec-state')].map(e=>Math.round(parseFloat(getComputedStyle(e).fontSize))+'@'+Math.round(e.getBoundingClientRect().top))
@@ -179,7 +182,7 @@ module.exports = async function()
     done(await t.close());
 
     // ── A hover: the value it's on in its curve's place, texts cut shown in full, the Y labels near it opaque ──
-    t = await openCard(card({ look: 'mini', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', name: 'Rafales du vent mesurées au sommet du mât' },
+    t = await openCard(card({ look: 'mini', showStateFor: 'all', showStatsFor: 'all', showStats: ['min', 'max'], graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', name: 'Rafales du vent mesurées au sommet du mât' },
         { entity: 'sensor.power2', name: 'Vitesse moyenne du vent mesurée au sommet du mât' }] }] }), { mock: { series: true }, height: 700 });
     await t.E(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t.wait(1500);
     const first = () => t.E(`(()=>{ const s=graphAt(0).chart._hecValuesEl.querySelector('.hec-state[data-curve="0"]'); return { text: s.textContent, time: !!s.querySelector('.hec-time') }; })()`);

@@ -233,7 +233,7 @@ module.exports = async function()
             return { texts: L.legendItems.map(legendText), within: L.legendHitBoxes.every(b=>b.left>=0 && b.left+b.width<=c.width+1) }; })()`);
     };
     await t.step('a legend too narrow: every name at the same step (the device abbreviated for both), then cut before the value — the lines below the first on the whole width; full width: as it is', async () => {
-        const wide = await legendAt(1000), mid = await legendAt(300), narrow = await legendAt(168);
+        const wide = await legendAt(1000), mid = await legendAt(260), narrow = await legendAt(168);
         await legendAt(1000);
         return wide.texts[0] === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && wide.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
             && mid.texts[0] === 'E Vitesse du vent (Filtered) (400 W)' && mid.texts[1] === 'M-F V… Vitesse du vent (300 W)'
@@ -243,7 +243,7 @@ module.exports = async function()
         await t.E(`(()=>{ for( const [k, n] of ['Température', 'Humidité', 'Pression'].entries() ) { const id='sensor.f_'+k;
             STATES[id]={ entity_id:id, state:'1', last_changed:lc, last_updated:lc, attributes:{ friendly_name:'Ecowitt '+n+' (Filtered)', unit_of_measurement:'x' } }; }
             el.hass=mkHass(); })()`);
-        const mid = await legendAt(300);
+        const mid = await legendAt(260);
         await legendAt(1000);
         return mid.texts[0] === 'Ecowitt Vitesse du vent (F) (400 W)' && mid.texts[1] === 'Météo-France Villeveyrac Vitesse du vent (300 W)'
             || mid.texts[0] === 'E Vitesse du vent (F) (400 W)' && mid.texts[1] === 'M-F V… Vitesse du vent (300 W)' ? true : JSON.stringify(mid);
@@ -285,7 +285,7 @@ module.exports = async function()
             r[w] = await t.E(`(()=>{ const g=el.instance.graphs[0], c=g.chart, cr=c.canvas.getBoundingClientRect(), bd=el.querySelector('#bd-'+g.id).getBoundingClientRect();
                 const cb=c._hecCloseButtonRect(), lh=c._hecLockAndHandleRect(), h=c.legend.legendHitBoxes[0], R=cb?cb.x-8:c.width-4;
                 return { reserved: !!c._hecTopRowReserved, right: Math.round(cr.left+R-bd.right), mid: Math.round((bd.left+bd.right)/2-(cr.left+((lh?lh.x+lh.width:0)+R)/2)),
-                         top: Math.round((bd.top+bd.bottom)/2-(cr.top+16)), below: cr.top+h.top >= bd.bottom-1 }; })()`);
+                         top: Math.round((bd.top+bd.bottom)/2-(cr.top+11.5)), below: cr.top+h.top >= bd.bottom-1 }; })()`);
         }
         const wide = r[1000], narrow = r[340];
         const ok = !wide.reserved && Math.abs(wide.right) <= 1 && Math.abs(wide.top) <= 1 && narrow.reserved && Math.abs(narrow.mid) <= 1 && Math.abs(narrow.top) <= 1 && narrow.below;
@@ -341,7 +341,7 @@ module.exports = async function()
         const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
         return wide.boxes === 'true,true,true' && wide.chainColor === wide.boxColor && wide.boxColor !== narrow.boxColor && wide.legendLeft === wide.zone + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
             && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
-            && narrow.legendLeft === 4 && narrow.firstLabel < narrow.zone && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
+            && narrow.legendLeft === 4 && narrow.firstLabel < wide.firstLabel && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
             && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
     });
     await t.step('a narrow card: on the box (over a label), a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
@@ -373,14 +373,14 @@ module.exports = async function()
         await t.E('(()=>{ const c=graphAt(0).chart; c.options.yAxisLockEnabled=false; c.update(); })()'); await t.wait(300);
         const none = await t.E('graphAt(0).chart._hecTopTargetAt(20, 14)');
         await set({ moveHandleVisible: true, yAxisLockEnabled: true }); await t.wait(300);
-        return top < 28 && !l0 && l1 && none !== 'lockAndHandle' && lockOnly === '24px 24px 12px' && chain === '24px 24px' && /^3\dpx 24px 12px$/.test(both)
+        return top < 28 && !l0 && l1 && none !== 'lockAndHandle' && lockOnly === '16px 17px 8.5px' && chain === '16px 17px' && both === '27px 17px 8.5px'
             ? true : JSON.stringify({ top, l0, l1, none, both, lockOnly, chain });
     });
     await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it removes the graph', async () => {
         await controlsAt(1000);
         await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
         const look = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, e=c._hecCloseButtonEl, s=e&&getComputedStyle(e), r=c._hecCloseButtonRect(), cr=c.canvas.getBoundingClientRect(), er=e.getBoundingClientRect();
-            return { yaml: g.slice(0,-1).map(x=>!!x.chart._hecCloseButtonRect()||!!(x.chart._hecCloseButtonEl&&x.chart._hecCloseButtonEl.style.display!=='none')).join(), text: e.textContent, box: s.width+' '+s.height+' '+s.borderRadius,
+            return { yaml: g.slice(0,-1).map(x=>!!x.chart._hecCloseButtonRect()||!!(x.chart._hecCloseButtonEl&&x.chart._hecCloseButtonEl.style.display!=='none')).join(), text: e.querySelector('svg path') ? '×' : e.textContent, box: s.width+' '+s.height+' '+s.borderRadius,
                      right: Math.round(cr.right-er.right), top: Math.round(er.top-cr.top), margin: c.legend.rightMargin, zone: c._hecTopTargetAt(r.x+12, r.y+12), old: !!el.querySelector('[id^="bc-"]') }; })()`);
         const wide = await look();
         await controlsAt(168); const narrow = await look(); await controlsAt(1000);
@@ -388,7 +388,7 @@ module.exports = async function()
         const n0 = await t.E('el.instance.graphs.length');
         await t.page.mouse.click(p.x, p.y); await t.wait(1200);
         const n1 = await t.E('el.instance.graphs.length'), stored = await t.E(`el.instance.store.has('sensor.wind_rad')`);
-        return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '24px 24px 50%' && wide.right === 1 && wide.top === 4 && wide.margin === 29 && wide.zone === 'closeButton' && !wide.old
+        return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '16px 17px 8.5px' && wide.right === 1 && wide.top === 3 && wide.margin === 21 && wide.zone === 'closeButton' && !wide.old
             && narrow.margin === 4 && narrow.zone === 'closeButton' && n1 === n0 - 1 && !stored ? true : JSON.stringify({ wide, narrow, n0, n1, stored });
     });
     await t.step('the legend\'s first line never left empty: its first label, value included, too wide beside the controls — a shorter form there', async () => {
@@ -424,8 +424,8 @@ module.exports = async function()
         const at = async w => { await t.E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`); await t.wait(1200);
             return t.E(`(()=>{ const c=graphAt(0).chart, L=c.legend, b=L.legendHitBoxes[0];
                 return { line: Math.round(b.top - L.top), margins: L.leftMargin+'/'+L.rightMargin, box: getComputedStyle(c._hecControlsBackdropEl).backgroundColor }; })()`); };
-        const narrowish = await at(350), wide = await at(1000);
-        return narrowish.line < 14 && narrowish.margins === '4/4' && /rgba\(.*, 0\.8\)$/.test(narrowish.box) && wide.line < 14 && wide.margins === '37/4' && wide.box !== narrowish.box
+        const narrowish = await at(330), wide = await at(1000);
+        return narrowish.line < 14 && narrowish.margins === '4/4' && /rgba\(.*, 0\.8\)$/.test(narrowish.box) && wide.line < 14 && wide.margins === '31/4' && wide.box !== narrowish.box
             ? true : JSON.stringify({ narrowish, wide });
     });
     done(await t.close());

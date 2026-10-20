@@ -4,6 +4,33 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.31] - 2026-10-20
+
+### Fixed — bars of several entities stacked
+- A bar graph's bars, `stacked` not set, were stacked in one column instead of side by side: each bar had its Y axis as its stack, and Chart.js stacks the bars of a stack whenever `stacked` isn't set. Since 1.2.4. They are now side by side unless `stacked: true` (each axis' bars in their own column)
+- Test (`minigraph`): two entities' bars side by side; with `stacked: true`, in one column
+
+### Fixed — the times over a graph on the 12-hour clock
+- The times of the statistics and of the value hovered over a graph followed moment's own locale: `hour24`, and Home Assistant's own clock setting, did nothing to them. They are now written as the time axis writes them (`styleTimeTicks`)
+- Test (`minigraph`): `hour24: true` — 24 hours; `false` — AM/PM
+
+### Fixed — fill: fade with thresholds along the time
+- A curve whose thresholds color it along the time (`colorSteps`: thresholds on another entity, on states, or `hard` on its values) with `fill: fade` (`look: mini`'s) wasn't drawn, nor the graph's other curves: its fill's gradient was given a gradient as a color (`hecColorSteps`). With `fill: fade`, its own fading fill is now kept, its line colored as before
+- Test (`minigraph`): `color_thresholds` with `hard` under `look: mini`, the curves drawn, no error
+
+### Changed — the legend's dots, the controls' boxes: smaller, the curves keeping the room
+- A legend label's dot: a filled disc of its curve's color, 0.7 × the label's font size across (8 px for 12 px) — it was 1.4 × the font size, ringed by a line as thick as the curve's (5 px under `look: mini`): some 22 px. The room around each label 6 px instead of 10: a legend's lines lower, the labels more often on one line (Chart.js `getBoxWidth`, the legend's `drawLegendBox`; the card's `legend.labels.padding`)
+- The handle, the padlock and the close button smaller: each symbol drawn as it is seen — the padlock cut to its own bounds (10×12 px, 2 px from its box's top and 3 px from its bottom — its body heavier than its shackle —, its corners within its round box; 12×16 px seen of an 18 px icon before), the handle six dots (6×11 px; the `⠿` character placed by its font before), the × two strokes (10×11 px; a 16 px character before) — each in a box 17 px high, 2 to 3 px larger than it above and below (24 px before, 4 to 8 px around the symbols), round ones 16×17 px, the lock+handle box 27×17 px; the close button's on the same line, from 3 to 20 px; the chain icon's as large (its chain 10×10 px; a 24 px box before), between the two linked graphs, right above the lower one's top edge — laid over what is there, taking no room, as the others (`_hecControlSymbolsAt`, `CTRL_*`). The legend's first line keeps room for the box as it is (`_hecLockAndHandleRect`)
+- A bar graph's interval selector centred on the controls' line too (it was on the old one, 16 px down: on a card of 230 px, over the legend's second line by 2 px)
+- Tests (`features`, `values`): the boxes' sizes and places, the chain icon's; the legend's shortening now from about 280 px (300 px before); a click on a legend label's name, its value now nearer its middle
+
+### New — mini-graph-card's values: the first entity's, their color, extrema and average
+- `showStateFor` and `showStatsFor` (a graph or the card): `all` — the default —, or `first`: a graph's or the card's `showState`, `showStats` for its first curve only, the others' set on them (on the entity, in `entityOptions`: mini-graph-card's `show_state`) — as mini-graph-card shows its first entity's value and extrema (`showValues`)
+- `stateAdaptiveColor` (`state_adaptive_color`): `false` — the values over a graph in the text's color, instead of their curve's; the `showIndicator` dot keeps the curve's color (`hecSetValues`: a state's `indicator` may be a color)
+- `show.extrema`, `show.average`: `showStats` — `[min, max]`, `[average]`, both `[min, average, max]` (`normalizeOptions`)
+- `look: mini`: `showStateFor: first`, `showStatsFor: first`, `stateAdaptiveColor: false`, `uiLayout: { interval: hide }` — and no `showStats` any more (mini-graph-card's `show.extrema` is off by default)
+- Tests (`minigraph`): `look: mini` — the first entity's value, another's with its `show_state`, in the text's color, `state_adaptive_color` in its curve's; `show.extrema` and `show.average` — the first entity's; without `look: mini`, every curve's; `showStateFor: all` under `look: mini`; no bar interval selector. `values`: the tests of `look: mini` with several curves set `showStateFor: all`, `showStatsFor: all`, `showStats`
+
 ## [v1.2.30] - 2026-10-20
 
 ### New — mini-graph-card's header

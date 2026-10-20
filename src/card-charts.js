@@ -188,6 +188,9 @@ export class CardCharts
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
                         boxWidth: 0,
+                        // (the room around each label: as little as keeps them apart — the
+                        // curves keep the rest)
+                        padding: 6,
                         fontSize: this._textSizes().text,
                         // (a label wider than the legend: shortened, its value kept)
                         hecShortNames: datasets => this.shortNameForms(datasets)
@@ -375,8 +378,9 @@ export class CardCharts
             ...this._legendParts(d),
             yAxisID: d.yAxisID,
             // (stacked bars: those of each Y axis in their own column — stacking
-            // values of two scales on each other would mean nothing)
-            stack: d.yAxisID,
+            // values of two scales on each other would mean nothing; not stacked, the default:
+            // each its own column, side by side — a stack given would stack them)
+            stack: config?.stacked === true ? d.yAxisID : undefined,
             name: d.name,
             cubicInterpolationMode: 'monotone',
             // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)

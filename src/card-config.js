@@ -114,7 +114,7 @@ export class CardConfig
         P.tapAction =              c.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
@@ -417,6 +417,7 @@ export class CardConfig
             showIndicator     : ent.showIndicator,
             showGraph         : ent.showGraph,
             fixedValue        : ent.fixedValue,
+            stateAdaptiveColor: ent.stateAdaptiveColor,
             showCurrentValues : ent.showCurrentValues,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
@@ -570,6 +571,7 @@ export class CardConfig
                 showLine       : _opts.showLine,
                 showIndicator  : _opts.showIndicator,
                 showGraph      : _opts.showGraph,
+                stateAdaptiveColor: _opts.stateAdaptiveColor,
                 showCurrentValues: _opts.showCurrentValues,
                 // (its header and its values: see graphOption)
                 ...Object.fromEntries(GRAPH_HEADER_KEYS.map(k => [k, _opts[k]])),

@@ -62,17 +62,26 @@ export class CardValues
         this.updateGraphHeader(g);
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
             .filter(x => x.d && ( !x.d.hidden || x.d.notDrawn ));
-        const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
-        const _stats = _entities.map(x => ({ ...x, which: this._resolveShow(x.e, 'showStats') ?? [] })).filter(x => x.which.length);
+        // (showStateFor, showStatsFor: first — the graph's or the card's showState, showStats
+        // only for its first curve; the others' own (on the entity, in entityOptions) — as
+        // mini-graph-card shows its first entity's)
+        const o = k => this.graphOption(g.groupId, k);
+        const _show = (x, key, forKey) => ( o(forKey) === 'first' && x !== _entities[0] )
+            ? x.e?.[key] ?? this.getEntityOptions(x.e?.entity)?.[key] : this._resolveShow(x.e, key);
+        const _states = _entities.filter(x => _show(x, 'showState', 'showStateFor'));
+        const _stats = _entities.map(x => ({ ...x, which: _show(x, 'showStats', 'showStatsFor') ?? [] })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
-        const _color = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
+        // (its curve's color — or with stateAdaptiveColor: false, the text's)
+        const _curveColor = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
+        const _color = x => this.resolveOption(x.e, 'stateAdaptiveColor') === false ? 'var(--primary-text-color)' : _curveColor(x);
         const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
-        const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? 'LT' : 'L LT');
+        // (a time as the time axis writes it — the card's clock: hour24, else Home Assistant's)
+        const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? this.i18n.styleTimeTicks : this.i18n.styleDateTicks + ', ' + this.i18n.styleTimeTicks);
         const states = _states.map(x => {
             const s = this.stateOf(x.e.entity)?.state;
             // (a state_map's state: its label)
-            // (show_indicator: a dot in its color before it)
-            const _ind = this.resolveOption(x.e, 'showIndicator') === true;
+            // (show_indicator: a dot in its curve's color before it)
+            const _ind = this.resolveOption(x.e, 'showIndicator') === true ? _curveColor(x) : false;
             if( x.d.stateMap?.length ) return { curve: x.j, key: x.e.entity, color: _color(x), unit: '', indicator: _ind, text: stateLabel(x.d.stateMap, String(s ?? '')) ?? String(s ?? '') };
             return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '', indicator: _ind,
                      text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 ), x.d) };
@@ -93,7 +102,7 @@ export class CardValues
         // (the icon with them, alignIcon: state; their place, alignState; their size, fontSize
         // — mini-graph-card's)
         g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format,
-            align: this.graphOption(g.groupId, 'alignState'), fontSize: this.graphOption(g.groupId, 'fontSize'), icon: this.graphStateIcon(g) });
+            align: o('alignState'), fontSize: o('fontSize'), icon: this.graphStateIcon(g) });
     }
 
     // A value of dataset d as the values over a graph show it: its curve's decimals (see
