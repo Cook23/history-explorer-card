@@ -178,7 +178,9 @@ export class CardCharts
                     animationDuration: 0
                 },
                 legend: {
-                    display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true,
+                    display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true &&
+                             // (legendVisible: auto — only for several labels in it)
+                             ( !this.pconfig.legendAuto || datasets.filter(d => !d.legendHidden).length > 1 ),
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
@@ -424,16 +426,19 @@ export class CardCharts
         const _map = _list.length && _list.every(d => d.stateMap?.length && JSON.stringify(d.stateMap) === JSON.stringify(_list[0].stateMap)) ? _list[0].stateMap : null;
         // (a logarithmic axis: curves only)
         const _log = config?.logarithmic === true && graphtype == 'line' && !_period && !_map;
+        // (its labels — labelsLeft / labelsRight, mini-graph-card's show.labels(_secondary):
+        // false, none, the plot taking their room; hover, shown while the pointer is over the
+        // graph — Chart.js ticks.hecShowOnHover)
+        const _shown = ( graphtype == 'line' || graphtype == 'bar' ) ? config?.[_right ? 'labelsRight' : 'labelsLeft'] : true;
         return {
             id,
             ...( _log ? { type: 'logarithmic' } : {} ),
             position: _right ? 'right' : 'left',
-            // (the right axis' labels hidden: labelsRight — mini-graph-card's labels_secondary)
-            ...( _right && config?.labelsRight === false ? { display: false } : {} ),
             yLabelsMode: config?.yLabels,
             labelUnit: _unit,
+            labelsShown: _shown,
             afterFit: (scaleInstance) => {
-                scaleInstance.width = scaleInstance.options.ticks.mirror ? 0 : this.pconfig.labelAreaWidth;
+                scaleInstance.width = ( scaleInstance.options.ticks.mirror || _shown === false ) ? 0 : this.pconfig.labelAreaWidth;
             },
             afterDataLimits: (me) => {
                 // (a side set by hand — the padlock, a drag, a pinch — or fixed: as it is)
@@ -460,14 +465,16 @@ export class CardCharts
                 period: _period,
                 // (a state_map's labels, at their places; nothing between them)
                 ...( _map ? { callback: v => Number.isInteger(v) ? ( _map[v]?.label ?? '' ) : '' } : {} ),
-                ...this._yLabelTicks(_inside)
+                ...this._yLabelTicks(_inside),
+                display: _shown !== false,
+                hecShowOnHover: _shown === 'hover'
             },
             gridLines: {
                 color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
                 drawOnChartArea: !_right
             },
             scaleLabel: {
-                display: !_inside && _unit !== undefined && _unit !== '',
+                display: !_inside && _shown !== false && _unit !== undefined && _unit !== '',
                 labelString: _unit,
                 fontColor: this.pconfig.graphLabelColor
             },
@@ -546,7 +553,7 @@ export class CardCharts
             for( const ax of o.scales?.yAxes ?? [] ) {
                 const _inside = this._yLabelsInside(ax.yLabelsMode, g.chart.config.type);
                 _set(ax.ticks, this._yLabelTicks(_inside));
-                _set(ax.scaleLabel, { display: !_inside && ax.labelUnit !== undefined && ax.labelUnit !== '' });
+                _set(ax.scaleLabel, { display: !_inside && ax.labelsShown !== false && ax.labelUnit !== undefined && ax.labelUnit !== '' });
             }
             for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
             _set(o, { hecControlsBackdrop: this._controlsBackdrop() });

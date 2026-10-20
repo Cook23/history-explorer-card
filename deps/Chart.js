@@ -4706,6 +4706,7 @@
                 me._hecUpdateHoverDot(null);
                 me._hecUpdateReveal(null);
                 me._hecSetLabelsHovered(null);
+                me._hecSetPointerOver(false);
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -8065,6 +8066,9 @@
               } else if (optionTicks.display) {
                 // Make sure we draw text in the correct color and font
                 context.save();
+                // (fork) shown on a hover only (ticks.hecShowOnHover): as much as the pointer
+                // has made them (_hecLabelsAlphaOf)
+                if (me.chart && me.chart._hecLabelsAlphaOf) context.globalAlpha *= me.chart._hecLabelsAlphaOf(me);
                 context.translate(itemToDraw.labelX, itemToDraw.labelY);
                 context.rotate(itemToDraw.rotation);
                 context.font = itemToDraw.major ? majorTickFont.font : tickFont.font;
@@ -8121,6 +8125,8 @@
               }
 
               context.save();
+              // (fork) the unit with the labels (ticks.hecShowOnHover: _hecLabelsAlphaOf)
+              if (me.chart && me.chart._hecLabelsAlphaOf) context.globalAlpha *= me.chart._hecLabelsAlphaOf(me);
               context.translate(scaleLabelX, scaleLabelY);
               context.rotate(rotation);
               context.textAlign = 'center';

@@ -319,11 +319,11 @@ Drag & drop shows a ghost element and insertion markers for precise positioning.
 
 ![image](https://user-images.githubusercontent.com/60828821/221268643-735e4b1a-81da-4709-aff8-913b9b8f95a8.png)
 
-The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves.
+The Y axis auto-scales by default. Click the padlock icon (or use the [graph menu](#the-graph-menu-cut-and-paste)) to lock it to the current range. Drag directly on the label area of an axis (left side of the graph, or right side for a second axis) to pan that axis — the cursor changes to ↕; on a touch screen, tap it, then press it again right away and drag. Hold **SHIFT** to enable vertical drag and zoom on the graph itself. On a touch screen, a two-finger vertical pinch zooms the Y axis, a horizontal one zooms the time. Labels drawn inside the plot (a narrow card, `yLabels: inside`, `look: mini`): a drag along them moves that axis and its curves (a finger or a pen: tap, then press again and drag), while a click, a long-press or a hover there is for the curves. `labelsLeft` and `labelsRight` show each axis' labels: `true`, `false` (none, the plot taking their room) or `hover` (shown while the pointer is over the graph; on a touch screen, for 3 s after a tap).
 
 **Two Y axes** — with two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side, and `yAxis: left` on the graph (or the card) keeps all its curves on one axis. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Dragging the labels of one axis moves that one; Shift, the pinch and the padlock act on both.
 
-A bound written with a `~` is soft (`ymin: ~0`: 0 at least, lower where the values go lower); `yrange` is the smallest range the axis shows; `logarithmic: true`, a logarithmic axis; the right axis has its own (`yminRight`, `ymaxRight`, `yrangeRight`, `labelsRight`).
+A bound written with a `~` is soft (`ymin: ~0`: 0 at least, lower where the values go lower); `yrange` is the smallest range the axis shows; `logarithmic: true`, a logarithmic axis; the right axis has its own (`yminRight`, `ymaxRight`, `yrangeRight`).
 
 To set initial Y axis bounds in YAML:
 ```yaml
@@ -608,7 +608,7 @@ graphs:
         showStats: false
 ```
 
-`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`; `colorTransition: smooth` (thresholds blended from one to the next); a header with the graph's name on the left and its icon on the right (`showName`, `showIcon`, `alignHeader: default`, `fontSizeHeader: 14`); the legend's names without their values (`showCurrentValues: false`).
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`; `colorTransition: smooth` (thresholds blended from one to the next); a header with the graph's name on the left and its icon on the right (`showName`, `showIcon`, `alignHeader: default`, `fontSizeHeader: 14`); the legend's names without their values (`showCurrentValues: false`), and a legend only for several curves (`legendVisible: auto`); the Y labels shown on a hover (`labelsLeft: hover`, `labelsRight: hover`).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
@@ -625,7 +625,7 @@ graphs:
 
 ## mini-graph-card compatibility
 
-A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`), `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend`, `hour24`, the header's options (`show.name`, `show.icon`, `icon`, `align_*`, `font_size`…), `show_indicator` and `show_legend_state` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover`), `show.legend`, `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend`, `hour24`, the header's options (`show.name`, `show.icon`, `icon`, `align_*`, `font_size`…), `show_indicator` and `show_legend_state` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
 
 > For full details, and what isn't implemented yet → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
@@ -709,14 +709,15 @@ graphs:
 | `valueFactor` | `value_factor` | | ✓ | ✓ | ✓ | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see *6 |
 | `stateMap` | `state_map` | | ✓ | ✓ | ✓ | A text state drawn as a curve: each state at its place in the list, its label shown — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
 | `hidden` | | | | | ✓ | Hide by default in legend |
-| `legendVisible` | `show_legend` | | ✓ | | ✓ | `false`: no legend (the card); no label in the legend for this entity (an entity) |
+| `legendVisible` | `show_legend` | | ✓ | | ✓ | `false`: no legend (the card); no label in the legend for this entity (an entity); `auto` (the card): a graph's legend only for several labels |
 | `process` | | | | | ✓ | JS expression to transform values before display |
 | `circular` | | | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
 | `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *7 |
 | `yminRight` / `ymaxRight` | `lower_bound_secondary` / `upper_bound_secondary` | | ✓ | ✓ | ✓ | The right Y axis' own bounds — see *7 |
 | `yrange` / `yrangeRight` | `min_bound_range` / `min_bound_range_secondary` | | ✓ | ✓ | ✓ | The smallest range the Y axis (the right one) shows — see *7 |
 | `logarithmic` | | | ✓ | ✓ | ✓ | A logarithmic Y axis (a line graph) — see *7 |
-| `labelsRight` | `show_labels_secondary` | `hover` = `true` | ✓ | ✓ | ✓ | `false`: the right Y axis' labels hidden — see *7 |
+| `labelsLeft` | `show_labels` | | ✓ | ✓ | ✓ | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see *7 |
+| `labelsRight` | `show_labels_secondary` | | ✓ | ✓ | ✓ | The right Y axis' labels, the same way — see *7 |
 | `ystepSize` | `ystepsize` | | ✓ | ✓ | ✓ | Fix Y axis tick step — see *7 |
 | `ylock` | | | ✓ | ✓ | ✓ | Disable all interactive Y axis pan and zoom — see *7 |
 | `stacked` | | | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
@@ -725,7 +726,7 @@ graphs:
 | `showGrid` | | | ✓ | ✓ | ✓ | `false`: no grid lines — see *7 |
 | `yLabels` | | | ✓ | ✓ | ✓ | `inside`: the Y labels inside the plot, which takes the whole width — see *7 |
 | `defaultTimeRange` | `hours_to_show` | | ✓ | | | The time range shown when the card opens — see [Time range](#time-range-and-display-defaults) |
-| `labelsVisible` | `show_labels` | | ✓ | | | `false`: no Y labels |
+| `labelsVisible` | | | ✓ | | | `false`: no names left of the timelines' rows |
 | `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `entityOptions` | | | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
 | `filterEntities` / `excludeFilterEntities` | | | ✓ | | | Limit which entities appear in the entity picker — see *4 |
@@ -792,7 +793,7 @@ uiLayout:
   invertZoom: true     # swap + and - zoom buttons
   interval: hide       # hide the bar interval selector
 
-labelsVisible: false
+labelsVisible: false      # no names left of the timelines' rows
 labelAreaWidth: 65
 
 lineGraphHeight: 250
@@ -801,7 +802,7 @@ timelineBarHeight: 24
 timelineBarSpacing: 40
 
 showCurrentValues: false  # live values next to legend labels are shown by default; set false to hide
-legendVisible: false       # hide the legend entirely
+legendVisible: false       # hide the legend entirely (auto: only for several curves)
 
 stateColorSeed: 137       # seed for automatic state colors
 

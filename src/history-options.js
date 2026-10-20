@@ -66,7 +66,7 @@ const OPTION_SYNONYMS = {
     ystepSize        : ['ystepsize'],
     showState        : ['show_state'],
     legendVisible    : ['show_legend'],
-    labelsVisible    : ['show_labels'],
+    labelsLeft       : ['show_labels'],
     defaultTimeRange : ['hours_to_show'],
     rounding         : ['decimals'],
     lineMode         : ['smoothing'],
@@ -139,6 +139,9 @@ export function stateLabel(map, v)
     return map.find(m => m.value === String(v))?.label;
 }
 
+// An axis' labels: shown (true), hidden (false) or shown on a hover ('hover')
+const _labelsShown = v => v === 'hover' ? v : v !== false;
+
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
 
@@ -151,9 +154,12 @@ const OPTION_VALUES = {
     ymaxRight     : _yBound,
     yrange        : _positive,
     yrangeRight   : _positive,
-    // (the right axis' labels: false hides them; true or hover — mini-graph-card's default,
-    // its labels shown on a hover — shows them)
-    labelsRight   : v => v !== false,
+    // (an axis' labels: false hides them, hover shows them while the pointer is over the
+    // graph — see card-charts.js _chartYAxis)
+    labelsLeft    : _labelsShown,
+    labelsRight   : _labelsShown,
+    // (auto: the legend only when the graph has several labels in it)
+    legendVisible : v => v === 'auto' ? v : v !== false,
     logarithmic   : v => v === true,
     // (a power of ten: an integer)
     valueFactor   : v => Number.isInteger(Number(v)) ? Number(v) : undefined,
@@ -249,7 +255,7 @@ export function normalizeOptions(o)
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues'];
 
@@ -262,7 +268,7 @@ export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight'];
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its
@@ -286,12 +292,13 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
 // the plot, thick smooth lines with a fill fading out, a small graph, colors of thresholds
 // blended from one to the next; a header with the name on the left and the icon on the
-// right; the legend's names without their values
+// right; the legend's names without their values, and only for several curves; the Y
+// labels shown on a hover
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
             showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
             interpolation: 'bspline', colorTransition: 'smooth', showName: true, showIcon: true, alignHeader: 'default', fontSizeHeader: 14,
-            showCurrentValues: false },
+            showCurrentValues: false, legendVisible: 'auto', labelsLeft: 'hover', labelsRight: 'hover' },
 };
 
 // The card's configuration, in its one form (see normalizeOptions), with its

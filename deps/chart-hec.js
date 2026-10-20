@@ -343,10 +343,14 @@
         if (!labels || !labels.length) return;
         // (opaque while the pointer is near that axis' labels — _hecSetLabelsHovered)
         var _bg = hecUi.background(chart.canvas, chart._hecLabelsHovered === scale.position ? 1 : hecUi.BOX_OPACITY);
+        // (shown on a hover only: as much as the pointer has made them — _hecLabelsAlphaOf;
+        // their boxes kept all the same: where a drag moves the axis)
+        var _alpha = chart._hecLabelsAlphaOf(scale);
         // (the boxes drawn: a label whose box would touch one of them is skipped; kept on
         // the scale — the column of its labels, see _hecInsideLabelColumns)
         var _drawn = scale._hecLabelBoxes = [];
         ctx.save();
+        ctx.globalAlpha *= _alpha;
         labels.forEach(function (l) {
           var _text = helpers.isArray(l.label) ? l.label.join(' ') : String(l.label);
           if (_text === '' || _text === 'undefined') return;
@@ -1799,6 +1803,11 @@
     }
   }
 
+  // The Y labels shown on a hover (ticks.hecShowOnHover): how long they take to fade in or
+  // out (as mini-graph-card's), and how long they stay after a touch, which has no hover
+  var LABELS_FADE = 250;
+  var LABELS_TOUCH_TIME = 3000;
+
   var GESTURE_EVENTS = { mousedown: hecPointerDown, mousemove: hecPointerMove, mouseup: hecPointerUp, pointercancel: hecPointerCancel, wheel: hecWheel, contextmenu: hecContextMenu };
 
   // ── Methods added to every chart ──
@@ -2097,6 +2106,9 @@
       var _pt = e.native && e.native.pointerType ? e.native.pointerType : 'mouse';
       var _g = Chart.hecGestures(_pt);
       pickPointerType = _pt;
+      // (the pointer over the graph: the labels shown on a hover — it leaving: Chart.js's
+      // mouseout, see handleEvent)
+      if (e.type === 'mousedown' || e.type === 'mousemove') this._hecSetPointerOver(true, _pt);
       h({ me: this, e: e, gs: this._hecGesture,
         cfg: helpers.extend({}, cfg, { longPressMs: _g.longPressMs, dragSlop: _g.slop }),
         pid: e.native && e.native.pointerId !== undefined ? e.native.pointerId : 0,
@@ -2284,6 +2296,36 @@
       if ((this._hecLabelsHovered || null) === (side || null)) return;
       this._hecLabelsHovered = side || null;
       this.render({ duration: 0, lazy: true });
+    },
+
+    // ── Y labels shown on a hover (ticks.hecShowOnHover) ──
+
+    // How opaque the labels of scale are drawn: 1, or with ticks.hecShowOnHover, as much as
+    // the pointer being over the graph has made them (_hecSetPointerOver)
+    _hecLabelsAlphaOf: function (scale) {
+      return scale && scale.options.ticks && scale.options.ticks.hecShowOnHover ? (this._hecLabelsAlpha || 0) : 1;
+    },
+
+    // The pointer over the graph (over) or not: the labels shown on a hover faded in or out
+    // (LABELS_FADE). A touch, which has no hover: shown for LABELS_TOUCH_TIME after it.
+    _hecSetPointerOver: function (over, pointerType) {
+      var me = this;
+      clearTimeout(me._hecPointerOverTimer);
+      if (over && pointerType === 'touch') me._hecPointerOverTimer = setTimeout(function () { me._hecSetPointerOver(false); }, LABELS_TOUCH_TIME);
+      if (!!me._hecPointerOver === !!over) return;
+      me._hecPointerOver = !!over;
+      var _hover = (me.options.scales && me.options.scales.yAxes || []).some(function (a) { return a.ticks && a.ticks.hecShowOnHover; });
+      if (!_hover) return;
+      var _from = me._hecLabelsAlpha || 0, _to = over ? 1 : 0, _t0 = Date.now();
+      cancelAnimationFrame(me._hecLabelsFrame);
+      var _step = function () {
+        if (!me.ctx) return;
+        var k = Math.min(1, (Date.now() - _t0) / LABELS_FADE);
+        me._hecLabelsAlpha = _from + (_to - _from) * k;
+        me.render({ duration: 0, lazy: true });
+        if (k < 1) me._hecLabelsFrame = requestAnimationFrame(_step);
+      };
+      _step();
     },
 
     // ── The controls at the top left: the lock+handle zone, its buttons, the chain icon, their boxes ──
