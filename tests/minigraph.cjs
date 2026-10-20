@@ -312,5 +312,58 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The header: name, icon, their layout and colors; the values' indicator, place and size ──
+    // (graph i's header: shown, its layout, its size, its name and the name's color, its icon, the icon's order and color)
+    const header = (t, i = 0) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${i}], h=el.instance.graphDiv(g).querySelector('.hec-graph-header'),
+            n=h.querySelector('.hec-graph-name'), ic=h.querySelector('.hec-graph-icon');
+        return { shown: h.style.display !== 'none', justify: h.style.justifyContent, size: h.style.fontSize, name: n?.textContent ?? null, nameColor: n?.style.color ?? null,
+                 icon: ic?.querySelector('ha-icon')?.getAttribute('icon') ?? ic?.querySelector('img')?.getAttribute('src') ?? null, order: ic?.style.order ?? null, iconColor: ic?.style.color ?? null }; })()`);
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, name: 'Power',
+        entities: ['sensor.power', { entity: 'sensor.rain', show_legend_state: true }] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini — the header: the name on the left, the icon on the right (show.name, show.icon), in 14 px', async () => {
+        const h = await header(t);
+        return h.shown && h.justify === 'space-between' && h.name === 'Power' && h.icon && h.order !== '-1' && h.size === '14px' ? true : JSON.stringify(h);
+    });
+    await t.step('look: mini — the legend\'s names without their values; show_legend_state on an entity: its value', async () => {
+        const v = await t.E(`el.instance.graphsInDisplayOrder()[0].chart.legend.legendItems.map(x=>x.hecValue)`);
+        return v[0] === '' && /^\(4 mm\)$/.test(v[1]) ? true : JSON.stringify(v);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, show: { name: true, icon: true, state: true,
+        name_adaptive_color: true, icon_adaptive_color: true }, icon: 'mdi:home', align_icon: 'left', align_header: 'center', font_size_header: 20,
+        align_state: 'right', font_size: 80, entities: [{ entity: 'sensor.power', color: '#ff0000', show_indicator: true }] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('show.name without a name: the entity\'s; icon, align_icon: left, align_header: center, font_size_header; adaptive colors: the curve\'s', async () => {
+        const h = await header(t);
+        const red = /rgb\(255, ?0, ?0\)|#ff0000/;
+        return h.name === 'power' && h.icon === 'mdi:home' && h.order === '-1' && h.justify === 'center' && h.size === '20px' && red.test(h.nameColor) && red.test(h.iconColor)
+            ? true : JSON.stringify(h);
+    });
+    await t.step('show_indicator: a dot before the value; align_state: right; font_size: 80 — the values at 80 %', async () => {
+        const r = await t.E(`(()=>{ const v=el.instance.graphsInDisplayOrder()[0].chart._hecValuesEl; return { dot: !!v.querySelector('.hec-state .hec-indicator'),
+            justify: v.querySelector('.hec-states').style.justifyContent, size: v.style.fontSize }; })()`);
+        return r.dot && r.justify === 'flex-end' && r.size === '80%' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, show: { icon: true, state: true }, align_icon: 'state',
+        icon_image: 'https://example.com/i.png', entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('align_icon: state — the icon with the values; icon_image: an image', async () => {
+        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0]; return { header: !!el.instance.graphDiv(g).querySelector('.hec-graph-header .hec-graph-icon'),
+            img: g.chart._hecValuesEl?.querySelector('.hec-states .hec-graph-icon img')?.getAttribute('src') ?? null }; })()`);
+        return !r.header && r.img === 'https://example.com/i.png' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard(card({ graphs: [{ type: 'line', title: 'Titled', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }),
+        { mock: { series: true }, height: 900 });
+    await t.wait(1500);
+    await t.step('the card\'s own: a graph\'s title centered, no icon; a graph without a title, no header; the legend\'s values', async () => {
+        const a = await header(t, 0), b = await header(t, 1);
+        const v = await t.E(`el.instance.graphsInDisplayOrder()[0].chart.legend.legendItems.map(x=>x.hecValue)`);
+        return a.shown && a.name === 'Titled' && a.justify === 'center' && !a.icon && !b.shown && /^\(\d+ W\)$/.test(v[0]) ? true : JSON.stringify({ a, b, v });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

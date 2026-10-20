@@ -91,6 +91,18 @@ const OPTION_SYNONYMS = {
     lineColor        : ['line_color'],
     colorTransition  : ['color_thresholds_transition'],
     showLine         : ['show_line'],
+    showName         : ['show_name'],
+    showIcon         : ['show_icon'],
+    iconImage        : ['icon_image'],
+    alignHeader      : ['align_header'],
+    alignIcon        : ['align_icon'],
+    alignState       : ['align_state'],
+    fontSize         : ['font_size'],
+    fontSizeHeader   : ['font_size_header'],
+    nameAdaptiveColor: ['show_name_adaptive_color'],
+    iconAdaptiveColor: ['show_icon_adaptive_color'],
+    showIndicator    : ['show_indicator'],
+    showCurrentValues: ['show_legend_state'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -154,6 +166,19 @@ const OPTION_VALUES = {
     colorTransition : v => v === 'smooth' || v === 'hard' ? v : undefined,
     showLine      : v => v !== false,
     hour24        : v => v === true || v === false ? v : undefined,
+    // (a graph's header — its name and its icon — and its values: see card-graphs.js
+    // updateGraphHeader, card-values.js showValues)
+    showName      : v => v !== false,
+    showIcon      : v => v !== false,
+    alignHeader   : v => ['default', 'left', 'right', 'center'].includes(v) ? v : undefined,
+    alignIcon     : v => ['left', 'right', 'state'].includes(v) ? v : undefined,
+    alignState    : v => ['left', 'right', 'center'].includes(v) ? v : undefined,
+    fontSize      : _positive,
+    fontSizeHeader: _positive,
+    nameAdaptiveColor : v => v === true,
+    iconAdaptiveColor : v => v === true,
+    showIndicator : v => v === true,
+    showCurrentValues : v => v !== false,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
@@ -224,7 +249,14 @@ export function normalizeOptions(o)
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
+    'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
+    'showIndicator', 'showCurrentValues'];
+
+// A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
+// else the card's
+export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader',
+    'nameAdaptiveColor', 'iconAdaptiveColor'];
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
@@ -253,11 +285,13 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // mini: mini-graph-card's look — no header, toolbar nor selector, each curve's value now
 // and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
 // the plot, thick smooth lines with a fill fading out, a small graph, colors of thresholds
-// blended from one to the next
+// blended from one to the next; a header with the name on the left and the icon on the
+// right; the legend's names without their values
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
             showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
-            interpolation: 'bspline', colorTransition: 'smooth' },
+            interpolation: 'bspline', colorTransition: 'smooth', showName: true, showIcon: true, alignHeader: 'default', fontSizeHeader: 14,
+            showCurrentValues: false },
 };
 
 // The card's configuration, in its one form (see normalizeOptions), with its

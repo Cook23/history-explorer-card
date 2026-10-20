@@ -341,8 +341,6 @@ export class HistoryCardState {
 
     handleChangedEntities()
     {
-        if( !this.pconfig.showCurrentValues && !this.pconfig.refreshEnabled ) return false;
-
         let changed = false;
 
         for( let g of this.graphs ) {
@@ -354,7 +352,8 @@ export class HistoryCardState {
             });
             if( !_changed.length ) continue;
             changed = true;
-            if( this.pconfig.showCurrentValues && g !== this._frozenChart ) this.refreshCurrentValues(g, _changed);
+            // (the values now: in the legend — each entity's own showCurrentValues — and over the graph)
+            if( g !== this._frozenChart ) this.refreshCurrentValues(g, _changed);
         }
         // (an entity giving a shown entity its color: that curve changes too)
         for( const id of this.colorEntityIds() ) {

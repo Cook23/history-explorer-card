@@ -160,9 +160,12 @@ and for whether the history tells more than the statistics at that resolution.
 `chart.hecSetValues(values)` — the values shown over the chart, given by the card (`null`:
 none), drawn by Chart.js in an element of its own right above the chart's box (its canvas'
 parent), in the page's flow:
-`{ layout: 'row' | 'narrow', states: [{ curve, key, text, unit, color }], stats: [{ curve,
-key, name, color, cells: [{ stat, label, value, time }] }], format(curve, y, x) → { text,
-unit, time } }`. `states`: each curve's value now, on a row — `'narrow'`: the first one large,
+`{ layout: 'row' | 'narrow', states: [{ curve, key, text, unit, color, indicator }], stats:
+[{ curve, key, name, color, cells: [{ stat, label, value, time }] }], format(curve, y, x) →
+{ text, unit, time }, align: 'left' | 'center' | 'right', fontSize, icon }`. `indicator`: a
+dot in the value's color before it; `align`: where the values go along their row (left, the
+default: spread from its left; center: evenly; right); `fontSize`: their size, a percentage;
+`icon`: an element given by the card, shown at the end of the values' row. `states`: each curve's value now, on a row — `'narrow'`: the first one large,
 the others small in a column on its right, each cut ('…') rather than wrapped, the
 statistics a little smaller; `stats`: a curve's statistics, `name` above them (`null`: none),
 a cell each; all in the given colors (`curve`: its dataset index, `key`: an opaque id kept on

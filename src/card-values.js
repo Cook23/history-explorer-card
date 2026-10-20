@@ -58,6 +58,8 @@ export class CardValues
     // layout 'narrow'. A hover on a curve shows the value it is on in its place: format
     showValues(g)
     {
+        // (its header follows the values now: its colors — see updateGraphHeader)
+        this.updateGraphHeader(g);
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
             .filter(x => x.d && !x.d.hidden);
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
@@ -69,8 +71,10 @@ export class CardValues
         const states = _states.map(x => {
             const s = this.stateOf(x.e.entity)?.state;
             // (a state_map's state: its label)
-            if( x.d.stateMap?.length ) return { curve: x.j, key: x.e.entity, color: _color(x), unit: '', text: stateLabel(x.d.stateMap, String(s ?? '')) ?? String(s ?? '') };
-            return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '',
+            // (show_indicator: a dot in its color before it)
+            const _ind = this.resolveOption(x.e, 'showIndicator') === true;
+            if( x.d.stateMap?.length ) return { curve: x.j, key: x.e.entity, color: _color(x), unit: '', indicator: _ind, text: stateLabel(x.d.stateMap, String(s ?? '')) ?? String(s ?? '') };
+            return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '', indicator: _ind,
                      text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 ), x.d) };
         });
         const stats = _stats.map(x => {
@@ -86,7 +90,10 @@ export class CardValues
             const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
             return { text: this._roundedValue(v, d), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
         };
-        g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format });
+        // (the icon with them, alignIcon: state; their place, alignState; their size, fontSize
+        // — mini-graph-card's)
+        g.chart.hecSetValues({ layout: this.narrowCard() ? 'narrow' : 'row', states, stats, format,
+            align: this.graphOption(g.groupId, 'alignState'), fontSize: this.graphOption(g.groupId, 'fontSize'), icon: this.graphStateIcon(g) });
     }
 
     // A value of dataset d as the values over a graph show it: its curve's decimals (see

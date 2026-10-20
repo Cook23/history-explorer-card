@@ -1164,12 +1164,22 @@ A graph can show, over its plot:
 
 A curve hidden from its legend shows neither. Both are set at every level — card, `entityOptions`, graph, entity (`showStats: false` on one curve of a graph that shows them turns them off for it).
 
+The values' place along their row: `alignState` — `left` (the default), `center`, `right`; their size: `fontSize`, a percentage (`80`); `showIndicator` on an entity: a dot in its color before its value.
+
+Above them, a graph's **header** — its name and its icon, as mini-graph-card shows them —, set on a graph or on the card:
+- **the name** — the graph's `title`; `showName: true` without one, its first curve's name; `showName: false`, none;
+- **`showIcon: true`** — an icon: `iconImage` (an image's address), else `icon` (`mdi:home`), else the entity's own, else one by its device class (a thermometer for a temperature…);
+- **`alignHeader`** — `center` (the default), `default` (the name on the left, the icon on the right), `left`, `right`; **`alignIcon`** — `right` (the default), `left`, or `state`: with the values, at the end of their row;
+- **`fontSizeHeader`** — its size in pixels; **`nameAdaptiveColor`**, **`iconAdaptiveColor`** — the name, the icon in the color of the first curve now.
+
+`showCurrentValues: false` — on the card, a graph, an entity or in `entityOptions` — leaves a curve's value now out of its legend label (mini-graph-card's `show_legend_state`, on an entity, shows it).
+
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
 - **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
 - **`fill: fade`** — the area under a curve filled with its own color, fading out downwards.
 
-**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`, `interpolation: bspline`, `colorTransition: smooth`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
+**`look: mini`** sets, for the whole card, what [mini-graph-card](https://github.com/kalkih/mini-graph-card) shows: `header: hide`, `uiLayout: { toolbar: hide, selector: hide }`, `showState: true`, `showStats: [min, max]`, `showTimeLabels: false`, `showGrid: false`, `yLabels: inside`, `fill: fade`, `height: 150`, `lineWidth: 5`, `lineMode: curves`, `interpolation: bspline`, `colorTransition: smooth`, `showName: true`, `showIcon: true`, `alignHeader: default`, `fontSizeHeader: 14`, `showCurrentValues: false`. It only gives defaults: every option set on the card itself still wins over the look's, under any of its names (`look: mini` with `showGrid: true` keeps the grid). Its options in mini-graph-card's syntax: see [Replacing mini-graph-card](#replacing-mini-graph-card). Unlike mini-graph-card, the time can still be panned and zoomed — a drag, the wheel with Ctrl, a pinch — and the statistics follow the window shown.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1235,11 +1245,11 @@ Written differently in the card's syntax:
 |---|---|
 | `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
 
-`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels_secondary` (see [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line` and `show_legend`, and `hour24` (see [The clock](#the-clock)). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
+`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels_secondary` (see [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line` and `show_legend`, and `hour24` (see [The clock](#the-clock)); the header's options — `show.name`, `show.icon`, `icon`, `icon_image`, `align_header`, `align_icon`, `align_state`, `font_size`, `font_size_header`, `show.name_adaptive_color`, `show.icon_adaptive_color` — and an entity's `show_indicator` and `show_legend_state` (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)); the values are always in their curve's color (`state_adaptive_color`). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
 
 ### Not yet implemented
 
-These mini-graph-card options are being added, its code as the example: `datetime_format`; the header's `icon`, `icon_image`, `font_size`, `font_size_header`, `align_*`, adaptive colors and `show.name`, `show.icon`, `show_indicator`, `show_legend_state`; `hover` and `below` for the labels and the legend; `show.graph: false`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`.
+These mini-graph-card options are being added, its code as the example: `datetime_format`; `hover` and `below` for the labels and the legend; `show.graph: false`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`.
 
 ---
 
@@ -1417,6 +1427,13 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `showMinMax` | string or boolean | | | A lighter band between the min and max of each column of pixels: `true` (everywhere), `statistics`, `history`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
 | `showTimeLabels` | boolean | | | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
 | `showState` | boolean | `show_state` | | The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `showIndicator` | boolean | `show_indicator` | | A dot in its color before its value over the graph |
+| `showCurrentValues` | boolean | `show_legend_state` | | `false`: its value now left out of its legend label |
+| `showName`, `showIcon` | boolean | `show_name`, `show_icon` | | On a graph or the card: the header's name (its title, else its first curve's name) and icon — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `icon`, `iconImage` | string | `icon_image` | | On a graph or the card: the header's icon (`mdi:home`), or an image's address |
+| `alignHeader`, `alignIcon`, `alignState` | string | `align_header`, `align_icon`, `align_state` | | On a graph or the card: the header's layout (`center`, `default`, `left`, `right`), the icon's place (`right`, `left`, `state`), the values' place (`left`, `center`, `right`) |
+| `fontSizeHeader`, `fontSize` | number | `font_size_header`, `font_size` | | On a graph or the card: the header's size in pixels; the values' size, a percentage |
+| `nameAdaptiveColor`, `iconAdaptiveColor` | boolean | `show_name_adaptive_color`, `show_icon_adaptive_color` | | On a graph or the card: the header's name, its icon in the color of the first curve now |
 | `showStats` | boolean, string or list | | | The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
 | `showGrid` | boolean | | | `false`: no grid lines on the graph |
 | `yLabels` | string | | | `inside`: the Y labels inside the plot, which takes the whole width |

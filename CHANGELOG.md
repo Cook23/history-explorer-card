@@ -6,6 +6,14 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.30] - 2026-10-20
 
+### New — mini-graph-card's header
+- A graph's header, above its values: its name — its `title`, else with `showName` (`show.name`) its first curve's name — and its icon (`showIcon`, `show.icon`): `iconImage` (`icon_image`), else `icon`, else the entity's own, else one by its device class (mini-graph-card's); on a graph or the card (`graphOption`, `updateGraphHeader` in card-graphs.js)
+- `alignHeader` (`align_header`: `center` — the default, a title alone as before —, `default`, `left`, `right`), `alignIcon` (`align_icon`: `right`, `left`, `state` — with the values, at the end of their row), `fontSizeHeader` (`font_size_header`, px), `nameAdaptiveColor`, `iconAdaptiveColor` (`show.name_adaptive_color`, `show.icon_adaptive_color`: the first curve's color now)
+- The values over a graph: `alignState` (`align_state`), `fontSize` (`font_size`, a percentage); an entity's `showIndicator` (`show_indicator`): a dot in its color before its value (`hecSetValues`: `align`, `fontSize`, `icon`, a state's `indicator`)
+- `showCurrentValues` on a graph, an entity or in `entityOptions` too (`show_legend_state`): its value in its legend label or not (`showsCurrentValue`). The values now are refreshed at each change whatever the card's `showCurrentValues` (the values over a graph waited for the automatic refresh without it)
+- `look: mini`: `showName`, `showIcon`, `alignHeader: default`, `fontSizeHeader: 14`, `showCurrentValues: false` — mini-graph-card's header, its legend's names alone
+- Tests (`minigraph`): the header with `look: mini`, its options, the icon with the values, an image; the card's own title centered, no header without one; the legend's values
+
 ### Changed — the min/max band easier to see
 - `showMinMax`: the band at opacity 0.3 (0.15 before: the same as a light fill, `fill: true`, so it hardly showed, over a fill above all)
 
