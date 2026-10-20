@@ -21,6 +21,17 @@ Changelog for the HA History Explorer Card.
 - Docs: `labelsVisible` described as it is (the names left of the timelines' rows); mini-graph-card has no `below`, removed from what isn't implemented yet
 - Tests (`minigraph`): `look: mini` with one curve — no legend, the labels faded in over the graph and out when the pointer leaves, shown for a while after a tap; `show.labels: false`, `labels_secondary: true`, `legendVisible: auto` with two curves
 
+### New — mini-graph-card's show.graph, show_graph, fixed_value, bar_spacing
+- `showGraph: false` (`show_graph`) on an entity: its curve not drawn, nor in the legend — its value still shown over the graph; on a graph or the card (`show.graph: false`), none of its curves drawn: no plot, only the header and the values (card-graphs.js `_showPlot`). `show.graph: bar` / `line` stays the graph's type
+- `fixedValue: true` (`fixed_value`): a curve's last value in the window — in real time, its value now — flat over the whole window, instead of its history (`_lineSamples`)
+- `barSpacing` (`bar_spacing`): the room between two bars, in px — on the card, a graph, an entity or in `entityOptions` (Chart.js `hecBarSpacing`)
+- Docs: mini-graph-card has no `datetime_format`, `baseline`, `zero_position`, `invert`, `graph_order` nor static values — they were listed as not implemented yet; that section removed: every option of mini-graph-card is read
+- Tests (`minigraph`): `show.graph: false` — no plot, the header and the value; `show_graph: false` on an entity — not drawn, not in the legend, its value kept; `fixed_value` — one value from the window's start to its end; `bar_spacing: 10` — 10 px between two bars
+
+### Fixed — an entity's show_legend: false back in the legend
+- An entity left out of the legend (`show_legend: false`) came back in it at the first change of a value shown: the legend's values were brought up to date from the chart's datasets, which didn't say so (`refreshCurrentValues`). They now do (`legendHidden`)
+- Test (`minigraph`): two values changing, `show_legend: false` and `show_graph: false` still out of the legend
+
 ### Changed — the min/max band easier to see
 - `showMinMax`: the band at opacity 0.3 (0.15 before: the same as a light fill, `fill: true`, so it hardly showed, over a fill above all)
 

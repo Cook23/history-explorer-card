@@ -625,9 +625,9 @@ graphs:
 
 ## mini-graph-card compatibility
 
-A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover`), `show.legend`, `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend`, `hour24`, the header's options (`show.name`, `show.icon`, `icon`, `align_*`, `font_size`…), `show_indicator` and `show_legend_state` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover`), `show.legend`, `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend`, `show_graph` and `fixed_value`, `show.graph: false`, `bar_spacing`, `hour24`, the header's options (`show.name`, `show.icon`, `icon`, `align_*`, `font_size`…), `show_indicator` and `show_legend_state` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
 
-> For full details, and what isn't implemented yet → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
+> For full details → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
 ---
 
@@ -693,6 +693,8 @@ graphs:
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showLine` | `show_line` | | ✓ | ✓ | ✓ | `false`: its points only, no line |
+| `showGraph` | `show_graph` | `show.graph: bar` / `line`: drawn | ✓ | ✓ | ✓ | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot, only its header and values |
+| `fixedValue` | `fixed_value` | | ✓ | ✓ | ✓ | `true`: its last value in the window, flat over the whole window |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
 | `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
@@ -721,6 +723,7 @@ graphs:
 | `ystepSize` | `ystepsize` | | ✓ | ✓ | ✓ | Fix Y axis tick step — see *7 |
 | `ylock` | | | ✓ | ✓ | ✓ | Disable all interactive Y axis pan and zoom — see *7 |
 | `stacked` | | | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
+| `barSpacing` | `bar_spacing` | | ✓ | ✓ | ✓ | The room between two bars, in pixels — see *7 |
 | `showTimeLabels` | | | ✓ | ✓ | ✓ | Show/hide time axis labels on timeline/arrowline graphs (default `true`) — see *7 |
 | `height` | | | ✓ | ✓ | ✓ | Graph height in pixels — see *2 and *7 |
 | `showGrid` | | | ✓ | ✓ | ✓ | `false`: no grid lines — see *7 |
@@ -742,7 +745,7 @@ graphs:
 
 *6 — `scale` and `valueFactor` both multiply the values. `scale` is the factor itself; without `unit` it only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W. `valueFactor` is a power of 10, and multiplies what is drawn **and** shown, with or without `unit`: `valueFactor: -3` is `scale: 0.001` with the entity's own unit. Details: [README_Full.md — Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor).
 
-*7 — an option of the graph itself (its Y axis, its stacking, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
+*7 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
 Every option is spelled the same at every level where it's accepted, and its aliases — the names and values above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names. A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set). When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 

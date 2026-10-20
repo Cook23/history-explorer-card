@@ -192,6 +192,10 @@ graphs:
     # For bar charts, this can be set to True to enable stacking the values
     stacked: False
 
+    # For bar charts, the room between two bars, in px (mini-graph-card's bar_spacing); not set: a gap in
+    # proportion to each bar's interval
+    barSpacing: null
+
     # The Y axis of this graph's curves, unless an entity sets its own: left (one axis, whatever their units),
     # right, or auto — see $.yAxis
     yAxis: null
@@ -427,6 +431,13 @@ lineColor: null
 
 # False: a curve's points only, without its line (also on a graph, an entity or in entityOptions)
 showLine: True
+
+# False: a curve not drawn, nor in the legend, its value kept over the graph (mini-graph-card's show_graph);
+# a graph none of whose curves is drawn shows no plot, only its header and values (show.graph: false)
+showGraph: True
+
+# True: a curve's last value in the window, flat over the whole window (mini-graph-card's fixed_value)
+fixedValue: False
 
 # The clock: true, 24 hours; false, 12 hours; not set, Home Assistant's own setting
 hour24: null

@@ -487,7 +487,7 @@ export class CardGraphs
 
         // Apply interval override if provided
         const _dynG = this.graphs.find(g => g.id === _dynGid);
-        if( _dynG ) this.updateGraphHeader(_dynG);
+        if( _dynG ) { this.updateGraphHeader(_dynG); this._showPlot(_dynG); }
         if( _dynG && interval !== null && interval !== undefined ) {
             _dynG.interval = interval;
             const _bd = this._this.querySelector(`#bd-${_dynGid}`);
@@ -631,6 +631,14 @@ export class CardGraphs
         const _all = this.graphsInDisplayOrder();
         const _lastIdx = _all[_all.length - 1]?.entities?.[0]?.graphIndex;
         return _lastIdx !== undefined ? Math.ceil(_lastIdx) + 1 : 1;
+    }
+
+    // Graph g's plot shown unless none of its curves is drawn (showGraph: false on each —
+    // mini-graph-card's show.graph: false): its header and its values over it only
+    _showPlot(g)
+    {
+        const _box = g.canvas?.parentNode;
+        if( _box ) _box.style.display = g.entities.some(e => this.resolveOption(e, 'showGraph') !== false) ? '' : 'none';
     }
 
     // The element of a new graph (its header, canvas, interval selector),

@@ -103,6 +103,9 @@ const OPTION_SYNONYMS = {
     iconAdaptiveColor: ['show_icon_adaptive_color'],
     showIndicator    : ['show_indicator'],
     showCurrentValues: ['show_legend_state'],
+    showGraph        : ['show_graph'],
+    barSpacing       : ['bar_spacing'],
+    fixedValue       : ['fixed_value'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -185,6 +188,14 @@ const OPTION_VALUES = {
     iconAdaptiveColor : v => v === true,
     showIndicator : v => v === true,
     showCurrentValues : v => v !== false,
+    // (false: not drawn — its value kept over the graph; a graph none of whose curves is
+    // drawn shows no plot: see card-graphs.js _showPlot. mini-graph-card's show.graph: bar
+    // or line is the graph's type: drawn)
+    showGraph     : v => v !== false,
+    // (the room between two bars, in px)
+    barSpacing    : v => v !== null && v !== '' && Number(v) >= 0 ? Number(v) : undefined,
+    // (its last value drawn flat over the whole window — see card-datasets.js _lineSamples)
+    fixedValue    : v => v === true,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
@@ -257,7 +268,7 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
-    'showIndicator', 'showCurrentValues'];
+    'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing'];
 
 // A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
 // else the card's
@@ -268,7 +279,7 @@ export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'barSpacing'];
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its

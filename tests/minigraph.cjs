@@ -406,5 +406,49 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── show.graph: false, an entity's show_graph: false, fixed_value, bar_spacing ──
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, name: 'Power',
+        show: { graph: false }, entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('show.graph: false — no plot; the header and the value now over it', async () => {
+        const r = await t.E(`(()=>{ const g=graphAt(0), box=g.canvas.parentNode, d=el.instance.graphDiv(g);
+            return { plot: getComputedStyle(box).display, header: d.querySelector('.hec-graph-header')?.textContent ?? '', value: g.chart._hecValuesEl?.querySelector('.hec-state')?.textContent ?? '' }; })()`);
+        return r.plot === 'none' && /Power/.test(r.header) && /\d/.test(r.value) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, show: { state: true },
+        entities: ['sensor.power', { entity: 'sensor.power2', show_graph: false }, { entity: 'sensor.rain', show_legend: false }, { entity: 'sensor.tank', fixed_value: true }] },
+        { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    // (graph 0's datasets: hidden, in the legend; the values over it: their entities)
+    const shown = t => t.E(`(()=>{ const c=graphAt(0).chart; return { hidden: c.data.datasets.map(d=>!!d.hidden), legend: c.legend.legendItems.map(x=>!x.hecHidden),
+        values: [...(c._hecValuesEl?.querySelectorAll('.hec-state') ?? [])].map(x=>x.dataset.key) }; })()`);
+    await t.step('show_graph: false on an entity — not drawn, not in the legend, its value kept over the graph; the plot kept for the others', async () => {
+        const r = await shown(t);
+        const plot = await t.E(`getComputedStyle(graphAt(0).canvas.parentNode).display`);
+        return plot !== 'none' && r.hidden.join() === 'false,true,false,false' && r.legend.join() === 'true,false,false,true' && r.values.includes('sensor.power2')
+            ? true : JSON.stringify({ plot, ...r });
+    });
+    await t.step('a value changing — show_graph: false and show_legend: false still out of the legend', async () => {
+        await t.E(`setState('sensor.power2', '321')`); await t.E(`setState('sensor.rain', '3')`); await t.wait(800);
+        const r = await shown(t);
+        return r.legend.join() === 'true,false,false,true' ? true : JSON.stringify(r);
+    });
+    await t.step('fixed_value: its last value, flat over the whole window', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart, d=c.data.datasets[3].data, xs=c.scales[c.options.scales.xAxes[0].id];
+            return { ys: [...new Set(d.map(p=>p.y))], x0: d[0]?.x, min: xs.min, xn: d[d.length-1]?.x, max: xs.max }; })()`);
+        return r.ys.length === 1 && Math.abs(r.x0 - r.min) < 60e3 && r.max - r.xn < 120e3 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard(card({ defaultTimeRange: '7d', bar_spacing: 10, graphs: [{ type: 'bar', interval: 'daily', entities: [{ entity: 'sensor.energy' }] }] }),
+        { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('bar_spacing: 10 — 10 px between two bars', async () => {
+        const gaps = await t.E(`(()=>{ const m=graphAt(0).chart.getDatasetMeta(0).data.map(b=>b._model).filter(b=>b && b.width > 0);
+            return m.slice(1).map((b,i)=>+((b.x-b.width/2)-(m[i].x+m[i].width/2)).toFixed(1)); })()`);
+        return gaps.length >= 3 && gaps.every(g => Math.abs(g - 10) <= 1) ? true : JSON.stringify(gaps);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
