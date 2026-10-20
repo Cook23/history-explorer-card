@@ -107,6 +107,9 @@ export class CardCharts
                         type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
                         // (half a bar of margin at both ends only when there are bars to show)
                         offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
+                        // (barSpacing — mini-graph-card's bar_spacing: the room between two
+                        // bars, in px; Chart.js hecBarSpacing)
+                        ...( graphtype == 'bar' && config?.barSpacing !== undefined ? { hecBarSpacing: config.barSpacing } : {} ),
                         time: {
                             // (the time window from the start: without it, the axis would
                             // span the data first, ticked every few minutes — thousands of
@@ -385,7 +388,11 @@ export class CardCharts
             rounding: d.rounding,
             shownScale: d.shownScale,
             textFactor: d.shownScale / d.drawScale,
-            hidden: d.hidden,
+            // (not drawn — showGraph: false —: hidden, out of the legend, its value kept over
+            // the graph: see showValues)
+            hidden: d.hidden || d.notDrawn,
+            notDrawn: d.notDrawn,
+            legendHidden: d.legendHidden,
             showMinMax: d.showMinMax ? true : false,
             siConversionFactor: d.siConversionFactor,
             borderJoinStyle: 'round',
@@ -734,8 +741,10 @@ export class CardCharts
                 "stateMap": ( _kind === 'line' ) ? this.resolveOption(d, 'stateMap') : undefined,
                 // (show_line: false — its points only)
                 "showLine": this.resolveOption(d, 'showLine') !== false,
-                // (show_legend: false on the entity — no label in the legend)
-                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false,
+                // (show_graph: false — not drawn)
+                "notDrawn": this.resolveOption(d, 'showGraph') === false,
+                // (show_legend: false on the entity — no label in the legend; nor when not drawn)
+                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false || this.resolveOption(d, 'showGraph') === false,
                 // (its value now after its name in the legend: see showsCurrentValue)
                 "showCurrentValue": this.showsCurrentValue(d),
                 "domain": this.getDomainForEntity(d.entity),

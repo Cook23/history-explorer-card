@@ -61,7 +61,7 @@ export class CardValues
         // (its header follows the values now: its colors — see updateGraphHeader)
         this.updateGraphHeader(g);
         const _entities = g.entities.map((e, j) => ({ e, j, d: g.chart.data.datasets[j] }))
-            .filter(x => x.d && !x.d.hidden);
+            .filter(x => x.d && ( !x.d.hidden || x.d.notDrawn ));
         const _states = _entities.filter(x => this._resolveShow(x.e, 'showState'));
         const _stats = _entities.map(x => ({ ...x, which: this._resolveShow(x.e, 'showStats') ?? [] })).filter(x => x.which.length);
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }

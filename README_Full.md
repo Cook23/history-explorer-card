@@ -75,7 +75,6 @@ This card offers a highly interactive and configurable way to view the history o
 - [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)
 - [mini-graph-card compatibility](#mini-graph-card-compatibility)
   - [Replacing mini-graph-card](#replacing-mini-graph-card)
-  - [Not yet implemented](#not-yet-implemented)
 - [Default view and time ranges](#default-view-and-time-ranges)
   - [Enabling persistence (enable_persistence / enable_multidevice_persistence)](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
 - [Auto refresh](#auto-refresh)
@@ -531,6 +530,8 @@ graphs:
       - entity: sensor.rain_amount
 ```
 
+`barSpacing` (mini-graph-card's `bar_spacing`) — on the card, a graph, an entity or in `entityOptions` (for its graph) — is the room between two bars, in pixels; without it, each bar leaves a small gap on both sides, in proportion to its interval.
+
 #### Bars and curves on the same graph
 
 A bar graph can also hold line entities: their curves are drawn over the bars, with their own line mode (`curves`, `smart`...). The interval and *Raw* only apply to the bars, and `stacked` only stacks the bars — curves are never stacked. This happens with a YAML graph mixing both (no `type:`), when a curve's display type is changed to bars (it stays in its graph), or when a curve is dropped onto it. An entity added from the UI never joins a graph of the other type on its own.
@@ -968,6 +969,8 @@ lineWidth: 2
 
 `showLine: false` draws a curve's points only, without the line between them (its points shown, unless `showPoints` says otherwise).
 
+`fixedValue: true` (mini-graph-card's `fixed_value`, on an entity or wherever an option is set) draws a curve's last value in the window shown — in real time, its value now — flat over the whole window, instead of its history.
+
 ### Displaying individual samples
 
 Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints` (hidden: `hover`); so does *Show the points* in the *Layout* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
@@ -1178,6 +1181,8 @@ Above them, a graph's **header** — its name and its icon, as mini-graph-card s
 
 `showCurrentValues: false` — on the card, a graph, an entity or in `entityOptions` — leaves a curve's value now out of its legend label (mini-graph-card's `show_legend_state`, on an entity, shows it).
 
+`showGraph: false` on an entity (mini-graph-card's `show_graph`) leaves its curve undrawn and out of the legend; its value is still shown over the graph. On a graph or the card (mini-graph-card's `show.graph: false`), none of its curves is drawn: no plot, only the header and the values.
+
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
 - **`yLabels: inside`** — the Y labels drawn inside the plot, over the curves, each in a box of the card's background, just above their grid line, at mini-graph-card's size, the plot then taking the whole width (an axis is moved by a drag along its labels, see [Y axis scaling](#y-axis-scaling)). A card narrower than 300 px draws them so by itself, its other text a little smaller; `yLabels: outside` keeps them beside the plot whatever the width;
@@ -1249,11 +1254,7 @@ Written differently in the card's syntax:
 |---|---|
 | `show.extrema`, `show.average` | `showStats: [min, max]`, `showStats: [average]` (with the others: `[min, average, max]`) |
 
-`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover` (see [Y axis scaling](#y-axis-scaling), [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `show.legend` (shown only for several curves under `look: mini`, see [Legend / entity labels](#legend--entity-labels)), `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line` and `show_legend`, and `hour24` (see [The clock](#the-clock)); the header's options — `show.name`, `show.icon`, `icon`, `icon_image`, `align_header`, `align_icon`, `align_state`, `font_size`, `font_size_header`, `show.name_adaptive_color`, `show.icon_adaptive_color` — and an entity's `show_indicator` and `show_legend_state` (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)); the values are always in their curve's color (`state_adaptive_color`). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
-
-### Not yet implemented
-
-These mini-graph-card options are being added, its code as the example: `datetime_format`; `show.graph: false`; `bar_spacing`, `baseline`, `zero_position`, `invert`, static values, `fixed_value`, `graph_order`.
+`points_per_hour`, `aggregate_func` and `group_by` are the card's own `pointsPerHour`, `aggregateFunc` and `groupBy` (see [Aggregation](#aggregation)); a sub-attribute (`attribute: forecast.0.temperature`) is read as mini-graph-card reads it. The Y axis' options too — soft bounds (`lower_bound: ~0`), `min_bound_range`, the `_secondary` ones, `logarithmic`, `show.labels` and `show.labels_secondary` with their `hover` (see [Y axis scaling](#y-axis-scaling), [Bounds](#bounds), [Two Y axes](#two-y-axes)) —, `show.legend` (shown only for several curves under `look: mini`, see [Legend / entity labels](#legend--entity-labels)), `value_factor`, `state_map` (see [Text states as a curve](#text-states-as-a-curve)), `line_color` and `color_thresholds_transition` (see [Colors of curves and bars](#colors-of-curves-and-bars)), an entity's `show_line`, `show_legend` and `fixed_value` (see [Line stroke style](#line-stroke-style)), `bar_spacing` (see [Bar graphs for total increasing entities](#bar-graphs-for-total-increasing-entities)), and `hour24` (see [The clock](#the-clock)); the header's options — `show.name`, `show.icon`, `icon`, `icon_image`, `align_header`, `align_icon`, `align_state`, `font_size`, `font_size_header`, `show.name_adaptive_color`, `show.icon_adaptive_color` — an entity's `show_indicator`, `show_legend_state` and `show_graph`, and `show.graph: false` (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)); the values are always in their curve's color (`state_adaptive_color`). `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect: the card draws at once, loads what the screen shows (see [Long term statistics](#long-term-statistics)) and keeps nothing in the browser's cache.
 
 ---
 
@@ -1400,6 +1401,8 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `interpolation` | string | | `akima` = `makima`, `catmull-rom`, `b-spline` | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` — see [Curve interpolation](#curve-interpolation) |
 | `dashMode` | string or array | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | Stroke style: `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showLine` | boolean | `show_line` | | `false`: its points only, no line between them |
+| `showGraph` | boolean | `show_graph` | `show.graph: bar` / `line`: drawn | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line stroke style](#line-stroke-style) |
 | `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
@@ -1425,6 +1428,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |
 | `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
+| `barSpacing` | number | `bar_spacing` | | The room between two bars, in pixels |
 | `process` | string | | | Javascript expression to transform state values before display |
 | `pointsPerHour` | number | `points_per_hour` | | Points an hour: groups of 1 / `pointsPerHour` hours — see [Aggregation](#aggregation) |
 | `groupBy` | string | `group_by` | | `interval`, `hour`, `date` — see [Aggregation](#aggregation) |
@@ -1450,7 +1454,7 @@ Options of the card only, with aliases: `defaultTimeRange` (`hours_to_show`), `l
 
 Every option above, except `type`, `name`, `hidden`, `legendVisible`, `scale`, `process` and `circular` (an entity's only), `color` and `unit` (an entity's or the card's — the card's: every entity's), and `lineColor` (a graph's or the card's), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
-The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
+The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
 An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 

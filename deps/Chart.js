@@ -2174,10 +2174,19 @@
               }
             }
 
-            leftCategorySize = leftSampleSize * options.categoryPercentage;
-            rightCategorySize = rightSampleSize * options.categoryPercentage;
-            fullBarSize = (leftCategorySize + rightCategorySize) / ruler.stackCount;
-            size = fullBarSize * options.barPercentage;
+            // (fork) hecBarSpacing (px): the room between two bars, instead of the percentages
+            var _spacing = options.hecBarSpacing;
+            if (typeof _spacing === 'number' && _spacing >= 0) {
+              leftCategorySize = Math.max(0, leftSampleSize - _spacing / 2);
+              rightCategorySize = Math.max(0, rightSampleSize - _spacing / 2);
+              fullBarSize = (leftCategorySize + rightCategorySize) / ruler.stackCount;
+              size = fullBarSize;
+            } else {
+              leftCategorySize = leftSampleSize * options.categoryPercentage;
+              rightCategorySize = rightSampleSize * options.categoryPercentage;
+              fullBarSize = (leftCategorySize + rightCategorySize) / ruler.stackCount;
+              size = fullBarSize * options.barPercentage;
+            }
 
             size = Math.min(
             helpers.valueOrDefault(options.barThickness, size),

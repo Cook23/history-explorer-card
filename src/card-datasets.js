@@ -311,6 +311,12 @@ export class CardDatasets
             if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); v.period = v.end - v.t; }
             _values.push(v);
         }
+        // (fixedValue — mini-graph-card's fixed_value: its last value, flat over the whole
+        // window)
+        if( this.resolveOption(e, 'fixedValue') === true && _values.length ) {
+            const _l = _values[_values.length - 1];
+            _values.splice(0, _values.length, { t: w.start.valueOf(), y: _l.y, min: _l.y, max: _l.y, stat: false });
+        }
         _values.forEach((v, k) => { v.end ??= k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t); });
 
         // (the groups the values are put in: each column of pixels — or, aggregated
