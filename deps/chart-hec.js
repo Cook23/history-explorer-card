@@ -225,23 +225,24 @@
         return _hecStepColors(ds, steps[k]);
       };
       var stroke = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
-      var fill = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+      // (the fill too — unless it fades out (hecFillFade): its own gradient kept)
+      var fill = ds.hecFillFade ? null : chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
       var cur = at(area.left);
       stroke.addColorStop(0, cur.border);
-      fill.addColorStop(0, cur.fill);
+      if (fill) fill.addColorStop(0, cur.fill);
       for (var i = 0; i < px.length; i++) {
         var o = (px[i] - area.left) / w;
         if (o <= 0) continue;
         if (o >= 1) break;
         var next = _hecStepColors(ds, steps[i]);
         stroke.addColorStop(o, cur.border); stroke.addColorStop(o, next.border);
-        fill.addColorStop(o, cur.fill); fill.addColorStop(o, next.fill);
+        if (fill) { fill.addColorStop(o, cur.fill); fill.addColorStop(o, next.fill); }
         cur = next;
       }
       stroke.addColorStop(1, cur.border);
-      fill.addColorStop(1, cur.fill);
+      if (fill) fill.addColorStop(1, cur.fill);
       line._model.borderColor = stroke;
-      line._model.backgroundColor = fill;
+      if (fill) line._model.backgroundColor = fill;
       (meta.data || []).forEach(function (pt) {
         if (!pt._model) return;
         var c = at(pt._model.x);
@@ -1808,6 +1809,14 @@
   var LABELS_FADE = 250;
   var LABELS_TOUCH_TIME = 3000;
 
+  // The floating icons at the top (the handle, the padlock, the close button): each symbol
+  // drawn as it is seen, centred in a box a few px larger, all the boxes on one line — from
+  // CTRL_TOP, CTRL_H high; a round one CTRL_W wide. The symbols' sizes (px, an odd height:
+  // centred on whole pixels); CTRL_END: the room at the ends of an oblong box (its half
+  // circles) around two symbols
+  var CTRL_TOP = 3, CTRL_H = 17, CTRL_W = 16;
+  var LOCK_W = 10, LOCK_H = 12, HANDLE_W = 6, HANDLE_H = 11, CLOSE_W = 10, CLOSE_H = 11, CHAIN_W = 10, CHAIN_H = 11, CTRL_END = 4, CTRL_GAP = 3;
+
   var GESTURE_EVENTS = { mousedown: hecPointerDown, mousemove: hecPointerMove, mouseup: hecPointerUp, pointercancel: hecPointerCancel, wheel: hecWheel, contextmenu: hecContextMenu };
 
   // ── Methods added to every chart ──
@@ -2219,14 +2228,20 @@
       var _el = me._hecLockIconEl;
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:10;pointer-events:none;';
-        _el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
+        _el.style.cssText = 'position:absolute;z-index:10;line-height:0;pointer-events:none;';
+        // (the path's own bounds — 4..20 × 1..22 of its 24 —, a little wider to keep its
+        // proportions in LOCK_W × LOCK_H: what is seen is what is centred, its corners within
+        // a round box)
+        _el.innerHTML = '<svg width="' + LOCK_W + '" height="' + LOCK_H + '" viewBox="3.25 1 17.5 21"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
         me._hecLockIconEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
-      _el.style.left = '15px';
-      // (its bottom on the handle's ⠿ bottom)
-      _el.style.top = '7px';
+      // (centred in its box: _hecControlSymbolsAt)
+      var _at = me._hecControlSymbolsAt();
+      if (_at) {
+        _el.style.left = (me.canvas.offsetLeft + _at.lock.x) + 'px';
+        _el.style.top = (me.canvas.offsetTop + _at.lock.y) + 'px';
+      }
       var _svg = _el.children[0];
       var _showIcon = me._hecLockIconShown();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
@@ -2351,9 +2366,25 @@
     // 4px past the zone); null when none is shown
     _hecLockAndHandleRect: function () {
       var _h = this.options.moveHandleVisible !== false, _l = this._hecLockIconShown();
-      if (this._hecHandleButtons() || (_h && _l)) return { x: 0, y: 4, width: this._hecLockAndHandleWidth() + 4, height: 24 };
-      if (_l) return { x: 12, y: 4, width: 24, height: 24 };
-      return _h ? { x: 1, y: 4, width: 24, height: 24 } : null;
+      if (this._hecHandleButtons()) return { x: 0, y: CTRL_TOP, width: this._hecLockAndHandleWidth() + 4, height: CTRL_H };
+      if (_h && _l) return { x: 0, y: CTRL_TOP, width: this._hecLockAndHandleWidth(), height: CTRL_H };
+      if (_l) return { x: 16, y: CTRL_TOP, width: CTRL_W, height: CTRL_H };
+      return _h ? { x: 1, y: CTRL_TOP, width: CTRL_W, height: CTRL_H } : null;
+    },
+
+    // Where the handle's and the padlock's symbols are drawn (canvas-relative, their top
+    // left), centred in their box (_hecLockAndHandleRect): side by side in an oblong one,
+    // alone in a round one
+    _hecControlSymbolsAt: function () {
+      var _r = this._hecLockAndHandleRect(), _y = function (h) { return CTRL_TOP + (CTRL_H - h) / 2; };
+      if (!_r) return null;
+      var _both = this.options.moveHandleVisible !== false && this._hecLockIconShown();
+      return {
+        handle: { x: _both ? CTRL_END : _r.x + (_r.width - HANDLE_W) / 2, y: _y(HANDLE_H) },
+        // (the padlock 2px from the top, 3px from the bottom: its shackle thin, its body heavy —
+        // centred as it is seen)
+        lock: { x: _both ? CTRL_END + HANDLE_W + CTRL_GAP : _r.x + (_r.width - LOCK_W) / 2, y: CTRL_TOP + 2 }
+      };
     },
 
     // Whether the padlock is shown: the Y axis lock on, no handleButtons in its place, and
@@ -2366,7 +2397,7 @@
 
     _hecLockAndHandleWidth: function () {
       var b = this._hecHandleButtons();
-      return b ? Math.max(33, b.length * 18) : 33;
+      return b ? Math.max(33, b.length * 18) : CTRL_END + HANDLE_W + CTRL_GAP + LOCK_W + CTRL_END;
     },
 
     // The buttons shown in the lock+handle zone instead of the handle and the padlock
@@ -2407,20 +2438,22 @@
       if (!me.canvas) return;
       var _el = me._hecMoveHandleIconEl;
       if (!_el) {
+        // (six dots, as ⠿ — drawn, so that what is seen is what is centred, whatever the font)
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:10;width:15px;height:28px;display:flex;align-items:flex-end;padding-left:2px;padding-bottom:3px;color:var(--secondary-text-color);font-size:14px;opacity:0.5;user-select:none;pointer-events:none;';
-        _el.textContent = '\u283F';
+        _el.style.cssText = 'position:absolute;z-index:10;line-height:0;opacity:0.5;user-select:none;pointer-events:none;';
+        var _dots = '';
+        [1.1, 4.9].forEach(function (cx) { [1.1, 5, 8.9].forEach(function (cy) { _dots += '<circle cx="' + cx + '" cy="' + cy + '" r="1.1"/>'; }); });
+        _el.innerHTML = '<svg width="' + HANDLE_W + '" height="' + HANDLE_H + '" viewBox="0 -0.5 ' + HANDLE_W + ' ' + HANDLE_H + '" fill="var(--secondary-text-color)">' + _dots + '</svg>';
         me._hecMoveHandleIconEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
-      // (alone — no padlock beside it —: centered in its round box, 1-25px, _hecLockAndHandleRect)
-      var _alone = !me._hecLockIconShown();
-      _el.style.left = (me.canvas.offsetLeft + (_alone ? 1 : 0)) + 'px';
-      _el.style.top = me.canvas.offsetTop + 'px';
-      _el.style.width = _alone ? '24px' : '15px';
-      _el.style.paddingLeft = _alone ? '0px' : '2px';
-      _el.style.justifyContent = _alone ? 'center' : '';
-      _el.style.display = me.options.moveHandleVisible === false || me._hecHandleButtons() ? 'none' : 'flex';
+      // (centred in its box — alone in a round one, or beside the padlock: _hecControlSymbolsAt)
+      var _at = me._hecControlSymbolsAt();
+      if (_at) {
+        _el.style.left = (me.canvas.offsetLeft + _at.handle.x) + 'px';
+        _el.style.top = (me.canvas.offsetTop + _at.handle.y) + 'px';
+      }
+      _el.style.display = !_at || me.options.moveHandleVisible === false || me._hecHandleButtons() ? 'none' : 'block';
     },
 
     // options.handleButtons drawn over the lock+handle zone, in place of the handle and
@@ -2466,19 +2499,21 @@
     },
 
     // Linked-graphs marker (chain icon), shown while options.linkMarkerVisible is
-    // true: straddling this chart's top edge, under the Y axis labels of the graph
-    // above (an empty spot — centered on the top it would cover this chart's legend).
-    // Canvas-relative rectangle, or null when hidden.
+    // true: between the two graphs, right above this chart's top edge — a floating icon
+    // like the others, as large, laid over what is there, taking no room. Canvas-relative
+    // rectangle, or null when hidden.
     // (two floating icons, each taking a gesture within the icons' margin around it
     // (_hecTopTargetAt): right of the lock+handle zone, far enough for their margins never
     // to meet — two of it apart)
     _hecLinkMarkerRect: function () {
       if (this.options.linkMarkerVisible !== true || !this.chartArea) return null;
-      var _left = Math.max(0, Math.round(this.chartArea.left / 2) - 12);
+      // (a box as the controls' — CTRL_W × CTRL_H —, right above the top edge, under the Y
+      // axis labels' middle, right of the lock+handle zone's box)
+      var _left = Math.max(0, Math.round((this.chartArea.left - CTRL_W) / 2));
       var _lh = this._hecLockAndHandleRect(), _zone = _lh ? _lh.x + _lh.width : 0;
       var _gap = 2 * _hecIconMargin();
       if (_zone && _left < _zone + _gap) _left = _zone + _gap;
-      return { left: _left, top: -25, width: 24, height: 24 };
+      return { left: _left, top: -CTRL_H - 1, width: CTRL_W, height: CTRL_H };
     },
 
     // The chain icon itself: a relay zone like the others (_hecTouchOverlay) — its
@@ -2498,8 +2533,9 @@
         _el.style.zIndex = '2';
         _el.style.alignItems = 'center';
         _el.style.justifyContent = 'center';
-        _el.style.borderRadius = '50%';
-        _el.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
+        _el.style.borderRadius = CTRL_H / 2 + 'px';
+        // (the path's own bounds — 2.75..21.25 of its 24 —: what is seen is what is centred)
+        _el.innerHTML = '<svg width="' + CHAIN_W + '" height="' + CHAIN_H + '" viewBox="2.75 2.25 18.5 19.5" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
@@ -2516,7 +2552,7 @@
     // graph's right edge (canvas-relative); null when hidden
     _hecCloseButtonRect: function () {
       if (this.options.closeButtonVisible !== true || !this.width) return null;
-      return { x: this.width - 25, y: 4, width: 24, height: 24 };
+      return { x: this.width - CTRL_W - 1, y: CTRL_TOP, width: CTRL_W, height: CTRL_H };
     },
 
     // The close button itself (×): a relay zone like the chain icon (_hecTouchOverlay) —
@@ -2535,11 +2571,10 @@
         _el.style.zIndex = '10';
         _el.style.alignItems = 'center';
         _el.style.justifyContent = 'center';
-        _el.style.borderRadius = '50%';
-        _el.style.color = 'var(--primary-text-color)';
-        _el.style.fontSize = '16px';
+        _el.style.borderRadius = CTRL_H / 2 + 'px';
         _el.style.userSelect = 'none';
-        _el.textContent = '\u00D7';
+        // (the ×, drawn: centred as it is seen)
+        _el.innerHTML = '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 -0.5 10 11" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.6" stroke-linecap="round"/></svg>';
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
@@ -2575,7 +2610,8 @@
       el.style.right = 'auto';
       el.style.zIndex = '10';
       el.style.left = (me.canvas.offsetLeft + Math.max(0, _left)) + 'px';
-      el.style.top = (me.canvas.offsetTop + 16 - _h / 2) + 'px';
+      // (centred on the controls' line, as their boxes)
+      el.style.top = (me.canvas.offsetTop + CTRL_TOP + CTRL_H / 2 - _h / 2) + 'px';
     },
 
     // The floating icons' boxes (the chain icon's, the lock+handle zone's, the close
@@ -2598,7 +2634,7 @@
       }
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:9;border-radius:12px;pointer-events:none;';
+        _el.style.cssText = 'position:absolute;z-index:9;border-radius:' + CTRL_H / 2 + 'px;pointer-events:none;';
         me._hecControlsBackdropEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
@@ -2697,7 +2733,7 @@
 
     // Public (Chart Custom.js.md §1): the values shown over the chart, given by its owner —
     // values null: none. { layout: 'row' | 'narrow', states: [{ curve, key, text, unit,
-    // color, indicator }], stats: [{ curve, key, name, color, cells: [{ stat, label, value, time }] }],
+    // color, indicator — true, or a color: a dot before it }], stats: [{ curve, key, name, color, cells: [{ stat, label, value, time }] }],
     // format(curve, y, x) → { text, unit, time }, align: 'left' | 'center' | 'right',
     // fontSize: a percentage, icon: an element shown at the end of the values' row }: each curve's value now (states, in a
     // row; 'narrow': the first one large, the others small in a column on its right, each
@@ -2730,8 +2766,8 @@
       if (_el.nextSibling !== _box || _el.parentNode !== _box.parentNode) _box.parentNode.insertBefore(_el, _box);
       var _narrow = v.layout === 'narrow';
       var _cut = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0';
-      // (a value's indicator: a dot in its color before it)
-      var _dot = function (s) { return s.indicator ? '<span class="hec-indicator" style="display:inline-block;width:0.45em;height:0.45em;border-radius:50%;background:' + s.color + ';margin-right:0.3em;vertical-align:middle"></span>' : ''; };
+      // (a value's indicator: a dot before it, in its color — or in the one it gives)
+      var _dot = function (s) { return s.indicator ? '<span class="hec-indicator" style="display:inline-block;width:0.45em;height:0.45em;border-radius:50%;background:' + (typeof s.indicator === 'string' ? s.indicator : s.color) + ';margin-right:0.3em;vertical-align:middle"></span>' : ''; };
       var state = function (s, size) {
         return '<div class="hec-state' + (_narrow ? ' hec-cut' : '') + '" data-curve="' + s.curve + '" data-key="' + s.key + '" style="color:' + s.color +
           ';font-size:' + size + ';line-height:1.2;cursor:pointer;' + (_narrow ? _cut : '') + '">' + _dot(s) + _hecValueHtml(s) + '</div>';
@@ -3311,7 +3347,7 @@
       _mo.style.left = me.canvas.offsetLeft + 'px';
       _mo.style.top = me.canvas.offsetTop + 'px';
       _mo.style.width = _moVisible ? me._hecLockAndHandleWidth() + 'px' : '0px';
-      _mo.style.height = _moVisible ? '28px' : '0px';
+      _mo.style.height = _moVisible ? ( CTRL_TOP + CTRL_H + 4 ) + 'px' : '0px';
       // (with handleButtons, a swipe there is theirs, never the page's)
       if (me._hecHandleButtons()) _mo.style.touchAction = 'none';
     }

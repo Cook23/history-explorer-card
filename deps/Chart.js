@@ -11853,9 +11853,11 @@
                                   * @param fontSize {Number} the label font size
                                   * @return {Number} width of the color box area
                                   */
+        // (fork) a point style: a dot as wide as the text's x-height (0.7 × the font size) — it
+        // took 1.4 × the font size, and a ring as thick as the line around it
         function getBoxWidth(labelOpts, fontSize) {
           return labelOpts.usePointStyle ?
-          fontSize * Math.SQRT2 :
+          fontSize * 0.7 :
           labelOpts.boxWidth;
         }
 
@@ -12014,7 +12016,8 @@
                   if (_ch) _ch._hecIconsOverLegend = over;
                   // on the left, the room the lock+handle zone needs (4 px apart)
                   me.leftMargin = over ? 4 : me.options.leftMargin !== undefined ? me.options.leftMargin :
-                    _ch && _ch._hecHasControls && _ch._hecHasControls() ? _ch._hecLockAndHandleWidth() + 4 : 4;
+                    _ch && _ch._hecHasControls && _ch._hecHasControls() && _ch._hecLockAndHandleRect() ?
+                    _ch._hecLockAndHandleRect().x + _ch._hecLockAndHandleRect().width + 4 : 4;
                   // on the right, the close button's (closeButtonVisible), mirrored, and the top
                   // control's (hecTopControl) before it — at least options.rightMargin
                   var _cb = !over && _ch && _ch._hecCloseButtonRect && _ch._hecCloseButtonRect();
@@ -12218,15 +12221,13 @@
                 }
 
                 if (opts.labels && opts.labels.usePointStyle) {
-                  // Recalculate x and y for drawPoint() because its expecting
-                  // x and y to be center of figure (instead of top left)
-                  var radius = fontSize * Math.SQRT2 / 2;
-                  var offSet = radius / Math.SQRT2;
-                  var centerX = x + offSet;
-                  var centerY = y + offSet;
-
-                  // Draw pointStyle as legend symbol
-                  helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, centerX, centerY);
+                  // (fork) a dot of the curve's color, filled, its diameter boxWidth (0.7 × the font
+                  // size), centred on the text's middle — no ring
+                  var radius = boxWidth / 2;
+                  ctx.fillStyle = valueOrDefault(legendItem.strokeStyle, ctx.fillStyle);
+                  ctx.lineWidth = 0;
+                  ctx.strokeStyle = 'rgba(0,0,0,0)';
+                  helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, x + radius, y + fontSize / 2);
                 } else {
                   // Draw box as legend symbol
                   if (!isLineWidthZero) {

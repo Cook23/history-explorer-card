@@ -54,8 +54,13 @@ graphs:
       # The value now, in large, over the graph (the curve's colour and unit)
       showState: false
 
-      # min, average, max over the time window shown, over the graph (a name, a list, or true: all three)
+      # min, average, max over the time window shown, over the graph (a name, a list, or true: all three;
+      # mini-graph-card's show.extrema: min and max, show.average: average)
       showStats: null
+
+      # False: its values over the graph in the text's colour instead of its own (mini-graph-card's
+      # state_adaptive_color)
+      stateAdaptiveColor: True
 
       # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
       # — or dashes and gaps in px, as CSS writes them ('10,5')
@@ -401,8 +406,8 @@ yAxis: auto
 # $.barGraphHeight win over it)
 
 # A set of default options at once — the card's own options still win, under any of their names. mini:
-# mini-graph-card's look (header: hide, no toolbar nor selector, showState: true, showStats: [min, max],
-# showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
+# mini-graph-card's look (header: hide, no toolbar, selector nor bar interval selector, showState: true,
+# showStateFor: first, showStatsFor: first, stateAdaptiveColor: false, showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
 # lineMode: curves, interpolation: bspline, colorTransition: smooth, showName: true, showIcon: true,
 # alignHeader: default, fontSizeHeader: 14, showCurrentValues: false, legendVisible: auto, labelsLeft: hover,
 # labelsRight: hover)
@@ -441,6 +446,12 @@ fixedValue: False
 
 # The clock: true, 24 hours; false, 12 hours; not set, Home Assistant's own setting
 hour24: null
+
+# Which curves a graph's or the card's showState and showStats are for (also on a graph): all, or first —
+# its first curve only, the others' set on them (on the entity, in entityOptions), as mini-graph-card shows
+# its first entity's
+showStateFor: all
+showStatsFor: all
 
 # A graph's header (also on a graph): its name — its title, else, with showName, its first curve's name —
 # and its icon (showIcon: iconImage, else icon, else the entity's own, else one by its device class);
