@@ -53,6 +53,7 @@ This card offers a highly interactive and configurable way to view the history o
     - [Customizing state colors](#customizing-state-colors)
   - [Compass arrow graphs](#compass-arrow-graphs)
 - [Colors of curves and bars](#colors-of-curves-and-bars)
+- [Scaling values: scale, unit and valueFactor](#scaling-values-scale-unit-and-valuefactor)
 - [Y axis scaling](#y-axis-scaling)
   - [Bounds](#bounds)
   - [Two Y axes](#two-y-axes)
@@ -124,7 +125,7 @@ This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](http
 
 - **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among five algorithms: `monotone`, `steffen`, `makima`, `catmullrom` and `bspline` (mini-graph-card's smoothing). Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
 - **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
-- **`scale` and `unit`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit.
+- **`scale`, `unit` and `valueFactor`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit; `valueFactor` multiplies by a power of 10 what is drawn and shown.
 - **Display options** — `showMinMax` (a lighter min/max band around the mean curve: everywhere, or only where it comes from the statistics, or from the history), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
 - **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
 - **Colors** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
@@ -731,6 +732,34 @@ graphs:
 ```
 
 **A color for each entity of a graph.** `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's (mini-graph-card's `line_color`).
+
+---
+
+## Scaling values: scale, unit and valueFactor
+
+Three options of an entity (`valueFactor`: also of a graph, the card or `entityOptions`) multiply its values. They overlap; what differs is how the factor is written and what is shown:
+
+| | `scale` | `valueFactor` (`value_factor`) |
+|---|---|---|
+| Written as | the factor itself (`0.001`, `-1`) | a power of 10 (`-3`: × 10⁻³) |
+| Without `unit` | only the curve drawn is multiplied: the legend, the tooltip and the values over the graph show the entity's real value — to make a small curve visible next to larger ones, or to flip it with a negative factor | the values drawn **and** shown are multiplied (400 W shows 0.4 W) |
+| With `unit` | a conversion: the values drawn and shown are multiplied, in that unit (`scale: 0.001` and `unit: kW` for a power in W) | the same, in that unit |
+
+`valueFactor: -3` thus gives the same as `scale: 0.001` with `unit` set to the entity's own unit. Both can be set together: the values are drawn multiplied by `scale` × 10^`valueFactor`, and shown multiplied by the same with `unit`, by 10^`valueFactor` alone without it.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.power            # in W
+        scale: 0.001
+        unit: kW                        # shown and drawn in kW
+      - entity: sensor.energy_meter     # in Wh
+        valueFactor: -3                 # shown and drawn divided by 1000, its unit kept
+      - entity: sensor.small_signal
+        scale: 100                      # only drawn larger: its real value shown
+```
 
 ---
 
@@ -1361,9 +1390,9 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
 | `tapAction` | string or object | `tap_action` | an action's name alone: `tapAction: none` | What a click on its value does (in the legend, over the graph): Home Assistant's actions — `more-info` (default: its dialog, with the info panel when it's on), `navigate` (`navigation_path`), `url` (`url_path`), `perform-action` (`perform_action`, `data`, `target`), `call-service` (`service`, `service_data`), `none` |
-| `scale` | number | | | Multiply all values by this factor before drawing. Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
+| `scale` | number | | | Multiply all values by this factor before drawing (see [Scaling values](#scaling-values-scale-unit-and-valuefactor)). Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
 | `unit` | string | | | Unit shown instead of the entity's own (see `scale`) |
-| `valueFactor` | integer | `value_factor` | | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) |
+| `valueFactor` | integer | `value_factor` | | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see [Scaling values](#scaling-values-scale-unit-and-valuefactor) |
 | `stateMap` | list | `state_map` | | A text state drawn as a curve: each state (`off`, or `{ value: off, label: Off }`) at its place in the list — 0, 1, 2… —, its label shown in the legend, the tooltip and on the Y axis — see [Text states as a curve](#text-states-as-a-curve) |
 | `hidden` | boolean | | | Hide this entity by default in the legend |
 | `legendVisible` | boolean | `show_legend` | | `false` on an entity: no label for it in the legend (on the card: no legend) |
