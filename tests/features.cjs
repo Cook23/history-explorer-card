@@ -512,6 +512,29 @@ module.exports = async function()
         return h.band === h.agg && h.agg > 0 && st.band === 0 ? true : JSON.stringify({ h, st });
     });
 
+    // ── The band's color: the line's, at opacity 0.3 — a gradient where the line's color varies ──
+    // (each fill of the band: its fill style and opacity, from a draw with the band less one without)
+    const bandFills = tb => tb.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], ctx=c.ctx; const rec=()=>{ const out=[]; const f=ctx.fill;
+            ctx.fill=function(){ out.push({ style: typeof ctx.fillStyle==='string' ? ctx.fillStyle : 'gradient', alpha: ctx.globalAlpha }); return f.apply(this,arguments); }; c.draw(); ctx.fill=f; return out; };
+        const on=rec(); ds.showMinMax=false; const off=rec(); ds.showMinMax=true;
+        return on.filter(x=>!off.some(y=>y.style===x.style && y.alpha===x.alpha)); })()`);
+    let tb = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', color: '#ff0000', showMinMax: true }] }] }),
+        { mock: { series: true, historyStep: 60 } });
+    await tb.wait(2500);
+    await tb.step('showMinMax: the band in the curve\'s color at opacity 0.3', async () => {
+        const f = await bandFills(tb);
+        return f.length && f.every(x => /^#ff0000$|rgba?\(255, ?0, ?0(, ?1)?\)/.test(x.style) && Math.abs(x.alpha - 0.3) < 1e-9) ? true : JSON.stringify(f);
+    });
+    done(await tb.close());
+    tb = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: true, colorTransition: 'smooth',
+        color: { '0': '#0000ff', '1000': '#ff0000' } }] }] }), { mock: { series: true, historyStep: 60 } });
+    await tb.wait(2500);
+    await tb.step('showMinMax with a color that varies (thresholds blended): the band in the line\'s gradient, not in black', async () => {
+        const f = await bandFills(tb);
+        return f.length && f.every(x => x.style === 'gradient' && Math.abs(x.alpha - 0.3) < 1e-9) ? true : JSON.stringify(f);
+    });
+    done(await tb.close());
+
     // ── A timeline over a week: only states too thin to see merged (narrower than 2 px) ──
     const H = 3600, D = 86400;
     const rows = [[7 * D + H, 'off'],
