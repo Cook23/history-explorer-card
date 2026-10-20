@@ -480,6 +480,31 @@
       });
     } });
 
+  // A curve colored by its value, its thresholds blended from one to the next (dataset option
+  // hecValueGradient: [{ value, color, fill }] in increasing value — mini-graph-card's
+  // smooth color transition): a gradient along its Y axis, from each threshold's height to
+  // the next, its color below the lowest and above the highest; the fill too (unless it
+  // fades out: hecFillFade)
+  Chart.plugins.register({
+    id: 'hecValueGradient',
+    afterDatasetUpdate: function (chart, args) {
+      var ds = chart.data.datasets[args.index];
+      var stops = ds && ds.hecValueGradient;
+      var meta = args.meta, line = meta.dataset, area = chart.chartArea;
+      var ys = chart.scales[meta.yAxisID];
+      if (!stops || !stops.length || !line || !line._model || !ys || !area) return;
+      var px = stops.map(function (st) { return ys.getPixelForValue(st.value); });
+      var y0 = px[0], y1 = px[px.length - 1];
+      var _make = function (key) {
+        if (stops.length === 1 || y0 === y1) return stops[stops.length - 1][key];
+        var g = chart.ctx.createLinearGradient(0, y0, 0, y1);
+        stops.forEach(function (st, i) { if (st[key]) g.addColorStop((px[i] - y0) / (y1 - y0), st[key]); });
+        return g;
+      };
+      line._model.borderColor = _make('color');
+      if (!ds.hecFillFade && stops.every(function (st) { return st.fill; })) line._model.backgroundColor = _make('fill');
+    } });
+
   // The area under a curve filled with its own color fading out downwards (dataset option
   // hecFillFade): a gradient over the plot area, made once its size is known (after the
   // layout, before the datasets take their colors)
@@ -2094,19 +2119,26 @@
       }).filter(function (a) { return a.scale; });
     },
 
-    // The current range of each Y axis (see _hecValueYAxes): [[min, max], ...]
+    // The current range of each Y axis (see _hecValueYAxes): [[min, max], ...] — of a
+    // logarithmic axis, the logarithm of its range (the gestures move and zoom it evenly,
+    // as they're seen)
     _hecYRanges: function () {
-      return this._hecValueYAxes().map(function (a) { return [a.scale.min, a.scale.max]; });
+      return this._hecValueYAxes().map(function (a) {
+        var _log = a.opts.type === 'logarithmic';
+        return _log ? [Math.log10(Math.max(a.scale.min, 1e-12)), Math.log10(Math.max(a.scale.max, 1e-12))] : [a.scale.min, a.scale.max];
+      });
     },
 
-    // Sets the range of each Y axis (ranges: one [min, max] per axis of _hecValueYAxes;
+    // Sets the range of each Y axis (ranges: one [min, max] per axis of _hecValueYAxes, as
+    // _hecYRanges gives them — of a logarithmic axis, the logarithm;
     // an undefined one leaves that axis as it is) — a range set by hand engages the lock
     _hecSetYRanges: function (ranges) {
       var me = this;
       me._hecValueYAxes().forEach(function (a, i) {
         if (!ranges[i]) return;
-        a.opts.ticks.min = ranges[i][0];
-        a.opts.ticks.max = ranges[i][1];
+        var _log = a.opts.type === 'logarithmic';
+        a.opts.ticks.min = _log ? Math.pow(10, ranges[i][0]) : ranges[i][0];
+        a.opts.ticks.max = _log ? Math.pow(10, ranges[i][1]) : ranges[i][1];
         a.opts.ticks.removeEdgeTicks = true;
       });
       if (!me._hecYAxisLock) me._hecYAxisLock = 2;

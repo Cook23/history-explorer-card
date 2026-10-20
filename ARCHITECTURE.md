@@ -66,6 +66,7 @@ show it, and the conductor starts the card and wires the parts together.
 | **Tools of the business program** — pure, no state | |
 | `src/history-options.js` | The options: interpolation algorithms, line modes, which types share a graph, bar intervals, the synonyms of option names, which options can be set at which level. |
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id, its state, its history. |
+| `src/history-stats.js` | How a run of values gives its mean, as Home Assistant compiles its statistics (each value weighted by how long it lasted): the one rule of the points drawn, their groups and the average over a graph. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
 | `src/legend-names.js` | The shorter forms of the curves' names, for a legend too narrow for them. |
 | `src/gesture-settings.js` | The gesture settings (long-press duration, precision, for a mouse or a pen and for a finger): their bounds, given to Chart.js (`Chart.defaults.global.gestures`). Saved by `card-storage.js`. |

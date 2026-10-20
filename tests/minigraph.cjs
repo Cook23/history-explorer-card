@@ -207,5 +207,110 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The Y axis: soft bounds, a smallest range, the right axis' own, logarithmic ──
+    // (graph i's Y axis k: its range drawn, its options)
+    const axis = (t, k = 0, i = 0) => t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[${i}].chart, o=c.options.scales.yAxes[${k}], s=c.scales[o.id];
+        return { min: s.min, max: s.max, type: o.type ?? 'linear', display: o.display !== false, tmin: o.ticks.min, tmax: o.ticks.max }; })()`);
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24,
+        lower_bound: '~0', upper_bound: '~10', lower_bound_secondary: 0, upper_bound_secondary: 50, show: { labels_secondary: false },
+        entities: ['sensor.power', { entity: 'sensor.rain', y_axis: 'secondary' }] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('soft bounds (~0, ~10): the axis reaches 0, and goes past 10 to the values above it', async () => {
+        const a = await axis(t);
+        return a.min <= 0 && a.max >= 400 && a.tmin === undefined && a.tmax === undefined ? true : JSON.stringify(a);
+    });
+    await t.step('lower_bound_secondary / upper_bound_secondary: the right axis\' own bounds; show: labels_secondary: false — its labels hidden', async () => {
+        const a = await axis(t, 1);
+        return a.min === 0 && a.max === 50 && !a.display ? true : JSON.stringify(a);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, min_bound_range: 5000,
+        entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('min_bound_range: the axis shows at least that range, widened on both sides', async () => {
+        const a = await axis(t);
+        return a.max - a.min >= 5000 && a.min < 200 && a.max > 600 ? true : JSON.stringify(a);
+    });
+    done(await t.close());
+    t = await openCard(card({ graphs: [{ type: 'line', logarithmic: true, entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('logarithmic: a logarithmic Y axis; a drag on its labels moves it evenly, as it\'s seen (the logarithm of its range)', async () => {
+        const a = await axis(t);
+        const r = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, r0=c._hecYRanges()[0]; c._hecSetYRanges([[r0[0]+1, r0[1]+1]]); const r1=c._hecYRanges()[0];
+            const s=c.scales[c.options.scales.yAxes[0].id]; return { r0, r1, max: s.max, was: Math.pow(10, r0[1]) }; })()`);
+        return a.type === 'logarithmic' && Math.abs(r.r1[0] - r.r0[0] - 1) < 1e-9 && Math.abs(r.max / r.was - 10) < 1e-6 ? true : JSON.stringify({ a, r });
+    });
+    done(await t.close());
+
+    // ── Values: value_factor, state_map ──
+    const legendValues = (t, i = 0) => t.E(`el.instance.graphsInDisplayOrder()[${i}].chart.legend.legendItems.map(x=>x.hecValue)`);
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, value_factor: -3,
+        entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('value_factor: -3 — the values shown and drawn divided by 1000 (400 W shows 0.4)', async () => {
+        const v = await legendValues(t);
+        const ys = await t.E(`el.instance.graphsInDisplayOrder()[0].chart.data.datasets[0].data.map(p=>p.y)`);
+        return v[0] === '(0.4 W)' && ys.length && ys.every(y => y > 0 && y < 1) ? true : JSON.stringify({ v, ys: ys.slice(0, 5) });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24,
+        state_map: [{ value: 'off', label: 'Off' }, { value: 'cold', label: 'Cold' }, 'hot'], entities: ['sensor.clim_mode'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('state_map: a text state drawn as a curve, each state at its place (0, 1, 2), its label in the legend and on the Y axis', async () => {
+        const r = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, s=c.scales[c.options.scales.yAxes[0].id];
+            return { type: el.instance.graphsInDisplayOrder()[0].type, ys: [...new Set(c.data.datasets[0].data.map(p=>p.y))], ticks: s.ticks }; })()`);
+        const v = await legendValues(t);
+        const ok = r.type === 'line' && r.ys.length > 1 && r.ys.every(y => y >= 0 && y <= 2) && v[0] === '(hot)'
+            && r.ticks.includes('Cold');
+        return ok ? true : JSON.stringify({ r, v });
+    });
+    done(await t.close());
+
+    // ── Colors: line_color, color thresholds blended ──
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, line_color: ['#ff0000', '#00ff00'],
+        entities: ['sensor.power', 'sensor.power2', { entity: 'sensor.rain', color: '#0000ff' }] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('line_color: each entity the color at its place in the list; an entity\'s own color wins', async () => {
+        const c = await ds(t, 'borderColor');
+        return c.join() === '"#ff0000","#00ff00","#0000ff"' ? true : c.join();
+    });
+    done(await t.close());
+    const thresholds = [{ value: 0, color: '#0000ff' }, { value: 1000, color: '#ff0000' }];
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, color_thresholds: thresholds,
+        entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('look: mini — the thresholds blended (smooth): a gradient along the Y axis, the color now a mix of both', async () => {
+        const r = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, d=c.data.datasets[0], m=c.getDatasetMeta(0).dataset._model;
+            return { stops: d.hecValueGradient?.length, steps: d.colorSteps, color: d.borderColor, line: m.borderColor instanceof CanvasGradient }; })()`);
+        return r.stops === 2 && !r.steps && r.line && /^rgb\(\d+, ?0, ?\d+\)$/.test(r.color) && r.color !== 'rgb(0, 0, 255)' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24, color_thresholds: thresholds,
+        color_thresholds_transition: 'hard', entities: ['sensor.power'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('color_thresholds_transition: hard — no blend: each value the color of its threshold', async () => {
+        const r = await t.E(`(()=>{ const d=el.instance.graphsInDisplayOrder()[0].chart.data.datasets[0]; return { stops: d.hecValueGradient, color: d.borderColor }; })()`);
+        return r.stops === undefined && r.color === '#0000ff' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Each entity: show_line, show_legend; hour24 ──
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, hour24: false,
+        entities: [{ entity: 'sensor.power', show_line: false }, { entity: 'sensor.power2', show_legend: false }, 'sensor.rain'] }, { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.step('show_line: false — its points, no line', async () => {
+        const l = await ds(t, 'showLine'), r = await ds(t, 'pointRadius');
+        return l.join() === 'false,true,true' && +r[0] > 0 ? true : JSON.stringify({ l, r });
+    });
+    await t.step('show_legend: false on an entity — no label for it in the legend, the others laid out as usual', async () => {
+        const r = await t.E(`(()=>{ const l=el.instance.graphsInDisplayOrder()[0].chart.legend; return { hidden: l.legendItems.map(x=>!!x.hecHidden), w: l.legendHitBoxes.map(b=>Math.round(b.width)), x: l.legendHitBoxes.map(b=>Math.round(b.left)) }; })()`);
+        return r.hidden.join() === 'false,true,false' && r.w[1] === 0 && r.w[0] > 0 && r.w[2] > 0 && r.x[2] > r.x[0] ? true : JSON.stringify(r);
+    });
+    await t.step('hour24: false — the 12-hour clock', async () => {
+        const f = await t.E('el.instance.i18n.styleTimeTicks');
+        return /h/.test(f) && /a/.test(f) && !/HH/.test(f) ? true : f;
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
