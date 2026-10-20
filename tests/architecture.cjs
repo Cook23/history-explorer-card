@@ -78,7 +78,7 @@ const RULES = [
     { id: 'no-business-in-chart', why: "Chart.js never knows what an entity, Home Assistant, the store or the card's texts are",
       files: ['deps/chart-hec.js', 'deps/timeline.js'], re: /\b(entity|entities|entity_id|hass|pconfig|store|i18n|statistics?)\b/gi },
     { id: 'pure-data', why: 'these parts are data only: no DOM, no style, no event',
-      files: ['src/history-entity-store.js', 'src/legend-names.js', 'src/history-units.js', 'src/history-options.js', 'src/history-series.js', 'src/card-values.js'],
+      files: ['src/history-entity-store.js', 'src/legend-names.js', 'src/history-units.js', 'src/history-options.js', 'src/history-series.js', 'src/history-stats.js', 'src/card-values.js'],
       re: /\bdocument\b|getComputedStyle|querySelector|addEventListener|\.style\b|innerHTML|getBoundingClientRect|\bChart\b/g },
     { id: 'persistence', why: 'what is kept between sessions is read and written by card-storage.js only',
       files: CARD.filter(f => f !== 'src/card-storage.js'), re: /localStorage|frontend\/(set|get)_user_data/g },

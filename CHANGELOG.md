@@ -4,6 +4,35 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.29] - 2026-10-20
+
+### New — mini-graph-card's Y axis options
+- Soft bounds: `lower_bound: ~0` / `upper_bound: ~100` (`ymin`, `ymax` with a `~`) — the bound, unless the values go past it
+- `min_bound_range` (`yrange`): the smallest range the Y axis shows — a nearly constant sensor isn't drawn as if it varied a lot —, widened on the sides that aren't fixed (both, evenly, when neither is). A side set by hand (the padlock, a drag, a pinch) kept as it is
+- The right axis' own: `lower_bound_secondary`, `upper_bound_secondary`, `min_bound_range_secondary` (`yminRight`, `ymaxRight`, `yrangeRight`) — else the left one's, as before; `show.labels_secondary: false` (`labelsRight`) hides its labels (`hover`: shown)
+- `logarithmic`: a logarithmic Y axis (a line graph). A drag, a pinch or Shift + wheel move and zoom it evenly, as it's seen (`_hecYRanges` / `_hecSetYRanges` work on the logarithm of its range)
+
+### New — values: value_factor, state_map
+- `value_factor` (`valueFactor`): the values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — the legend, the tooltip, the values over the graph and the Y axis
+- `state_map` (`stateMap`): a text state drawn as a curve — each state (`off`, or `{ value, label }`) at its place in the list, 0, 1, 2…; its label in the legend, the tooltip, the values over the graph and on the Y axis (one label per place, nothing between them); a state not listed is a gap. Curves only: a timeline keeps its states (`processOf`, card-history.js)
+
+### New — colors: line_color, blended thresholds
+- `line_color` (`lineColor`) on the card or a graph: a color, or a list of colors — each entity without its own color takes the one at its place in the graph, the others the palette's
+- `color_thresholds_transition` (`colorTransition`): `smooth` — number thresholds blended from one to the next, as mini-graph-card draws them: the line a gradient along the Y axis (Chart.js plugin `hecValueGradient`), each point its blended color, the legend the color of the value now; `hard` — each value its threshold's color, as before. `look: mini`: `smooth` by default (mini-graph-card's). Thresholds on states, or compared on another entity, aren't blended
+
+### New — show_line, an entity's show_legend, hour24
+- `show_line: false` (`showLine`): a curve's points only, without its line
+- `show_legend: false` on an entity (`legendVisible`): no label for it in the legend — it takes no room, the others keep theirs (`hecLegendHidden`; the legend's items keep the datasets' indexes)
+- `hour24`: the 24-hour clock (`true`) or the 12-hour one (`false`); not set, Home Assistant's own setting
+- `animate`, `cache`, `compress`, `group`, `loading_indicator`: accepted, without effect (documented)
+
+### Changed — one mean
+- The mean of values weighted by how long each lasted, written once (`timeWeightedMean`, src/history-stats.js): the points drawn and their groups (card-datasets.js `_aggregate`) and the average over a graph (card-values.js `curveStats`) — they can't differ any more
+- Test (`values`): yesterday from midnight to midnight, `groupBy: date` — the day's point and the average shown over the graph are the same mean
+
+### Tests
+- `minigraph`: soft bounds; the right axis' own bounds and hidden labels; `min_bound_range`; `logarithmic` and a drag moving it by a factor of 10; `value_factor`; `state_map` (the values drawn, the legend, the Y labels); `line_color`; blended and hard thresholds; `show_line`; an entity's `show_legend`; `hour24: false`
+
 ## [v1.2.28] - 2026-10-19
 
 ### New — aggregation (mini-graph-card's points_per_hour, aggregate_func, group_by)

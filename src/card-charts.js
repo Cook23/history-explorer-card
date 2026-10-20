@@ -5,6 +5,7 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
+import { stateLabel } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
@@ -31,14 +32,15 @@ export class CardCharts
     // and a small arrow when it's on the right Y axis
     _legendParts(d)
     {
-        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding) : '',
-                 hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '' };
+        return { label: d.name, hecLegendValue: this.pconfig.showCurrentValues ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding, d.stateMap) : '',
+                 hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '', hecLegendHidden: !!d.legendHidden };
     }
 
     // An entity's value now, in its unit, as the legend shows it after its name: '(400 W)' —
-    // '' when it isn't a number
-    _legendValue(entity, unit, shownScale = 1, rounding)
+    // with a stateMap, its state's label; '' when it isn't a number
+    _legendValue(entity, unit, shownScale = 1, rounding, stateMap)
     {
+        if( stateMap?.length ) { const _l = stateLabel(stateMap, this.stateOf(entity)?.state); return _l === undefined ? '' : '(' + _l + ')'; }
         const v = Number(this.stateOf(entity)?.state) * shownScale;
         return isNaN(v) ? '' : '(' + formatNumber(v, rounding) + (unit ? ' ' + unit : '') + ')';
     }
@@ -340,7 +342,9 @@ export class CardCharts
 
     _curveDataset(d, graphtype, config)
     {
-        const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(d.showPoints, config?.showPoints, d.width);
+        // (without its line: its points, unless they're asked for otherwise)
+        const _points = d.showLine === false && ( d.showPoints ?? config?.showPoints ?? 'hover' ) === 'hover' ? true : d.showPoints;
+        const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(_points, config?.showPoints, d.width);
         // (dashMode: a style's name, or its dashes and gaps)
         const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
         return {
@@ -359,6 +363,8 @@ export class CardCharts
             pointBackgroundColor: d.bColor,
             pointHoverRadius: _pointHoverRadius,
             hitRadius: 5,
+            showLine: d.showLine !== false,
+            stateMap: d.stateMap,
             ...this._legendParts(d),
             yAxisID: d.yAxisID,
             // (stacked bars: those of each Y axis in their own column — stacking
@@ -406,27 +412,52 @@ export class CardCharts
         // (the labels drawn inside the plot, which then takes the whole width: yLabels: inside,
         // or a narrow card — see _yLabelsInside; yLabelsMode, labelUnit: what fitToCardWidth reads)
         const _inside = this._yLabelsInside(config?.yLabels, graphtype);
+        // Its bounds — the right axis' own (yminRight, ymaxRight, yrangeRight), else the
+        // graph's: a number is fixed; { soft } is a bound unless the values go past it; its
+        // range (yrange): the smallest the axis shows, widened on the sides not fixed
+        const _own = k => _right ? ( config?.[k + 'Right'] ?? config?.[k] ) : config?.[k];
+        const _lo = _own('ymin'), _hi = _own('ymax'), _range = _own('yrange');
+        const _fixedLo = typeof _lo === 'number' ? _lo : undefined, _fixedHi = typeof _hi === 'number' ? _hi : undefined;
+        // (a state_map's curves only, all with the same one: its labels, at their places)
+        const _map = _list.length && _list.every(d => d.stateMap?.length && JSON.stringify(d.stateMap) === JSON.stringify(_list[0].stateMap)) ? _list[0].stateMap : null;
+        // (a logarithmic axis: curves only)
+        const _log = config?.logarithmic === true && graphtype == 'line' && !_period && !_map;
         return {
             id,
+            ...( _log ? { type: 'logarithmic' } : {} ),
             position: _right ? 'right' : 'left',
+            // (the right axis' labels hidden: labelsRight — mini-graph-card's labels_secondary)
+            ...( _right && config?.labelsRight === false ? { display: false } : {} ),
             yLabelsMode: config?.yLabels,
             labelUnit: _unit,
             afterFit: (scaleInstance) => {
                 scaleInstance.width = scaleInstance.options.ticks.mirror ? 0 : this.pconfig.labelAreaWidth;
             },
             afterDataLimits: (me) => {
+                // (a side set by hand — the padlock, a drag, a pinch — or fixed: as it is)
+                const _freeLo = me.options.ticks.min == null, _freeHi = me.options.ticks.max == null;
+                if( _freeLo && _lo?.soft !== undefined ) me.min = Math.min(me.min, _lo.soft);
+                if( _freeHi && _hi?.soft !== undefined ) me.max = Math.max(me.max, _hi.soft);
+                const _short = ( _range ?? 0 ) - ( me.max - me.min );
+                if( _short > 0 && ( _freeLo || _freeHi ) ) {
+                    if( _freeLo && _freeHi ) { me.min -= _short / 2; me.max += _short / 2; }
+                    else if( _freeLo ) me.min -= _short;
+                    else me.max += _short;
+                }
                 const epsilon = 0.0001;
-                if( config?.ymin == null && this.pconfig.axisAddMarginMin && curvesOnly ) me.min -= epsilon;
-                if( config?.ymax == null && this.pconfig.axisAddMarginMax && curvesOnly ) me.max += epsilon;
+                if( _freeLo && this.pconfig.axisAddMarginMin && curvesOnly ) me.min -= epsilon;
+                if( _freeHi && this.pconfig.axisAddMarginMax && curvesOnly ) me.max += epsilon;
             },
             ticks: {
                 fontColor: this.pconfig.graphLabelColor,
-                min: config?.ymin ?? undefined,
-                max: config?.ymax ?? undefined,
-                forceMin: config?.ymin ?? undefined,
-                forceMax: config?.ymax ?? undefined,
-                stepSize: config?.ystepSize ?? undefined,
+                min: _fixedLo,
+                max: _fixedHi,
+                forceMin: _fixedLo,
+                forceMax: _fixedHi,
+                stepSize: _map ? 1 : config?.ystepSize ?? undefined,
                 period: _period,
+                // (a state_map's labels, at their places; nothing between them)
+                ...( _map ? { callback: v => Number.isInteger(v) ? ( _map[v]?.label ?? '' ) : '' } : {} ),
                 ...this._yLabelTicks(_inside)
             },
             gridLines: {
@@ -544,6 +575,7 @@ export class CardCharts
                         const _tf = _ds.textFactor ?? 1;
                         const _circQ = _ds.circularPeriod;
                         const _shown = y => {
+                            if( _ds.stateMap?.length ) return stateLabel(_ds.stateMap, Math.round(y)) ?? '';
                             const v = y / _siFactor * _tf;
                             // (a circular curve shows its real value, in [0, period))
                             return formatNumber(_circQ ? this.wrapCircular(v, _circQ * Math.abs(_tf)) : v, _ds.rounding);
@@ -676,7 +708,7 @@ export class CardCharts
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
                 // (period of a circular entity in the units shown, before SI conversion)
-                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(d.scale ?? 1) || null : null,
+                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : null,
                 // (an arrowline's values are angles: a full turn is the entity's circular
                 // period, 360 when it has none)
                 "arrowPeriod": ( _kind === 'arrowline' ) ? ( this.circularPeriodOf(d) ?? 360 ) : undefined,
@@ -686,8 +718,15 @@ export class CardCharts
                 // tooltip: with its own `unit`, `scale` is a conversion and the converted value
                 // is shown; without, it only changes how the curve is drawn and the entity's
                 // real value is shown)
-                "shownScale": ( d.unit !== undefined ) ? ( d.scale ?? 1 ) : 1,
-                "drawScale": d.scale || 1,
+                "shownScale": this.shownScaleOf(d),
+                "drawScale": this.drawScaleOf(d) || 1,
+                // (mini-graph-card's state_map: each state drawn at its place in the list, its
+                // label shown — see processOf)
+                "stateMap": ( _kind === 'line' ) ? this.resolveOption(d, 'stateMap') : undefined,
+                // (show_line: false — its points only)
+                "showLine": this.resolveOption(d, 'showLine') !== false,
+                // (show_legend: false on the entity — no label in the legend)
+                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false,
                 "domain": this.getDomainForEntity(d.entity),
                 "device_class": this.getDeviceClass(d.entity),
                 "hidden": d.hidden,

@@ -363,6 +363,32 @@ export function fillValue(fill, color)
     return _c?.valid ? _c.alpha(0.15).rgbString() : 'rgba(0,0,0,0.15)';
 }
 
+// Whether thresholds can be blended from one to the next (colorTransition: smooth): number
+// thresholds only — no state, no entity compared
+export function isBlendable(spec)
+{
+    return !!spec && !spec.color && !spec.entity && Array.isArray(spec.thresholds) && spec.thresholds.length > 0 && !Object.keys(spec.states ?? {}).length;
+}
+
+// The color a value takes with thresholds blended (see isBlendable), as mini-graph-card
+// draws them: at a threshold, its color; between two, a mix of both, by where the value is
+// between them; below the lowest, its color; above the highest, its color. Thresholds that
+// can't be blended: their own color (colorForValue)
+export function blendedColorForValue(spec, value)
+{
+    if( !isBlendable(spec) ) return colorForValue(spec, value);
+    const n = _number(value), t = spec.thresholds;
+    if( isNaN(n) ) return spec.default;
+    if( n <= t[0][0] ) return t[0][1];
+    if( n >= t[t.length - 1][0] ) return t[t.length - 1][1];
+    let i = 0;
+    while( n >= t[i + 1][0] ) i++;
+    const C = window.HXLocal_Chart?.helpers?.color;
+    const a = C?.(t[i][1]), b = C?.(t[i + 1][1]);
+    if( !a?.valid || !b?.valid ) return t[i][1];
+    return a.mix(b, 1 - ( n - t[i][0] ) / ( t[i + 1][0] - t[i][0] )).rgbString();
+}
+
 // The color a value takes (see parseColorValue): the color itself; a state listed, its
 // color; a number, the color of the highest threshold at or below it — below every
 // threshold, the lowest one's; any other value, the default color (undefined when none)

@@ -2,9 +2,10 @@
 // shown — line modes (smart, stepped...), bars by interval, circular values, timelines.
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { parseColorValue, colorSpec, colorForValue, isColorSeries } from "./history-default-colors.js";
+import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL } from "./history-options.js";
+import { timeWeightedMean } from "./history-stats.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -61,7 +62,8 @@ export class CardDatasets
         const _state = id => this.stateOf(id)?.state;
         if( _ce && typeof e.color === 'object' ) return colorForValue(e.color, _state(_ce)) ?? e.paletteColor;
         const _spec = _ce ? parseColorValue(_state(_ce)) : colorSpec(e.color);
-        return colorForValue(_spec, Number(_state(e.entity))) ?? e.paletteColor;
+        const _of = !_ce && this.resolveOption(e, 'colorTransition') === 'smooth' ? blendedColorForValue : colorForValue;
+        return _of(_spec, Number(_state(e.entity))) ?? e.paletteColor;
     }
 
     // A fill color like `fill` (its transparency), in color c — or undefined when `fill`
@@ -77,8 +79,26 @@ export class CardDatasets
     // The colors of a curve's points (see _colorFunction): the dataset's colorSteps (one
     // where the color changes), and its own colors made those of the point now (the last
     // one at or before now) — the legend's
+    // — or, thresholds blended (colorTransition: smooth, see isBlendable), the stops of the
+    // dataset's gradient over its Y axis (hecValueGradient: Chart.js draws it) and each
+    // point's own color
     _applyPointColors(ds, e, s, colorFn, scale, fill)
     {
+        const _spec = typeof e.color === 'object' ? e.color : null;
+        ds.hecValueGradient = undefined;
+        if( this.resolveOption(e, 'colorTransition') === 'smooth' && !colorEntityOf(e) && isBlendable(_spec) ) {
+            const _f = scale || 1;
+            ds.colorSteps = undefined;
+            ds.hecValueGradient = _spec.thresholds.map(([k, c]) => ({ value: k * _f, color: c, fill: this._fillLike(c, fill) }));
+            ds.pointBackgroundColor = s.map(pt => blendedColorForValue(_spec, pt.y / _f) ?? e.paletteColor);
+            const _now = Date.now(), _last = [...s].reverse().find(pt => moment(pt.x).valueOf() <= _now) ?? s[0];
+            const _current = _last ? blendedColorForValue(_spec, _last.y / _f) : undefined;
+            if( _current ) {
+                ds.borderColor = _current;
+                ds.backgroundColor = this._fillLike(_current, fill) ?? ds.backgroundColor;
+            }
+            return;
+        }
         const _steps = [];
         const _now = Date.now();
         let _prev, _current;
@@ -208,10 +228,11 @@ export class CardDatasets
 
                 if( result && result.length > id ) {
 
-                    const process = this.buildProcessFunction(e.process);
-
                     // Per entity: a bar graph can hold curves too (see entityKind)
                     const _kind = this.entityKind(g, e);
+                    // (its states as the values drawn — a timeline's and an arrowline's own,
+                    // without a state_map: see processOf)
+                    const process = ( _kind == 'line' || _kind == 'bar' ) ? this.processOf(e) : this.buildProcessFunction(e.process);
 
                     // Circular values (angles): a continuous curve, see _unwrapCircular
                     const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this.circularPeriodOf(e) : null;
@@ -221,7 +242,7 @@ export class CardDatasets
                     if( _kind == 'line' ) this.keepValueSamples(g, j, result[id], process);
 
                     if( _kind == 'line' ) {
-                        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+                        const scale = this.drawScaleOf(e) * (e.siConversionFactor ?? 1.0);
                         s = this._lineSamples(e, result[id], process, scale, w, g.chart.hecPlotWidth());
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
                         const _colorFn = this._colorFunction(e, colorHistory);
@@ -406,9 +427,7 @@ export class CardDatasets
                 return _s.length % 2 ? _s[_m] : ( _s[_m - 1] + _s[_m] ) / 2;
             }
         }
-        let sum = 0, span = 0;
-        for( const v of group ) { const d = Math.max(0, end(v) - v.t) || 1; sum += v.y * d; span += d; }
-        return sum / span;
+        return timeWeightedMean(group, v => v.y, v => v.t, end);
     }
 
     // A bar entity's bars: what it added over each interval of the graph (10 minutes, an
@@ -423,7 +442,7 @@ export class CardDatasets
         if( _func ) return this._aggregatedBars(g, e, data, process, w, colorFn, _func);
         const n = data.length;
         const s = [], bcol = [];
-        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+        const scale = this.drawScaleOf(e) * (e.siConversionFactor ?? 1.0);
         const netBars = e.netBars ?? false;
 
         const _interval = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1);
@@ -474,7 +493,7 @@ export class CardDatasets
     _aggregatedBars(g, e, data, process, w, colorFn, func)
     {
         const s = [], bcol = [];
-        const scale = (e.scale ?? 1.0) * (e.siConversionFactor ?? 1.0);
+        const scale = this.drawScaleOf(e) * (e.siConversionFactor ?? 1.0);
         const _interval = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1);
         const td = moment.duration(..._interval.length);
         const _values = [];

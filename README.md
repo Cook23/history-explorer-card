@@ -28,6 +28,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.2.29** — More of mini-graph-card's options: its Y axis (soft bounds, `min_bound_range`, `logarithmic`, the secondary axis' own), `value_factor`, `state_map`, `line_color`, thresholds blended (`color_thresholds_transition`).
 - **v1.2.28** — mini-graph-card compatibility: its aggregation (`points_per_hour`, `aggregate_func`, `group_by`), sub-attributes, the same entity several times in one graph.
 - **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
 - **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
@@ -322,6 +323,8 @@ The Y axis auto-scales by default. Click the padlock icon (or use the [graph men
 
 **Two Y axes** — with two groups of units (a power and a temperature), the second one gets its own Y axis, on the right — its curves marked ▸ in the legend; `yAxis: left` or `right` on an entity chooses its side, and `yAxis: left` on the graph (or the card) keeps all its curves on one axis. With more groups, the curves share one Y axis without a title (the legend and tooltip still show each entity's own unit): when their values aren't of the same order, use `scale:` to make a small one visible next to a large one. Dragging the labels of one axis moves that one; Shift, the pinch and the padlock act on both.
 
+A bound written with a `~` is soft (`ymin: ~0`: 0 at least, lower where the values go lower); `yrange` is the smallest range the axis shows; `logarithmic: true`, a logarithmic axis; the right axis has its own (`yminRight`, `ymaxRight`, `yrangeRight`, `labelsRight`).
+
 To set initial Y axis bounds in YAML:
 ```yaml
 graphs:
@@ -522,7 +525,7 @@ entityOptions:
 
 ## Colors of curves and bars
 
-`color` takes a color, or colors that change with the value — thresholds, for curves and bars alike:
+`color` takes a color, or colors that change with the value — thresholds, for curves and bars alike (`colorTransition: smooth`: blended from one to the next; `lineColor` on a graph or the card: a color, or a list of colors, for its entities in their order):
 ```yaml
 entityOptions:
   energy:
@@ -605,7 +608,7 @@ graphs:
         showStats: false
 ```
 
-`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`.
+`look: mini` sets: no header, toolbar nor entity selector; `showState: true`; `showStats: [min, max]`; `showTimeLabels: false`; `showGrid: false`; `yLabels: inside` (the Y labels inside the plot, in boxes, which takes the whole width — an axis is moved by a drag along its labels); `fill: fade` (each curve's color fading out downwards); `height: 150`; `lineWidth: 5`; `lineMode: curves`; `interpolation: bspline`; `colorTransition: smooth` (thresholds blended from one to the next).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
@@ -622,7 +625,7 @@ graphs:
 
 ## mini-graph-card compatibility
 
-A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
+A mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `look: mini`, its other lines kept. Its options are aliases of the card's own, names and values (see [Card, graph, and entity-level options](#card-graph-and-entity-level-options)), mixed freely with them — its Y axis' (soft bounds, `min_bound_range`, the `_secondary` ones, `logarithmic`), `value_factor`, `state_map`, `line_color`, `color_thresholds_transition`, `show_line`, an entity's `show_legend` and `hour24` included; `animate`, `cache`, `compress`, `group` and `loading_indicator` are accepted, without effect. mini-graph-card's aggregation is the card's own: `pointsPerHour` (`points_per_hour`), `groupBy` (`group_by`: `hour`, `date`) and `aggregateFunc` (`aggregate_func`: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff`) — a point per group of time, each the function chosen → [README_Full.md — Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation).
 
 > For full details, and what isn't implemented yet → [README_Full.md — mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
@@ -673,6 +676,8 @@ graphs:
 | Option | Name aliases | Value aliases | Card | Graph | Entity | Description |
 |---|---|---|:-:|:-:|:-:|---|
 | `type` | `graph` | | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
+| `colorTransition` | `color_thresholds_transition` | | ✓ | ✓ | ✓ | `smooth`: number thresholds blended from one to the next; `hard` (default): each value its threshold's color |
+| `lineColor` | `line_color` | | ✓ | ✓ | | A color, or a list of colors: each entity of a graph without its own takes the one at its place |
 | `color` | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` | ✓ | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
 | `fill` | `show_fill` | `true`: the curve's color, light; `false`: none | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards |
 | `showState` | `show_state` | | ✓ | ✓ | ✓ | The curve's value now, in large, over the graph |
@@ -681,6 +686,7 @@ graphs:
 | `lineMode` | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
 | `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
+| `showLine` | `show_line` | | ✓ | ✓ | ✓ | `false`: its points only, no line |
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
 | `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
@@ -694,10 +700,17 @@ graphs:
 | `scale` | | | | | ✓ | Multiply values by this factor before drawing — see *6 |
 | `yAxis` | `y_axis` | `primary` = `left`, `secondary` = `right` | ✓ | ✓ | ✓ | `auto`, `left` or `right`: the Y axis of the curves (`auto`, the default: the second group of units goes on the right; `left` keeps one axis) |
 | `unit` | | | ✓ | | ✓ | Unit shown instead of the entity's own — see *6 |
+| `valueFactor` | `value_factor` | | ✓ | ✓ | ✓ | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) |
+| `stateMap` | `state_map` | | ✓ | ✓ | ✓ | A text state drawn as a curve: each state at its place in the list, its label shown — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
 | `hidden` | | | | | ✓ | Hide by default in legend |
+| `legendVisible` | `show_legend` | | ✓ | | ✓ | `false`: no legend (the card); no label in the legend for this entity (an entity) |
 | `process` | | | | | ✓ | JS expression to transform values before display |
 | `circular` | | | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
-| `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively) — see *7 |
+| `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *7 |
+| `yminRight` / `ymaxRight` | `lower_bound_secondary` / `upper_bound_secondary` | | ✓ | ✓ | ✓ | The right Y axis' own bounds — see *7 |
+| `yrange` / `yrangeRight` | `min_bound_range` / `min_bound_range_secondary` | | ✓ | ✓ | ✓ | The smallest range the Y axis (the right one) shows — see *7 |
+| `logarithmic` | | | ✓ | ✓ | ✓ | A logarithmic Y axis (a line graph) — see *7 |
+| `labelsRight` | `show_labels_secondary` | `hover` = `true` | ✓ | ✓ | ✓ | `false`: the right Y axis' labels hidden — see *7 |
 | `ystepSize` | `ystepsize` | | ✓ | ✓ | ✓ | Fix Y axis tick step — see *7 |
 | `ylock` | | | ✓ | ✓ | ✓ | Disable all interactive Y axis pan and zoom — see *7 |
 | `stacked` | | | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
@@ -706,7 +719,6 @@ graphs:
 | `showGrid` | | | ✓ | ✓ | ✓ | `false`: no grid lines — see *7 |
 | `yLabels` | | | ✓ | ✓ | ✓ | `inside`: the Y labels inside the plot, which takes the whole width — see *7 |
 | `defaultTimeRange` | `hours_to_show` | | ✓ | | | The time range shown when the card opens — see [Time range](#time-range-and-display-defaults) |
-| `legendVisible` | `show_legend` | | ✓ | | | `false`: no legend |
 | `labelsVisible` | `show_labels` | | ✓ | | | `false`: no Y labels |
 | `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `entityOptions` | | | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
@@ -757,6 +769,7 @@ type: custom:history-explorer-card
 header: 'My history'   # or 'hide' to remove entirely
 uimode: dark           # force dark or light mode
 cardName: my-card      # required if using multiple cards on the same dashboard
+hour24: true           # the 24-hour clock (false: the 12-hour one; not set: Home Assistant's setting)
 
 uiColors:
   gridlines: '#ff000040'

@@ -7,6 +7,8 @@
 import { i18n } from "./languages.js";
 import { formatNumber } from "./history-units.js";
 import { msOf } from "./history-series.js";
+import { timeWeightedMean } from "./history-stats.js";
+import { stateLabel } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
 
@@ -15,17 +17,16 @@ const moment = window.HXLocal_moment;
 // before t0 (the value in effect at t0); null when there's none
 export function curveStats(samples, t0, t1)
 {
-    let min = null, max = null, sum = 0, span = 0;
-    for( let i = 0; i < samples.length; i++ ) {
-        const a = Math.max(samples[i].t, t0);
-        const b = Math.min(i + 1 < samples.length ? samples[i + 1].t : t1, t1);
-        if( b < a || ( b === a && samples[i].t < t0 ) ) continue;
-        const v = samples[i].v, lo = samples[i].vMin ?? v, hi = samples[i].vMax ?? v;
+    // (each value over the part of [t0, t1] it lasted: from the one in effect at t0 on)
+    const _spans = samples.map((s, i) => ({ s, a: Math.max(s.t, t0), b: Math.min(i + 1 < samples.length ? samples[i + 1].t : t1, t1) }))
+                          .filter(x => !( x.b < x.a || ( x.b === x.a && x.s.t < t0 ) ));
+    let min = null, max = null;
+    for( const { s, a } of _spans ) {
+        const lo = s.vMin ?? s.v, hi = s.vMax ?? s.v;
         if( min === null || lo < min.v ) min = { v: lo, t: a };
         if( max === null || hi > max.v ) max = { v: hi, t: a };
-        sum += v * ( b - a ); span += b - a;
     }
-    return min === null ? null : { min, max, average: { v: span > 0 ? sum / span : min.v } };
+    return min === null ? null : { min, max, average: { v: timeWeightedMean(_spans, x => x.s.v, x => x.a, x => x.b) } };
 }
 
 export class CardValues
@@ -67,6 +68,8 @@ export class CardValues
         const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? 'LT' : 'L LT');
         const states = _states.map(x => {
             const s = this.stateOf(x.e.entity)?.state;
+            // (a state_map's state: its label)
+            if( x.d.stateMap?.length ) return { curve: x.j, key: x.e.entity, color: _color(x), unit: '', text: stateLabel(x.d.stateMap, String(s ?? '')) ?? String(s ?? '') };
             return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '',
                      text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 ), x.d) };
         });
@@ -87,9 +90,10 @@ export class CardValues
     }
 
     // A value of dataset d as the values over a graph show it: its curve's decimals (see
-    // roundingOf)
+    // roundingOf) — with a state_map, the label of the state drawn there
     _roundedValue(v, d)
     {
+        if( d?.stateMap?.length ) return stateLabel(d.stateMap, Math.round(v)) ?? '';
         return formatNumber(v, d?.rounding);
     }
 }

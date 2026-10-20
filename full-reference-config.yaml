@@ -73,6 +73,8 @@ graphs:
 
       # If true, hide this entity from the graph
       hidden: False
+      # False: no label for this entity in the legend (mini-graph-card's show_legend), its curve drawn
+      legendVisible: True
 
       # (line and bar entities) The Y axis of this curve: left (primary), right (secondary), or auto — by its
       # unit: the second group of units of a graph goes on the right. Wins over the graph's, $.entityOptions' and the card's
@@ -194,11 +196,26 @@ graphs:
     # right, or auto — see $.yAxis
     yAxis: null
 
-    # Minimum value of the Y-axis (initial bound — automatically calculated by default)
+    # Minimum value of the Y-axis (initial bound — automatically calculated by default). With a ~ (~0), soft:
+    # the bound unless the values go below it
     ymin: null
 
-    # Maximum value of the Y-axis (initial bound — automatically calculated by default)
+    # Maximum value of the Y-axis (initial bound — automatically calculated by default). ~ for a soft bound
     ymax: null
+
+    # The right Y axis' own bounds (else ymin / ymax), the same way
+    yminRight: null
+    ymaxRight: null
+
+    # The smallest range the Y axis shows (the right one: yrangeRight), widened on the sides not fixed
+    yrange: null
+    yrangeRight: null
+
+    # A logarithmic Y axis (a line graph)
+    logarithmic: False
+
+    # False hides the right Y axis' labels
+    labelsRight: True
 
     # Step size to display on the Y-axis (automatically calculated by default). See its aliases in README_Full.md
     ystepSize: null
@@ -378,7 +395,7 @@ yAxis: auto
 # A set of default options at once — the card's own options still win, under any of their names. mini:
 # mini-graph-card's look (header: hide, no toolbar nor selector, showState: true, showStats: [min, max],
 # showTimeLabels: false, showGrid: false, yLabels: inside, fill: fade, height: 150, lineWidth: 5,
-# lineMode: curves)
+# lineMode: curves, interpolation: bspline, colorTransition: smooth)
 look: null
 
 # Default style of the line for every line graph on the card, unless overridden at the graph or entity level.
@@ -389,6 +406,24 @@ dashMode: "solid"
 # overridden at the graph or entity level. Can be: True (everywhere), statistics or history (only where
 # the curve comes from them), or False to disable
 showMinMax: False
+
+# Values (also on a graph, an entity or in entityOptions): valueFactor, the values shown and drawn multiplied
+# by 10 to that power (-3: 400 W shows 0.4); stateMap, a text state drawn as a curve — a list of states
+# (off, or { value: off, label: Off }), each at its place (0, 1, 2…), its label shown
+valueFactor: 0
+stateMap: null
+
+# Colors: colorTransition — smooth, number thresholds blended from one to the next, or hard (each value its
+# threshold's color); lineColor — on the card or a graph: a color, or a list of colors, for its entities in
+# their order (an entity's own color wins)
+colorTransition: hard
+lineColor: null
+
+# False: a curve's points only, without its line (also on a graph, an entity or in entityOptions)
+showLine: True
+
+# The clock: true, 24 hours; false, 12 hours; not set, Home Assistant's own setting
+hour24: null
 
 # Aggregation (mini-graph-card's points_per_hour, group_by, aggregate_func), also on a graph,
 # an entity or in entityOptions: a point per group of time instead of one per column of pixels.

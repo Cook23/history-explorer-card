@@ -11791,6 +11791,9 @@
                   // a mark ('▸') — see Chart.hecLegendTail
                   hecValue: dataset.hecLegendValue || '',
                   hecMark: dataset.hecLegendMark || '',
+                  // (fork) no label in the legend (dataset.hecLegendHidden): it takes no room,
+                  // its index kept — the legend's labels stay those of the datasets
+                  hecHidden: !!dataset.hecLegendHidden,
                   fillStyle: last(dataset.backgroundColor),
                   hidden: !chart.isDatasetVisible(i),
                   lineCap: dataset.borderCapStyle,
@@ -12052,7 +12055,9 @@
                   // — or, with a top control (hecTopControl), which can't be under a label: the
                   // first line left to the top row, the control centred between the icons)
                   var _fitted = Chart.hecFitLegendTexts(ctx, _items, _roomOf(1));
-                  if (ctx.measureText(_fitted[0] + _items[0].tail).width > _roomOf(0)) {
+                  // (the first label shown: a hidden one takes no room — hecHidden)
+                  var _first = Math.max(0, me.legendItems.findIndex(function (it) { return !it.hecHidden; }));
+                  if (ctx.measureText(_fitted[_first] + _items[_first].tail).width > _roomOf(0)) {
                     if (_ch && _ch._hecTopControlWidth && _ch._hecTopControlWidth()) _reserveFirstLine(); else _setMargins(true);
                   }
                   // (its name shortened, its full name kept: shown in place on a hover or a click
@@ -12060,6 +12065,8 @@
                   me.legendItems.forEach(function (it, k) { it.hecFullText = it.text; it.text = _fitted[k]; });
                 }
                 helpers.each(me.legendItems, function (legendItem, i) {
+                  // (fork) a label not shown: no room, its hit box out of reach
+                  if (legendItem.hecHidden) { hitboxes[i] = { left: -1e6, top: -1e6, width: 0, height: 0 }; return; }
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
                   var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
@@ -12254,6 +12261,7 @@
 
               var itemHeight = fontSize + labelOpts.padding;
               helpers.each(me.legendItems, function (legendItem, i) {
+                if (legendItem.hecHidden) return;
                 var textWidth = ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
                 var width = boxWidth + fontSize / 2 + textWidth;
                 var x = cursor.x;

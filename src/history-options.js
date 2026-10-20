@@ -81,6 +81,16 @@ const OPTION_SYNONYMS = {
     pointsPerHour    : ['points_per_hour'],
     aggregateFunc    : ['aggregate_func'],
     groupBy          : ['group_by'],
+    yminRight        : ['lower_bound_secondary'],
+    ymaxRight        : ['upper_bound_secondary'],
+    yrange           : ['min_bound_range'],
+    yrangeRight      : ['min_bound_range_secondary'],
+    labelsRight      : ['show_labels_secondary'],
+    valueFactor      : ['value_factor'],
+    stateMap         : ['state_map'],
+    lineColor        : ['line_color'],
+    colorTransition  : ['color_thresholds_transition'],
+    showLine         : ['show_line'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -94,9 +104,56 @@ export const STATS = ['min', 'average', 'max'];
 // A dashMode written as CSS writes dashes and gaps ('10,10', '10 5'): as a list
 const _dashList = v => ( typeof v === 'string' && /^[\d.\s,]+$/.test(v) && /\d/.test(v) ) ? v.trim().split(/[\s,]+/).map(Number) : v;
 
+// A Y axis bound: a number — fixed —, or '~' and a number — soft: the bound, unless the
+// values go past it ({ soft }); else not set
+function _yBound(v)
+{
+    if( typeof v === 'string' && v.trim().startsWith('~') ) {
+        const n = Number(v.trim().slice(1));
+        return isFinite(n) && v.trim().length > 1 ? { soft: n } : undefined;
+    }
+    if( v && typeof v === 'object' && isFinite(v.soft) ) return v;
+    const n = Number(v);
+    return v !== '' && v !== true && v !== false && isFinite(n) ? n : undefined;
+}
+
+// The label of a state of a stateMap (mini-graph-card's state_map — see normalizeOptions):
+// a whole number, the one at that place in the list (the value drawn); else the one of that
+// state; undefined when there's none
+export function stateLabel(map, v)
+{
+    if( !map?.length || v === undefined || v === null ) return undefined;
+    if( typeof v === 'number' ) return map[v]?.label;
+    return map.find(m => m.value === String(v))?.label;
+}
+
+// A number > 0, else not set
+const _positive = v => Number(v) > 0 ? Number(v) : undefined;
+
 // Each option's value in its one form, whatever the user wrote — the rest of the card only
 // ever sees that form
 const OPTION_VALUES = {
+    ymin          : _yBound,
+    ymax          : _yBound,
+    yminRight     : _yBound,
+    ymaxRight     : _yBound,
+    yrange        : _positive,
+    yrangeRight   : _positive,
+    // (the right axis' labels: false hides them; true or hover — mini-graph-card's default,
+    // its labels shown on a hover — shows them)
+    labelsRight   : v => v !== false,
+    logarithmic   : v => v === true,
+    // (a power of ten: an integer)
+    valueFactor   : v => Number.isInteger(Number(v)) ? Number(v) : undefined,
+    // (each state, a text or { value, label }: its value's place in the list is the value
+    // drawn, its label the one shown — the value itself without one)
+    stateMap      : v => Array.isArray(v) ? v.map(x => ( x && typeof x === 'object' ) ? { value: String(x.value), label: String(x.label ?? x.value) }
+                                                                                       : { value: String(x), label: String(x) }) : undefined,
+    // (a color, or a list of them: the entities' colors, in their order)
+    lineColor     : v => ( Array.isArray(v) ? v : [v] ).map(normalizeColor).filter(c => c !== undefined),
+    colorTransition : v => v === 'smooth' || v === 'hard' ? v : undefined,
+    showLine      : v => v !== false,
+    hour24        : v => v === true || v === false ? v : undefined,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
@@ -166,12 +223,14 @@ export function normalizeOptions(o)
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
-    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy'];
+    'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine'];
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
-export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels'];
+export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsRight'];
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its
@@ -193,11 +252,12 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // option means).
 // mini: mini-graph-card's look — no header, toolbar nor selector, each curve's value now
 // and its minimum and maximum over the window, no time labels nor grid, the Y labels inside
-// the plot, thick smooth lines with a fill fading out, a small graph
+// the plot, thick smooth lines with a fill fading out, a small graph, colors of thresholds
+// blended from one to the next
 export const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide' }, showState: true, showStats: ['min', 'max'],
             showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
-            interpolation: 'bspline' },
+            interpolation: 'bspline', colorTransition: 'smooth' },
 };
 
 // The card's configuration, in its one form (see normalizeOptions), with its

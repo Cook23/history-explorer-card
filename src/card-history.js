@@ -441,6 +441,21 @@ export class CardHistory
         return process ? process(sample) : sample;
     }
 
+    // How entity e's states become the values drawn: its process function, then its
+    // stateMap (mini-graph-card's state_map) — a state listed, its place in the list (0, 1,
+    // 2…); any other, unavailable. null: as they are
+    processOf(e)
+    {
+        const _p = this.buildProcessFunction(e?.process);
+        const _map = this.resolveOption(e, 'stateMap');
+        if( !_map?.length ) return _p;
+        return v => {
+            const x = _p ? _p(v) : v;
+            const i = _map.findIndex(m => m.value === String(x));
+            return i >= 0 ? i : 'unavailable';
+        };
+    }
+
     buildProcessFunction(p)
     {
         if( !p ) return null;

@@ -105,6 +105,8 @@ export class HistoryCardState {
         this.pconfig.defaultLineMode      = undefined;
         this.pconfig.defaultInterpolation = 'monotone';
         this.pconfig.cardGraphDefaults    = {};
+        this.pconfig.cardOptions          = {};
+        this.pconfig.hour24               = undefined;
         this.pconfig.cardShow             = {};
         this.pconfig.defaultLineWidth     = undefined;
         this.pconfig.defaultDashMode      = undefined;
@@ -310,6 +312,10 @@ export class HistoryCardState {
 
         if( this._hass.locale?.time_format === '24' ) locale = 'en-GB';
         if( this._hass.locale?.time_format === '12' ) locale = 'en-US';
+        // (mini-graph-card's hour24: the 24-hour clock, or the 12-hour one — not set: Home
+        // Assistant's own setting)
+        if( this.pconfig.hour24 === true ) locale = 'en-GB';
+        if( this.pconfig.hour24 === false ) locale = 'en-US';
 
         this.i18n.styleTimeTicks = getLocalizedDateString(locale, { timeStyle: 'short' });
         this.i18n.styleTimeTooltip = getLocalizedDateString(locale, { timeStyle: 'medium' });

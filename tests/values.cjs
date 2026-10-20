@@ -83,6 +83,21 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── One mean: the average over a graph and a group's point, over the same day ──
+    // (yesterday, from midnight to midnight: a group of a day — groupBy: date — and the
+    // window are the same time; both means are weighted by how long each value lasted)
+    t = await openCard(card({ defaultTimeOffset: '1D', groupBy: 'date', rounding: 4, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showStats: ['average'] }] }] }),
+        { mock: { series: true }, height: 700 });
+    await t.wait(1500);
+    await t.E(`el.querySelector('#b1_0').click()`); await t.wait(1500);
+    await t.step('the average shown over a graph and the point of a day\'s group are the same mean', async () => {
+        const r = await t.E(`(()=>{ const i=el.instance, s=new Date(i.startTime).getTime(), e=new Date(i.endTime).getTime();
+            const p=i.graphs[0].chart.data.datasets[0].data.find(p=>p.columnFrom===s && p.columnTo===e); return { y: p?.y, s, e }; })()`);
+        const avg = num((await values(t)).stats[0], 'average');
+        return r.y !== undefined && Math.abs(r.y - avg) < 0.001 ? true : JSON.stringify({ point: r, average: avg });
+    });
+    done(await t.close());
+
     // ── The grid, the Y labels, the fill ──
     t = await openCard(card({ graphs: [{ type: 'line', showGrid: false, yLabels: 'inside', entities: [{ entity: 'sensor.rain', fill: 'fade' }, { entity: 'sensor.power' }] }] }), { mock: { series: true }, height: 700 });
     await t.wait(1500);

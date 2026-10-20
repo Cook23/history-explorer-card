@@ -55,6 +55,13 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
   means something else on each side is a conflict to settle once for all, not by the look.
   If it has to change an aspect no parameter sets, a parameter is missing: add it to the
   card (usable without `look`), and `look: mini` only gives its default.
+- **`look: mini` is never necessary (set by the user).** It switches every default at once,
+  nothing more: the same card is obtained without it by setting each YAML option concerned,
+  one by one. That is the logic of this compatibility: history-explorer-card is enriched
+  with what it lacks (a parameter of its own), and `look: mini` is only a shortcut to
+  mini-graph-card's defaults. No code reads `look` but `withLook` (history-options.js), which
+  only merges `LOOKS.mini` under the card's own options; every key of `LOOKS.mini` is an
+  option of the card, documented.
 - **A mini-graph-card function this card lacks is added to it**, mini-graph-card's code
   (MIT) taken as the example, and becomes a function of this card like any other: in its
   part, through its contracts, documented, tested, usable in this card's own syntax too.

@@ -110,6 +110,10 @@ export class CardConfig
         P.defaultShowPoints =      c.showPoints;
         P.defaultYAxis =           c.yAxis;
         P.tapAction =              c.tapAction;
+        // (options of every curve an entity, its graph or entityOptions can set their own —
+        // see resolveOption; hour24, the card's)
+        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine'].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
             ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
@@ -217,6 +221,29 @@ export class CardConfig
             ?? this.pconfig.graphs[e?.groupId]?.interpolation
             ?? this.getEntityOptions(e?.entity)?.interpolation
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
+    }
+
+    // Option k of entity e: its own, else its graph's, else entityOptions', else the card's
+    // (P.cardOptions) — resolved when used, never copied onto the entity: a curve moved to
+    // another graph takes that graph's
+    resolveOption(e, k)
+    {
+        return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k];
+    }
+
+    // The factor entity e's values are drawn with: its scale, times 10 to the power of its
+    // valueFactor (mini-graph-card's value_factor — a factor shown too: see shownScaleOf)
+    drawScaleOf(e)
+    {
+        return ( e?.scale ?? 1 ) * 10 ** ( this.resolveOption(e, 'valueFactor') ?? 0 );
+    }
+
+    // The factor between entity e's value and the value shown (legend, tooltip, values over
+    // the graph): with its own `unit`, its scale — a conversion —, else 1 (the scale only
+    // changes how it's drawn); times 10 to the power of its valueFactor either way
+    shownScaleOf(e)
+    {
+        return ( e?.unit !== undefined ? ( e?.scale ?? 1 ) : 1 ) * 10 ** ( this.resolveOption(e, 'valueFactor') ?? 0 );
     }
 
     // How an entity's values are grouped into points (mini-graph-card's aggregation):
@@ -357,6 +384,17 @@ export class CardConfig
             pointsPerHour     : ent.pointsPerHour,
             aggregateFunc     : ent.aggregateFunc,
             groupBy           : ent.groupBy,
+            yminRight         : ent.yminRight,
+            ymaxRight         : ent.ymaxRight,
+            yrange            : ent.yrange,
+            yrangeRight       : ent.yrangeRight,
+            logarithmic       : ent.logarithmic,
+            labelsRight       : ent.labelsRight,
+            valueFactor       : ent.valueFactor,
+            stateMap          : ent.stateMap,
+            colorTransition   : ent.colorTransition,
+            showLine          : ent.showLine,
+            legendVisible     : ent.legendVisible,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
         };
@@ -367,9 +405,13 @@ export class CardConfig
     // bar) — then `graphs` (undefined when there's none)
     yamlGraphs(config)
     {
-        if( !Array.isArray(config?.entities) || !config.entities.length ) return config?.graphs;
+        // (the card's line_color: every graph's, unless it sets its own)
+        const _lc = config?.lineColor ?? config?.line_color;
+        const _withColors = gs => _lc === undefined || !Array.isArray(gs) ? gs
+            : gs.map(g => g && typeof g === 'object' && g.lineColor === undefined && g.line_color === undefined && g.options?.lineColor === undefined && g.options?.line_color === undefined ? { ...g, lineColor: _lc } : g);
+        if( !Array.isArray(config?.entities) || !config.entities.length ) return _withColors(config?.graphs);
         const _own = { type: config.show_graph === 'bar' ? 'bar' : 'line', title: config.name, entities: config.entities };
-        return [_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )];
+        return _withColors([_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )]);
     }
 
     // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
@@ -409,7 +451,14 @@ export class CardConfig
             // way: the same sensor's max, min and mean, each its aggregate_func; in the YAML
             // only, the card's own gestures never put a curve twice in a graph) —: a second
             // curve of it (its copy number — see keyOf)
+            // (mini-graph-card's line_color: the graph's, else the card's — see yamlGraphs —, a
+            // color or a list of them: each entity without its own color takes the one at its
+            // place in the graph)
+            const _lineColor = _opts.lineColor;
+            let _place = 0;
             const _addStatic = (id, ent) => {
+                if( ent.color === undefined && ent.color_thresholds === undefined && _lineColor?.[_place] !== undefined ) ent = { ...ent, color: _lineColor[_place] };
+                _place++;
                 const _entry = this._makeStaticEntityEntry(id, _groupId, ent, _interval);
                 const _copy = this.store.newCopy(id);
                 if( _copy ) _entry.copy = _copy;
@@ -485,6 +534,16 @@ export class CardConfig
                 pointsPerHour  : _opts.pointsPerHour,
                 aggregateFunc  : _opts.aggregateFunc,
                 groupBy        : _opts.groupBy,
+                yminRight      : _opts.yminRight,
+                ymaxRight      : _opts.ymaxRight,
+                yrange         : _opts.yrange,
+                yrangeRight    : _opts.yrangeRight,
+                logarithmic    : _opts.logarithmic,
+                labelsRight    : _opts.labelsRight,
+                valueFactor    : _opts.valueFactor,
+                stateMap       : _opts.stateMap,
+                colorTransition: _opts.colorTransition,
+                showLine       : _opts.showLine,
             };
         }
     }
