@@ -188,17 +188,19 @@ Decided by the user about the silence detection:
 
 | card 1.2 | lowpass_dt |
 |---|---|
-| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`; `card-datasets.js` `circularPeriodOf` | `attributes.py` |
+| `history-series.js`: `attributeValue`, `_seriesValue`, `attributeUnitOf`, `WEATHER_UNITS`, `DOMAIN_UNITS`, `TEMPERATURE_ATTRIBUTES`, `isDirectionAttribute`, `attributeAt`, `_leafName`, `attributeLabel`; `card-datasets.js` `circularPeriodOf` | `attributes.py` |
 
 - An attribute's unit: the one its value holds (`45 %`), else Home Assistant frontend's tables
   (weather units, units by domain, temperatures in the system unit; a light's `brightness`
   and a media player's `volume_level` converted into %), else an `X_unit` attribute for every
   attribute with `X` in its name; `X_unit` attributes are units, never series.
 - A weather entity's `wind_bearing` is in `°` (Home Assistant gives no unit).
-- A sub-attribute (a path: `forecast.0.temperature`, each level's key or index — read by the
-  card, not by lowpass_dt): its unit and whether it's a direction from its last name that
-  isn't an index (`temperature`). lowpass_dt reading sub-attributes one day would take the
-  same rule.
+- Sub-attributes: the attribute is a path, read level by level — the key in a dictionary, the
+  index in a list (`forecast.0.temperature`); an attribute whose own name holds a dot is taken
+  as is. Its unit, classes and whether it is a direction come from its last name that is not
+  an index (`temperature`); its label shows each level, joined by ` › `. (here
+  `history-series.js` `attributeAt`, `_leafName`, `attributeLabel`; lowpass_dt `attributes.py`
+  `attribute_at`, `_leaf_name`, `attribute_label`.)
 - Automatic `circular` for an attribute: `measurement_angle`, or a unit of `°` only when the
   attribute's name is a direction (`bearing|direction|azimuth|heading|(^|_)yaw|wind_?dir`);
   the sun's `elevation` is not circular. An entity's own state keeps rule 1.
