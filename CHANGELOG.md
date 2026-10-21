@@ -4,12 +4,6 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.39] - 2026-10-21
-
-### Fixed — the range's name shortened with room for it
-- The toolbar shortened the date and the range's name together as soon as the long date and the whole range didn't fit side by side — the range cut (`1 Jou`) though the short date left it room. They're shortened one after the other: the date first, the range's name only once the short date and the whole range still don't fit (back to a longer form only once it clearly fits, as before) (`resizeSelector`)
-- Test (`features`): a French card narrowed from 700 to 300 px — the short date with the whole range in between, the range shortened last
-
 ## [v1.2.38] - 2026-10-21
 
 ### Changed — the color picker in the middle of the screen
@@ -33,6 +27,10 @@ Changelog for the HA History Explorer Card.
 
 ### Fixed — the color picker at the page's top left the first time
 - The picker's field, created on the first use, was asked to open its picker before it had a place on the page: Chrome opened it at the page's top left. It's opened once laid out, at the next frame — the calendar's too (`openNativePicker`)
+
+### Fixed — the range's name shortened with room for it
+- The toolbar shortened the date and the range's name together as soon as the long date and the whole range didn't fit side by side — the range cut (`1 Jou`) though the short date left it room. They're shortened one after the other: the date first, the range's name only once the short date and the whole range still don't fit (back to a longer form only once it clearly fits, as before) (`resizeSelector`)
+- Test (`features`): a French card narrowed from 700 to 300 px — the short date with the whole range in between, the range shortened last
 
 ## [v1.2.37] - 2026-10-21
 
