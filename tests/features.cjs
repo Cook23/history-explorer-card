@@ -340,9 +340,9 @@ module.exports = async function()
         const gap = await t.E(`(C => Math.max(C.hecGestures('mouse').slop, C.hecGestures('touch').slop))(graphAt(0).chart.constructor)`);
         return shown === hidden && r.chainLeft >= r.box + gap ? true : JSON.stringify({ shown, hidden, gap, r });
     });
-    await t.step('a narrow card: the handle, the padlock and the chain icon in boxes as opaque as the Y labels\', over the legend or the rows, which keep no room for them; wider: half see-through boxes, beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept; wide again: as before', async () => {
+    await t.step('a narrow card: the handle, the padlock and the chain icon in boxes as opaque as the Y labels\', over the legend or the rows, which keep no room for them; wider: half see-through boxes, beside the legend\'s first line, the room they need, the Y axis\' unit and labels kept, a timeline\'s first row at its top, the handle over it; wide again: as before', async () => {
         const wide = await controlsAt(1000), narrow = await controlsAt(168), back = await controlsAt(1000);
-        return wide.boxes === 'true,true,true' && wide.chainColor === wide.boxColor && wide.boxColor !== narrow.boxColor && wide.legendLeft === wide.boxRight + 4 && wide.timelineTop >= 24 && wide.unit && wide.yColumn > 40
+        return wide.boxes === 'true,true,true' && wide.chainColor === wide.boxColor && wide.boxColor !== narrow.boxColor && wide.legendLeft === wide.boxRight + 4 && wide.timelineTop < 10 && wide.unit && wide.yColumn > 40
             && narrow.boxes === 'true,true,true' && /^rgba\(.*, 0\.8\)$/.test(narrow.boxColor) && narrow.chainColor === narrow.boxColor
             && narrow.legendLeft === 4 && narrow.firstLabel < wide.firstLabel && narrow.firstTop < 12 && narrow.timelineTop < 10 && !narrow.unit
             && JSON.stringify(back) === JSON.stringify(wide) ? true : JSON.stringify({ wide, narrow, back });
@@ -379,11 +379,28 @@ module.exports = async function()
         return top < 28 && !l0 && l1 && none !== 'lockAndHandle' && lockOnly === '16px 17px 8.5px' && chain === '16px 17px' && both === '27px 17px 8.5px'
             ? true : JSON.stringify({ top, l0, l1, none, both, lockOnly, chain });
     });
+    await t.step('the padlock open and green while the Y axis follows the curves, closed and red once locked (the theme\'s colors); the handle in the text\'s color, not faded', async () => {
+        const look = () => t.E(`(()=>{ const c=graphAt(0).chart, p=c._hecLockIconEl.querySelector('path'), h=c._hecMoveHandleIconEl;
+            return { locked: !!c._hecYAxisLock, d: p.getAttribute('d').slice(0, 12), fill: p.getAttribute('fill'), opacity: getComputedStyle(c._hecLockIconEl).opacity,
+                     handle: getComputedStyle(h).opacity + ' ' + h.querySelector('svg').getAttribute('fill') }; })()`);
+        const p = await t.E('lockPt(0)'), first = await look();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400); const second = await look();
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const [open, closed] = first.locked ? [second, first] : [first, second];
+        const ok = !open.locked && closed.locked && /success-color/.test(open.fill) && /error-color/.test(closed.fill) && open.d !== closed.d && open.opacity === '1' && closed.opacity === '1'
+            && open.handle === '1 var(--primary-text-color)';
+        return ok ? true : JSON.stringify({ open, closed });
+    });
+    await t.step('a legend label\'s dot filled as its curve: with showMinMax, its band\'s color (30 %); with fill: fade, the fill color it kept; with fill, its fill; else empty', async () => {
+        const r = await t.E(`(()=>{ const C=graphAt(0).chart.constructor, f=(d,fill)=>C.hecLegendFill(d, 'rgb(10,20,30)', fill);
+            return [f({ showMinMax: true }, 'rgba(0,0,0,0)'), f({ hecFillFade: true, hecFillColor: 'rgba(10, 20, 30, 0.15)' }, {}), f({}, 'rgba(1,2,3,0.15)'), f({}, 'rgba(0,0,0,0)')].join(' | '); })()`);
+        return r === 'rgba(10, 20, 30, 0.3) | rgba(10, 20, 30, 0.15) | rgba(1,2,3,0.15) | rgba(0,0,0,0)' ? true : r;
+    });
     await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it removes the graph', async () => {
         await controlsAt(1000);
         await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
         const look = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, e=c._hecCloseButtonEl, s=e&&getComputedStyle(e), r=c._hecCloseButtonRect(), cr=c.canvas.getBoundingClientRect(), er=e.getBoundingClientRect();
-            return { yaml: g.slice(0,-1).map(x=>!!x.chart._hecCloseButtonRect()||!!(x.chart._hecCloseButtonEl&&x.chart._hecCloseButtonEl.style.display!=='none')).join(), text: e.querySelector('svg path') ? '×' : e.textContent, box: s.width+' '+s.height+' '+s.borderRadius,
+            return { yaml: g.slice(0,-1).map(x=>!!x.chart._hecCloseButtonRect()||!!(x.chart._hecCloseButtonEl&&x.chart._hecCloseButtonEl.style.display!=='none')).join(), text: e.querySelector('svg path') ? '×' : e.textContent, symbol: (r => r.width+'x'+r.height)(e.querySelector('svg').getBoundingClientRect()), box: s.width+' '+s.height+' '+s.borderRadius,
                      right: Math.round(cr.right-er.right), edge: (C => Math.max(C.hecGestures('mouse').slop, C.hecGestures('touch').slop) / 2)(c.constructor), top: Math.round(er.top-cr.top), margin: c.legend.rightMargin, zone: c._hecTopTargetAt(r.x+12, r.y+12), old: !!el.querySelector('[id^="bc-"]') }; })()`);
         const wide = await look();
         await controlsAt(168); const narrow = await look(); await controlsAt(1000);
@@ -391,7 +408,7 @@ module.exports = async function()
         const n0 = await t.E('el.instance.graphs.length');
         await t.page.mouse.click(p.x, p.y); await t.wait(1200);
         const n1 = await t.E('el.instance.graphs.length'), stored = await t.E(`el.instance.store.has('sensor.wind_rad')`);
-        return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '16px 17px 8.5px' && wide.right === wide.edge && wide.top === 3 && wide.margin === 16 + wide.edge + 4 && wide.zone === 'closeButton' && !wide.old
+        return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '16px 17px 8.5px' && wide.symbol === '8x8' && wide.right === wide.edge && wide.top === 3 && wide.margin === 16 + wide.edge + 4 && wide.zone === 'closeButton' && !wide.old
             && narrow.margin === 4 && narrow.zone === 'closeButton' && n1 === n0 - 1 && !stored ? true : JSON.stringify({ wide, narrow, n0, n1, stored });
     });
     await t.step('the legend\'s first line never left empty: its first label, value included, too wide beside the controls — a shorter form there', async () => {
@@ -516,11 +533,12 @@ module.exports = async function()
     });
 
     // ── The band's color: the line's, at opacity 0.3 — a gradient where the line's color varies ──
-    // (each fill of the band: its fill style and opacity, from a draw with the band less one without)
+    // (each fill of the band: its fill style and opacity, from a draw with the band less one without
+    // — the legend's dot, filled in the band's color at full opacity, left out)
     const bandFills = tb => tb.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], ctx=c.ctx; const rec=()=>{ const out=[]; const f=ctx.fill;
             ctx.fill=function(){ out.push({ style: typeof ctx.fillStyle==='string' ? ctx.fillStyle : 'gradient', alpha: ctx.globalAlpha }); return f.apply(this,arguments); }; c.draw(); ctx.fill=f; return out; };
         const on=rec(); ds.showMinMax=false; const off=rec(); ds.showMinMax=true;
-        return on.filter(x=>!off.some(y=>y.style===x.style && y.alpha===x.alpha)); })()`);
+        return on.filter(x=>x.alpha!==1 && !off.some(y=>y.style===x.style && y.alpha===x.alpha)); })()`);
     let tb = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', color: '#ff0000', showMinMax: true }] }] }),
         { mock: { series: true, historyStep: 60 } });
     await tb.wait(2500);
@@ -760,7 +778,7 @@ module.exports = async function()
         const ws = await t.E('__ws'), d1 = (await t.E('datasets(0)'))[0];
         const h = ws.filter(w => w.type === 'history/history_during_period'), st = ws.filter(w => w.type === 'recorder/statistics_during_period');
         const today = Date.parse(await t.E('el.instance.cache[el.instance.cache.length-1].start'));
-        const ok = d0.x1 >= Date.now() - 5 * 60e3 && d1.x1 >= Date.now() - 5 * 60e3 && h.length === 1 && Date.parse(h[0].start) >= Date.now() - 25 * 60e3
+        const ok = d0.x1 >= Date.now() - 5 * 60e3 && d1.x1 >= Date.now() - 5 * 60e3 && h.length >= 1 && h.every(w => Date.parse(w.start) >= Date.now() - 25 * 60e3)
             && st.length >= 1 && st.every(w => Date.parse(w.start) >= today);
         return ok ? true : JSON.stringify({ d0, d1, ws });
     });

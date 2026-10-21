@@ -11853,12 +11853,11 @@
                                   * @param fontSize {Number} the label font size
                                   * @return {Number} width of the color box area
                                   */
-        // (fork) a point style: a dot as wide as the text's x-height (0.7 × the font size) — it
-        // took 1.4 × the font size, and a ring as thick as the line around it
+        // (fork) a point style: a dot LEGEND_DOT × the font size across, ringed and filled (see
+        // drawLegendBox)
+        var LEGEND_DOT = 0.9;
         function getBoxWidth(labelOpts, fontSize) {
-          return labelOpts.usePointStyle ?
-          fontSize * 0.7 :
-          labelOpts.boxWidth;
+          return labelOpts.usePointStyle ? fontSize * LEGEND_DOT : labelOpts.boxWidth;
         }
 
         Chart.Legend = Element.extend({
@@ -12221,13 +12220,19 @@
                 }
 
                 if (opts.labels && opts.labels.usePointStyle) {
-                  // (fork) a dot of the curve's color, filled, its diameter boxWidth (0.7 × the font
-                  // size), centred on the text's middle — no ring
-                  var radius = boxWidth / 2;
-                  ctx.fillStyle = valueOrDefault(legendItem.strokeStyle, ctx.fillStyle);
-                  ctx.lineWidth = 0;
-                  ctx.strokeStyle = 'rgba(0,0,0,0)';
-                  helpers.canvas.drawPoint(ctx, legendItem.pointStyle, radius, x + radius, y + fontSize / 2);
+                  // (fork) a dot boxWidth across, centred on the capitals' middle (the text is
+                  // drawn on its middle line, below which capitals reach less than above):
+                  // ringed in the curve's color, 2 px (a curve's default width), filled as the
+                  // curve is (Chart.hecLegendFill: its min/max band, or its fill; else nothing)
+                  var radius = boxWidth / 2, _cap = ctx.measureText('H');
+                  var _cy = y + fontSize / 2 + ((_cap.actualBoundingBoxDescent || 0) - (_cap.actualBoundingBoxAscent || 0)) / 2;
+                  ctx.setLineDash([]);
+                  ctx.lineWidth = 2;
+                  ctx.fillStyle = Chart.hecLegendFill(me.chart.data.datasets[legendItem.datasetIndex] || {}, legendItem.strokeStyle, legendItem.fillStyle) || 'rgba(0,0,0,0)';
+                  ctx.beginPath();
+                  ctx.arc(x + radius, _cy, radius - 1, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.stroke();
                 } else {
                   // Draw box as legend symbol
                   if (!isLineWidthZero) {

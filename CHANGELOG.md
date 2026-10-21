@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.32] - 2026-10-21
+
+### Changed — the padlock open in green or closed in red, the handle not greyed, a smaller ×
+- The padlock: closed and red (`--error-color`) while the Y axis is locked, open and green (`--success-color`) while its range follows the curves — Home Assistant's theme colors (Material Design's lock and lock-open, the same body: the same bounds, the same place). It was the closed padlock, faded to 30 % while unlocked: it looked like a control that was off (`_hecUpdateYAxisState`, `LOCK_PATHS`)
+- The handle's six dots in the text's color — they were faded, in the secondary text's color
+- The close button's ×: 8×8 px instead of 10×11, stroke 1.5 — the same weight as the other symbols; its box unchanged (16×17 px, as the others')
+
+### Changed — the legend's dots ringed, filled as their curve
+- A legend label's dot: 0.9 × the label's font size across, as tall as its capitals, centred on their middle (0.7 before, on the font size's middle), ringed 2 px in its curve's color (a curve's default width), filled as the curve is — with `showMinMax`, its band's color (its line's at 30 %); else with `fill`, its fill (15 %: `fill: true`, `fill: fade`); empty otherwise. It was a disc of the curve's color (`getBoxWidth`, `drawLegendBox`, `Chart.hecLegendFill`)
+
+### Changed — a timeline's and an arrowline's rows from their top
+- A timeline or an arrowline kept 24 px above its rows for its handle on a card wider than 300 px. Its rows start at its top; the handle is over the first row's label, in its half see-through box, as the floating icons everywhere (`_controlsRoom` removed)
+
+### Changed — the cut mode's buttons on the controls' line
+- The buttons shown over the lock+handle zone in the cut mode (↓ 📋 ↑, `handleButtons`) kept the geometry of the 24 px boxes (28 px high, picked from 4 to 24 px): on the zone's box now, as the icons they replace (`CTRL_TOP`, `CTRL_H`)
+
+### Changed — code review
+- `card-history.js`: the statistics, the 5-minute statistics and the history after them asked by one function (`_askRows`, `_askedFor`); a day's start written by one (`dayAfter`)
+- `history-csv-exporter.js`: the history and the statistics exports share a base class (the entities, the spinner, the file saved, a failure)
+- `card-datasets.js`, `card-values.js`: times in ms by `msOf`, as elsewhere
+- A fading fill (`fill: fade`) given its fill color (15 %) by the card, as `fill: true`: the legend's dot takes it — no transparency of its own in `chart-hec.js`
+- `chart-hec.js`: comments with the controls' old sizes, the gestures' old thresholds and a person's name rewritten — what the code does and why
+- Tests: a timeline's row label clicked near its right end, clear of the handle (`tlPt`)
+
 ## [v1.2.31] - 2026-10-20
 
 ### Changed — the history only after the 5-minute statistics

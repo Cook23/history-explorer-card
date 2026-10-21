@@ -43,7 +43,7 @@ export class CardDatasets
         if( !_ce ) return _spec && !_spec.color ? (t, v) => colorForValue(_spec, v) : null;
         // The color entity's states over time, each read once (the calls come in increasing
         // time): thresholds compare them; else each holds a color value
-        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: moment(p.last_changed).valueOf(), state: p.state,
+        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: msOf(p.last_changed), state: p.state,
             spec: _spec ? null : parseColorValue(p.state) }));
         let k = -1;
         return (t, v) => {
@@ -91,7 +91,7 @@ export class CardDatasets
             ds.colorSteps = undefined;
             ds.hecValueGradient = _spec.thresholds.map(([k, c]) => ({ value: k * _f, color: c, fill: this._fillLike(c, fill) }));
             ds.pointBackgroundColor = s.map(pt => blendedColorForValue(_spec, pt.y / _f) ?? e.paletteColor);
-            const _now = Date.now(), _last = [...s].reverse().find(pt => moment(pt.x).valueOf() <= _now) ?? s[0];
+            const _now = Date.now(), _last = [...s].reverse().find(pt => msOf(pt.x) <= _now) ?? s[0];
             const _current = _last ? blendedColorForValue(_spec, _last.y / _f) : undefined;
             if( _current ) {
                 ds.borderColor = _current;
@@ -103,7 +103,7 @@ export class CardDatasets
         const _now = Date.now();
         let _prev, _current;
         for( const pt of s ) {
-            const t = moment(pt.x).valueOf();
+            const t = msOf(pt.x);
             const c = colorFn(t, scale ? pt.y / scale : pt.y) ?? e.paletteColor;
             if( c !== _prev ) _steps.push({ x: t, borderColor: c, backgroundColor: this._fillLike(c, fill) });
             _prev = c;

@@ -27,28 +27,86 @@ function escapeSeperator(sep, state)
 
 
 // --------------------------------------------------------------------------------------
-// Export CSV : history DB
+// What both exports share: the entities shown (an attribute's curve: its entity), the
+// spinner while Home Assistant answers, the file saved — each export its own request
+// (_request) and its own lines (exportCallback)
 // --------------------------------------------------------------------------------------
 
-export class HistoryCSVExporter {
+class CSVExporter {
 
-    constructor() 
+    constructor()
     {
         this.overlay = null;
         this.separator = undefined;
         this.timeFormat = undefined;
-        this.saveAttributes = undefined;
-        this._hass = null;
+    }
+
+    exportFile(cardstate)
+    {
+        this.separator = cardstate.pconfig.exportSeparator ?? ',';
+        this.timeFormat = cardstate.pconfig.exportTimeFormat ?? 'YYYY-MM-DD HH:mm:ss';
+        this.numberLocale = cardstate.pconfig.exportNumberLocale;
+
+        const t0 = cardstate.startTime.replace('+', '%2b');
+        const t1 = cardstate.endTime.replace('+', '%2b');
+        const l = [];
+        for( const g of cardstate.graphs )
+            for( const e of g.entities ) {
+                const _id = seriesOf(e.entity).entity;
+                if( !l.includes(_id) ) l.push(_id);
+            }
+        if( !l.length ) return;
+
+        this.overlay = cardstate.ui.spinOverlay;
+        document.body.appendChild(this.overlay);
+        this._request(cardstate, l, t0, t1).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
+    }
+
+    // The numbers' format (exportNumberLocale), or null: as they are
+    numberFormat()
+    {
+        return this.numberLocale ? new Intl.NumberFormat(this.numberLocale, { maximumSignificantDigits: 20 }) : null;
+    }
+
+    // The file saved, its lines data; the spinner removed
+    save(data)
+    {
+        const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
+        document.body.removeChild(this.overlay);
+        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH:mm:ss') + ".csv");
+    }
+
+    exportFailed(error)
+    {
+        document.body.removeChild(this.overlay);
+        console.log(error);
+    }
+
+}
+
+
+// --------------------------------------------------------------------------------------
+// Export CSV : history DB
+// --------------------------------------------------------------------------------------
+
+export class HistoryCSVExporter extends CSVExporter {
+
+    exportFile(cardstate)
+    {
+        this.saveAttributes = cardstate.pconfig.exportAttributes;
+        this._hass = cardstate._hass;
+        super.exportFile(cardstate);
+    }
+
+    _request(cardstate, l, t0, t1)
+    {
+        return cardstate._hass.callWS(cardstate.historyRequest(l, t0, t1, this.saveAttributes));
     }
 
     exportCallback(result)
-    { 
-        let data = [];
+    {
+        const data = [], nf = this.numberFormat();
         let attributes = [];
-        let nf = null;
-
-        if( this.numberLocale ) 
-            nf = new Intl.NumberFormat(this.numberLocale, { maximumSignificantDigits: 20 });
 
         data.push(`Time stamp${this.separator}State\r\n`);
 
@@ -89,52 +147,7 @@ export class HistoryCSVExporter {
 
         }
 
-        const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
-
-        document.body.removeChild(this.overlay);
-
-        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH:mm:ss') + ".csv");
-    }
-
-    exportFailed(error) 
-    {
-        document.body.removeChild(this.overlay);
-
-        console.log(error);
-    }
-
-    exportFile(cardstate)
-    {
-        this.separator = cardstate.pconfig.exportSeparator ?? ',';
-        this.timeFormat = cardstate.pconfig.exportTimeFormat ?? 'YYYY-MM-DD HH:mm:ss';
-        this.saveAttributes = cardstate.pconfig.exportAttributes;
-        this.numberLocale = cardstate.pconfig.exportNumberLocale;
-
-        this._hass = cardstate._hass;
-
-        let n = 0;
-
-        let t0 = cardstate.startTime.replace('+', '%2b');
-        let t1 = cardstate.endTime.replace('+', '%2b');
-        // (an attribute's curve: its entity exported, with its attributes when asked)
-        let l = [];
-        for( let g of cardstate.graphs ) {
-            for( let e of g.entities ) {
-                const _id = seriesOf(e.entity).entity;
-                if( !l.includes(_id) ) l.push(_id);
-                n++;
-            }
-        }
-
-        if( n > 0 ) {
-
-            this.overlay = cardstate.ui.spinOverlay;
-            document.body.appendChild(this.overlay);
-
-            // Issue history retrieval call
-            cardstate._hass.callWS(cardstate.historyRequest(l, t0, t1, this.saveAttributes)).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
-
-        }
+        this.save(data);
     }
 
 }
@@ -144,22 +157,16 @@ export class HistoryCSVExporter {
 // Export CSV : statistics DB
 // --------------------------------------------------------------------------------------
 
-export class StatisticsCSVExporter {
+export class StatisticsCSVExporter extends CSVExporter {
 
-    constructor() 
+    _request(cardstate, l, t0, t1)
     {
-        this.overlay = null;
-        this.separator = undefined;
-        this.timeFormat = undefined;
+        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod ?? 'hour'));
     }
 
     exportCallback(result)
-    { 
-        let data = [];
-        let nf = null;
-
-        if( this.numberLocale ) 
-            nf = new Intl.NumberFormat(this.numberLocale, { maximumSignificantDigits: 20 });
+    {
+        const data = [], nf = this.numberFormat();
 
         data.push(`Time stamp${this.separator}State${this.separator}Mean${this.separator}Min${this.separator}Max\r\n`);
 
@@ -169,64 +176,12 @@ export class StatisticsCSVExporter {
             data.push(entity + "\r\n");
             for( let e of r ) {
                 const t = moment(e.start).format(this.timeFormat);
-
-                let state = e.state ? localizeNumber(e.state, nf) : '';
-                let smean = e['mean'] ? localizeNumber(e['mean'], nf) : '';
-                let smin = e['min'] ? localizeNumber(e['min'], nf) : '';
-                let smax = e['max'] ? localizeNumber(e['max'], nf) : '';
-
-                state = escapeSeperator(this.separator, state);
-                smean = escapeSeperator(this.separator, smean);
-                smin = escapeSeperator(this.separator, smin);
-                smax = escapeSeperator(this.separator, smax);
-
-                data.push(t + this.separator + state + this.separator + smean + this.separator + smin + this.separator + smax + "\r\n");
+                const _cell = x => escapeSeperator(this.separator, x ? localizeNumber(x, nf) : '');
+                data.push(t + this.separator + [e.state, e.mean, e.min, e.max].map(_cell).join(this.separator) + "\r\n");
             }
         }
 
-        const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
-
-        document.body.removeChild(this.overlay);
-
-        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH:mm:ss') + ".csv");
-    }
-
-    exportFailed(error) 
-    {
-        document.body.removeChild(this.overlay);
-
-        console.log(error);
-    }
-
-    exportFile(cardstate)
-    {
-        this.separator = cardstate.pconfig.exportSeparator ?? ',';
-        this.timeFormat = cardstate.pconfig.exportTimeFormat ?? 'YYYY-MM-DD HH:mm:ss';
-        this.numberLocale = cardstate.pconfig.exportNumberLocale;
-
-        let n = 0;
-
-        let t0 = cardstate.startTime.replace('+', '%2b');
-        let t1 = cardstate.endTime.replace('+', '%2b');
-        // (an attribute's curve: its entity exported, with its attributes when asked)
-        let l = [];
-        for( let g of cardstate.graphs ) {
-            for( let e of g.entities ) {
-                const _id = seriesOf(e.entity).entity;
-                if( !l.includes(_id) ) l.push(_id);
-                n++;
-            }
-        }
-
-        if( n > 0 ) {
-
-            this.overlay = cardstate.ui.spinOverlay;
-            document.body.appendChild(this.overlay);
-
-            // Issue statistics retrieval call
-            cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod ?? 'hour')).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
-
-        }
+        this.save(data);
     }
 
 }

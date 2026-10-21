@@ -74,7 +74,7 @@ export class CardValues
         // (its curve's color — or with stateAdaptiveColor: false, the text's)
         const _curveColor = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
         const _color = x => this.resolveOption(x.e, 'stateAdaptiveColor') === false ? 'var(--primary-text-color)' : _curveColor(x);
-        const t0 = moment(this.startTime).valueOf(), t1 = Math.min(moment(this.endTime).valueOf(), Date.now());
+        const t0 = msOf(this.startTime), t1 = Math.min(msOf(this.endTime), Date.now());
         // (a time as the time axis writes it — the card's clock: hour24, else Home Assistant's)
         const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? this.i18n.styleTimeTicks : this.i18n.styleDateTicks + ', ' + this.i18n.styleTimeTicks);
         const states = _states.map(x => {
@@ -97,7 +97,7 @@ export class CardValues
         const format = (j, y, x) => {
             const d = g.chart.data.datasets[j], p = d?.circularPeriod;
             const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
-            return { text: this._roundedValue(v, d), unit: d?.unit ?? '', time: _time(moment(x).valueOf()) };
+            return { text: this._roundedValue(v, d), unit: d?.unit ?? '', time: _time(msOf(x)) };
         };
         // (the icon with them, alignIcon: state; their place, alignState; their size, fontSize
         // — mini-graph-card's)

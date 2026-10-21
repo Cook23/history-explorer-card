@@ -11,6 +11,9 @@ const PERIOD_MS = { '5minute': 300e3, hour: 3600e3, day: 86400e3, week: 7 * 8640
 // Home Assistant's short-term statistics: every 5 minutes, kept as long as the history
 // (recorder purge_keep_days) — what it returns is taken, nothing assumed
 const FINE_PERIOD = '5minute';
+// The start of the day n days after day d (a date or a slot's start), as a cache slot's
+// bounds are written: local time, "YYYY-MM-DDT00:00:00"
+const dayAfter = (d, n) => moment(d).add(n, "day").format("YYYY-MM-DD") + "T00:00:00";
 // Where each kind of request goes in a cache slot: the history of whole days, the history
 // after the statistics (tail), the 5-minute statistics, the statistics of the period
 const LAYER = { stats: 'stats', fine: 'fine', tail: 'tail', history: 'hist' };
@@ -43,11 +46,10 @@ export class CardHistory
 
     initCache()
     {
-        let d = moment().format("YYYY-MM-DD") + "T00:00:00";
-        d = moment(d).subtract(this.cacheSize, "day").format("YYYY-MM-DD") + "T00:00:00";
+        let d = dayAfter(moment(), -this.cacheSize);
 
         for( let i = 0; i < this.cacheSize+1; i++ ) {
-            let e = moment(d).add(1, "day").format("YYYY-MM-DD") + "T00:00:00";
+            let e = dayAfter(d, 1);
             this.cache.push(this._slot(d, e));
             d = e;
         }
@@ -60,7 +62,7 @@ export class CardHistory
         let e = this.cache[0].start;
 
         for( let i = 0; i < growSize; i++ ) {
-            let d = moment(e).subtract(1, "day").format("YYYY-MM-DD") + "T00:00:00";
+            let d = dayAfter(e, -1);
             this.cache.unshift(this._slot(d, e));
             e = d;
         }
@@ -78,7 +80,7 @@ export class CardHistory
     {
         while( msOf(this.cache[this.cache.length - 1].end) <= Date.now() ) {
             const d = this.cache[this.cache.length - 1].end;
-            this.cache.push(this._slot(d, moment(d).add(1, "day").format("YYYY-MM-DD") + "T00:00:00"));
+            this.cache.push(this._slot(d, dayAfter(d, 1)));
             this.cacheSize++;
         }
     }
@@ -277,7 +279,7 @@ export class CardHistory
         const _ids = this.historyEntityIds();
         if( c0 < 0 || c1 < 0 || !_ids.length ) return;
         const _statIds = this._statisticsIds(), _hasStats = new Set(_statIds);
-        const _asked = (kind, i, id) => this._requests.some(q => q.kind === kind && q.c0 <= i && i <= q.c1 && q.ids.has(id));
+        const _asked = (kind, i, id) => this._askedFor(kind, i, id);
         const _source = this._sourceNeeded();
 
         // The statistics of the window — and its 5-minute ones where they tell more, and
@@ -285,21 +287,12 @@ export class CardHistory
         const _period = PERIOD_MS[this.statistics.period] ?? PERIOD_MS.hour;
         const _finest = _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats', _finestMs = Math.min(_period, PERIOD_MS[FINE_PERIOD]);
         const _wants = { stats: () => true, fine: i => _finest === 'fine' && ( _source === 'fine' || ( _source === 'stats' && this._lacksStatistics(i, _period) ) ) };
-        for( const kind of ['stats', 'fine'] ) {
-            const _l = [];
-            for( let i = c0; i <= c1; i++ ) if( _wants[kind](i) )
-                for( const id of _statIds ) if( this._missing(i, kind, id) && !_asked(kind, i, id) ) _l.push([i, id]);
-            if( _l.length ) this._ask(kind, Math.min(..._l.map(x => x[0])), Math.max(..._l.map(x => x[0])), new Set(_l.map(x => x[1])));
-        }
+        for( const kind of ['stats', 'fine'] ) this._askRows(kind, c0, c1, _statIds, _wants[kind]);
 
         // The history after the finest statistics — what Home Assistant hasn't compiled yet —,
         // from their period and STATS_LAG ago to now, in one request
-        if( _source !== 'history' ) {
-            const _l = [];
-            for( let i = c0; i <= c1; i++ ) if( this._lacksStatistics(i, _finestMs) )
-                for( const id of _statIds ) if( this._missing(i, 'tail', id) && !_asked('tail', i, id) ) _l.push([i, id]);
-            if( _l.length ) this._ask('tail', Math.min(..._l.map(x => x[0])), Math.max(..._l.map(x => x[0])), new Set(_l.map(x => x[1])), Date.now() - _finestMs - STATS_LAG);
-        }
+        if( _source !== 'history' )
+            this._askRows('tail', c0, c1, _statIds, i => this._lacksStatistics(i, _finestMs), Date.now() - _finestMs - STATS_LAG);
 
         // The history each day needs: everything when it tells more; else the entities
         // without statistics, and those whose finest statistics stop early on a recent day
@@ -330,6 +323,23 @@ export class CardHistory
         }
 
         this.state.loading = this._requests.length > 0;
+    }
+
+    // The rows of a kind ('stats', 'fine', 'tail') that slots c0 to c1 lack — in the slots
+    // wanted (wants(i)), for entities ids, neither loaded nor under way —, asked in one
+    // request (from: see _ask)
+    _askRows(kind, c0, c1, ids, wants, from = null)
+    {
+        const _l = [];
+        for( let i = c0; i <= c1; i++ ) if( wants(i) )
+            for( const id of ids ) if( this._missing(i, LAYER[kind], id) && !this._askedFor(kind, i, id) ) _l.push([i, id]);
+        if( _l.length ) this._ask(kind, Math.min(..._l.map(x => x[0])), Math.max(..._l.map(x => x[0])), new Set(_l.map(x => x[1])), from);
+    }
+
+    // Is a request of a kind under way for slot i and entity id?
+    _askedFor(kind, i, id)
+    {
+        return this._requests.some(q => q.kind === kind && q.c0 <= i && i <= q.c1 && q.ids.has(id));
     }
 
     // Does slot i reach into the time the statistics of a period (ms) may not cover yet —

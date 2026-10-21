@@ -453,6 +453,15 @@
     var c = typeof color === 'string' ? helpers.color(color) : null;
     return c && c.valid ? c.alpha(alpha).rgbString() : 'rgba(0,0,0,' + alpha + ')';
   }
+  // A legend label's dot fill (usePointStyle, see the legend's drawLegendBox): as the curve
+  // is filled — its min/max band's color (showMinMax: its line's at MINMAX_BAND_ALPHA); else
+  // its own fill color (a fading fill's, kept by hecFillFade); none otherwise. lineColor,
+  // fillColor: the dataset's, as the legend shows them (the last ones)
+  Chart.hecLegendFill = function (dataset, lineColor, fillColor) {
+    if (dataset.showMinMax) return hecColorWithAlpha(lineColor, MINMAX_BAND_ALPHA);
+    var f = dataset.hecFillFade ? dataset.hecFillColor : fillColor;
+    return typeof f === 'string' ? f : null;
+  };
   Chart.plugins.register({
     id: 'hecMinMaxBand',
     afterDatasetsDraw: function (chart) {
@@ -529,6 +538,8 @@
         var g = chart.ctx.createLinearGradient(0, _a.top, 0, _a.bottom);
         g.addColorStop(0, hecColorWithAlpha(dataset.borderColor, 0.4));
         g.addColorStop(1, hecColorWithAlpha(dataset.borderColor, 0));
+        // (its own fill color kept for its legend label's dot: Chart.hecLegendFill)
+        if (typeof dataset.backgroundColor === 'string') dataset.hecFillColor = dataset.backgroundColor;
         dataset.backgroundColor = g;
       });
     } });
@@ -823,12 +834,9 @@
   // constants), pid (pointer id), pointerType }: _hecGestureHandler builds it and calls
   // the function of the event's type below; everything they share takes c.
 
-  // Drag/gesture handlers — per Thierry's explicit instruction, ALL
-  // 2-finger and 1-finger drag gestures are handled uniformly through
-  // this single table, replacing what used to be a scattered if/else-if
-  // chain spread across mousedown, dragstart, and dragmove (plus pinch
-  // as an entirely separate branch). Order is significant — this array
-  // IS the priority order when more than one handler's test would pass.
+  // Drag/gesture handlers — every 2-finger and 1-finger drag gesture goes through this
+  // one table. Order is significant — this array IS the priority order when more than
+  // one handler's test would pass.
   // Most handlers' test(p) runs once at dragstart (p = the pending
   // gesture object, x0/y0 already set) and returns truthy to claim the
   // drag; onMove(p, e) runs on every subsequent dragmove for whichever
@@ -839,13 +847,11 @@
   var HEC_DRAG_HANDLERS = [
     {
       // Pinch (2 fingers) — structurally different trigger from every
-      // other handler below (gs.count===2, re-tested on every
-      // mousemove, not a single x0/y0 origin tested once past a 10px
-      // threshold), since a pinch has no single starting point the way
-      // a 1-finger drag does. Still folded into this same table (per
-      // Thierry) rather than left as a separately-scattered branch —
-      // same test/onMove shape, just evaluated differently. Always
-      // first: mousedown already nulls gs.pending the instant a second
+      // other handler below (gs.count===2, re-tested on every mousemove,
+      // not a single x0/y0 origin tested once past the slop), since a pinch
+      // has no single starting point the way a 1-finger drag does — the
+      // same test/onMove shape as the others, just evaluated differently.
+      // Always first: mousedown already nulls gs.pending the instant a second
       // finger arrives, so this always wins outright once active.
       name: 'pinch',
       test: function (c, p) { return !!c.gs.pinch; },
@@ -1226,9 +1232,9 @@
         me._hecToggleYAxisLock();
       }
       // Second trigger for the Y-axis touch overlay's touch-action:none —
-      // a click in this zone arms a 500ms window to anticipate a possible
-      // NEXT contact there (this click itself is already over by the time it
-      // fires, per Thierry), separate from the lock-driven trigger below.
+      // a click in this zone arms a window (the long-press duration) to anticipate a
+      // possible NEXT contact there (this click itself is already over by the time it
+      // fires), separate from the lock-driven trigger below.
       var _clickInYAxisZone = me.options.yAxisPanEnabled !== false && me._hecValueYAxes().length &&
         (me._hecYAxisSideAt(_hx, _hy) || me._hecInsideLabelSideAt(_hx, _hy, c.pointerType));
       if (_clickInYAxisZone) {
@@ -1429,10 +1435,9 @@
     return _drop;
   }
 
-  // Common drag-end cleanup — was duplicated identically between mouseup
-  // and pointercancel (ghost, marker, drop-target highlight cleanup, then
-  // firing dragend with zoom-selection data if applicable). Factored per
-  // Thierry's explicit request to harmonize the drag-handling code.
+  // The end of a drag, for mouseup and pointercancel alike: the ghost, the marker and the
+  // drop target's highlight removed, then dragend fired (with the zoom selection's data
+  // when there is one).
   function _hecEndDrag(c, p) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     me._hecDestroyDragGhost();
@@ -1528,20 +1533,20 @@
 
     gs.longPressReleased = null;
     if (gs.count === 1) {
-      // Four independent events, defined purely by time and distance —
-      // per Thierry's exact spec:
-      //   click     = down/up, stayed within 10px, < 600ms
-      //   longpress = down/up, stayed within 10px, >= 600ms
-      //   dblclickdown = down/up/down, stayed within 10px, < 400ms between
+      // Independent events, defined purely by time and distance — the
+      // pointer's gesture settings (cfg.dragSlop, cfg.longPressMs):
+      //   click     = down/up, stayed within the slop, before the long press
+      //   longpress = down/up, stayed within the slop, held the long press
+      //   dblclickdown = down/up/down, stayed within the slop, the long press between
       //               the two downs — at the second down: what a drag
       //               following the second press needs is armed right away
       //   dblclick  = the same, released without moving — at the second up,
       //               like the browser's own: only then is it known not to be
       //               a tap-then-drag
-      //   drag      = down, moved past 10px (time doesn't matter)
+      //   drag      = down, moved past the slop (time doesn't matter)
       // The second press never produces its own click at release — see
-      // dblClickFired below and its use at mouseup.
-      // Long-press remains independent from drag, same as before.
+      // dblClickFired below and its use at mouseup. A long press is independent
+      // of a drag.
       // Pen with its barrel button held at contact: a right-click, as on every
       // system — released without a drag, it's a longpress (see mouseup); a drag
       // is a plain drag, the button keeping the browser from scrolling. It never
@@ -1620,8 +1625,7 @@
           cancelLongPress(gs);
           p.dragging = true;
           fire(c, 'dragstart', p.x0, p.y0);
-          // Table-driven zone selection — per Thierry's explicit
-          // instruction: every zone (Y-axis pan, legend, timeline,
+          // Table-driven zone selection: every zone (Y-axis pan, legend, timeline,
           // zoom-select, lock+handle, plain panX) is tried uniformly
           // here, in HEC_DRAG_HANDLERS order, first match wins. Each zone's
           // test() does its own setup (ghost, scale capture, etc.) and
@@ -1683,7 +1687,7 @@
         // created for this pointer (gs.pending is only set at
         // gs.count===1, which this finger skipped, having started as
         // part of a 2-finger pinch). Without this, its next mousemove
-        // would never be evaluated against the 10px drag threshold at
+        // would never be evaluated against the drag slop at
         // all. Same shape as a normal mousedown's _pending — zone
         // selection happens the same way everyone else's does, via
         // HEC_DRAG_HANDLERS at the next dragstart, not decided here.
@@ -1718,8 +1722,8 @@
         fire(c, 'dblclick', undefined, undefined);
       } else {
         // click: released without moving, before the long-press timer
-        // fired, and this press wasn't itself a dblclick's second press —
-        // per Thierry's spec. Its release may start a double-click.
+        // fired, and this press wasn't itself a dblclick's second press.
+        // Its release may start a double-click.
         gs.lastRelease = { t: Date.now(), x: pu.x0, y: pu.y0 };
         fire(c, 'click', undefined, undefined);
       }
@@ -1782,7 +1786,7 @@
 
     // High-level default behavior: Ctrl = zoom X, Shift = zoom Y. Ctrl+wheel
     // calls a card-supplied zoomX callback (the shared date range across all
-    // graphs is a card responsibility, per Thierry). Shift+wheel zoom Y, by
+    // graphs is a card responsibility). Shift+wheel zoom Y, by
     // contrast, is a per-graph responsibility Chart.js handles directly on its
     // own Y scale — no callback needed. Configurable, on by default (see
     // options.wheelZoomEnabled / options.zoomYEnabled below).
@@ -1815,7 +1819,14 @@
   // centred on whole pixels); CTRL_END: the room at the ends of an oblong box (its half
   // circles) around two symbols
   var CTRL_TOP = 3, CTRL_H = 17, CTRL_W = 16;
-  var LOCK_W = 10, LOCK_H = 12, HANDLE_W = 6, HANDLE_H = 11, CLOSE_W = 10, CLOSE_H = 11, CHAIN_W = 10, CHAIN_H = 11, CTRL_END = 4, CTRL_GAP = 3;
+  var LOCK_W = 10, LOCK_H = 12, HANDLE_W = 6, HANDLE_H = 11, CLOSE_W = 8, CLOSE_H = 8, CHAIN_W = 10, CHAIN_H = 11, CTRL_END = 4, CTRL_GAP = 3;
+
+  // The padlock's two symbols (Material Design's lock and lock-open, outlined: the same body,
+  // so the same bounds): closed — the Y axis locked —, open — its range following the curves
+  var LOCK_PATHS = {
+    closed: 'M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z',
+    open: 'M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,17A2,2 0 0,1 10,15A2,2 0 0,1 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17Z'
+  };
 
   var GESTURE_EVENTS = { mousedown: hecPointerDown, mousemove: hecPointerMove, mouseup: hecPointerUp, pointercancel: hecPointerCancel, wheel: hecWheel, contextmenu: hecContextMenu };
 
@@ -1830,7 +1841,7 @@
     // button's, where they are drawn — then the legend's labels (within the legend's band). The icons are drawn
     // over the graph (legend, Y labels, plot area: wherever they fit), so they take the
     // gesture first: on an icon's box or within the largest picking margin around it
-    // (_hecIconMargin: 24px boxes, 36px targets by default), the
+    // (_hecIconMargin: 17px high boxes, 29px targets by default), the
     // nearest icon (_hecPick, between the two); elsewhere, a label picked (_hecPick): the
     // one under the point, else the nearest one if near enough and clearly nearer than
     // the next. An icon not drawn takes nothing. → 'linkMarker', 'lockAndHandle',
@@ -2232,7 +2243,7 @@
         // (the path's own bounds — 4..20 × 1..22 of its 24 —, a little wider to keep its
         // proportions in LOCK_W × LOCK_H: what is seen is what is centred, its corners within
         // a round box)
-        _el.innerHTML = '<svg width="' + LOCK_W + '" height="' + LOCK_H + '" viewBox="3.25 1 17.5 21"><path fill="var(--primary-text-color)" d="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,20V10H6V20H18M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg>';
+        _el.innerHTML = '<svg width="' + LOCK_W + '" height="' + LOCK_H + '" viewBox="3.25 1 17.5 21"><path/></svg>';
         me._hecLockIconEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
@@ -2245,7 +2256,13 @@
       var _svg = _el.children[0];
       var _showIcon = me._hecLockIconShown();
       if (_svg) _svg.style.display = _showIcon ? 'inherit' : 'none';
-      _el.style.opacity = (me._hecYAxisLock) ? '1.0' : '0.3';
+      // (closed and red, the Y axis locked; open and green, its range following the curves —
+      // Home Assistant's theme colors)
+      var _path = _svg && _svg.firstChild;
+      if (_path) {
+        _path.setAttribute('d', me._hecYAxisLock ? LOCK_PATHS.closed : LOCK_PATHS.open);
+        _path.setAttribute('fill', me._hecYAxisLock ? 'var(--error-color, #db4437)' : 'var(--success-color, #4caf50)');
+      }
 
       // Y-axis touch overlay — exists only so touch-action applies to this small
       // zone instead of the whole canvas (a change to touch-action after a
@@ -2414,10 +2431,10 @@
     _hecHandleButtonAt: function (x, y) {
       var b = this._hecHandleButtons();
       if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
-      // (each icon: its slot of the zone, less 3px on each side and 4px above and below)
+      // (each icon: its slot of the zone's box, less 3px on each side)
       var _w = this._hecLockAndHandleWidth() / b.length;
       var _x = this._hecLockAndHandleRect().x;
-      var rects = b.map(function (btn, k) { return { x: _x + k * _w + 3, y: 4, width: _w - 6, height: 20 }; });
+      var rects = b.map(function (btn, k) { return { x: _x + k * _w + 3, y: CTRL_TOP, width: _w - 6, height: CTRL_H }; });
       var _i = _hecPick(x, y, rects);
       return _i === PICK_BETWEEN ? PICK_BETWEEN : _i >= 0 ? b[_i] : null;
     },
@@ -2434,7 +2451,7 @@
     // The actual gesture (drag to reorder) is handled by the separate
     // _hecMoveHandleTouchEl overlay in _hecUpdateDragTouchOverlays below, same
     // relay-to-canvas pattern as everything else. Matches the card's original
-    // #mo-N appearance exactly (⠿ character, opacity 0.5, secondary text color).
+    // #mo-N place (six dots, as ⠿), in the text's color.
     _hecUpdateMoveHandleIcon: function () {
       var me = this;
       if (!me.canvas) return;
@@ -2442,10 +2459,10 @@
       if (!_el) {
         // (six dots, as ⠿ — drawn, so that what is seen is what is centred, whatever the font)
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:10;line-height:0;opacity:0.5;user-select:none;pointer-events:none;';
+        _el.style.cssText = 'position:absolute;z-index:10;line-height:0;user-select:none;pointer-events:none;';
         var _dots = '';
         [1.1, 4.9].forEach(function (cx) { [1.1, 5, 8.9].forEach(function (cy) { _dots += '<circle cx="' + cx + '" cy="' + cy + '" r="1.1"/>'; }); });
-        _el.innerHTML = '<svg width="' + HANDLE_W + '" height="' + HANDLE_H + '" viewBox="0 -0.5 ' + HANDLE_W + ' ' + HANDLE_H + '" fill="var(--secondary-text-color)">' + _dots + '</svg>';
+        _el.innerHTML = '<svg width="' + HANDLE_W + '" height="' + HANDLE_H + '" viewBox="0 -0.5 ' + HANDLE_W + ' ' + HANDLE_H + '" fill="var(--primary-text-color)">' + _dots + '</svg>';
         me._hecMoveHandleIconEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
@@ -2473,12 +2490,13 @@
       if (!me.canvas) return;
       if (!_el) {
         _el = document.createElement('div');
-        _el.style.cssText = 'position:absolute;z-index:10;height:28px;pointer-events:none;user-select:none;';
+        _el.style.cssText = 'position:absolute;z-index:10;height:' + CTRL_H + 'px;pointer-events:none;user-select:none;';
         me._hecHandleButtonsEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
+      // (on the zone's box, as the icons they replace)
       _el.style.left = (me.canvas.offsetLeft + me._hecLockAndHandleRect().x) + 'px';
-      _el.style.top = me.canvas.offsetTop + 'px';
+      _el.style.top = (me.canvas.offsetTop + CTRL_TOP) + 'px';
       _el.style.display = 'flex';
       // (rebuilt only when they change: called at each draw)
       var _key = JSON.stringify(b);
@@ -2488,12 +2506,12 @@
       var _w = me._hecLockAndHandleWidth() / b.length;
       b.forEach(function (btn) {
         var _s = document.createElement('div');
-        _s.style.cssText = 'position:relative;width:' + _w + 'px;height:28px;display:flex;align-items:center;justify-content:center;' +
+        _s.style.cssText = 'position:relative;width:' + _w + 'px;height:' + CTRL_H + 'px;display:flex;align-items:center;justify-content:center;' +
           'font-size:14px;color:var(--primary-text-color);' + (btn.disabled ? 'opacity:0.45;' : '');
         _s.textContent = btn.text;
         if (btn.disabled) {
           var _bar = document.createElement('div');
-          _bar.style.cssText = 'position:absolute;inset:4px 2px;background:linear-gradient(to top right,transparent calc(50% - 1px),var(--error-color,#f44336) calc(50% - 1px),var(--error-color,#f44336) calc(50% + 1px),transparent calc(50% + 1px));';
+          _bar.style.cssText = 'position:absolute;inset:2px;background:linear-gradient(to top right,transparent calc(50% - 1px),var(--error-color,#f44336) calc(50% - 1px),var(--error-color,#f44336) calc(50% + 1px),transparent calc(50% + 1px));';
           _s.appendChild(_bar);
         }
         _el.appendChild(_s);
@@ -2577,7 +2595,7 @@
         _el.style.borderRadius = CTRL_H / 2 + 'px';
         _el.style.userSelect = 'none';
         // (the ×, drawn: centred as it is seen)
-        _el.innerHTML = '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 -0.5 10 11" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.6" stroke-linecap="round"/></svg>';
+        _el.innerHTML = '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 0 10 10" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.5" stroke-linecap="round"/></svg>';
       }
       me._hecAttachToCanvasParent(_el);
       _el.style.display = 'flex';
@@ -2975,12 +2993,9 @@
     },
 
     // Cross-graph scan — finds whichever OTHER Chart instance's canvas
-    // contains this client position, or null. Factored out (per Thierry)
-    // from what used to be two separately-written scans: the move-handle's
-    // own reorder-target lookup, and the legend/timeline dragovergraph
-    // lookup. Both now share this single implementation; each keeps its own
-    // logic for what to DO with the result (draw directly vs. dispatch
-    // customEvent).
+    // contains this client position, or null: for the move handle's reorder
+    // target and the legend's or a timeline's dragovergraph alike, each doing
+    // its own with the result (draw directly vs. dispatch customEvent).
     _hecFindInstanceAt: function (clientX, clientY) {
       var me = this;
       if (!Chart.instances) return null;
@@ -3273,13 +3288,13 @@
     },
 
     // Dynamic touch-blocking overlays for the legend (line/bar) and label
-    // column (timeline/arrowline) — migrating the original #lg-N/#tl-N zones.
+    // column (timeline/arrowline).
     // Mouse/pen: touch-action is irrelevant to them, drag always works via
-    // normal >10px movement detection, same as everywhere else.
+    // the movement past the slop, same as everywhere else.
     // Touch: touch-action:none is only applied while me._hecLabelDragAllowed
     // is true — set on dblclick on either zone (single flag shared by legend
     // and timeline on the same graph, since a graph never has both at once),
-    // cleared on mouseup. The 500ms-armed window used for the Y-axis zone
+    // cleared on mouseup. The armed window used for the Y-axis zone
     // isn't needed here: touch-action:none set at the FIRST click of the
     // double-click already covers the whole gap up to the second click — once
     // that second mousedown fires (drag can now start), the block is already
@@ -3328,16 +3343,11 @@
         _tl.style.height = me.canvas.offsetHeight + 'px';
       }
 
-      // Grouped lock+handle touch zone — top-left 0-33px × 0-28px, covering
-      // BOTH the move handle (0-15px) AND the lock icon (15-33px) as ONE
-      // single zone that receives every click/drag and lets the gesture
-      // detector's own consumers (lock toggle, graph reorder) sort out what
-      // to do with it — per Thierry's explicit correction: this was
-      // previously only 15px wide, so a touch contact starting directly over
-      // the lock icon never got touch-action:none applied (the click/toggle
-      // still worked, since the canvas has its own native listeners
-      // independent of this overlay — but the touch-scroll-blocking workaround
-      // silently didn't cover that half of the zone). Neutralized (0×0) when
+      // Grouped lock+handle touch zone — over the lock+handle zone's box
+      // (_hecLockAndHandleRect), the handle and the padlock as ONE zone that
+      // receives every click/drag and lets the gesture detector's own
+      // consumers (lock toggle, graph reorder) sort out what to do with it:
+      // a touch contact anywhere on it gets touch-action:none. Neutralized (0×0) when
       // moveHandleVisible is false (only one graph total, per the card) so it
       // can't intercept a contact for a handle the user can't even see —
       // the lock icon itself stays visible/clickable in that case via the
