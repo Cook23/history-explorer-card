@@ -909,6 +909,17 @@ module.exports = async function()
         const c = await t.E(`(()=>{ const s=getComputedStyle(el.querySelector('#b7_0')); return [s.backgroundColor, s.color]; })()`);
         return !/255, ?255, ?255/.test(c[0]) ? true : JSON.stringify(c);
     });
+    await t.step('French, the card narrowed: the date shortened first, the range ("1 Jour") only once the short date and the whole range don\'t fit', async () => {
+        const r = [];
+        for( const w of [700, 600, 500, 450, 420, 400, 380, 360, 340, 320, 300] ) {
+            await t.E(`(()=>{ el.style.display='block'; el.style.width='${w}px'; })()`); await t.wait(300);
+            r.push(await t.E(`[${w}, el.instance._toolbarForm[0], el.querySelector('#by_0').style.maxWidth]`));
+        }
+        await t.E(`el.style.width=''`); await t.wait(300);
+        const forms = r.map(x => x[1]);
+        const ok = forms.every((f, k) => k === 0 || f >= forms[k - 1]) && forms.includes(1) && r.every(x => x[2] === ( x[1] === 2 ? '50px' : '83px' ));
+        return ok ? true : JSON.stringify(r);
+    });
     await t.step('French: the menus are in French', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await t.E(`el.instance.showOptionsSubmenu(0, 'export')`); await t.wait(200);
         const txt = await t.E(`el.querySelector('#eo_0_csv')?.textContent`);

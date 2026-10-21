@@ -273,29 +273,26 @@ export class CardToolbar
             const dlwShort = _mw(dl);
             const drwShort = _mw(dr);
 
-            // Decide format with hysteresis
-            if( !this._isCompact ) this._isCompact = [];
-            const _prevCompact = this._isCompact[i] || false;
-            let isCompact;
-            if( dlwLong + drwLong > tbwNow - 10 ) {
-                isCompact = true;   // NORMAL doesn't fit → go COMPACT
-            } else if( dlwLong + drwLong < tbwNow - 20 ) {
-                isCompact = false;  // clearly fits → go NORMAL
-            } else {
-                isCompact = _prevCompact; // hysteresis zone → keep previous state
-            }
-            this._isCompact[i] = isCompact;
-
-            const dlwNow = isCompact ? dlwShort : dlwLong;
-            const drwNow = isCompact ? drwShort : drwLong;
+            // The forms tried in turn, the first that fits taken: the long date and the whole
+            // range, the short date and the whole range, the short date and the short range —
+            // each shortened only when needed. Back to a longer form only once it clearly fits
+            // (a hysteresis: no flicker at the edge)
+            const _forms = [{ need: dlwLong + drwLong, fmt: this.i18n._styleDateLong, range: '83px', dlw: dlwLong, drw: drwLong },
+                            { need: dlwShort + drwLong, fmt: this.i18n._styleDateShort, range: '83px', dlw: dlwShort, drw: drwLong },
+                            { need: dlwShort + drwShort, fmt: this.i18n._styleDateShort, range: '50px', dlw: dlwShort, drw: drwShort }];
+            this._toolbarForm ??= [];
+            const _prev = this._toolbarForm[i] ?? 0;
+            let _k = _forms.findIndex((f, k) => f.need <= tbwNow - ( k < _prev ? 20 : 10 ));
+            if( _k < 0 ) _k = _forms.length - 1;
+            this._toolbarForm[i] = _k;
+            const { fmt, dlw: dlwNow, drw: drwNow } = _forms[_k];
 
             // Apply chosen format and range width
-            const fmt = isCompact ? this.i18n._styleDateShort : this.i18n._styleDateLong;
             if( bxEl && fmt ) {
                 this.ui.dateFormat = fmt;
                 bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
             }
-            if( byEl ) byEl.style.maxWidth = isCompact ? '50px' : '83px';
+            if( byEl ) byEl.style.maxWidth = _forms[_k].range;
 
 
             const totNow = dlwNow + drwNow || 1;
