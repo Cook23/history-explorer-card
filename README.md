@@ -125,7 +125,7 @@ infoPanel: true
 defaultInfoPanel: true   # set default enabled state; user preference is otherwise preserved
 ```
 
-Once enabled, clicking any entity anywhere opens the history explorer graph instead. Switching it on or off applies right away, without reloading the page. Ungrouping, drag & drop and CSV export are not available in the popup.
+Once enabled, clicking any entity anywhere opens the history explorer graph instead. Switching it on or off applies right away, without reloading the page. Opened from a curve of the card — a click on its value, or *Info* in its menu —, the panel shows it as it looks on the card: its type, its color, its fill, its line, its points and its extremes. Ungrouping, drag & drop and CSV export are not available in the popup.
 
 Home Assistant only loads the card's file once a dashboard is shown: a page opened directly (Settings, History…) shows its own history until then. To have the info panel on every page, load the file in `configuration.yaml` too:
 
@@ -146,7 +146,7 @@ The `?hacstag=…` part isn't required — the file works without it — but wit
 The ▾ button beside the entity selector opens the options menu:
 - **Export ▸** — *History*, *Statistics* (as CSV files);
 - **Card ▸** — *Default graphs* (the graphs added from the card removed, the YAML's kept as you changed them), *Default display* (back to the YAML: every change made from the card forgotten, the time range too), each confirmed in a submenu (*Confirm* / *Cancel*);
-- **Global ▸** — what applies to every card and every device: the info panel on or off (confirmed as above), and the gesture settings, entered right there.
+- **Global ▸** — what applies to every card and every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red), and the gesture settings, entered right there.
 
 The gesture settings tell a click from a long-press, and a tap from a drag — for a mouse or a pen, and for a finger. Raise them if your hand is less steady, or slower:
 
@@ -227,13 +227,14 @@ Selecting an entity (or attribute) that's already shown says so and outlines its
 
 ![image](https://user-images.githubusercontent.com/60828821/156686448-919cbd9c-4e77-4efc-a725-e53a7049a092.png)
 
-The type menu has four items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
+The type menu has five items, each opening its submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
+- **Appearance ▸** — how the curve looks: *Color* (the browser's color picker; a bar's too), *Points* and *Extremes* (switches: its samples' dots, as a long-press near it, and its min/max band — `showMinMax`), *Fill ▸* (*None*, *Solid*, *Fade*), *Width ▸* (1 to 5 px), *Line style ▸* (*Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot*) — each list opened in the submenu itself, ← or Escape going back; the value in use in bold. A choice there is saved with the entity, as the interpolation;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Layout ▸** — opened by a long-press on a label: *Show the points* / *Hide the points* (a curve's, as a long-press near it), *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
+- **Layout ▸** — opened by a long-press on a label: *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than its submenus, so its lines stay readable beside the one open; on a card too narrow for that, it opens without any submenu, and a submenu opened leaves at least the start of its lines.
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A choice that changes what the menu shows — a type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it, then closes (another choice meanwhile is applied too); an action — *Separate*, *Cut*, *Delete*, *Info*, a test, *Color* — closes it at once. A switch is green when on, red when off. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu is wider than its submenus, so its lines stay readable beside the one open; on a card too narrow for that, it opens without any submenu, and a submenu opened leaves at least the start of its lines.
 
 In *Display*, the type in use — or, for an entity being added, the most fitting one — is shown in bold. Enter right away takes it; ArrowUp/ArrowDown first highlight it, then move through the other choices; or click directly. For an entity being added, the most fitting type is:
 - *Timeline* for a state that isn't a number;
@@ -294,8 +295,8 @@ Linked graphs always stay together: moving one of them elsewhere moves the whole
 ### The graph menu, cut and paste
 
 A long-press (or a right click) on the ⠿ zone of a graph opens its menu, titled with the graph's `title` (else the start of its curves' names) — the same zone where a click toggles the Y axis lock and a drag moves the graph:
-- **Display ▸** (open with the menu) and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the type all of them share in bold);
-- **Layout ▸** — *Show the points* / *Hide the points* (of all its curves), *Lock the Y axis* / *Unlock the Y axis* (as a click on the padlock), *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
+- **Display ▸** (open with the menu), **Appearance ▸** (its color aside) and **Interpolation ▸** — as in the type menu, for all the graph's curves at once (the value all of them share in bold, a switch on when all of them show it);
+- **Layout ▸** — *Y axis locked* (a switch, as a click on the padlock), *Merge back* (a linked graph put back into the one above), *Cut* (the graph moved elsewhere, as a drag), *Delete the graph* (a graph added from the card).
 
 After *Cut* — of a graph, or of a curve from its type menu — the ⠿ zone of every graph shows where it can go: 📋 to paste a curve into that graph, ↓ / ↑ to insert a graph below or above that one — or a swipe down or up on them. A choice that isn't possible (a curve onto a timeline, a graph inside a block of linked graphs) is struck through in red, and says why when clicked. ✂ marks where it was cut from. A click just beside a button counts as on it, about halfway between two does nothing; a click anywhere else, or Escape, cancels.
 
@@ -428,7 +429,7 @@ Angles (a wind direction, for example) are drawn without jumping across the whol
 ```yaml
 entities:
   - entity: sensor.temperature
-    dashMode: shortlines          # points, shortlines, longlines, pointline
+    dashMode: shortlines          # solid, points, shortlines, longlines, pointline
   - entity: sensor.humidity
     dashMode: [10, 4, 2, 4]       # custom Canvas dash pattern
 ```
@@ -437,7 +438,7 @@ entities:
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
-Hold **Alt** (Option on Mac) while moving over a graph to reveal its individual data points; a long-press (or a right click) near a curve shows or hides its own, saved with it. The points are as wide as the line plus 2 px, the one the tooltip shows 2 px more. To show them from the YAML:
+Hold **Alt** (Option on Mac) while moving over a graph to reveal its individual data points; a long-press (or a right click) near a curve shows or hides its own — as *Points* in its menu's *Appearance ▸* —, saved with it. The points are as wide as the line plus 2 px, the one the tooltip shows 2 px more. To show them from the YAML:
 
 ```yaml
 entityOptions:
@@ -692,7 +693,7 @@ graphs:
 | `lineWidth` | `width`, `line_width` | | ✓ | ✓ | ✓ | Line width in pixels |
 | `lineMode` | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
 | `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
-| `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `points`, `shortlines`, `longlines`, `pointline`, or custom array |
+| `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom array |
 | `showLine` | `show_line` | | ✓ | ✓ | ✓ | `false`: its points only, no line |
 | `showGraph` | `show_graph` | `show.graph: bar` / `line`: drawn | ✓ | ✓ | ✓ | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot, only its header and values |
 | `fixedValue` | `fixed_value` | | ✓ | ✓ | ✓ | `true`: its last value in the window, flat over the whole window |

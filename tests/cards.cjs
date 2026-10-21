@@ -37,13 +37,13 @@ module.exports = async function()
         const open=['rep','interp','layout'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
         return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_layout_sub')].join(' || '); })()`;
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300); };
-    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Interpolation, Layout', async () => {
+    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Layout', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Interpolation ▸ | Layout ▸ | Info | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Show the points | Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Layout ▸ | Info | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Cut | Delete' ? true : m;
     });
-    await t.step('type menu of a binary sensor: Display (timeline only), Layout', async () => {
+    await t.step('type menu of a binary sensor: Display (timeline only), Layout — no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
@@ -62,15 +62,15 @@ module.exports = async function()
         else await closeMenu();
         return v;
     };
-    await t.step('Layout on a curve of a YAML graph: its points, separate, cut, delete; separate takes it into a linked graph', async () => {
+    await t.step('Layout on a curve of a YAML graph: separate, cut, delete; separate takes it into a linked graph', async () => {
         const v = await arrange(0, 0, 'split');
         const g = await t.graphs();
-        return v === 'points,split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
+        return v === 'split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
     });
-    await t.step('Layout on the curve taken out: its points, merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
+    await t.step('Layout on the curve taken out: merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
         const v = await arrange(1, 0, 'merge');
         const g = await t.graphs();
-        return v === 'points,merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
+        return v === 'merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
     });
     await t.step('Layout, delete: the curve removed', async () => {
         const id = await t.E(`graphAt(0).entities[1].entity`);

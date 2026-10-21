@@ -4,6 +4,8 @@
 // and the entity moves these lead to (through the entity store). Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
+import { keepInfoLook } from "./card-storage.js";
+
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -66,7 +68,7 @@ export class CardGestures
         // click; the curve stays as it is)
         if( info.zone === 'value' || info.legendPart === 'value' ) {
             const _curve = info.zone === 'value' ? info.curveIndex : info.legendIndex;
-            if( info.gestureType === 'click' ) this._onValueClick(g.entities[_curve]);
+            if( info.gestureType === 'click' ) this._onValueClick(g.entities[_curve], g);
             return;
         }
         const idx = info.legendIndex;
@@ -74,9 +76,9 @@ export class CardGestures
         this.toggleCurveHidden(g, idx);
     }
 
-    // A click on entity e's value (in the legend, over the graph): its tapAction (see
-    // tapActionOf) — more-info, the default: its dialog (openEntityInfo)
-    _onValueClick(e)
+    // A click on the value of entity e of graph g (in the legend, over the graph): its
+    // tapAction (see tapActionOf) — more-info, the default: its dialog (openEntityInfo)
+    _onValueClick(e, g)
     {
         const a = this.tapActionOf(e);
         switch( a.action ?? 'more-info' ) {
@@ -97,18 +99,21 @@ export class CardGestures
                 return;
             }
             default:
-                this.openEntityInfo(e?.entity);
+                this.openEntityInfo(e, g);
         }
     }
 
-    // Home Assistant's dialog of an entity — with the card's info panel in it, when it's on —
-    // from a click on its value (its tapAction, by default) or its menu's Info
-    openEntityInfo(entityId)
+    // Home Assistant's dialog of the entity of curve e of graph g — with the card's info panel
+    // in it, when it's on, showing that curve as it looks here (keepInfoLook) — from a click on
+    // its value (its tapAction, by default) or its menu's Info
+    openEntityInfo(e, g)
     {
-        if( !entityId ) return;
-        const _e = new Event('hass-more-info', { bubbles: true, composed: true });
-        _e.detail = { entityId };
-        this._this.dispatchEvent(_e);
+        if( !e?.entity ) return;
+        keepInfoLook(e.entity, { type: e.type ?? g?.type, lineMode: e.lineMode, interpolation: e.interpolation, color: e.color,
+                                 fill: e.fill, width: e.width, dashMode: e.dashMode, showPoints: e.showPoints, showMinMax: e.showMinMax });
+        const _ev = new Event('hass-more-info', { bubbles: true, composed: true });
+        _ev.detail = { entityId: e.entity };
+        this._this.dispatchEvent(_ev);
     }
 
     // Double-click: on the chain icon, merges two linked graphs back into one; on a legend
@@ -144,10 +149,10 @@ export class CardGestures
         if( info.legendIndex >= 0 && !this.isRowGraph(g) ) {
             const _entity = g.entities[info.legendIndex];
             if( _entity && this.isNumericEntity(_entity.entity) )
-                this.showEntityTypeMenu(0, _entity.entity, g, _r.left + 30, _r.bottom);
+                this.showEntityTypeMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: _r.bottom });
         } else if( info.yAxisIndex >= 0 && this.isRowGraph(g) ) {
             const _entity = g.entities[info.yAxisIndex];
-            if( _entity ) this.showEntityTypeMenu(0, _entity.entity, g, _r.left + 30, info.clientY);
+            if( _entity ) this.showEntityTypeMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: info.clientY });
         }
     }
 

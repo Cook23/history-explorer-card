@@ -64,6 +64,22 @@ export function fetchInfoPanelData(hass, onKept)
 // Is the info panel on (on this device)?
 export let infoPanelEnabled = !!infoPanelData();
 
+// The look of the curve an entity's dialog was opened from (a click on its value, its menu's
+// Info): its type, its line mode, its interpolation, its color, its fill, its line's width
+// and style, its points and its extremes — for the info panel to show it the same way. Taken
+// once, by that entity's panel (takeInfoLook)
+let infoLook = null;
+export function keepInfoLook(entityId, look)
+{
+    infoLook = { entityId, look };
+}
+export function takeInfoLook(entityId)
+{
+    const _look = infoLook?.entityId === entityId ? infoLook.look : null;
+    infoLook = null;
+    return _look;
+}
+
 // --------------------------------------------------------------------------------------
 // Where each field of an entity that can be saved goes — the one place to change it:
 //   'devices' — the user finds it on every device (Home Assistant's user data: one user,

@@ -459,20 +459,31 @@ export class CardToolbar
     {
         const _bx = this._this.querySelector(`#bx_${i}`);
         if( !_bx ) return;
-        let _in = ( this._calendarInputs ??= [] )[i];
+        this.openNativePicker(_bx.parentNode, 'date', _bx.offsetLeft, _bx.offsetTop + _bx.offsetHeight,
+                              moment(this.startTime).format('YYYY-MM-DD'), v => this.showDay(v), { max: moment().format('YYYY-MM-DD') });
+    }
+
+    // The browser's own picker of an input of type (date, color), at (left, top) in parent —
+    // an invisible input there, one per type, kept —, value preselected (attrs: more of the
+    // input's attributes, as max); onPick(value) once one is chosen
+    openNativePicker(parent, type, left, top, value, onPick, attrs = {})
+    {
+        parent._pickers ??= {};
+        let _in = parent._pickers[type];
         if( !_in?.isConnected ) {
-            _in = this._calendarInputs[i] = document.createElement('input');
-            _in.type = 'date';
+            _in = parent._pickers[type] = document.createElement('input');
+            _in.type = type;
             _in.tabIndex = -1;
             _in.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0';
-            _in.addEventListener('change', () => this.showDay(_in.value));
-            _bx.parentNode.style.position = 'relative';
-            _bx.parentNode.appendChild(_in);
+            _in.addEventListener('change', () => _in._onPick?.(_in.value));
+            if( getComputedStyle(parent).position === 'static' ) parent.style.position = 'relative';
+            parent.appendChild(_in);
         }
-        _in.style.left = _bx.offsetLeft + 'px';
-        _in.style.top = ( _bx.offsetTop + _bx.offsetHeight ) + 'px';
-        _in.max = moment().format('YYYY-MM-DD');
-        _in.value = moment(this.startTime).format('YYYY-MM-DD');
+        _in.style.left = left + 'px';
+        _in.style.top = top + 'px';
+        Object.assign(_in, attrs);
+        _in.value = value;
+        _in._onPick = onPick;
         try { _in.showPicker(); } catch( e ) { _in.focus(); _in.click(); }
     }
 

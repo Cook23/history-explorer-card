@@ -208,23 +208,11 @@ export class CardSelector
     }
 
     // A menu of the selector (its series submenu, its duplicate choice) filled with items
-    // { label, series, marked, choose }: the marked one in bold and pre-selected (Enter
-    // takes it, the first arrow highlights it); listened to once — the arrows, Enter, and ←
-    // or Escape calling back(); closed with the selector when the focus leaves them
+    // { label, series, marked, choose } (see fillMenuItems); listened to once — the arrows,
+    // Enter, and ← or Escape calling back(); closed with the selector when the focus leaves them
     _fillSelectorMenu(idx, menuEl, items, back)
     {
-        menuEl.innerHTML = '';
-        for( const it of items ) {
-            const _a = document.createElement('a');
-            _a.href = '#es';
-            if( it.series ) _a.dataset.series = it.series;
-            _a.style = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;white-space:nowrap';
-            _a.textContent = it.label;
-            if( it.marked ) { _a.style.fontWeight = 'bold'; _a.dataset.selected = '1'; }
-            _a.addEventListener('click', (e) => { e.preventDefault(); it.choose(); }, true);
-            menuEl.appendChild(_a);
-        }
-        menuEl._subBack = back;
+        this.fillMenuItems(menuEl, items, back).forEach((a, i) => { if( items[i].series ) a.dataset.series = items[i].series; });
         if( menuEl._subListening ) return;
         menuEl._subListening = true;
         menuEl.addEventListener('keydown', (e) => {
@@ -298,7 +286,7 @@ export class CardSelector
         const _cancel = () => { _menu.style.display = 'none'; this.resetEntityInput(_input); };
         this._fillSelectorMenu(idx, _menu, [
             { label: i18n('ui.menu.duplicate_cancel'), marked: true, choose: _cancel },
-            { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null); } },
+            { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null, { from: 'add' }); } },
         ], _cancel);
         // (under the input field, as the type menu)
         const _tb = this._this.querySelector(`#tb_${idx}`);
@@ -703,7 +691,7 @@ export class CardSelector
             // always, even if none is numeric (reduced to timeline only in that case)
             if( _newIds.length ) {
                 this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + _newIds.join('; '));
-                this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null);
+                this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null, { from: 'add' });
             }
 
             if( _duplicates.length ) {
@@ -715,7 +703,7 @@ export class CardSelector
                 const _dupG = Array.from(_duplicateGraphs)[0];
                 const _dupEntityId = _dupG?.entities.find(e => _duplicates.includes(e.entity))?.entity;
                 if( !_newIds.length && _dupEntityId ) {
-                    this.showEntityTypeMenu(ii, _dupEntityId, _dupG);
+                    this.showEntityTypeMenu(ii, _dupEntityId, _dupG, { from: 'duplicate' });
                 }
                 this.flagGraphs(Array.from(_duplicateGraphs));
             }
@@ -745,7 +733,7 @@ export class CardSelector
                 // Show the type menu (with "Default"), even if none matched is numeric
                 // (reduced to timeline only in that case) — deferred creation of the whole
                 // batch until the user chooses
-                this.showEntityTypeMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null);
+                this.showEntityTypeMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null, { from: 'add' });
             }
 
         } else {
@@ -765,7 +753,7 @@ export class CardSelector
             // a non-numeric entity (reduced to timeline only, its one valid representation)
             // — keeps the same two-step add/cancel process homogeneous for every entity.
             this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + entity_id);
-            this.showEntityTypeMenu(ii, entity_id, null);
+            this.showEntityTypeMenu(ii, entity_id, null, { from: 'add' });
 
         }
         // (nothing added yet: the type menu adds what's chosen — addCurves)

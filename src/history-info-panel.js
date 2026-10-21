@@ -4,7 +4,7 @@ import { HistoryCardState } from "./history-explorer-card";
 import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure, baseTypePure } from "./card-config.js";
 import { typeMenuHtml } from "./card-menus.js";
 import { i18n } from "./languages.js";
-import { infoPanelData, fetchInfoPanelData } from "./card-storage.js";
+import { infoPanelData, fetchInfoPanelData, takeInfoLook } from "./card-storage.js";
 
 // --------------------------------------------------------------------------------------
 // Clone of lit html(), don't want to pull in the entire framework
@@ -84,7 +84,11 @@ function hxHookInfoPanel()
 
         const entityOptions = instance.getEntityOptions(entity_id);
 
-        const type = entityOptions?.type || baseTypePure(instance._hass, entity_id);
+        // Opened from a card's curve: shown as it looks there — its type, its color, its fill,
+        // its line, its points, its extremes (keepInfoLook) —, else as the panel's options say
+        const _look = takeInfoLook(entity_id) ?? {};
+
+        const type = _look.type || entityOptions?.type || baseTypePure(instance._hass, entity_id);
 
         // Make sure the panel always starts with the same default graph color
         instance.pconfig.nextDefaultColor = 0;
@@ -112,14 +116,21 @@ function hxHookInfoPanel()
         const _pcEntry = {
             entity   : entity_id,
             groupId  : instance.g_id,
-            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (entityOptions?.lineWidth ?? 1.001) : undefined,
+            type     : _look.type,
+            lineMode : _look.lineMode,
+            interpolation : _look.interpolation,
+            dashMode : _look.dashMode,
+            showPoints : _look.showPoints,
+            showMinMax : _look.showMinMax,
+            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (_look.width ?? entityOptions?.lineWidth ?? 1.001) : undefined,
             interval : entityOptions?.interval ?? null,
             isStatic : true,
         };
         instance.store.reset([_pcEntry]);
 
         instance.graphs = [];
-        instance.addGraph(entity_id, { noAutoGroup: true, color: entityOptions?.color, fill: entityOptions?.fill, isStatic: true, interval: entityOptions?.interval, groupId: instance.g_id, entry: _pcEntry });
+        instance.addGraph(entity_id, { noAutoGroup: true, color: _look.color ?? entityOptions?.color, fill: _look.fill ?? entityOptions?.fill, isStatic: true,
+                                       interval: entityOptions?.interval, groupId: instance.g_id, entry: _pcEntry });
     }
 
     __fn.prototype._injectHistoryExplorer = function(instance)
@@ -174,7 +185,7 @@ function hxHookInfoPanel()
             instance.initEntityTypeMenu(0);
             _tf0.addEventListener('click', () => {
                 const _g = instance.graphs[0];
-                if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, null, null, 'center');
+                if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, { from: 'panel', align: 'center' });
             });
         }
 

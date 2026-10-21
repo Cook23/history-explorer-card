@@ -1,6 +1,6 @@
 // A gesture on a curve — the nearest one, picked as a label is: a click or a tap puts it in the
 // tooltip mode (several curves can be), a long-press (a right click) shows or hides its
-// samples' dots, as the Layout submenu of its menu or of its
+// samples' dots, as the Points switch of the Appearance submenu of its menu or of its
 // graph's; every dot shown by default of a diameter of the line width + 2 px (Alt's too), the
 // hovered one 2 px wider
 const { openCard } = require('./lib.cjs');
@@ -92,17 +92,20 @@ module.exports = async function()
         await t.longPress(await beside(t, 0)); const d = await dots(t, 0); const menu = await menuOpen(t);
         return d.r === 0 && !menu ? true : JSON.stringify({ d, menu });
     });
-    await t.step('Layout ▸ Show the points, in a curve\'s menu; then Hide the points', async () => {
-        const open = async () => { await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_layout').click()`); await t.wait(300); };
-        await open(); const l1 = await t.E(`el.querySelector('#et_0_points').textContent`);
-        await t.E(`el.querySelector('#et_0_points').click()`); await t.wait(400); const on = await dots(t, 0);
-        await open(); const l2 = await t.E(`el.querySelector('#et_0_points').textContent`);
-        await t.E(`el.querySelector('#et_0_points').click()`); await t.wait(400); const off = await dots(t, 0);
-        return l1 === 'Show the points' && l2 === 'Hide the points' && shown(on) && off.r === 0 ? true : JSON.stringify({ l1, l2, on, off });
+    // (the Points switch of the open menu's Appearance submenu: its line, its state)
+    const pointsLine = `[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Points')`;
+    await t.step('Appearance ▸ Points, a switch, in a curve\'s menu: on, the dots shown; again, off, hidden', async () => {
+        const open = async () => { await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300); };
+        await open(); const s1 = await t.E(`${pointsLine}.getAttribute('aria-checked')`);
+        await t.E(`${pointsLine}.click()`); await t.wait(800); const on = await dots(t, 0);
+        await open(); const s2 = await t.E(`${pointsLine}.getAttribute('aria-checked')`);
+        await t.E(`${pointsLine}.click()`); await t.wait(800); const off = await dots(t, 0);
+        return s1 === 'false' && s2 === 'true' && shown(on) && off.r === 0 ? true : JSON.stringify({ s1, s2, on, off });
     });
-    await t.step('Layout ▸ Show the points, in a graph\'s menu: every curve of the graph', async () => {
+    await t.step('Appearance ▸ Points, in a graph\'s menu: every curve of the graph', async () => {
         await t.longPress(await t.E('moPt(1)'));
-        await t.E(`el.querySelector('#et_0_points').click()`); await t.wait(400);
+        await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300);
+        await t.E(`${pointsLine}.click()`); await t.wait(800);
         const a = await dots(t, 1, 0), b = await dots(t, 1, 1);
         return shown(a) && shown(b) && a.saved && b.saved ? true : JSON.stringify({ a, b });
     });
