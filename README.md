@@ -28,7 +28,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
 
-- **v1.2.31** — mini-graph-card compatible: a mini-graph-card's YAML with `look: mini` gives a rendering close to its own — the first entity's value, extrema and average, mini-graph-card's colors, small legend dots and controls; the history only loaded for the last minutes.
+- **v1.2.31** — mini-graph-card compatible: a mini-graph-card's YAML with `look: mini` gives a rendering close to its own.
 - **v1.2.29** — More of mini-graph-card's options: its Y axis (soft bounds, `min_bound_range`, `logarithmic`, the secondary axis' own), `value_factor`, `state_map`, `line_color`, thresholds blended (`color_thresholds_transition`).
 - **v1.2.28** — mini-graph-card compatibility: its aggregation (`points_per_hour`, `aggregate_func`, `group_by`), sub-attributes, the same entity several times in one graph.
 - **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
