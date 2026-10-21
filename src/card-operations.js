@@ -12,6 +12,7 @@
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { typesCompatible, RAW_INTERVAL } from "./history-options.js";
+import { fillValue } from "./history-default-colors.js";
 
 export class CardOperations
 {
@@ -330,14 +331,8 @@ export class CardOperations
             this.setLineMode(g, g.entities.map((e, i) => i), lineMode);
             this.updateHistory();
         } else {
-            const _entities = g.entities;
-            const _nextG = this.nextGraph(g);
-            this.detachGraph(g);
-            _entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
-            this.rebuildGraph(_entities, g.groupId, _nextG, { fill: null });
-            this._keepFill(_entities);
-            this.refreshGraphControls();
-            this.updateHistory();
+            g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
+            this._keepFill(this._rebuildInPlace(g, { fill: null }));
         }
         this.writeLocalState();
     }
@@ -367,6 +362,37 @@ export class CardOperations
         // (g.entities' are the store's own entries: saved with them)
         for( const e of _apply ) e.interpolation = algo;
         this.setCurvesInterpolation(g, _apply, algo);
+        this.writeLocalState();
+    }
+
+    // Graph g built again in its place, from its entities (options: more addGraph options for
+    // each, see rebuildGraph) → its entities
+    _rebuildInPlace(g, options = {})
+    {
+        const _entities = g.entities;
+        const _nextG = this.nextGraph(g);
+        this.detachGraph(g);
+        this.rebuildGraph(_entities, g.groupId, _nextG, options);
+        this.refreshGraphControls();
+        this.updateHistory();
+        return _entities;
+    }
+
+    // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
+    // showMinMax) set to value on each, saved so — the graph rebuilt in its place. A fill:
+    // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
+    // color chosen: kept as the curve's own (colorSet), its fill of its color following it
+    setCurvesLook(g, entities, field, value)
+    {
+        for( const e of entities ) {
+            if( field === 'color' ) {
+                if( e.fill === fillValue(true, e.color) ) e.fill = fillValue(true, value);
+                e.color = value;
+                e.colorSet = true;
+            } else
+                e[field] = field === 'fill' ? fillValue(value, e.color) : value;
+        }
+        this._rebuildInPlace(g);
         this.writeLocalState();
     }
 

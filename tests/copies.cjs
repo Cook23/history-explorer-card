@@ -26,7 +26,7 @@ module.exports = async function()
     });
     await t.step('each curve its own: one hidden, one changed to stepped — the other unchanged, both kept after a reload', async () => {
         const p = await t.E('legendPt(1,0)'); await t.page.mouse.click(p.x, p.y); await t.wait(800);
-        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.showEntityTypeMenu(0, 'sensor.power', g, 100, 100); I.entityTypeMenuClicked(0, 'line', 'stepped'); })()`); await t.wait(1000);
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.showEntityTypeMenu(0, 'sensor.power', g, { from: 'label', clientX: 100, clientY: 100 }); I.entityTypeMenuClicked(0, 'line', 'stepped'); })()`); await t.wait(1000);
         const modes = () => t.E(`el.instance.store.list.filter(e=>e.entity==='sensor.power').map(e=>(e.copy||0)+':'+(e.lineMode||'-')+':'+!!e.hidden).join(' ')`);
         const before = { shown: await shown(t), modes: await modes() };
         await reload(t);

@@ -26,7 +26,7 @@ module.exports = async function()
         const i=g.entities.findIndex(e=>e.entity==='${id}'); const d=g.chart.data.datasets[i];
         return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!d?.hidden, graphs: el.instance.graphs.length }; })()`);
     const menu = (id, act) => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'));
-        I.showEntityTypeMenu(0, '${id}', g, 100, 100); ${act} })()`);
+        I.showEntityTypeMenu(0, '${id}', g, { from: 'label', clientX: 100, clientY: 100 }); ${act} })()`);
     const setInterp = (id, a) => menu(id, `I.entityInterpolationClicked(0, '${a}');`).then(() => t.wait(500));
     const setType = (id, type, mode) => menu(id, `I.entityTypeMenuClicked(0, '${type}', ${mode ? `'${mode}'` : 'null'});`).then(() => t.wait(1500));
     const legendPtOf = id => t.E(`(()=>{ const all=el.instance.graphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));

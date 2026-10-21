@@ -33,7 +33,7 @@ module.exports = async function()
         return Date.parse(t1[0]) < Date.parse(t0[0]) - 20 * HOUR ? true : `${t0} -> ${t1}`;
     });
     await t.step('the type menu turns the curve into bars, with their interval selector', async () => {
-        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityTypeMenu(0, g.entities[0].entity, g); I.entityTypeMenuClicked(0, 'bar', null); })()`);
+        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityTypeMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); I.entityTypeMenuClicked(0, 'bar', null); })()`);
         await t.wait(1500);
         const g = await t.E(`[inst().graphs[0].type, !!inst()._this.querySelector('#bd-' + inst().graphs[0].id)]`);
         return g[0] === 'bar' && g[1] ? true : JSON.stringify(g);

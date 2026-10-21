@@ -459,16 +459,16 @@ module.exports = async function()
         await t.E(`(()=>{ window.__picker=0; HTMLInputElement.prototype.showPicker = function(){ __picker++; }; })()`);
         const d = await at('#bx_0'); await t.page.mouse.click(d.x, d.y);
         const soon = await t.E('__picker'); await t.wait(900); const later = await t.E('__picker');
-        const shown = await t.E(`[el.instance._calendarInputs[0].value, el.instance.startTime.slice(0, 10)]`);
+        const shown = await t.E(`[el.querySelector('#bx_0').parentNode._pickers.date.value, el.instance.startTime.slice(0, 10)]`);
         // (three days ago: a local date)
         const day = await t.E(`(()=>{ const d=new Date(); d.setDate(d.getDate()-3); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })()`);
-        await t.E(`(()=>{ const i=el.instance._calendarInputs[0]; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
+        await t.E(`(()=>{ const i=el.querySelector('#bx_0').parentNode._pickers.date; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
         const [t0, t1, h] = await win(), live = await t.E('el.instance.isLive()');
         return soon === 0 && later === 1 && shown[0] === shown[1] && t0 === day + 'T00:00:00' && h === 24 && !live ? true : JSON.stringify({ soon, later, shown, t0, t1, day, h, live });
     });
     await t.step('the calendar: a day whose window reaches the present — real time, the range kept', async () => {
         const day = await t.E(`(()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })()`);
-        await t.E(`(()=>{ const i=el.instance._calendarInputs[0]; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
+        await t.E(`(()=>{ const i=el.querySelector('#bx_0').parentNode._pickers.date; i.value='${day}'; i.dispatchEvent(new Event('change')); })()`); await t.wait(1200);
         const [, t1, h] = await win(), live = await t.E('el.instance.isLive()');
         const late = await t.E(`Math.abs(Date.now() - new Date(${JSON.stringify(t1)}).getTime())`);
         return live && late < 3 * 3600e3 && h === 24 ? true : JSON.stringify({ t1, late, h, live });

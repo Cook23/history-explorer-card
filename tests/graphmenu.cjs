@@ -37,11 +37,11 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display (open), interpolation, layout (the points, the Y axis)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, layout (the Y axis, a switch)', async () => {
         await graphMenu('rain');
         const m = await menu(); await click('layout'); const l = await menu();
-        return m === 'rain || Display ▸* | Interpolation ▸ | Layout ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Display ▸ | Interpolation ▸ | Layout ▸* || Show the points | Lock the Y axis | Cut' ? true : `${m} / ${l}`;
+        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Layout ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
+            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Layout ▸* || Y axis locked | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -49,14 +49,15 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
         await graphMenu('rain'); const late = await menu();
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
-        return /Layout ▸\* \|\| Show the points/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
+        return /Layout ▸\* \|\| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
-    await t.step('Lock the Y axis: locked; the menu then offers to unlock it, which releases it', async () => {
-        await graphMenu('rain'); await click('layout'); await click('ylock');
-        const r = { locked: await t.E(`lockOf(${await gi('rain')})`) };
-        await graphMenu('rain'); r.menu = await menu(); await click('layout'); await click('ylock');
+    await t.step('Y axis locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
+        const sw = () => t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
+        await graphMenu('rain'); await click('layout'); const r = { off: await sw() }; await click('ylock');
+        r.locked = await t.E(`lockOf(${await gi('rain')})`);
+        await graphMenu('rain'); await click('layout'); r.on = await sw(); await click('ylock');
         r.released = await t.E(`lockOf(${await gi('rain')})`);
-        return r.locked === 1 && r.menu.includes('Unlock the Y axis') && r.released === 0 ? true : JSON.stringify(r);
+        return r.off === 'false' && r.locked === 1 && r.on === 'true' && r.released === 0 ? true : JSON.stringify(r);
     });
     await t.step('a right click on the zone opens the same menu', async () => {
         await t.contextMenu(await t.E(`moPt(${await gi('tank')})`)); await t.wait(500);

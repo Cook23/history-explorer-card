@@ -45,10 +45,10 @@ module.exports = async function()
     const ds = `el.instance.graphs[0].chart.data.datasets.map(d=>d.hecInterpolation).join(',')`;
     await t.step('a smart curve\'s type menu offers Interpolation, after Display', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        const v = await t.E(menu); return /^Display ▸\* \| Interpolation ▸/.test(v) ? true : v;
+        const v = await t.E(menu); return /^Display ▸\* \| Appearance ▸ \| Interpolation ▸/.test(v) ? true : v;
     });
-    await t.step('keyboard: ← back to the menu, ↓ ↓ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
-        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
+    await t.step('keyboard: ← back to the menu, ↓ ↓ ↓ onto Interpolation, → opens the submenu, the algorithm in use in bold', async () => {
+        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
         await t.wait(200);
         const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom | B-spline' ? true : v;
     });
@@ -57,9 +57,9 @@ module.exports = async function()
         const v = await t.E(sub); const m = await t.E(`el.querySelector('#et_0').style.display`);
         return v === 'closed' && m === 'block' ? true : v + ' / ' + m;
     });
-    await t.step('Enter reopens it; ↓ ↓ Enter picks Steffen, saved with the entity, both menus closed', async () => {
+    await t.step('Enter reopens it; ↓ ↓ Enter picks Steffen, saved with the entity, both menus closed half a second later', async () => {
         await t.page.keyboard.press('Enter'); await t.wait(200);
-        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(400);
+        await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(900);
         const d = await t.E(ds); const p = await t.E(`el.instance.store.entry('sensor.power')?.interpolation`);
         const m = await t.E(`el.querySelector('#et_0').style.display+'/'+el.querySelector('#et_0_interp_sub').style.display`);
         return d.startsWith('steffen') && p === 'steffen' && m === 'none/none' ? true : [d, p, m].join(' ; ');
@@ -117,7 +117,7 @@ module.exports = async function()
     const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
         return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#et_0_interp_sub'), vw:innerWidth, vh:innerHeight }; })()`;
     const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
-    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, ${x}, ${y}); I.showTypeSubmenu(0, 'interp'); })()`;
+    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, { from: 'label', clientX: ${x}, clientY: ${y} }); I.showTypeSubmenu(0, 'interp'); })()`;
 
     // ── Position ──
     t = await openCard(card(LINE), { height: 700 });
@@ -152,7 +152,7 @@ module.exports = async function()
     await t.wait(2500);
     await t.step('in a shadow root: focus moves to the submenu, both stay open; keyboard choice applied', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
-        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
+        for( const k of ['ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowRight'] ) await t.page.keyboard.press(k);
         await t.wait(500);   // (longer than the focusout check)
         const open = await t.E(`el.querySelector('#et_0').style.display + '/' + el.querySelector('#et_0_interp_sub').style.display`);
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter');

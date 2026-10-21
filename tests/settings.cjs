@@ -41,7 +41,7 @@ module.exports = async function()
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
         return r.m === 'Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
-            && /panel/i.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
+            && /Enhanced native history/.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12 }) ? true : JSON.stringify(r);
     });
     // With submenu sub of menu open: '' when the menu's lines are readable beside it (its
@@ -127,18 +127,14 @@ module.exports = async function()
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const v = await inputs(); await closeMenus();
         return JSON.stringify(v) === JSON.stringify({ longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20 }) ? true : JSON.stringify(v);
     });
-    await t.step('the info panel switch: confirmed in a submenu (Cancel: unchanged); saved on every device without any persistence option', async () => {
-        await openAll(); await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
-        const asked = { shown: await shown('#ei_0_sub'), marked: await t.E(`el.querySelector('#ei_0_cancel').dataset.selected`) };
-        await t.E(`el.querySelector('#ei_0_cancel').click()`); await t.wait(500);
-        const kept = await t.E(`el.querySelector('#ei_0').textContent`);
-        await t.E(`el.querySelector('#ei_0').click()`); await t.wait(300);
-        await t.E(`el.querySelector('#ei_0_ok').click()`); await t.wait(800);
-        const on = await t.E(`el.querySelector('#ei_0').textContent`);
-        if( !asked.shown || asked.marked !== '1' || !/enable/i.test(kept) ) return JSON.stringify({ asked, kept });
+    await t.step('the info panel switch (Enhanced native history): no confirmation, a click switches it; saved on every device without any persistence option', async () => {
+        const sw = () => t.E(`el.querySelector('#ei_0').getAttribute('aria-checked')`);
+        await openAll(); const off = await sw();
+        await t.E(`el.querySelector('#ei_0').click()`); await t.wait(800);
+        await openAll(); const on = await sw(); const asked = await t.E(`!!el.querySelector('#ei_0_sub')`); await closeMenus();
         await newDevice(YAML({ gestures: { longPress: 800 } })); await openAll();
-        const after = await t.E(`el.querySelector('#ei_0').textContent`); await closeMenus();
-        return /disable/i.test(on) && /disable/i.test(after) ? true : JSON.stringify({ on, after });
+        const after = await sw(); await closeMenus();
+        return off === 'false' && on === 'true' && !asked && after === 'true' ? true : JSON.stringify({ off, on, asked, after });
     });
     done(await t.close());
 

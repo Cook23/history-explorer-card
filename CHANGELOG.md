@@ -4,6 +4,24 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.36] - 2026-10-21
+
+### New — the Appearance submenu
+- The type menu's *Appearance ▸*, after *Display ▸*: *Color* (the browser's own color picker, the curve's color preselected — a bar's too), *Points* and *Extremes* (switches: `showPoints`, `showMinMax` everywhere or none), *Fill ▸* (*None*, *Solid*, *Fade*), *Width ▸* (1 to 5 px), *Line style ▸* (*Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot*) — each list opened in the submenu itself, as an attribute's sub-attributes in the selector (← or Escape: back), the value in use in bold. A choice is applied at once — the graph built again in its place — and saved with the entity as its option (`color`, `fill`, `width`, `dashMode`, `showMinMax`), as the interpolation; the graph's menu has it too, its color aside, for all its curves. Not for a timeline's or an arrowline's row (`_fillAppearance`, `setCurvesLook`, `openNativePicker`)
+- *Show the points* / *Hide the points* left *Layout ▸* for the *Points* switch
+- `dashMode: solid`: a solid line, as no `dashMode`
+- The info panel opened from a curve of the card — a click on its value, *Info* in its menu — shows it as it looks there: its type, its line mode, its interpolation, its color, its fill, its line's width and style, its points and its extremes (`keepInfoLook`, `takeInfoLook`); opened from anywhere else, as before. Its *Type* menu has *Appearance ▸* too
+
+### Changed — switches, and the menus showing a choice before they close
+- A choice on or off is a switch, in Home Assistant's shape — a thin track, a larger knob over it —, green and on the right when on, red and on the left when off: *Points*, *Extremes*, *Y axis locked* (it was *Lock the Y axis* / *Unlock the Y axis*), and in the options menu's *Global ▸* the info panel's, named *Enhanced native history* (it was *Enable* / *Disable history info panel*), without the confirmation it asked for — a second click undoes it (`switchLineHtml`, `setSwitch`)
+- A choice that changes what its menu shows — a display type, an interpolation, a look, a switch — is applied at once, the menu updated (the new type in bold, the switch moved) and kept open 0.5 s, then closed; another choice meanwhile is applied too, and the delay starts again (`_typeMenuChosen`, `_closeMenuSoon`, `MENU_CLOSE_DELAY_MS`). An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color*, a type for an entity being added — closes it at once, as before
+
+### Fixed — the type menu's title in a red dashed box in the info panel
+- The type menu told where it was opened from by whether it was given a position: the info panel's, opened under its *Type* link without one, was taken for an entity added again from the selector — its title in a red dashed box. The caller now says it (`showEntityTypeMenu`'s `from`: `add`, `duplicate`, `label`, `panel`)
+
+### Changed — code
+- The calendar's input and the color picker's: one function (`openNativePicker`); the selector's submenus and the appearance submenu filled by one (`fillMenuItems`); a graph built again in its place by one (`_rebuildInPlace`)
+
 ## [v1.2.35] - 2026-10-21
 
 ### Changed — the elastic box leaves a way it would hardly zoom
