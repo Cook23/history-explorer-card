@@ -116,9 +116,9 @@ that fixes it. The example then only checks that the rule holds.
 
 The floating icons (the handle, the padlock, the chain, the close button) never reserve room.
 Normally they need none: they sit in the left and right margins kept for the Y axes' labels,
-above the labels, with no conflict. In the ultra-compact layouts (the axes pushed to the
-edges, their labels inside, over the curves) there is no such margin: they go where they
-can, over something else, and take the clicks up to ½ × max(mouse precision, finger
+above the labels, with no conflict. Otherwise — whatever the reason, notably the
+ultra-compact layouts (the axes pushed to the edges, their labels inside, over the curves),
+but also a layout without a legend — they go where they can, over something else, and take the clicks up to ½ × max(mouse precision, finger
 precision) around their boxes (`deps/chart-hec.js` `_hecIconMargin`, `_hecTopTargetAt`).
 Never propose to reserve room for them.
 
