@@ -1487,10 +1487,14 @@
     } else if (_hName === 'zoomBox') {
       me._hecHideZoomSelection();
       document.removeEventListener('keydown', p.boxEscape, true);
-      // (each way the box spans beyond the slop: zoomed to it — the Y axes here, as a
-      // pinch does, the time by the card, given the box's ends; within it, left as it is)
-      var _wide = !p.boxCancelled && Math.abs(p.boxX1 - p.x0) > cfg.dragSlop;
-      var _tall = !p.boxCancelled && Math.abs(p.boxY1 - p.y0) > cfg.dragSlop;
+      // (each way the box zooms: the Y axes here, as a pinch does, the time by the card,
+      // given the box's ends — a way it spans beyond the slop and less than the plot area
+      // but its dead band: a pinch's dead band, at the other end — a pinch too small does
+      // nothing, a box nearly the plot area's size neither: it would hardly zoom)
+      var _a = me.chartArea, _keep = 1 - cfg.pinchDeadBand;
+      var _zooms = function (d, size) { return !p.boxCancelled && d > cfg.dragSlop && d < _keep * size; };
+      var _wide = _zooms(Math.abs(p.boxX1 - p.x0), _a.right - _a.left);
+      var _tall = _zooms(Math.abs(p.boxY1 - p.y0), _a.bottom - _a.top);
       if (_tall && me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false) me._hecZoomYTo(p.y0, p.boxY1);
       fire(c, 'dragend', undefined, undefined, _wide ? { zoomBox: true, zoomSelectFactor0: me._hecPlotFactor(p.x0), zoomSelectFactor1: me._hecPlotFactor(p.boxX1) } : { zoomBox: true });
     } else {
