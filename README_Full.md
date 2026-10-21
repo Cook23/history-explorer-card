@@ -768,7 +768,7 @@ graphs:
 
 ## Y axis scaling
 
-By default the min/max scales for the Y axis are adjusted automatically to the data you are currently viewing.
+By default the min/max scales for the Y axis are adjusted automatically to the data you are currently viewing: the padlock is open, in green. Locked, it is closed, in red (the theme's own green and red).
 
 Pressing the axis lock icon — or *Lock the Y axis* in the [graph menu](#the-graph-menu-cut-and-paste) — will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
 

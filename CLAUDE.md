@@ -75,8 +75,9 @@ what changed, when, or what it was before. No version number in them — no "(1.
 "📋 Version highlights" section of README.md (before the table of contents, formatted as
 lowpass_dt's): the only place naming versions. It lists only the versions of its own branch
 (1.1 on `main`, 1.2 on `v1.2-dev`, never mixed), each the one version where an important
-functional improvement appeared and works — never a range of versions. It is never deleted;
-README_Full links to it. What
+functional improvement appeared and works — never a range of versions; more options, a step or
+a polish of an improvement already listed is not a highlight (CHANGELOG only). It is never
+deleted; README_Full links to it. What
 changed and when goes to the CHANGELOG (and the release notes). An option kept only for
 compatibility is described as it is today ("accepted, no effect"), without its history.
 Before any README edit, check the whole file against this rule.

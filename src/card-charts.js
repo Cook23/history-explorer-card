@@ -7,6 +7,7 @@
 import { i18n } from "./languages.js";
 import { stateLabel } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
+import { fillValue } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -146,13 +147,6 @@ export class CardCharts
                 },
                 topClipMargin : 4,
                 bottomClipMargin: 4,
-                // (a timeline's or an arrowline's room for the handle, above its rows — none on a
-                // narrow card, where it's in a box over them: _controlsBackdrop)
-                layout: {
-                    padding: {
-                        top: this._controlsRoom(graphtype)
-                    }
-                },
                 hecControlsBackdrop: this._controlsBackdrop(),
                 animation: {
                     duration: 0
@@ -531,20 +525,13 @@ export class CardCharts
     }
 
     // The controls at a graph's top left (the handle, the padlock, the chain icon) on a
-    // narrow card: their boxes as opaque as the Y labels', over the legend or the rows,
-    // taking no room (Chart.js hecControlsBackdrop) — else false: half see-through, beside
-    // the legend's first line, as much room as they need (the Y axes' labels and units
-    // keep theirs)
+    // narrow card: their boxes as opaque as the Y labels', over the legend or the rows
+    // (Chart.js hecControlsBackdrop) — else false: half see-through, dimming what is under
+    // them (a timeline's first row, the Y labels), beside the legend's first line when it
+    // fits there. Never any room of their own
     _controlsBackdrop()
     {
         return this.narrowCard();
-    }
-
-    // The room above a timeline's or an arrowline's rows for its handle (px): none on a
-    // narrow card (_controlsBackdrop)
-    _controlsRoom(graphtype)
-    {
-        return ( graphtype === 'timeline' || graphtype === 'arrowline' ) && !this.narrowCard() ? 24 : 0;
     }
 
     // Each graph's Y labels placed, its text sized and its controls laid out as the card's
@@ -568,7 +555,6 @@ export class CardCharts
             }
             for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
             _set(o, { hecControlsBackdrop: this._controlsBackdrop() });
-            _set(o.layout?.padding, { top: this._controlsRoom(g.chart.config.type) });
             _set(o.legend?.labels, { fontSize: _sizes.text });
             _set(o.elements, { font: _sizes.timeline });
             if( _changed ) g.chart.update(0);
@@ -719,7 +705,7 @@ export class CardCharts
                 "bColor": this.entityColor(d),
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar is filled with its own color)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill,
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d)) : d.fill,
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
                 "mode": d.lineMode || this.pconfig.defaultLineMode,
