@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.36] - 2026-10-21
+## [v1.2.37] - 2026-10-21
 
 ### New — the Appearance submenu
 - The type menu's *Appearance ▸*, after *Display ▸*: *Color* (the browser's own color picker, the curve's color preselected — a bar's too), *Points* and *Extremes* (switches: `showPoints`, `showMinMax` everywhere or none), *Fill ▸* (*None*, *Solid*, *Fade*), *Width ▸* (1 to 5 px), *Line style ▸* (*Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot*) — each list opened in the submenu itself, as an attribute's sub-attributes in the selector (← or Escape: back), the value in use in bold. A choice is applied at once — the graph built again in its place — and saved with the entity as its option (`color`, `fill`, `width`, `dashMode`, `showMinMax`), as the interpolation; the graph's menu has it too, its color aside, for all its curves. Not for a timeline's or an arrowline's row (`_fillAppearance`, `setCurvesLook`, `openNativePicker`)
