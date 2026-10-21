@@ -168,7 +168,9 @@ module.exports = async function()
     const subOf = key => t.E(`[...el.querySelectorAll('#et_0_${key}_sub a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
     const items = () => t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>a.textContent).join(' | ')`);
     const closeAll = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1390); await t.wait(400); };
-    const pick = async (gIdx, key, id) => { await t.longPress(await t.E(`moPt(${gIdx})`)); await click(key); await click(id); };
+    // (a choice: the menu closed half a second after it's made — waited for: a press while
+    // it's open would only close it)
+    const pick = async (gIdx, key, id) => { await t.longPress(await t.E(`moPt(${gIdx})`)); await click(key); await click(id); await t.wait(400); };
     await t.step('Display on a graph: every type, the one all its curves share marked', async () => {
         await t.longPress(await t.E('moPt(0)')); await click('rep');
         const v = await subOf('rep'); await closeAll();

@@ -76,7 +76,8 @@ module.exports = async function()
     // ── From the entity selector ──
     t = await openCard(card({ graphs: [] }), { mock: { series: true }, height: 1100 });
     await t.wait(800);
-    const sub = () => t.E(`(()=>{ const s=el.querySelector('#es_0_series'); return s.style.display==='none' ? 'closed' : [...s.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
+    // (the last series submenu open over the dropdown — the cascade —, else 'closed')
+    const sub = () => t.E(`(()=>{ const s=(el.querySelector('#es_0')._cascade||[]).slice(1).pop(); return !s || s.style.display==='none' ? 'closed' : [...s.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
     const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._menuEntityId; })()`);
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
@@ -97,15 +98,15 @@ module.exports = async function()
         const v = await sub(); await closeAll();
         return v === 'Value (rainy)* | Temperature (21.7 °C) | Apparent temperature (29 °C) | Humidity (85 %) | Pressure (1016.4 hPa) | Wind bearing (130 °) | Wind gust speed (0 km/h) | Wind speed (14.4 km/h) | Forecast ▸' ? true : v;
     });
-    await t.step('sub-attributes: a list of dictionaries marked ▸, opening its items over the attributes, each ▸ too, then their values (a date not offered, a temperature in its unit); ← back one level; the entity\'s line again: its attributes', async () => {
+    await t.step('sub-attributes: a list of dictionaries marked ▸, opening its items in a submenu over the attributes, each ▸ too, then their values in one over it (a date not offered, a temperature in its unit); ← closes the last one; the entity\'s line again: its attributes', async () => {
         await closeAll(); await search('villeveyrac'); await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]'); await t.wait(400);
         await t.page.click('#es_0_series a:last-child'); await t.wait(300); const l1 = await sub();
-        await t.page.click('#es_0_series a:first-child'); await t.wait(300); const l2 = await sub();
+        await t.page.click('#es_0_series_more a:first-child'); await t.wait(300); const l2 = await sub();
         await t.page.keyboard.press('ArrowLeft'); await t.wait(300); const back = await sub();
         // (the entity's line: on its left, the submenu over the rest of it)
         await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]', { position: { x: 4, y: 6 } }); await t.wait(400); const again = await sub();
-        await t.page.click('#es_0_series a:last-child'); await t.wait(300); await t.page.click('#es_0_series a:first-child'); await t.wait(300);
-        await t.page.click('#es_0_series a[data-series="weather.villeveyrac.forecast.0.temperature"]'); await t.wait(500);
+        await t.page.click('#es_0_series a:last-child'); await t.wait(300); await t.page.click('#es_0_series_more a:first-child'); await t.wait(300);
+        await t.page.click('#es_0_series_more_more a[data-series="weather.villeveyrac.forecast.0.temperature"]'); await t.wait(500);
         const m = await typeMenuFor(); await closeAll();
         const ok = l1 === '0 ▸* | 1 ▸' && l2 === 'Condition (sunny)* | Temperature (23.5 °C) | Templow (14 °C)' && back === l1 && /^Value \(rainy\)\*/.test(again) && /Forecast ▸$/.test(again)
             && m === 'weather.villeveyrac.forecast.0.temperature';

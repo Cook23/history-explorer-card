@@ -59,7 +59,7 @@ export class CardToolbar
                 <div id="es_${i}_choice" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 ${typeMenuHtml(i, true)}
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
-                ${optionsMenuHtml(i, this.statistics.enabled)}
+                ${optionsMenuHtml(i)}
             </div>`;
 
         if( tools ) html += `
@@ -140,8 +140,6 @@ export class CardToolbar
         // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
         // back to the default range)
         this._this.querySelector(`#bz_${i}`)?.addEventListener('dblclick', this.defaultRange.bind(this), false);
-        this._this.querySelector(`#ef_${i}`)?.addEventListener('click', this.exportFile.bind(this), false);
-        this._this.querySelector(`#eh_${i}`)?.addEventListener('click', this.exportStatistics.bind(this), false);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
         // A click on the toolbar beside its small buttons — none under it: the one picked
         // (Chart.hecUi.pick: the nearest, unless about halfway between two)
@@ -189,9 +187,6 @@ export class CardToolbar
         // The entity field's prompt: "Loading…" until its list is built (see requestEntityCollection)
         const _in = this._this.querySelector(`#b7_${i}`);
         if( _in ) _in.placeholder = i18n(this.entityListReady() ? 'ui.label.type_to_search' : 'ui.label.loading');
-        // The menus' labels — updated here so language is already set
-        this.relabelTypeMenu(i);
-        this.relabelOptionsMenu(i);
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
             by.children[0].innerHTML = i18n('ui.ranges.l_hour');
@@ -484,7 +479,9 @@ export class CardToolbar
         Object.assign(_in, attrs);
         _in.value = value;
         _in._onPick = onPick;
-        try { _in.showPicker(); } catch( e ) { _in.focus(); _in.click(); }
+        // (opened once laid out at its place: a field just added has none yet — Chrome then
+        // opens its picker at the page's top left)
+        requestAnimationFrame(() => { try { _in.showPicker(); } catch( e ) { _in.focus(); _in.click(); } });
     }
 
     // The toolbar's date: the time window's start, as long as its room allows (resizeSelector)
