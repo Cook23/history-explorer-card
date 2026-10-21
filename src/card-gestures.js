@@ -33,6 +33,12 @@ export class CardGestures
             }
             else if( _action ) this._endCut();
         }
+        // (the magnifier on: any gesture on a graph but the elastic box's drag ends it, and
+        // goes on as usual — a drag on the plot area is the box's, ended at its dragend; a
+        // pinch, at its end: onTimePan)
+        if( this.state.zoomMode && ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType) &&
+            !( info.gestureType === 'dragstart' && info.zone === 'plot' ) )
+            this.endZoomMode();
         switch( info.gestureType ) {
             case 'click':         return this._onGraphClick(info, g);
             // (the second press of a double-click or of a tap-then-drag: the first
@@ -44,6 +50,7 @@ export class CardGestures
             case 'dragmove':      return this._onDragMove(info, g);
             case 'dragovergraph': return this._onDragOver(info, g);
             case 'dragend':       return this._onDragEnd(info, g);
+            case 'zoombox':       return this._onZoomBox(info, g);
         }
     }
 
@@ -156,7 +163,6 @@ export class CardGestures
         } else if( info.zone === 'lockAndHandle' ) {
             this._drag = { kind: 'graph', g };
         } else {
-            if( this.state.zoomMode ) g.chart.options.tooltips.enabled = false;
             return;
         }
         this._startAutoScroll(info.clientY);
@@ -197,7 +203,16 @@ export class CardGestures
         this._freezeChart(g);
     }
 
-    // The drag ends: the drop (info.drop, resolved by Chart.js) or the zoom selection
+    // The elastic box starts (Chart.js's, a drag mostly vertical or any drag with the
+    // magnifier on): the magnifier lit up while it's drawn, the tooltips off
+    _onZoomBox(info, g)
+    {
+        this.startZoomMode();
+        g.chart.options.tooltips.enabled = false;
+    }
+
+    // The drag ends: the drop (info.drop, resolved by Chart.js) or the elastic box — its
+    // time (zoomSelectFactor0/1, the Y axes zoomed by Chart.js), the magnifier off
     _onDragEnd(info, g)
     {
         const d = this._drag;
@@ -205,6 +220,7 @@ export class CardGestures
             g.chart.options.tooltips.enabled = true;
             if( info.zoomSelectFactor0 !== undefined && info.zoomSelectFactor1 !== undefined )
                 this.zoomToSelection(info.zoomSelectFactor0, info.zoomSelectFactor1);
+            if( info.zoomBox ) this.endZoomMode();
             return;
         }
         this._drag = null;
@@ -249,6 +265,8 @@ export class CardGestures
                 this.updateHistory();
             }
             this._pinchLive = false;
+            // (a pinch over: the magnifier off, as at the end of any gesture on a graph)
+            if( info.source === 'pinch' ) this.endZoomMode();
         }
     }
 
@@ -353,15 +371,24 @@ export class CardGestures
             _g.chart.options.handleButtons = this._cutButtons(_g);
             _g.chart.update();
         }
-        // (a press outside the graphs, or Escape — after the menu's own click is over)
-        this._cutListeners = {
-            pointerdown: (e) => { if( !this.graphs.some(_g => e.composedPath().includes(this.graphDiv(_g))) ) this._endCut(); },
-            keydown: (e) => { if( e.key === 'Escape' ) this._endCut(); },
+        this._cutStop = this.listenOutsideGraphs(() => this._endCut());
+    }
+
+    // A mode of the card (the cut, the magnifier) ended by a press outside the graphs — but on
+    // the elements keep (the button turning it on and off) — or Escape: end() called; listened
+    // to once the click that started the mode is over. → stops listening
+    listenOutsideGraphs(end, keep = [])
+    {
+        const _on = {
+            pointerdown: (e) => {
+                const _path = e.composedPath();
+                if( !this.graphs.some(g => _path.includes(this.graphDiv(g))) && !keep.some(k => k && _path.includes(k)) ) end();
+            },
+            keydown: (e) => { if( e.key === 'Escape' ) end(); },
         };
-        setTimeout(() => {
-            if( !this._cut ) return;
-            for( const t in this._cutListeners ) document.addEventListener(t, this._cutListeners[t], true);
-        }, 0);
+        let _listening = true;
+        setTimeout(() => { if( _listening ) for( const t in _on ) document.addEventListener(t, _on[t], true); }, 0);
+        return () => { _listening = false; for( const t in _on ) document.removeEventListener(t, _on[t], true); };
     }
 
     // The buttons of graph g's lock+handle zone during the cut: disabled (struck through)
@@ -397,8 +424,8 @@ export class CardGestures
     {
         if( !this._cut ) return;
         this._cut = null;
-        for( const t in this._cutListeners ?? {} ) document.removeEventListener(t, this._cutListeners[t], true);
-        this._cutListeners = null;
+        this._cutStop?.();
+        this._cutStop = null;
         for( const _g of this.graphs ) {
             if( !_g.chart.options.handleButtons ) continue;
             _g.chart.options.handleButtons = null;

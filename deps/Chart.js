@@ -7438,10 +7438,16 @@
 
             me.afterTickToLabelConversion();
 
-            // Optionally remove first and last label (Alex)
+            // Optionally remove first and last label (Alex) — (fork) only those off the grid:
+            // an axis' range set by hand (the Y lock) ends where it ends, its labels there any
+            // value ('12.37'); a bound on the grid, a multiple of the step between the labels
+            // inside, keeps its label (a logarithmic axis, whose step varies: both removed)
             if( me.options.ticks.removeEdgeTicks ) {
-                labels[0] = ' ';
-                labels[labels.length - 1] = ' ';
+                var _v = me.ticksAsNumbers || [];
+                var _step = me.options.type !== 'logarithmic' && _v.length > 2 ? Math.abs(_v[2] - _v[1]) : 0;
+                var _offGrid = function (v) { var q = v / _step; return !_step || typeof v !== 'number' || Math.abs(q - Math.round(q)) > 1e-6; };
+                if( _offGrid(_v[0]) ) labels[0] = ' ';
+                if( _offGrid(_v[_v.length - 1]) ) labels[labels.length - 1] = ' ';
             }
 
             me.ticks = labels; // BACKWARD COMPATIBILITY

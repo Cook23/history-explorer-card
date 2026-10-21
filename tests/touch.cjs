@@ -56,6 +56,16 @@ module.exports = async function()
         const y = await t.scrollY(); const r1 = await E('yRange(1)');
         return r0.join() !== r1.join() && y === 0 ? true : `scrollY=${y} y ${r0} -> ${r1}`;
     });
+    await step('the magnifier: a finger\'s drag over the plot draws the same elastic box — the time and the Y axis zoomed to it, the mode ended', async () => {
+        const li = await lineGraph();
+        const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
+        await E('el.instance.toggleZoom()');
+        const w0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.45)`);
+        await t.swipe({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 50 });
+        const w1 = await win(), y1 = await E(`yRange(${li})`), mode = await E('el.instance.state.zoomMode');
+        await E(`graphAt(${li}).chart.hecSetYAxisLocked(false)`); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
+        return w1[1] - w1[0] < w0[1] - w0[0] && y1[1] - y1[0] < y0[1] - y0[0] && !mode ? true : JSON.stringify({ w0, w1, y0, y1, mode });
+    });
     await step('tap then drag the move handle reorders graphs', async () => {
         const g0 = await t.graphs();
         await t.tapDrag(await E('moPt(3)'), await E('graphPtAt(0,0.2)'));

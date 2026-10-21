@@ -129,15 +129,42 @@ export class CardTimeRange
         this.updateHistory();
     }
 
+    // The magnifier — the elastic box's mode: turned on by a click on it, or by a mouse's drag
+    // mostly vertical on a graph (Chart.js's zoombox); off by a click on it again,
+    // at the end of a gesture on a graph (the box's, or any other — which then goes on as
+    // usual), by a press outside the graphs, or Escape. On: every drag on a graph's plot area
+    // draws the box, a finger's too (the canvas takes the gesture: Chart.js zoomSelectMode,
+    // as the padlock's touch-action), the magnifier green
     toggleZoom()
     {
-        this.state.zoomMode = !this.state.zoomMode;
+        if( this.state.zoomMode ) this.endZoomMode(); else this.startZoomMode();
+    }
 
-        for( let i of this.ui.zoomButton )
-            if( i ) i.style.backgroundColor = this.state.zoomMode ? this.ui.darkMode ? '#ffffff3a' : '#0000003a' : '#0000';
+    startZoomMode()
+    {
+        if( this.state.zoomMode ) return;
+        this._setZoomMode(true);
+        this._zoomStop = this.listenOutsideGraphs(() => this.endZoomMode(), this.ui.zoomButton);
+    }
 
-        for( let g of this.graphs )
-            if( g.chart ) g.chart.options.zoomSelectMode = this.state.zoomMode;
+    endZoomMode()
+    {
+        if( !this.state.zoomMode ) return;
+        this._zoomStop?.();
+        this._zoomStop = null;
+        this._setZoomMode(false);
+    }
+
+    _setZoomMode(on)
+    {
+        this.state.zoomMode = on;
+        for( const b of this.ui.zoomButton ) {
+            const _p = b?.querySelector('path');
+            if( _p ) _p.setAttribute('fill', on ? 'var(--success-color, #4caf50)' : 'var(--primary-text-color)');
+        }
+        // (redrawn: a finger's drag is the box's in the mode — the canvas' touch-action)
+        for( const g of this.graphs )
+            if( g.chart ) { g.chart.options.zoomSelectMode = on; g.chart.render({ duration: 0, lazy: true }); }
     }
 
     // The zoom buttons and the duration menu: where the window goes, applyTimeRange's rule
@@ -428,8 +455,9 @@ export class CardTimeRange
         return moment(this.startTime) + moment(this.endTime).diff(this.startTime) * f;
     }
 
-    // A zoom selection, between factor0 and factor1 along the time axis: the time range
-    // becomes the nearest preset covering it, centred on it
+    // The elastic box's time (the magnifier's, or a mouse's drag mostly
+    // vertical), between factor0 and factor1 along the time axis: the time range becomes
+    // the nearest preset covering it, centred on it
     zoomToSelection(_factor0, _factor1)
     {
         let st0 = this.factorToTimecode(_factor0);
@@ -471,7 +499,6 @@ export class CardTimeRange
 
         }
 
-        this.toggleZoom();
         this.writeLocalState();
     }
 }
