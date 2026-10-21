@@ -2359,17 +2359,18 @@
       return this._hecTopTargetAt(x, y) === 'lockAndHandle';
     },
 
-    // The box around the icons shown in the lock+handle zone (canvas-relative), 24px high
-    // (4-28px), as the chain icon's: the padlock alone, or the handle alone, in a round one
-    // (each centered on it, see _hecUpdateMoveHandleIcon); two icons or more — the handle
-    // and the padlock, options.handleButtons — in an oblong one (from the canvas' edge to
-    // 4px past the zone); null when none is shown
+    // The box around the icons shown in the lock+handle zone (canvas-relative), CTRL_H high
+    // from CTRL_TOP, as the chain icon's, the icons' picking margin from the canvas' left
+    // edge (_hecIconMargin: the whole of its target on the card, the room beside it left to
+    // the Y labels and the legend): the padlock alone, or the handle alone, in a round one;
+    // two icons or more — the handle and the padlock, options.handleButtons — in an oblong
+    // one; null when none is shown
     _hecLockAndHandleRect: function () {
       var _h = this.options.moveHandleVisible !== false, _l = this._hecLockIconShown();
-      if (this._hecHandleButtons()) return { x: 0, y: CTRL_TOP, width: this._hecLockAndHandleWidth() + 4, height: CTRL_H };
-      if (_h && _l) return { x: 0, y: CTRL_TOP, width: this._hecLockAndHandleWidth(), height: CTRL_H };
-      if (_l) return { x: 16, y: CTRL_TOP, width: CTRL_W, height: CTRL_H };
-      return _h ? { x: 1, y: CTRL_TOP, width: CTRL_W, height: CTRL_H } : null;
+      var _x = _hecIconMargin();
+      if (this._hecHandleButtons()) return { x: _x, y: CTRL_TOP, width: this._hecLockAndHandleWidth() + 4, height: CTRL_H };
+      if (_h && _l) return { x: _x, y: CTRL_TOP, width: this._hecLockAndHandleWidth(), height: CTRL_H };
+      return _h || _l ? { x: _x, y: CTRL_TOP, width: CTRL_W, height: CTRL_H } : null;
     },
 
     // Where the handle's and the padlock's symbols are drawn (canvas-relative, their top
@@ -2380,10 +2381,10 @@
       if (!_r) return null;
       var _both = this.options.moveHandleVisible !== false && this._hecLockIconShown();
       return {
-        handle: { x: _both ? CTRL_END : _r.x + (_r.width - HANDLE_W) / 2, y: _y(HANDLE_H) },
+        handle: { x: _both ? _r.x + CTRL_END : _r.x + (_r.width - HANDLE_W) / 2, y: _y(HANDLE_H) },
         // (the padlock 2px from the top, 3px from the bottom: its shackle thin, its body heavy —
         // centred as it is seen)
-        lock: { x: _both ? CTRL_END + HANDLE_W + CTRL_GAP : _r.x + (_r.width - LOCK_W) / 2, y: CTRL_TOP + 2 }
+        lock: { x: _both ? _r.x + CTRL_END + HANDLE_W + CTRL_GAP : _r.x + (_r.width - LOCK_W) / 2, y: CTRL_TOP + 2 }
       };
     },
 
@@ -2415,7 +2416,8 @@
       if (!b || !this._hecInLockAndHandleZone(x, y)) return null;
       // (each icon: its slot of the zone, less 3px on each side and 4px above and below)
       var _w = this._hecLockAndHandleWidth() / b.length;
-      var rects = b.map(function (btn, k) { return { x: k * _w + 3, y: 4, width: _w - 6, height: 20 }; });
+      var _x = this._hecLockAndHandleRect().x;
+      var rects = b.map(function (btn, k) { return { x: _x + k * _w + 3, y: 4, width: _w - 6, height: 20 }; });
       var _i = _hecPick(x, y, rects);
       return _i === PICK_BETWEEN ? PICK_BETWEEN : _i >= 0 ? b[_i] : null;
     },
@@ -2475,7 +2477,7 @@
         me._hecHandleButtonsEl = _el;
       }
       me._hecAttachToCanvasParent(_el);
-      _el.style.left = me.canvas.offsetLeft + 'px';
+      _el.style.left = (me.canvas.offsetLeft + me._hecLockAndHandleRect().x) + 'px';
       _el.style.top = me.canvas.offsetTop + 'px';
       _el.style.display = 'flex';
       // (rebuilt only when they change: called at each draw)
@@ -2548,11 +2550,12 @@
     },
 
     // The close button (options.closeButtonVisible): a floating icon like the lock+handle
-    // zone's, mirrored at the top right — a round box of 24px, 4-28px high, 1px from the
-    // graph's right edge (canvas-relative); null when hidden
+    // zone's, mirrored at the top right — a round box CTRL_W × CTRL_H from CTRL_TOP, the
+    // icons' picking margin from the graph's right edge (_hecIconMargin; canvas-relative);
+    // null when hidden
     _hecCloseButtonRect: function () {
       if (this.options.closeButtonVisible !== true || !this.width) return null;
-      return { x: this.width - CTRL_W - 1, y: CTRL_TOP, width: CTRL_W, height: CTRL_H };
+      return { x: this.width - CTRL_W - _hecIconMargin(), y: CTRL_TOP, width: CTRL_W, height: CTRL_H };
     },
 
     // The close button itself (×): a relay zone like the chain icon (_hecTouchOverlay) —
@@ -3344,7 +3347,7 @@
       // toggle, which doesn't need touch-action changes at all).
       var _moVisible = me.options.moveHandleVisible !== false || !!me._hecHandleButtons();
       var _mo = ensureOverlay('_hecMoveHandleTouchEl');
-      _mo.style.left = me.canvas.offsetLeft + 'px';
+      _mo.style.left = (me.canvas.offsetLeft + (_moVisible ? me._hecLockAndHandleRect().x : 0)) + 'px';
       _mo.style.top = me.canvas.offsetTop + 'px';
       _mo.style.width = _moVisible ? me._hecLockAndHandleWidth() + 'px' : '0px';
       _mo.style.height = _moVisible ? ( CTRL_TOP + CTRL_H + 4 ) + 'px' : '0px';
