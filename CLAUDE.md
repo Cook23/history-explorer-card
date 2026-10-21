@@ -112,6 +112,16 @@ around it. Search globally for the general cause it shows — which rule, in whi
 produces it for every case — explain that cause to the user, and propose the general rule
 that fixes it. The example then only checks that the rule holds.
 
+## Floating icons — set by the user, not negotiable
+
+The floating icons (the handle, the padlock, the chain, the close button) never reserve room.
+Normally they need none: they sit in the left and right margins kept for the Y axes' labels,
+above the labels, with no conflict. In the ultra-compact layouts (the axes pushed to the
+edges, their labels inside, over the curves) there is no such margin: they go where they
+can, over something else, and take the clicks up to ½ × max(mouse precision, finger
+precision) around their boxes (`deps/chart-hec.js` `_hecIconMargin`, `_hecTopTargetAt`).
+Never propose to reserve room for them.
+
 ## README structure — set by the user
 
 - The header holds the title, the links (README_Full, FORK_DESCRIPTION) and the disclaimer,
