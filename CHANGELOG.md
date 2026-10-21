@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.34] - 2026-10-21
+
+### Changed — the elastic box leaves a way it would hardly zoom
+- A box covering 90 % or more of the curves' area one way leaves that axis as it is — a pinch's dead band (`pinchDeadBand`, 10 %), at the other end: a pinch too small does nothing, a box nearly the curves' size neither, it would hardly zoom. A box the curves' whole height zooms the time only, the padlock left open (it zoomed the Y axis a few hundredths and closed the padlock); the curves' whole width, the Y axis only (`_hecEndDrag`, `zoomBox`)
+- Test (`mouse`): a box the plot area's whole height: the time zoomed, the Y axis as it was, the padlock open
+
 ## [v1.2.33] - 2026-10-21
 
 ### New — the elastic box
