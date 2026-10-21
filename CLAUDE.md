@@ -104,6 +104,11 @@ version…) is reported to the user, and decided together — never handled on o
 patch. A compatibility problem at a version change happens once; ugly code stays forever.
 Keep the code clean.
 
+A clean code and a clean architecture are priority goals, above every other goal (a
+rendering, the best use of the room…): never hundreds of particular cases. An improvement
+is taken only when it comes from a general rule that doesn't complicate the code beyond
+reason; otherwise the particular case stays as it is.
+
 ## An example is a symptom — set by the user, not negotiable
 
 An example the user gives (a screenshot, a width, an entity, a case) is a symptom, never
@@ -122,7 +127,8 @@ but also a layout without a legend — they go where they can, over something el
 the clicks up to ½ × max(mouse precision, finger precision) around their boxes
 (`deps/chart-hec.js` `_hecIconMargin`, `_hecTopTargetAt`). Free room, where there is some,
 is better used ("normally") than the fallback ("otherwise"): using the free room as well as
-possible is a goal, not an obligation — a particular case where it isn't optimal may exist.
+possible is a goal, not an obligation — a particular case where it isn't optimal may exist,
+and clean code comes first (see "No patch for a special case").
 Never propose to reserve room for them.
 
 ## README structure — set by the user
