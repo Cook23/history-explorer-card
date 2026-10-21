@@ -544,6 +544,17 @@
       });
     } });
 
+  // A touch on el while it takes the gesture (its touch-action: none — the padlock's zone, a
+  // label's, the canvas with the magnifier) is the card's alone: no element around the card
+  // gets it — Home Assistant's bottom sheet (its entity dialog on a phone) would follow it in
+  // JavaScript, whatever touch-action says, and close; a card that swipes, change page. Else
+  // it goes on as usual (a drag on the curves scrolls the page, or moves the sheet)
+  function hecKeepTouches(el) {
+    ['touchstart', 'touchmove'].forEach(function (t) {
+      el.addEventListener(t, function (ev) { if (el.style.touchAction === 'none') ev.stopPropagation(); });
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
@@ -863,6 +874,44 @@
         schedulePinch(c, pinch);
       }
     },
+    // (the floating icons — drawn over everything, the Y labels inside the plot too — take
+    // a drag first, as they take a click: _hecTopTargetAt)
+    {
+      // A swipe starting on a button of options.handleButtons (§1): reported at its end,
+      // up or down (dragend's swipe, with that button) — nothing drawn meanwhile
+      name: 'handleSwipe',
+      test: function (c, p) { return !!c.me._hecHandleButtonAt(p.x0, p.y0); },
+      onMove: function () {}
+    },
+    {
+      name: 'lockAndHandle',
+      test: function (c, p) {
+        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0) && !me._hecHandleButtons();
+        if (!_inZone) return false;
+        var _gRect = me.canvas.getBoundingClientRect();
+        me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
+        return true;
+      },
+      onMove: function (c, p, e) {
+        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        _hecDragMoveTick(c, p, e);
+        if (e.native && e.native.clientX !== undefined) {
+          var _hOther = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
+          if (_hOther) {
+            var _hr = _hOther.canvas.getBoundingClientRect();
+            var _hInsertBefore = e.native.clientY < _hr.top + _hr.height / 2;
+            // (the card decides there whether that place is allowed: insertionForbidden)
+            dragOver(c, _hOther, e.native, { insertBefore: _hInsertBefore });
+            var _hy = _hInsertBefore ? _hr.top : _hr.bottom;
+            var _hColor = _hOther.options.insertionForbidden ? 'var(--error-color,#f44336)' : undefined;
+            me._hecShowInsertionMarker(_hr.left, _hy, _hr.width, 3, true, _hColor);
+          } else {
+            me._hecHideInsertionMarker();
+          }
+        }
+      }
+    },
     {
       name: 'yAxisPan',
       test: function (c, p) {
@@ -957,54 +1006,39 @@
       }
     },
     {
-      name: 'zoomSelect',
+      // The elastic box: a drag in the plot area draws a box, growing with the pointer; at
+      // its end the time and the Y axes zoom to it (_hecEndDrag) — in zoom select mode
+      // (the card's magnifier), any drag there, whatever the pointer; else a mouse's drag
+      // mostly vertical as it starts (mostly horizontal: panX) — a finger's or a pen's
+      // vertical move is the page's scroll (the canvas' touch-action: pan-y). Escape, or a
+      // box back within the slop, cancels it. Tried last but panX: every object's drag
+      // (the Y axis, a label, a floating icon) comes first
+      name: 'zoomBox',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        return me.options.zoomSelectMode === true && me.chartArea &&
-          p.x0 > me.chartArea.left && p.x0 < me.chartArea.right;
-      },
-      onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        if (!me.chartArea) return;
-        var _zX1 = Math.max(Math.min(e.x, me.chartArea.right), me.chartArea.left);
-        p.dragZoomSelectX1 = _zX1;
-        me._hecShowZoomSelection(p.x0, _zX1);
-      }
-    },
-    {
-      // A swipe starting on a button of options.handleButtons (§1): reported at its end,
-      // up or down (dragend's swipe, with that button) — nothing drawn meanwhile
-      name: 'handleSwipe',
-      test: function (c, p) { return !!c.me._hecHandleButtonAt(p.x0, p.y0); },
-      onMove: function () {}
-    },
-    {
-      name: 'lockAndHandle',
-      test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0) && !me._hecHandleButtons();
-        if (!_inZone) return false;
-        var _gRect = me.canvas.getBoundingClientRect();
-        me._hecShowDragGhost('', _gRect.width, _gRect.height, p.native ? p.native.clientX : undefined, p.native ? p.native.clientY : undefined, 'topleft', null);
+        var me = c.me, e = c.e, _a = me.chartArea;
+        if (!_a || p.x0 <= _a.left || p.x0 >= _a.right || p.y0 <= _a.top || p.y0 >= _a.bottom) return false;
+        // (an object first — a floating icon laid over the plot area, a legend label: the
+        // handlers above, or none; the box only from the plot itself)
+        if (me._hecTopTargetAt(p.x0, p.y0) !== -1) return false;
+        if (me.options.zoomSelectMode !== true &&
+          (c.pointerType !== 'mouse' || Math.abs(e.y - p.y0) <= Math.abs(e.x - p.x0))) return false;
+        p.boxEscape = function (ev) {
+          if (ev.key !== 'Escape') return;
+          p.boxCancelled = true;
+          me._hecHideZoomSelection();
+        };
+        document.addEventListener('keydown', p.boxEscape, true);
+        // (the box started — customEvent 'zoombox': the card lights its magnifier up)
+        fire(c, 'zoombox', p.x0, p.y0);
+        this.onMove(c, p, e);
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
-        _hecDragMoveTick(c, p, e);
-        if (e.native && e.native.clientX !== undefined) {
-          var _hOther = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
-          if (_hOther) {
-            var _hr = _hOther.canvas.getBoundingClientRect();
-            var _hInsertBefore = e.native.clientY < _hr.top + _hr.height / 2;
-            // (the card decides there whether that place is allowed: insertionForbidden)
-            dragOver(c, _hOther, e.native, { insertBefore: _hInsertBefore });
-            var _hy = _hInsertBefore ? _hr.top : _hr.bottom;
-            var _hColor = _hOther.options.insertionForbidden ? 'var(--error-color,#f44336)' : undefined;
-            me._hecShowInsertionMarker(_hr.left, _hy, _hr.width, 3, true, _hColor);
-          } else {
-            me._hecHideInsertionMarker();
-          }
-        }
+        var me = c.me, _a = me.chartArea;
+        if (!_a || p.boxCancelled) return;
+        p.boxX1 = Math.max(Math.min(e.x, _a.right), _a.left);
+        p.boxY1 = Math.max(Math.min(e.y, _a.bottom), _a.top);
+        me._hecShowZoomSelection(p.x0, p.y0, p.boxX1, p.boxY1);
       }
     },
     {
@@ -1450,10 +1484,15 @@
       var _sw = me._hecHandleButtonFields(p.x0, p.y0);
       _sw.swipe = Math.abs(_dy) > cfg.dragSlop ? (_dy < 0 ? 'up' : 'down') : null;
       fire(c, 'dragend', undefined, undefined, _sw);
-    } else if (_hName === 'zoomSelect') {
+    } else if (_hName === 'zoomBox') {
       me._hecHideZoomSelection();
-      fire(c, 'dragend', undefined, undefined, { zoomSelectFactor0: me._hecPlotFactor(p.x0),
-        zoomSelectFactor1: p.dragZoomSelectX1 !== undefined ? me._hecPlotFactor(p.dragZoomSelectX1) : undefined });
+      document.removeEventListener('keydown', p.boxEscape, true);
+      // (each way the box spans beyond the slop: zoomed to it — the Y axes here, as a
+      // pinch does, the time by the card, given the box's ends; within it, left as it is)
+      var _wide = !p.boxCancelled && Math.abs(p.boxX1 - p.x0) > cfg.dragSlop;
+      var _tall = !p.boxCancelled && Math.abs(p.boxY1 - p.y0) > cfg.dragSlop;
+      if (_tall && me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false) me._hecZoomYTo(p.y0, p.boxY1);
+      fire(c, 'dragend', undefined, undefined, _wide ? { zoomBox: true, zoomSelectFactor0: me._hecPlotFactor(p.x0), zoomSelectFactor1: me._hecPlotFactor(p.boxX1) } : { zoomBox: true });
     } else {
       if (_hName === 'panX' || p.dragShiftKey) panX(c, 'end');
       fire(c, 'dragend', undefined, undefined, { drop: _hecDropAt(c, p) });
@@ -3202,7 +3241,8 @@
     // responsibility, since the resulting time range is shared across every
     // graph, not just this one). Migrated verbatim from the card's own
     // overlay creation/fill logic.
-    _hecShowZoomSelection: function (x0, x1) {
+    // The elastic box (zoomBox) from (x0, y0) to (x1, y1), canvas-relative
+    _hecShowZoomSelection: function (x0, y0, x1, y1) {
       if (!this.canvas || !this.chartArea) return;
       var _el = this._hecZoomSelectionEl;
       if (!_el) {
@@ -3211,16 +3251,34 @@
         this.canvas.parentNode.insertBefore(_el, this.canvas);
         this._hecZoomSelectionEl = _el;
       }
+      // (the canvas' own resolution, at its CSS size: drawn in CSS pixels times _r)
       _el.width = this.canvas.width;
       _el.height = this.canvas.height;
+      _el.style.width = this.canvas.offsetWidth + 'px';
+      _el.style.height = this.canvas.offsetHeight + 'px';
       var _ctx = _el.getContext('2d');
       _ctx.clearRect(0, 0, _el.width, _el.height);
-      var _left = Math.min(x0, x1), _right = Math.max(x0, x1);
       var _cs = getComputedStyle(this.canvas.parentNode || this.canvas);
       var _themeColor = _cs.getPropertyValue('--secondary-text-color').trim() || '#888';
+      var _r = this.canvas.width / (this.canvas.offsetWidth || this.canvas.width);
+      var _x = Math.min(x0, x1) * _r, _y = Math.min(y0, y1) * _r, _w = Math.abs(x1 - x0) * _r, _h = Math.abs(y1 - y0) * _r;
       _ctx.globalAlpha = 0.13;
       _ctx.fillStyle = _themeColor;
-      _ctx.fillRect(_left, this.chartArea.top, _right - _left, this.chartArea.bottom - this.chartArea.top);
+      _ctx.fillRect(_x, _y, _w, _h);
+      _ctx.globalAlpha = 0.6;
+      _ctx.strokeStyle = _themeColor;
+      _ctx.lineWidth = _r;
+      _ctx.strokeRect(_x + _r / 2, _y + _r / 2, Math.max(0, _w - _r), Math.max(0, _h - _r));
+    },
+
+    // Every value Y axis zoomed to the values between two heights (canvas-relative), its
+    // lock engaged (_hecSetYRanges) — the elastic box's
+    _hecZoomYTo: function (y0, y1) {
+      var _lo = Math.max(y0, y1), _hi = Math.min(y0, y1);
+      this._hecSetYRanges(this._hecValueYAxes().map(function (a) {
+        var _log = a.opts.type === 'logarithmic', _v = function (y) { var v = a.scale.getValueForPixel(y); return _log ? Math.log10(Math.max(v, 1e-12)) : v; };
+        return [_v(_lo), _v(_hi)];
+      }));
     },
 
     _hecHideZoomSelection: function () {
@@ -3272,14 +3330,7 @@
         ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerout', 'contextmenu'].forEach(function (t) {
           _el.addEventListener(t, _forward);
         });
-        // A touch on the zone while it takes the gesture (touch-action: none) is the card's
-        // alone: no element around the card gets it — Home Assistant's bottom sheet (its
-        // entity dialog on a phone) would follow it in JavaScript, whatever touch-action
-        // says, and close; a card that swipes, change page. Else it goes on as usual (a
-        // drag on the curves scrolls the page, or moves the sheet)
-        ['touchstart', 'touchmove'].forEach(function (t) {
-          _el.addEventListener(t, function (ev) { if (_el.style.touchAction === 'none') ev.stopPropagation(); });
-        });
+        hecKeepTouches(_el);
         _el._hecChart = me;
         me[key] = _el;
       }
@@ -3305,6 +3356,12 @@
     _hecUpdateDragTouchOverlays: function () {
       var me = this;
       if (!me.canvas || !me.chartArea) return;
+
+      // (the canvas: a finger's vertical move scrolls the page — except in zoom select mode,
+      // where every finger's drag is the elastic box's: the canvas takes the gesture, as a
+      // zone does — hecKeepTouches)
+      me.canvas.style.touchAction = me.options.zoomSelectMode === true ? 'none' : 'pan-y';
+      if (!me._hecCanvasTouchesKept) { hecKeepTouches(me.canvas); me._hecCanvasTouchesKept = true; }
 
       function ensureOverlay(key) {
         var _el = me._hecTouchOverlay(key, 'move');

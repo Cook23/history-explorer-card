@@ -4,6 +4,21 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.33] - 2026-10-21
+
+### New — the elastic box
+- With a mouse, a drag on a graph's plot area mostly vertical as it starts (past the pointer's precision) draws an elastic box, growing with the pointer; mostly horizontal, it pans the time as ever. Released, the time zooms to the box — the round duration covering it, centred on its middle (`zoomToSelection`) — and every value Y axis of the graph to its values, the padlock closed (`_hecZoomYTo`), as a pinch's Y zoom. A box within the precision one way leaves that axis as it is (a tall, narrow box: the Y axis only); Escape during it, or a box within the precision both ways, applies nothing (`zoomBox`, Chart.js; `zoombox`, `dragend`'s `zoomBox`)
+- The magnifier is the elastic box's mode: on by a click on it, or by a mouse's drag mostly vertical (a finger's or a pen's vertical move stays the page's scroll); green while on, in the text's color while off (it was shown in inverse video). On, any drag on a graph's plot area draws the box — a finger's too: the canvas then takes every finger's move (`touch-action: none`), and a touch there reaches nothing around the card (Home Assistant's bottom sheet on a phone: the entity dialog) — as the padlock's zone, by the same function (`hecKeepTouches`). Off by a click on it again, at the end of a gesture on a graph (the box's, a pinch, or any other — which then goes on as usual), by a press outside the graphs, or Escape — as the cut mode, by the same function (`startZoomMode`, `endZoomMode`, `listenOutsideGraphs`). It drew a band the plot's height, the time only; a selection turned the magnifier on when it was off (`toggleZoom` in `zoomToSelection`)
+- Tests (`mouse`, `touch`, `panel`): the magnifier on, a drag on the curves in the entity dialog never reaching its bottom sheet; the magnifier green while on, off by a click on it again, a press outside the graphs, Escape; on, a click on a legend label ends it and shows/hides its curve; the box drawn, the magnifier lit up meanwhile, the time and the Y axis zoomed, the magnifier off; a drag mostly horizontal pans, no box; a tall, narrow box: the Y axis only; Escape: nothing; a pen's drag mostly vertical: no box; the magnifier with a finger
+
+### Fixed — a drag on a floating icon over the Y labels inside the plot
+- On a card where the Y labels are inside the plot (narrow, `look: mini`), a drag on the handle over them moved the Y axis instead of the graph: the floating icons — drawn over everything — now take a drag first, as they take a click (`handleSwipe`, `lockAndHandle` before `yAxisPan` in `HEC_DRAG_HANDLERS`); the elastic box only from the plot itself, never from an object
+- Test (`mouse`): a narrow card, a legend hidden, a vertical drag on the handle over the plot moves its graph — no box, the Y axis as it was
+
+### Fixed — the Y axis locked: its first and last labels gone
+- The padlock closed, the Y axis' first and last labels were always removed — meant for a range moved by hand, whose ends fall anywhere (`12.37`). They are now removed only when off the grid: the range shown when the padlock closes keeps them (`removeEdgeTicks`, `deps/Chart.js`)
+- Test (`mouse`): the Y axis locked at the range shown, its first and last labels kept
+
 ## [v1.2.32] - 2026-10-21
 
 ### Changed — the padlock open in green or closed in red, the handle not greyed, a smaller ×

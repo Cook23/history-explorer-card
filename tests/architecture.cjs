@@ -120,7 +120,7 @@ const STOCK_OPTIONS = new Set(['scales', 'layout', 'legend', 'tooltips', 'elemen
 // The exceptions: [rule, file, the text matched, why it's right there]
 const EXCEPTIONS = [
     ['store', 'src/history-explorer-card.js', 'pconfig.entities             =', 'the card creates the list the store then manages'],
-    ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'during a cut, a press anywhere on the page or Escape cancels it — the page, not a graph'],
+    ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'a mode (the cut, the magnifier): a press anywhere on the page or Escape ends it — the page, not a graph (listenOutsideGraphs)'],
     ['datasets', 'src/card-values.js', 'chart.data.datasets', "the values read a curve's own data there (its unit, its scale, its period, its color, hidden), never change it"],
     ['rendering', 'src/card-toolbar.js', 'getComputedStyle', "the toolbar's own layout"],
     ['rendering', 'src/card-menus.js', 'getComputedStyle', "a menu's own layout"],

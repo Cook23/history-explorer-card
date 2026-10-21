@@ -180,7 +180,7 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400);
         return open ? true : 'menu not open';
     });
-    await t.step('zoom mode: a drag over the plot selects a span, the range shrinks, the mode ends', async () => {
+    await t.step('zoom mode (the magnifier): a drag over the plot, any way, draws the elastic box — the range shrinks, the mode ends', async () => {
         await E('el.instance.toggleZoom()');
         const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
         const r0 = (await t.state()).range; const a = await E(`graphPtAt(${li},0.6)`);
@@ -189,6 +189,108 @@ module.exports = async function()
         const mode = await E('el.instance.state.zoomMode');
         const tooltips = await E(`el.instance.graphsInDisplayOrder()[${li}].chart.options.tooltips.enabled`);
         return r1[0] < r0[0] && mode === false && tooltips === true ? true : JSON.stringify({ r0, r1, mode, tooltips });
+    });
+    // ── The elastic box: a mouse's or a pen's drag mostly vertical over the plot ──
+    const boxGraph = async () => (await t.graphs()).findIndex(x => x.startsWith('l:'));
+    const span = r => r[1] - r[0];
+    const unlock = gi => E(`graphAt(${gi}).chart.hecSetYAxisLocked(false)`);
+    // (the pointer's moves, step by step, with what is drawn halfway — the box's overlay)
+    const manualDrag = async (a, c, mid, steps = 14) => {
+        const m = t.page.mouse; await m.move(a.x, a.y); await m.down(); let seen;
+        for( let i = 1; i <= steps; i++ ) { await m.move(a.x + (c.x - a.x) * i / steps, a.y + (c.y - a.y) * i / steps); if( i === steps >> 1 && mid ) seen = await mid(); await t.wait(15); }
+        await m.up(); await t.wait(900); return seen;
+    };
+    await t.step('a mouse drag mostly vertical over the plot: an elastic box drawn as it goes, the magnifier lit up; released, the time zoomed to it (a round duration around its middle), the Y axis to its values, locked; the magnifier left off', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
+        const r0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        const box = await manualDrag({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 60 }, () => E(`!!graphAt(${li}).chart._hecZoomSelectionEl && el.instance.state.zoomMode`));
+        const r1 = await win(), y1 = await E(`yRange(${li})`), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
+        const gone = await E(`!graphAt(${li}).chart._hecZoomSelectionEl`), mode = await E('el.instance.state.zoomMode');
+        await unlock(li);
+        await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
+        return box && gone && !mode && span(r1) < span(r0) && span(y1) < span(y0) && y1[0] >= y0[0] && y1[1] <= y0[1] && locked ? true : JSON.stringify({ box, gone, mode, r0, r1, y0, y1, locked });
+    });
+    await t.step('a mouse drag mostly horizontal: the time panned as ever, no box, the Y axis as it was', async () => {
+        const li = await boxGraph();
+        const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
+        const w0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.5)`);
+        const box = await manualDrag({ x: a.x, y: a.y }, { x: a.x - 120, y: a.y + 20 }, () => E(`!!graphAt(${li}).chart._hecZoomSelectionEl`));
+        const w1 = await win(), y1 = await E(`yRange(${li})`), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
+        return !box && w1[0] !== w0[0] && Math.abs(span(w1) - span(w0)) < 2000 && y1.join() === y0.join() && !locked ? true : JSON.stringify({ box, w0, w1, y0, y1, locked });
+    });
+    await t.step('a tall, narrow box (narrower than the precision): the Y axis zoomed, the time as it was', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const r0 = (await t.state()).range, y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        await manualDrag({ x: a.x, y: a.y - 30 }, { x: a.x + 3, y: a.y + 50 });
+        const r1 = (await t.state()).range, y1 = await E(`yRange(${li})`);
+        await unlock(li);
+        return r1.join() === r0.join() && span(y1) < span(y0) ? true : JSON.stringify({ r0, r1, y0, y1 });
+    });
+    await t.step('Escape during the box: nothing applied, the box gone', async () => {
+        const li = await boxGraph();
+        const r0 = (await t.state()).range, y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        await manualDrag({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 60 }, () => t.page.keyboard.press('Escape'));
+        const r1 = (await t.state()).range, y1 = await E(`yRange(${li})`), gone = await E(`!graphAt(${li}).chart._hecZoomSelectionEl`);
+        return r1.join() === r0.join() && y1.join() === y0.join() && gone ? true : JSON.stringify({ r0, r1, y0, y1, gone });
+    });
+    await t.step('a pen\'s drag mostly vertical: no box — the page\'s (a pen\'s vertical move scrolls it, as a finger\'s)', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        await t.penDrag({ x: a.x - 20, y: a.y - 30 }, { x: a.x + 20, y: a.y + 60 }); await t.wait(900);
+        const y1 = await E(`yRange(${li})`), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`), on = await E('el.instance.state.zoomMode');
+        await unlock(li);
+        return y1.join() === y0.join() && !locked && !on ? true : JSON.stringify({ y0, y1, locked, on });
+    });
+    // ── The magnifier: green while on; off at the end of any gesture on a graph (which goes
+    // on as usual), a press outside the graphs, Escape, or a click on it again ──
+    const zoomOn = () => E('el.instance.state.zoomMode');
+    const glass = () => E(`el.querySelector('#bz_0 path').getAttribute('fill')`);
+    await t.step('the magnifier: green while on, in the text\'s color while off; a click on it again turns it off', async () => {
+        const off0 = await glass(); await t.page.click('#bz_0'); await t.wait(300);
+        const on = await zoomOn(), green = await glass(); await t.page.click('#bz_0'); await t.wait(300);
+        const off = !(await zoomOn()), off1 = await glass();
+        return /primary-text-color/.test(off0) && on && /success-color/.test(green) && off && off1 === off0 ? true : JSON.stringify({ off0, on, green, off, off1 });
+    });
+    await t.step('the magnifier on: a click on a legend label turns it off and shows/hides its curve as usual', async () => {
+        const li = await boxGraph(); await t.page.click('#bz_0'); await t.wait(300);
+        const hidden = () => E(`graphAt(${li}).chart.getDatasetMeta(0).hidden === true || !graphAt(${li}).chart.isDatasetVisible(0)`);
+        const h0 = await hidden(); const p = await E(`legendPt(${li},0)`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(700);
+        const off = !(await zoomOn()), h1 = await hidden();
+        if( h1 !== h0 ) { await t.page.mouse.click(p.x, p.y); await t.wait(700); }
+        return off && h1 !== h0 ? true : JSON.stringify({ off, h0, h1 });
+    });
+    await t.step('the magnifier on: a press outside the graphs turns it off; Escape too', async () => {
+        await t.page.click('#bz_0'); await t.wait(300);
+        await t.page.mouse.click(3, 3); await t.wait(300); const a = !(await zoomOn());
+        await t.page.click('#bz_0'); await t.wait(300);
+        await t.page.keyboard.press('Escape'); await t.wait(300); const b = !(await zoomOn());
+        return a && b ? true : JSON.stringify({ outside: a, escape: b });
+    });
+    await t.step('a narrow card (the handle over the plot area): a vertical drag on the handle moves its graph — the object first, never the box', async () => {
+        const width = w => E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`);
+        await width(260); await t.wait(1200);
+        const g0 = await t.graphs(), li = g0.findIndex(x => x.startsWith('l:'));
+        // (a line graph's legend hidden: its plot area from the top, under the handle)
+        const gi = g0.findIndex((x, i) => i > 0 && x.startsWith('l:'));
+        await E(`(()=>{ const c=graphAt(${gi}).chart; c.options.legend.display=false; c.update(); })()`); await t.wait(400);
+        const r = await E(`(()=>{ const c=graphAt(${gi}).chart, b=c._hecLockAndHandleRect(), cr=c.canvas.getBoundingClientRect(); return { x: cr.left+b.x+b.width/2, y: cr.top+b.y+b.height/2, over: b.x+b.width > c.chartArea.left && b.y+b.height > c.chartArea.top }; })()`);
+        const c = await E('graphPtAt(0,0.2)');
+        await t.drag(r, { x: r.x, y: c.y });
+        const g1 = await t.graphs(), box = await E('el.instance.state.zoomMode'), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
+        await E(`(()=>{ for( const g of el.instance.graphs ) { g.chart.options.legend.display=true; g.chart.update(); } })()`);
+        await width(1000); await t.wait(1200);
+        return r.over && g1.join() !== g0.join() && !box && !locked ? true : JSON.stringify({ over: r.over, g0, g1, box, locked });
+    });
+    await t.step('the Y axis locked at the range shown (round bounds): its first and last labels kept', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const labels = () => E(`graphAt(${li}).chart.scales['y-axis-0'].ticks.map(String)`);
+        const l0 = await labels(); const p = await E(`lockPt(${li})`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(500);
+        const l1 = await labels(), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
+        await unlock(li);
+        return locked && l1[0].trim() !== '' && l1[l1.length - 1].trim() !== '' && l1.join() === l0.join() ? true : JSON.stringify({ l0, l1, locked });
     });
     await t.step('Alt held while moving over a graph shows every sample, moving without it hides them', async () => {
         const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));

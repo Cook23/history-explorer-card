@@ -61,6 +61,14 @@ module.exports = async function()
         const n1 = await t.E('__sheet');
         return n1 === n0 + 1 ? true : JSON.stringify({ n0, n1 });
     });
+    await t.step('the magnifier on: a drag on the curves is the elastic box\'s — the sheet never gets it, as with the padlock\'s zone; the magnifier off after', async () => {
+        const p = await t.E(`(()=>{ const c=inst().graphs[0].chart, r=c.canvas.getBoundingClientRect(); return { x: r.left+(c.chartArea.left+c.chartArea.right)/2, y: r.top+(c.chartArea.top+c.chartArea.bottom)/2 }; })()`);
+        await t.E('inst().startZoomMode()'); await t.wait(400);
+        const ta = await t.E('getComputedStyle(inst().graphs[0].chart.canvas).touchAction'), n0 = await t.E('__sheet');
+        await t.swipe({ x: p.x - 30, y: p.y - 30 }, { x: p.x + 30, y: p.y + 40 });
+        const n1 = await t.E('__sheet'), on = await t.E('inst().state.zoomMode');
+        return ta === 'none' && n1 === n0 && !on ? true : JSON.stringify({ ta, n0, n1, on });
+    });
     done(await t.close());
 
     t = await open('sensor.wind');
