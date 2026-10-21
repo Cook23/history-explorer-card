@@ -6,6 +6,11 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.31] - 2026-10-20
 
+### Changed — the history only after the 5-minute statistics
+- The card took the last two hours from the history whatever the source drawn — Home Assistant compiles an hour's statistics once it has ended —, and so loaded the whole day's history of every curve (today's, and yesterday's until 2:00), again at each automatic refresh. The 5-minute statistics are compiled every 5 minutes: the hour the hourly statistics don't cover yet now comes from them (asked for the day it falls on), and only the minutes after them from the history — one request from 20 minutes ago (`STATS_LAG`: 10 minutes for Home Assistant being slow) to now. A recent day whose 5-minute statistics stop earlier (Home Assistant late, or none for an entity) is still loaded from the history. Where the graph is drawn from the history (a column of pixels shorter than 5 minutes), nothing changes (`_askMissing`, `_lacksStatistics`, `_statisticsStopEarly`, the cache's `tail` layer)
+- The refresh asks again what was asked before its day ended in every layer — the history, the tail, the statistics —, each kept and drawn until its answer replaces it (`askedAt`, `stale` by layer): today's statistics follow the day, yesterday's last hour is completed after midnight. A curve's history of a recent day left from a shorter window, once out of date, is dropped instead of asked again
+- Tests (`features`): the history only after the 5-minute statistics, the 5-minute ones for the day the hourly ones don't cover yet (6 months, 30 days, statistics forced); a refresh in the statistics asks the last minutes and today's statistics, never the day's history, the curve up to now; Home Assistant 3 hours late: that day's history asked
+
 ### Fixed — bars of several entities stacked
 - A bar graph's bars, `stacked` not set, were stacked in one column instead of side by side: each bar had its Y axis as its stack, and Chart.js stacks the bars of a stack whenever `stacked` isn't set. Since 1.2.4. They are now side by side unless `stacked: true` (each axis' bars in their own column)
 - Test (`minigraph`): two entities' bars side by side; with `stacked: true`, in one column
