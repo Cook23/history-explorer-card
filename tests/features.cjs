@@ -910,7 +910,9 @@ module.exports = async function()
         return !/255, ?255, ?255/.test(c[0]) ? true : JSON.stringify(c);
     });
     await t.step('French: the menus are in French', async () => {
-        const txt = await t.E(`el.querySelector('#ef_0')?.textContent`);
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await t.E(`el.instance.showOptionsSubmenu(0, 'export')`); await t.wait(200);
+        const txt = await t.E(`el.querySelector('#eo_0_csv')?.textContent`);
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
         return txt === 'Historique' ? true : JSON.stringify(txt);
     });
     done(await t.close());

@@ -241,7 +241,7 @@ export class HistoryCardState {
 
             const _needsIntervalRedraw = await this.readLocalState();
             // (the info panel's switch as read: the options menu shows it)
-            this.showInfoPanelSwitch();
+            this.refreshOptionsMenus();
 
             // (the time window known before the graphs are built: their time axis has it
             // from the first drawing — without it, it spans the data, ticked for the

@@ -13,7 +13,7 @@ module.exports = async function()
     const done = r => { passed += r.passed; failed += r.failed; };
 
     // The appearance submenu's lines: name, then (on) / (off) for a switch, * when in bold
-    const lines = t => t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].map(a=>a.textContent+(a.getAttribute('role')==='switch'?' ('+(a.getAttribute('aria-checked')==='true'?'on':'off')+')':'')+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+    const lines = t => t.E(`[...((el.querySelector('#et_0')._cascade||[]).slice(1).pop()?.querySelectorAll('a') ?? [])].map(a=>a.textContent+(a.getAttribute('role')==='switch'?' ('+(a.getAttribute('aria-checked')==='true'?'on':'off')+')':'')+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
     const line = (t, i) => t.E(`el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[${i}].click()`);
     const menuOpen = t => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
     const ds = (t, gi, k) => t.E(`(()=>{ const d=graphAt(${gi}).chart.data.datasets[${k}]; return { color: d.borderColor, width: d.borderWidth, dash: d.borderDash ?? null, fade: !!d.hecFillFade, fill: d.backgroundColor, minmax: d.showMinMax, r: d.pointRadius }; })()`);
@@ -24,42 +24,46 @@ module.exports = async function()
     const closeMenu = async t => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700); };
 
     let t = await openCard(card(), { height: 900 });
-    await t.step('a curve\'s menu: Appearance after Display; its lines — Color, Points and Extremes (switches, off), Fill, Width, Line style', async () => {
+    await t.step('a curve\'s menu: Appearance after Display; its lines — Color ▸, Points and Extremes (switches, off), Fill, Width, Line style', async () => {
         await curveMenu(t, 0, 0);
         const m = await t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>a.textContent).join(' | ')`);
         const l = await lines(t); await closeMenu(t);
-        return m.startsWith('Display ▸ | Appearance ▸ | Interpolation ▸ | Layout ▸') && l === 'Color | Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' ? true : `${m} / ${l}`;
+        return m.startsWith('Display ▸ | Appearance ▸ | Interpolation ▸ | Layout ▸') && l === 'Color ▸ | Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' ? true : `${m} / ${l}`;
     });
-    await t.step('Points: the curve\'s dots shown, the switch on, the menu open half a second, then closed; again: hidden', async () => {
-        await curveMenu(t, 0, 0); await line(t, 1); await t.wait(150);
+    await t.step('Points, clicked with the mouse (its line focused, then rebuilt): the curve\'s dots shown, the switch on, the menu still open 0.4 s later, then closed; again: hidden', async () => {
+        await curveMenu(t, 0, 0);
+        const p = await t.E(`(()=>{ const r=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[1].getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
         const r = { l: await lines(t), open: await menuOpen(t), dots: (await ds(t, 0, 0)).r };
         await t.wait(700); r.later = await menuOpen(t);
         await curveMenu(t, 0, 0); await line(t, 1); await t.wait(800); r.off = (await ds(t, 0, 0)).r;
         return r.l.includes('Points (on)') && r.open && r.dots > 0 && !r.later && r.off === 0 ? true : JSON.stringify(r);
     });
-    await t.step('Extremes: the min/max band on, saved; the other curve as it was', async () => {
-        await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150);
+    await t.step('Extremes: the switch moved at once, as the click ends — the graph built again only then —; the min/max band on, saved; the other curve as it was', async () => {
+        await curveMenu(t, 0, 0);
+        const now = await t.E(`(()=>{ const a=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[2]; a.click(); return [a.getAttribute('aria-checked'), graphAt(0).entities[0].showMinMax ?? null]; })()`);
+        await t.wait(150);
         const l = await lines(t); await t.wait(800);
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1), saved = await t.E('graphAt(0).entities[0].showMinMax');
-        return l.includes('Extremes (on)') && a.minmax === true && !b.minmax && saved === true ? true : JSON.stringify({ l, a, b, saved });
+        return now[0] === 'true' && now[1] !== true && l.includes('Extremes (on)') && a.minmax === true && !b.minmax && saved === true ? true : JSON.stringify({ now, l, a, b, saved });
     });
-    await t.step('Fill ▸: its list in the submenu itself (the palette\'s fill: Solid in bold); Fade chosen: the curve fading out; Escape back to the lines', async () => {
+    await t.step('Fill ▸: its list in a submenu over Appearance (the palette\'s fill: Solid in bold); Fade chosen: the curve fading out; Escape closes it, back to Appearance', async () => {
         await curveMenu(t, 0, 0); await line(t, 3); await t.wait(150);
         const l0 = await lines(t);
-        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Fade').click()`); await t.wait(150);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_fill_sub a')].find(a=>a.textContent==='Fade').click()`); await t.wait(150);
         const l1 = await lines(t);
         await t.page.keyboard.press('Escape'); await t.wait(150);
         const l2 = await lines(t); await t.wait(800);
         const d = await ds(t, 0, 0), saved = await t.E('graphAt(0).entities[0].fill');
-        return l0 === 'None | Solid* | Fade' && l1 === 'None | Solid | Fade*' && l2.startsWith('Color |') && d.fade && saved === 'fade' ? true : JSON.stringify({ l0, l1, l2, d, saved });
+        return l0 === 'None | Solid* | Fade' && l1 === 'None | Solid | Fade*' && l2.startsWith('Color ▸ |') && d.fade && saved === 'fade' ? true : JSON.stringify({ l0, l1, l2, d, saved });
     });
     await t.step('Width ▸ 4 px and Line style ▸ Short dashes: the curve drawn so', async () => {
         await curveMenu(t, 0, 0); await line(t, 4); await t.wait(150);
         const w = await lines(t);
-        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='4 px').click()`); await t.wait(800);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='4 px').click()`); await t.wait(800);
         await curveMenu(t, 0, 0); await line(t, 5); await t.wait(150);
         const s = await lines(t);
-        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Short dashes').click()`); await t.wait(800);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_dash_sub a')].find(a=>a.textContent==='Short dashes').click()`); await t.wait(800);
         const d = await ds(t, 0, 0);
         return w === '1 px | 2 px* | 3 px | 4 px | 5 px' && s === 'Solid* | Dots | Short dashes | Long dashes | Dash-dot' && d.width === 4 && d.dash?.join() === '5,5' ? true : JSON.stringify({ w, s, d });
     });
@@ -73,13 +77,13 @@ module.exports = async function()
     });
     await t.step('a timeline row\'s menu: no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
-        const a = await t.E(`el.querySelector('#et_0_appearance').style.display`); await closeMenu(t);
-        return a === 'none' ? true : a;
+        const a = await t.E(`!!el.querySelector('#et_0_appearance')`); await closeMenu(t);
+        return !a ? true : a;
     });
     await t.step('the graph\'s menu: Appearance without Color, for every curve; Width 3 px: both curves', async () => {
         await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showTypeSubmenu(0, 'appearance'); })()`); await t.wait(200);
         const l = await lines(t); await line(t, 3); await t.wait(150);
-        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='3 px').click()`); await t.wait(800);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='3 px').click()`); await t.wait(800);
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1);
         return l === 'Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' && a.width === 3 && b.width === 3 ? true : JSON.stringify({ l, a, b });
     });

@@ -91,25 +91,18 @@ export class CardSelector
         this._closeSelectorIfLeft(idx);
     }
 
-    // The dropdown of selector idx (and its series submenu) closed, unless the focus is
-    // still in it, in the submenu or in the input field — checked once the focus has moved
+    // The dropdown of selector idx (and its series submenus) closed, unless the focus is
+    // still in it, in a submenu or in the input field — checked once the focus has moved
+    // (whenFocusLeaves, as every menu)
     _closeSelectorIfLeft(idx)
     {
-        const dropdown = this._this.querySelector(`#es_${idx}`);
-        const _sub = this._this.querySelector(`#es_${idx}_series`);
-        const _choice = this._this.querySelector(`#es_${idx}_choice`);
-        const _input = this._this.querySelector(`#b7_${idx}`);
-        setTimeout(() => {
-            // (the focused element as seen from the dropdown's own tree: inside Home
-            // Assistant's shadow roots, document.activeElement is only their host)
-            const _a = dropdown.getRootNode()?.activeElement;
-            const _in = el => el && ( el.contains(document.activeElement) || ( _a && el.contains(_a) ) );
-            if( ![dropdown, _sub, _choice, _input].some(_in) ) {
-                this.hideSeriesMenu(idx);
-                if( _choice ) _choice.style.display = 'none';
-                this.setDropdownVisibility(idx, false);
-            }
-        }, 150);
+        const q = id => this._this.querySelector(`#${id}`);
+        const _dropdown = q(`es_${idx}`), _choice = q(`es_${idx}_choice`);
+        this.whenFocusLeaves(() => [...( _dropdown._cascade ?? [_dropdown] ), _choice, q(`b7_${idx}`)], () => {
+            this.hideSeriesMenu(idx);
+            if( _choice ) _choice.style.display = 'none';
+            this.setDropdownVisibility(idx, false);
+        })();
     }
 
     entitySelectorEntered(event)
@@ -207,72 +200,51 @@ export class CardSelector
         this.addEntitySelected(idx);
     }
 
-    // A menu of the selector (its series submenu, its duplicate choice) filled with items
-    // { label, series, marked, choose } (see fillMenuItems); listened to once — the arrows,
-    // Enter, and ← or Escape calling back(); closed with the selector when the focus leaves them
-    _fillSelectorMenu(idx, menuEl, items, back)
-    {
-        this.fillMenuItems(menuEl, items, back).forEach((a, i) => { if( items[i].series ) a.dataset.series = items[i].series; });
-        if( menuEl._subListening ) return;
-        menuEl._subListening = true;
-        menuEl.addEventListener('keydown', (e) => {
-            if( e.key === 'ArrowLeft' || e.key === 'Escape' ) {
-                e.preventDefault();
-                e.stopPropagation();
-                menuEl._subBack();
-                return;
-            }
-            this.menuKeyDown(e, menuEl);
-        });
-        menuEl.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
-    }
-
     // The series submenu of selector idx, for the entity of dropdown entry entryEl: its
     // value first — marked and pre-selected, Enter takes it — then its attributes, each with
-    // its current value. Like the type menu's submenus: over the dropdown, level with the
-    // entry, right edges aligned, the entry in bold while it's open; ← or Escape back to the
-    // dropdown.
+    // its current value. As every submenu: over the dropdown, level with the entry (the
+    // cascade, see openInCascade); ← or Escape back to the dropdown's field
     showSeriesMenu(idx, entryEl)
     {
+        const _dropdown = this._this.querySelector(`#es_${idx}`);
         const _sub = this._this.querySelector(`#es_${idx}_series`);
-        if( !_sub ) return;
-        this.hideSeriesMenu(idx);
-        this._fillSeriesLevel(idx, _sub, entryEl.dataset.entity, null);
-        entryEl.style.fontWeight = 'bold';
-        _sub._subEntry = entryEl;
-        this.openSubmenu(_sub, entryEl);
-        _sub.focus();
+        if( !_dropdown || !_sub ) return;
+        // (← or Escape from its first submenu: back to the field; the focus leaving them all:
+        // the selector closed)
+        _dropdown._focusTarget = this._this.querySelector(`#b7_${idx}`);
+        _dropdown._whenLeft = () => this._closeSelectorIfLeft(idx);
+        this.listenCascadeBox(_dropdown, _sub);
+        this._openSeries(idx, _dropdown, entryEl, _sub, entryEl.dataset.entity, null);
     }
 
-    // The series submenu _sub at one level: the entity's value and its attributes (path
-    // null), or the sub-attributes of the dictionary or the list at path — each with its
-    // current value; one holding sub-attributes (isAttributeGroup) marked ▸, opening them in
-    // the same submenu, over this level (back to the attributes: the entity's line again in
-    // the dropdown; ← or Escape: the level before)
-    _fillSeriesLevel(idx, _sub, entity_id, path)
+    // The series of entity_id at path (null: its value and its attributes; else the
+    // sub-attributes of the dictionary or the list at path), each with its current value, in
+    // box, opened over parent from line; one holding sub-attributes (isAttributeGroup) marked
+    // ▸, opening them in a submenu over this one — the cascade, at any depth
+    _openSeries(idx, parent, line, box, entity_id, path)
     {
         const _state = this._hass.states[entity_id];
         const _label = (name, state) => { const v = this._valueText(state); return v ? `${name} (${v})` : name; };
         const _item = (id, name) => ({ label: _label(name, this.stateOf(id)), series: id,
             choose: () => this._selectSeries(idx, id, this.stateOf(id)?.attributes?.friendly_name || id) });
         const _group = (k, name) => ({ label: name + ' ▸',
-            choose: () => { this._fillSeriesLevel(idx, _sub, entity_id, k); _sub.focus(); } });
+            choose: groupLine => {
+                const _next = this._this.querySelector(`#${box.id}_more`) ?? this.cascadeBox(box, `${box.id}_more`);
+                this.listenCascadeBox(parent._root ?? parent, _next);
+                this._openSeries(idx, box, groupLine, _next, entity_id, k);
+            } });
         const _name = k => attributeLabel(path === null ? k : k.slice(path.length + 1));
         const _items = [ ...( path === null ? [{ ..._item(entity_id, i18n('ui.menu.series_value')), marked: true }] : [] ),
                          ...seriesAttributes(_state, path).map(k => isAttributeGroup(_state, k) ? _group(k, _name(k)) : _item(seriesId(entity_id, k), _name(k))) ];
         if( path !== null && _items.length ) _items[0].marked = true;
-        const _up = path === null ? null : ( path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : null );
-        this._fillSelectorMenu(idx, _sub, _items, path === null
-            ? () => { this.hideSeriesMenu(idx); this._this.querySelector(`#b7_${idx}`)?.focus(); }
-            : () => { this._fillSeriesLevel(idx, _sub, entity_id, _up); _sub.focus(); });
+        this.fillMenuItems(box, _items).forEach((a, i) => { if( _items[i].series ) a.dataset.series = _items[i].series; });
+        this.openInCascade(parent, line, box);
     }
 
     hideSeriesMenu(idx)
     {
-        const _sub = this._this.querySelector(`#es_${idx}_series`);
-        if( !_sub ) return;
-        _sub.style.display = 'none';
-        if( _sub._subEntry ) { _sub._subEntry.style.fontWeight = ''; _sub._subEntry = null; }
+        const _dropdown = this._this.querySelector(`#es_${idx}`);
+        if( _dropdown ) this.closeCascade(_dropdown);
     }
 
     // Series id already shown (its graphs flagged, its message given): a choice under the
@@ -284,10 +256,20 @@ export class CardSelector
         const _input = this.ui.inputField[idx];
         if( !_menu || !_input ) return;
         const _cancel = () => { _menu.style.display = 'none'; this.resetEntityInput(_input); };
-        this._fillSelectorMenu(idx, _menu, [
+        this.fillMenuItems(_menu, [
             { label: i18n('ui.menu.duplicate_cancel'), marked: true, choose: _cancel },
             { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null, { from: 'add' }); } },
-        ], _cancel);
+        ]);
+        // (listened to once — the arrows, Enter; ← or Escape: Cancel — closed with the
+        // selector when the focus leaves it)
+        if( !_menu._listened ) {
+            _menu._listened = true;
+            _menu.addEventListener('keydown', (e) => {
+                if( e.key === 'ArrowLeft' || e.key === 'Escape' ) { e.preventDefault(); e.stopPropagation(); _cancel(); return; }
+                this.menuKeyDown(e, _menu);
+            });
+            _menu.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
+        }
         // (under the input field, as the type menu)
         const _tb = this._this.querySelector(`#tb_${idx}`);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };

@@ -480,7 +480,7 @@ export class CardOperations
     showSaved()
     {
         this.removeGraphs([...this.graphs]);
-        this.showInfoPanelSwitch();
+        this.refreshOptionsMenus();
         this.setPresentWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();

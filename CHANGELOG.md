@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.38] - 2026-10-21
+
+### Changed — the color picker in the middle of the screen
+- *Color* in *Appearance ▸* marked ▸, as every line opening something — here, the browser's picker
+- The browser's picker opened under its field (Chrome, Edge, Safari) opens in the middle of the screen: its invisible field placed there, half a picker up and left. It opened under the *Color* line; Firefox on Windows opens the system's own, placed by Windows (`_pickCurveColor`, `PICKER_SIZE`)
+
+### Fixed — a switch moving late
+- A choice made in a menu was shown once made: *Points* (its dots changed in place) moved its switch at once, *Extremes* (its graph built again) only after the graph — a delay. Every choice is now shown at once — its switch moved, or its line in bold —, then made once that's on screen; the half second before the menu closes counts from when it's made (`_choiceMade`)
+
+### Fixed — the menu closing at once after a switch of Appearance
+- A click on a line of *Appearance ▸* (*Points*, *Extremes*, a list's value) put the focus on it; the submenu, rebuilt to show the new state, took that line away with the focus, and the menu, seeing the focus gone, closed some 0.15 s later — not the half second. The focus is kept in the submenu (`fillMenuItems`)
+- Tests (`menus`, new): every choice of every menu — a curve's, a graph's, the options menu, the info panel's — clicked with the mouse: one that changes what its menu shows leaves it open 0.4 s later, closed 1.3 s later; *Color* and *Separate* close it at once
+
+### Changed — the menus: one model, a cascade at any depth
+- Every menu and submenu — the type menu of an entity or a graph, the info panel's, the options menu, the selector's attributes — is a list of lines written by one function from what is true now (`fillMenuItems`): when it opens, when a submenu opens, after a choice. They were written once in the page, each submenu updated by a function of its own (the display types' bold, the interpolation's, the padlock's switch) — except the appearance submenu and the selector's, rebuilt: two ways, two behaviours (above). One function opens a submenu, closes them, refreshes a menu after a choice and listens to the keyboard and the focus, for every menu (`_menuOf`, `_fillMenu`, `_openSubmenu`, `_menuChosen`, `_listenMenu`, `whenFocusLeaves`)
+- Submenus open in a cascade, at any depth, by one function (`openInCascade`, `closeCascade`, `cascadeBox`): each over the one it comes from, right-aligned, level with its line — narrower, so the start of the lines under it still shows and another can be picked, unless opened from the last line —, ← or Escape closing it. A box is fitted to its submenus when it opens at every depth: they're filled one level ahead (`_fillBox`)
+- *Appearance ▸*'s *Fill ▸*, *Width ▸* and *Line style ▸*: each list in a submenu over *Appearance* (they replaced its lines)
+- The selector's sub-attributes: an attribute holding others (`Forecast ▸`) opens them in a submenu over the attributes, at any depth (they replaced the attributes, the level before back with ← or Escape)
+- *Card ▸*'s *Default graphs ▸*, *Default display ▸*: marked ▸ — they open their confirmation, in a submenu over *Card ▸*, as before
+- The CSV exports' lines named `eo_N_csv`, `eo_N_stats` — `eh_N` was also the toolbar's date
+
+### Fixed — the color picker at the page's top left the first time
+- The picker's field, created on the first use, was asked to open its picker before it had a place on the page: Chrome opened it at the page's top left. It's opened once laid out, at the next frame — the calendar's too (`openNativePicker`)
+
 ## [v1.2.37] - 2026-10-21
 
 ### New — the Appearance submenu

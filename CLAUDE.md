@@ -146,6 +146,28 @@ compromise: ¼ × max(…) would do if ½ took too much room.
 Never propose to reserve room for them: on a small screen room is short, and the card is
 there to show curves, not boxes of buttons.
 
+## Menus: a cascade, always visible — set by the user, not negotiable
+
+How every menu is designed (the type menu, a graph's, the info panel's, the options menu,
+and any one to come):
+- A menu has sections (*Display*, *Appearance*…), each line ▸ opening its submenu, and a
+  submenu's line ▸ its own, at any depth — the selector's sub-attributes too. A submenu never replaces the content of the menu
+  it comes from: it opens **over** it, right-aligned on it, level with its line — there is
+  no room beside it.
+- The cascade of calling menus always shows: a submenu is narrower than its calling menu,
+  leaving 2 or 3 characters of each line visible — with the room there is: the line was
+  read just before, its start is enough to recognize it and click it to change submenu. A
+  menu fully hidden by its submenu is a dead end. (A guideline on how much shows, not a
+  minimum to push.)
+- The only exception: a submenu opened from the **last** line of its menu may be as wide as
+  that menu — unfolding from that last line, it hides no other line. That's why a section
+  needing a wide submenu goes last: *Global* (the info panel's switch, the gesture
+  thresholds) is the last section of the options menu (*Export*, *Card*, *Global*).
+- One model for every menu and submenu, one code path (filled from what is true now, opened,
+  refreshed after a choice, keyboard, focus, the close delay): a menu never behaves
+  differently from another. Standardize and homogenize — never code a menu "the simplest
+  way" beside the common model.
+
 ## README structure — set by the user
 
 - The header holds the title, the links (README_Full, FORK_DESCRIPTION) and the disclaimer,
