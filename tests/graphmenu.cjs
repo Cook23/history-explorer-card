@@ -84,8 +84,8 @@ module.exports = async function()
         const l = await layout();
         return l === 'power+power_kw | a | rain | tank' ? true : l;
     });
-    // A point of graph i's zone: x px from its left, y px from its top
-    const zonePt = (i, x, y) => t.E(`(()=>{ const r=el.instance.graphsInDisplayOrder()[${i}].canvas.getBoundingClientRect(); return {x:r.left+${x}, y:r.top+${y}}; })()`);
+    // A point of graph i's zone: x px from its box's left, y px from its top
+    const zonePt = (i, x, y) => t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[${i}].chart, r=c.canvas.getBoundingClientRect(); return {x:r.left+c._hecLockAndHandleRect().x+${x}, y:r.top+${y}}; })()`);
     const clickAt = async p => { await t.page.mouse.click(p.x, p.y); await t.wait(900); };
     await t.step('just beside a button (under ↓): that button', async () => {
         await graphMenu('tank'); await click('cut');

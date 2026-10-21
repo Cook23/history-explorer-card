@@ -97,6 +97,15 @@ the extreme. Past sessions turned "can" into "must" and a guideline into a rewor
 everything — the user had to correct it each time. Do what is asked, at the scale asked;
 when the scale is unclear, ask.
 
+An imperative and a goal are told apart by their words. An imperative ("don't reserve room")
+is an obligation: kept always; a problem that seems to have no solution within it is
+discussed with the user before any code. A goal ("use the room as well as possible") is a
+guideline to tend to: never turn it into an absolute rule. A display especially is a
+compromise, made as well as the room allows: what renders best at every size without
+complicating the code too much — not a rule applied whatever the cost. In that compromise the functional goal
+comes before the accessory functions: the card is there to show curves; the controls,
+their boxes and everything around them take only the room the curves can spare.
+
 ## No patch for a special case — set by the user, not negotiable
 
 A special case that looks like a problem (an old saved state, compatibility with a former
@@ -117,9 +126,10 @@ around it. Search globally for the general cause it shows — which rule, in whi
 produces it for every case — explain that cause to the user, and propose the general rule
 that fixes it. The example then only checks that the rule holds.
 
-## Floating icons — set by the user, not negotiable
+## Floating icons — set by the user
 
-The floating icons (the handle, the padlock, the chain, the close button) never reserve room.
+The floating icons (the handle, the padlock, the chain, the close button) never reserve room
+(an obligation).
 Normally they need none: they sit in the left and right margins kept for the Y axes' labels,
 above the labels, with no conflict. Otherwise — whatever the reason, notably the
 ultra-compact layouts (the axes pushed to the edges, their labels inside, over the curves),
@@ -128,8 +138,11 @@ the clicks up to ½ × max(mouse precision, finger precision) around their boxes
 (`deps/chart-hec.js` `_hecIconMargin`, `_hecTopTargetAt`). Free room, where there is some,
 is better used ("normally") than the fallback ("otherwise"): using the free room as well as
 possible is a goal, not an obligation — a particular case where it isn't optimal may exist,
-and clean code comes first (see "No patch for a special case").
-Never propose to reserve room for them.
+and clean code comes first (see "No patch for a special case"). Their boxes sit that
+picking margin from the card's left and right edges, their targets whole on the card — a
+compromise: ¼ × max(…) would do if ½ took too much room.
+Never propose to reserve room for them: on a small screen room is short, and the card is
+there to show curves, not boxes of buttons.
 
 ## README structure — set by the user
 
