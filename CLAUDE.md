@@ -3,18 +3,18 @@
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
 
-## A README is not a changelog — set by the user, not negotiable (said ten times)
+## A README is not a changelog — set by the user, not negotiable (said more than ten times)
 
-README.md and README_Full.md describe how to use the latest version, as it is now: never
-what changed, when, or what it was before. No version number in them — no "(1.2.25)",
-"since 1.2.23", "now", "no longer", "was", "is ignored since" — except in the
-"📋 Version highlights" section of README.md (before the table of contents, formatted as
-lowpass_dt's): the only place naming versions. It lists only the versions of its own branch
-(1.1 on `main`, 1.2 on `v1.2-dev`, never mixed), each the one version where an important
-functional improvement appeared and works — never a range of versions. It is never deleted;
-README_Full links to it. What
-changed and when goes to the CHANGELOG (and the release notes). An option kept only for
-compatibility is described as it is today ("accepted, no effect"), without its history.
+Three documents, three roles — never mixed:
+
+| Document | What it says |
+|---|---|
+| README.md, README_Full.md | How to use the card **as it is now**. Never what changed, when, or what it was before: no version number, no "(1.2.25)", "since 1.2.23", "now", "no longer", "was", "is ignored since". An option kept only for compatibility is described as it is today ("accepted, no effect"), without its history. |
+| "📋 Version highlights" (README.md, before the table of contents, formatted as lowpass_dt's — the only place in a README naming versions; README_Full links to it, it is never deleted) | **When each important feature appeared, usable.** One line per important feature, at the one version where it first worked and could be used — never a range of versions. Not the versions before it (not usable yet), not the ones after it (refinements, more options, bug fixes, polish: the feature didn't really change). A version of bug fixes and refinements only has no line at all. Only the versions of its own branch (1.1 on `main`, 1.2 on `v1.2-dev`, never mixed). |
+| CHANGELOG.md (and the release notes) | **Everything, version by version**: every change, fix, refinement — the full traceability. |
+
+Before adding a version to the highlights, ask: does it bring an important feature that
+wasn't usable before? If it only improves, extends or fixes one already there — no line.
 Before any README edit, check the whole file against this rule.
 
 ## README structure — set by the user
