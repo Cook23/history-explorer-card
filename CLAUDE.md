@@ -69,7 +69,9 @@ mini-graph-card is replaced in place: `type: custom:history-explorer-card` and `
 
 ## A README is not a changelog — set by the user, not negotiable (said more than ten times)
 
-Three documents, three roles — never mixed:
+Three documents, three roles — never mixed. The README answers the user's needs: "how do I use
+the product" (the README itself) and "oh, that's new, I must try it" (its version highlights);
+the CHANGELOG is the traceability:
 
 | Document | What it says |
 |---|---|
