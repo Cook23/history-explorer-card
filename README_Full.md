@@ -150,7 +150,7 @@ Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a
 
 **Options**
 
-Every display option can be set on the card, in `entityOptions`, on a graph and on an entity, the most specific one winning; the options of a graph (its Y axis, height, stacking, time labels) can be set on its entities too. Every spelling of an option is accepted at every level. `entityOptions` also takes a list form, matching entities by a pattern on their entity ID. The automatic refresh is on by default, and reloads the recent history at most once every 2 seconds.
+Every display option can be set on the card, in `entityOptions`, on a graph and on an entity, the most specific one winning; the options of a graph (its Y axis, height, stacking, time labels) can be set on its entities too. Every spelling of an option is accepted at every level. `entityOptions` also takes a list form, matching entities by a pattern on their entity ID. The automatic refresh is on by default, and reloads the recent data at most once every 2 seconds.
 
 **Persistence**
 
@@ -1091,15 +1091,15 @@ The card loads what the screen can show, and no more. A graph can't draw anythin
 
 | A column of pixels lasts | Loaded |
 |---|---|
-| an hour or more | the hourly statistics of the whole window, in one request |
+| an hour or more | the hourly statistics of the whole window, in one request (the 5-minute statistics for the day whose last hour isn't compiled yet) |
 | between 5 minutes and an hour | the hourly statistics of the whole window, then its 5-minute statistics, in one request each (the hourly ones kept where Home Assistant no longer has 5-minute ones) |
 | less than 5 minutes | the history, a few days at a time, the most recent first, each day drawn as it comes (the hourly statistics only where there's no more history) |
 
 For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h). The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500. It's asked two parts at a time: each part is drawn as it comes, parts that arrive meanwhile together.
 
-- **The last two hours, always from the history.** Home Assistant writes an hour's statistics a few minutes after it ends: the days the last two hours fall on are always asked from the history, at the same time as the statistics — just after midnight, the day before too.
+- **The last minutes from the history.** Home Assistant compiles a period's statistics once it has ended: the hour not compiled yet comes from the 5-minute statistics, and the minutes after them from the history — one short request, from 20 minutes ago (the 5 minutes not compiled yet, and room for Home Assistant being slow), at the same time as the statistics. On a recent day whose 5-minute statistics stop earlier (Home Assistant late with them, or none for an entity), that day comes from the history. The automatic refresh asks these last minutes and today's statistics again, never the day's history.
 - **The same values from both.** A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics over the same time (see [Data decimation](#data-decimation)): nothing shows where the history meets the statistics.
-- **`statistics.period`** (below) is the table's first threshold — an hour by default, a day with `period: day`; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last two hours.
+- **`statistics.period`** (below) is the table's first threshold — an hour by default, a day with `period: day`; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last minutes.
 - **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever: the card takes what it returns, however far back.
 - **Entities without statistics** — timelines, attributes, angles (`circular`: Home Assistant averages angles as plain numbers), entities without a state class — always come from the history: past the history retention limit, their graph is blank.
 
@@ -1114,7 +1114,7 @@ type: custom:history-explorer-card
 statistics:
   enabled: true    # true is the default, use false to turn LTS support off (history only)
   period: hour     # reporting period. hour, day or month. Default is hour.
-  force: false     # set to true if you want to use long term statistics only (still the history for the last two hours, and for entities without statistics)
+  force: false     # set to true if you want to use long term statistics only (still the history for the last minutes, and for entities without statistics)
 ```
 
 `mode` and `retention` are accepted, without effect: a curve is drawn through the mean, the minimum and maximum shown by the band (`showMinMax`) and in the tooltip; the statistics cover the whole window, whatever the history's retention. A `total_increasing` sensor (energy…) is drawn from its state.
@@ -1338,7 +1338,7 @@ See [Persistence for specific entities](#persistence-for-specific-entities) for 
 
 The card can reflect changing values on the fly in two ways. Both can be combined if needed.
 
-Automatic refresh monitors the entities that are displayed in your graphs for changes and reloads their recent history — at most once every 2 seconds, however often they change, and never sooner than five times what drawing the graphs again last took: many graphs over a long window are refreshed less often, the page never kept busy. Their current values (next to their names, `showCurrentValues`, and over the graph, `showState`) follow each change at once. It's on by default; turn it off with `automatic: false` (the card then refreshes only when the page is reloaded, or at the interval below):
+Automatic refresh monitors the entities that are displayed in your graphs for changes and reloads their recent data — the last minutes of history and today's statistics, today's history where the graph is drawn from the history — at most once every 2 seconds, however often they change, and never sooner than five times what drawing the graphs again last took: many graphs over a long window are refreshed less often, the page never kept busy. Their current values (next to their names, `showCurrentValues`, and over the graph, `showState`) follow each change at once. It's on by default; turn it off with `automatic: false` (the card then refreshes only when the page is reloaded, or at the interval below):
 ```yaml
 type: custom:history-explorer-card
 refresh:

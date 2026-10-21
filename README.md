@@ -384,7 +384,7 @@ refresh:
   interval: 30       # Or refresh every 30 seconds (combine both if needed)
 ```
 
-The automatic refresh reloads the recent history at most once every 2 seconds, however often the entities change — less often on a device slow to draw the graphs (never sooner than five times what drawing them takes). A value's change is shown next to its name at once.
+The automatic refresh reloads the recent data at most once every 2 seconds, however often the entities change — less often on a device slow to draw the graphs (never sooner than five times what drawing them takes). A value's change is shown next to its name at once.
 
 ---
 
@@ -572,17 +572,17 @@ The card seamlessly extends graphs beyond the history retention limit using long
 
 | A column of pixels lasts | Loaded |
 |---|---|
-| an hour or more | the hourly statistics |
+| an hour or more | the hourly statistics (the 5-minute ones for the hour not compiled yet) |
 | between 5 minutes and an hour | the hourly, then the 5-minute statistics |
 | less than 5 minutes | the history (the statistics only where there's no more history) |
 
-The last two hours always come from the history. A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics. `mode` and `retention` are accepted, without effect.
+The last minutes, after the 5-minute statistics, come from the history. A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics. `mode` and `retention` are accepted, without effect.
 
 ```yaml
 statistics:
   enabled: true
   period: hour     # hour, day, or month
-  force: false     # true = use statistics only (still the history for the last two hours)
+  force: false     # true = use statistics only (still the history for the last minutes)
 ```
 
 > For full details → [README_Full.md — Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics)

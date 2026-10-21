@@ -613,11 +613,11 @@ statistics:
   enabled: True
   # The statistics of the whole window are loaded first; finer data only where it shows more: the 5-minute
   # statistics for a column of pixels shorter than the period, the history for one shorter than 5 minutes
-  # (and always for the last two hours). mode and retention: accepted, without effect
+  # (and always for the last minutes, after the 5-minute statistics). mode and retention: accepted, without effect
   # Reporting period that statistics are averaged over. Can be hour, day, or month
   period: 'hour'
   # If set to true, graph will use long term statistics only (5-minute ones included), forgoing normal
-  # history data (except the last two hours, and entities without statistics)
+  # history data (except the last minutes, and entities without statistics)
   force: undefined
 
 # Settings related to the colours of the UI
