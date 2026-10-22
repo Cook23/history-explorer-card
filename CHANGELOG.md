@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.39] - 2026-10-22
+
+### Fixed — a submenu left behind when its menu scrolls
+- A menu scrolled (the entity selector's list, a long list of attributes), its submenu stayed where it opened, away from its line. It follows its line now, the ones over it in turn, at any depth of the cascade: its part past its menu's top is masked, and it closes — with the ones over it — once its own first line is wholly out of its menu, by the top or by the bottom (a submenu opened from a menu's first or last line isn't closed by the least scroll)
+- Test (`menus`): the selector's list scrolled, an attribute submenu open follows its entity's line, then closes once its first line is wholly out of the list
+
+### Fixed — a menu left behind when the page scrolls
+- A menu opened from a curve's label or a graph's ⠿ zone stayed where it opened when the page scrolled under a sticky toolbar (the menus are the toolbar's), and went on over the page's header otherwise. Every menu now follows what it was opened from — a label, a field, a button —, its submenus with it, whatever scrolls (the page, a dialog, in any shadow tree: watched each frame while the menu is open). What goes past the part of the page that shows — the screen, minus a sticky toolbar or the page's header — is masked, at the top and at the bottom; the menu closes once its own first line is wholly past it. Same code for every menu and submenu (`followAnchor`, `_zoneOf`, `_firstLineOut`)
+- Tests (`menus`): the page scrolled, with and without a sticky toolbar: a curve's menu follows its label; its first line partly under the screen's top or the toolbar: masked there, still open; wholly: closed; past the screen's bottom: masked, still open
+
 ## [v1.2.38] - 2026-10-21
 
 ### Changed — the color picker in the middle of the screen

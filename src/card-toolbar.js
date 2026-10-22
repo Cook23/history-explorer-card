@@ -30,7 +30,7 @@ export class CardToolbar
 
         if( (tools || selector) && (this.ui.stickyTools & (1<<i)) ) {
             const threshold = i ? 'bottom:0px' : 'top:var(--header-height)';
-            html = `<div style="position:sticky;${threshold};padding-top:${this.ui.hideHeader ? 0 : 15}px;padding-bottom:10px;margin-top:-${this.ui.hideHeader ? 0 : 15}px;z-index:1;background-color:var(--card-background-color);line-height:0px;">`;
+            html = `<div data-sticky="${i ? 'bottom' : 'top'}" style="position:sticky;${threshold};padding-top:${this.ui.hideHeader ? 0 : 15}px;padding-bottom:10px;margin-top:-${this.ui.hideHeader ? 0 : 15}px;z-index:1;background-color:var(--card-background-color);line-height:0px;">`;
         } else if( tools || selector ) {
             // Always wrap in a div, sticky or not — _footerAnchor()'s walk-up-to-gl's-
             // direct-child loop already targets this wrapper automatically (same mechanism

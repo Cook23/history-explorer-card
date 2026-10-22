@@ -50,6 +50,8 @@ export class CardSelector
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
             this.openMenu(dropdown, topPos, leftPos);
+            // (kept on its field — see followAnchor)
+            this.followAnchor(dropdown, input, () => { this.hideSeriesMenu(input_idx); this.setDropdownVisibility(input_idx, false); });
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
             const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
@@ -275,6 +277,7 @@ export class CardSelector
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         const _r = _input.getBoundingClientRect();
         this.openMenu(_menu, (_r.bottom - _parentRect.top) + 'px', (_r.left + 30 - _parentRect.left) + 'px');
+        this.followAnchor(_menu, _input, _cancel);
         _menu.focus();
     }
 
