@@ -163,6 +163,17 @@ and any one to come):
   that menu — unfolding from that last line, it hides no other line. That's why a section
   needing a wide submenu goes last: *Global* (the info panel's switch, the gesture
   thresholds) is the last section of the options menu (*Export*, *Card*, *Global*).
+- A menu follows what opened it (its line for a submenu; a label, a ⠿ zone, a field, a
+  button for a menu) — the page, a dialog or its parent menu scrolled. Its display zone: the
+  screen less what covers it (a sticky toolbar, Home Assistant's header) for a menu; for a
+  submenu, its parent menu's box above (it never goes above it), the page's display zone
+  below (it may go below its parent, not past the page's bottom, a sticky bottom toolbar,
+  Home Assistant's). What goes past it is masked — cut there, not closed. It closes once
+  **its own first line** is wholly out of its zone (the page's for a menu, its parent's box
+  for a submenu), by the top or the bottom: its first line is level with its opener,
+  scrolls with it, always the same height — the condition depends on the menu alone, the
+  same for every menu —, and the line of margin keeps a submenu opened from its parent's
+  first or last line from closing at the least scroll.
 - One model for every menu and submenu, one code path (filled from what is true now, opened,
   refreshed after a choice, keyboard, focus, the close delay): a menu never behaves
   differently from another. Standardize and homogenize — never code a menu "the simplest

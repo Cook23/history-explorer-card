@@ -261,7 +261,105 @@ export class CardMenus
         _root._cascade.push(box);
         line.style.fontWeight = 'bold';
         this.openSubmenu(box, line);
+        // (where it stands from its line: kept so, its menu scrolled — see followAnchor)
+        box._fromLine = box.getBoundingClientRect().top - line.getBoundingClientRect().top;
         box.focus();
+    }
+
+    // Menu menuEl, opened from anchorEl, kept on it while it's open — watched each frame
+    // (a scroll anywhere, the page's, a dialog's, a menu's, in any shadow tree, is seen):
+    // - it follows anchorEl, its submenus with it, as their own parent doesn't (a sticky
+    //   toolbar); each submenu follows its line (its menu scrolled);
+    // - what goes past its display zone is masked — the page's (_zoneOf) for menuEl; for a
+    //   submenu, its menu's top above, the page's bottom below (it may go below its menu);
+    // - it closes once its own first line is wholly out of that zone — the page's for
+    //   menuEl (close: how), its menu's box for a submenu: a line of margin, so that a
+    //   submenu opened from its menu's first or last line isn't closed by the least scroll
+    followAnchor(menuEl, anchorEl, close)
+    {
+        cancelAnimationFrame(menuEl._followRaf);
+        if( !anchorEl ) return;
+        const _parent = menuEl.parentNode;
+        const _zone = this._zoneOf(anchorEl);
+        // (opened higher than its zone's top — moved up to fit the screen: down to it)
+        const _under = _zone().top - menuEl.getBoundingClientRect().top;
+        if( _under > 0 ) this._shiftBox(menuEl, 0, _under);
+        let _last = { a: anchorEl.getBoundingClientRect(), p: _parent.getBoundingClientRect() };
+        const _watch = () => {
+            if( menuEl.style.display === 'none' || !anchorEl.isConnected ) return;
+            const _a = anchorEl.getBoundingClientRect(), _p = _parent.getBoundingClientRect();
+            const _dx = ( _a.left - _last.a.left ) - ( _p.left - _last.p.left ), _dy = ( _a.top - _last.a.top ) - ( _p.top - _last.p.top );
+            _last = { a: _a, p: _p };
+            const _boxes = menuEl._cascade ?? [menuEl];
+            if( _dx || _dy ) for( const _box of _boxes ) this._shiftBox(_box, _dx, _dy);
+            // (a submenu where it stands from its line, its menu scrolled)
+            for( const _box of _boxes.slice(1) ) {
+                const _off = _box.getBoundingClientRect().top - _box._line.getBoundingClientRect().top - _box._fromLine;
+                if( Math.abs(_off) > 0.5 ) this._shiftBox(_box, 0, -_off);
+            }
+            const _page = _zone();
+            for( let k = 0; k < _boxes.length; k++ ) {
+                if( !this._firstLineOut(_boxes[k], k ? _boxes[k - 1].getBoundingClientRect() : _page) ) continue;
+                if( !k ) return close();
+                this.closeCascade(menuEl, k);
+                break;
+            }
+            const _open = menuEl._cascade ?? [menuEl];
+            _open.forEach((_box, k) => {
+                const _r = _box.getBoundingClientRect();
+                const _top = k ? Math.max(_page.top, _open[k - 1].getBoundingClientRect().top) : _page.top;
+                const _cutTop = Math.max(0, _top - _r.top), _cutBottom = Math.max(0, _r.bottom - _page.bottom);
+                _box.style.clipPath = _cutTop || _cutBottom ? `inset(${_cutTop}px 0 ${_cutBottom}px 0)` : '';
+                _box._maskBelow = window.innerHeight - _page.bottom;
+            });
+            menuEl._followRaf = requestAnimationFrame(_watch);
+        };
+        menuEl._followRaf = requestAnimationFrame(_watch);
+    }
+
+    // Is box's first line — at its top, as high as its first line shown — wholly out of zone?
+    _firstLineOut(box, zone)
+    {
+        const _top = box.getBoundingClientRect().top;
+        const _bottom = _top + ( [...box.children].find(c => c.offsetHeight > 0)?.offsetHeight ?? 0 );
+        return _bottom <= zone.top || _top >= zone.bottom;
+    }
+
+    // A function giving the page's display zone around anchorEl now (its top and bottom): the
+    // screen, within every box scrolling anchorEl (a dialog, a panel, in any shadow tree),
+    // less what covers it — Home Assistant's header (--header-height) and the card's sticky
+    // toolbars (data-sticky) that don't hold anchorEl
+    _zoneOf(anchorEl)
+    {
+        const _clips = [], _sticky = [...this._this.querySelectorAll('[data-sticky]')].filter(s => !s.contains(anchorEl));
+        for( let el = anchorEl.parentNode; el && el !== document; el = el.parentNode ?? el.host ) {
+            if( el.nodeType !== 1 ) { el = el.host ?? null; if( !el ) break; }
+            if( /(auto|scroll)/.test(getComputedStyle(el).overflowY) ) _clips.push(el);
+        }
+        const _header = parseFloat(getComputedStyle(anchorEl).getPropertyValue('--header-height')) || 0;
+        return () => {
+            const z = { top: _header, bottom: window.innerHeight };
+            for( const el of _clips ) {
+                const r = el.getBoundingClientRect();
+                z.top = Math.max(z.top, r.top);
+                z.bottom = Math.min(z.bottom, r.bottom);
+            }
+            for( const el of _sticky ) {
+                const r = el.getBoundingClientRect();
+                if( el.dataset.sticky === 'top' ) z.top = Math.max(z.top, r.bottom);
+                else z.bottom = Math.min(z.bottom, r.top);
+            }
+            return z;
+        };
+    }
+
+    // A menu box moved by (dx, dy) px — placed by its top, or by its bottom (a menu opened above)
+    _shiftBox(box, dx, dy)
+    {
+        if( dx ) box.style.left = ( ( parseFloat(box.style.left) || 0 ) + dx ) + 'px';
+        if( !dy ) return;
+        if( box.style.bottom !== '' && box.style.top === '' ) box.style.bottom = ( ( parseFloat(box.style.bottom) || 0 ) - dy ) + 'px';
+        else box.style.top = ( ( parseFloat(box.style.top) || 0 ) + dy ) + 'px';
     }
 
     // The submenus of root's cascade from depth on closed (1: all of them), the lines they
@@ -495,6 +593,8 @@ export class CardMenus
             _left = (_anchorX - _parentRect.left) + 'px';
         }
         this.openMenu(_menu, _top, _left, align);
+        // (kept on what it was opened from — the label of its graph, or the field it's under)
+        this.followAnchor(_menu, from === 'label' ? graph?.canvas?.parentNode : _input, () => this.hideEntityTypeMenu(input_idx));
         this._openRememberedSubmenu(input_idx, 'rep');
     }
 
@@ -524,6 +624,7 @@ export class CardMenus
         const _tb = this._menuParent(input_idx);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this.openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
+        this.followAnchor(_menu, graph.canvas?.parentNode, () => this.hideEntityTypeMenu(input_idx));
         this._openRememberedSubmenu(input_idx, graph.entities.every(e => this.isNumericEntity(e.entity)) ? 'rep' : 'layout');
     }
 
@@ -950,6 +1051,7 @@ export class CardMenus
         const _tb = this._this.querySelector(`#tb_${idx}`);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this.openMenu(dropdown, (_boRect.bottom - _parentRect.top) + 'px', (_boRect.left - _parentRect.left - 30) + 'px');
+        this.followAnchor(dropdown, this._this.querySelector(`#bo_${idx}`), () => this.menuSetVisibility(idx, false));
         dropdown.focus();
         // (reopened soon after it was closed: with the submenu it had open)
         // (no room for the menu and a submenu beside its lines: the menu alone, read first)
@@ -1024,6 +1126,8 @@ export class CardMenus
         // ArrowDown / ArrowUp
         event.preventDefault();
         const _next = this._navigateMenuArrowKey(_visible, event.key);
+        // (a line under the mask at the page's bottom — see followAnchor — scrolled above it)
+        _next.style.scrollMarginBottom = ( menuEl._maskBelow ?? 0 ) + 'px';
         _next.scrollIntoView({ block: 'nearest' });
         onHighlight?.(_next);
     }
@@ -1058,6 +1162,7 @@ export class CardMenus
         // (a curve's tooltip closes: a menu opened is never under it)
         for( const g of this.graphs ?? [] ) g.chart?.hecEndTooltip();
         menuEl.style.display = 'block';
+        menuEl.style.clipPath = '';
         if( top  !== undefined ) menuEl.style.top  = top;
         if( left !== undefined ) menuEl.style.left = left;
         menuEl.style.transform = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '';
@@ -1164,6 +1269,10 @@ export class CardMenus
         const _lines = this._menuLines(_menu);
         subEl.dataset.room = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
         this.openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
+        // (moved up to fit the screen: never above its menu — its first line within it, see
+        // followAnchor —, the rest masked below)
+        const _above = _menu.getBoundingClientRect().top - subEl.getBoundingClientRect().top;
+        if( _above > 0 ) subEl.style.top = ( ( parseFloat(subEl.style.top) || 0 ) + _above ) + 'px';
     }
 
     _navigateMenuArrowKey(visible, key)

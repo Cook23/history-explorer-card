@@ -88,6 +88,65 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A menu scrolled: its submenu follows its line, closed once its first line is wholly out of the menu ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [] }, { mock: { series: true }, height: 500 });
+    await t.wait(800);
+    await t.step('the selector\'s list scrolled: an attribute submenu open follows its entity\'s line, then closes once its first line is wholly out of the list', async () => {
+        await t.page.click('#b7_0'); await t.wait(400);
+        const id = await t.E(`(()=>{ const d=el.querySelector('#es_0'), dr=d.getBoundingClientRect(); const a=[...d.querySelectorAll('a[data-entity]')].find(a=>a.textContent.endsWith(' ▸') && a.getBoundingClientRect().top > dr.top + 60 && a.getBoundingClientRect().bottom < dr.bottom); return a ? a.dataset.entity : null; })()`);
+        if( !id ) return 'no entity with attributes in view: ' + await t.E(`el.querySelector('#es_0').scrollHeight+'/'+el.querySelector('#es_0').clientHeight`);
+        await t.page.click(`#es_0 a[data-entity="${id}"]`); await t.wait(400);
+        const level = () => t.E(`(()=>{ const s=el.querySelector('#es_0_series'), l=el.querySelector('#es_0 a[data-entity="${id}"]'); return { shown: s.style.display!=='none', dy: Math.round(s.getBoundingClientRect().top - l.getBoundingClientRect().top) }; })()`);
+        const before = await level();
+        await t.E(`el.querySelector('#es_0').scrollTop += 30`); await t.wait(200);
+        const scrolled = await level();
+        await t.E(`el.querySelector('#es_0').scrollTop += 400`); await t.wait(200);
+        const gone = await level();
+        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 490); await t.wait(300);
+        return before.shown && Math.abs(before.dy) <= 1 && scrolled.shown && Math.abs(scrolled.dy) <= 1 && !gone.shown ? true : JSON.stringify({ id, before, scrolled, gone });
+    });
+    done(await t.close());
+
+    // ── The page scrolled: a menu stays on what it was opened from, masked past what shows of
+    // the page — the screen's edge, or under the sticky toolbar — closed once its first line is
+    // wholly past it ──
+    for( const sticky of [false, true] ) {
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, ...( sticky ? { uiLayout: { sticky: 'top' } } : {} ),
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }, { type: 'line', entities: [{ entity: 'sensor.tank' }] }] },
+            { mock: { series: true }, height: 600 });
+        // (room to scroll below the card; Home Assistant's header height, which a sticky
+        // toolbar stays under: none here)
+        await t.E(`(()=>{ const d=document.createElement('div'); d.style.height='1500px'; document.body.appendChild(d); document.documentElement.style.setProperty('--header-height', '0px'); })()`);
+        await t.wait(800);
+        await t.step(`${sticky ? 'a sticky toolbar' : 'the page'}: a curve\'s menu follows its label as the page scrolls; its first line partly past ${sticky ? 'the toolbar' : 'the screen\'s top'}: masked there, still open; wholly past: closed; scrolled the other way, its part below the screen masked, still open`, async () => {
+            await t.E('scrollTo(0, 0)'); await t.wait(200);
+            await t.longPress(await t.E('legendPt(1,0)'));
+            const menu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); if( m.style.display==='none' ) return null; const r=m.getBoundingClientRect(); return { gap: Math.round(r.top - legendPt(1,0).y), top: r.top, bottom: r.bottom, clip: m.style.clipPath }; })()`);
+            const zoneTop = () => t.E(`${sticky ? "el.querySelector('[data-sticky]').getBoundingClientRect().bottom" : '0'}`);
+            const m0 = await menu();
+            await t.E('scrollBy(0, 40)'); await t.wait(250);
+            const m1 = await menu();
+            // (its top 10 px past the zone's top: that much masked, open; 40 px past, more than
+            // its first line: closed)
+            await t.E(`scrollBy(0, ${m1.top} - ${await zoneTop()} + 10)`); await t.wait(250);
+            const m2 = await menu();
+            await t.E('scrollBy(0, 30)'); await t.wait(250);
+            const m3 = await menu();
+            // (room added above the card; opened again with its label 260 px above the screen's
+            // bottom, then the page scrolled up until the menu goes 60 px past the screen's bottom)
+            await t.E(`(()=>{ const d=document.createElement('div'); d.style.height='600px'; document.body.prepend(d); scrollTo(0, 0); })()`); await t.wait(200);
+            await t.E(`scrollTo(0, legendPt(1,0).y - innerHeight + 260)`); await t.wait(250);
+            await t.longPress(await t.E('legendPt(1,0)'));
+            const m4 = await menu();
+            await t.E(`scrollBy(0, -(innerHeight - ${m4?.bottom ?? 0} + 60))`); await t.wait(250);
+            const m5 = await menu();
+            await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.E('scrollTo(0, 0)'); await t.wait(300);
+            const ok = m0 && m1 && Math.abs(m1.gap - m0.gap) <= 1 && m2 && /inset\((9|10|11)/.test(m2.clip) && !m3 && m4 && m5 && /inset\(0px 0px [1-9]/.test(m5.clip);
+            return ok ? true : JSON.stringify({ m0, m1, m2, m3, m4, m5 });
+        });
+        done(await t.close());
+    }
+
     // ── The info panel's type menu ──
     t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
