@@ -37,11 +37,11 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, layout (the Y axis, a switch)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, behavior (the tooltip, the Y axis lock — a switch —, cut)', async () => {
         await graphMenu('rain');
-        const m = await menu(); await click('layout'); const l = await menu();
-        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Layout ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Layout ▸* || Y axis locked | Cut' ? true : `${m} / ${l}`;
+        const m = await menu(); await click('behavior'); const l = await menu();
+        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
+            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* || Tooltip ▸ | Y axis locked | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -49,13 +49,13 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
         await graphMenu('rain'); const late = await menu();
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
-        return /Layout ▸\* \|\| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
+        return /Behavior ▸\* \|\| Tooltip ▸ \| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
     await t.step('Y axis locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
         const sw = () => t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
-        await graphMenu('rain'); await click('layout'); const r = { off: await sw() }; await click('ylock');
+        await graphMenu('rain'); await click('behavior'); const r = { off: await sw() }; await click('ylock');
         r.locked = await t.E(`lockOf(${await gi('rain')})`);
-        await graphMenu('rain'); await click('layout'); r.on = await sw(); await click('ylock');
+        await graphMenu('rain'); await click('behavior'); r.on = await sw(); await click('ylock');
         r.released = await t.E(`lockOf(${await gi('rain')})`);
         return r.off === 'false' && r.locked === 1 && r.on === 'true' && r.released === 0 ? true : JSON.stringify(r);
     });
@@ -135,9 +135,9 @@ module.exports = async function()
         r.scissors = await buttons(); r.layout = await layout();
         return [r.outside, r.escape, r.scissors].every(b => b === ' |  |  | ') && r.layout === L0 ? true : JSON.stringify(r);
     });
-    await t.step('cut a curve (its type menu, Layout): 📋 on the graphs it can go to, struck through on a timeline', async () => {
+    await t.step('cut a curve (its type menu, Behavior): 📋 on the graphs it can go to, struck through on a timeline', async () => {
         await t.longPress(await t.E(`legendPt(${await gi('rain')},0)`));
-        await click('layout'); await click('cut');
+        await click('behavior'); await click('cut');
         const b = await buttons();
         return b === 'paste | -paste | cancel | paste' ? true : b;
     });
@@ -149,7 +149,7 @@ module.exports = async function()
     await t.step('a graph added from the card: its menu can delete it', async () => {
         await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.wind_rad'], 'default'); })()`);
         await t.wait(1200);
-        await graphMenu('wind_rad'); await click('layout');
+        await graphMenu('wind_rad'); await click('behavior');
         const m = await menu(); await click('gdelete');
         const r = { m, layout: await layout(), stored: await t.E(`el.instance.store.has('sensor.wind_rad')`) };
         return r.m.endsWith('Cut | Delete') && !r.layout.includes('wind_rad') && !r.stored ? true : JSON.stringify(r);
@@ -265,6 +265,42 @@ module.exports = async function()
         await t.swipe(a, { x: a.x, y: a.y - 60 });
         const r = { layout: await layout(), y: await t.scrollY() };
         return r.layout === 'power+power_kw | a | tank | rain' && r.y === 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The card's menu, a graph's, a curve's: the last one to speak wins, whatever its level ──
+    // (graph 0: power and power2; graph 1: rain)
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] },
+                                       { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { height: 1000, mock: { series: true } });
+    await t.wait(800);
+    // (a line of an open box, by its text — a list's values have no id)
+    const lPick = (box, text) => t.E(`[...el.querySelector('#${box}').querySelectorAll('a')].find(a=>a.textContent.trim()==='${text}').click()`);
+    const lClickIds = async ids => { for( const id of ids ) { await t.E(`el.querySelector('#${id}').click()`); await t.wait(300); } };
+    // Each menu opened, its lines of path clicked in turn, then its value text in the last box
+    const lViaCard = async (path, box, text) => { await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await lClickIds(path.map(k => `eo_0_${k}`)); await lPick(`eo_0_${box}`, text); await t.wait(900); };
+    const lViaGraph = async (gi, path, box, text) => { await t.longPress(await t.E(`moPt(${gi})`)); await t.wait(300); await lClickIds(path.map(k => `et_0_${k}`)); await lPick(`et_0_${box}`, text); await t.wait(900); };
+    const lViaCurve = async (gi, li, path, box, text) => { await t.longPress(await t.E(`legendPt(${gi},${li})`)); await t.wait(300); await lClickIds(path.map(k => `et_0_${k}`)); await lPick(`et_0_${box}`, text); await t.wait(900); };
+    // Each curve, in display order: what it shows of a field
+    const lCurves = what => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.entities.map((e,i)=>{ const d=g.chart.data.datasets[i]; return ${what}; }).join(' ')).join(' | ')`);
+    const TIP = ['behavior', 'behavior_tooltip'], TIPBOX = 'behavior_tooltip_sub';
+    await t.step('the tooltip: All from the card\'s menu, Selected on a curve, Nearest on its graph, Selected from the card: each time the last one to speak wins, for each curve it concerns', async () => {
+        const mode = () => lCurves(`el.instance.tooltipModeOf(e)+'/'+d.hecTooltip`);
+        await lViaCard(TIP, TIPBOX, 'All'); const a = await mode();
+        await lViaCurve(0, 0, TIP, TIPBOX, 'Selected'); const b = await mode();
+        await lViaGraph(0, TIP, TIPBOX, 'Nearest'); const c = await mode();
+        await lViaCard(TIP, TIPBOX, 'Selected'); const d = await mode();
+        const want = ['all/all all/all | all/all', 'selected/selected all/all | all/all', 'nearest/nearest nearest/nearest | all/all', 'selected/selected selected/selected | selected/selected'];
+        const r = [a, b, c, d];
+        return r.every((x, i) => x === want[i]) ? true : JSON.stringify(r);
+    });
+    await t.step('the width: 3 px from the card\'s menu, 5 px on a curve, 1 px on its graph: each time the last one to speak wins, for each curve it concerns', async () => {
+        const W = ['appearance', 'appearance_width'], WBOX = 'appearance_width_sub';
+        const width = () => lCurves('d.borderWidth');
+        await lViaCard(W, WBOX, '3 px'); const a = await width();
+        await lViaCurve(0, 0, W, WBOX, '5 px'); const b = await width();
+        await lViaGraph(0, W, WBOX, '1 px'); const c = await width();
+        const r = [a, b, c], want = ['3 3 | 3', '5 3 | 3', '1 1 | 3'];
+        return r.every((x, i) => x === want[i]) ? true : JSON.stringify(r);
     });
     done(await t.close());
 

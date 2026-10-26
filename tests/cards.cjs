@@ -34,45 +34,45 @@ module.exports = async function()
     // The entries shown in the menu and in each submenu (the marked one with *); the open
     // submenu after a colon
     const menu = `(()=>{ const list=id=>[...el.querySelectorAll(id+' a')].filter(a=>a.style.display!=='none').map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');
-        const open=['rep','interp','layout'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
-        return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_layout_sub')].join(' || '); })()`;
+        const open=['rep','interp','behavior'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
+        return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_behavior_sub')].join(' || '); })()`;
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300); };
-    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Layout', async () => {
+    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Behavior (the tooltip, the Y axis lock, cut, delete)', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Layout ▸ | Info | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
     });
-    await t.step('type menu of a binary sensor: Display (timeline only), Layout — no Appearance', async () => {
+    await t.step('type menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis) — no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Layout ▸ | Info | Tests (beta) ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Behavior ▸ | Info | Tests (beta) ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
     });
     done(await t.close());
 
-    // ── The Layout submenu: separate, merge back, delete — the same as the gestures ──
+    // ── The Behavior submenu: separate, merge back, delete — the same as the gestures ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900 });
-    const org = `[...el.querySelectorAll('#et_0_layout_sub a')].filter(a=>a.style.display!=='none').map(a=>a.id.replace('et_0_','')).join(',')`;
+    const org = `[...el.querySelectorAll('#et_0_behavior_sub a')].filter(a=>a.style.display!=='none').map(a=>a.id.replace('et_0_','')).join(',')`;
     const arrange = async (gi, li, action) => {
         await t.longPress(await t.E(`legendPt(${gi},${li})`));
-        await t.E(`el.querySelector('#et_0_layout').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(200);
         const v = await t.E(org);
         if( action ) { await t.E(`el.querySelector('#et_0_${action}').click()`); await t.wait(800); }
         else await closeMenu();
         return v;
     };
-    await t.step('Layout on a curve of a YAML graph: separate, cut, delete; separate takes it into a linked graph', async () => {
+    await t.step('Behavior on a curve of a YAML graph: its tooltip, its graph\'s Y axis lock, separate, cut, delete; separate takes it into a linked graph', async () => {
         const v = await arrange(0, 0, 'split');
         const g = await t.graphs();
-        return v === 'split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
+        return v === 'behavior_tooltip,ylock,split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
     });
-    await t.step('Layout on the curve taken out: merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
+    await t.step('Behavior on the curve taken out: its tooltip, the Y axis lock, merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
         const v = await arrange(1, 0, 'merge');
         const g = await t.graphs();
-        return v === 'merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
+        return v === 'behavior_tooltip,ylock,merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
     });
-    await t.step('Layout, delete: the curve removed', async () => {
+    await t.step('Behavior, delete: the curve removed', async () => {
         const id = await t.E(`graphAt(0).entities[1].entity`);
         await arrange(0, 1, 'delete');
         const g = await t.graphs();
@@ -82,7 +82,7 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         await t.E(`el.querySelector('#et_0_algo_makima').click()`); await t.wait(500);
         await t.longPress(await t.E('legendPt(0,0)'));
-        const open = await t.E(`['rep','interp','layout','tests'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; })`);
+        const open = await t.E(`['rep','interp','behavior','tests'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; })`);
         await t.E(`el.querySelector('#et_0_algo_monotone').click()`); await t.wait(500);
         return open.join() === 'interp' ? true : JSON.stringify(open);
     });

@@ -4,6 +4,31 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.40] - 2026-10-26
+
+### Added — the tooltip as the screen suits
+- Each curve has a tooltip mode, for a large screen (`largeScreenTooltip`: a card 600 px wide or more) and for a small one (`smallScreenTooltip`: narrower, and the info panel): `selected` — the curves clicked, as before (the small screen's default); `nearest` — the value nearest the pointer on any curve, at a hover too, without a click (the large screen's default); `all` — that value and each other curve's nearest in time. On the card, a graph, an entity or in `entityOptions` (`large_screen_tooltip`, `small_screen_tooltip`), or from *Behavior ▸ Tooltip ▸* of a curve's, a graph's or the card's menu, the last one to speak winning; kept on this device only (`tooltipField`, `tooltipModeOf`, `applyTooltipModes`, `setCurvesTooltip`; Chart.js dataset option `hecTooltip`, `_hecTooltipCurvesAt`)
+- Tests (`points`): the three modes, at a hover and at a click, and a drag that doesn't act on the tooltip; (`graphmenu`) the tooltip and the width set from the card's menu, a curve's and a graph's in turn — the last one to speak wins for each curve
+
+### Added — the card's menu acts on every curve
+- The options menu (▾) opens with *Display ▸*, *Appearance ▸* (its color aside), *Interpolation ▸* and *Behavior ▸* — the same submenus as a graph's menu, for every curve of the card at once — then *Export ▸*, *Card ▸*, *Global ▸*. The sections are one code for the three menus, for the curves each acts on (`_scopeOf`, `_sectionLines`, `_sectionItems`)
+
+### Changed — *Layout* becomes *Behavior*
+- A curve's and a graph's *Layout ▸* submenu is now *Behavior ▸*: *Tooltip ▸* and *Y axis locked* (a curve's: its graph's padlock; also in the info panel's menu), then *Separate*, *Merge back*, *Cut*, *Delete* as before (Chart.js `hecYAxisLocked()`)
+- Every submenu of a cascade is filled from the start, at any depth: a submenu opening its own (*Behavior* and its *Tooltip*, *Card* and its confirmations) is as wide as it needs at once, its menu's lines readable beside it; a line of a menu closed meanwhile opens nothing
+
+### Fixed — a drag showed the tooltip
+- A drag (the time moved, the elastic box) updated the tooltip as a hover would. A contact in progress — a press the gesture engine hasn't yet resolved into a click, a drag, a pinch — no longer acts on the tooltip, whatever the mode; an open tooltip follows its curve as the curves move
+
+### Fixed — a circular curve zoomed or its Y axis moved
+- Zoomed in time, a circular curve (an angle) was placed by what was loaded around the window too: the Y axis spread over other turns, the curve seen squeezed at an edge. Its turn is now chosen on the window shown, from the value in force at its start to the first one after its end, and what is loaded around it put in that same turn (`_unwrapCircular`)
+- The Y axis moved by hand (a drag of its labels, a pinch, the padlock), the curve stayed in its turn and jumped across the graph. The turn shown is now that of the range: the curve moved by whole turns to sit around its middle — or, going round more than a turn in the window, each value put in the turn around it, its jumps dashed (Chart.js dataset option `circularPeriod`, plugin `hecCircularView`)
+- Tests (`yaxes`): a wind going round more than a turn, zoomed where it crosses 0, its Y axis moved a turn up, released
+
+### Fixed — the min/max band of a hidden curve
+- A curve hidden from its legend label left its min/max band (`showMinMax`) drawn. It's hidden with its curve (plugin `hecMinMaxBand`)
+- Test (`features`)
+
 ## [v1.2.39] - 2026-10-22
 
 ### Fixed — a submenu left behind when its menu scrolls

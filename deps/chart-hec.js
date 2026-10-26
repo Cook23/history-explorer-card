@@ -440,6 +440,75 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // Circular curves in the Y window shown — the dataset option circularPeriod (Q, in the
+  // units drawn: an angle's 360): values that wrap around, as the card gives them (a
+  // continuous curve, or one put in a turn, its jumps marked hecCircularJump). While a Y
+  // range is set by hand (a pan, a zoom, the padlock: the lock engaged), the turn shown is
+  // the one of that range: the curve made continuous again, then moved by whole periods to
+  // sit around the range's middle; should it span more than a turn in the time window shown
+  // (the time axis' min and max), each value put in the turn around that middle instead, its
+  // jumps dashed (hecPlateauEnd). The range released,
+  // the curve as the card gave it. Each point keeps the card's value (hecY0, and its band's
+  // hecYMin0 / hecYMax0, hecJump0): moved from it at each update, never from the last move.
+  Chart.plugins.register({
+    id: 'hecCircularView',
+    beforeUpdate: function (chart) {
+      var axes = chart.options.scales && chart.options.scales.yAxes || [];
+      chart.data.datasets.forEach(function (ds) {
+        var Q = ds.circularPeriod, pts = ds.data;
+        if (!Q || !Array.isArray(pts)) return;
+        var ok = pts.filter(function (p) { return p && typeof p.y === 'number' && isFinite(p.y); });
+        ok.forEach(function (p) {
+          if (p.hecY0 !== undefined) return;
+          p.hecY0 = p.y; p.hecYMin0 = p.yMin; p.hecYMax0 = p.yMax;
+          p.hecJump0 = !!p.hecCircularJump; p.hecPlateau0 = !!p.hecPlateauEnd && !p.hecCircularJump;
+        });
+        var o = axes.filter(function (a) { return a.id === ds.yAxisID; })[0] || axes[0];
+        var t = o && o.ticks;
+        var set = chart._hecYAxisLock && t && typeof t.min === 'number' && typeof t.max === 'number';
+        // (each point: the card's value moved, its band with it; its jump as said)
+        var put = function (p, y, jump) {
+          var d = y - p.hecY0;
+          p.y = y;
+          if (p.hecYMin0 != null) p.yMin = p.hecYMin0 + d;
+          if (p.hecYMax0 != null) p.yMax = p.hecYMax0 + d;
+          p.hecCircularJump = jump;
+          p.hecPlateauEnd = p.hecPlateau0 || jump;
+        };
+        if (!set) { ok.forEach(function (p) { put(p, p.hecY0, p.hecJump0); }); return; }
+        var mod = function (v) { return ((v % Q) + Q) % Q; };
+        // (the time window shown — the time axis' min and max —: its span measured there, not
+        // over what is loaded around it)
+        var _ms = function (v) { return v == null ? NaN : typeof v === 'number' ? v : +(v.valueOf ? v.valueOf() : new Date(v)); };
+        var _tx = chart.options.scales && chart.options.scales.xAxes && chart.options.scales.xAxes[0] && chart.options.scales.xAxes[0].time || {};
+        var _t0 = _ms(_tx.min), _t1 = _ms(_tx.max);
+        var _shown = function (p) { var x = _ms(p.x); return !(x < _t0) && !(x > _t1); };
+        // (continuous: each step of more than half a turn taken as a crossing)
+        var un = [], off = 0, lo = Infinity, hi = -Infinity;
+        ok.forEach(function (p, k) {
+          if (k) off -= Math.round((p.hecY0 - ok[k - 1].hecY0) / Q) * Q;
+          var y = p.hecY0 + off;
+          un.push(y);
+          if (_shown(p)) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
+        });
+        if (lo > hi) { lo = Math.min.apply(null, un); hi = Math.max.apply(null, un); }
+        var mid = (t.min + t.max) / 2;
+        if (hi - lo <= Q) {
+          var k = Math.round((mid - (lo + hi) / 2) / Q) * Q;
+          ok.forEach(function (p, i) { put(p, un[i] + k, false); });
+        } else {
+          var base = mid - Q / 2, prev = null;
+          ok.forEach(function (p) {
+            var y = base + mod(p.hecY0 - base);
+            put(p, y, prev !== null && Math.abs(y - prev) > Q / 2);
+            prev = y;
+          });
+        }
+      });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
   // points (those that have them, within the plot area — each run of them following each
   // other an area of its own), shaded in the dataset's line color at MINMAX_BAND_ALPHA, on
@@ -469,7 +538,8 @@
       var xScale = chart.scales['x-axis-0'];
       if (!xScale) return;
       chart.data.datasets.forEach(function (dataset, di) {
-        if (!dataset.showMinMax) return;
+        // (a curve hidden — its legend label clicked —: its band with it)
+        if (!dataset.showMinMax || !chart.isDatasetVisible(di)) return;
         var yScale = chart.scales[chart.getDatasetMeta(di).yAxisID];
         var points = dataset.data;
         // (a dataset not filled yet holds {}, not a list)
@@ -2245,6 +2315,12 @@
         !!(this.options.scales && this.options.scales.yAxes && this.options.scales.yAxes.length);
     },
 
+    // Public (Chart Custom.js.md §1): whether the Y axes are locked (the padlock closed);
+    // undefined on a chart without a lock
+    hecYAxisLocked: function () {
+      return this._hecHasYAxisLock() ? !!this._hecYAxisLock : undefined;
+    },
+
     // Public (Chart Custom.js.md §1): locks or releases the Y axes, as a click on the padlock
     hecSetYAxisLocked: function (locked) {
       if (this._hecHasYAxisLock() && !!this._hecYAxisLock !== !!locked) this._hecToggleYAxisLock();
@@ -2946,13 +3022,43 @@
       });
     },
 
-    // The elements the tooltip shows at this point: with curves in the tooltip mode, the
-    // value of each of them nearest the point along the time axis; else those under it
-    // (hover.mode) — only values drawn on the plot area, never a curve-shaping point
+    // The curves a tooltip shows at this point, each as its tooltip mode says (the dataset
+    // option hecTooltip): 'selected' (the default) — in the tooltip mode, a click on it having
+    // selected it —, 'nearest' — the curve the point is on or nearest, by the picking rule
+    // (_hecCurveAt) —, 'all' — every one, once a curve is that near
+    _hecTooltipCurvesAt: function (e) {
+      var me = this, _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
+      var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
+      var _picked = _at ? me._hecCurveAt(e.x, e.y) : -1;
+      var _curves = [];
+      (me.data.datasets || []).forEach(function (ds, i) {
+        if (!me.isDatasetVisible(i) || !me.getDatasetMeta(i).dataset) return;
+        var _m = ds.hecTooltip || 'selected';
+        if ((_m === 'all' && _picked >= 0) || (_m === 'nearest' && i === _picked) || (_m === 'selected' && _sel.indexOf(i) >= 0)) _curves.push(i);
+      });
+      return _curves;
+    },
+
+    // Whether a curve shown opens its tooltip on a hover: its tooltip mode (hecTooltip)
+    // 'nearest' or 'all'
+    _hecHasHoverTooltips: function () {
+      var me = this;
+      return (me.data.datasets || []).some(function (ds, i) {
+        return me.isDatasetVisible(i) && !!me.getDatasetMeta(i).dataset && (ds.hecTooltip === 'nearest' || ds.hecTooltip === 'all');
+      });
+    },
+
+    // The elements the tooltip shows at this point: the value of each curve it shows
+    // (_hecTooltipCurvesAt) nearest the point along the time axis; else, in the tooltip mode
+    // without any curve selected (or without hover.activateOnContact), those under it (hover.mode) — only values drawn on the plot
+    // area, never a curve-shaping point
     _hecHoverElements: function (e) {
       var me = this, ho = me.options.hover;
-      var _curves = (me._hecTooltipCurves || []).filter(function (i) { return me.isDatasetVisible(i); });
-      if (!_curves.length) return me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho));
+      var _curves = me._hecTooltipCurvesAt(e);
+      if (!_curves.length) {
+        var _sel = (me._hecTooltipCurves || []).filter(function (i) { return me.isDatasetVisible(i); });
+        return ( me._hecTooltipMode || ho.activateOnContact !== true ) && !_sel.length ? me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho)) : [];
+      }
       return _curves.map(function (i) { return me._hecNearestValueOf(i, e.x); }).filter(function (el) { return el; });
     },
 

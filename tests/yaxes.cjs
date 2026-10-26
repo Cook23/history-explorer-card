@@ -305,5 +305,46 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A circular curve: the turn shown chosen on the window shown; a Y range set by hand
+    // chooses it then ──
+    // (a wind turning 20° every half hour, for two days: 960° a day — the last 4 h cross 0:
+    // 320, 340, 0, 20 … 120)
+    const wind = Array.from({ length: 97 }, (_, k) => [( 96 - k ) * 1800, String(( 240 + 20 * ( k - 48 ) + 3600 ) % 360)]);
+    // (the points of the window shown: their values, the jumps marked, the Y axis' range)
+    const shownCurve = () => t.E(`(()=>{ const c=graphAt(0).chart, x=c.scales['x-axis-0'], ys=c.scales['y-axis-0'];
+        const p=c.data.datasets[0].data.filter(q=>q && typeof q.y==='number' && q.x>=x.min && q.x<=x.max);
+        const y=p.map(q=>q.y); return { n: p.length, lo: Math.min(...y), hi: Math.max(...y), jumps: p.filter((q,i)=>i && q.hecCircularJump).length,
+            steps: p.filter((q,i)=>i && Math.abs(q.y-p[i-1].y)>180).length, axis: [ys.min, ys.max] }; })()`);
+    const windCard = range => card({ defaultTimeRange: range, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind', type: 'line', lineMode: 'lines' }] }] });
+    t = await openCard(windCard('24h'), { height: 700, mock: { series: true, rows: { 'sensor.wind': wind } } });
+    await t.wait(1500);
+    await t.step('a circular curve going round more than a turn in the window: put in one turn, its jumps dashed', async () => {
+        const r = await shownCurve();
+        return r.hi - r.lo <= 360 && r.jumps >= 2 && r.jumps === r.steps ? true : JSON.stringify(r);
+    });
+    await t.step('zoomed to the last 4 h, where it crosses 0 (more than a turn before them): continuous there — 320, 340, 360, 380 …', async () => {
+        await t.E(`(()=>{ const s=el.querySelector('#by_0'); s.value='4'; s.dispatchEvent(new Event('change')); })()`); await t.wait(1500);
+        const r = await shownCurve();
+        return r.n >= 8 && r.hi - r.lo <= 360 && !r.jumps && !r.steps ? true : JSON.stringify(r);
+    });
+    await t.step('the Y axis moved by hand a turn up: the curve with it, a turn up, still continuous', async () => {
+        const r0 = await shownCurve();
+        await t.E(`(()=>{ const c=graphAt(0).chart; c._hecSetYRanges([[c.scales['y-axis-0'].min+360, c.scales['y-axis-0'].max+360]]); })()`); await t.wait(300);
+        const r1 = await shownCurve();
+        return Math.abs(r1.lo - r0.lo - 360) < 1e-6 && Math.abs(r1.hi - r0.hi - 360) < 1e-6 && !r1.jumps && !r1.steps ? true : JSON.stringify({ r0, r1 });
+    });
+    await t.step('the padlock released: the curve back where it was', async () => {
+        await t.E(`(()=>{ const c=graphAt(0).chart; c.hecSetYAxisLocked(false); c.update(); })()`); await t.wait(300);
+        const r = await shownCurve();
+        return r.lo < 360 && r.hi - r.lo <= 360 && !r.jumps && !r.steps ? true : JSON.stringify(r);
+    });
+    await t.step('back to 24 h, the Y axis moved by hand: every value in the turn around the range\'s middle, its jumps dashed there', async () => {
+        await t.E(`(()=>{ const s=el.querySelector('#by_0'); s.value='24'; s.dispatchEvent(new Event('change')); })()`); await t.wait(1500);
+        await t.E(`graphAt(0).chart._hecSetYRanges([[500, 860]])`); await t.wait(300);
+        const r = await shownCurve();
+        return r.lo >= 500 && r.hi < 860 && r.jumps >= 2 && r.jumps === r.steps ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

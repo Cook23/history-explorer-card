@@ -66,7 +66,7 @@ module.exports = async function()
         await curve(); await click('#et_0_appearance'); await t.wait(250); await click([A, 'Color']); await t.wait(250);
         const color = await shown('#et_0');
         await t.page.mouse.click(5, 880); await t.wait(300);
-        await curve(); await click('#et_0_layout'); await t.wait(250); await click('#et_0_split'); await t.wait(250);
+        await curve(); await click('#et_0_behavior'); await t.wait(250); await click('#et_0_split'); await t.wait(250);
         const split = await shown('#et_0');
         return !color && !split ? true : JSON.stringify({ color, split });
     });
@@ -76,8 +76,8 @@ module.exports = async function()
         () => choice('graph Points', graph, ['#et_0_appearance', [A, 'Points']]),
         () => choice('graph Extremes', graph, ['#et_0_appearance', [A, 'Extremes']]),
         () => choice('graph Width 2 px', graph, ['#et_0_appearance', [A, 'Width'], ['#et_0_appearance_width_sub', '2 px']]),
-        () => choice('graph Y axis locked', graph, ['#et_0_layout', '#et_0_ylock']),
-        () => choice('graph Y axis unlocked', graph, ['#et_0_layout', '#et_0_ylock']),
+        () => choice('graph Y axis locked', graph, ['#et_0_behavior', '#et_0_ylock']),
+        () => choice('graph Y axis unlocked', graph, ['#et_0_behavior', '#et_0_ylock']),
     ]));
     await t.step('the options menu: Enhanced native history — open half a second, then closed (twice: back as it was)', async () => {
         const options = async () => { await click('#bo_0'); };
