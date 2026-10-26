@@ -4735,8 +4735,8 @@
               // lifts off, doesn't leave the graph)
               if (!e.native || !e.native.buttons) me._hecHasMoved = true;
               var _searched = false;
-              // (fork) curves whose tooltip a hover opens, without a click (hecTooltip 'nearest'
-              // or 'all'); and a contact in progress — a press the gesture engine hasn't yet
+              // (fork) curves whose tooltip a hover opens, without a click (hecTooltip 'nearest',
+              // 'mixed' or 'all'); and a contact in progress — a press the gesture engine hasn't yet
               // resolved into a click (_hecTap, at its release), or a drag —: no tooltip from a
               // drag, whatever the curves' mode
               var _hoverTips = me._hecHasHoverTooltips();

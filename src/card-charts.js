@@ -24,7 +24,7 @@ export const NARROW_CARD_PX = 300;
 // tooltipModeOf); the info panel is always on a small screen
 const SMALL_SCREEN_PX = 600;
 // Each screen's tooltip mode when none is set
-const TOOLTIP_DEFAULTS = { smallScreenTooltip: 'selected', largeScreenTooltip: 'nearest' };
+const TOOLTIP_DEFAULTS = { smallScreenTooltip: 'selected', largeScreenTooltip: 'mixed' };
 // Where a bar graph's interval selector is: this far from the graph's right edge (px)
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
@@ -524,8 +524,8 @@ export class CardCharts
     // How entity e's curve enters its graph's tooltip, on the screen the card is on now
     // (tooltipField) — its own mode, else its graph's, its entityOptions', the card's, else
     // that screen's default (TOOLTIP_DEFAULTS): 'selected' — once a click on it selected it —,
-    // 'nearest' — while it's the curve nearest the pointer —, 'all' — whenever the pointer is
-    // over the plot (Chart.js hecTooltip)
+    // 'nearest' — while it's the curve nearest the pointer —, 'mixed' — either —, 'all' —
+    // whenever a curve is that near (Chart.js hecTooltip)
     tooltipModeOf(e)
     {
         const _f = this.tooltipField();

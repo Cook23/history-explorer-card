@@ -361,6 +361,8 @@ module.exports = async function()
     const MODES = {
         selected: { hover: [], click: ['tank'], thenRain: ['tank'] },
         nearest:  { hover: ['tank'], click: ['tank'], thenRain: ['rain'] },
+        // (tank selected by the click, rain the nearest one)
+        mixed:    { hover: ['tank'], click: ['tank'], thenRain: ['tank', 'rain'] },
         all:      { hover: ['tank', 'rain'], click: ['tank', 'rain'], thenRain: ['tank', 'rain'] },
     };
     const shows = (text, names) => ['tank', 'rain'].every(n => names.includes(n) === new RegExp(n).test(text || ''));
