@@ -148,9 +148,9 @@ export function stateLabel(map, v)
 // An axis' labels: shown (true), hidden (false) or shown on a hover ('hover')
 const _labelsShown = v => v === 'hover' ? v : v !== false;
 
-// The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest or
-// all, whatever its case; anything else not set, with a warning
-export const TOOLTIP_MODES = ['selected', 'nearest', 'all'];
+// The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
+// or all, whatever its case; anything else not set, with a warning
+export const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
 const _tooltipMode = v => {
     const m = String(v).trim().toLowerCase();
     if( TOOLTIP_MODES.includes(m) ) return m;

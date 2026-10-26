@@ -3025,7 +3025,7 @@
     // The curves a tooltip shows at this point, each as its tooltip mode says (the dataset
     // option hecTooltip): 'selected' (the default) — in the tooltip mode, a click on it having
     // selected it —, 'nearest' — the curve the point is on or nearest, by the picking rule
-    // (_hecCurveAt) —, 'all' — every one, once a curve is that near
+    // (_hecCurveAt) —, 'mixed' — either —, 'all' — every one, once a curve is that near
     _hecTooltipCurvesAt: function (e) {
       var me = this, _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
       var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
@@ -3034,17 +3034,18 @@
       (me.data.datasets || []).forEach(function (ds, i) {
         if (!me.isDatasetVisible(i) || !me.getDatasetMeta(i).dataset) return;
         var _m = ds.hecTooltip || 'selected';
-        if ((_m === 'all' && _picked >= 0) || (_m === 'nearest' && i === _picked) || (_m === 'selected' && _sel.indexOf(i) >= 0)) _curves.push(i);
+        var _near = i === _picked, _selected = _sel.indexOf(i) >= 0;
+        if ((_m === 'all' && _picked >= 0) || (_m === 'nearest' && _near) || (_m === 'selected' && _selected) || (_m === 'mixed' && (_near || _selected))) _curves.push(i);
       });
       return _curves;
     },
 
     // Whether a curve shown opens its tooltip on a hover: its tooltip mode (hecTooltip)
-    // 'nearest' or 'all'
+    // 'nearest', 'mixed' or 'all'
     _hecHasHoverTooltips: function () {
       var me = this;
       return (me.data.datasets || []).some(function (ds, i) {
-        return me.isDatasetVisible(i) && !!me.getDatasetMeta(i).dataset && (ds.hecTooltip === 'nearest' || ds.hecTooltip === 'all');
+        return me.isDatasetVisible(i) && !!me.getDatasetMeta(i).dataset && (ds.hecTooltip === 'nearest' || ds.hecTooltip === 'mixed' || ds.hecTooltip === 'all');
       });
     },
 

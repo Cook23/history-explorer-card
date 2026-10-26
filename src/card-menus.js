@@ -52,8 +52,9 @@ const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', ylock: 'ui.menu.ylocked'
                             merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
                             delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
-// on one), the one nearest the pointer, every one
-const _TOOLTIP_MODES = [['selected', 'ui.menu.tooltip_selected'], ['nearest', 'ui.menu.tooltip_nearest'], ['all', 'ui.menu.tooltip_all']];
+// on one), the one nearest the pointer, both, every one
+const _TOOLTIP_MODES = [['selected', 'ui.menu.tooltip_selected'], ['nearest', 'ui.menu.tooltip_nearest'], ['mixed', 'ui.menu.tooltip_mixed'],
+                        ['all', 'ui.menu.tooltip_all']];
 // The appearance submenu: the curve's color (the browser's color picker), its points and its
 // extremes (switches), and three lists, each opened in the submenu itself, over it (← or
 // Escape: back) — its fill, its line's width, its line's style. Each line: the entry's field
