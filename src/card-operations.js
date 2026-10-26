@@ -401,11 +401,29 @@ export class CardOperations
     toggleCurvePoints(g, entities)
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
+        if( _curves.length ) this.setCurvePoints(g, _curves, !this.curvesShowPoints(g, _curves));
+    }
+
+    // The samples' dots of the curves among entities of graph g shown (show) or hidden —
+    // back to the hovered dot only, see _pointRadii —, saved as their showPoints
+    setCurvePoints(g, entities, show)
+    {
+        const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
         if( !_curves.length ) return;
-        // (hidden: back to the hovered dot only — see _pointRadii)
-        const _show = this.curvesShowPoints(g, _curves) ? 'hover' : true;
+        const _show = show ? true : 'hover';
         for( const e of _curves ) e.showPoints = _show;
         this.showCurvePoints(g, _curves, _show);
+        this.writeLocalState();
+    }
+
+    // The tooltip's mode of the curves among entities of graph g (see tooltipModeOf) — for
+    // the screen the card is on now (tooltipField): saved so, on this device only
+    setCurvesTooltip(g, entities, mode)
+    {
+        const _field = this.tooltipField();
+        const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
+        for( const e of _curves ) e[_field] = mode;
+        this.applyTooltipModes(g);
         this.writeLocalState();
     }
 

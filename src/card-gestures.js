@@ -139,7 +139,7 @@ export class CardGestures
     {
         // (the lock+handle zone: the graph's menu)
         if( info.zone === 'lockAndHandle' )
-            return this.showGraphMenu(0, g, info.clientX, info.clientY, info.yAxisLocked);
+            return this.showGraphMenu(0, g, info.clientX, info.clientY);
         // (on a curve: its samples' dots shown or hidden — about halfway between two curves,
         // or clearly beside them, nothing)
         if( info.zone === 'plot' )

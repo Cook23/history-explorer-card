@@ -3,7 +3,9 @@
 // and look: mini — each gesture still reaching what it's for, by the picking rule
 const { openCard } = require('./lib.cjs');
 
-const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+// (the tooltip of the curves selected — a click on one —, on this large screen too: see
+// points.cjs for the other modes)
+const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, largeScreenTooltip: 'selected',
     graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] },
         { type: 'line', entities: [{ entity: 'sensor.rain' }] },
@@ -24,7 +26,7 @@ window.valuePt=(gi)=>{ const c=graphAt(gi).chart, A=c.chartArea, r=c.canvas.getB
     const far=v=>others.length?Math.min(...others.map(w=>Math.hypot(w.x-v.x,w.y-v.y))):99;
     const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+(A.right-A.left)*0.3&&v.x<A.left+(A.right-A.left)*0.7&&v.y>A.top+8&&v.y<A.bottom-8)
         .sort((a,b)=>far(b)-far(a))[0]; return {x:r.left+v.x, y:r.top+v.y}; };
-window.menuKind=()=>{ const m=el.querySelector('#et_0'), y=el.querySelector('#et_0_ylock'); return !m||m.style.display==='none' ? 'closed' : y&&y.style.display!=='none' ? 'graph' : 'entity'; };
+window.menuKind=()=>{ const m=el.querySelector('#et_0'), i=el.querySelector('#et_0_info'); return !m||m.style.display==='none' ? 'closed' : i ? 'entity' : 'graph'; };
 window.tipShown=gi=>{ const e=graphAt(gi).chart.tooltip._hecHoverTooltipEl; return !!e && e.isConnected && getComputedStyle(e).display!=='none' && getComputedStyle(e).opacity!=='0'; };
 `;
 

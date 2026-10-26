@@ -5,7 +5,9 @@
 // hovered one 2 px wider
 const { openCard } = require('./lib.cjs');
 
-const card = () => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+// (the tooltip of the curves selected — a click on one —, on this large screen too: what most
+// steps here are about; the other modes, see the end)
+const card = () => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, largeScreenTooltip: 'selected',
     graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
              { type: 'line', yAxis: 'left', entities: [{ entity: 'sensor.rain' }, { entity: 'sensor.tank' }] },
              // (two curves close to each other: rain drawn 180 times larger)
@@ -331,8 +333,9 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The hover dot: the curve the pointer is on, then its value nearest along the time ──
-    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false },
+    // ── The hover dot: the curve the pointer is on, then its value nearest along the time (the
+    // tooltip of the curves selected: a hover alone shows the dot alone) ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: 'selected',
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true }, clock: CLOCK });
     await t.step('a hover on a curve between two values far apart: the dot of the one nearest along the time', async () => {
         // (a point of the drawn path, a third of the way from a value to the next, away from both)
@@ -349,6 +352,44 @@ module.exports = async function()
         return d && d[0] === 0 && d[1] === p.a && p.da > 15 ? true : JSON.stringify({ p, d });
     });
     done(await t.close());
+
+    // ── The tooltip's modes (largeScreenTooltip: this screen is a large one): which curves it
+    // shows, opened by a hover or a click (whatever the pointer: the gesture engine's one click),
+    // never acted on by a drag. Graph 1: rain and tank; near tank, away from rain ──
+    // (each mode: what the tooltip shows near tank — a hover, a click; then a hover near rain
+    // after that click)
+    const MODES = {
+        selected: { hover: [], click: ['tank'], thenRain: ['tank'] },
+        nearest:  { hover: ['tank'], click: ['tank'], thenRain: ['rain'] },
+        all:      { hover: ['tank', 'rain'], click: ['tank', 'rain'], thenRain: ['tank', 'rain'] },
+    };
+    const shows = (text, names) => ['tank', 'rain'].every(n => names.includes(n) === new RegExp(n).test(text || ''));
+    const leave = async () => { const y = await t.E('yaPt(1,0.5)'); await t.page.mouse.move(y.x, y.y, { steps: 10 }); await t.wait(1300); };
+    for( const [mode, want] of Object.entries(MODES) ) {
+        t = await openCard({ ...card(), largeScreenTooltip: mode }, { mock: { series: true }, clock: CLOCK });
+        await t.wait(800);
+        await t.step(`${mode}: a hover near a curve shows ${want.hover.join(' and ') || 'nothing'}`, async () => {
+            const p = await nearCurve(1); await t.page.mouse.move(p.x, p.y - 40, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+            const r = await tip(1); await leave();
+            return shows(r, want.hover) ? true : String(r);
+        });
+        await t.step(`${mode}: a click near a curve shows ${want.click.join(' and ')}; then a hover near the other one: ${want.thenRain.join(' and ')}`, async () => {
+            await t.page.mouse.click(...Object.values(await nearCurve(1))); await t.wait(400);
+            const clicked = await tip(1);
+            const q = await nearCurve(0); await t.page.mouse.move(q.x, q.y, { steps: 8 }); await t.wait(400);
+            const moved = await tip(1); await leave();
+            return shows(clicked, want.click) && shows(moved, want.thenRain) ? true : `${clicked} / ${moved}`;
+        });
+        await t.step(`${mode}: a drag doesn't act on the tooltip — what a hover near a curve opened (${want.hover.join(' and ') || 'nothing'}) stays as it is, during the drag and after it (the curves move, the tooltip with them)`, async () => {
+            const p = await nearCurve(1); await t.page.mouse.move(p.x, p.y - 40, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+            // (30 px: the point stays within the plot — nearCurve's is 40 px at least from its edges)
+            await t.page.mouse.down(); await t.page.mouse.move(p.x - 30, p.y, { steps: 8 }); await t.wait(300);
+            const during = await tip(1); await t.page.mouse.up(); await t.wait(600);
+            const after = await tip(1); await leave();
+            return shows(during, want.hover) && shows(after, want.hover) ? true : `${during} / ${after}`;
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

@@ -18,6 +18,13 @@ export const RIGHT_Y_AXIS = 'y-axis-1';
 // A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
 // _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
 export const NARROW_CARD_PX = 300;
+
+// A card narrower than this (px) is on a small screen — a phone, or a part of a screen no
+// wider —: its curves' tooltip follows smallScreenTooltip, else largeScreenTooltip (see
+// tooltipModeOf); the info panel is always on a small screen
+const SMALL_SCREEN_PX = 600;
+// Each screen's tooltip mode when none is set
+const TOOLTIP_DEFAULTS = { smallScreenTooltip: 'selected', largeScreenTooltip: 'nearest' };
 // Where a bar graph's interval selector is: this far from the graph's right edge (px)
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
@@ -355,6 +362,7 @@ export class CardCharts
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
             hecNoStack: graphtype == 'bar' && d.kind === 'line',
             circularPeriod: d.circular,
+            hecTooltip: d.tooltip,
             borderColor: d.bColor,
             backgroundColor: d.fillColor,
             // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
@@ -502,6 +510,36 @@ export class CardCharts
     narrowCard()
     {
         return ( this._this?.querySelector('#maincard')?.clientWidth || Infinity ) < NARROW_CARD_PX;
+    }
+
+    // The option the curves' tooltip follows on the screen the card is on now: the info
+    // panel's, or a card narrower than SMALL_SCREEN_PX — smallScreenTooltip —, else
+    // largeScreenTooltip
+    tooltipField()
+    {
+        const _w = this._this?.querySelector('#maincard')?.clientWidth || Infinity;
+        return this.infoPanel || _w < SMALL_SCREEN_PX ? 'smallScreenTooltip' : 'largeScreenTooltip';
+    }
+
+    // How entity e's curve enters its graph's tooltip, on the screen the card is on now
+    // (tooltipField) — its own mode, else its graph's, its entityOptions', the card's, else
+    // that screen's default (TOOLTIP_DEFAULTS): 'selected' — once a click on it selected it —,
+    // 'nearest' — while it's the curve nearest the pointer —, 'all' — whenever the pointer is
+    // over the plot (Chart.js hecTooltip)
+    tooltipModeOf(e)
+    {
+        const _f = this.tooltipField();
+        return this.resolveOption(e, _f) ?? TOOLTIP_DEFAULTS[_f];
+    }
+
+    // Graph g's curves given their tooltip mode as it is now (tooltipModeOf) — each graph's
+    // when g is null: the card changed screens
+    applyTooltipModes(g = null)
+    {
+        for( const _g of g ? [g] : this.graphs ) {
+            _g.chart.data.datasets.forEach((ds, i) => { if( _g.entities[i] ) ds.hecTooltip = this.tooltipModeOf(_g.entities[i]); });
+            _g.chart.hecEndTooltip();
+        }
     }
 
     // The size of the graphs' text, as the card's width says: text (the legend, the time
@@ -713,6 +751,7 @@ export class CardCharts
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
                 "showMinMax": d.showMinMax,
+                "tooltip": this.tooltipModeOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)
                 "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : null,
                 // (an arrowline's values are angles: a full turn is the entity's circular

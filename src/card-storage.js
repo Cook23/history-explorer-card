@@ -105,6 +105,8 @@ const ENTITY_FIELD_SCOPE = {
     interpolation : 'devices',
     width         : 'devices',
     showPoints    : 'local',
+    largeScreenTooltip : 'local',
+    smallScreenTooltip : 'local',
     showMinMax    : 'devices',
     unit          : 'devices',
     process       : 'devices',

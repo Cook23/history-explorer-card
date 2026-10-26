@@ -1,7 +1,9 @@
 // Interactions with a mouse
 const { openCard } = require('./lib.cjs');
 
-const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+// (the tooltip of the curves selected — a click on one —, on this large screen too: see
+// points.cjs for the other modes)
+const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, largeScreenTooltip: 'selected',
     graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }, { entity: 'sensor.rain' }] },
         { type: 'line', entities: [{ entity: 'sensor.watering_cycle' }] },

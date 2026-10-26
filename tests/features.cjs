@@ -350,7 +350,7 @@ module.exports = async function()
     await t.step('a narrow card: on the box (over a label), a gesture is the controls\' (a click on the padlock locks, a long-press opens the graph\'s menu), on the label beside it, the label\'s', async () => {
         await controlsAt(168);
         const locked = () => t.E('!!graphAt(0).chart._hecYAxisLock');
-        const graphMenu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'), y=el.querySelector('#et_0_ylock'); return !m||m.style.display==='none' ? 'closed' : y&&y.style.display!=='none' ? 'graph' : 'entity'; })()`);
+        const graphMenu = () => t.E(`(()=>{ const m=el.querySelector('#et_0'), i=el.querySelector('#et_0_info'); return !m||m.style.display==='none' ? 'closed' : i ? 'entity' : 'graph'; })()`);
         const close = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400); };
         const p = await t.E('lockPt(0)'), l0 = await locked();
         await t.page.mouse.click(p.x, p.y); await t.wait(400); const l1 = await locked();
@@ -545,6 +545,13 @@ module.exports = async function()
     await tb.step('showMinMax: the band in the curve\'s color at opacity 0.3', async () => {
         const f = await bandFills(tb);
         return f.length && f.every(x => /^#ff0000$|rgba?\(255, ?0, ?0(, ?1)?\)/.test(x.style) && Math.abs(x.alpha - 0.3) < 1e-9) ? true : JSON.stringify(f);
+    });
+    await tb.step('showMinMax, the curve hidden (its legend label clicked): its band hidden with it; shown again: back', async () => {
+        await tb.E('el.instance.toggleDatasetHidden(graphAt(0), 0)'); await tb.wait(200);
+        const hidden = await bandFills(tb);
+        await tb.E('el.instance.toggleDatasetHidden(graphAt(0), 0)'); await tb.wait(200);
+        const shown = await bandFills(tb);
+        return hidden.length === 0 && shown.length ? true : JSON.stringify({ hidden, shown });
     });
     done(await tb.close());
     tb = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: true, colorTransition: 'smooth',

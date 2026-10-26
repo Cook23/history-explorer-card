@@ -107,6 +107,8 @@ const OPTION_SYNONYMS = {
     barSpacing       : ['bar_spacing'],
     fixedValue       : ['fixed_value'],
     stateAdaptiveColor: ['state_adaptive_color'],
+    largeScreenTooltip: ['large_screen_tooltip'],
+    smallScreenTooltip: ['small_screen_tooltip'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -145,6 +147,16 @@ export function stateLabel(map, v)
 
 // An axis' labels: shown (true), hidden (false) or shown on a hover ('hover')
 const _labelsShown = v => v === 'hover' ? v : v !== false;
+
+// The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest or
+// all, whatever its case; anything else not set, with a warning
+export const TOOLTIP_MODES = ['selected', 'nearest', 'all'];
+const _tooltipMode = v => {
+    const m = String(v).trim().toLowerCase();
+    if( TOOLTIP_MODES.includes(m) ) return m;
+    console.warn(`history-explorer-card: invalid tooltip mode ${JSON.stringify(v)} — expected ${TOOLTIP_MODES.join(', ')}`);
+    return undefined;
+};
 
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
@@ -233,6 +245,8 @@ const OPTION_VALUES = {
     pointsPerHour : v => Number(v) > 0 ? Number(v) : undefined,
     aggregateFunc : v => AGGREGATE_FUNCS.find(f => f === String(v).trim().toLowerCase()),
     groupBy       : v => GROUP_BY.find(f => f === String(v).trim().toLowerCase()),
+    largeScreenTooltip : _tooltipMode,
+    smallScreenTooltip : _tooltipMode,
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
     circular      : v => {
@@ -281,7 +295,8 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
-    'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor'];
+    'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
+    'largeScreenTooltip', 'smallScreenTooltip'];
 
 // A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
 // else the card's

@@ -4735,12 +4735,18 @@
               // lifts off, doesn't leave the graph)
               if (!e.native || !e.native.buttons) me._hecHasMoved = true;
               var _searched = false;
+              // (fork) curves whose tooltip a hover opens, without a click (hecTooltip 'nearest'
+              // or 'all'); and a contact in progress — a press the gesture engine hasn't yet
+              // resolved into a click (_hecTap, at its release), or a drag —: no tooltip from a
+              // drag, whatever the curves' mode
+              var _hoverTips = me._hecHasHoverTooltips();
+              var _contact = !!(me._hecGesture && (me._hecGesture.pending || me._hecGesture.count));
               if (_contactMode && me._hecTooltipMode && !_inPlot) {
                 // Left the plot area: the tooltip mode ends, the tooltip closes
                 me._hecEndTooltipMode();
                 me.active = [];
                 me._hecLastHitXY = undefined;
-              } else if (hoverOptions.hoverEnabled && (!_contactMode || me._hecTooltipMode)) {
+              } else if (hoverOptions.hoverEnabled && !_contact && (!_contactMode || me._hecTooltipMode || (_hoverTips && _inPlot))) {
                 if (!me._hecLastHitXY || e.x === null || e.y === null) {
                   _searched = true;
                 } else {
@@ -4760,6 +4766,9 @@
                 var _found = me._hecHoverElements(e);
                 if (_found.length) {
                   me.active = _found;
+                  // (fork) a hover opening the tooltip of 'nearest' or 'all' curves: the tooltip
+                  // mode, as a click opens it — the same rules from then on
+                  if (_contactMode) me._hecTooltipMode = true;
                 }
                 if (e.x !== null && e.y !== null) {
                   me._hecLastHitXY = { x: e.x, y: e.y };

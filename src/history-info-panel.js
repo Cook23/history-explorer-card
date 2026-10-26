@@ -137,6 +137,9 @@ function hxHookInfoPanel()
     {
         instance.initLocalization();
 
+        // (always on a small screen: its curve's tooltip as smallScreenTooltip says)
+        instance.infoPanel = true;
+
         instance.insertUIHtmlText(0);
 
         instance.wireToolbar(0);

@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; locking or releasing the Y axes (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -125,6 +125,8 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | `hecFillFade` | `boolean` | `false` | A line dataset filled with its own `borderColor` fading out downwards (alpha 0.4 at the top of the plot area, 0 at its bottom): its `backgroundColor` set to that gradient after each layout (plugin `hecFillFade`), the color it had kept as `hecFillColor` (its legend label's dot: `Chart.hecLegendFill`). The card sets it from its `fill: fade`, its `backgroundColor` the curve's color at 15 %. |
 | `hecLegendHidden` | `boolean` | `false` | No label in the legend for this dataset: it takes no room and can't be pointed at, the other labels keeping their indexes (a legend item stays at each dataset's index, `hecHidden`). The card sets it from an entity's `show_legend: false`. |
 | `hecValueGradient` | `[{ value, color, fill }]` | — | A line dataset colored by its value, its thresholds blended (in increasing `value`, in the units drawn): its line a gradient along its Y axis, from each threshold's height to the next, the lowest's color below it, the highest's above (plugin `hecValueGradient`); its fill the same with each `fill` (unless `hecFillFade`). Its points keep their own colors (`pointBackgroundColor`). The card sets it from `colorTransition: smooth`. |
+| `hecTooltip` | `'selected'`, `'nearest'` or `'all'` | `'selected'` | Which line datasets a tooltip shows, each its value nearest the pointer along the time axis (`_hecTooltipCurvesAt`): `selected` — those a click or a tap selected (`hover.activateOnContact`: the tooltip mode); `nearest` — the curve the pointer is on or nearest, by the picking rule (`_hecCurveAt`), whether selected or not; `all` — once a curve is that near, it and every other one. A hover opens the tooltip mode of `nearest` and `all` curves without a click, a click as for `selected`; the same rules from then on. A contact in progress — a press not yet resolved into a click, a drag, a pinch — never opens nor moves a tooltip, whatever the mode. The card sets it from `largeScreenTooltip` / `smallScreenTooltip`. |
+| `circularPeriod` | `number` | none | A line dataset of values that wrap around (angles), the period in the units drawn (360): its points as the card gives them — a continuous curve, or one put in a turn, its jumps marked `hecCircularJump` (and `hecPlateauEnd`, dashed). While a Y range is set by hand (the lock engaged: a pan, a zoom, the padlock), the turn shown is that range's (plugin `hecCircularView`, before each update): the curve made continuous again, then moved by whole periods to sit around the range's middle; spanning more than a turn, each value put in the turn around that middle, its jumps dashed. The range released, the points as given. Each point keeps the card's value (`hecY0`, `hecYMin0`, `hecYMax0`, `hecJump0`, `hecPlateau0`). The card sets it on a circular curve. |
 | `hecNoStack` | `boolean` | `false` | A line dataset in a graph of stacked bars: never stacked, drawn in a second pass, over the bars. The card sets it on a curve of a mixed bar/line graph. |
 
 ### Data point fields (a line dataset's `data` items)
@@ -132,6 +134,7 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | Field | Type | Effect |
 |---|---|---|
 | `hecPlateauEnd` | `boolean` | The point ends a flat stretch: drawn from the previous point as a straight, dashed segment (no tension, not stepped). |
+| `hecCircularJump` | `boolean` | A circular curve's jump across the edge of its turn (`circularPeriod`), drawn as `hecPlateauEnd`. |
 | `hecVirtual` | `boolean` | The point only shapes the curve — not a value: no dot, never hit, never hovered nor shown in a tooltip. |
 
 The card sets both from its `lineMode: smart` (a silence: the curve held flat, then a virtual point where the next value starts).
@@ -145,6 +148,9 @@ The card sets both from its `lineMode: smart` (a silence: the curve held flat, t
 ---
 
 ### Public methods
+
+`chart.hecYAxisLocked()` — whether the chart's Y axes are locked (the padlock closed), or
+`undefined` on a chart without a lock: what a menu entry shows.
 
 `chart.hecSetYAxisLocked(locked)` locks (`true`) or releases (`false`) the chart's Y axes, as
 a click on the padlock does — for a menu entry that does the same. Nothing on a chart
@@ -323,7 +329,8 @@ value needs to come back from the card:
   each Y axis keeps the range it shows (`_hecSetYRanges(_hecYRanges())`), so new
   data or a time move no longer rescales it; released, it gets its own range back.
   The card never reads or writes `_hecYAxisLock` (see §6 for why that matters): it
-  reads the payload's `yAxisLocked` (§2) and sets it with `hecSetYAxisLocked()` (§1).
+  reads it with `hecYAxisLocked()` (or the payload's `yAxisLocked`, §2) and sets it
+  with `hecSetYAxisLocked()` (§1).
 - **Cursor** — `canvas.style.cursor` changes to `move`/`ns-resize`/etc. on
   hover over a draggable zone, entirely computed from `_hecLegendIndexAt`/
   `_hecYAxisIndexAt` (see §4), no card involvement.

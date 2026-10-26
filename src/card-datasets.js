@@ -237,7 +237,7 @@ export class CardDatasets
                     // Circular values (angles): a continuous curve, see _unwrapCircular
                     const _circP = ( _kind == 'line' || _kind == 'bar' ) ? this.circularPeriodOf(e) : null;
                     let _circBand = false;
-                    if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP));
+                    if( _circP ) ({ data: result[id], band: _circBand } = this._unwrapCircular(result[id], _circP, w));
 
                     if( _kind == 'line' ) this.keepValueSamples(g, j, result[id], process);
 
@@ -642,12 +642,16 @@ export class CardDatasets
     // The whole curve is then moved by a multiple of P to sit around its circular mean c in
     // [0, P). Should it span more than a turn (it went round several times), every value is put
     // in the one-turn band [c - P/2, c + P/2) instead: band is then true, and its jumps get
-    // dashed (_markCircularJumps).
-    _unwrapCircular(data, P)
+    // dashed (_markCircularJumps). The mean and the span are those of the part of the window
+    // shown (w: from the value in force at its start to the first one after its end) — what
+    // is loaded around it doesn't choose the turn of what is seen, zoomed or moved in time,
+    // and is put in that turn too; a Y range set by hand chooses it then (Chart.js, dataset
+    // option circularPeriod).
+    _unwrapCircular(data, P, w)
     {
         const mod = v => ( ( v % P ) + P ) % P;
         const idx = [], raw = [], un = [];
-        let prev = null, offset = 0, sumS = 0, sumC = 0;
+        let prev = null, offset = 0;
         for( let i = 0; i < data.length; i++ ) {
             const st = data[i].state;
             if( st === null || st === undefined || st === '' ) continue;
@@ -660,18 +664,39 @@ export class CardDatasets
             }
             prev = r;
             idx.push(i); raw.push(r); un.push(r + offset);
-            sumS += Math.sin(r / P * 2 * Math.PI);
-            sumC += Math.cos(r / P * 2 * Math.PI);
         }
         if( !idx.length ) return { data, band: false };
 
-        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[0];
-        const mean = un.reduce((a, v) => a + v, 0) / un.length;
-        const k = Math.round(( c - mean ) / P) * P;
+        // (the values of the window shown: from the one in force at its start — the last one
+        // before it — to the first one after its end, the curve drawn to its edges; none
+        // there: all of them)
+        const _t0 = w ? w.start.valueOf() : -Infinity, _t1 = w ? w.end.valueOf() : Infinity;
+        const _tOf = m => msOf(data[idx[m]].last_changed);
+        let _first = 0;
+        while( _first + 1 < idx.length && _tOf(_first + 1) <= _t0 ) _first++;
+        let _shown = [];
+        for( let m = _first; m < idx.length; m++ ) { _shown.push(m); if( _tOf(m) > _t1 ) break; }
+        if( !_shown.length ) _shown = un.map((_, m) => m);
+
+        let sumS = 0, sumC = 0, sum = 0;
+        for( const m of _shown ) {
+            sumS += Math.sin(raw[m] / P * 2 * Math.PI);
+            sumC += Math.cos(raw[m] / P * 2 * Math.PI);
+            sum += un[m];
+        }
+        const c = ( Math.abs(sumS) + Math.abs(sumC) > 1e-9 ) ? mod(Math.atan2(sumS, sumC) / ( 2 * Math.PI ) * P) : raw[_shown[0]];
+        const k = Math.round(( c - sum / _shown.length ) / P) * P;
+        for( let m = 0; m < un.length; m++ ) un[m] += k;
         let lo = Infinity, hi = -Infinity;
-        for( let m = 0; m < un.length; m++ ) { un[m] += k; lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
+        for( const m of _shown ) { lo = Math.min(lo, un[m]); hi = Math.max(hi, un[m]); }
         const band = ( hi - lo > P );
         if( band ) for( let m = 0; m < un.length; m++ ) un[m] = ( c - P / 2 ) + mod(raw[m] - ( c - P / 2 ));
+        // (what is loaded around the window shown, out of sight: in the turn of what is seen —
+        // never other turns spreading the Y axis beyond it)
+        else {
+            const _base = ( lo + hi ) / 2 - P / 2;
+            for( let m = 0; m < un.length; m++ ) if( m < _shown[0] || m > _shown[_shown.length - 1] ) un[m] = _base + mod(raw[m] - _base);
+        }
 
         const out = data.slice();
         for( let m = 0; m < idx.length; m++ ) {
@@ -687,12 +712,13 @@ export class CardDatasets
     }
 
     // A circular curve put in a one-turn band jumps where it crosses the band's edge: the
-    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode.
-    // Q: the period in chart units.
+    // segment is drawn as a straight dashed line, like the plateaus of the smart line mode —
+    // marked as a jump too (hecCircularJump), which Chart.js unmarks when it puts the curve in
+    // another turn (circularPeriod). Q: the period in chart units.
     _markCircularJumps(s, Q)
     {
         for( let k = 1; k < s.length; k++ )
-            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) s[k].hecPlateauEnd = true;
+            if( Math.abs(s[k].y - s[k-1].y) > Q / 2 ) { s[k].hecPlateauEnd = true; s[k].hecCircularJump = true; }
     }
 
     // A value of a circular curve as shown (tooltip, Y axis labels): back into [0, Q)

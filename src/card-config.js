@@ -114,7 +114,7 @@ export class CardConfig
         P.tapAction =              c.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', 'largeScreenTooltip', 'smallScreenTooltip', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
         P.cardGraphDefaults =      Object.fromEntries(
@@ -389,6 +389,8 @@ export class CardConfig
             showGrid          : ent.showGrid,
             yLabels           : ent.yLabels,
             showPoints        : ent.showPoints,
+            largeScreenTooltip: ent.largeScreenTooltip,
+            smallScreenTooltip: ent.smallScreenTooltip,
             showMinMax        : ent.showMinMax,
             showState         : ent.showState,
             showStats         : ent.showStats,
@@ -551,6 +553,8 @@ export class CardConfig
                 interpolation  : _opts.interpolation,
                 lineWidth      : _opts.lineWidth,
                 showPoints     : _opts.showPoints,
+                largeScreenTooltip : _opts.largeScreenTooltip,
+                smallScreenTooltip : _opts.smallScreenTooltip,
                 netBars        : _opts.netBars,
                 yAxis          : _opts.yAxis,
                 rounding       : _opts.rounding,

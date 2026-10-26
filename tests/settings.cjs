@@ -32,7 +32,7 @@ module.exports = async function()
 
     t = await openCard(YAML(), { mock: { series: true } });
     await t.wait(800);
-    await t.step('the options menu: Export ▸, Card ▸, Global ▸; Global: the info panel and the four thresholds, as they are', async () => {
+    await t.step('the options menu: the sections for every curve of the card (Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸), Export ▸, Card ▸, Global ▸; Global: the info panel and the four thresholds, as they are', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         const m = await items('#eo_0');
         await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
@@ -40,7 +40,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
+        return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
             && /Enhanced native history/.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12 }) ? true : JSON.stringify(r);
     });
@@ -61,8 +61,8 @@ module.exports = async function()
         }
         await hold(800); await t.wait(400);
         r.rep = await readable('#et_0', '#et_0_rep_sub', false);
-        await t.E(`el.querySelector('#et_0_layout').click()`); await t.wait(300);
-        r.layout = await readable('#et_0', '#et_0_layout_sub', false); await closeMenus();
+        await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(300);
+        r.behavior = await readable('#et_0', '#et_0_behavior_sub', false); await closeMenus();
         return Object.values(r).every(v => v === '') ? true : JSON.stringify(r);
     });
     await t.step('a card too narrow for a menu and a submenu beside its lines: the menu opens alone; a submenu opened leaves 48 px and three characters of its lines; Escape or a click beside closes it', async () => {
