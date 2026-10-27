@@ -344,6 +344,10 @@ module.exports = async function()
         const r = await shownCurve();
         return r.lo >= 500 && r.hi < 860 && r.jumps >= 2 && r.jumps === r.steps ? true : JSON.stringify(r);
     });
+    await t.step('a value on the edge of the turn (140 for the turn 500–860): at its start, 500, even with the middle rounded off by its last digit (680.0000000000001)', async () => {
+        const r = await t.E(`[680, 680.0000000000001, 679.9999999999999].map(c => window.HXLocal_Chart.hecCircular.place([0, 120, 240, 0, 140], 360, 0, 4, c).values)`);
+        return r.every((v, i) => v.every(x => x >= [680, 680.0000000000001, 679.9999999999999][i] - 180 && x < 860) && v[4] < 501) ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     return { passed, failed };
