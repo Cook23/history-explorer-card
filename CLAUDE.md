@@ -146,6 +146,75 @@ compromise: ¼ × max(…) would do if ½ took too much room.
 Never propose to reserve room for them: on a small screen room is short, and the card is
 there to show curves, not boxes of buttons.
 
+## Curve or point, nearest-smart or nearest, X and Y or X only — set by the user, not negotiable
+
+Three pairs of notions, never mixed. Mixing them caused regressions (see below).
+
+**What concerns a curve picks the curve; what concerns a point picks a point.**
+- The curve (`deps/chart-hec.js` `_hecCurveAt`: the picking rule on the drawn line) is picked by:
+  - the hover dot (and the hovered value shown over the graph);
+  - the click that puts the curve in the "show tooltips" mode (`_hecTap`, `_hecTooltipCurves`);
+  - the long-press that shows or hides its points.
+- A point is picked by the tooltip. A tooltip shows points — the real value of a real
+  measure, never an interpolation, never a place on the line between two values: between
+  the points there is nothing to show. "A curve's tooltip" doesn't exist.
+
+**Nearest-smart ("le plus proche intelligent") or nearest.**
+- Nearest-smart is the picking rule, `_hecPickNearest`, the same everywhere: labels, Y labels,
+  bars and timeline segments, floating icons, curves, points.
+  1. Each candidate gives its place nearest the pointer and its distance to the pointer.
+     The distance is to the object itself, its edge, not its centre: a box clamped (a label,
+     a bar), a line minus half its width, a point minus its radius.
+  2. The nearest is kept only within the picking margin: the pointer's slop (mouse, finger,
+     pen; a setting). The floating icons use `_hecIconMargin`, see "Floating icons".
+  3. Against the second nearest:
+     - on the same pixel (under 1 px apart), the first one wins (the curve drawn over);
+     - else the nearest must win clearly: the gap between their distances must be at least
+       ⅓ of the distance between their places;
+     - else the pointer is about halfway, and nothing is kept (`PICK_BETWEEN`).
+- Nearest (no limit) is used only for the hover dot's point. Its curve is picked
+  nearest-smart; then the dot goes on that curve's point nearest the pointer in X and Y,
+  however far (`_hecNearestPointOf`).
+
+**X and Y, or X only.**
+- The tooltip's first point is the point pointed at, nearest-smart in X and Y
+  (`_hecPointAt`), among the points of the candidate curves:
+  - the curves in `nearest`, `mixed` and `all`;
+  - the curves selected (`selected`, `mixed`).
+
+  With no first point, the tooltip is neither opened nor moved; an open one stays, then
+  fades out after its reading time.
+- The following points are those of the other curves shown: the selected ones, or every one
+  with `all`. Each is that curve's point nearest the first point's time, in X only — the
+  same instant or the nearest one. It is kept only within the same picking margin, along X.
+
+**The usage logic** (`_hecUpdateHoverDot`, `_hecHoverElements`):
+1. The user doesn't know where the points are, and hovers a zone near the curve.
+2. The small dot shows the real value nearest the pointer: a discreet guide.
+3. The user puts the pointer on that point: it is drawn larger (`pointHoverRadius`) and its
+   tooltip opens.
+
+The small dot shows whenever the pointer is nearest-smart to a curve, in the tooltip mode
+too — never on the tooltip's own point, which it must not hide.
+
+A click always doubles a hover, for devices without hover. A click on a line far from every
+point shows the dot, puts the curve in the "show tooltips" mode, and opens no tooltip; where
+a hover exists it adds nothing visible. The modes (`largeScreenTooltip`,
+`smallScreenTooltip`) only adapt this logic to the device (a hover or a click opens the
+tooltip); they never change it.
+
+**Regression to remember.** The dot and the tooltip once worked together. In 1.2.43 the
+tooltip's first point was the curve's nearest point with no distance limit: the curve was
+picked on its line, then its point taken however far. A tooltip then opened even hundreds
+of pixels from any value. The dot and the tooltip had the same conditions to appear, and the
+tooltip mode hid the dot, so the dot never showed. Fixed in 1.2.44. The tests guarding it
+are in `tests/points.cjs`:
+- a click or a hover on a line far from its values;
+- a finger's tap there;
+- a tooltip kept, then faded, with the dot elsewhere;
+- `all` beyond the margin in X;
+- the stepped plateau.
+
 ## Menus: a cascade, always visible — set by the user, not negotiable
 
 How every menu is designed (the type menu, a graph's, the info panel's, the options menu,
