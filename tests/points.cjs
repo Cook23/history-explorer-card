@@ -428,6 +428,31 @@ module.exports = async function()
         return JSON.stringify(on) === JSON.stringify([[0, v[1].i]]) && open && onDot === null && JSON.stringify(kept) === JSON.stringify(on) && dot && dot[1] === v[2].i && gone === null ? true : JSON.stringify({ on, open, onDot, kept, dot, gone });
     });
     done(await t.close());
+    // ── The hover dot: the value nearest on the curve — from the place of its line nearest the
+    // pointer, along the line as drawn. On a stepped curve's plateau (the line going on along
+    // it, then up or down the step to the next value), a place where the next value is
+    // nearer as the crow flies, but further along the line: the dot on the plateau's value ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: 'selected',
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'stepped' }] }] },
+        { mock: { series: true, rows: { 'sensor.power': [[3000, '100'], [2400, '300'], [1800, '900'], [1200, '700'], [600, '100']] } }, clock: CLOCK });
+    await t.wait(800);
+    await t.step('a stepped curve: on a plateau, the next value nearer as the crow flies but further along the line — the dot on the plateau\'s value', async () => {
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
+            const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>=A.left&&o.v.x<=A.right);
+            for( let k=0; k+1<real.length; k++ ) {
+                const a=real[k], b=real[k+1], g=b.v.x-a.v.x, dy=Math.abs(b.v.y-a.v.y), u=(g+dy)/2-2;
+                // (the plateau at a's height up to b's time, then the step: along the line, a at u, b at g-u+dy;
+                // as the crow flies, b at the hypotenuse)
+                if( u > 0 && u < g && u < g-u+dy && Math.hypot(g-u, dy) < u ) return { x: r.left+a.v.x+u, y: r.top+a.v.y, a: a.i, b: b.i };
+            }
+            return null; })()`);
+        if( !p ) return 'no plateau with such a step';
+        await t.page.mouse.move(p.x, p.y - 30, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(300);
+        const d = await hoverDot(0);
+        return d && d[1] === p.a ? true : JSON.stringify({ p, d });
+    });
+    done(await t.close());
+
     // ── The tooltip's side beside its point: behind the pointer's move, decided when it shows a
     // new point (the gesture engine's direction); a finger: the half of the plot it's in ──
     const side = () => t.E('graphAt(0).chart.tooltip._view.xAlign');
