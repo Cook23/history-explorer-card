@@ -15,7 +15,7 @@ const moment = window.HXLocal_moment;
 // A curve's minimum, average (weighted by time: each value counts for as long as it lasted)
 // and maximum over [t0, t1] (ms) — samples: { t, v } in time order, the first one possibly
 // before t0 (the value in effect at t0); null when there's none
-export function curveStats(samples, t0, t1)
+function curveStats(samples, t0, t1)
 {
     // (each value over the part of [t0, t1] it lasted: from the one in effect at t0 on)
     const _spans = samples.map((s, i) => ({ s, a: Math.max(s.t, t0), b: Math.min(i + 1 < samples.length ? samples[i + 1].t : t1, t1) }))

@@ -221,12 +221,12 @@ export class CardGraphs
 
     // Removes g.entities[idx] and detaches g. If any entities remain, rebuilds g's
     // replacement in the same spot (right before whatever graph followed g) with the same
-    // groupId — same "remove one entity from a combined graph" shared by _uncombineEntity,
+    // groupId — same "remove one entity from a combined graph" shared by splitCurve,
     // the cross-graph legend drag (source side), and entity removal. Callers still handle
     // whatever they do with the removed entity afterward (recreate it elsewhere, drop it,
     // move it into a target graph, etc.) — this only ever rebuilds what's LEFT of g.
     // nextG defaults to nextGroup(g), computed here — but a caller that mutates
-    // pconfig.entities' order or groupIds BEFORE calling this (e.g. _uncombineEntity,
+    // pconfig.entities' order or groupIds BEFORE calling this (e.g. splitCurve,
     // regrouping the just-extracted entity under its new groupId first) must compute and
     // pass its own, since nextGroup's scan depends on that order already being final.
     // Returns the removed entity.
@@ -254,14 +254,14 @@ export class CardGraphs
     }
 
     // Shows a chain-link icon between two consecutive graphs that share the same non-null
-    // groupId (linked graphs — see _wouldSplitGroup) so the link is visible even outside a
+    // groupId (linked graphs) so the link is visible even outside a
     // drag gesture. Called after anything that can change graph composition or order.
     // Takes no vertical space (height:0 wrapper, icon floated up over it) and is always
     // re-inserted at its correct DOM position even if it already existed, as a cheap safety
-    // net — addGraph now inserts each graph div directly at its final spot via `before`.
+    // net (addGraph inserts each graph div directly at its final spot via `before`).
     // Chain icon between two linked graphs (same group, one right below the other): shown
     // by Chart.js on the lower one (linkMarkerVisible); a double-click on it reaches
-    // customEvent with linkMarkerZone (see newGraph) and merges them (_mergeLinkedGraph).
+    // customEvent in the zone 'linkMarker' and merges them (mergeGraphUp).
     _updateGroupLinkMarkers()
     {
         // Sort by graphIndex — the stable, persisted display-order field — rather than
@@ -376,7 +376,7 @@ export class CardGraphs
         // is registered as one, rather than leaving a second, disconnected copy)
         const _pcEntry = this.store.add(entry ?? { entity: entity_id });
         _pcEntry.entity = entity_id;
-        // The entity's own display type — kept per entity, since a graph can now hold both
+        // The entity's own display type — kept per entity, since a graph can hold both
         // line and bar entities (see entityKind)
         _pcEntry.type = type;
         // A YAML entity's graph stays static whichever operation rebuilds it (uncombine,
@@ -430,13 +430,13 @@ export class CardGraphs
         // entityOptions.groupId was frozen before the combine block resolved the final
         // groupId (e.g. adopting the target graph's groupId when it was null) — resync it
         // here so the graph object built below gets the correct, final groupId. _pcEntry
-        // is now g.entities[0] itself (no separate copy), so it must be kept in step too.
+        // is g.entities[0] itself (no separate copy), so it must be kept in step too.
         entityOptions.groupId = groupId;
         _pcEntry.groupId = groupId;
 
         // Y axis bounds: the graph's own options first, else the first entity of the graph
         // that sets them (on its YAML entry), else entityOptions — taken from every entity
-        // of the graph, not only the one being added (which used to decide alone).
+        // of the graph, not only the one being added.
         for( const _k of GRAPH_SCOPE_KEYS ) {
             if( _graphProps[_k] !== undefined ) continue;
             const _fromEntity = entities.map(e => e[_k]).find(v => v !== undefined && v !== null);
@@ -573,7 +573,7 @@ export class CardGraphs
     // The graph an entry joins, if any:
     // - With an explicit groupId (static YAML graph, or any graph being rebuilt): the
     //   graph of that same group showing the same sub-graph (graphKey — see
-    //   _uncombineEntity) with a compatible type. Units are deliberately NOT checked here:
+    //   splitCurve) with a compatible type. Units are deliberately NOT checked here:
     //   the entities of one group are shown together by definition (a YAML graph is the
     //   author's explicit choice, a curve dropped there the user's), on two Y axes or one
     //   (see _assignYAxes). Only the type keeps them apart (a timeline or an arrowline
@@ -701,7 +701,7 @@ export class CardGraphs
 
     // Builds every graph (static and dynamic) from the entity list (pconfig.entities), in
     // its order, then saves the result — at first display, and when the card goes back to
-    // the YAML (_resetToYaml)
+    // the YAML (defaultDisplay)
     buildGraphsFromStore()
     {
         // (the default colors given from the palette's start)

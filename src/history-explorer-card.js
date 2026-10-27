@@ -265,8 +265,6 @@ export class HistoryCardState {
             let ro = new ResizeObserver(() => { this.resize(); });
             ro.observe(this._this.querySelector('#maincard'));
 
-            // Per-graph interval now restored in readLocalState (last-one-to-speak-wins)
-
             // Update the info panel config in the browser local storage to sync with the YAML
             this.writeInfoPanelConfig();
 

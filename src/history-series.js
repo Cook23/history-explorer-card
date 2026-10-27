@@ -74,7 +74,7 @@ export function attributeLabel(attribute)
 // The value of attributes at path — an attribute, or a sub-attribute (see above), each
 // level's key or index in turn; an attribute whose own name holds a dot taken as is.
 // undefined when there's none
-export function attributeAt(attributes, path)
+function attributeAt(attributes, path)
 {
     if( !attributes ) return undefined;
     if( path in attributes ) return attributes[path];
@@ -92,7 +92,7 @@ function _leafName(path)
 // An attribute's value as a series': a number followed by a text that isn't one (12.5 °C,
 // 80 %, 3 days — not a time, a date or a range) is that number, in that unit
 const _NUMBER_UNIT = /^\s*([-+]?\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?)\s*([^\d\s:.,\/+-].*?)\s*$/;
-export function attributeValue(v)
+function attributeValue(v)
 {
     const _m = typeof v === 'string' ? _NUMBER_UNIT.exec(v) : null;
     return _m ? { value: Number(_m[1].replace(',', '.')), unit: _m[2] } : { value: v, unit: undefined };

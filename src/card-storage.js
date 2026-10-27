@@ -159,7 +159,7 @@ export class CardStorage
         return {
             // Active values
             // (an entity dropped where its placement isn't saved: saved where it was — see
-            // _moveEntity)
+            // moveCurve)
             entities            : this.store.savedList(),
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
@@ -351,7 +351,7 @@ export class CardStorage
         // once by HA/local would get baked into the mirror, permanently masking later
         // genuine YAML edits to that same field.
         // (a copy: the entries themselves go on living in the card — also what the card goes
-        // back to, see _resetToYaml)
+        // back to, see defaultDisplay)
         this._pureYamlEntities = JSON.parse(JSON.stringify(_yamlEntities));
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _ls?.ha_entities ?? [];
@@ -458,7 +458,7 @@ export class CardStorage
             for( const _f of _multiFields )
                 _take(_haE, _f);
         // graphKey (which linked graph of its group the entity is shown in — see
-        // _uncombineEntity) isn't a field of its own: it's part of the grouping, so it
+        // splitCurve) isn't a field of its own: it's part of the grouping, so it
         // follows whichever source won groupId above. graphIndex is NOT taken over per
         // entity: it's a position relative to the other graphs of the block, so taking
         // it from different sources for different entities would mix two coordinate

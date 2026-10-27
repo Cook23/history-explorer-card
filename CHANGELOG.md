@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.41] - 2026-10-27
+## [v1.2.42] - 2026-10-27
 
 ### Changed — the architecture: one rule, one place
 - Values that wrap around (angles): one rule for the card and for Chart.js, `Chart.hecCircular` (Chart Custom.js.md §1) — `wrap` (a value in [0, period): the tooltip, the values over the graph, the Y axis' labels), `place` (continuous, around the window shown's mean, or in one turn; what is loaded around the window in the same turn), `jumps` (a jump across a turn's edge). The card places a circular entity's samples with it before grouping them by column; the plugin `hecCircularView` places them again around a Y range set by hand. Before, the rule was written twice (the card's `_unwrapCircular`, the plugin) and the wrap four times
@@ -13,6 +13,13 @@ Changelog for the HA History Explorer Card.
 - The hover asks the gesture engine whether a contact is in progress (`_hecContactInProgress`) instead of reading its state
 - The card's width read in one place (`cardWidth`): narrow, small screen, the toolbar's forms, the time labels, a menu's room
 - The menus: a menu's curves by graph and one by one from one function (`_curvesByGraph`, `_menuCurves`); the Y axis locks of what a menu acts on, one function (`_yLocks`)
+- The toolbar's markup written once, for the card and the info panel (`timeButtonsHtml`, `rangeControlsHtml`), its ranges and their labels from one table (`RANGES`) — the info panel's range selector centred as the card's
+- The time window set in one place (`_setWindow`); the toolbar's '<' and '>' one function (`stepDay`); a range in hours or in minutes applied by one function (`_applyRange`)
+- A curve's and a graph's menu opened by one function (`_openTypeMenu`); the floating icons' boxes placed by one function (Chart.js `_hecPlaceControlBox`)
+
+### Removed — code left unused
+- The menus' former entry points (`entityInterpolationClicked`, `entityLayoutClicked`, `entityTypeMenuClicked`), `todayReset`, the alias `buildEntityExclusionList`; exports used by no other file
+- Comments naming functions that no longer exist or telling what the code used to do
 
 ## [v1.2.40] - 2026-10-26
 

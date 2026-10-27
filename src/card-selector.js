@@ -311,13 +311,6 @@ export class CardSelector
         return regex;
     }
 
-    // Back-compat alias: per-entity `exclude:` used to require a distinct function name,
-    // but the normalization logic is now identical to buildFilterRegexList.
-    buildEntityExclusionList(exclude)
-    {
-        return this.buildFilterRegexList(exclude);
-    }
-
     matchRegexList(regex, v)
     {
         if( !regex.length ) return true;

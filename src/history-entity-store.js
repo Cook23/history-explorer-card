@@ -17,7 +17,7 @@
 // Pure data: it knows nothing about graphs, charts, the DOM or Home Assistant. The graphs
 // on screen are built from it by the card.
 
-// An entry is a plain string (legacy) or an object with an .entity field
+// An entry is a plain string or an object with an .entity field
 export function entityIdOf(e)
 {
     return typeof e === 'string' ? e : e.entity;
@@ -157,7 +157,7 @@ export class EntityStore
         this.list = this.statics();
     }
 
-    // A curve's entry, by its key, as an object (a legacy string entry is converted in place)
+    // A curve's entry, by its key, as an object (a string entry is converted in place)
     entry(key)
     {
         const i = this.indexOf(key);

@@ -113,11 +113,11 @@ const OPTION_SYNONYMS = {
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
 // and how values are grouped (groupBy) — mini-graph-card's
-export const AGGREGATE_FUNCS = ['avg', 'median', 'min', 'max', 'first', 'last', 'sum', 'delta', 'diff'];
-export const GROUP_BY = ['interval', 'hour', 'date'];
+const AGGREGATE_FUNCS = ['avg', 'median', 'min', 'max', 'first', 'last', 'sum', 'delta', 'diff'];
+const GROUP_BY = ['interval', 'hour', 'date'];
 
 // The statistics a curve can show over its graph (showStats), in the order they're shown
-export const STATS = ['min', 'average', 'max'];
+const STATS = ['min', 'average', 'max'];
 
 // A dashMode written as CSS writes dashes and gaps ('10,10', '10 5'): as a list
 const _dashList = v => ( typeof v === 'string' && /^[\d.\s,]+$/.test(v) && /\d/.test(v) ) ? v.trim().split(/[\s,]+/).map(Number) : v;
@@ -150,7 +150,7 @@ const _labelsShown = v => v === 'hover' ? v : v !== false;
 
 // The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
 // or all, whatever its case; anything else not set, with a warning
-export const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
+const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
 const _tooltipMode = v => {
     const m = String(v).trim().toLowerCase();
     if( TOOLTIP_MODES.includes(m) ) return m;
@@ -333,7 +333,7 @@ export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 // fading out, a small graph, colors of thresholds blended from one to the next; a header
 // with the name on the left and the icon on the right; the legend's names without their
 // values, and only for several curves; the Y labels shown on a hover
-export const LOOKS = {
+const LOOKS = {
     mini: { header: 'hide', uiLayout: { toolbar: 'hide', selector: 'hide', interval: 'hide' }, showState: true,
             showStateFor: 'first', showStatsFor: 'first', stateAdaptiveColor: false,
             showTimeLabels: false, showGrid: false, yLabels: 'inside', fill: 'fade', height: 150, lineWidth: 5, lineMode: 'curves',
