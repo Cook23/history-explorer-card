@@ -787,7 +787,7 @@ export class CardMenus
         const _menu = m.el();
         const _full = m.prefix.startsWith('eo_') || !!this._this.querySelector(`#${m.prefix}_tests_sub`);
         const _g = pairs[0]?.g;
-        const _locks = pairs.map(({ g }) => g.chart.hecYAxisLocked()).filter(l => l !== undefined);
+        const _locks = this._yLocks(m);
         const _shown = {
             tooltip: _curves.length > 0,
             ylock: _locks.length > 0,
@@ -894,17 +894,23 @@ export class CardMenus
     // and style of the menu's curves (see _APPEARANCE)
     // --------------------------------------------------------------------------------------
 
-    // The curves menu m acts on: its entities drawn as curves, each with its graph
-    _menuCurves(m)
-    {
-        return this._scopeOf(m).pairs.flatMap(({ g, entities }) => entities.filter(e => this.isCurve(g, g.entities.indexOf(e))).map(e => ({ g, e })));
-    }
-
-    // Each graph of menu m with its curves
+    // Each graph of menu m with the curves it acts on there: its entities drawn as curves
     _curvesByGraph(m)
     {
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => this.isCurve(g, g.entities.indexOf(e))) }))
             .filter(({ curves }) => curves.length);
+    }
+
+    // The same curves one by one, each with its graph
+    _menuCurves(m)
+    {
+        return this._curvesByGraph(m).flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
+    }
+
+    // The Y axis lock of each graph menu m acts on that has one (Chart.js hecYAxisLocked)
+    _yLocks(m)
+    {
+        return this._scopeOf(m).pairs.map(({ g }) => g.chart.hecYAxisLocked()).filter(l => l !== undefined);
     }
 
     // The appearance submenu's lines that apply to what menu m acts on: the color, for one
@@ -1017,8 +1023,7 @@ export class CardMenus
             return this._menuChosen(m);
         }
         if( action === 'ylock' ) {
-            const _locks = pairs.map(({ g }) => g.chart.hecYAxisLocked()).filter(l => l !== undefined);
-            const _lock = !_locks.every(l => l);
+            const _lock = !this._yLocks(m).every(l => l);
             for( const { g } of pairs ) g.chart.hecSetYAxisLocked(_lock);
             return this._menuChosen(m);
         }
@@ -1298,8 +1303,7 @@ export class CardMenus
     // The room a menu has: the card's width, within the screen's
     _menuRoom()
     {
-        const _card = this._this?.querySelector('#maincard');
-        return Math.min(_card?.clientWidth || Infinity, document.documentElement.clientWidth || Infinity);
+        return Math.min(this.cardWidth() || Infinity, document.documentElement.clientWidth || Infinity);
     }
 
     // The width menuEl needs to stay readable under its submenus (its own, without any)

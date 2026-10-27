@@ -28,6 +28,7 @@ only:
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
+| Both | `Chart.hecCircular` (§1) | Values that wrap around (angles): one rule placing them, for the card's samples and Chart.js's view |
 
 Rules that keep it that way:
 
@@ -149,6 +150,19 @@ The card sets both from its `lineMode: smart` (a silence: the curve held flat, t
 
 ### Public methods
 
+`Chart.hecCircular` — values that wrap around (an angle: period `Q`, 360), the one rule for
+the card and for Chart.js: `wrap(v, Q)` — a value brought into [0, Q), as the tooltip, the
+values over the graph and the Y axis' labels (`ticks.period`) show it; `place(values, Q,
+first, last, target)` → `{ values, band }` — the values brought into [0, Q), made continuous (a
+step of more than half a turn is a crossing of the turn's edge), moved by whole turns for the
+mean of those of the window shown (indices `first` to `last`) to sit nearest `target`
+(`undefined`: their circular mean), those outside it put in the same turn; spanning more than
+a turn there, each one put in the turn around `target` instead (`band: true`); `jumps(a, b,
+Q)` — whether the step from `a` to `b`, two values placed, crosses the edge of a turn. The
+card places a circular entity's samples with it before grouping them by column (a mean across
+0 needs them continuous); plugin `hecCircularView` places them again around a Y range set by
+hand (`circularPeriod`).
+
 `chart.hecYAxisLocked()` — whether the chart's Y axes are locked (the padlock closed), or
 `undefined` on a chart without a lock: what a menu entry shows.
 
@@ -177,7 +191,7 @@ default: spread from its left; center: evenly; right); `fontSize`: their size, a
 the others small in a column on its right, each cut ('…') rather than wrapped, the
 statistics a little smaller; `stats`: a curve's statistics, `name` above them (`null`: none),
 a cell each; all in the given colors (`curve`: its dataset index, `key`: an opaque id kept on
-its element). `format`: a value of a curve at a point, as `states` shows one — the value a
+its element). `format`: a value of a curve at a point, as `states` shows one — a circular curve's (`circularPeriod`) given in [0, period), as its labels show it — the value a
 hover is on (`hover.dotOnHover`) is shown in its curve's place, with its time, while it lasts.
 A click or a tap on a value now reaches `customEvent` (`gestureType: 'click'`, `zone:
 'value'`, `curveIndex`); a text cut is shown in full in place while hovered, and on a click
@@ -235,8 +249,6 @@ card may need, so it never has to compute one from the chart's layout.
   curveIndex,          // a contact gesture (click, dblclick, longpress) on the plot area: the
                        // curve (line dataset index) picked at the point (_hecCurveAt), or -1
   curveBetween,        // true about halfway between two curves (none picked), else undefined
-  yAxisLocked,         // whether the Y axes are locked (the padlock); undefined on a
-                       // chart without a lock
   event,               // the native PointerEvent (or the one a touch overlay forwards, §5)
   // ...plus the gestureType's own fields, below
 }
@@ -329,8 +341,7 @@ value needs to come back from the card:
   each Y axis keeps the range it shows (`_hecSetYRanges(_hecYRanges())`), so new
   data or a time move no longer rescales it; released, it gets its own range back.
   The card never reads or writes `_hecYAxisLock` (see §6 for why that matters): it
-  reads it with `hecYAxisLocked()` (or the payload's `yAxisLocked`, §2) and sets it
-  with `hecSetYAxisLocked()` (§1).
+  reads it with `hecYAxisLocked()` and sets it with `hecSetYAxisLocked()` (§1).
 - **Cursor** — `canvas.style.cursor` changes to `move`/`ns-resize`/etc. on
   hover over a draggable zone, entirely computed from `_hecLegendIndexAt`/
   `_hecYAxisIndexAt` (see §4), no card involvement.

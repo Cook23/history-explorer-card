@@ -280,7 +280,7 @@ export class HistoryCardState {
     updateContent()
     {
         if( !this.contentValid ) {
-            let width = this._this.querySelector('#maincard').clientWidth;
+            let width = this.cardWidth();
             if( width > 0 ) {
                 clearInterval(this.iid);
                 this.createContent().catch(e => console.error('history-explorer-card createContent error:', e));

@@ -440,16 +440,63 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // Values that wrap around (an angle: period Q, 360) — the one rule placing them, for the
+  // card (its samples, before they're grouped by column: a mean across 0 needs them
+  // continuous) and for the plugin hecCircularView below (Chart Custom.js.md §1)
+  Chart.hecCircular = {
+    // A value brought into [0, Q) — as the tooltip, the values over the graph and the Y axis'
+    // labels show it (359 for -1)
+    wrap: function (v, Q) {
+      return ((v % Q) + Q) % Q;
+    },
+    // values (numbers) placed: each brought into [0, Q), then made continuous — a step of
+    // more than half a turn is a crossing of the turn's edge (3, 1, 359 → 3, 1, -1) —, then
+    // moved by whole turns for the mean of those of the window shown (indices first to last)
+    // to sit nearest target (undefined: their circular mean, in [0, Q)); those outside the
+    // window put in the same turn, out of sight. Spanning more than a turn in the window:
+    // each value put in the one turn around target instead (band). → { values, band }
+    place: function (values, Q, first, last, target) {
+      var n = values.length, mod = function (v) { return Chart.hecCircular.wrap(v, Q); };
+      if (!n) return { values: [], band: false };
+      first = Math.max(0, first || 0);
+      last = Math.min(n - 1, last == null ? n - 1 : last);
+      if (first > last) { first = 0; last = n - 1; }
+      var r = values.map(mod), un = [], off = 0;
+      r.forEach(function (v, i) {
+        if (i) off -= Math.round((v - r[i - 1]) / Q) * Q;
+        un.push(v + off);
+      });
+      var lo = Infinity, hi = -Infinity, sum = 0, sS = 0, sC = 0;
+      for (var i = first; i <= last; i++) {
+        lo = Math.min(lo, un[i]); hi = Math.max(hi, un[i]); sum += un[i];
+        sS += Math.sin(r[i] / Q * 2 * Math.PI); sC += Math.cos(r[i] / Q * 2 * Math.PI);
+      }
+      var c = target != null ? target : Math.abs(sS) + Math.abs(sC) > 1e-9 ? mod(Math.atan2(sS, sC) / (2 * Math.PI) * Q) : r[first];
+      var base;
+      if (hi - lo > Q) {
+        base = c - Q / 2;
+        return { values: r.map(function (v) { return base + mod(v - base); }), band: true };
+      }
+      var mean = sum / (last - first + 1), k = Math.round((c - mean) / Q) * Q;
+      base = mean + k - Q / 2;
+      return { values: un.map(function (v, j) { return j < first || j > last ? base + mod(r[j] - base) : v + k; }), band: false };
+    },
+    // Whether the step from a to b, two values placed, jumps across the edge of a turn
+    jumps: function (a, b, Q) {
+      return Math.abs(b - a) > Q / 2;
+    },
+  };
+
+  // ---------------------------------------------------------------------------
   // Circular curves in the Y window shown — the dataset option circularPeriod (Q, in the
-  // units drawn: an angle's 360): values that wrap around, as the card gives them (a
-  // continuous curve, or one put in a turn, its jumps marked hecCircularJump). While a Y
-  // range is set by hand (a pan, a zoom, the padlock: the lock engaged), the turn shown is
-  // the one of that range: the curve made continuous again, then moved by whole periods to
-  // sit around the range's middle; should it span more than a turn in the time window shown
-  // (the time axis' min and max), each value put in the turn around that middle instead, its
-  // jumps dashed (hecPlateauEnd). The range released,
-  // the curve as the card gave it. Each point keeps the card's value (hecY0, and its band's
-  // hecYMin0 / hecYMax0, hecJump0): moved from it at each update, never from the last move.
+  // units drawn: an angle's 360): values that wrap around, as the card gives them (placed
+  // by Chart.hecCircular for the time window shown, a curve put in a turn having its jumps
+  // marked hecCircularJump). While a Y range is set by hand (a pan, a zoom, the padlock:
+  // the lock engaged), the turn shown is the one of that range: the curve placed again by
+  // Chart.hecCircular, around the range's middle, for the time window shown (the time
+  // axis' min and max). The range released, the curve as the card gave it. Each point keeps
+  // the card's value (hecY0, and its band's hecYMin0 / hecYMax0, hecJump0): moved from it at
+  // each update, never from the last move.
   Chart.plugins.register({
     id: 'hecCircularView',
     beforeUpdate: function (chart) {
@@ -476,34 +523,18 @@
           p.hecPlateauEnd = p.hecPlateau0 || jump;
         };
         if (!set) { ok.forEach(function (p) { put(p, p.hecY0, p.hecJump0); }); return; }
-        var mod = function (v) { return ((v % Q) + Q) % Q; };
-        // (the time window shown — the time axis' min and max —: its span measured there, not
-        // over what is loaded around it)
+        // (the time window shown — the time axis' min and max —: from the value in force at
+        // its start to the first one after its end, as the card measures it)
         var _ms = function (v) { return v == null ? NaN : typeof v === 'number' ? v : +(v.valueOf ? v.valueOf() : new Date(v)); };
         var _tx = chart.options.scales && chart.options.scales.xAxes && chart.options.scales.xAxes[0] && chart.options.scales.xAxes[0].time || {};
-        var _t0 = _ms(_tx.min), _t1 = _ms(_tx.max);
-        var _shown = function (p) { var x = _ms(p.x); return !(x < _t0) && !(x > _t1); };
-        // (continuous: each step of more than half a turn taken as a crossing)
-        var un = [], off = 0, lo = Infinity, hi = -Infinity;
-        ok.forEach(function (p, k) {
-          if (k) off -= Math.round((p.hecY0 - ok[k - 1].hecY0) / Q) * Q;
-          var y = p.hecY0 + off;
-          un.push(y);
-          if (_shown(p)) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
-        });
-        if (lo > hi) { lo = Math.min.apply(null, un); hi = Math.max.apply(null, un); }
-        var mid = (t.min + t.max) / 2;
-        if (hi - lo <= Q) {
-          var k = Math.round((mid - (lo + hi) / 2) / Q) * Q;
-          ok.forEach(function (p, i) { put(p, un[i] + k, false); });
-        } else {
-          var base = mid - Q / 2, prev = null;
-          ok.forEach(function (p) {
-            var y = base + mod(p.hecY0 - base);
-            put(p, y, prev !== null && Math.abs(y - prev) > Q / 2);
-            prev = y;
-          });
+        var _t0 = _ms(_tx.min), _t1 = _ms(_tx.max), first = 0, last = ok.length - 1;
+        for (var i = 0; i < ok.length; i++) {
+          var x = _ms(ok[i].x);
+          if (x <= _t0) first = i;
+          if (x > _t1) { last = i; break; }
         }
+        var r = Chart.hecCircular.place(ok.map(function (p) { return p.hecY0; }), Q, first, last, (t.min + t.max) / 2);
+        ok.forEach(function (p, i) { put(p, r.values[i], r.band && i > 0 && Chart.hecCircular.jumps(r.values[i - 1], r.values[i], Q)); });
       });
     }
   });
@@ -2212,7 +2243,6 @@
         payload.curveIndex = _ci >= 0 ? _ci : -1;
         if (_ci === PICK_BETWEEN) payload.curveBetween = true;
       }
-      if (this._hecHasYAxisLock()) payload.yAxisLocked = !!this._hecYAxisLock;
       if (extra) { for (var k in extra) payload[k] = extra[k]; }
       return payload;
     },
@@ -2313,6 +2343,13 @@
     _hecHasYAxisLock: function () {
       return this.options.yAxisLockEnabled !== false && this.config.type !== 'timeline' && this.config.type !== 'arrowline' &&
         !!(this.options.scales && this.options.scales.yAxes && this.options.scales.yAxes.length);
+    },
+
+    // Whether a contact is in progress — a press the gesture engine hasn't resolved yet into
+    // a click (at its release), a drag, a pinch: what a hover must then leave alone
+    _hecContactInProgress: function () {
+      var gs = this._hecGesture;
+      return !!(gs && (gs.pending || gs.count));
     },
 
     // Public (Chart Custom.js.md §1): whether the Y axes are locked (the padlock closed);
@@ -2950,7 +2987,9 @@
       var s = p && typeof v.format === 'function' && _el.querySelector('.hec-state[data-curve="' + el._datasetIndex + '"]');
       if (!s) return;
       s.setAttribute('data-hec-now', s.innerHTML);
-      s.innerHTML = _hecValueHtml(v.format(el._datasetIndex, p.y, p.x));
+      // (a circular curve's value as its labels show it: in [0, circularPeriod))
+      var _Q = this.data.datasets[el._datasetIndex].circularPeriod;
+      s.innerHTML = _hecValueHtml(v.format(el._datasetIndex, _Q ? Chart.hecCircular.wrap(p.y, _Q) : p.y, p.x));
     },
 
     // A click on the values over the chart: on a value now, customEvent (zone 'value',

@@ -4740,7 +4740,7 @@
               // resolved into a click (_hecTap, at its release), or a drag —: no tooltip from a
               // drag, whatever the curves' mode
               var _hoverTips = me._hecHasHoverTooltips();
-              var _contact = !!(me._hecGesture && (me._hecGesture.pending || me._hecGesture.count));
+              var _contact = me._hecContactInProgress();
               if (_contactMode && me._hecTooltipMode && !_inPlot) {
                 // Left the plot area: the tooltip mode ends, the tooltip closes
                 me._hecEndTooltipMode();
@@ -13164,7 +13164,7 @@
               me.ticks = me.ticks.map(function (label, i) {
                 var _v = me.ticksAsNumbers[i];
                 var _dec = (String(label).split('.')[1] || '').length;
-                var _w = parseFloat((((_v % _P) + _P) % _P).toFixed(_dec));
+                var _w = parseFloat(Chart.hecCircular.wrap(_v, _P).toFixed(_dec));
                 if (_w !== 0 && _w < _P) return _w.toFixed(_dec);
                 return (_v === _top && me.ticks.length > 1) ? parseFloat(_P.toFixed(_dec)).toFixed(_dec) : '0';
               });

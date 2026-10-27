@@ -506,10 +506,18 @@ export class CardCharts
         return this.narrowCard();
     }
 
+    // The card's width (px): what every choice made from it reads — narrow (NARROW_CARD_PX),
+    // a small screen (SMALL_SCREEN_PX), the toolbar's forms, the time labels, a menu's room;
+    // 0 before it's laid out
+    cardWidth()
+    {
+        return this._this?.querySelector('#maincard')?.clientWidth || 0;
+    }
+
     // Whether the card is narrower than NARROW_CARD_PX
     narrowCard()
     {
-        return ( this._this?.querySelector('#maincard')?.clientWidth || Infinity ) < NARROW_CARD_PX;
+        return ( this.cardWidth() || Infinity ) < NARROW_CARD_PX;
     }
 
     // The option the curves' tooltip follows on the screen the card is on now: the info
@@ -517,7 +525,7 @@ export class CardCharts
     // largeScreenTooltip
     tooltipField()
     {
-        const _w = this._this?.querySelector('#maincard')?.clientWidth || Infinity;
+        const _w = this.cardWidth() || Infinity;
         return this.infoPanel || _w < SMALL_SCREEN_PX ? 'smallScreenTooltip' : 'largeScreenTooltip';
     }
 
@@ -622,7 +630,7 @@ export class CardCharts
                             if( _ds.stateMap?.length ) return stateLabel(_ds.stateMap, Math.round(y)) ?? '';
                             const v = y / _siFactor * _tf;
                             // (a circular curve shows its real value, in [0, period))
-                            return formatNumber(_circQ ? this.wrapCircular(v, _circQ * Math.abs(_tf)) : v, _ds.rounding);
+                            return formatNumber(_circQ ? Chart.hecCircular.wrap(v, _circQ * Math.abs(_tf)) : v, _ds.rounding);
                         };
                         // (a column of values: their min, mean and max — see _lineSamples)
                         const _p = _ds.data[item.index];

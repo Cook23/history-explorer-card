@@ -220,7 +220,7 @@ export class CardToolbar
 
     resize()
     {
-        const w = this._this.querySelector('#maincard').clientWidth;
+        const w = this.cardWidth();
 
         if( Math.abs(this.lastWidth - w) > 2 ) {
             const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
@@ -239,7 +239,7 @@ export class CardToolbar
 
     resizeSelector()
     {
-        const w = this._this.querySelector('#maincard').clientWidth;
+        const w = this.cardWidth();
 
         for( let i = 0; i < 2; ++i ) {
             const tb = this._this.querySelector(`#tb_${i}`);
