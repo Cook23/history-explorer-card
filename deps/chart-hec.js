@@ -89,6 +89,19 @@
       : [a, { x: b.x, y: a.y }, b];
   }
 
+  // The box of an element other than a curve's point (its _view): a timeline's or an
+  // arrowline's segment, else a bar — { l, r, t, b }
+  function _hecElementBox(v) {
+    return v.height !== undefined
+      ? { l: v.x, r: v.x + v.width, t: v.y, b: v.y + v.height }
+      : { l: v.x - v.width / 2, r: v.x + v.width / 2, t: Math.min(v.y, v.base), b: Math.max(v.y, v.base) };
+  }
+  // The place of that box nearest (px, py), the pointer clamped on it: { d, x, y }
+  function _hecBoxNearest(v, px, py) {
+    var b = _hecElementBox(v), cx = Math.max(b.l, Math.min(px, b.r)), cy = Math.max(b.t, Math.min(py, b.b));
+    return { d: Math.sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py)), x: cx, y: cy };
+  }
+
   // The point of the segment (ax, ay)-(bx, by) nearest (px, py): { d, x, y }
   function _hecSegmentNearest(px, py, ax, ay, bx, by) {
     var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
@@ -1155,7 +1168,12 @@
         if (!_a || p.boxCancelled) return;
         p.boxX1 = Math.max(Math.min(e.x, _a.right), _a.left);
         p.boxY1 = Math.max(Math.min(e.y, _a.bottom), _a.top);
-        me._hecShowZoomSelection(p.x0, p.y0, p.boxX1, p.boxY1);
+        // (the axes it zooms — options.zoomBoxAxes: the time only, a band the plot area's
+        // height; the Y axes only, a band its width; both, the box as drawn)
+        var _ax = me._hecZoomBoxAxes();
+        if (_ax === 'x') me._hecShowZoomSelection(p.x0, _a.top, p.boxX1, _a.bottom);
+        else if (_ax === 'y') me._hecShowZoomSelection(_a.left, p.y0, _a.right, p.boxY1);
+        else me._hecShowZoomSelection(p.x0, p.y0, p.boxX1, p.boxY1);
       }
     },
     {
@@ -1610,8 +1628,9 @@
       // nothing, a box nearly the plot area's size neither: it would hardly zoom)
       var _a = me.chartArea, _keep = 1 - cfg.pinchDeadBand;
       var _zooms = function (d, size) { return !p.boxCancelled && d > cfg.dragSlop && d < _keep * size; };
-      var _wide = _zooms(Math.abs(p.boxX1 - p.x0), _a.right - _a.left);
-      var _tall = _zooms(Math.abs(p.boxY1 - p.y0), _a.bottom - _a.top);
+      var _ax = me._hecZoomBoxAxes();
+      var _wide = _ax !== 'y' && _zooms(Math.abs(p.boxX1 - p.x0), _a.right - _a.left);
+      var _tall = _ax !== 'x' && _zooms(Math.abs(p.boxY1 - p.y0), _a.bottom - _a.top);
       if (_tall && me.options.zoomEnabled !== false && me.options.zoomYEnabled !== false) me._hecZoomYTo(p.y0, p.boxY1);
       fire(c, 'dragend', undefined, undefined, _wide ? { zoomBox: true, zoomSelectFactor0: me._hecPlotFactor(p.x0), zoomSelectFactor1: me._hecPlotFactor(p.boxX1) } : { zoomBox: true });
     } else {
@@ -2176,15 +2195,9 @@
       (me.data.datasets || []).forEach(function (ds, i) {
         var meta = me.getDatasetMeta(i);
         if (meta.dataset || !me.isDatasetVisible(i)) return;
-        (meta.data || []).forEach(function (el) { if (el._view && !el._view.skip) els.push(el); });
+        els = els.concat(me._hecOnlyDrawnElements(meta.data || []));
       });
-      var _i = _hecPickNearest(els.map(function (el) {
-        var v = el._view, b = v.height !== undefined
-          ? { l: v.x, r: v.x + v.width, t: v.y, b: v.y + v.height }                      // (a timeline's segment)
-          : { l: v.x - v.width / 2, r: v.x + v.width / 2, t: Math.min(v.y, v.base), b: Math.max(v.y, v.base) };   // (a bar)
-        var cx = Math.max(b.l, Math.min(x, b.r)), cy = Math.max(b.t, Math.min(y, b.b));
-        return { d: Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y)), x: cx, y: cy };
-      }));
+      var _i = _hecPickNearest(els.map(function (el) { return _hecBoxNearest(el._view, x, y); }));
       return _i >= 0 ? els[_i] : null;
     },
 
@@ -2219,23 +2232,63 @@
       return _hecPickNearest(_cands);
     },
 
-    // The point (a value drawn, never a curve-shaping point) at (px, py), by the picking rule
-    // (_hecPickNearest) on the points themselves — each curve's point nearest it, in X and Y,
-    // within the picking margin and its radius drawn; none about halfway between two curves' points. only(i): the
-    // curves taken into account. The tooltip's first point: a real value, never a place
-    // between two — there is nothing to show there
+    // The element at (px, py) a tooltip shows first — a curve's point (a value drawn, never a
+    // curve-shaping point), a bar, a timeline's or an arrowline's segment —, by the picking
+    // rule (_hecPickNearest) on the elements themselves: each dataset's element nearest it, in
+    // X and Y — a point within the picking margin and its radius drawn, a box (the pointer
+    // clamped on it) within the margin —; none about halfway between two datasets'. only(i):
+    // the datasets taken into account. A real value, never a place between two: there is
+    // nothing to show there
     _hecPointAt: function (px, py, only) {
       var me = this, _els = [];
       var _cands = (me.data.datasets || []).map(function (ds, i) {
-        if (!me.getDatasetMeta(i).dataset || !me.isDatasetVisible(i) || (only && !only(i))) return null;
-        var el = _els[i] = me._hecNearestPointOf(i, px, py);
-        if (!el) return null;
-        // (the margin it must be within: that much wider, its radius drawn)
-        var v = el._view;
-        return { d: Math.sqrt((v.x - px) * (v.x - px) + (v.y - py) * (v.y - py)), x: v.x, y: v.y, size: v.radius || 0 };
+        var meta = me.getDatasetMeta(i);
+        if (!me.isDatasetVisible(i) || (only && !only(i))) return null;
+        if (meta.dataset) {
+          var el = _els[i] = me._hecNearestPointOf(i, px, py);
+          if (!el) return null;
+          // (the margin it must be within: that much wider, its radius drawn)
+          var v = el._view;
+          return { d: Math.sqrt((v.x - px) * (v.x - px) + (v.y - py) * (v.y - py)), x: v.x, y: v.y, size: v.radius || 0 };
+        }
+        var best = null;
+        me._hecOnlyDrawnElements(meta.data || []).forEach(function (e) {
+          var n = _hecBoxNearest(e._view, px, py);
+          if (!best || n.d < best.d) { best = n; _els[i] = e; }
+        });
+        return best;
       });
       var _i = _hecPickNearest(_cands);
       return _i >= 0 ? _els[_i] : null;
+    },
+
+    // Dataset i's element at the time x, as a tooltip's following points are: a curve's value
+    // nearest x along the time axis, a bar, a segment over x or nearest it — within the picking
+    // margin along the time axis; else null
+    _hecElementAtTime: function (i, x) {
+      var me = this, _m = _hecPickMargin(), meta = me.getDatasetMeta(i);
+      if (meta.dataset) {
+        var el = me._hecNearestValueOf(i, x);
+        return el && Math.abs(el._view.x - x) <= _m ? el : null;
+      }
+      var best = null, _d = Infinity;
+      me._hecOnlyDrawnElements(meta.data || []).forEach(function (e) {
+        var b = _hecElementBox(e._view), d = x < b.l ? b.l - x : x > b.r ? x - b.r : 0;
+        if (d < _d) { _d = d; best = e; }
+      });
+      return best && _d <= _m ? best : null;
+    },
+
+    // The elements other than a curve's points drawn (not skipped), within the plot area's time
+    _hecOnlyDrawnElements: function (elements) {
+      var A = this.chartArea;
+      return elements.filter(function (e) {
+        var v = e._view;
+        if (!v || v.skip) return false;
+        if (!A) return true;
+        var b = _hecElementBox(v);
+        return b.r >= A.left && b.l <= A.right;
+      });
     },
 
     // Curve i's value nearest the point (px, py) on the curve — "the nearest on the curve":
@@ -3140,13 +3193,12 @@
 
     // A click or a tap — released without a drag, a pinch or a long press; never a press
     // alone, a swipe (a scroll or a move of the time) or a pinch. With hover.activateOnContact:
-    // on a curve — the nearest one, by the picking rule (_hecCurveAt), not necessarily on
-    // one of its points — that curve joins the tooltip mode (several curves can be in it), the
-    // tooltip opened on the point pointed at (_hecHoverElements: none far from every point);
-    // on the plot area of a chart without curves, or on a bar, the tooltip mode opens on
-    // the elements under it (hover.mode), as without contact mode; beside or between the
-    // curves, nothing changes; anywhere else, the mode ends. Applied by
-    // Controller.handleEvent, right after.
+    // on a series — the curve nearest, by the picking rule (_hecCurveAt), not necessarily on
+    // one of its points; else the bar, the timeline's or arrowline's segment nearest
+    // (_hecElementAt): its dataset — that series joins the tooltip mode (several can be in
+    // it), the tooltip opened on the element pointed at (_hecHoverElements: none far from
+    // every element); beside or between them, nothing changes; anywhere else, the mode ends.
+    // Applied by Controller.handleEvent, right after.
     _hecTap: function (e) {
       var me = this, ho = me.options.hover;
       var _at = e.x !== null && e.y !== null;
@@ -3157,7 +3209,9 @@
           me.active = [];
           return;
         }
+        // (the series clicked: the curve nearest, else the bar, the segment nearest — its row)
         var _ci = me._hecCurveAt(e.x, e.y);
+        if (_ci === -1) { var _hit = me._hecElementAt(e.x, e.y); if (_hit) _ci = _hit._datasetIndex; }
         var _curves = me._hecTooltipCurves || [];
         if (_ci >= 0) {
           if (_curves.indexOf(_ci) < 0) _curves.push(_ci);
@@ -3170,10 +3224,9 @@
           if (ho.dotOnHover) me._hecUpdateHoverDot(e);
           return;
         }
-        // (beside or between the curves; or no curve in the tooltip mode on a chart with
-        // other elements — bars, a timeline — which then work as without contact mode)
+        // (beside or between the series)
         if (ho.dotOnHover) me._hecUpdateHoverDot(e);
-        if (_curves.length || !me._hecHasOtherElements()) return;
+        return;
       }
       me._hecTooltipMode = true;
       var _el = _at ? me._hecElementAt(e.x, e.y) : null;
@@ -3181,50 +3234,39 @@
       me._hecLastHitXY = _at ? { x: e.x, y: e.y } : undefined;
     },
 
-    // Whether this chart shows anything else than curves (bars, a timeline, arrows)
-    _hecHasOtherElements: function () {
-      var me = this;
-      return (me.data.datasets || []).some(function (ds, i) {
-        return me.isDatasetVisible(i) && !me.getDatasetMeta(i).dataset;
-      });
-    },
-
-    // Whether a curve shown opens its tooltip on a hover: its tooltip mode (hecTooltip)
-    // 'nearest', 'mixed' or 'all'
+    // Whether a dataset shown — a curve, bars, a timeline's or an arrowline's row — opens its
+    // tooltip on a hover: its tooltip mode (hecTooltip) 'nearest', 'mixed' or 'all'
     _hecHasHoverTooltips: function () {
       var me = this;
       return (me.data.datasets || []).some(function (ds, i) {
-        return me.isDatasetVisible(i) && !!me.getDatasetMeta(i).dataset && (ds.hecTooltip === 'nearest' || ds.hecTooltip === 'mixed' || ds.hecTooltip === 'all');
+        return me.isDatasetVisible(i) && (ds.hecTooltip === 'nearest' || ds.hecTooltip === 'mixed' || ds.hecTooltip === 'all');
       });
     },
 
-    // The points a tooltip shows at this point — values drawn, never a curve's path between
-    // them. The first: the point pointed at (_hecPointAt), among the points of the curves that
-    // can show it — each curve's tooltip mode (the dataset option hecTooltip): 'nearest', 'mixed'
+    // The elements a tooltip shows at this point — a curve's points (values drawn, never its
+    // path between them), bars, a timeline's or an arrowline's segments: every dataset alike.
+    // The first: the element pointed at (_hecPointAt), among those of the datasets that can
+    // show it — each one's tooltip mode (the dataset option hecTooltip): 'nearest', 'mixed'
     // and 'all' ones, and those a click selected ('selected', 'mixed': the tooltip mode) —;
-    // none: nothing shown. Then, on each other curve that shows it — selected ('selected',
-    // 'mixed'), or every one with 'all' —, its point nearest that one's time, within the picking
-    // margin along the time axis. Else, without any curve selected, on a chart with other
-    // elements (bars, a timeline), those under it (hover.mode)
+    // none: nothing shown. Then, on each other dataset that shows it — selected ('selected',
+    // 'mixed'), or every one with 'all' —, its element at that one's time, within the
+    // picking margin along the time axis (_hecElementAtTime)
     _hecHoverElements: function (e) {
-      var me = this, ho = me.options.hover;
+      var me = this;
       var _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
       var _mode = function (i) { return me.data.datasets[i].hecTooltip || 'selected'; };
-      var _line = function (i) { return !!me.getDatasetMeta(i).dataset && me.isDatasetVisible(i); };
       var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
       var _first = _at ? me._hecPointAt(e.x, e.y, function (i) { return _mode(i) !== 'selected' || _sel.indexOf(i) >= 0; }) : null;
-      if (!_first) {
-        if (!_at || !( me._hecTooltipMode || ho.activateOnContact !== true ) || _sel.some(_line)) return [];
-        // (the elements of the other datasets only: a curve's points are the rule above's)
-        return me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho)).filter(function (el) { return !me.getDatasetMeta(el._datasetIndex).dataset; });
-      }
-      var _fi = _first._datasetIndex, _x = _first._view.x, _m = _hecPickMargin(), _els = [_first];
+      if (!_first) return [];
+      var _fi = _first._datasetIndex, _v = _first._view, _els = [_first];
+      // (the first one's time: a point's, a box's middle)
+      var _x = me.getDatasetMeta(_fi).dataset ? _v.x : (function (b) { return (b.l + b.r) / 2; })(_hecElementBox(_v));
       (me.data.datasets || []).forEach(function (ds, i) {
-        if (i === _fi || !_line(i)) return;
+        if (i === _fi || !me.isDatasetVisible(i)) return;
         var m = _mode(i), _selected = _sel.indexOf(i) >= 0;
         if (!(m === 'all' || ((m === 'selected' || m === 'mixed') && _selected))) return;
-        var el = me._hecNearestValueOf(i, _x);
-        if (el && Math.abs(el._view.x - _x) <= _m) _els.push(el);
+        var el = me._hecElementAtTime(i, _x);
+        if (el) _els.push(el);
       });
       return _els;
     },
@@ -3516,6 +3558,13 @@
     // startTime/endTime needed (that conversion stays the card's own
     // responsibility, since the resulting time range is shared across every
     // graph, not just this one).
+    // The axes the elastic box zooms (options.zoomBoxAxes): 'x' the time, 'y' the Y axes,
+    // 'xy' (the default) both
+    _hecZoomBoxAxes: function () {
+      var a = this.options.zoomBoxAxes;
+      return a === 'x' || a === 'y' ? a : 'xy';
+    },
+
     // The elastic box (zoomBox) from (x0, y0) to (x1, y1), canvas-relative
     _hecShowZoomSelection: function (x0, y0, x1, y1) {
       if (!this.canvas || !this.chartArea) return;

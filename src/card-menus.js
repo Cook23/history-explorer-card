@@ -110,6 +110,38 @@ export function optionsMenuHtml(i)
     return menuBoxesHtml(`eo_${i}`, Object.keys(_OPTIONS_SUBMENUS), 150, 1);
 }
 
+// The magnifier's modes (what the elastic box zooms — Chart.js zoomBoxAxes): the time (↔),
+// the Y axes (↕), both (⤢); each one's symbol in the magnifier's glass
+export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
+const _ZOOM_BOX_SYMBOLS = { x: 'M6,9.5H13M6,9.5L7.8,7.9M6,9.5L7.8,11.1M13,9.5L11.2,7.9M13,9.5L11.2,11.1',
+                            y: 'M9.5,6V13M9.5,6L7.9,7.8M9.5,6L11.1,7.8M9.5,13L7.9,11.2M9.5,13L11.1,11.2',
+                            xy: 'M6.8,12.2L12.2,6.8M12.2,6.8H9.8M12.2,6.8V9.2M6.8,12.2H9.2M6.8,12.2V9.8' };
+
+// A magnifier (magnifierSvg) shown in another mode or color, its elements kept (a click and
+// the next one on the same element: a double-click)
+export function paintMagnifier(svg, mode, color)
+{
+    const [_glass, _symbol] = svg.querySelectorAll('path');
+    _glass.setAttribute('fill', color);
+    _symbol.setAttribute('stroke', color);
+    _symbol.setAttribute('d', _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy);
+}
+
+// The magnifier of mode (ZOOM_BOX_MODES), in color: its glass and handle, its mode's symbol
+// in the glass
+export function magnifierSvg(mode, color = 'var(--primary-text-color)')
+{
+    return `<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;">` +
+        `<path fill="${color}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
+        `<path fill="none" stroke="${color}" stroke-width="1.2" stroke-linecap="round" d="${_ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy}" /></svg>`;
+}
+
+// The magnifier's menu ez_N: its modes
+export function zoomMenuHtml(i)
+{
+    return menuBoxesHtml(`ez_${i}`, [], 0, 2);
+}
+
 // A menu line with a switch — a choice on or off: its name, then the switch on its right, in
 // Home Assistant's shape (a thin track, a larger knob over it), red while off and green while
 // on (the theme's colors, as the padlock's) — see setSwitch. Its name in its [data-label]
@@ -235,6 +267,25 @@ export class CardMenus
         if( !m.el() || m.el().style.display === 'none' ) return;
         this._fillMenu(m);
         this._closeMenuSoon(m.prefix, m.close);
+    }
+
+    // Menu m opened — whichever it is: its planned close cancelled, its submenus closed, filled
+    // as it is now (_fillMenu), shown at the page point `at` ({ x, y }; null: where it is),
+    // aligned there (align: openMenu), kept on anchorEl as the page scrolls (followAnchor:
+    // closed once out — m.close), given the keyboard. Placed relative to its positioned parent
+    // (_menuParent: #tb_N) read directly — not m.el().offsetParent, always null while it's
+    // still hidden, as it is here (openMenu shows it)
+    _openMenuAt(m, at, align, anchorEl)
+    {
+        const _el = m.el();
+        this._cancelMenuClose(m.prefix);
+        this.closeCascade(_el);
+        this._fillMenu(m);
+        const _tb = this._menuParent(m.index);
+        const _p = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+        this.openMenu(_el, at ? (at.y - _p.top) + 'px' : undefined, at ? (at.x - _p.left) + 'px' : undefined, align);
+        this.followAnchor(_el, anchorEl, () => m.close());
+        _el.focus();
     }
 
     // Menu m listened to: the arrows, Enter or → on a line (its submenu), Escape (closed);
@@ -506,7 +557,10 @@ export class CardMenus
                 Object.assign(_in, { min: it.input.min, max: it.input.max, step: it.input.step, value: it.value });
                 _in.addEventListener('change', () => { _in.value = it.change(_in.value); });
             } else {
-                ( _line.querySelector('[data-label]') ?? _line ).textContent = it.label;
+                // (a line shown by a symbol — an icon of the card's own: its markup)
+                if( it.icon ) _line.innerHTML = it.icon;
+                else ( _line.querySelector('[data-label]') ?? _line ).textContent = it.label;
+                if( it.icon ) _line.title = it.label;
                 if( it.on !== undefined ) setSwitch(_line, it.on);
                 if( it.style ) _line.style.cssText += it.style;
                 if( it.marked ) { _line.style.fontWeight = 'bold'; _line.dataset.selected = _line.dataset.marked = '1'; }
@@ -622,23 +676,13 @@ export class CardMenus
     _openTypeMenu(input_idx, ctx, at, align, anchorEl, sub)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
-        this._cancelMenuClose(`et_${input_idx}`);
         _menu._menuEntityId = ctx.entityId;
         _menu._menuGraphId  = ctx.graphId;
         _menu._menuKey      = ctx.key;
         _menu._menuForGraph = ctx.forGraph;
         _menu._menuFrom     = ctx.from;
         _menu._menuAnchor   = ctx.anchor;
-        const m = this._typeMenu(input_idx);
-        this.closeCascade(_menu);
-        this._fillMenu(m);
-
-        // Position — relative to #tb_N (_menuParent) directly, not _menu.offsetParent: that of
-        // a display:none element is always null, and _menu is still hidden here (openMenu shows it)
-        const _tb = this._menuParent(input_idx);
-        const _p = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
-        this.openMenu(_menu, at ? (at.y - _p.top) + 'px' : undefined, at ? (at.x - _p.left) + 'px' : undefined, align);
-        this.followAnchor(_menu, anchorEl, () => this.hideEntityTypeMenu(input_idx));
+        this._openMenuAt(this._typeMenu(input_idx), at, align, anchorEl);
         this._openRememberedSubmenu(input_idx, sub);
     }
 
@@ -1111,25 +1155,49 @@ export class CardMenus
         this._listenMenu(this._optionsMenu(i));
     }
 
+    // --------------------------------------------------------------------------------------
+    // The magnifier's menu (ez_N): its modes, each its symbol — the one it's in marked
+    // --------------------------------------------------------------------------------------
+
+    _zoomMenu(i)
+    {
+        return this._menuOf(`ez_${i}`, {
+            index: i,
+            keys: [],
+            kind: () => 'zoom',
+            lines: () => ZOOM_BOX_MODES.map(mode => ({ id: `ez_${i}_${mode}`, icon: magnifierSvg(mode), label: i18n(`ui.menu.zoom_${mode}`),
+                marked: this.state.zoomBox === mode, final: true,
+                choose: () => { this.setZoomBoxMode(mode); this._menuChosen(this._zoomMenu(i)); } })),
+            sub: () => [],
+            close: () => this._closeMenu(this._zoomMenu(i)),
+        });
+    }
+
+    // The magnifier's menu opened, under it (_menuParent: its positioned parent)
+    showZoomMenu(i)
+    {
+        const m = this._zoomMenu(i), _bz = this._this.querySelector(`#bz_${i}`);
+        if( !m.el() || !_bz ) return;
+        const _r = _bz.getBoundingClientRect();
+        this._openMenuAt(m, { x: _r.left + _r.width / 2, y: _r.bottom }, 'center', _bz);
+    }
+
+    // Listeners of the magnifier's menu
+    initZoomMenu(i)
+    {
+        this._listenMenu(this._zoomMenu(i));
+    }
+
     menuSetVisibility(idx, show)
     {
         const dropdown = this._this.querySelector(`#eo_${idx}`);
         if( !dropdown ) return;
-        const m = this._optionsMenu(idx);
-        this._this.querySelector(`#bo_${idx}`).style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
+        const m = this._optionsMenu(idx), _bo = this._this.querySelector(`#bo_${idx}`);
+        _bo.style.transform = show ? 'scale(1,-1)' : 'scale(1,1)';
         if( !show ) return this._closeMenu(m);
-        this._cancelMenuClose(m.prefix);
-        this.closeCascade(dropdown);
-
-        // Position below the toggle button — #tb_N directly, not dropdown.offsetParent:
-        // dropdown still has display:none at this exact point
-        this._fillMenu(m);
-        const _boRect = this._this.querySelector(`#bo_${idx}`).getBoundingClientRect();
-        const _tb = this._this.querySelector(`#tb_${idx}`);
-        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
-        this.openMenu(dropdown, (_boRect.bottom - _parentRect.top) + 'px', (_boRect.left - _parentRect.left - 30) + 'px');
-        this.followAnchor(dropdown, this._this.querySelector(`#bo_${idx}`), () => this.menuSetVisibility(idx, false));
-        dropdown.focus();
+        // (below the toggle button)
+        const _r = _bo.getBoundingClientRect();
+        this._openMenuAt(m, { x: _r.left - 30, y: _r.bottom }, 'left', _bo);
         // (reopened soon after it was closed: with the submenu it had open)
         // (no room for the menu and a submenu beside its lines: the menu alone, read first)
         const _key = this._submenuToOpen('options', null);

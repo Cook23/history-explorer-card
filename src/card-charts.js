@@ -105,6 +105,8 @@ export class CardCharts
                 panX: (info) => this.onTimePan(info),
                 zoomX: (info) => this.onTimeZoom(info),
                 zoomSelectMode: this.state.zoomMode,
+                // (what the elastic box zooms: the magnifier's mode — setZoomBoxMode)
+                zoomBoxAxes: this.state.zoomBox,
                 legendClickEnabled: false,
                 // ylock: the Y axis can't be moved nor zoomed by hand (the padlock still works)
                 yAxisPanEnabled: !config?.ylock,
@@ -251,6 +253,8 @@ export class CardCharts
                 arrowColor: d.bColor,
                 arrowBackground: d.fillColor,
                 arrowPeriod: d.arrowPeriod,
+                // (its row's tooltip, as a curve's: Chart.js hecTooltip)
+                hecTooltip: d.tooltip,
                 data: [ ]
             }))
         };

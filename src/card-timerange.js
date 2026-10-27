@@ -4,6 +4,7 @@
 // history-explorer-card.js).
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
+import { paintMagnifier, ZOOM_BOX_MODES } from "./card-menus.js";
 const moment = window.HXLocal_moment;
 
 // Valid time ranges in hours
@@ -147,13 +148,31 @@ export class CardTimeRange
     _setZoomMode(on)
     {
         this.state.zoomMode = on;
-        for( const b of this.ui.zoomButton ) {
-            const _p = b?.querySelector('path');
-            if( _p ) _p.setAttribute('fill', on ? 'var(--success-color, #4caf50)' : 'var(--primary-text-color)');
-        }
+        this._paintMagnifiers();
         // (redrawn: a finger's drag is the box's in the mode — the canvas' touch-action)
         for( const g of this.graphs )
             if( g.chart ) { g.chart.options.zoomSelectMode = on; g.chart.render({ duration: 0, lazy: true }); }
+    }
+
+    // The magnifiers (#bz_N): their mode's symbol (state.zoomBox), green while the elastic
+    // box's mode is on
+    _paintMagnifiers()
+    {
+        for( const b of this.ui.zoomButton ) {
+            const _svg = b?.querySelector('svg');
+            if( _svg ) paintMagnifier(_svg, this.state.zoomBox, this.state.zoomMode ? 'var(--success-color, #4caf50)' : 'var(--primary-text-color)');
+        }
+    }
+
+    // The magnifier's mode — what the elastic box zooms: 'x' the time, 'y' the Y axes, 'xy'
+    // both (Chart.js zoomBoxAxes) —, chosen in its menu (save: kept, as the time range is) or
+    // restored (card-storage.js)
+    setZoomBoxMode(mode, save = true)
+    {
+        this.state.zoomBox = ZOOM_BOX_MODES.includes(mode) ? mode : 'xy';
+        this._paintMagnifiers();
+        for( const g of this.graphs ) if( g.chart ) g.chart.options.zoomBoxAxes = this.state.zoomBox;
+        if( save ) this.writeLocalState();
     }
 
     // The zoom buttons and the duration menu: where the window goes, applyTimeRange's rule

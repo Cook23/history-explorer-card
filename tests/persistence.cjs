@@ -188,6 +188,16 @@ module.exports = async function()
         await newDevice(); const r3 = await range();
         return r1 !== r0 && r2 === r1 && r3 === r1 ? true : [r0, r1, r2, r3].join(' → ');
     });
+    await t.step('the magnifier\'s mode, kept as the range is: chosen on this device (the Y axis), kept after a reload and on another device', async () => {
+        const mode = () => t.E('el.instance.state.zoomBox + "/" + graphAt(0).chart.options.zoomBoxAxes');
+        const m0 = await mode();
+        await t.E(`(()=>{ const r=el.querySelector('#bz_0'); r.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })); })()`); await t.wait(300);
+        await t.E(`el.querySelector('#ez_0_y').click()`); await t.wait(1500);
+        const m1 = await mode();
+        await reload(); const m2 = await mode();
+        await newDevice(); const m3 = await mode();
+        return m0 === 'xy/xy' && m1 === 'y/y' && m2 === 'y/y' && m3 === 'y/y' ? true : [m0, m1, m2, m3].join(' → ');
+    });
     await t.step('range: a change of defaultTimeRange in the YAML wins', async () => {
         await reload(YAML({ enable_multidevice_persistence: 'range', defaultTimeRange: '12' }));
         const r = await range();
