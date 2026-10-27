@@ -1720,31 +1720,25 @@ graphs:
 
 ### Configuring the tooltip popup
 
-The tooltip popups used in timelines and arrowlines support three different sizes: full, compact and slim. By default, the size is selected automatically depending on the available space around the graph. The size can be overridden manually:
+Every tooltip — a curve's, a bar's, a timeline's or an arrowline's — has the same layout. Its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown, its color box, its series' name and its value: a curve's or a bar's in its unit (`min / mean / max` for a column of values), a timeline's state, an arrowline's value.
 
-```yaml
-type: custom:history-explorer-card
-tooltip:
-  size: slim       # Supported sizes are full, compact, slim. Use auto for automatic size (this is the default).
-```
+`tooltip.size` is accepted, with no effect.
 
-The state color boxes in the tooltips can optionally be hidden for line graphs or timelines (or both):
+The color boxes in the tooltips can be hidden for timelines, or for every other graph (lines, bars, arrowlines), or both:
 
 ```yaml
 tooltip:
-  showColorsLine: false       # hide the color boxes in the tooltip popups for line graphs
-  showColorsTimeline: false   # hide the color boxes in the tooltip popups for timeline graphs
+  showColorsLine: false       # hide the color boxes in the tooltips of every graph but timelines
+  showColorsTimeline: false   # hide the color boxes in the tooltips of timelines
 ```
 
-The tooltips can optionally show the duration of the selected state next to the start and end times:
+The tooltip of a timeline's or an arrowline's state can show how long it lasted, after the time it covers:
 ```yaml
 tooltip:
   showDuration: true
 ```
 
-![image](https://user-images.githubusercontent.com/60828821/186550469-bec9bad3-c76e-4f9f-a1d7-a0b76ec2f51c.png)
-
-You can hide the entity name label on tooltips for line and bar charts to make it even more compact:
+The series' name can be hidden in every tooltip, to make it even more compact:
 ```yaml
 tooltip:
   showLabel: false

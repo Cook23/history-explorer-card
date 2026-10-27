@@ -54,26 +54,6 @@ export class CardCharts
         return isNaN(v) ? '' : '(' + formatNumber(v, rounding) + (unit ? ' ' + unit : '') + ')';
     }
 
-    generateTooltipContents(label, d, mode, n = 1)
-    {
-        if( this.pconfig.tooltipShowDuration ) {
-            let s = "";
-            let duration = moment(d[1]).diff(moment(d[0]));
-            if( duration >= 24*60*60*1000 ) {
-                const days = Math.floor(duration / (24*60*60*1000));
-                duration -= days * 24*60*60*1000;
-                s = ( days > 1 ) ? `${i18n('ui.ranges.n_days', days)}, ` : `${i18n('ui.ranges.day')}, `;
-            }
-            s += moment.utc(duration).format('HH:mm:ss');
-            label = `${label}  (for ${s})`;
-        }
-
-        if( mode == 'compact' || mode == 'slim' || ( mode == 'auto' && n < 2 ) )
-            return [label, moment(d[0]).format(this.i18n.styleDateTimeTooltip) + " -- " + moment(d[1]).format(this.i18n.styleDateTimeTooltip)];
-        else
-            return [label, moment(d[0]).format(this.i18n.styleDateTimeTooltip), moment(d[1]).format(this.i18n.styleDateTimeTooltip)];
-    }
-
     newGraph(canvas, graphtype, datasets, config)
     {
         // Any dataset drawn as a curve / as bars (a bar graph can hold both)
@@ -160,7 +140,7 @@ export class CardCharts
                 animation: {
                     duration: 0
                 },
-                tooltips: this._chartTooltips(graphtype, datasets, _hasCurves),
+                tooltips: this._chartTooltips(graphtype),
                 hover: {
                     // (mixed bar/line graph: see the hecMixed mode in deps/Chart.js)
                     mode: ( _hasCurves && _hasBars ) ? 'hecMixed' : 'nearest',
@@ -611,82 +591,79 @@ export class CardCharts
         }
     }
 
-    // The tooltip of a chart: a curve's value in its unit (circular ones in [0, period)), a
-    // timeline's state and its time span, an arrowline's value
-    _chartTooltips(graphtype, datasets, hasCurves)
+    // The tooltip of a chart — every type alike, as a curve's: its title, where its first
+    // element comes from and its time (_tooltipTitle); a line per element shown, its series'
+    // name (tooltip.showLabel) and its value (_tooltipValue). Colors: a timeline's as
+    // tooltip.showColorsTimeline says, every other's as tooltip.showColorsLine
+    _chartTooltips(graphtype)
     {
-        const tooltipSize = this.pconfig.tooltipSize;
         return {
             callbacks: {
                 label: (item, data) => {
-                    if( graphtype == 'line' || graphtype == 'bar' ) {
-                        let label = '';
-                        if( this.pconfig.tooltipShowLabel ) label = data.datasets[item.datasetIndex].name || '';
-                        if( label ) label += ': ';
-                        const _ds = data.datasets[item.datasetIndex];
-                        const _siFactor = _ds.siConversionFactor ?? 1;
-                        // (from the value drawn back to the value shown: see shownScale)
-                        const _tf = _ds.textFactor ?? 1;
-                        const _circQ = _ds.circularPeriod;
-                        const _shown = y => {
-                            if( _ds.stateMap?.length ) return stateLabel(_ds.stateMap, Math.round(y)) ?? '';
-                            const v = y / _siFactor * _tf;
-                            // (a circular curve shows its real value, in [0, period))
-                            return formatNumber(_circQ ? Chart.hecCircular.wrap(v, _circQ * Math.abs(_tf)) : v, _ds.rounding);
-                        };
-                        // (a column of values: their min, mean and max — see _lineSamples)
-                        const _p = _ds.data[item.index];
-                        label += _p?.columnFrom != null ? `${_shown(_p.columnMin)} / ${_shown(item.yLabel)} / ${_shown(_p.columnMax)}` : _shown(item.yLabel);
-                        label += ' ' + (data.datasets[item.datasetIndex].unit || '');
-                        return label;
-                    } else if( graphtype == 'timeline' ) {
-                        const dataset = data.datasets[item.datasetIndex];
-                        const d = dataset.data[item.index];
-                        let label = d[2];
-                        if( this.pconfig.tooltipStateTextMode == 'auto' )
-                            label = this.getLocalizedState(label, dataset.domain, dataset.device_class, dataset.entity_id);
-                        return this.generateTooltipContents(label, d, tooltipSize, datasets.length);
-                    } else if( graphtype == 'arrowline' ) {
-                        const d = data.datasets[item.datasetIndex].data[item.index];
-                        let label = formatNumber(d[2], data.datasets[item.datasetIndex].rounding);
-                        label += ' ' + (data.datasets[item.datasetIndex].unit || '');
-                        return this.generateTooltipContents(label, d, 'slim');
-                    }
+                    const _ds = data.datasets[item.datasetIndex];
+                    const _name = this.pconfig.tooltipShowLabel ? ( _ds.name || '' ) : '';
+                    return ( _name ? _name + ': ' : '' ) + this._tooltipValue(graphtype, _ds, item);
                 },
-                title: (tooltipItems, data) => {
-                    let title = '';
-                    if( tooltipItems.length > 0 ) {
-                        if( graphtype == 'line' || graphtype == 'bar' ) {
-                            const _ds = data.datasets[tooltipItems[0].datasetIndex];
-                            // (a curve: every dataset of a line graph, a bar graph's of type line)
-                            const _curve = graphtype == 'line' || _ds?.type === 'line';
-                            title = _curve ? this._pointTitle(_ds.data[tooltipItems[0].index], tooltipItems[0].xLabel) : tooltipItems[0].xLabel;
-                        } else {
-                            title = ( tooltipSize !== 'slim' ) ? ( data.datasets[tooltipItems[0].datasetIndex]?.name ?? '' ) : '';
-                        }
-                    }
-                    return title;
-                }
+                title: (items, data) => items.length ? this._tooltipTitle(data.datasets[items[0].datasetIndex]?.data[items[0].index], items[0].xLabel) : ''
             },
             yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
             caretPadding: 8,
-            displayColors: hasCurves ? this.pconfig.showTooltipColors[0] : ( graphtype == 'timeline' ) ? this.pconfig.showTooltipColors[1] : false
+            displayColors: this.pconfig.showTooltipColors[graphtype == 'timeline' ? 1 : 0]
         };
     }
 
-    // The first line of a curve's tooltip: where its point comes from — the history or the
-    // statistics, and their period (5 min, 1 h) — and its time: a column of values, the time they cover (its end's date
-    // only when it's another day); a value, its own (xLabel)
-    _pointTitle(p, xLabel)
+    // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
+    // [0, period); a column of values: their min / mean / max — see _lineSamples), a
+    // timeline's state (named as Home Assistant names it: tooltip.stateTextMode auto), an
+    // arrowline's value in its unit
+    _tooltipValue(graphtype, ds, item)
     {
-        if( !p || typeof p !== 'object' || p.x === undefined ) return xLabel;
+        const _unit = ' ' + ( ds.unit || '' );
+        if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
+            const _state = ds.data[item.index][2];
+            if( graphtype == 'arrowline' ) return formatNumber(_state, ds.rounding) + _unit;
+            return this.pconfig.tooltipStateTextMode == 'auto' ? this.getLocalizedState(_state, ds.domain, ds.device_class, ds.entity_id) : _state;
+        }
+        const _siFactor = ds.siConversionFactor ?? 1;
+        // (from the value drawn back to the value shown: see shownScale)
+        const _tf = ds.textFactor ?? 1;
+        const _circQ = ds.circularPeriod;
+        const _shown = y => {
+            if( ds.stateMap?.length ) return stateLabel(ds.stateMap, Math.round(y)) ?? '';
+            const v = y / _siFactor * _tf;
+            // (a circular curve shows its real value, in [0, period))
+            return formatNumber(_circQ ? Chart.hecCircular.wrap(v, _circQ * Math.abs(_tf)) : v, ds.rounding);
+        };
+        const _p = ds.data[item.index];
+        return ( _p?.columnMin != null ? `${_shown(_p.columnMin)} / ${_shown(item.yLabel)} / ${_shown(_p.columnMax)}` : _shown(item.yLabel) ) + _unit;
+    }
+
+    // A tooltip's title: where its first element comes from — the history, or the statistics
+    // and their period (5 min, 1 h) — and its time: a value's own (xLabel); the time a column
+    // of values, a bar, a timeline's or arrowline's state covers (its end's date only when
+    // it's another day) — a state's duration after it with tooltip.showDuration
+    _tooltipTitle(p, xLabel)
+    {
+        // (a timeline's or arrowline's state: [start, end, state], from the history)
+        const _state = Array.isArray(p);
+        if( _state ) p = { columnFrom: moment(p[0]).valueOf(), columnTo: moment(p[1]).valueOf() };
+        if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return xLabel;
         // (statistics: their period too — 5 min, 1 h)
         const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : moment.duration(ms).humanize();
         const _source = p.statistics ? `${i18n('ui.label.source_statistics')}${p.statisticsPeriod ? ' ' + _period(p.statisticsPeriod) : ''}` : i18n('ui.label.source_history');
         const _sep = i18n('ui.label.source_separator');
         if( p.columnFrom == null ) return `${_source}${_sep}${xLabel}`;
         const _fmt = this.i18n.styleDateTimeTooltip, _from = moment(p.columnFrom), _to = moment(p.columnTo);
-        return `${_source}${_sep}${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}`;
+        const _duration = _state && this.pconfig.tooltipShowDuration ? ` (${this._durationText(p.columnTo - p.columnFrom)})` : '';
+        return `${_source}${_sep}${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}${_duration}`;
+    }
+
+    // A duration as a tooltip shows it: its days (1 day, 2 days…), then hh:mm:ss
+    _durationText(ms)
+    {
+        const _days = Math.floor(ms / 86400e3);
+        const _rest = moment.utc(ms - _days * 86400e3).format('HH:mm:ss');
+        return _days ? `${_days > 1 ? i18n('ui.ranges.n_days', _days) : i18n('ui.ranges.day')}, ${_rest}` : _rest;
     }
 
     // Graph g's top control (Chart.js hecTopControl): its bar interval selector, placed by

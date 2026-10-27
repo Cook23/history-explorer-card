@@ -334,7 +334,7 @@ cursor:
 
 # Configuration related to the tooltip displaying
 tooltip:
-  # Whether to show the colours of each data series in the tool tip on line graphs
+  # Whether to show the colours of each data series in the tool tip on every graph but timelines
   # (Can also be set with $.showTooltipColorsLine)
   showColorsLine: True
   
@@ -342,15 +342,15 @@ tooltip:
   # (Can also be set with $.showTooltipColorsTimeline)
   showColorsTimeline: True
 
-  # The size of the tooltip to display. Can also be set to: 'full', 'slim', 'compact'
+  # Accepted, no effect (every tooltip has the same layout)
   # (Can also be set with $.tooltipSize)
   size: "auto"
 
-  # Whether to show the duration of the given state on the tooltip for timeline graphs
+  # Whether to show how long a timeline's or arrowline's state lasted, after its time span in the tooltip's title
   # (Can also be set with $.tooltipShowDuration)
   showDuration: False
 
-  # Whether to show the name of the data series on the tooltip (for line and bar graphs)
+  # Whether to show the name of the data series on the tooltip, before its value
   showLabel: True
 
   # Similar to $.stateTextMode config, but for the tooltip, defaults to matching $.stateTextMode, or auto
