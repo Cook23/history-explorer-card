@@ -4775,9 +4775,9 @@
                 }
               }
               // else: below threshold (or hover disabled) — leave me.active untouched
-              // (fork) hover.dotOnHover: a hover outside the tooltip mode shows the dot of
-              // the value it's on (_hecUpdateHoverDot)
-              if (hoverOptions.dotOnHover) me._hecUpdateHoverDot(!me._hecTooltipMode && _inPlot && !(e.native && e.native.buttons) ? e : null);
+              // (fork) hover.dotOnHover: a hover shows the dot of the value nearest it, on the
+              // curve it's on — except the tooltip's own point (_hecUpdateHoverDot)
+              if (hoverOptions.dotOnHover) me._hecUpdateHoverDot(_inPlot && !(e.native && e.native.buttons) ? e : null);
             }
             // (fork) a hover over a text shortened or hidden shows it in full (_hecUpdateReveal)
             if (e.type === 'mousemove') me._hecUpdateReveal(!(e.native && e.native.buttons) ? e : null);
