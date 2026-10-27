@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [v1.2.41] - 2026-10-27
+## [v1.2.42] - 2026-10-27
 
 ### Changed — the architecture: one rule, one place
 - Values that wrap around (angles): one rule for the card and for Chart.js, `Chart.hecCircular` (Chart Custom.js.md §1) — `wrap` (a value in [0, period): the tooltip, the values over the graph, the Y axis' labels), `place` (continuous, around the window shown's mean, or in one turn; what is loaded around the window in the same turn), `jumps` (a jump across a turn's edge). The card places a circular entity's samples with it before grouping them by column; the plugin `hecCircularView` places them again around a Y range set by hand. Before, the rule was written twice (the card's `_unwrapCircular`, the plugin) and the wrap four times
