@@ -176,9 +176,12 @@ Three pairs of notions, never mixed. Mixing them caused regressions (see below).
      - else the nearest must win clearly: the gap between their distances must be at least
        ⅓ of the distance between their places;
      - else the pointer is about halfway, and nothing is kept (`PICK_BETWEEN`).
-- Nearest (no limit) is used only for the hover dot's point. Its curve is picked
-  nearest-smart; then the dot goes on that curve's point nearest the pointer in X and Y,
-  however far (`_hecNearestPointOf`).
+- Nearest on the curve ("le plus proche sur la courbe", no limit) is used only for the hover
+  dot's point. Its curve is picked nearest-smart; then, from the place of that curve's line
+  nearest the pointer, following the line as drawn (straight, in steps, a B-spline's arcs),
+  the dot goes on the value at the least length either way — the first one met on either side
+  (`_hecNearestOnCurve`). It is not the nearest as the crow flies: on a stepped curve's
+  plateau, the next value can be nearer in X and Y but further along the line.
 
 **X and Y, or X only.**
 - The tooltip's first point is the point pointed at, nearest-smart in X and Y

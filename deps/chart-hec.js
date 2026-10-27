@@ -77,6 +77,18 @@
     return path;
   }
 
+  // The piece of a line drawn from pts[k - 1] to pts[k] (their _view), as a few straight
+  // pieces: straight, in steps for a stepped line (st: its steppedLine), or a B-spline's arc
+  // (_hecBsplinePath)
+  function _hecDrawnPiece(pts, k, st) {
+    var a = pts[k - 1], b = pts[k];
+    return b.hecBspline ? _hecBsplinePath(pts, k)
+      : !st ? [a, b]
+      : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
+      : st === 'after' ? [a, { x: a.x, y: b.y }, b]
+      : [a, { x: b.x, y: a.y }, b];
+  }
+
   // The point of the segment (ax, ay)-(bx, by) nearest (px, py): { d, x, y }
   function _hecSegmentNearest(px, py, ax, ay, bx, by) {
     var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
@@ -2178,8 +2190,7 @@
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
     // each shown line's point nearest it, along its drawn path (within the picking margin and
-    // the line's half width) — its points joined
-    // straight, in steps for a stepped line, or a B-spline's arcs (_hecBsplinePath); -1, or
+    // the line's half width) — its points joined as drawn (_hecDrawnPiece); -1, or
     // PICK_BETWEEN about halfway between two. Two curves drawn on top of each other there:
     // the one drawn over (the first). only(i): the curves taken into account, all by default
     _hecCurveAt: function (px, py, only) {
@@ -2196,11 +2207,7 @@
           var a = pts[k - 1], b = pts[k];
           // (only the segments around the point can be near it)
           if (Math.max(a.x, b.x) < px - _m || Math.min(a.x, b.x) > px + _m) continue;
-          var path = b.hecBspline ? _hecBsplinePath(pts, k)
-            : !st ? [a, b]
-            : st === 'middle' ? [a, { x: (a.x + b.x) / 2, y: a.y }, { x: (a.x + b.x) / 2, y: b.y }, b]
-            : st === 'after' ? [a, { x: a.x, y: b.y }, b]
-            : [a, { x: b.x, y: a.y }, b];
+          var path = _hecDrawnPiece(pts, k, st);
           for (var j = 1; j < path.length; j++) {
             var n = _hecSegmentNearest(px, py, path[j - 1].x, path[j - 1].y, path[j].x, path[j].y);
             n.size = _hw;
@@ -2229,6 +2236,42 @@
       });
       var _i = _hecPickNearest(_cands);
       return _i >= 0 ? _els[_i] : null;
+    },
+
+    // Curve i's value nearest the point (px, py) on the curve — "the nearest on the curve":
+    // from the place of its drawn path nearest the point, along that path as drawn
+    // (_hecDrawnPiece), the value at the least length either way — the first one met on
+    // either side —; only values drawn on the plot area, never a curve-shaping point; null
+    // without any. (A B-spline's value, its arc's control point off the path, stands where
+    // its arc passes nearest it: the arc's middle.) The hover dot's value
+    _hecNearestOnCurve: function (i, px, py) {
+      var me = this, ds = me.data.datasets[i];
+      var els = (me.getDatasetMeta(i).data || []).filter(function (p) { return p._view && !p._view.skip; });
+      var pts = els.map(function (p) { return p._view; });
+      if (!pts.length) return null;
+      // (pos[k]: value k's place along the path, as a length from its start; at: the point's)
+      var pos = [0], len = 0, best = null, st = ds.steppedLine;
+      for (var k = 1; k < pts.length; k++) {
+        var path = _hecDrawnPiece(pts, k, st), start = len;
+        for (var j = 1; j < path.length; j++) {
+          var a = path[j - 1], b = path[j];
+          var n = _hecSegmentNearest(px, py, a.x, a.y, b.x, b.y);
+          if (!best || n.d < best.d) best = { d: n.d, at: len + Math.sqrt((n.x - a.x) * (n.x - a.x) + (n.y - a.y) * (n.y - a.y)) };
+          len += Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+          // (a B-spline's arc from somewhere else than its value: the value at the arc's middle)
+          if (j === 2 && pts[k].hecBspline && (path[0].x !== pts[k - 1].x || path[0].y !== pts[k - 1].y)) pos[k - 1] = len;
+        }
+        if (pos[k - 1] === undefined) pos[k - 1] = start;
+        pos[k] = len;
+      }
+      var A = me.chartArea, _best = null, _d = Infinity;
+      els.forEach(function (el, k) {
+        var v = el._view;
+        if (v.hecVirtual || (A && (v.x < A.left || v.x > A.right || v.y < A.top || v.y > A.bottom))) return;
+        var d = Math.abs(pos[k] - (best ? best.at : 0));
+        if (d < _d) { _d = d; _best = el; }
+      });
+      return _best;
     },
 
     // Curve i's value drawn on the plot area nearest the point (x, y), in X and Y (never a
@@ -3189,14 +3232,14 @@
     // The value a hover — or a click, for a pointer without hover — shows the dot of
     // (hecHoverDot), a discreet guide to where the real values are: the curve the pointer is
     // on, by the picking rule (_hecCurveAt, along its drawn path), and its value nearest the
-    // pointer in X and Y, however far (_hecNearestPointOf); none on the tooltip's own point
+    // pointer on the curve, however far (_hecNearestOnCurve); none on the tooltip's own point
     // (drawn larger, me.active), on a curve showing its points, or between two curves — e
     // null: none
     _hecUpdateHoverDot: function (e) {
       var me = this, el = null;
       if (e && e.x !== null && e.y !== null && !me._hecShowSamples) {
         var _i = me._hecCurveAt(e.x, e.y);
-        if (_i >= 0 && !(me.data.datasets[_i].pointRadius > 0)) el = me._hecNearestPointOf(_i, e.x, e.y);
+        if (_i >= 0 && !(me.data.datasets[_i].pointRadius > 0)) el = me._hecNearestOnCurve(_i, e.x, e.y);
         if (el && (me.active || []).indexOf(el) >= 0) el = null;
       }
       if (el === (me._hecHoverDot || null)) return;

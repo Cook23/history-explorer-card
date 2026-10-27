@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.46] - 2026-10-27
+
+### Changed — the hover dot: the value nearest on the curve
+- The hover dot, on the curve picked as before, goes on its value nearest the pointer on the curve: from the place of its line nearest the pointer, following the line as drawn (straight, in steps, a B-spline's arcs), the value at the least length either way — the first one met on either side —, no longer the value nearest as the crow flies (in X and Y): it stays on the stretch of line pointed at — on a stepped curve's plateau, the plateau's value, even where the next one is nearer in X and Y beyond the step (Chart.js `_hecNearestOnCurve`; the line's pieces as drawn shared with `_hecCurveAt`: `_hecDrawnPiece`). The tooltip's first point unchanged: the point pointed at, in X and Y
+- README, README_Full, Chart Custom.js.md, CLAUDE.md: the hover dot's value
+- Test (`points`): a stepped curve, on a plateau where the next value is nearer as the crow flies but further along the line — the dot on the plateau's value (fails with the value nearest in X and Y)
+
 ## [v1.2.45] - 2026-10-27
 
 ### Changed — the tooltip's side
