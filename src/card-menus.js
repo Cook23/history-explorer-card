@@ -238,7 +238,7 @@ export class CardMenus
     }
 
     // Menu m listened to: the arrows, Enter or → on a line (its submenu), Escape (closed);
-    // closed once the focus has left it and its submenus open. Its submenus: see _listenBox
+    // closed once the focus has left it and its submenus open. Its submenus: see listenCascadeBox
     _listenMenu(m)
     {
         const _el = m.el();
@@ -520,9 +520,9 @@ export class CardMenus
     }
 
     // --------------------------------------------------------------------------------------
-    // The type menu: Display ▸, Appearance ▸, Interpolation ▸, Layout ▸, Info, Tests ▸ — and,
-    // for a graph, Display ▸, Appearance ▸ and Interpolation ▸ of all its curves, and
-    // Layout ▸ (its Y axis lock, merge back, cut, delete)
+    // The type menu: Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸, Info, Tests ▸ —
+    // for a graph, the same sections over all its curves, Behavior ▸ holding its Y axis
+    // lock, merge back, cut and delete
     // --------------------------------------------------------------------------------------
 
     _typeMenu(i)
@@ -583,45 +583,22 @@ export class CardMenus
     // panel's Type ('panel', under it, align). Opens with its representation submenu.
     showEntityTypeMenu(input_idx, entity_id, graph, { from, clientX = null, clientY = null, align = 'left' })
     {
-        const _menu = this._this.querySelector(`#et_${input_idx}`);
+        if( !this._this.querySelector(`#et_${input_idx}`) ) return;
+        // Where it opens: at the label's point, else under the field it belongs to (align)
         const _input = this.ui.inputField[input_idx];
-        if( !_menu ) return;
-        this._cancelMenuClose(`et_${input_idx}`);
-        // The context, for the menu's choices — entity_id a string (an entity shown, or a new
-        // one) or an array (new entities from a wildcard match)
-        _menu._menuEntityId = entity_id;
-        _menu._menuGraphId  = graph ? graph.id : null;
-        _menu._menuKey      = graph ? keyOf(graph.entities.find(e => e.entity === entity_id) ?? entity_id) : null;
-        _menu._menuForGraph = false;
-        _menu._menuFrom     = from;
-        _menu._menuAnchor   = { clientX, clientY };
-        const m = this._typeMenu(input_idx);
-        this.closeCascade(_menu);
-        this._fillMenu(m);
-
-        // Position — #tb_N directly, not _menu.offsetParent — offsetParent of a display:none
-        // element is always null, and _menu still has display:none at this exact point
-        // (before openMenu turns it on). #tb_N is already known to be the real positioned
-        // ancestor (see its position:relative in the HTML), no need to read it back off an
-        // element that isn't shown yet.
-        const _tb = this._menuParent(input_idx);
-        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
-        let _top, _left;
-        if( from === 'label' ) {
-            _top  = (clientY - _parentRect.top)  + 'px';
-            _left = (clientX - _parentRect.left) + 'px';
-        } else if( _input ) {
-            const _inputRect = _input.getBoundingClientRect();
-            _top = (_inputRect.bottom - _parentRect.top) + 'px';
-            const _anchorX = align === 'center' ? (_inputRect.left + _inputRect.width / 2)
-                            : align === 'right'  ? _inputRect.right
-                            : _inputRect.left + 30;
-            _left = (_anchorX - _parentRect.left) + 'px';
+        let _at = null;
+        if( from === 'label' ) _at = { x: clientX, y: clientY };
+        else if( _input ) {
+            const _r = _input.getBoundingClientRect();
+            _at = { x: align === 'center' ? _r.left + _r.width / 2 : align === 'right' ? _r.right : _r.left + 30, y: _r.bottom };
         }
-        this.openMenu(_menu, _top, _left, align);
-        // (kept on what it was opened from — the label of its graph, or the field it's under)
-        this.followAnchor(_menu, from === 'label' ? graph?.canvas?.parentNode : _input, () => this.hideEntityTypeMenu(input_idx));
-        this._openRememberedSubmenu(input_idx, 'rep');
+        // (entity_id a string — an entity shown, or a new one — or an array: new entities from
+        // a wildcard match)
+        this._openTypeMenu(input_idx, {
+            entityId: entity_id, graphId: graph ? graph.id : null,
+            key: graph ? keyOf(graph.entities.find(e => e.entity === entity_id) ?? entity_id) : null,
+            forGraph: false, from, anchor: { clientX, clientY },
+        }, _at, align, from === 'label' ? graph?.canvas?.parentNode : _input, 'rep');
     }
 
     // The same menu for a graph — from a long-press (or a right click) on its lock+handle
@@ -631,25 +608,38 @@ export class CardMenus
     // axis lock, merge back, cut, delete). Opens with its representation submenu.
     showGraphMenu(input_idx, graph, clientX, clientY)
     {
-        const _menu = this._this.querySelector(`#et_${input_idx}`);
         // (the info panel's menu has no graph menu: its one graph is its entity's)
-        if( !_menu || !this._this.querySelector(`#et_${input_idx}_tests_sub`) ) return;
+        if( !this._this.querySelector(`#et_${input_idx}`) || !this._this.querySelector(`#et_${input_idx}_tests_sub`) ) return;
+        this._openTypeMenu(input_idx, {
+            entityId: null, graphId: graph.id, key: keyOf(graph.entities[0]),
+            forGraph: true, from: 'graph', anchor: { clientX, clientY },
+        }, { x: clientX, y: clientY }, 'left', graph.canvas?.parentNode,
+           graph.entities.every(e => this.isNumericEntity(e.entity)) ? 'rep' : 'behavior');
+    }
+
+    // Type menu input_idx opened for ctx (what its choices act on), at the page point `at`
+    // ({ x, y }; null: where it is), kept on anchorEl, its submenu `sub` opened if remembered
+    _openTypeMenu(input_idx, ctx, at, align, anchorEl, sub)
+    {
+        const _menu = this._this.querySelector(`#et_${input_idx}`);
         this._cancelMenuClose(`et_${input_idx}`);
-        _menu._menuEntityId = null;
-        _menu._menuGraphId  = graph.id;
-        _menu._menuKey      = keyOf(graph.entities[0]);
-        _menu._menuForGraph = true;
-        _menu._menuFrom     = 'graph';
-        _menu._menuAnchor   = { clientX, clientY };
+        _menu._menuEntityId = ctx.entityId;
+        _menu._menuGraphId  = ctx.graphId;
+        _menu._menuKey      = ctx.key;
+        _menu._menuForGraph = ctx.forGraph;
+        _menu._menuFrom     = ctx.from;
+        _menu._menuAnchor   = ctx.anchor;
         const m = this._typeMenu(input_idx);
         this.closeCascade(_menu);
         this._fillMenu(m);
 
+        // Position — relative to #tb_N (_menuParent) directly, not _menu.offsetParent: that of
+        // a display:none element is always null, and _menu is still hidden here (openMenu shows it)
         const _tb = this._menuParent(input_idx);
-        const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
-        this.openMenu(_menu, (clientY - _parentRect.top) + 'px', (clientX - _parentRect.left) + 'px');
-        this.followAnchor(_menu, graph.canvas?.parentNode, () => this.hideEntityTypeMenu(input_idx));
-        this._openRememberedSubmenu(input_idx, graph.entities.every(e => this.isNumericEntity(e.entity)) ? 'rep' : 'behavior');
+        const _p = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
+        this.openMenu(_menu, at ? (at.y - _p.top) + 'px' : undefined, at ? (at.x - _p.left) + 'px' : undefined, align);
+        this.followAnchor(_menu, anchorEl, () => this.hideEntityTypeMenu(input_idx));
+        this._openRememberedSubmenu(input_idx, sub);
     }
 
     // The type menu's lines, as its entity — or its graph — is now: its title, then each
@@ -1001,12 +991,6 @@ export class CardMenus
         this._menuChosen(m);
     }
 
-    // (the type menu's: its entity's, or its graph's)
-    entityInterpolationClicked(input_idx, algo)
-    {
-        this._interpolationChosen(this._typeMenu(input_idx), algo);
-    }
-
     // Behavior: the tooltip's mode of the curves (value), or the Y axes locked or released
     // (a switch, as a click on the padlock: all the graphs locked, unless they all are) — the
     // menu showing it a moment —; the entity taken out into its own graph (as a double-click
@@ -1042,12 +1026,6 @@ export class CardMenus
         else this.deleteCurve(_g, _idx);
     }
 
-    // (the type menu's: its entity's, or its graph's)
-    entityLayoutClicked(input_idx, action, value)
-    {
-        this._behaviorChosen(this._typeMenu(input_idx), action, value);
-    }
-
     // A display type chosen: menu m's entity — or its graph's, the card's — shown so, the
     // menu showing it a moment; for an entity being added, added so, the menu closed at once
     // (its work done: a second choice would add it again)
@@ -1066,12 +1044,6 @@ export class CardMenus
         if( kind === 'graph' || kind === 'card' ) for( const { g } of pairs ) this.setGraphType(g, type, lineMode);
         else if( pairs.length && pairs[0].entities.length ) this.setCurveType(pairs[0].g, pairs[0].g.entities.indexOf(pairs[0].entities[0]), type, lineMode);
         this._menuChosen(m);
-    }
-
-    // (the type menu's: its entity's, or its graph's)
-    entityTypeMenuClicked(input_idx, type, lineMode)
-    {
-        this._typeChosen(this._typeMenu(input_idx), type, lineMode);
     }
 
     // --------------------------------------------------------------------------------------
@@ -1176,7 +1148,7 @@ export class CardMenus
     // --------------------------------------------------------------------------------------
 
     // Shared keyboard navigation for any open floating menu (entity selector dropdown,
-    // entity type menu, export menu) — Escape closes, ArrowUp/ArrowDown move the highlight,
+    // entity type menu, options menu) — Escape closes, ArrowUp/ArrowDown move the highlight,
     // Enter activates the highlighted item (or the first visible one). This is purely menu
     // navigation, the same regardless of what the menu actually contains — any
     // menu-specific business logic (e.g. the entity selector's wildcard/multi-select/
@@ -1242,8 +1214,8 @@ export class CardMenus
     // Menu navigation and the entities they act on
     // --------------------------------------------------------------------------------------
 
-    // Generic menu-opening action, shared by all 3 menus (entity selector dropdown, entity
-    // type menu, export menu): makes the menu visible, applies the position its caller
+    // Generic menu-opening action, shared by the menus (entity selector dropdown, entity
+    // type menu, options menu): makes the menu visible, applies the position its caller
     // already computed (each menu's own placement logic — above/below, anchored to a
     // button or an input, or at pointer coordinates — stays with the caller, since that
     // part genuinely differs), clears any leftover navigation highlight (background only)
@@ -1382,7 +1354,7 @@ export class CardMenus
     _navigateMenuArrowKey(visible, key)
     {
         // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity type menu
-        // (et_N), the entity selector dropdown (es_N), and the export menu (eo_N) — moves
+        // (et_N), the entity selector dropdown (es_N), and the options menu (eo_N) — moves
         // the highlighted <a> to the next/previous visible item, wrapping at either end.
         // Only ever touches the navigation highlight (background + selected marker) —
         // never fontWeight, which is menu-specific business state (e.g. the entity type

@@ -13,7 +13,7 @@ const moment = window.HXLocal_moment;
 
 // The Y axes of a line or bar graph: on the left (Chart.js's own first Y axis), and on the
 // right for a second group of units (see _assignYAxes)
-export const LEFT_Y_AXIS = 'y-axis-0';
+const LEFT_Y_AXIS = 'y-axis-0';
 export const RIGHT_Y_AXIS = 'y-axis-1';
 // A card narrower than this (px) is narrow: its graphs' Y labels inside their plot (see
 // _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
@@ -91,7 +91,7 @@ export class CardCharts
             options: {
                 // Static (YAML) graphs have draggable legend/timeline labels too: their
                 // curves can be split (double-click) and dropped onto another graph — see
-                // _dropCompatibility.
+                // curveMoveRefusal.
                 cursorEnabled: true,
                 // Chart.js's floating tooltips stay within the card (see Chart.hecUi.clampToViewport)
                 floatingBoundsSelector: '#maincard',
@@ -174,11 +174,9 @@ export class CardCharts
                     activateOnContact: true,
                     // (outside the tooltip mode, a hover on a value shows its dot)
                     dotOnHover: true,
-                    // Default is 400ms — was likely relied on as a rough anti-flicker delay
-                    // before handleEvent's own move-threshold existed; that threshold is now
-                    // what actually prevents flicker, so this generic delay is just latency
-                    // with no remaining purpose. Also governs hover style updates (point/line
-                    // highlighting), not just the tooltip.
+                    // No delay (Chart.js's default is 400ms): handleEvent's move-threshold is
+                    // what prevents flicker, a delay would only add latency. Also governs hover
+                    // style updates (point/line highlighting), not just the tooltip.
                     animationDuration: 0
                 },
                 legend: {

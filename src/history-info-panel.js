@@ -3,6 +3,7 @@ import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, st
 import { HistoryCardState } from "./history-explorer-card";
 import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure, baseTypePure } from "./card-config.js";
 import { typeMenuHtml } from "./card-menus.js";
+import { timeButtonsHtml, rangeControlsHtml } from "./card-toolbar.js";
 import { i18n } from "./languages.js";
 import { infoPanelData, fetchInfoPanelData, takeInfoLook } from "./card-storage.js";
 
@@ -109,7 +110,7 @@ function hxHookInfoPanel()
         // Not persisted (this panel has nothing to save) — same pconfig.entities shape as
         // history-explorer-card, just never written to storage. addGraph computes color,
         // fill, lineMode, scale, process, etc. itself (via its own getEntityOptions call)
-        // and writes them into this same entry — it's now the single source for entity
+        // and writes them into this same entry — the single source for entity
         // data, no separate copy. width is set explicitly here: this panel's default
         // (1.001) differs from the main card's (pconfig.defaultLineWidth, 2.0). lineWidth
         // is accepted as a synonym of width, same as the main card.
@@ -139,6 +140,11 @@ function hxHookInfoPanel()
 
         // (always on a small screen: its curve's tooltip as smallScreenTooltip says)
         instance.infoPanel = true;
+
+        // (the toolbar's buttons and range selector: the card's markup)
+        const _dl = instance._this.querySelector('#dl_0'), _dr = instance._this.querySelector('#dr_0');
+        if( _dl ) _dl.innerHTML = timeButtonsHtml(0);
+        if( _dr ) _dr.innerHTML = rangeControlsHtml(0, 'style="color:var(--primary-text-color);background-color:var(--card-background-color)"', hec_panel?.config?.uiLayout?.invertZoom === true);
 
         instance.insertUIHtmlText(0);
 
@@ -281,13 +287,8 @@ function hxHookInfoPanel()
         const _state = this.hass.states[entity_id]?.state;
         const _isNumeric = _state !== undefined && _state !== null && !isNaN(Number(_state));
 
-        const optColor = 'var(--primary-text-color)';
-        const optBack = 'var(--card-background-color)';
-
         const bgcol = buttonsColor(hec_panel?.config?.uiColors);
         const tools = hec_panel?.config?.uiLayout?.toolbar != 'hide';
-        const invertZoom = hec_panel?.config?.uiLayout?.invertZoom === true;
-        const interval = hec_panel?.config?.uiLayout?.interval != 'hide';
 
         if( hec_panel.entity !== this.entityId ) {
             hec_panel.entity = this.entityId;
@@ -297,57 +298,21 @@ function hxHookInfoPanel()
 
         const i = 0;
 
-        // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C
-        // !! Keep in sync with addUIHtml() in card-toolbar.js !!
+        // The toolbar: the card's (its time buttons and zoom controls filled in by
+        // _injectHistoryExplorer — this template renders no HTML string)
         if( tools ) {
 
             return html`
                 <div id="maincard" style="display:${(hec_panel.show === false) ? 'none' : 'block'};margin-bottom: 16px">
                 <div id="tb_${i}" style="position:relative;margin-left:0px;width:100%;min-height:30px;margin-bottom:10px;display:flex;align-items:center;line-height:normal;">
-                    <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">
-                        <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
-                        <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
-                        <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
-                    </div>
+                    <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;"></div>
                     <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;">
                     ${_isNumeric ? html`
                         <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
                         <div id="etw_${i}" style="display:contents"></div>
                     ` : ''}
                     </div>
-                    <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;">
-                        <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
-                        <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
-                        <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px">
-                            <option value="0" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="1" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="2" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="3" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="4" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="5" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="6" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="7" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="8" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="9" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="10" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="11" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="12" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="24" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="48" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="72" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="96" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="120" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="144" style="color:${optColor};background-color:${optBack}" hidden></option>
-                            <option value="168" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="336" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="504" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="720" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="2184" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="4368" style="color:${optColor};background-color:${optBack}"></option>
-                            <option value="8760" style="color:${optColor};background-color:${optBack}"></option>
-                        </select>
-                        <button id="b${invertZoom ? 4 : 5}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">+</button>
-                    </div>
+                    <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;"></div>
                 </div>
                 <div id='graphlist' style="margin-left:-2px;margin-right:-10px">
                 </div>

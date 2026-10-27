@@ -53,8 +53,15 @@ export class CardTimeRange
     // time; set before the graphs are first built, so their time axis has it from the start
     setPresentWindow()
     {
-        this.endTime = this.presentTime().format('YYYY-MM-DDTHH:mm:ss');
-        this.startTime = moment(this.endTime).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute").format('YYYY-MM-DDTHH:mm:ss');
+        const t1 = this.presentTime().startOf('second');
+        this._setWindow(moment(t1).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute"), t1);
+    }
+
+    // The window set from t0 to t1 (to the second), then settled (_settleWindow)
+    _setWindow(t0, t1)
+    {
+        this.startTime = moment(t0).format('YYYY-MM-DDTHH:mm:ss');
+        this.endTime = moment(t1).format('YYYY-MM-DDTHH:mm:ss');
         this._settleWindow();
     }
 
@@ -79,11 +86,6 @@ export class CardTimeRange
         this.today(false);
     }
 
-    todayReset()
-    {
-        this.today(true);
-    }
-
     // The window starting at the start of day (YYYY-MM-DD, the calendar — openCalendar), as
     // the toolbar's date shows it, the range kept; reaching the present, real time
     showDay(day)
@@ -103,28 +105,15 @@ export class CardTimeRange
         this.writeLocalState();
     }
 
-    subDay()
+    // The toolbar's '<' (dir -1) and '>' (dir 1): the window a day — a month from a month's
+    // range — before or after, from the start of its day, a day long at least
+    stepDay(dir)
     {
         if( this.activeRange.timeRangeHours < 24 ) this.applyTimeRange(24, false);
 
-        let t0 = moment(this.startTime).subtract(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
-        let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
-        this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
-        this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
-        this._settleWindow();
-
-        this.updateHistory();
-    }
-
-    addDay()
-    {
-        if( this.activeRange.timeRangeHours < 24 ) this.applyTimeRange(24, false);
-
-        let t0 = moment(this.startTime).add(1, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
-        let t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
-        this.startTime = t0.format("YYYY-MM-DD") + "T00:00:00";
-        this.endTime = t1.format("YYYY-MM-DD") + "T00:00:00";
-        this._settleWindow();
+        const t0 = moment(this.startTime).add(dir, ( this.activeRange.timeRangeHours < 720 ) ? "day" : "month");
+        const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
+        this._setWindow(t0.startOf('day'), t1.startOf('day'));
 
         this.updateHistory();
     }
@@ -326,26 +315,35 @@ export class CardTimeRange
     // t_position along it, else where _rangeAnchor keeps it
     applyTimeRange(range, update, t_center = null, t_position = 0.5)
     {
+        range = Math.max(range, 1);
+        this._applyRange(range, 0, range, update, t_center, t_position);
+    }
+
+    // (as applyTimeRange)
+    applyTimeRangeMinutes(range, update, t_center = null, t_position = 0.5)
+    {
+        this._applyRange(0, Math.max(range, 1), "0", update, t_center, t_position);
+    }
+
+    // The range of `hours` and `minutes` set, the range selectors showing `selected`
+    _applyRange(hours, minutes, selected, update, t_center, t_position)
+    {
         if( update && !t_center ) [t_center, t_position] = this._rangeAnchor();
 
         t_position = Math.min(Math.max(t_position, 0.0), 1.0);
 
-        range = Math.max(range, 1);
-
-        this.activeRange.timeRangeHours = range;
-        this.activeRange.timeRangeMinutes = 0;
+        this.activeRange.timeRangeHours = hours;
+        this.activeRange.timeRangeMinutes = minutes;
 
         this.setStepSize(!update, this._this.querySelector('#tb_0')?.clientWidth || null);
 
-        for( let i of this.ui.rangeSelector ) if( i ) i.value = range;
+        for( let i of this.ui.rangeSelector ) if( i ) i.value = selected;
 
         if( update ) {
 
-            let t1 = moment(t_center).add(this.activeRange.timeRangeHours * (1.0 - t_position), "hour");
-            let t0 = moment(t1).subtract(this.activeRange.timeRangeHours, "hour");
-            this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-            this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-            this._settleWindow();
+            const _unit = hours ? "hour" : "minute", _length = hours || minutes;
+            const t1 = moment(t_center).add(_length * (1.0 - t_position), _unit);
+            this._setWindow(moment(t1).subtract(_length, _unit), t1);
 
             this.applyTimeAxes();
 
@@ -378,37 +376,6 @@ export class CardTimeRange
         for( let g of this.graphs ) this.applyTimeAxis(g);
     }
 
-    // (as applyTimeRange)
-    applyTimeRangeMinutes(range, update, t_center = null, t_position = 0.5)
-    {
-        if( update && !t_center ) [t_center, t_position] = this._rangeAnchor();
-
-        t_position = Math.min(Math.max(t_position, 0.0), 1.0);
-
-        range = Math.max(range, 1);
-
-        this.activeRange.timeRangeHours = 0;
-        this.activeRange.timeRangeMinutes = range;
-
-        this.setStepSize(!update, this._this.querySelector('#tb_0')?.clientWidth || null);
-
-        for( let i of this.ui.rangeSelector ) if( i ) i.value = "0";
-
-        if( update ) {
-
-            let t1 = moment(t_center).add(this.activeRange.timeRangeMinutes * (1.0 - t_position), "minute");
-            let t0 = moment(t1).subtract(this.activeRange.timeRangeMinutes, "minute");
-            this.startTime = t0.format("YYYY-MM-DDTHH:mm:ss");
-            this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-            this._settleWindow();
-
-            this.applyTimeAxes();
-
-            this.updateHistory();
-
-        }
-    }
-
     // The time range `range` in its one form (see normalizeOptions): a number and its unit
     // — m, h, d, w, o (months), y
     setTimeRangeFromString(range, update = false, t_center = null)
@@ -437,10 +404,7 @@ export class CardTimeRange
     // asked (whatever is loading)
     moveTimeWindow(t0)
     {
-        const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute");
-        this.startTime = moment(t0).format("YYYY-MM-DDTHH:mm:ss");
-        this.endTime = t1.format("YYYY-MM-DDTHH:mm:ss");
-        this._settleWindow();
+        this._setWindow(t0, moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute"));
         this.updateHistory();
     }
 

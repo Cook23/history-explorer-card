@@ -660,7 +660,7 @@
   // Chart.hecUi — generic floating-element and highlight utilities. Public (see
   // "Shared UI utilities" in Chart Custom.js.md): this file's own tooltips and drag
   // feedback use them, and so does the card for its own menus and messages — one
-  // implementation, where there used to be a copy on each side. Stateless: whatever
+  // implementation for both. Stateless: whatever
   // they keep is stored on the element they're given. They know nothing about the
   // card; the area a floating element must stay in is passed in by the caller.
   // ---------------------------------------------------------------------------
@@ -1296,9 +1296,9 @@
 
   // Single distribution point for every consumer of a detected gesture —
   // internal (legend click/hover toggle, Controller.options.onClick, label-
-  // truncated tooltip) and external (customEvent) alike. Nothing here
-  // re-derives 'click' from mouseup independently anymore; this is the one
-  // place that decides a gesture happened and tells everyone at once.
+  // truncated tooltip) and external (customEvent) alike: the one place that
+  // decides a gesture happened (nothing derives 'click' from mouseup on its own)
+  // and tells everyone at once.
   function fire(c, gestureType, hitX, hitY, extra) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     var _hx = hitX !== undefined ? hitX : e.x;
@@ -1810,7 +1810,7 @@
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     // Legend/timeline label drag workaround: armed by the second press
     // (dblclickdown), always disarmed here on the raw mouseup itself — not
-    // custDragEnd — so it never stays stuck armed when no drag followed.
+    // at the end of a drag — so it never stays stuck armed when no drag followed.
     if (me._hecLabelDragAllowed) {
       me._hecLabelDragAllowed = false;
       me._hecUpdateDragTouchOverlays();
@@ -2280,15 +2280,13 @@
 
     // ── The Y axes: their ranges, their lock, their labels inside the plot ──
 
-    // Y-axis lock state — high-level default behavior, on by default (see
-    // options.yAxisLockEnabled), fully owned by Chart.js: the lock icon itself,
-    // its click (toggle lock on/off), automatic engagement on zoom/pan/longpress/
-    // dblclick (see _hecSetYRanges below), disengaging the forced min/max so
-    // the axis goes back to auto-computing from the data, AND syncing the
-    // dedicated touch overlay's touch-action from that same lock/click-armed
-    // state. Icon SVG/positioning matches the card's original
-    // createScaleLockIconHtml, drawn as a floating element over the canvas
-    // instead of card-side HTML.
+    // Y-axis lock state — on by default (see options.yAxisLockEnabled), fully owned by
+    // Chart.js: the lock icon (a floating element over the canvas), its click (toggle
+    // lock on/off), automatic engagement on zoom/pan/longpress/dblclick (see
+    // _hecSetYRanges below), disengaging the forced min/max so the axis goes back to
+    // auto-computing from the data, and syncing the touch overlay's touch-action from
+    // that same lock/click-armed state.
+
     // The Y axes a gesture moves — those of a line or bar chart (a timeline's or an
     // arrowline's rows don't move): { opts, scale, side ('left', 'right') }, the left one
     // first. Every Y gesture (pan, pinch, Shift+wheel) and the lock go through these.
@@ -2364,9 +2362,8 @@
     },
 
     // Toggles the Y-axis lock on/off: locked, each Y axis keeps the range it shows; released,
-    // it gets its own back (_hecReleaseYAxes) — factored out so it can be called from
-    // the unified custClick handler on the grouped lock+handle zone below, not
-    // just from a native button click anymore.
+    // it gets its own back (_hecReleaseYAxes). Called from a click on the grouped
+    // lock+handle zone (fire), and from hecSetYAxisLocked.
     _hecToggleYAxisLock: function () {
       var me = this;
       if (!me.options.scales || !me.options.scales.yAxes || !me.options.scales.yAxes.length) return;
@@ -2389,9 +2386,9 @@
       var _yAxis = me.options.scales && me.options.scales.yAxes && me.options.scales.yAxes[0];
       if (!_yAxis || me.config.type === 'timeline' || me.config.type === 'arrowline') return;
 
-      // Purely visual now, pointer-events:none — the click is handled by the
-      // unified custClick handler on the grouped lock+handle zone, same
-      // relay-to-canvas pattern as everything else. No more native click.
+      // Purely visual, pointer-events:none — the click is handled by the
+      // grouped lock+handle zone, through the same relay-to-canvas pattern as
+      // everything else.
       var _el = me._hecLockIconEl;
       if (!_el) {
         _el = document.createElement('div');
@@ -2606,8 +2603,7 @@
     // Graph reorder handle symbol (⠿) — purely visual, pointer-events:none.
     // The actual gesture (drag to reorder) is handled by the separate
     // _hecMoveHandleTouchEl overlay in _hecUpdateDragTouchOverlays below, same
-    // relay-to-canvas pattern as everything else. Matches the card's original
-    // #mo-N place (six dots, as ⠿), in the text's color.
+    // relay-to-canvas pattern as everything else. Six dots (⠿), in the text's color.
     _hecUpdateMoveHandleIcon: function () {
       var me = this;
       if (!me.canvas) return;
@@ -2713,13 +2709,7 @@
         // (the path's own bounds — 2.75..21.25 of its 24 —: what is seen is what is centred)
         _el.innerHTML = '<svg width="' + CHAIN_W + '" height="' + CHAIN_H + '" viewBox="2.75 2.25 18.5 19.5" style="pointer-events:none;"><path fill="var(--primary-text-color)" d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24V16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>';
       }
-      me._hecAttachToCanvasParent(_el);
-      _el.style.display = 'flex';
-      _el.style.background = me._hecControlsBoxBackground();
-      _el.style.left = (me.canvas.offsetLeft + _r.left) + 'px';
-      _el.style.top = (me.canvas.offsetTop + _r.top) + 'px';
-      _el.style.width = _r.width + 'px';
-      _el.style.height = _r.height + 'px';
+      me._hecPlaceControlBox(_el, _r.left, _r.top, _r.width, _r.height, 'flex');
       _el.title = me.options.linkMarkerTitle || '';
     },
 
@@ -2753,13 +2743,7 @@
         // (the ×, drawn: centred as it is seen)
         _el.innerHTML = '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 0 10 10" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.5" stroke-linecap="round"/></svg>';
       }
-      me._hecAttachToCanvasParent(_el);
-      _el.style.display = 'flex';
-      _el.style.background = me._hecControlsBoxBackground();
-      _el.style.left = (me.canvas.offsetLeft + _r.x) + 'px';
-      _el.style.top = (me.canvas.offsetTop + _r.y) + 'px';
-      _el.style.width = _r.width + 'px';
-      _el.style.height = _r.height + 'px';
+      me._hecPlaceControlBox(_el, _r.x, _r.y, _r.width, _r.height, 'flex');
       _el.title = me.options.closeButtonTitle || '';
     },
 
@@ -2791,6 +2775,18 @@
       el.style.top = (me.canvas.offsetTop + CTRL_TOP + CTRL_H / 2 - _h / 2) + 'px';
     },
 
+    // One of the floating icons' boxes, el, shown (display) over the canvas at (x, y) —
+    // canvas-relative —, width × height, in their background
+    _hecPlaceControlBox: function (el, x, y, width, height, display) {
+      this._hecAttachToCanvasParent(el);
+      el.style.display = display;
+      el.style.background = this._hecControlsBoxBackground();
+      el.style.left = (this.canvas.offsetLeft + x) + 'px';
+      el.style.top = (this.canvas.offsetTop + y) + 'px';
+      el.style.width = width + 'px';
+      el.style.height = height + 'px';
+    },
+
     // The floating icons' boxes (the chain icon's, the lock+handle zone's, the close
     // button's): half see-through — over the legend's labels (options.hecControlsBackdrop, or its first label
     // not fitting beside them: _hecIconsOverLegend): as opaque as the Y labels' boxes
@@ -2814,13 +2810,7 @@
         _el.style.cssText = 'position:absolute;z-index:9;border-radius:' + CTRL_H / 2 + 'px;pointer-events:none;';
         me._hecControlsBackdropEl = _el;
       }
-      me._hecAttachToCanvasParent(_el);
-      _el.style.display = '';
-      _el.style.background = me._hecControlsBoxBackground();
-      _el.style.left = (me.canvas.offsetLeft + _r.x) + 'px';
-      _el.style.top = (me.canvas.offsetTop + _r.y) + 'px';
-      _el.style.width = _r.width + 'px';
-      _el.style.height = _r.height + 'px';
+      me._hecPlaceControlBox(_el, _r.x, _r.y, _r.width, _r.height, '');
     },
 
     // ── The legend's fonts, and texts shown in full where they're shortened or hidden ──
@@ -3296,11 +3286,9 @@
     },
 
     // Drag ghost — a small floating label that follows the pointer during a
-    // legend/label/handle drag, showing what's being moved. Migrated from the
-    // card's own _createGhost/_moveGhost/_destroyGhost: every value it needs
-    // (text, size, color) was already being read from this same chart's own
-    // native data by the card before calling those — Chart.js has all of it
-    // natively, no reason for the card to fetch and hand it back over.
+    // legend/label/handle drag, showing what's being moved. Every value it needs
+    // (text, size, color) comes from this chart's own data — the card hands
+    // nothing over.
     // position:fixed on document.body (not the canvas's own parent) since the
     // ghost must follow the pointer anywhere on screen, not stay confined to
     // the chart's own bounds. Gated by options.dragGhostEnabled, on by default.
@@ -3333,11 +3321,9 @@
     },
 
     // Insertion marker — the small arrow-tipped line shown at a potential drop
-    // position during a legend/label/handle drag. Migrated verbatim from the
-    // card's own _showInsertionMarker/_hideInsertionMarker, same visual
-    // appearance. Kept as a single global element (not per-chart) via
-    // Chart.prototype, matching the original's document.getElementById
-    // singleton — only one drag can be in progress across all charts at once.
+    // position during a legend/label/handle drag. A single global element (not
+    // per-chart) via Chart.prototype — only one drag can be in progress across
+    // all charts at once.
     _hecShowInsertionMarker: function (x, y, width, height, horizontal, color) {
       if (this.options.dragGhostEnabled === false) return;
       var _el = document.getElementById('_hec_insert');
@@ -3389,8 +3375,7 @@
     // Zoom-rectangle selection overlay — pure geometry, no knowledge of
     // startTime/endTime needed (that conversion stays the card's own
     // responsibility, since the resulting time range is shared across every
-    // graph, not just this one). Migrated verbatim from the card's own
-    // overlay creation/fill logic.
+    // graph, not just this one).
     // The elastic box (zoomBox) from (x0, y0) to (x1, y1), canvas-relative
     _hecShowZoomSelection: function (x0, y0, x1, y1) {
       if (!this.canvas || !this.chartArea) return;
@@ -3464,8 +3449,7 @@
         _el = document.createElement('div');
         _el.style.cssText = 'position:absolute;z-index:0;cursor:' + cursor + ';';
         var _forward = function (ev) {
-          // A press here keeps the browser's default actions to itself, as the card's
-          // own zones did before v1.2: with a mouse or pen, no text selection (dragging
+          // A press here keeps the browser's default actions to itself: with a mouse or pen, no text selection (dragging
           // out of the zone would leave one behind on the page, and the next press on
           // it would start the browser's own drag-and-drop instead — a pointercancel
           // that lost the drag); on touch, no focus change by the emulated mouse
@@ -3666,8 +3650,8 @@
       }
     },
 
-    // Generic early-close: any caller can fade the CURRENTLY-TARGETED (via
-    // elKey) tooltip out immediately (duration 0) — never touches the other one.
+    // Generic early-close: any caller can fade the hover tooltip out immediately
+    // (duration 0) — never touches the others.
     _hecCloseTooltip: function () {
       if (this._hecHoverTooltipEl) Chart.hecUi.startFade(this._hecHoverTooltipEl, 0);
     },

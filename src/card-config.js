@@ -194,7 +194,7 @@ export class CardConfig
             }
         }
 
-        // If entityOptions is a list, apply glob matching (same logic as former entityPatterns)
+        // If entityOptions is a list, apply glob matching
         if( Array.isArray(this.pconfig.entityOptions) ) {
             let patched = {};
             for( const p of this.pconfig.entityOptions ) {
@@ -442,8 +442,7 @@ export class CardConfig
 
     // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
     // level so a single malformed graph or entity is logged and skipped rather than throwing
-    // and losing every graph on the card (see history-explorer-card.md changelog for the bug
-    // this was written to prevent: a bad `exclude:` entry used to blank the whole card).
+    // and losing every graph on the card.
     buildGraphListFromConfig(graphs)
     {
         const testEntityExclusionList = function(entity, excludes) { for( let i of excludes ) if( i.test(entity) ) return true; return false; };
@@ -507,7 +506,7 @@ export class CardConfig
                         ? [ ...(Array.isArray(_graphExclude) ? _graphExclude : [_graphExclude]),
                             ...(Array.isArray(e.exclude) ? e.exclude : (e.exclude ? [e.exclude] : [])) ]
                         : e.exclude;
-                    const regexExcludes = this.buildEntityExclusionList(_combinedExclude);
+                    const regexExcludes = this.buildFilterRegexList(_combinedExclude);
                     const regex = this.matchWildcardPattern(e.entity);
                     // Collect matches first, then add in natural alphabetical order —
                     // HA's state object iterates in entity creation order, which carries

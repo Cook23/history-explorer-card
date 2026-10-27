@@ -27,8 +27,12 @@ module.exports = async function()
         return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!d?.hidden, graphs: el.instance.graphs.length }; })()`);
     const menu = (id, act) => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'));
         I.showEntityTypeMenu(0, '${id}', g, { from: 'label', clientX: 100, clientY: 100 }); ${act} })()`);
-    const setInterp = (id, a) => menu(id, `I.entityInterpolationClicked(0, '${a}');`).then(() => t.wait(500));
-    const setType = (id, type, mode) => menu(id, `I.entityTypeMenuClicked(0, '${type}', ${mode ? `'${mode}'` : 'null'});`).then(() => t.wait(1500));
+    // (a line of the menu clicked: an algorithm, et_0_algo_<name>; a display type, et_0_<its index> —
+    // card-menus.js _TYPE_MENU_DEFS)
+    const TYPE_LINE = { 'line/lines': 0, 'line/curves': 1, 'line/stepped': 2, 'bar/null': 3, 'arrowline/null': 4, 'timeline/null': 5, 'line/smart': 6 };
+    const clickType = (type, mode) => `el.querySelector('#et_0_${TYPE_LINE[type + '/' + mode]}').click();`;
+    const setInterp = (id, a) => menu(id, `el.querySelector('#et_0_algo_${a}').click();`).then(() => t.wait(500));
+    const setType = (id, type, mode) => menu(id, clickType(type, mode ?? null)).then(() => t.wait(1500));
     const legendPtOf = id => t.E(`(()=>{ const all=el.instance.graphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
         return legendPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
     const toggleHidden = async id => { const p = await legendPtOf(id); await t.page.mouse.click(p.x, p.y); await t.wait(800); };
@@ -92,8 +96,8 @@ module.exports = async function()
     // (on the graph of sensor.power: Steffen for its curves, then bars)
     const graphMenu = act => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.showGraphMenu(0, g, 100, 100); ${act} })()`);
     const viaGraphMenu = async () => {
-        await graphMenu(`I.entityInterpolationClicked(0, 'steffen');`); await t.wait(500);
-        await graphMenu(`I.entityTypeMenuClicked(0, 'bar', null);`); await t.wait(1500);
+        await graphMenu(`el.querySelector('#et_0_algo_steffen').click();`); await t.wait(500);
+        await graphMenu(clickType('bar', null)); await t.wait(1500);
     };
     const viaTypeMenus = async () => {
         for( const id of ['sensor.power', 'sensor.power2'] ) await setInterp(id, 'steffen');
@@ -131,7 +135,7 @@ module.exports = async function()
         await t.wait(2000);
         const look = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.type+':'+g.entities.map(e=>e.entity.split('.')[1]).join('+')).join(' | ')`);
         const before = await look();
-        await graphMenu(`I.entityTypeMenuClicked(0, 'timeline', null);`); await t.wait(1500);
+        await graphMenu(clickType('timeline', null)); await t.wait(1500);
         const now = await look(); await reload(); const after = await look(); await newDevice(); const other = await look();
         return before === 'line:power+power_kw' && now === 'timeline:power+power_kw' && after === now && other === now ? true : JSON.stringify({ before, now, after, other });
     });

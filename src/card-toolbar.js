@@ -8,14 +8,53 @@ import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
+// The ranges of the range selector (#by_N): their hours, their label (ui.ranges.*, with its
+// count), and whether they're left out of the list (still taken when the window is set so)
+const RANGES = [
+    { hours: 0, label: 'l_hour', hidden: true }, { hours: 1, label: 'hour' },
+    ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => ({ hours: n, label: 'n_hours', n, hidden: ![2, 6, 12].includes(n) })),
+    { hours: 24, label: 'day' },
+    ...[2, 3, 4, 5, 6].map(n => ({ hours: 24 * n, label: 'n_days', n, hidden: n > 3 })),
+    { hours: 168, label: 'week' },
+    ...[2, 3].map(n => ({ hours: 168 * n, label: 'n_weeks', n })),
+    { hours: 720, label: 'month' },
+    { hours: 2184, label: 'n_months', n: 3 }, { hours: 4368, label: 'n_months', n: 6 },
+    { hours: 8760, label: 'year' },
+];
+
+const BUTTON_STYLE = 'margin:0px;border:0px solid black;color:inherit;background-color:#00000000';
+
+// The toolbar's time buttons, its left part (#dl_N's content): '<', the date, '>' — the
+// card's and the info panel's
+export function timeButtonsHtml(i)
+{
+    return `
+        <button id="b1_${i}" style="${BUTTON_STYLE};height:30px"><</button>
+        <button id="bx_${i}" style="${BUTTON_STYLE};height:30px">-</button>
+        <button id="b2_${i}" style="${BUTTON_STYLE};height:30px">></button>`;
+}
+
+// The toolbar's zoom controls, its right part (#dr_N's content): the magnifier, '-', the
+// range selector, '+' (swapped by invertZoom) — the card's and the info panel's
+export function rangeControlsHtml(i, optionStyle, invertZoom)
+{
+    return `
+        <button id="bz_${i}" style="${BUTTON_STYLE}"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
+        <button id="b${invertZoom ? 5 : 4}_${i}" style="${BUTTON_STYLE};height:30px">-</button>
+        <select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center">
+            ${RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('')}
+        </select>
+        <button id="b${invertZoom ? 4 : 5}_${i}" style="${BUTTON_STYLE};height:30px">+</button>`;
+}
+
 export class CardToolbar
 {
     // --------------------------------------------------------------------------------------
     // HTML generation
     // --------------------------------------------------------------------------------------
 
-    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D
-    // !! Keep in sync with _hxRender() in history-info-panel.js !!
+    // TOOLBAR LAYOUT — CSS Grid, layouts A/B/C/D (its parts shared with the info panel:
+    // timeButtonsHtml, rangeControlsHtml)
     // The menus of an entity and of a graph on a card without any entity selector, where
     // they otherwise are: their gestures (a long-press on a label, on the ⠿ zone…) open them
     // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
@@ -45,10 +84,7 @@ export class CardToolbar
         if( tools || selector ) html += `<div id="tb_${i}" style="position:relative;margin-left:0px;width:100%;min-height:30px;display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:'dl sl dr';align-items:center;line-height:normal;">`;
 
         if( tools ) html += `
-            <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">
-                <button id="b1_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px"><</button>
-                <button id="bx_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
-                <button id="b2_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">></button>
+            <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dl;justify-self:start;">${timeButtonsHtml(i)}
             </div>`;
 
         if( selector ) html += `
@@ -63,38 +99,7 @@ export class CardToolbar
             </div>`;
 
         if( tools ) html += `
-            <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">
-                <button id="bz_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
-                <button id="b${invertZoom ? 5 : 4}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">-</button>
-                <select id="by_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px;max-width:83px;text-align:center;text-align-last:center">
-                    <option value="0" ${optionStyle} hidden></option>
-                    <option value="1" ${optionStyle}></option>
-                    <option value="2" ${optionStyle}></option>
-                    <option value="3" ${optionStyle} hidden></option>
-                    <option value="4" ${optionStyle} hidden></option>
-                    <option value="5" ${optionStyle} hidden></option>
-                    <option value="6" ${optionStyle}></option>
-                    <option value="7" ${optionStyle} hidden></option>
-                    <option value="8" ${optionStyle} hidden></option>
-                    <option value="9" ${optionStyle} hidden></option>
-                    <option value="10" ${optionStyle} hidden></option>
-                    <option value="11" ${optionStyle} hidden></option>
-                    <option value="12" ${optionStyle}></option>
-                    <option value="24" ${optionStyle}></option>
-                    <option value="48" ${optionStyle}></option>
-                    <option value="72" ${optionStyle}></option>
-                    <option value="96" ${optionStyle} hidden></option>
-                    <option value="120" ${optionStyle} hidden></option>
-                    <option value="144" ${optionStyle} hidden></option>
-                    <option value="168" ${optionStyle}></option>
-                    <option value="336" ${optionStyle}></option>
-                    <option value="504" ${optionStyle}></option>
-                    <option value="720" ${optionStyle}></option>
-                    <option value="2184" ${optionStyle}></option>
-                    <option value="4368" ${optionStyle}></option>
-                    <option value="8760" ${optionStyle}></option>
-                </select>
-                <button id="b${invertZoom ? 4 : 5}_${i}" style="margin:0px;border:0px solid black;color:inherit;background-color:#00000000;height:30px">+</button>
+            <div id="dr_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;grid-area:dr;justify-self:end;">${rangeControlsHtml(i, optionStyle, invertZoom)}
             </div>`;
 
         if( tools || selector ) html += `</div>`;
@@ -123,8 +128,8 @@ export class CardToolbar
     // one, with fewer controls — those it lacks are skipped)
     wireToolbar(i)
     {
-        this._this.querySelector(`#b1_${i}`)?.addEventListener('click', this.subDay.bind(this), false);
-        this._this.querySelector(`#b2_${i}`)?.addEventListener('click', this.addDay.bind(this), false);
+        this._this.querySelector(`#b1_${i}`)?.addEventListener('click', () => this.stepDay(-1), false);
+        this._this.querySelector(`#b2_${i}`)?.addEventListener('click', () => this.stepDay(1), false);
         this.showRealTime();
         this._this.querySelector(`#b4_${i}`)?.addEventListener('click', this.decZoom.bind(this), false);
         this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
@@ -189,32 +194,7 @@ export class CardToolbar
         if( _in ) _in.placeholder = i18n(this.entityListReady() ? 'ui.label.type_to_search' : 'ui.label.loading');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
-            by.children[0].innerHTML = i18n('ui.ranges.l_hour');
-            by.children[1].innerHTML = i18n('ui.ranges.hour');
-            by.children[2].innerHTML = i18n('ui.ranges.n_hours', 2);
-            by.children[3].innerHTML = i18n('ui.ranges.n_hours', 3);
-            by.children[4].innerHTML = i18n('ui.ranges.n_hours', 4);
-            by.children[5].innerHTML = i18n('ui.ranges.n_hours', 5);
-            by.children[6].innerHTML = i18n('ui.ranges.n_hours', 6);
-            by.children[7].innerHTML = i18n('ui.ranges.n_hours', 7);
-            by.children[8].innerHTML = i18n('ui.ranges.n_hours', 8);
-            by.children[9].innerHTML = i18n('ui.ranges.n_hours', 9);
-            by.children[10].innerHTML = i18n('ui.ranges.n_hours', 10);
-            by.children[11].innerHTML = i18n('ui.ranges.n_hours', 11);
-            by.children[12].innerHTML = i18n('ui.ranges.n_hours', 12);
-            by.children[13].innerHTML = i18n('ui.ranges.day');
-            by.children[14].innerHTML = i18n('ui.ranges.n_days', 2);
-            by.children[15].innerHTML = i18n('ui.ranges.n_days', 3);
-            by.children[16].innerHTML = i18n('ui.ranges.n_days', 4);
-            by.children[17].innerHTML = i18n('ui.ranges.n_days', 5);
-            by.children[18].innerHTML = i18n('ui.ranges.n_days', 6);
-            by.children[19].innerHTML = i18n('ui.ranges.week');
-            by.children[20].innerHTML = i18n('ui.ranges.n_weeks', 2);
-            by.children[21].innerHTML = i18n('ui.ranges.n_weeks', 3);
-            by.children[22].innerHTML = i18n('ui.ranges.month');
-            by.children[23].innerHTML = i18n('ui.ranges.n_months', 3);
-            by.children[24].innerHTML = i18n('ui.ranges.n_months', 6);
-            by.children[25].innerHTML = i18n('ui.ranges.year');
+            RANGES.forEach((r, k) => { by.children[k].innerHTML = i18n('ui.ranges.' + r.label, r.n); });
         }
     }
 

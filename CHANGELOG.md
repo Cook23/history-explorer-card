@@ -13,6 +13,13 @@ Changelog for the HA History Explorer Card.
 - The hover asks the gesture engine whether a contact is in progress (`_hecContactInProgress`) instead of reading its state
 - The card's width read in one place (`cardWidth`): narrow, small screen, the toolbar's forms, the time labels, a menu's room
 - The menus: a menu's curves by graph and one by one from one function (`_curvesByGraph`, `_menuCurves`); the Y axis locks of what a menu acts on, one function (`_yLocks`)
+- The toolbar's markup written once, for the card and the info panel (`timeButtonsHtml`, `rangeControlsHtml`), its ranges and their labels from one table (`RANGES`) — the info panel's range selector centred as the card's
+- The time window set in one place (`_setWindow`); the toolbar's '<' and '>' one function (`stepDay`); a range in hours or in minutes applied by one function (`_applyRange`)
+- A curve's and a graph's menu opened by one function (`_openTypeMenu`); the floating icons' boxes placed by one function (Chart.js `_hecPlaceControlBox`)
+
+### Removed — code left unused
+- The menus' former entry points (`entityInterpolationClicked`, `entityLayoutClicked`, `entityTypeMenuClicked`), `todayReset`, the alias `buildEntityExclusionList`; exports used by no other file
+- Comments naming functions that no longer exist or telling what the code used to do
 
 ## [v1.2.40] - 2026-10-26
 

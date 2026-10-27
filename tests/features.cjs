@@ -840,7 +840,7 @@ module.exports = async function()
         const r0 = await liveWin();
         await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 3 * 3600e3))`);
         const r1 = await liveWin();
-        await t.E('el.instance.addDay()');
+        await t.E('el.instance.stepDay(1)');
         const r2 = await liveWin();
         // (the window set when the card opened: the present then, a few seconds ago)
         const ok = r0.live && r0.next && r0.toNow <= 1 && [r1, r2].every(r => r.live && r.next && r.toNow <= 1 && r.toNow >= -2 && r.span === 86400);
@@ -863,9 +863,9 @@ module.exports = async function()
     });
     await t.step('the day before then the day after: back in real time when it reaches the present, never past it', async () => {
         await t.E('el.instance.today()');
-        await t.E('el.instance.subDay()'); const before = await liveWin();
-        await t.E('el.instance.addDay()'); const after = await liveWin();
-        await t.E('el.instance.addDay()'); const again = await liveWin();
+        await t.E('el.instance.stepDay(-1)'); const before = await liveWin();
+        await t.E('el.instance.stepDay(1)'); const after = await liveWin();
+        await t.E('el.instance.stepDay(1)'); const again = await liveWin();
         const ok = !before.live && !before.next && after.toNow <= 2 && again.live && again.next && Math.abs(again.toNow) <= 2;
         return ok ? true : JSON.stringify({ before, after, again });
     });
