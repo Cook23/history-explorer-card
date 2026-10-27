@@ -333,11 +333,11 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The hover dot: the curve the pointer is on, then its value nearest along the time (the
+    // ── The hover dot: the curve the pointer is on, then its value nearest the pointer (the
     // tooltip of the curves selected: a hover alone shows the dot alone) ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: 'selected',
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true }, clock: CLOCK });
-    await t.step('a hover on a curve between two values far apart: the dot of the one nearest along the time', async () => {
+    await t.step('a hover on a curve between two values far apart: the dot of the one nearest the pointer', async () => {
         // (a point of the drawn path, a third of the way from a value to the next, away from both)
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
             const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>A.left&&o.v.x<A.right);
@@ -350,6 +350,29 @@ module.exports = async function()
         await t.page.mouse.move(p.x, p.y - 30, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(300);
         const d = await hoverDot(0);
         return d && d[0] === 0 && d[1] === p.a && p.da > 15 ? true : JSON.stringify({ p, d });
+    });
+    done(await t.close());
+
+    // ── What is pointed at: on a stepped curve, the plateau of a value, nearer the next value's
+    // time than its own — the hover dot, then the tooltip a click opens, show that value, the one
+    // nearest the pointer in X and Y, not the next one (nearest along the time only) ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: 'selected',
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'stepped' }] }] },
+        { mock: { series: true, rows: { 'sensor.power': [[3000, '100'], [2400, '900'], [1800, '100'], [1200, '900'], [600, '100']] } }, clock: CLOCK });
+    await t.wait(800);
+    await t.step('a stepped curve, a hover then a click on a value\'s plateau nearer the next value\'s time: the dot, then the tooltip, on the value pointed at', async () => {
+        // (a value and the next, far apart in time and further apart in Y; the plateau 60 % of the way)
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
+            const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>A.left+40&&o.v.x<A.right-40);
+            const k=real.findIndex((o,j)=>j+1<real.length&&real[j+1].v.x-o.v.x>20&&Math.abs(real[j+1].v.y-o.v.y)>0.6*(real[j+1].v.x-o.v.x)); if(k<0) return null;
+            const a=real[k], b=real[k+1];
+            return { x: r.left+a.v.x+0.6*(b.v.x-a.v.x), y: r.top+a.v.y, a: a.i, b: b.i }; })()`);
+        if( !p ) return 'no values far apart';
+        await t.page.mouse.move(p.x, p.y - 30, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const d = await hoverDot(0);
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const tip = await t.E('graphAt(0).chart.active.map(a=>a._index)');
+        return d && d[1] === p.a && tip.length === 1 && tip[0] === p.a ? true : JSON.stringify({ p, d, tip });
     });
     done(await t.close());
 

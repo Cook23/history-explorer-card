@@ -472,14 +472,16 @@
         sS += Math.sin(r[i] / Q * 2 * Math.PI); sC += Math.cos(r[i] / Q * 2 * Math.PI);
       }
       var c = target != null ? target : Math.abs(sS) + Math.abs(sC) > 1e-9 ? mod(Math.atan2(sS, sC) / (2 * Math.PI) * Q) : r[first];
-      var base;
+      // (a value put in the turn [base, base + Q) — one on its edge at base, whatever a
+      // rounding of base's last digit gives)
+      var base, into = function (v) { var p = mod(v - base); return base + (Q - p < Q * 1e-9 ? 0 : p); };
       if (hi - lo > Q) {
         base = c - Q / 2;
-        return { values: r.map(function (v) { return base + mod(v - base); }), band: true };
+        return { values: r.map(into), band: true };
       }
       var mean = sum / (last - first + 1), k = Math.round((c - mean) / Q) * Q;
       base = mean + k - Q / 2;
-      return { values: un.map(function (v, j) { return j < first || j > last ? base + mod(r[j] - base) : v + k; }), band: false };
+      return { values: un.map(function (v, j) { return j < first || j > last ? into(r[j]) : v + k; }), band: false };
     },
     // Whether the step from a to b, two values placed, jumps across the edge of a turn
     jumps: function (a, b, Q) {
@@ -2151,13 +2153,13 @@
     // each shown line's point nearest it, along its drawn path — its points joined
     // straight, in steps for a stepped line, or a B-spline's arcs (_hecBsplinePath); -1, or
     // PICK_BETWEEN about halfway between two. Two curves drawn on top of each other there:
-    // the one drawn over (the first)
-    _hecCurveAt: function (px, py) {
+    // the one drawn over (the first). only(i): the curves taken into account, all by default
+    _hecCurveAt: function (px, py, only) {
       var me = this;
       var _m = _hecPickMargin();
       var _cands = (me.data.datasets || []).map(function (ds, i) {
         var meta = me.getDatasetMeta(i);
-        if (!meta.dataset || !me.isDatasetVisible(i)) return null;
+        if (!meta.dataset || !me.isDatasetVisible(i) || (only && !only(i))) return null;
         var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
           .map(function (p) { return p._view; });
         var st = ds.steppedLine, best = null;
@@ -2178,6 +2180,31 @@
         return best;
       });
       return _hecPickNearest(_cands);
+    },
+
+    // Curve i's value drawn on the plot area nearest the point (x, y), in X and Y (never a
+    // curve-shaping point), or null — what the pointer points at, on the curve picked
+    _hecNearestPointOf: function (i, x, y) {
+      var _best = null, _d = Infinity;
+      this._hecOnlyDrawnPoints(this.getDatasetMeta(i).data || []).forEach(function (el) {
+        if (el._view.hecVirtual) return;
+        var d = (el._view.x - x) * (el._view.x - x) + (el._view.y - y) * (el._view.y - y);
+        if (d < _d) { _d = d; _best = el; }
+      });
+      return _best;
+    },
+
+    // Whether curve i is drawn at x, within the picking margin along the time axis only:
+    // its drawn path (its points joined) reaches [x - margin, x + margin]
+    _hecCurveDrawnNearX: function (i, x) {
+      var _m = _hecPickMargin();
+      var pts = (this.getDatasetMeta(i).data || []).filter(function (p) { return p._view && !p._view.skip; })
+        .map(function (p) { return p._view.x; });
+      for (var k = 0; k < pts.length; k++) {
+        if (Math.abs(pts[k] - x) <= _m) return true;
+        if (k && Math.min(pts[k - 1], pts[k]) <= x && Math.max(pts[k - 1], pts[k]) >= x) return true;
+      }
+      return false;
     },
 
     // Curve i's value drawn on the plot area nearest x along the time axis (never a
@@ -3054,19 +3081,23 @@
     // The curves a tooltip shows at this point, each as its tooltip mode says (the dataset
     // option hecTooltip): 'selected' (the default) — in the tooltip mode, a click on it having
     // selected it —, 'nearest' — the curve the point is on or nearest, by the picking rule
-    // (_hecCurveAt) —, 'mixed' — either —, 'all' — every one, once a curve is that near
+    // (_hecCurveAt) among the curves that can show it (candidates: 'nearest', 'mixed', 'all',
+    // and the curves selected) —, 'mixed' — either —, 'all' — every one, once a curve is that
+    // near: { first (the curve picked, or -1), curves }
     _hecTooltipCurvesAt: function (e) {
       var me = this, _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
       var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
-      var _picked = _at ? me._hecCurveAt(e.x, e.y) : -1;
+      var _mode = function (i) { return me.data.datasets[i].hecTooltip || 'selected'; };
+      var _cand = function (i) { var m = _mode(i); return m !== 'selected' || _sel.indexOf(i) >= 0; };
+      var _picked = _at ? me._hecCurveAt(e.x, e.y, _cand) : -1;
       var _curves = [];
       (me.data.datasets || []).forEach(function (ds, i) {
         if (!me.isDatasetVisible(i) || !me.getDatasetMeta(i).dataset) return;
-        var _m = ds.hecTooltip || 'selected';
+        var _m = _mode(i);
         var _near = i === _picked, _selected = _sel.indexOf(i) >= 0;
         if ((_m === 'all' && _picked >= 0) || (_m === 'nearest' && _near) || (_m === 'selected' && _selected) || (_m === 'mixed' && (_near || _selected))) _curves.push(i);
       });
-      return _curves;
+      return { first: _curves.indexOf(_picked) >= 0 ? _picked : -1, curves: _curves };
     },
 
     // Whether a curve shown opens its tooltip on a hover: its tooltip mode (hecTooltip)
@@ -3078,29 +3109,36 @@
       });
     },
 
-    // The elements the tooltip shows at this point: the value of each curve it shows
-    // (_hecTooltipCurvesAt) nearest the point along the time axis; else, in the tooltip mode
-    // without any curve selected (or without hover.activateOnContact), those under it (hover.mode) — only values drawn on the plot
-    // area, never a curve-shaping point
+    // The elements the tooltip shows at this point (_hecTooltipCurvesAt): on the curve picked,
+    // its value nearest the point in X and Y — what is pointed at —; on each other curve shown,
+    // its value nearest that one's time (else the point's) along the time axis, when drawn
+    // there within the picking margin (_hecCurveDrawnNearX); else, in the tooltip mode without
+    // any curve selected (or without hover.activateOnContact), those under it (hover.mode) —
+    // only values drawn on the plot area, never a curve-shaping point
     _hecHoverElements: function (e) {
       var me = this, ho = me.options.hover;
-      var _curves = me._hecTooltipCurvesAt(e);
+      var _at = me._hecTooltipCurvesAt(e), _curves = _at.curves;
       if (!_curves.length) {
         var _sel = (me._hecTooltipCurves || []).filter(function (i) { return me.isDatasetVisible(i); });
         return ( me._hecTooltipMode || ho.activateOnContact !== true ) && !_sel.length ? me._hecOnlyDrawnPoints(me.getElementsAtEventForMode(e, ho.mode, ho)) : [];
       }
-      return _curves.map(function (i) { return me._hecNearestValueOf(i, e.x); }).filter(function (el) { return el; });
+      var _first = _at.first >= 0 ? me._hecNearestPointOf(_at.first, e.x, e.y) : null;
+      var _x = _first ? _first._view.x : e.x;
+      return _curves.map(function (i) {
+        if (i === _at.first) return _first;
+        return me._hecCurveDrawnNearX(i, _x) ? me._hecNearestValueOf(i, _x) : null;
+      }).filter(function (el) { return el; });
     },
 
     // The value a hover shows the dot of (hecHoverDot): the curve the hover is on, by the
     // picking rule (_hecCurveAt, along its drawn path), and its value nearest the pointer
-    // along the time axis (_hecNearestValueOf) — as the tooltip mode does; none on a curve
+    // in X and Y (_hecNearestPointOf) — as the tooltip's first value; none on a curve
     // showing its points, or between two curves — e null: none
     _hecUpdateHoverDot: function (e) {
       var me = this, el = null;
       if (e && e.x !== null && e.y !== null && !me._hecShowSamples) {
         var _i = me._hecCurveAt(e.x, e.y);
-        if (_i >= 0 && !(me.data.datasets[_i].pointRadius > 0)) el = me._hecNearestValueOf(_i, e.x);
+        if (_i >= 0 && !(me.data.datasets[_i].pointRadius > 0)) el = me._hecNearestPointOf(_i, e.x, e.y);
       }
       if (el === (me._hecHoverDot || null)) return;
       me._hecHoverDot = el;

@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.43] - 2026-10-27
+
+### Fixed — the tooltip shows what is pointed at
+- The tooltip's value on the curve pointed at (*Nearest*, *Mixed*, *All*, and a click) was that curve's value nearest the pointer in time only: on a stepped curve, or a steep one, pointing at a value's plateau could show the next value. It is now the value nearest the pointer in X and Y, the curve itself still picked among the curves that can show the tooltip (Chart.js `_hecNearestPointOf`, `_hecCurveAt`'s `only`). The other curves of the tooltip keep their value nearest in time — nearest that value's time, and only where the curve is drawn within the picking margin along the time axis (`_hecCurveDrawnNearX`). The hover dot shows the value pointed at the same way
+- Test (`points`): a stepped curve, a hover then a click on a value's plateau nearer the next value's time — the dot, then the tooltip, on the value pointed at
+
+### Fixed — a circular value on the edge of its turn
+- A circular curve (an angle) put in a turn of its Y axis (a range set by hand, the window spanning more than a turn): a value exactly on the turn's edge (140 for the turn 500–860) could be drawn at its end (860) instead of its start (500), when the axis' middle came out of a rounding a hair too high (`Chart.hecCircular.place`)
+- Test (`yaxes`): that value at the turn's start, the middle exact or rounded off by its last digit either way
+
 ## [v1.2.42] - 2026-10-27
 
 ### Changed — the architecture: one rule, one place
