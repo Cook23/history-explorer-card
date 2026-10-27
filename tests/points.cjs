@@ -113,13 +113,13 @@ module.exports = async function()
     });
     // The tooltip of graph gi: its text, else null
     const tip = gi => t.E(`(()=>{ const el=graphAt(${gi}).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
-    // A point of curve k of graph 1 far from the other one, 3 px above the curve between two values
+    // 3 px above a value of curve k of graph 1, far from the other curve
     const nearCurve = k => t.E(`(()=>{ const c=graphAt(1).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
-        const vs=d=>c.getDatasetMeta(d).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.x<A.right-40);
+        const vs=d=>c.getDatasetMeta(d).data.map(p=>p._view).filter(v=>!v.skip&&!v.hecVirtual&&v.x>A.left+40&&v.x<A.right-40);
         const o=vs(1-${k}), yOf=x=>o.reduce((b,v)=>Math.abs(v.x-x)<Math.abs(b.x-x)?v:b).y, m=vs(${k});
-        const i=m.findIndex((v,i)=>i&&Math.abs(v.y-yOf(v.x))>30); const a=m[i-1], b=m[i];
-        return {x:r.left+(a.x+b.x)/2, y:r.top+(a.y+b.y)/2-3}; })()`);
-    await t.step('a click near a curve, not on a value: its tooltip only; near the other one: both', async () => {
+        const v=m.find(v=>Math.abs(v.y-yOf(v.x))>30);
+        return {x:r.left+v.x, y:r.top+v.y-3}; })()`);
+    await t.step('a click near a value of a curve: its tooltip only; near a value of the other one: both', async () => {
         await t.page.mouse.click(...Object.values(await nearCurve(1))); await t.wait(400);
         const one = await tip(1);
         await t.page.mouse.click(...Object.values(await nearCurve(0))); await t.wait(400);
@@ -214,7 +214,7 @@ module.exports = async function()
         const shownPt = await inked(); await t.longPress(p); await t.page.mouse.move(b.x, b.y, { steps: 3 }); await t.wait(1300);
         return dot && Math.abs(hovered - shownPt) <= 3 ? true : JSON.stringify({ dot, hovered, shownPt });
     });
-    await t.step('no hover dot in the tooltip mode, nor on a curve showing its points', async () => {
+    await t.step('no hover dot on the tooltip\'s own point (drawn larger), nor on a curve showing its points', async () => {
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
             const v=c.getDatasetMeta(0).data.map(p=>p._view).filter(v=>!v.skip&&v.x>A.left+40&&v.y>A.top+30&&v.y<A.bottom-30)[6]; return {x:r.left+v.x, y:r.top+v.y}; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(300); await t.page.mouse.move(p.x + 1, p.y, { steps: 3 }); await t.wait(300);
@@ -353,14 +353,15 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── What is pointed at: on a stepped curve, the plateau of a value, nearer the next value's
-    // time than its own — the hover dot, then the tooltip a click opens, show that value, the one
-    // nearest the pointer in X and Y, not the next one (nearest along the time only) ──
+    // ── On a stepped curve, the plateau of a value, nearer the next value's time than its own:
+    // the hover dot on that value — the curve's point nearest the pointer in X and Y, however
+    // far —; a click, far from both values: the curve selected, no tooltip (a tooltip shows
+    // points only) ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: 'selected',
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'stepped' }] }] },
         { mock: { series: true, rows: { 'sensor.power': [[3000, '100'], [2400, '900'], [1800, '100'], [1200, '900'], [600, '100']] } }, clock: CLOCK });
     await t.wait(800);
-    await t.step('a stepped curve, a hover then a click on a value\'s plateau nearer the next value\'s time: the dot, then the tooltip, on the value pointed at', async () => {
+    await t.step('a stepped curve, a hover on a value\'s plateau nearer the next value\'s time: the dot on that value; a click there, far from both values: no tooltip', async () => {
         // (a value and the next, far apart in time and further apart in Y; the plateau 60 % of the way)
         const p = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), m=c.getDatasetMeta(0).data;
             const real=m.map((q,i)=>({v:q._view,i})).filter(o=>!o.v.skip&&!o.v.hecVirtual&&o.v.x>A.left+40&&o.v.x<A.right-40);
@@ -372,7 +373,70 @@ module.exports = async function()
         const d = await hoverDot(0);
         await t.page.mouse.click(p.x, p.y); await t.wait(400);
         const tip = await t.E('graphAt(0).chart.active.map(a=>a._index)');
-        return d && d[1] === p.a && tip.length === 1 && tip[0] === p.a ? true : JSON.stringify({ p, d, tip });
+        return d && d[1] === p.a && !tip.length ? true : JSON.stringify({ p, d, tip });
+    });
+    done(await t.close());
+
+    // ── A tooltip shows points — real values, never a curve's path between them. Values an
+    // hour apart: power at 50, 40, 30, 20 and 10 min ago, rain at 50, 35 and 20 min ago ──
+    const sparse = (mode, o = {}) => openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: mode,
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain', scale: 100 }] }] },
+        { mock: { series: true, rows: { 'sensor.power': [[3000, '100'], [2400, '900'], [1800, '100'], [1200, '900'], [600, '100']],
+                                        'sensor.rain': [[3000, '2'], [2100, '6'], [1200, '2']] } }, clock: CLOCK, ...o });
+    // (curve d's values: their points; the middle of its path between its values j and j + 1)
+    const vals = d => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
+        return c.getDatasetMeta(${d}).data.filter(p=>!p._view.skip&&!p._view.hecVirtual&&p._view.x>=A.left&&p._view.x<=A.right).map(p=>({ x: r.left+p._view.x, y: r.top+p._view.y, i: p._index })); })()`);
+    const mid = (a, b, f = 0.5) => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+    const activeAt = () => t.E('graphAt(0).chart.active.map(a=>[a._datasetIndex, a._index])');
+    const fade = async () => { for( let i = 0; i < 60 && await tip(0) !== null; i++ ) await t.wait(250); return tip(0); };
+    t = await sparse('selected');
+    await t.wait(800);
+    await t.step('a click on a curve\'s path, far from its values: the curve selected, no tooltip, the dot of its value nearest (as a hover shows it)', async () => {
+        const v = await vals(0), p = mid(v[1], v[2], 0.3);
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const r = { far: Math.round(Math.hypot(v[1].x - p.x, v[1].y - p.y)), curves: await t.E('graphAt(0).chart._hecTooltipCurves'), tip: await tip(0), dot: await hoverDot(0) };
+        return r.far > 30 && r.curves && r.curves.includes(0) && r.tip === null && r.dot && r.dot[1] === v[1].i ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await sparse('selected', { touch: true });
+    await t.wait(800);
+    await t.step('a finger (no hover): a tap on a curve\'s path, far from its values, shows the dot of its value nearest — as a hover would — and no tooltip; a tap on that value, its tooltip', async () => {
+        const v = await vals(0), p = mid(v[1], v[2], 0.3);
+        await t.tap(p); await t.wait(500);
+        const dot = await hoverDot(0), none = await tip(0);
+        await t.tap(v[1]); await t.wait(500);
+        const on = await activeAt();
+        return dot && dot[1] === v[1].i && none === null && JSON.stringify(on) === JSON.stringify([[0, v[1].i]]) ? true : JSON.stringify({ dot, none, on });
+    });
+    done(await t.close());
+    t = await sparse('nearest');
+    await t.wait(800);
+    await t.step('nearest: a hover on a curve\'s path, far from its values: nothing', async () => {
+        const v = await vals(0), p = mid(v[1], v[2]);
+        await t.page.mouse.move(p.x, p.y - 40, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const r = { tip: await tip(0), mode: await t.E('!!graphAt(0).chart._hecTooltipMode'), curves: await t.E('graphAt(0).chart._hecTooltipCurves || null') };
+        return r.tip === null && !r.mode && !r.curves ? true : JSON.stringify(r);
+    });
+    await t.step('nearest: a tooltip on a value (no dot on it), then the pointer far from every value: the tooltip stays on it, then fades out after its reading time; the dot on the value nearest the pointer', async () => {
+        const v = await vals(0);
+        await t.page.mouse.move(v[1].x + 1, v[1].y - 1, { steps: 5 }); await t.wait(400);
+        const on = await activeAt(), open = await tip(0);
+        const onDot = await hoverDot(0);
+        const p = mid(v[1], v[2], 0.7); await t.page.mouse.move(p.x, p.y, { steps: 6 }); await t.wait(300);
+        const kept = await activeAt(), dot = await hoverDot(0), gone = await fade();
+        // (on the tooltip's point, no dot — it's drawn larger; far from it, the dot of the value nearest)
+        return JSON.stringify(on) === JSON.stringify([[0, v[1].i]]) && open && onDot === null && JSON.stringify(kept) === JSON.stringify(on) && dot && dot[1] === v[2].i && gone === null ? true : JSON.stringify({ on, open, onDot, kept, dot, gone });
+    });
+    done(await t.close());
+    t = await sparse('all');
+    await t.wait(800);
+    await t.step('all: on a value, the other curve\'s value at the same time joins it; one a few minutes away (beyond the picking margin along the time axis) doesn\'t', async () => {
+        const v = await vals(0), w = await vals(1);
+        const at = async p => { await t.page.mouse.move(p.x + 1, p.y - 1, { steps: 5 }); await t.wait(400); const r = await activeAt(); await t.page.mouse.move(p.x + 1, p.y - 120, { steps: 3 }); await fade(); return r; };
+        // (power 50 min ago: rain then too; power 40 min ago: rain 35 min ago, 5 min away)
+        const same = await at(v[0]), apart = await at(v[1]);
+        const r = { same, apart, dx: Math.round(Math.abs(w[1].x - v[1].x)) };
+        return same.length === 2 && same.some(a => a[0] === 1) && apart.length === 1 && apart[0][0] === 0 && r.dx > 8 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

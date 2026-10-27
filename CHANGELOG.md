@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.44] - 2026-10-27
+
+### Fixed — a tooltip shows points, never a curve's path
+- The tooltip's first value was the value of the curve nearest the pointer along its line, nearest the pointer however far: on the line between two values far apart, a tooltip opened on a value hundreds of pixels away. A tooltip shows points — real values, never the line between them: its first point is the point pointed at, by the picking rule on the points themselves (in X and Y, within the picking margin, none about halfway between two curves' points — Chart.js `_hecPointAt`), among the points of the curves that can show it; none: nothing opened nor moved, an open tooltip fading out after its reading time. The other curves' points: nearest that one's time, within the picking margin along the time axis (`_hecHoverElements`)
+- What concerns a curve picks the curve (`_hecCurveAt`, unchanged): the click putting it in the tooltip mode, the long-press showing its points, the hover dot (then its point nearest the pointer, however far)
+- The hover dot, a discreet guide to where the real values are: shown in the tooltip mode too — never on the tooltip's own point, drawn larger —, and by a click or a tap as by a hover (for a pointer without hover): a click on a curve's line far from its values shows the dot of its value nearest (Chart.js `_hecUpdateHoverDot`, `_hecTap`)
+- The picking rule measures the distance to the object itself everywhere: a curve's line, its half width less; a point, its radius drawn less (as a label's or a bar's box)
+- README, README_Full: the tooltip as it works — the value pointed at, real values only
+- Tests (`points`): a click on a curve's line far from its values — the curve selected, no tooltip, the dot of its value nearest; a finger's tap there — the dot, no tooltip, then a tap on that value — its tooltip; a hover there — nothing; a tooltip on a value, then the pointer far from every value — kept there, then faded out; `all` — the other curve's value at the same time joins it, one a few minutes away doesn't. The tests clicking near a curve now click near one of its values
+
 ## [v1.2.43] - 2026-10-27
 
 ### Fixed — the tooltip shows what is pointed at
