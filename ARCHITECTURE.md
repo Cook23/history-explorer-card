@@ -74,7 +74,7 @@ show it, and the conductor starts the card and wires the parts together.
 | `src/history-csv-exporter.js`, `src/languages.js`, `src/card-tests.js` | The CSV export; the card's texts in each language; *Tests (beta)* in the type menu (what a browser reports of a pen; what the card costs on this device). |
 | `src/history-info-panel.js` | The history panel of Home Assistant's own entity dialog, built from the same card state. |
 | **Toolbox** | |
-| `deps/chart-hec.js` | Everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, the legend's layout, the values over a graph, texts shown in full, `Chart.hecUi`. |
+| `deps/chart-hec.js` | Everything this fork adds to Chart.js — gesture detection, hit-testing, zones, touch overlays, drag feedback, Y axis lock, floating tooltip, the legend's layout, the values over a graph, texts shown in full, `Chart.hecUi`, `Chart.hecCircular` (the one rule for values that wrap around, the card's and Chart.js's). |
 | `deps/Chart.js` | Chart.js 2.7.1, with small changes and the hooks calling into `chart-hec.js`. |
 
 ## The rules

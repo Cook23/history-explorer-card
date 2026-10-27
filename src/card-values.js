@@ -93,11 +93,10 @@ export class CardValues
                                                       time: k !== 'average' ? _time(st[k].t) : null })) };
         }).filter(x => x);
         // (a value at a point of curve j — the point hovered: as its value now, with its time;
-        // a circular curve's in [0, period), as its labels show it)
+        // a circular curve's given by Chart.js in [0, period), as its labels show it)
         const format = (j, y, x) => {
-            const d = g.chart.data.datasets[j], p = d?.circularPeriod;
-            const v = p ? ( ( Number(y) % p ) + p ) % p : Number(y);
-            return { text: this._roundedValue(v, d), unit: d?.unit ?? '', time: _time(msOf(x)) };
+            const d = g.chart.data.datasets[j];
+            return { text: this._roundedValue(Number(y), d), unit: d?.unit ?? '', time: _time(msOf(x)) };
         };
         // (the icon with them, alignIcon: state; their place, alignState; their size, fontSize
         // — mini-graph-card's)

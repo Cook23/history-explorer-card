@@ -256,7 +256,7 @@ export class CardTimeRange
 
     setStepSize(update = false, tbw = null)
     {
-        const width = this._this.querySelector('#maincard').clientWidth;
+        const width = this.cardWidth();
         const _tbw = tbw ?? (this._this.querySelector('#tb_0')?.clientWidth || width);
 
         const tdensity = this.computeTickDensity(width);
