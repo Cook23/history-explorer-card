@@ -4,6 +4,14 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.48] - 2026-10-28
+
+### Changed — one tooltip layout, a curve's
+- Bars, timelines and arrowlines show their tooltip as a curve's: its title where its first value comes from — the history, or the statistics and their period — and its time — a value's own, or the time a column of values, a bar or a state covers (its end's date only when it's another day), a state's duration after it with `tooltip.showDuration` —; then a line per value, its color box, its series' name (`tooltip.showLabel`) and its value — a curve's or a bar's in its unit, a timeline's state, an arrowline's value. Before, a timeline's tooltip had its row's name as its title and its state, its start and its end each on a line ("(for …)" untranslated), a bar's its time alone (`_chartTooltips`, `_tooltipTitle`, `_tooltipValue`: one for every type; a bar's samples carry the time they cover)
+- `tooltip.size` accepted, with no effect; `tooltip.showColorsLine` for every graph but timelines (arrowlines' and bar graphs' tooltips: color boxes as curves')
+- README_Full, full-reference-config.yaml: the tooltip's layout
+- Tests (`points`): a timeline's tooltip — the source and the time its state covers, then its name and its state; a bar's — the source and the time it covers
+
 ## [v1.2.47] - 2026-10-28
 
 ### Changed — bars, timelines and arrowlines: the tooltip as a curve's

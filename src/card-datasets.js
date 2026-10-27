@@ -472,8 +472,9 @@ export class CardDatasets
             let te = moment(t).add(td);
             const _te = te.valueOf();
             y1 = y0;
-            let d = 0;
+            let d = 0, stat = false;
             while( i < n && msOf(data[i].last_changed) < _te ) {
+                stat ||= !!data[i].statistics;
                 const state = this.process(data[i].state, process) * 1.0;
                 if( !isNaN(state) ) {
                     if( !netBars && state < y1 ) {
@@ -485,7 +486,8 @@ export class CardDatasets
                 i++;
             }
             d += y1 - y0;
-            s.push({ x: t + td / 2.0, y: d * scale});
+            // (the time it covers, as a curve's column — its tooltip's title)
+            s.push({ x: t + td / 2.0, y: d * scale, columnFrom: t.valueOf(), columnTo: _te, statistics: stat });
             if( colorFn )
                 bcol.push(colorFn(t + td / 2.0, d) ?? e.paletteColor);
             t = te;
@@ -507,7 +509,7 @@ export class CardDatasets
             const y = this.process(data[i].state, process) * 1.0;
             if( isNaN(y) ) continue;
             const st = data[i].statistics;
-            _values.push({ t: msOf(data[i].last_changed), y, min: st ? Math.min(st.min * 1.0, y) : y, max: st ? Math.max(st.max * 1.0, y) : y });
+            _values.push({ t: msOf(data[i].last_changed), y, min: st ? Math.min(st.min * 1.0, y) : y, max: st ? Math.max(st.max * 1.0, y) : y, stat: !!st });
         }
         _values.forEach((v, k) => { v.end = k + 1 < _values.length ? _values[k + 1].t : Math.max(w.now.valueOf(), v.t); });
         let k = 0, last;
@@ -528,7 +530,7 @@ export class CardDatasets
             } else
                 y = func === 'delta' || func === 'diff' ? 0 : last;
             if( y !== undefined ) {
-                s.push({ x: t + td / 2.0, y: y * scale });
+                s.push({ x: t + td / 2.0, y: y * scale, columnFrom: _t0, columnTo: _te, statistics: group.some(v => v.stat) });
                 if( colorFn ) bcol.push(colorFn(t + td / 2.0, y) ?? e.paletteColor);
             }
             t = te;

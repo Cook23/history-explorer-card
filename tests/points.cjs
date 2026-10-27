@@ -470,7 +470,8 @@ module.exports = async function()
         const p = await segMid(0, 1);
         await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
         const on = await activeOf(0), text = await tip(0);
-        return JSON.stringify(on) === '[0]' && text ? true : JSON.stringify({ on, text });
+        // (as a curve's: the source and the time the state covers, then its name and its state)
+        return JSON.stringify(on) === '[0]' && /^History: .+ – .+/.test(text || '') && /door a: \S/.test(text || '') ? true : JSON.stringify({ on, text });
     });
     done(await t.close());
     t = await rowsCard('all');
@@ -503,7 +504,8 @@ module.exports = async function()
         if( !p ) return 'no bar';
         await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
         const on = await activeOf(0), text = await tip(0);
-        return JSON.stringify(on) === '[0]' && text ? true : JSON.stringify({ on, text });
+        // (as a curve's: the source and the time the bar covers, then its value)
+        return JSON.stringify(on) === '[0]' && /^History: .+ – .+/.test(text || '') ? true : JSON.stringify({ on, text });
     });
     done(await t.close());
 
