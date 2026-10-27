@@ -280,6 +280,39 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.wait(300); const b = !(await zoomOn());
         return a && b ? true : JSON.stringify({ outside: a, escape: b });
     });
+    // ── The magnifier's modes: a long press on it — or a right click — its menu (the time ↔,
+    // the Y axes ↕, both ⤢), its symbol on the magnifier; the elastic box drawn and acting as
+    // the mode says ──
+    const bz = async () => { const r = await E(`(()=>{ const b=el.querySelector('#bz_0').getBoundingClientRect(); return { x: b.left+b.width/2, y: b.top+b.height/2 }; })()`); return r; };
+    const zoomMenu = () => E(`(()=>{ const m=el.querySelector('#ez_0'); return m && m.style.display!=='none' ? [...m.querySelectorAll('a')].map(a=>a.id+(a.dataset.marked?'*':'')) : null; })()`);
+    await t.step('a long press on the magnifier: the menu of its modes (time, Y axis, both — both marked), the elastic box\'s mode left off', async () => {
+        await t.longPress(await bz());
+        const menu = await zoomMenu(), on = await zoomOn();
+        await t.page.keyboard.press('Escape'); await t.wait(300);
+        return JSON.stringify(menu) === JSON.stringify(['ez_0_x', 'ez_0_y', 'ez_0_xy*']) && !on ? true : JSON.stringify({ menu, on });
+    });
+    await t.step('the time chosen (a right click opens the menu too): the magnifier shows ↔; a box drawn the plot area\'s height, the time zoomed, the Y axis as it was', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const c = await bz(); await t.page.mouse.click(c.x, c.y, { button: 'right' }); await t.wait(300);
+        await t.E(`el.querySelector('#ez_0_x').click()`); await t.wait(900);
+        const mode = await E('el.instance.state.zoomBox'), axes = await E(`graphAt(${li}).chart.options.zoomBoxAxes`), closed = (await zoomMenu()) === null;
+        const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
+        const w0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        const band = await manualDrag({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 60 }, () => E(`(()=>{ const c=graphAt(${li}).chart, e=c._hecZoomSelectionEl, x=${a.x - 30}-c.canvas.getBoundingClientRect().left, d=e.getContext('2d').getImageData(Math.round(x*e.width/e.offsetWidth), Math.round((c.chartArea.top+3)*e.height/e.offsetHeight), 1, 1).data; return d[3] > 0; })()`));
+        const w1 = await win(), y1 = await E(`yRange(${li})`);
+        await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
+        return mode === 'x' && axes === 'x' && closed && band && span(w1) < span(w0) && y1.join() === y0.join() ? true : JSON.stringify({ mode, axes, closed, band, w0, w1, y0, y1 });
+    });
+    await t.step('the Y axis chosen: a box drawn the plot area\'s width, the Y axis zoomed, the time as it was', async () => {
+        const li = await boxGraph(); await unlock(li);
+        await t.longPress(await bz()); await t.E(`el.querySelector('#ez_0_y').click()`); await t.wait(900);
+        const r0 = (await t.state()).range, y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
+        await manualDrag({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 60 });
+        const r1 = (await t.state()).range, y1 = await E(`yRange(${li})`);
+        await unlock(li);
+        await t.longPress(await bz()); await t.E(`el.querySelector('#ez_0_xy').click()`); await t.wait(900);
+        return r1.join() === r0.join() && span(y1) < span(y0) ? true : JSON.stringify({ r0, r1, y0, y1 });
+    });
     await t.step('a narrow card (the handle over the plot area): a vertical drag on the handle moves its graph — the object first, never the box', async () => {
         const width = w => E(`(()=>{ document.body.style.width='${w}px'; document.getElementById('host').style.width='${w}px'; })()`);
         await width(260); await t.wait(1200);

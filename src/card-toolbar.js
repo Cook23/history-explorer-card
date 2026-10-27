@@ -4,7 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { BAR_INTERVALS } from "./history-options.js";
-import { typeMenuHtml, optionsMenuHtml } from "./card-menus.js";
+import { typeMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -34,12 +34,13 @@ export function timeButtonsHtml(i)
         <button id="b2_${i}" style="${BUTTON_STYLE};height:30px">></button>`;
 }
 
-// The toolbar's zoom controls, its right part (#dr_N's content): the magnifier, '-', the
-// range selector, '+' (swapped by invertZoom) — the card's and the info panel's
+// The toolbar's zoom controls, its right part (#dr_N's content): the magnifier (and its
+// modes' menu, ez_N), '-', the range selector, '+' (swapped by invertZoom) — the card's and
+// the info panel's
 export function rangeControlsHtml(i, optionStyle, invertZoom)
 {
     return `
-        <button id="bz_${i}" style="${BUTTON_STYLE}"><svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14M12,10H10V12H9V10H7V9H9V7H10V9H12V10Z" /></svg></button>
+        <button id="bz_${i}" style="${BUTTON_STYLE}">${magnifierSvg('xy')}</button>${zoomMenuHtml(i)}
         <button id="b${invertZoom ? 5 : 4}_${i}" style="${BUTTON_STYLE};height:30px">-</button>
         <select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center">
             ${RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('')}
@@ -145,6 +146,10 @@ export class CardToolbar
         // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
         // back to the default range)
         this._this.querySelector(`#bz_${i}`)?.addEventListener('dblclick', this.defaultRange.bind(this), false);
+        // (the magnifier: a long press — or a right click, a pen's button — the menu of its
+        // modes, ez_N: what the elastic box zooms)
+        this.listenLongPress(this._this.querySelector(`#bz_${i}`), () => this.showZoomMenu(i));
+        this.initZoomMenu(i);
         this._this.querySelector(`#bo_${i}`)?.addEventListener('click', this.menuClicked.bind(this), false);
         // A click on the toolbar beside its small buttons — none under it: the one picked
         // (Chart.hecUi.pick: the nearest, unless about halfway between two)
@@ -185,6 +190,25 @@ export class CardToolbar
         this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
         this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);
         this.ui.zoomButton[i] = this._this.querySelector(`#bz_${i}`);
+    }
+
+    // A long press on a button (the pointer's long-press delay, as the graphs' gestures), or
+    // the browser's context menu on it (a right click, a pen's button): onLong — the click
+    // the press then ends in does nothing
+    listenLongPress(el, onLong)
+    {
+        if( !el ) return;
+        let _timer = null;
+        const _cancel = () => { clearTimeout(_timer); _timer = null; };
+        el.addEventListener('pointerdown', (e) => {
+            if( e.button > 0 ) return;
+            _cancel();
+            el._longPressed = false;
+            _timer = setTimeout(() => { _timer = null; el._longPressed = true; onLong(); }, Chart.hecGestures(e.pointerType || 'mouse').longPressMs);
+        });
+        for( const t of ['pointerup', 'pointercancel', 'pointerleave'] ) el.addEventListener(t, _cancel);
+        el.addEventListener('click', (e) => { if( el._longPressed ) { el._longPressed = false; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+        el.addEventListener('contextmenu', (e) => { e.preventDefault(); _cancel(); onLong(); });
     }
 
     insertUIHtmlText(i)

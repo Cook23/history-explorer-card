@@ -453,6 +453,60 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Bars, timelines, arrowlines: the same tooltip as a curve's — a hover on an element
+    // opens it, as the screen's mode says (here largeScreenTooltip), the element pointed at
+    // first, then with 'all' each other row's element at that time ──
+    const rowsCard = mode => openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: mode,
+        graphs: [{ type: 'timeline', entities: [{ entity: 'binary_sensor.a' }, { entity: 'binary_sensor.b' }] }] },
+        { mock: { series: true, rows: { 'binary_sensor.a': [[3600, 'on'], [2400, 'off'], [1200, 'on']], 'binary_sensor.b': [[3600, 'off'], [1800, 'on']] } }, clock: CLOCK });
+    // (the middle of row d's segment k, page coordinates)
+    const segMid = (d, k) => t.E(`(()=>{ const c=graphAt(0).chart, r=c.canvas.getBoundingClientRect(), A=c.chartArea;
+        const v=c.getDatasetMeta(${d}).data.map(e=>e._view).filter(v=>!v.skip&&v.x+v.width>A.left&&v.x<A.right)[${k}];
+        const l=Math.max(v.x,A.left), rr=Math.min(v.x+v.width,A.right); return { x: r.left+(l+rr)/2, y: r.top+v.y+v.height/2 }; })()`);
+    const activeOf = gi => t.E(`graphAt(${gi}).chart.active.map(a=>a._datasetIndex)`);
+    t = await rowsCard('nearest');
+    await t.wait(800);
+    await t.step('nearest: a hover on a timeline\'s segment opens its tooltip, that segment only', async () => {
+        const p = await segMid(0, 1);
+        await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const on = await activeOf(0), text = await tip(0);
+        return JSON.stringify(on) === '[0]' && text ? true : JSON.stringify({ on, text });
+    });
+    done(await t.close());
+    t = await rowsCard('all');
+    await t.wait(800);
+    await t.step('all: a hover on a timeline\'s segment — that segment, then the other row\'s state at that time', async () => {
+        const p = await segMid(0, 1);
+        await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const on = await activeOf(0);
+        return JSON.stringify(on) === '[0,1]' ? true : JSON.stringify({ on });
+    });
+    done(await t.close());
+    t = await rowsCard('selected');
+    await t.wait(800);
+    await t.step('selected: a hover on a segment shows nothing; a click on it puts its row in the tooltip and opens its tooltip', async () => {
+        const p = await segMid(1, 0);
+        await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const hover = await activeOf(0);
+        await t.page.mouse.click(p.x, p.y); await t.wait(400);
+        const click = await activeOf(0), rows = await t.E('graphAt(0).chart._hecTooltipCurves');
+        return !hover.length && JSON.stringify(click) === '[1]' && rows && rows.includes(1) ? true : JSON.stringify({ hover, click, rows });
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, largeScreenTooltip: 'nearest',
+        graphs: [{ type: 'bar', entities: [{ entity: 'sensor.energy' }] }] }, { mock: { series: true }, clock: CLOCK });
+    await t.wait(800);
+    await t.step('nearest: a hover on a bar opens its tooltip', async () => {
+        const p = await t.E(`(()=>{ const c=graphAt(0).chart, r=c.canvas.getBoundingClientRect(), A=c.chartArea;
+            const vs=c.getDatasetMeta(0).data.map(e=>e._view).filter(v=>!v.skip&&v.x>A.left+20&&v.x<A.right-20&&Math.abs(v.base-v.y)>6); const v=vs[Math.floor(vs.length/2)];
+            return v ? { x: r.left+v.x, y: r.top+(v.y+v.base)/2 } : null; })()`);
+        if( !p ) return 'no bar';
+        await t.page.mouse.move(p.x, p.y - 15, { steps: 3 }); await t.page.mouse.move(p.x, p.y, { steps: 4 }); await t.wait(400);
+        const on = await activeOf(0), text = await tip(0);
+        return JSON.stringify(on) === '[0]' && text ? true : JSON.stringify({ on, text });
+    });
+    done(await t.close());
+
     // ── The tooltip's side beside its point: behind the pointer's move, decided when it shows a
     // new point (the gesture engine's direction); a finger: the half of the plot it's in ──
     const side = () => t.E('graphAt(0).chart.tooltip._view.xAlign');

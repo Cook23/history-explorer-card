@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.47] - 2026-10-28
+
+### Changed — bars, timelines and arrowlines: the tooltip as a curve's
+- Bars, a timeline's and an arrowline's rows follow the tooltip modes as curves do (`largeScreenTooltip`, `smallScreenTooltip`: `selected`, `nearest`, `mixed`, `all`): a hover — or a click — opens the tooltip of the element pointed at (a bar, a segment: the picking rule on its box, the pointer clamped on it), a click puts its series or row in the tooltip mode, and with `all` each other series' or row's element at that time joins it (a timeline: the other rows' states then); away from every element, nothing opened nor moved. No hover dot on them: they're drawn already (Chart.js `_hecPointAt`, `_hecElementAtTime`, `_hecHoverElements`, `_hecTap`; a timeline's or arrowline's datasets get `hecTooltip`)
+- README, README_Full, Chart Custom.js.md: the tooltip on bars, timelines and arrowlines
+
+### Added — the magnifier's modes
+- A long press on the magnifying glass — or a right click, a pen's button — opens the menu of its modes, each shown by its symbol: the time (↔), the Y axis (↕), both (⤢, the default — as before). The glass shows the mode's symbol (no longer a +). The elastic box is drawn and acts as the mode says: the time only — a band the plot area's height, the time zoomed, the Y axis left —; the Y axis only — a band its width —; both — the box as drawn. A mouse's drag mostly up or down (the box without the magnifier) follows the mode too. Kept as the time range is: on this device, across devices with the range's multi-device persistence (Chart.js option `zoomBoxAxes`; the card's `setZoomBoxMode`, the menu `ez_N`, `magnifierSvg`)
+- README, README_Full, Chart Custom.js.md: the magnifier's modes
+- The menus opened by one function (`_openMenuAt`: its close cancelled, filled, placed relative to its positioned parent, kept on its anchor, given the keyboard) — the type menu, the options menu, the magnifier's; a line can show an icon (`fillMenuItems`: `icon`, its name as its hover text)
+- Tests (`mouse`): a long press on the magnifier — its menu, both marked, the box's mode left off; a right click, the time chosen — ↔ on it, a band drawn up to the plot area's top, the time zoomed, the Y axis as it was; the Y axis chosen — the Y axis zoomed, the time as it was. (`persistence`): the mode kept after a reload and on another device
+- Tests (`points`): a timeline — `nearest`: a hover on a segment, its tooltip; `all`: the other row's state joins it; `selected`: a hover shows nothing, a click puts its row in the tooltip; bars — `nearest`: a hover on a bar, its tooltip (all fail with 1.2.46)
+
 ## [v1.2.46] - 2026-10-27
 
 ### Changed — the hover dot: the value nearest on the curve

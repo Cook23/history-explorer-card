@@ -139,6 +139,7 @@ export class CardStorage
             this._lastHaEntities         = data.entities;
             this._lastHaTimeRangeHours   = data.timeRangeHours;
             this._lastHaTimeRangeMinutes = data.timeRangeMinutes;
+            this._lastHaZoomBox          = data.zoomBox;
             this._keepLocal();
         } catch(e) {}
     }
@@ -163,6 +164,8 @@ export class CardStorage
             entities            : this.store.savedList(),
             timeRangeHours      : this.activeRange.timeRangeHours,
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
+            // (the magnifier's mode: kept as the time range is — _resolveZoomBox)
+            zoomBox             : this.state.zoomBox,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
             yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
@@ -172,6 +175,7 @@ export class CardStorage
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
             ha_timeRangeMinutes : this._lastHaTimeRangeMinutes,
+            ha_zoomBox          : this._lastHaZoomBox,
             ha_infoPanelEnabled : this._lastHaInfoEnabled,
             ha_gestures         : this._lastHaGestures,
         };
@@ -226,7 +230,7 @@ export class CardStorage
     {
         return {
             haCard: _ls.ha_entities === undefined && _ls.ha_timeRangeHours === undefined ? null
-                : { entities: _ls.ha_entities, timeRangeHours: _ls.ha_timeRangeHours, timeRangeMinutes: _ls.ha_timeRangeMinutes },
+                : { entities: _ls.ha_entities, timeRangeHours: _ls.ha_timeRangeHours, timeRangeMinutes: _ls.ha_timeRangeMinutes, zoomBox: _ls.ha_zoomBox },
             haInfoEnabled: _ls.ha_infoPanelEnabled ?? undefined,
             haGestures: _ls.ha_gestures ?? undefined,
         };
@@ -239,6 +243,7 @@ export class CardStorage
         this._lastHaEntities         = _haCard?.entities        ?? _ls?.ha_entities        ?? null;
         this._lastHaTimeRangeHours   = _haCard?.timeRangeHours  ?? _ls?.ha_timeRangeHours  ?? null;
         this._lastHaTimeRangeMinutes = _haCard?.timeRangeMinutes?? _ls?.ha_timeRangeMinutes?? null;
+        this._lastHaZoomBox          = _haCard?.zoomBox         ?? _ls?.ha_zoomBox         ?? null;
         this._lastHaInfoEnabled      = _haInfoEnabled            ?? _ls?.ha_infoPanelEnabled ?? null;
         this._lastHaGestures         = _haGestures               ?? _ls?.ha_gestures        ?? null;
     }
@@ -265,6 +270,7 @@ export class CardStorage
 
         this._resolveEntities(_ls, _haCard, _yamlImage, _noStatics);
         this._resolveTimeRange(_ls, _haCard, _yamlImage, _noStatics);
+        this._resolveZoomBox(_ls, _haCard, _noStatics);
         const _infoPanelChanged = this._resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage);
         this._resolveGestures(_ls, _haGestures, _yamlImage);
 
@@ -517,6 +523,17 @@ export class CardStorage
             else if( _ls?.timeRangeMinutes > 0 )
                 this.applyTimeRangeMinutes(_ls.timeRangeMinutes);
         }
+    }
+
+    // --- Last one to speak wins — the magnifier's mode ---
+    // Kept as the time range is (_cardPersists('range')): Home Assistant's value when it
+    // changed (persisted across devices), else this device's; nothing kept: both axes
+    _resolveZoomBox(_ls, _haCard, noStatics)
+    {
+        const _range = this._cardPersists('range', noStatics);
+        const _haChanged = _range.multi && _haCard?.zoomBox !== undefined && _haCard.zoomBox !== _ls?.ha_zoomBox;
+        const _mode = _haChanged ? _haCard.zoomBox : ( _range.multi || _range.local ) ? _ls?.zoomBox : undefined;
+        this.setZoomBoxMode(_mode ?? 'xy', false);
     }
 
     // --- Last one to speak wins — the info panel's switch ---

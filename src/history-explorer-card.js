@@ -144,6 +144,8 @@ export class HistoryCardState {
         this.state.updateCanvas  = null;
         this.state.loading       = false;
         this.state.zoomMode      = false;
+        // (the magnifier's mode: what the elastic box zooms — 'x' the time, 'y' the Y axes, 'xy' both)
+        this.state.zoomBox       = 'xy';
         this.state.autoScroll    = false;
 
         this._drag = null;   // label or graph being dragged (_onDragStart)
