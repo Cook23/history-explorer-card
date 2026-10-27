@@ -4716,6 +4716,7 @@
                 me._hecUpdateReveal(null);
                 me._hecSetLabelsHovered(null);
                 me._hecSetPointerOver(false);
+                me._hecForgetPointerDir();
                 me._hecSetShowSamples(false);
                 // A genuine mouseout leaves the canvas entirely — close both the hover
                 // tooltip and a label message shown from this chart.
@@ -8765,7 +8766,16 @@
             return y <= midY ? 'top' : 'bottom';
           };
 
-          if (lf(model.x)) {
+          // (fork) the side a hover prefers, behind the pointer's move (_hecTooltipXAlign): there
+          // when it fits, else on the other side, else above or below
+          var _pref = yAlign === 'center' && chart._hecTooltipXAlign ? chart._hecTooltipXAlign(tooltip) : null;
+          var _fits = function (a) { return a === 'left' ? !olf(model.x) : !orf(model.x); };
+          if (_pref) {
+            var _other = _pref === 'left' ? 'right' : 'left';
+            if (_fits(_pref)) xAlign = _pref;
+            else if (_fits(_other)) xAlign = _other;
+            else { xAlign = 'center'; yAlign = yf(model.y); }
+          } else if (lf(model.x)) {
             xAlign = 'left';
 
             // Is tooltip too wide and goes over the right side of the chart.?

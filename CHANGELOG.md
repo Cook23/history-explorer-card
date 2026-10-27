@@ -4,6 +4,17 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.45] - 2026-10-27
+
+### Changed — the tooltip's side
+- Beside its point, a tooltip opened by a hover stands behind the pointer's move: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new point, kept while it stays on it; there when it fits, else on the other side, else above or below (as before, when neither side fits). Without a direction — a finger, no hover —, the rule of the plot's halves as before (Chart.js `_hecTooltipXAlign`, read by the tooltip's `determineAlignment`)
+- The gesture engine gives the pointer's horizontal direction as a hover goes (`_hecPointerDirX`): the way it went between its last two hover positions — no hysteresis, which, wider than the gap between two points, would keep a stale direction there (one is kept inactive in the code); forgotten when the pointer leaves the graph, and for a finger
+- README_Full, Chart Custom.js.md: the tooltip's side
+
+### Fixed — two thick curves close together
+- Since 1.2.44, the picking rule took a line's half width (a point's radius) off its distance to the pointer — a distance its tie-break uses too: two thick curves a few pixels apart (5 px wide, 4 px apart) were seen halfway, none picked, even with the pointer exactly on one — no hover dot there. The size now only widens the margin the nearest must be within (the pointer's precision, plus a line's half width, a point's radius); the distances, and the tie-break, as before 1.2.44 (Chart.js `_hecPickNearest`: a candidate's `size`)
+- Tests (`points`): a value reached moving rightward — the tooltip on its left, a move back while on it changing nothing; the next one reached moving leftward — on its right; a finger's tap — the rule of the plot's halves
+
 ## [v1.2.44] - 2026-10-27
 
 ### Fixed — a tooltip shows points, never a curve's path
