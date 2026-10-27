@@ -428,6 +428,36 @@ module.exports = async function()
         return JSON.stringify(on) === JSON.stringify([[0, v[1].i]]) && open && onDot === null && JSON.stringify(kept) === JSON.stringify(on) && dot && dot[1] === v[2].i && gone === null ? true : JSON.stringify({ on, open, onDot, kept, dot, gone });
     });
     done(await t.close());
+    // ── The tooltip's side beside its point: behind the pointer's move, decided when it shows a
+    // new point (the gesture engine's direction); a finger: the half of the plot it's in ──
+    const side = () => t.E('graphAt(0).chart.tooltip._view.xAlign');
+    t = await sparse('nearest');
+    await t.wait(800);
+    await t.step('a hover reaching a value moving rightward: the tooltip on its left; a move back while on it changes nothing; the next value reached moving leftward: the tooltip on its right', async () => {
+        const v = await vals(0);
+        await t.page.mouse.move(v[1].x - 120, v[1].y - 60); await t.page.mouse.move(v[1].x, v[1].y - 1, { steps: 12 }); await t.wait(400);
+        const right = await side(), on = await activeAt();
+        await t.page.mouse.move(v[1].x - 5, v[1].y - 1, { steps: 3 }); await t.wait(300);
+        const back = await side();
+        await t.page.mouse.move(v[2].x + 120, v[2].y - 60, { steps: 12 }); await t.page.mouse.move(v[2].x, v[2].y - 1, { steps: 12 }); await t.wait(400);
+        const left = await side(), on2 = await activeAt();
+        // (xAlign 'right': the box's right edge at the point — the tooltip on the point's left)
+        return right === 'right' && on[0][1] === v[1].i && back === 'right' && left === 'left' && on2[0][1] === v[2].i ? true : JSON.stringify({ right, back, left, on, on2 });
+    });
+    done(await t.close());
+    t = await sparse('selected', { touch: true });
+    await t.wait(800);
+    await t.step('a finger (no hover, no direction): the tooltip beside its point as the half of the plot it\'s in says', async () => {
+        const v = await vals(0);
+        const r = [];
+        for( const p of [v[0], v[v.length - 1]] ) {
+            await t.tap(p); await t.wait(500);
+            r.push({ side: await side(), left: await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea; return ${p.x} - c.canvas.getBoundingClientRect().left <= (A.left + A.right) / 2; })()`) });
+        }
+        // (the left half: the tooltip on the point's right — xAlign 'left')
+        return r.every(x => x.side === (x.left ? 'left' : 'right')) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
     t = await sparse('all');
     await t.wait(800);
     await t.step('all: on a value, the other curve\'s value at the same time joins it; one a few minutes away (beyond the picking margin along the time axis) doesn\'t', async () => {

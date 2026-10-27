@@ -41,7 +41,9 @@
     }), margin);
   }
   // The same rule, from each candidate's point nearest the pointer: { d (its distance to
-  // the pointer), x, y }, or null (not a candidate); margin: the current pointer's by default
+  // the pointer), x, y, size (optional: its half width — a line's, a point's radius — added
+  // to the margin it must be within, the distance itself unchanged) }, or null (not a
+  // candidate); margin: the current pointer's by default
   function _hecPickNearest(cands, margin) {
     var best = -1, second = -1;
     for (var i = 0; i < cands.length; i++) {
@@ -53,7 +55,7 @@
     if (best < 0) return -1;
     var c1 = cands[best], c2 = second >= 0 ? cands[second] : null;
     var _gap = c2 ? Math.sqrt((c2.x - c1.x) * (c2.x - c1.x) + (c2.y - c1.y) * (c2.y - c1.y)) : Infinity;
-    if (c1.d > (margin !== undefined ? margin : _hecPickMargin())) return -1;
+    if (c1.d > (margin !== undefined ? margin : _hecPickMargin()) + (c1.size || 0)) return -1;
     // (on the same pixel — less than one apart: one place, the first one)
     if (_gap < 1) return Math.min(best, second);
     return !c2 || c2.d - c1.d >= _gap / 3 ? best : PICK_BETWEEN;
@@ -1665,6 +1667,8 @@
     // A mouse's other buttons start no gesture: its right button acts through the
     // contextmenu gesture (a pen's barrel button is handled below)
     if (pointerType === 'mouse' && e.native && e.native.button > 0) return;
+    // (a finger: no hover, no direction)
+    if (pointerType === 'touch') forgetDirection(gs);
     gs.pointers[pid] = { x: e.x, y: e.y };
     gs.count = Object.keys(gs.pointers).length;
     // Keep receiving this pointer's moves/release once it leaves the canvas —
@@ -1751,10 +1755,33 @@
     }
   }
 
+  // The pointer's horizontal direction as a hover goes (gs.dirX: 1 rightward, -1 leftward, 0
+  // not known — no hover yet, or a finger): the way it went between its last two hover
+  // positions (a move straight up or down keeps the last one; gs.dirLastX: the last position).
+  // Read through _hecPointerDirX
+  function trackDirection(gs, x) {
+    if (gs.dirLastX !== undefined && x !== gs.dirLastX) gs.dirX = x > gs.dirLastX ? 1 : -1;
+    gs.dirLastX = x;
+  }
+  // (inactive — kept should it serve elsewhere: the same direction with a hysteresis of the
+  // pointer's precision — set once the pointer went further than that, reversed only once it
+  // went back further than that from where its move turned back, gs.dirAnchor being the
+  // furthest point reached in the current direction. Not for the tooltip's side: wider than
+  // the gap between two points, it would keep a stale direction there.)
+  // function trackDirectionHysteresis(gs, x, slop) {
+  //   if (gs.dirAnchor === undefined) { gs.dirAnchor = x; gs.dirX = 0; return; }
+  //   var d = x - gs.dirAnchor;
+  //   if (gs.dirX && d * gs.dirX > 0) { gs.dirAnchor = x; return; }
+  //   if (Math.abs(d) > slop) { gs.dirX = d > 0 ? 1 : -1; gs.dirAnchor = x; }
+  // }
+  function forgetDirection(gs) { gs.dirX = 0; gs.dirLastX = undefined; }
+
   // mousemove
   function hecPointerMove(c) {
     var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
     if (gs.pointers[pid]) { gs.pointers[pid].x = e.x; gs.pointers[pid].y = e.y; gs.pointers[pid].moved = true; }
+    // (a hover: a mouse or a pen, no button pressed)
+    if (pointerType !== 'touch' && !(e.native && e.native.buttons)) trackDirection(gs, e.x);
     // Alt (Option) held while the pointer moves over the chart: every sample shown (the
     // hover and its tooltip stay on the point under the pointer) — unless
     // altSampleModeEnabled is false
@@ -2150,8 +2177,8 @@
     },
 
     // The curve (line dataset index) at this point, by the picking rule (_hecPickNearest):
-    // each shown line's point nearest it, along its drawn path (its distance to the line, its
-    // half width less) — its points joined
+    // each shown line's point nearest it, along its drawn path (within the picking margin and
+    // the line's half width) — its points joined
     // straight, in steps for a stepped line, or a B-spline's arcs (_hecBsplinePath); -1, or
     // PICK_BETWEEN about halfway between two. Two curves drawn on top of each other there:
     // the one drawn over (the first). only(i): the curves taken into account, all by default
@@ -2163,7 +2190,7 @@
         if (!meta.dataset || !me.isDatasetVisible(i) || (only && !only(i))) return null;
         var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
           .map(function (p) { return p._view; });
-        // (the distance to the line itself: its half width less)
+        // (_hw: the line's half width — the margin it must be within is that much wider)
         var st = ds.steppedLine, best = null, _hw = ((meta.dataset._view && meta.dataset._view.borderWidth) || ds.borderWidth || 0) / 2;
         for (var k = 1; k < pts.length; k++) {
           var a = pts[k - 1], b = pts[k];
@@ -2176,7 +2203,7 @@
             : [a, { x: b.x, y: a.y }, b];
           for (var j = 1; j < path.length; j++) {
             var n = _hecSegmentNearest(px, py, path[j - 1].x, path[j - 1].y, path[j].x, path[j].y);
-            n.d = Math.max(0, n.d - _hw);
+            n.size = _hw;
             if (!best || n.d < best.d) best = n;
           }
         }
@@ -2187,7 +2214,7 @@
 
     // The point (a value drawn, never a curve-shaping point) at (px, py), by the picking rule
     // (_hecPickNearest) on the points themselves — each curve's point nearest it, in X and Y,
-    // its distance to the point drawn (its radius less), within the picking margin; none about halfway between two curves' points. only(i): the
+    // within the picking margin and its radius drawn; none about halfway between two curves' points. only(i): the
     // curves taken into account. The tooltip's first point: a real value, never a place
     // between two — there is nothing to show there
     _hecPointAt: function (px, py, only) {
@@ -2196,9 +2223,9 @@
         if (!me.getDatasetMeta(i).dataset || !me.isDatasetVisible(i) || (only && !only(i))) return null;
         var el = _els[i] = me._hecNearestPointOf(i, px, py);
         if (!el) return null;
-        // (the distance to the point itself: its radius drawn less)
+        // (the margin it must be within: that much wider, its radius drawn)
         var v = el._view;
-        return { d: Math.max(0, Math.sqrt((v.x - px) * (v.x - px) + (v.y - py) * (v.y - py)) - (v.radius || 0)), x: v.x, y: v.y };
+        return { d: Math.sqrt((v.x - px) * (v.x - px) + (v.y - py) * (v.y - py)), x: v.x, y: v.y, size: v.radius || 0 };
       });
       var _i = _hecPickNearest(_cands);
       return _i >= 0 ? _els[_i] : null;
@@ -2377,6 +2404,34 @@
     _hecHasYAxisLock: function () {
       return this.options.yAxisLockEnabled !== false && this.config.type !== 'timeline' && this.config.type !== 'arrowline' &&
         !!(this.options.scales && this.options.scales.yAxes && this.options.scales.yAxes.length);
+    },
+
+    // The pointer's horizontal direction as a hover goes, from the gesture engine (between its
+    // last two hover positions — trackDirection): 1 rightward, -1 leftward, 0 not known
+    _hecPointerDirX: function () {
+      var gs = this._hecGesture;
+      return gs && gs.dirX || 0;
+    },
+
+    // The pointer left the graph: its direction forgotten (a hover coming back starts afresh)
+    _hecForgetPointerDir: function () {
+      if (this._hecGesture) forgetDirection(this._hecGesture);
+    },
+
+    // The side a tooltip prefers beside its point (the tooltip's determineAlignment): behind
+    // the pointer's move as the hover goes — moving rightward, on the point's left ('right':
+    // the box's right edge at the point), and the other way round —, decided when it shows a
+    // new point and kept while it stays on it, whatever the pointer does meanwhile; null
+    // without a direction (a finger, no hover): the rule of the plot's halves
+    _hecTooltipXAlign: function (tooltip) {
+      var a = tooltip._active && tooltip._active[0];
+      if (!a) { this._hecTooltipSideOf = null; return null; }
+      if (this._hecTooltipSideOf !== a) {
+        this._hecTooltipSideOf = a;
+        var d = this._hecPointerDirX();
+        this._hecTooltipSide = d > 0 ? 'right' : d < 0 ? 'left' : null;
+      }
+      return this._hecTooltipSide;
     },
 
     // Whether a contact is in progress — a press the gesture engine hasn't resolved yet into

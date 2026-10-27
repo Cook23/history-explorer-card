@@ -162,11 +162,15 @@ Three pairs of notions, never mixed. Mixing them caused regressions (see below).
 **Nearest-smart ("le plus proche intelligent") or nearest.**
 - Nearest-smart is the picking rule, `_hecPickNearest`, the same everywhere: labels, Y labels,
   bars and timeline segments, floating icons, curves, points.
-  1. Each candidate gives its place nearest the pointer and its distance to the pointer.
-     The distance is to the object itself, its edge, not its centre: a box clamped (a label,
-     a bar), a line minus half its width, a point minus its radius.
+  1. Each candidate gives its place nearest the pointer and its distance to the pointer: to a
+     box (a label, a bar), the pointer clamped on it; to a line, its centre line; to a point,
+     its centre. That distance serves everywhere, the tie-break of step 3 included — never
+     changed by the object's size.
   2. The nearest is kept only within the picking margin: the pointer's slop (mouse, finger,
-     pen; a setting). The floating icons use `_hecIconMargin`, see "Floating icons".
+     pen; a setting) plus the object's size — a line's half width, a point's radius (the
+     size only widens the margin; taking it off the distance instead, in 1.2.44, broke the
+     tie-break between two thick lines close together). The floating icons use
+     `_hecIconMargin`, see "Floating icons".
   3. Against the second nearest:
      - on the same pixel (under 1 px apart), the first one wins (the curve drawn over);
      - else the nearest must win clearly: the gap between their distances must be at least
