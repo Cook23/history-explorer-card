@@ -28,8 +28,8 @@ export class CardGraphs
             case 'line': return ( h ? h : this.pconfig.lineGraphHeight );
             case 'bar':  return ( h ? h : this.pconfig.barGraphHeight ) + 24;
             default:
-                // (room for its tooltip: its title and a line or two)
-                return Math.max(34 + n * this.pconfig.timelineBarSpacing, 115);
+                // (room for its tooltip, as large as its size says — see tooltipSize)
+                return Math.max(34 + n * this.pconfig.timelineBarSpacing, { full: 130, compact: 115, slim: 90 }[this.tooltipSize()]);
         }
     }
 

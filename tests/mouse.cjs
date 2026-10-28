@@ -291,17 +291,18 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.wait(300);
         return JSON.stringify(menu) === JSON.stringify(['ez_0_x', 'ez_0_y', 'ez_0_xy*']) && !on ? true : JSON.stringify({ menu, on });
     });
-    await t.step('the time chosen (a right click opens the menu too): the magnifier shows ↔; a box drawn the plot area\'s height, the time zoomed, the Y axis as it was', async () => {
+    await t.step('the time chosen (a right click opens the menu too): the magnifier shows ↔, its size kept (as large as − and +); a box drawn the plot area\'s height, the time zoomed, the Y axis as it was', async () => {
         const li = await boxGraph(); await unlock(li);
         const c = await bz(); await t.page.mouse.click(c.x, c.y, { button: 'right' }); await t.wait(300);
         await t.E(`el.querySelector('#ez_0_x').click()`); await t.wait(900);
         const mode = await E('el.instance.state.zoomBox'), axes = await E(`graphAt(${li}).chart.options.zoomBoxAxes`), closed = (await zoomMenu()) === null;
+        const sizes = await E(`['#bz_0', '#b4_0', '#b5_0'].map(id => Math.round(el.querySelector(id + ' svg').getBoundingClientRect().width))`);
         const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
         const w0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
         const band = await manualDrag({ x: a.x - 40, y: a.y - 40 }, { x: a.x + 40, y: a.y + 60 }, () => E(`(()=>{ const c=graphAt(${li}).chart, e=c._hecZoomSelectionEl, x=${a.x - 30}-c.canvas.getBoundingClientRect().left, d=e.getContext('2d').getImageData(Math.round(x*e.width/e.offsetWidth), Math.round((c.chartArea.top+3)*e.height/e.offsetHeight), 1, 1).data; return d[3] > 0; })()`));
         const w1 = await win(), y1 = await E(`yRange(${li})`);
         await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
-        return mode === 'x' && axes === 'x' && closed && band && span(w1) < span(w0) && y1.join() === y0.join() ? true : JSON.stringify({ mode, axes, closed, band, w0, w1, y0, y1 });
+        return mode === 'x' && axes === 'x' && closed && sizes.every(w => w === sizes[1]) && band && span(w1) < span(w0) && y1.join() === y0.join() ? true : JSON.stringify({ mode, axes, closed, sizes, band, w0, w1, y0, y1 });
     });
     await t.step('the Y axis chosen: a box drawn the plot area\'s width, the Y axis zoomed, the time as it was', async () => {
         const li = await boxGraph(); await unlock(li);

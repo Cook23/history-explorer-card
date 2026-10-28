@@ -35,17 +35,20 @@ export function timeButtonsHtml(i)
 }
 
 // The toolbar's zoom controls, its right part (#dr_N's content): the magnifier (and its
-// modes' menu, ez_N), '-', the range selector, '+' (swapped by invertZoom) — the card's and
-// the info panel's
+// modes' menu, ez_N), the magnifier −, the range selector, the magnifier + (their actions
+// swapped by invertZoom; the three of the same size, close together) — the card's and the
+// info panel's
 export function rangeControlsHtml(i, optionStyle, invertZoom)
 {
-    return `
-        <button id="bz_${i}" style="${BUTTON_STYLE}">${magnifierSvg('xy')}</button>${zoomMenuHtml(i)}
-        <button id="b${invertZoom ? 5 : 4}_${i}" style="${BUTTON_STYLE};height:30px">-</button>
-        <select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center">
-            ${RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('')}
-        </select>
-        <button id="b${invertZoom ? 4 : 5}_${i}" style="${BUTTON_STYLE};height:30px">+</button>`;
+    // (no space between them: side by side; the selector's text 5 px to the left — centred
+    // by the browser left of its arrow, it would look too far right, between the magnifier −
+    // and the arrow)
+    return `<button id="bz_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 18)}</button>${zoomMenuHtml(i)}` +
+        `<button id="b${invertZoom ? 5 : 4}_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 18)}</button>` +
+        `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-5px">` +
+            RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('') +
+        `</select>` +
+        `<button id="b${invertZoom ? 4 : 5}_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 18)}</button>`;
 }
 
 export class CardToolbar

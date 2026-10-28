@@ -342,7 +342,9 @@ tooltip:
   # (Can also be set with $.showTooltipColorsTimeline)
   showColorsTimeline: True
 
-  # Accepted, no effect (every tooltip has the same layout)
+  # The size of every tooltip: full (the source and the time, then each name and value), compact (the time,
+  # then each shortest name and value), slim (one line: the time and the value pointed at), or auto (by the
+  # card's width: full from 600 px, compact from 300 px and in the info panel, slim below)
   # (Can also be set with $.tooltipSize)
   size: "auto"
 
@@ -648,7 +650,7 @@ uiLayout:
   selector: 'bottom'
   # Where the toolbars should stick, when scrolling. By default they do not stick to screen. But here they can be made to stick to the top, bottom, or both sides of the screen when scrolling.
   sticky: 'hide'
-  # Whether to switch the + and - buttons around on the interval selector
+  # Whether to switch the magnifiers + and - around on the interval selector
   invertZoom: False
   # If set to 'hide', the interval selector on total_increasing bar graphs will be hidden.
   interval: undefined

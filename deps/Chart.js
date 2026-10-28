@@ -14318,6 +14318,24 @@
 
         time = moment(first);
 
+        // (fork) hours stepped by the clock, day by day — 00:00, 12:00; 00:00, 03:00, 06:00… —,
+        // not by their length: a day of 23 or 25 hours (a change of daylight saving time)
+        // keeps every midnight ticked, its day labelled (an hour that doesn't exist that day
+        // skipped). See "Chart Custom.js.md" §8
+        if (minor === 'hour' && major === 'day' && majorTicksEnabled && !weekday && !timeOpts.round) {
+          var _step = Math.max(1, +stepSize || 1), _day = moment(first).startOf('day'), _h, _t;
+          for (;; _day.add(1, 'day')) {
+            for (_h = 0; _h < 24; _h += _step) {
+              _t = +moment(_day).hour(_h);
+              if (ticks.length && _t <= ticks[ticks.length - 1]) continue;
+              // (from the last tick at or before the first one, as below)
+              if (_t <= +first) { ticks = [_t]; continue; }
+              ticks.push(_t);
+              if (_t >= +last) return ticks;
+            }
+          }
+        }
+
         if (majorTicksEnabled && major && !weekday && !timeOpts.round) {
           // Align the first tick on the previous `minor` unit aligned on the `major` unit:
           // we first aligned time on the previous `major` unit then add the number of full

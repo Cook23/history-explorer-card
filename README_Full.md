@@ -194,13 +194,13 @@ To see a list of all possible configuration options, check the [Full reference c
 
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
-When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown or plus / minus buttons) to zoom into or out of the history. A mouse's drag mostly up or down on a graph draws an elastic box (a finger's or a pen's vertical move scrolls the page) (a drag mostly sideways pans the time): released, the time zooms to it — the round duration that covers it, centred on it — and every Y axis of the graph to its values, the padlock closed; a box narrower or lower than the pointer's precision, or covering 90 % or more of the curves' area that way (it would hardly zoom), leaves that axis as it is — a box the whole height zooms the time only —, and Escape cancels it. The magnifying glass turns green while it's drawn; turned on (a click on it), any drag on a graph's curves draws the same box, with a finger too (the page doesn't scroll from a graph meanwhile). It goes off at the end of the next gesture on a graph — the box, or any other, which then does what it does —, a press outside the graphs, Escape, or a click on it again. A long press on the magnifying glass — or a right click, a pen's button — opens the menu of what the box zooms: the time (↔ — the box a band the curves' whole height, from the press to the pointer along the time), the Y axis (↕ — a band their whole width) or both (⤢, as above, the default); the glass shows its symbol. The choice is kept as the time range is (see the persistence options). Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
+When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown, or the magnifiers − and + on each side of it) to zoom into or out of the history. A mouse's drag mostly up or down on a graph draws an elastic box (a finger's or a pen's vertical move scrolls the page) (a drag mostly sideways pans the time): released, the time zooms to it — the round duration that covers it, centred on it — and every Y axis of the graph to its values, the padlock closed; a box narrower or lower than the pointer's precision, or covering 90 % or more of the curves' area that way (it would hardly zoom), leaves that axis as it is — a box the whole height zooms the time only —, and Escape cancels it. The magnifying glass turns green while it's drawn; turned on (a click on it), any drag on a graph's curves draws the same box, with a finger too (the page doesn't scroll from a graph meanwhile). It goes off at the end of the next gesture on a graph — the box, or any other, which then does what it does —, a press outside the graphs, Escape, or a click on it again. A long press on the magnifying glass — or a right click, a pen's button — opens the menu of what the box zooms: the time (↔ — the box a band the curves' whole height, from the press to the pointer along the time), the Y axis (↕ — a band their whole width) or both (⤢, as above, the default); the glass shows its symbol. The choice is kept as the time range is (see the persistence options). Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
 
 **Real time** is the window showing the present, on its right: the curves grow and slide as new values come. The window never goes past the present — dragged towards the future, zoomed, the day after: it stops at the present, and is in real time again; the date selector's `>` is greyed then (there's nothing after). Dragged or moved back, the present is no longer shown: the window stays where it is while new values keep coming, `>` active again. With `defaultTimeOffset`, the present is the time it gives (`1h`: an hour after now, `1D`: the end of the day).
 
 Where a zoom keeps the time window depends on what you're doing:
-- **In real time** — the present shown, the window following it: every change of the range keeps the present on the right — the time range selector, the plus / minus buttons, the default range (a double click on the magnifier). The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
-- **Looking at the history**: the time range selector and the plus / minus buttons keep the middle of the window, whatever the duration; the wheel and a pinch zoom around the pointer or the fingers.
+- **In real time** — the present shown, the window following it: every change of the range keeps the present on the right — the time range selector, the magnifiers − and +, the default range (a double click on the magnifier). The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
+- **Looking at the history**: the time range selector and the magnifiers − and + keep the middle of the window, whatever the duration; the wheel and a pinch zoom around the pointer or the fingers.
 
 Click or tap on a graph and drag left or right to slide it through time. The card loads what comes into view as you move along (see [Long term statistics](#long-term-statistics)): on a slow database (on an SD card, for example), parts of the window may stay empty for a moment, filled as the data comes in.
 
@@ -1677,7 +1677,7 @@ uiLayout:
   sticky: top   # Make the top toolbar controls sticky, so they always stay on top.
 ```
 
-If you prefer the `+` and `-` zoom icons in the time range control to work the other way round, you can invert them using the following YAML:
+If you prefer the magnifiers + and − in the time range control to work the other way round, you can invert them using the following YAML:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1720,9 +1720,19 @@ graphs:
 
 ### Configuring the tooltip popup
 
-Every tooltip — a curve's, a bar's, a timeline's or an arrowline's — has the same layout. Its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown, its color box, its series' name and its value: a curve's or a bar's in its unit (`min / mean / max` for a column of values), a timeline's state, an arrowline's value.
+Every tooltip — a curve's, a bar's, a timeline's or an arrowline's — has the same layout, in one of three sizes (`tooltip.size`):
 
-`tooltip.size` is accepted, with no effect.
+- `full` — its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown, its color box, its series' name and its value: a curve's or a bar's in its unit (`min / mean / max` for a column of values), a timeline's state, an arrowline's value.
+- `compact` — its title is the time alone; then a line per value, its color box, its series' name at its shortest — the legend's shortened form, its shared prefix removed (see the legend), whether the legend itself is shortened or not — and its value.
+- `slim` — no title; one value only, the one pointed at, whatever the tooltip mode (`all`, `mixed` and the curves clicked show nothing more), on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day (ticks in hours or minutes); a span over several days keeps its dates.
+- `auto` (the default) — as the card's width says: `full` from 600 px, `compact` from 300 px (and in the info panel), `slim` below.
+
+A timeline's graph is at least as high as its tooltip: 130 px in `full`, 115 in `compact`, 90 in `slim`.
+
+```yaml
+tooltip:
+  size: compact   # full, compact, slim or auto
+```
 
 The color boxes in the tooltips can be hidden for timelines, or for every other graph (lines, bars, arrowlines), or both:
 

@@ -906,6 +906,62 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The time axis across a change of daylight saving time (Paris): every midnight ticked
+    // and labelled with its day, the hours stepped by the clock ──
+    for( const [clock, label] of [['2026-10-28T05:44:00+01:00', 'October (a day of 25 h)'], ['2026-03-31T05:44:00+02:00', 'March (a day of 23 h)']] ) {
+        t = await openCard(card({ defaultTimeRange: '3d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+            { mock: { series: true }, clock, timezone: 'Europe/Paris' });
+        await t.wait(1500);
+        await t.step(`3 days over the change of time in ${label}: every midnight a tick of the day, the hours on the clock's`, async () => {
+            const r = await t.E(`(()=>{ const c=graphAt(0).chart, sc=c.scales[c.options.scales.xAxes[0].id], I=el.instance;
+                const at=v=>{ const d=new Date(v); return d.getDate()+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); };
+                const ticks=sc._ticks.map(k=>({ v:k.value, major:k.major, at:at(k.value) }));
+                const nights=[], d=new Date(I.startTime); d.setHours(0,0,0,0);
+                for( d.setDate(d.getDate()+1); +d<+new Date(I.endTime); d.setDate(d.getDate()+1) ) nights.push(+d);
+                return { step: I.activeRange.tickStepSize + I.activeRange.tickStepUnit, at: ticks.map(k=>k.at),
+                         missing: nights.filter(n=>!ticks.some(k=>k.v===n && k.major)).map(at),
+                         offClock: ticks.filter(k=>new Date(k.v).getHours() % +I.activeRange.tickStepSize || new Date(k.v).getMinutes()).map(k=>k.at) }; })()`);
+            return r.missing.length === 0 && r.offClock.length === 0 && /h|hour/.test(r.step) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── The tooltip's size: full, compact, slim — auto as the card's width says ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
+            { entity: 'sensor.power', name: 'Météo-France Villeveyrac Temperature (Filtered)' },
+            { entity: 'sensor.rain', name: 'Météo-France Villeveyrac Temperature' }] }] }),
+        { mock: { series: true }, clock: '2026-10-19T18:19:00+02:00', timezone: 'Europe/Paris' });
+    await t.wait(1500);
+    const tipAt = (w) => t.E(`(async()=>{ el.style.display='block'; el.style.width='${w}'; await new Promise(r=>setTimeout(r,400));
+        const I=el.instance, c=graphAt(0).chart, cb=c.options.tooltips.callbacks, ds=c.data.datasets[0], i=Math.floor(ds.data.length/2);
+        const it={ datasetIndex:0, index:i, xLabel:'X', yLabel:ds.data[i].y };
+        return { size: I.tooltipSize(), title: cb.title([it], c.data), label: cb.label(it, c.data), firstOnly: !!c.options.tooltips.hecFirstOnly }; })()`);
+    await t.step('auto, a large screen (600 px or more): full — the source and the time, the whole name and the value', async () => {
+        const r = await tipAt('');
+        return r.size === 'full' && r.title === 'History: X' && /^Météo-France Villeveyrac Temperature \(Filtered\): /.test(r.label) && !r.firstOnly ? true : JSON.stringify(r);
+    });
+    await t.step('auto, a small screen (300 to 600 px): compact — the time alone, the name at its shortest, the value', async () => {
+        const r = await tipAt('450px');
+        return r.size === 'compact' && r.title === 'X' && /^Temperature \(Filtered\): /.test(r.label) && !r.firstOnly ? true : JSON.stringify(r);
+    });
+    await t.step('auto, a narrow card (under 300 px): slim — no title, the first value alone, its time without its date (one day shown, the hours on the X axis) and its value', async () => {
+        const r = await tipAt('280px');
+        return r.size === 'slim' && r.title === '' && /^\d\d?:\d\d(:\d\d)?(\s?[ap]m)?\u00a0\u00a0-?[\d.,]+ /i.test(r.label) && r.firstOnly ? true : JSON.stringify(r);
+    });
+    await t.step('slim: one value only, whatever the tooltip mode (all) — a hover shows the first point alone', async () => {
+        const r = await t.E(`(()=>{ const c=graphAt(0).chart; c.data.datasets.forEach(d=>d.hecTooltip='all'); c.update(0);
+            const m=c.getDatasetMeta(0).data, p=m[Math.floor(m.length/2)]._view, b=c.canvas.getBoundingClientRect();
+            return c._hecHoverElements({ x:p.x, y:p.y }).length; })()`);
+        return r === 1 ? true : JSON.stringify(r);
+    });
+    await t.step('tooltip.size set: the same at every width', async () => {
+        await t.E(`(()=>{ el.instance.pconfig.tooltipSize='compact'; })()`);
+        const a = await tipAt(''), b = await tipAt('280px');
+        await t.E(`(()=>{ el.instance.pconfig.tooltipSize='auto'; el.style.width=''; })()`);
+        return a.size === 'compact' && b.size === 'compact' && !b.firstOnly ? true : JSON.stringify({ a, b });
+    });
+    done(await t.close());
+
     // ── Dark mode, language ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { dark: true, language: 'fr' } });
     await t.step('dark theme: light labels on the graphs', async () => {
@@ -918,7 +974,7 @@ module.exports = async function()
     });
     await t.step('French, the card narrowed: the date shortened first, the range ("1 Jour") only once the short date and the whole range don\'t fit', async () => {
         const r = [];
-        for( const w of [700, 600, 500, 450, 420, 400, 380, 360, 340, 320, 300] ) {
+        for( const w of [700, 600, 500, 450, 420, 400, 380, 360, 340, 320, 300, 280, 270, 260] ) {
             await t.E(`(()=>{ el.style.display='block'; el.style.width='${w}px'; })()`); await t.wait(300);
             r.push(await t.E(`[${w}, el.instance._toolbarForm[0], el.querySelector('#by_0').style.maxWidth]`));
         }
