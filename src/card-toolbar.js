@@ -42,9 +42,10 @@ export function rangeControlsHtml(i, optionStyle, invertZoom)
     // (side by side, about 10 px apart as they're seen — as the time buttons are: margins
     // between the magnifiers; the selector's text 7 px to the left — centred by the browser
     // left of its arrow, it would look too far right, between the magnifier − and the arrow)
-    // (each magnifier twice as large under a mouse or a pen above the screen — drawn over its
-    // neighbours, the layout unchanged —, so as to see what is clicked)
-    return `<style>@media (hover:hover){.hec-mag svg{position:relative;z-index:2;transition:transform .12s}.hec-mag:hover svg{transform:scale(2)}}</style>` +
+    // (each magnifier twice as large under the pointer — a mouse, a pen above the screen, a
+    // finger while it presses —, drawn over its neighbours, the layout unchanged, so as to see
+    // what is clicked: hec-big, see wireToolbar)
+    return `<style>.hec-mag svg{position:relative;z-index:2;transition:transform .12s}.hec-mag.hec-big svg{transform:scale(2)}</style>` +
         `<button id="bz_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 20)}</button>${zoomMenuHtml(i)}` +
         `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:2px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
         `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-7px">` +
@@ -148,6 +149,13 @@ export class CardToolbar
         this._this.querySelector(`#bx_${i}`)?.addEventListener('dblclick', () => { clearTimeout(this._dateClickTimer); this.todayNoReset(); }, false);
         this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
+        // (a magnifier under the pointer shown twice as large — every pointer: a CSS hover rule
+        // would follow the device's primary pointer only, a tablet's pen left out)
+        for( const id of ['bz', 'b4', 'b5'] ) {
+            const b = this._this.querySelector(`#${id}_${i}`);
+            b?.addEventListener('pointerenter', () => b.classList.add('hec-big'));
+            for( const ev of ['pointerleave', 'pointercancel'] ) b?.addEventListener(ev, () => b.classList.remove('hec-big'));
+        }
         // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
         // back to the default range)
         this._this.querySelector(`#bz_${i}`)?.addEventListener('dblclick', this.defaultRange.bind(this), false);
