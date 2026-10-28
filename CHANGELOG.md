@@ -8,6 +8,7 @@ Changelog for the HA History Explorer Card.
 
 ### Changed — the documentation's images
 - Every image of README.md and README_Full.md redone with the current card, its scenes kept; new ones for the menus (a curve's, a graph's, a timeline row's, the options menu, the type menu of an entity being added, an entity's attributes), drag and drop (a curve onto another graph, a graph, a timeline row, the Y axis), the tooltip and two Y axes. The images are stored on `main` (`images/screenshots/`), the READMEs pointing there
+- `tools/docs-images/`: the scripts rendering them (the built card against the tests' mocked Home Assistant, realistic entities and histories): `node tools/docs-images/render.cjs [scene…]`
 
 ### Added — *Tests (beta) ▸ Pen events*: what may tell a pen reported as a mouse
 - Each pointer event's id, tilt (`tiltX`, `tiltY`, `altitudeAngle`) and contact size (`width × height`); a pointer leaving: the element it went to (`null`: it left the screen), and a check for that
