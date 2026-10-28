@@ -77,58 +77,11 @@ export class HistoryCardState {
         this.pconfig.graphLabelColor      = '#333';
         this.pconfig.graphGridColor       = '#00000000';
         this.pconfig.cursorLineColor      = '#00000000';
-        this.pconfig.lineGraphHeight      = 250;
-        this.pconfig.barGraphHeight       = 150;
-        this.pconfig.timelineBarHeight    = 24;
-        this.pconfig.timelineBarSpacing   = 40;
-        this.pconfig.labelAreaWidth       = 65;
-        this.pconfig.labelsVisible        = true;
-        this.pconfig.cursorMode           = 'auto';
-        this.pconfig.cursorTypes          = ['all'];
         this.pconfig.showTooltipColors    = [true, true];
-        this.pconfig.tooltipSize          = 'auto';
-        this.pconfig.tooltipShowDuration  = false;
-        this.pconfig.tooltipShowLabel     = true;
-        this.pconfig.tooltipStateTextMode = 'raw';
         this.pconfig.closeButtonColor     = undefined;
-        this.pconfig.customStateColors    = undefined;
-        this.pconfig.colorSeed            = 137;
-        this.pconfig.stateTextMode        = 'raw';
         this.pconfig.graphs               = {};
-        this.pconfig.entityOptions        = undefined;
         this.pconfig.lockAllGraphs        = false;
-        this.pconfig.combineSameUnits     = false;
-        this.pconfig.recordedEntitiesOnly = false;
-        this.pconfig.filterEntities       = undefined;
-        this.pconfig.excludeFilterEntities = undefined;
-        this.pconfig.rounding             = undefined;
-        this.pconfig.defaultLineMode      = undefined;
-        this.pconfig.defaultInterpolation = 'monotone';
-        this.pconfig.cardGraphDefaults    = {};
-        this.pconfig.cardOptions          = {};
-        this.pconfig.hour24               = undefined;
-        this.pconfig.cardShow             = {};
-        this.pconfig.defaultLineWidth     = undefined;
-        this.pconfig.defaultDashMode      = undefined;
-        this.pconfig.defaultNetBars       = undefined;
-        this.pconfig.defaultInterval      = undefined;
-        this.pconfig.defaultShowMinMax    = undefined;
-        this.pconfig.defaultShowPoints    = undefined;
         this.pconfig.nextDefaultColor     = 0;
-        this.pconfig.showUnavailable      = true;
-        this.pconfig.showCurrentValues    = false;
-        this.pconfig.axisAddMarginMin     = true;
-        this.pconfig.axisAddMarginMax     = true;
-        this.pconfig.defaultTimeRange     = '24h';
-        this.pconfig.defaultTimeOffset    = undefined;
-        this.pconfig.timeTickDensity      = 'high';
-        this.pconfig.timeTickOverride     = undefined;
-        this.pconfig.timeTickShortDate    = false;
-        this.pconfig.refreshEnabled       = false;
-        this.pconfig.refreshInterval      = undefined;
-        this.pconfig.exportSeparator      = undefined;
-        this.pconfig.exportTimeFormat     = undefined;
-        this.pconfig.exportStatsPeriod    = undefined;
         this.pconfig.entities             = [];
         // Every change to pconfig.entities goes through the store (history-entity-store.js)
         this.store                        = new EntityStore(this.pconfig);
@@ -472,15 +425,10 @@ class HistoryExplorerCard extends HTMLElement
 
 
         this.instance.applyConfig(config);
-        // (the card's own: what's saved and how, the CSV export, the info panel)
+        // (the card's own: what's saved and how, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
-        this.instance.pconfig.exportSeparator =        config.csv?.separator;
-        this.instance.pconfig.exportTimeFormat =       config.csv?.timeFormat;
-        this.instance.pconfig.exportAttributes =       config.csv?.exportAttributes;
-        this.instance.pconfig.exportStatsPeriod =      config.csv?.statisticsPeriod ?? 'hour';
-        this.instance.pconfig.exportNumberLocale =     config.csv?.numberLocale;
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 

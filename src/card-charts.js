@@ -23,8 +23,6 @@ export const NARROW_CARD_PX = 300;
 // wider —: its curves' tooltip follows smallScreenTooltip, else largeScreenTooltip (see
 // tooltipModeOf); the info panel is always on a small screen
 const SMALL_SCREEN_PX = 600;
-// Each screen's tooltip mode when none is set
-const TOOLTIP_DEFAULTS = { smallScreenTooltip: 'selected', largeScreenTooltip: 'mixed' };
 // Where a bar graph's interval selector is: this far from the graph's right edge (px)
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
@@ -112,7 +110,7 @@ export class CardCharts
                             tooltipFormat: this.i18n.styleDateTimeTooltip,
                         },
                         ticks: {
-                            fontColor: ( config?.showTimeLabels === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphLabelColor,
+                            fontColor: config.showTimeLabels ? this.pconfig.graphLabelColor : 'rgba(0,0,0,0)',
                             fontSize: this._textSizes().text,
                             major: {
                                 enabled: true,
@@ -128,7 +126,7 @@ export class CardCharts
                             autoSkipPadding: 8
                         },
                         gridLines: {
-                            color: ( config?.showGrid === false ) ? 'rgba(0,0,0,0)' : this.pconfig.graphGridColor
+                            color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
                         },
                         stacked: config?.stacked
                     }],
@@ -335,7 +333,7 @@ export class CardCharts
     _curveDataset(d, graphtype, config)
     {
         // (without its line: its points, unless they're asked for otherwise)
-        const _points = d.showLine === false && ( d.showPoints ?? config?.showPoints ?? 'hover' ) === 'hover' ? true : d.showPoints;
+        const _points = !d.showLine && d.pointsMode === 'hover' ? true : d.showPoints;
         const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(_points, config?.showPoints, d.width);
         // (dashMode: a style's name, or its dashes and gaps)
         const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
@@ -356,7 +354,7 @@ export class CardCharts
             pointBackgroundColor: d.bColor,
             pointHoverRadius: _pointHoverRadius,
             hitRadius: 5,
-            showLine: d.showLine !== false,
+            showLine: d.showLine,
             stateMap: d.stateMap,
             showCurrentValue: d.showCurrentValue,
             ...this._legendParts(d),
@@ -364,7 +362,7 @@ export class CardCharts
             // (stacked bars: those of each Y axis in their own column — stacking
             // values of two scales on each other would mean nothing; not stacked, the default:
             // each its own column, side by side — a stack given would stack them)
-            stack: config?.stacked === true ? d.yAxisID : undefined,
+            stack: config.stacked ? d.yAxisID : undefined,
             name: d.name,
             cubicInterpolationMode: 'monotone',
             // (the curve interpolation algorithm, curves and smart modes — see deps/chart-hec.js)
@@ -420,7 +418,7 @@ export class CardCharts
         // (a state_map's curves only, all with the same one: its labels, at their places)
         const _map = _list.length && _list.every(d => d.stateMap?.length && JSON.stringify(d.stateMap) === JSON.stringify(_list[0].stateMap)) ? _list[0].stateMap : null;
         // (a logarithmic axis: curves only)
-        const _log = config?.logarithmic === true && graphtype == 'line' && !_period && !_map;
+        const _log = config.logarithmic && graphtype == 'line' && !_period && !_map;
         // (its labels — labelsLeft / labelsRight, mini-graph-card's show.labels(_secondary):
         // false, none, the plot taking their room; hover, shown while the pointer is over the
         // graph — Chart.js ticks.hecShowOnHover)
@@ -465,7 +463,7 @@ export class CardCharts
                 hecShowOnHover: _shown === 'hover'
             },
             gridLines: {
-                color: ( config?.showGrid !== false && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
+                color: ( config.showGrid && ( graphtype == 'line' || graphtype == 'bar' || datasets.length > 1 ) ) ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
                 drawOnChartArea: !_right
             },
             scaleLabel: {
@@ -513,13 +511,13 @@ export class CardCharts
 
     // How entity e's curve enters its graph's tooltip, on the screen the card is on now
     // (tooltipField) — its own mode, else its graph's, its entityOptions', the card's, else
-    // that screen's default (TOOLTIP_DEFAULTS): 'selected' — once a click on it selected it —,
+    // that screen's default (resolveOption): 'selected' — once a click on it selected it —,
     // 'nearest' — while it's the curve nearest the pointer —, 'mixed' — either —, 'all' —
     // whenever a curve is that near (Chart.js hecTooltip)
     tooltipModeOf(e)
     {
         const _f = this.tooltipField();
-        return this.resolveOption(e, _f) ?? TOOLTIP_DEFAULTS[_f];
+        return this.resolveOption(e, _f);
     }
 
     // Graph g's curves given their tooltip mode as it is now (tooltipModeOf) — each graph's
@@ -769,7 +767,7 @@ export class CardCharts
         const canvas = this._this.querySelector(`#graph${gid}`);
 
         // Needed before building the datasets: it decides how each bar entity is drawn
-        const interval = config?._graphInterval ?? config?.interval ?? 1;
+        const interval = config._graphInterval;
 
         let datasets = [];
         for( let d of entities ) {
@@ -787,6 +785,8 @@ export class CardCharts
                 "interpolation": this.resolveInterpolation(d),
                 "width": d.width || this.pconfig.defaultLineWidth,
                 "showPoints": d.showPoints,
+                // (its points as resolved — hover, the default: only the one hovered)
+                "pointsMode": this.resolveOption(d, 'showPoints'),
                 "showMinMax": d.showMinMax,
                 "tooltip": this.tooltipModeOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)
@@ -806,11 +806,11 @@ export class CardCharts
                 // label shown — see processOf)
                 "stateMap": ( _kind === 'line' ) ? this.resolveOption(d, 'stateMap') : undefined,
                 // (show_line: false — its points only)
-                "showLine": this.resolveOption(d, 'showLine') !== false,
+                "showLine": this.resolveOption(d, 'showLine'),
                 // (show_graph: false — not drawn)
-                "notDrawn": this.resolveOption(d, 'showGraph') === false,
+                "notDrawn": !this.resolveOption(d, 'showGraph'),
                 // (show_legend: false on the entity — no label in the legend; nor when not drawn)
-                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false || this.resolveOption(d, 'showGraph') === false,
+                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false || !this.resolveOption(d, 'showGraph'),
                 // (its value now after its name in the legend: see showsCurrentValue)
                 "showCurrentValue": this.showsCurrentValue(d),
                 "domain": this.getDomainForEntity(d.entity),
@@ -837,7 +837,7 @@ export class CardCharts
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config?.ylock ?? false, "showTimeLabels": config?.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
     }

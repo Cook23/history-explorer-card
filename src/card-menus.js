@@ -970,7 +970,7 @@ export class CardMenus
             return !( _c.valid && _c.alpha() === 0 );
         }
         if( key === 'width' ) return e.width;
-        return e.dashMode ?? 'solid';
+        return this.resolveOption(e, 'dashMode');
     }
 
     // The appearance submenu (list null): the color (▸: it opens the browser's picker), the

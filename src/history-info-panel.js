@@ -111,9 +111,8 @@ function hxHookInfoPanel()
         // history-explorer-card, just never written to storage. addGraph computes color,
         // fill, lineMode, scale, process, etc. itself (via its own getEntityOptions call)
         // and writes them into this same entry — the single source for entity
-        // data, no separate copy. width is set explicitly here: this panel's default
-        // (1.001) differs from the main card's (pconfig.defaultLineWidth, 2.0). lineWidth
-        // is accepted as a synonym of width, same as the main card.
+        // data, no separate copy. Its width: the curve's look, else entityOptions', else the
+        // panel's default (1.001, given to applyConfig — the card's is 2.0).
         const _pcEntry = {
             entity   : entity_id,
             groupId  : instance.g_id,
@@ -123,7 +122,7 @@ function hxHookInfoPanel()
             dashMode : _look.dashMode,
             showPoints : _look.showPoints,
             showMinMax : _look.showMinMax,
-            width    : ( type == 'line' || type == 'arrowline' || type == 'bar' ) ? (_look.width ?? entityOptions?.lineWidth ?? 1.001) : undefined,
+            width    : _look.width ?? entityOptions?.lineWidth,
             interval : entityOptions?.interval ?? null,
             isStatic : true,
         };
@@ -171,7 +170,7 @@ function hxHookInfoPanel()
         // The configuration, read as the card reads its own — with the panel's own defaults,
         // and what the panel decides whatever its configuration says
         instance.applyConfig(config, {
-            defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines' },
+            defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines', defaultLineWidth: 1.001 },
             fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
                      filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
                      // (no refresh.interval: the panel only lives while its dialog is open)

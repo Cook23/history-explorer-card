@@ -222,6 +222,13 @@ Which curves the tooltip shows is each curve's tooltip mode — `largeScreenTool
 
 *Behavior ▸ Tooltip ▸* sets the mode of the screen the card is on: `largeScreenTooltip` on a large screen, `smallScreenTooltip` on a small one; the other screen keeps its own.
 
+`tooltipBehavior` changes the default of `largeScreenTooltip` and `smallScreenTooltip` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs (`mixed`, `selected`). Like them, it can be set on the card, a graph, an entity or in `entityOptions`:
+
+```yaml
+tooltipBehavior: nearest        # every curve, on both screens, unless a screen's mode is set
+largeScreenTooltip: all         # on a large screen: all
+```
+
 A click opens it in every mode — a finger has no hover. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
 
 On a curve, the tooltip's first line tells where the value comes from: *History* and its time, or *Statistics* — with their period, `5 min` or `1 h` — and the time it covers (`History: 18:10`, `Statistics 1 h: 14:00 – 15:00`; in French `Historique : 18:10`). A point standing for several values (see [Data decimation](#data-decimation)) shows the interval of time it covers, `from – to` (the end's date only when it's another day), and `min / mean / max` with the unit.
@@ -1429,6 +1436,7 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line stroke style](#line-stroke-style) |
 | `largeScreenTooltip` | string | `large_screen_tooltip` | | The curve's tooltip on a large screen (a card 600 px wide or more): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
 | `smallScreenTooltip` | string | `small_screen_tooltip` | | The same on a small screen (a card narrower than 600 px, and the info panel): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
+| `tooltipBehavior` | string | `tooltip_behavior` | | Changes the default of `largeScreenTooltip` and `smallScreenTooltip`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
 | `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |

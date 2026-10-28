@@ -49,7 +49,7 @@ export class CardGraphs
         const _first = g.entities[0];
         const _title = this.pconfig.graphs[g.groupId]?.title;
         const _name = o('showName') === false ? undefined : _title ?? ( o('showName') === true && _first ? _first.name ?? this.stateOf(_first.entity)?.attributes?.friendly_name ?? _first.entity : undefined );
-        const _icon = o('showIcon') === true && o('alignIcon') !== 'state' ? this._graphIconElement(g) : null;
+        const _icon = o('showIcon') && o('alignIcon') !== 'state' ? this._graphIconElement(g) : null;
         _h.textContent = '';
         _h.style.display = ( _name === undefined && !_icon ) ? 'none' : 'flex';
         if( _h.style.display === 'none' ) return;
@@ -72,7 +72,7 @@ export class CardGraphs
     graphStateIcon(g)
     {
         const o = k => this.graphOption(g.groupId, k);
-        return o('showIcon') === true && o('alignIcon') === 'state' ? this._graphIconElement(g) : null;
+        return o('showIcon') && o('alignIcon') === 'state' ? this._graphIconElement(g) : null;
     }
 
     // A graph's icon (see updateGraphHeader): an image, or Home Assistant's icon element
@@ -454,7 +454,7 @@ export class CardGraphs
         // configured one. Needed before the graph is built: it decides how bar entities
         // are drawn (bars, or raw curves for interval 4).
         const _graphInterval = interval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
-            ?? entityOptions?.interval ?? this.pconfig.defaultInterval ?? 1;
+            ?? entityOptions?.interval ?? this.pconfig.defaultInterval;
         entityOptions._graphInterval = _graphInterval;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
@@ -638,7 +638,7 @@ export class CardGraphs
     _showPlot(g)
     {
         const _box = g.canvas?.parentNode;
-        if( _box ) _box.style.display = g.entities.some(e => this.resolveOption(e, 'showGraph') !== false) ? '' : 'none';
+        if( _box ) _box.style.display = g.entities.some(e => this.resolveOption(e, 'showGraph')) ? '' : 'none';
     }
 
     // The element of a new graph (its header, canvas, interval selector),
@@ -658,8 +658,8 @@ export class CardGraphs
         const _currentFirst = this._firstGraph();
         const _isFirstOnPage = !_currentFirst || graphIndex <= (_currentFirst.entities?.[0]?.graphIndex ?? Infinity);
         const _prevG = _isFirstOnPage ? null : this.graphsInDisplayOrder().filter(g => (g.entities?.[0]?.graphIndex ?? Infinity) < graphIndex).pop();
-        const _prevShowTimeLabels = _prevG ? (_prevG.showTimeLabels ?? true) : true;
-        const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels !== false) ? 8 : 0;
+        const _prevShowTimeLabels = _prevG ? _prevG.showTimeLabels : true;
+        const _graphMarginTop = (!_isFirstOnPage && _prevShowTimeLabels) ? 8 : 0;
         // Its header: its title, or its name and its icon (filled by updateGraphHeader)
         html += `<div class='hec-graph-header'></div>`;
         html += `<div style='height:${h}px;margin-top:${_graphMarginTop}px;position:relative'>`;

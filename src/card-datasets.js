@@ -313,7 +313,7 @@ export class CardDatasets
         }
         // (fixedValue — mini-graph-card's fixed_value: its last value, flat over the whole
         // window)
-        if( this.resolveOption(e, 'fixedValue') === true && _values.length ) {
+        if( this.resolveOption(e, 'fixedValue') && _values.length ) {
             const _l = _values[_values.length - 1];
             _values.splice(0, _values.length, { t: w.start.valueOf(), y: _l.y, min: _l.y, max: _l.y, stat: false });
         }
@@ -449,7 +449,7 @@ export class CardDatasets
         const n = data.length;
         const s = [], bcol = [];
         const scale = this.drawScaleOf(e) * (e.siConversionFactor ?? 1.0);
-        const netBars = e.netBars ?? false;
+        const netBars = this.resolveOption(e, 'netBars');
 
         const _interval = barInterval(g.interval)?.length ? barInterval(g.interval) : barInterval(1);
         const td = moment.duration(..._interval.length);

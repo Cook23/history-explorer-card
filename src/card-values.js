@@ -73,7 +73,7 @@ export class CardValues
         if( !_states.length && !_stats.length ) { g.chart.hecSetValues(null); return; }
         // (its curve's color — or with stateAdaptiveColor: false, the text's)
         const _curveColor = x => typeof x.d.borderColor === 'string' ? x.d.borderColor : this.entityColor(x.e);
-        const _color = x => this.resolveOption(x.e, 'stateAdaptiveColor') === false ? 'var(--primary-text-color)' : _curveColor(x);
+        const _color = x => this.resolveOption(x.e, 'stateAdaptiveColor') ? _curveColor(x) : 'var(--primary-text-color)';
         const t0 = msOf(this.startTime), t1 = Math.min(msOf(this.endTime), Date.now());
         // (a time as the time axis writes it — the card's clock: hour24, else Home Assistant's)
         const _time = t => moment(t).format(t1 - t0 <= 86400e3 ? this.i18n.styleTimeTicks : this.i18n.styleDateTicks + ', ' + this.i18n.styleTimeTicks);
@@ -81,7 +81,7 @@ export class CardValues
             const s = this.stateOf(x.e.entity)?.state;
             // (a state_map's state: its label)
             // (show_indicator: a dot in its curve's color before it)
-            const _ind = this.resolveOption(x.e, 'showIndicator') === true ? _curveColor(x) : false;
+            const _ind = this.resolveOption(x.e, 'showIndicator') ? _curveColor(x) : false;
             if( x.d.stateMap?.length ) return { curve: x.j, key: x.e.entity, color: _color(x), unit: '', indicator: _ind, text: stateLabel(x.d.stateMap, String(s ?? '')) ?? String(s ?? '') };
             return { curve: x.j, key: x.e.entity, color: _color(x), unit: x.d.unit ?? '', indicator: _ind,
                      text: isNaN(Number(s)) ? String(s ?? '') : this._roundedValue(Number(s) * ( x.d.shownScale ?? 1 ), x.d) };
