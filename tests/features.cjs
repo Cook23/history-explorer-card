@@ -521,6 +521,13 @@ module.exports = async function()
         await send('pointerleave', 'touch'); await t.wait(400); const up = await size();
         return pen === 40 && left === 20 && finger === 40 && up === 20 ? true : JSON.stringify({ pen, left, finger, up });
     });
+    await t.step('a pen gone out of hover range over a magnifier (no more moves, no pointerleave): back to its size 1 s after its last move', async () => {
+        const size = () => t.E(`Math.round(el.querySelector('#b5_0 svg').getBoundingClientRect().width)`);
+        const send = (type) => t.E(`el.querySelector('#b5_0').dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: 'pen', isPrimary: true, buttons: 0 }))`);
+        await send('pointerenter'); await send('pointermove'); await t.wait(600); const still = await size();
+        await t.wait(800); const gone = await size();
+        return still === 40 && gone === 20 ? true : JSON.stringify({ still, gone });
+    });
     done(await t.close());
 
     // ── One point per column of pixels: the mean of its values (weighted by how long each

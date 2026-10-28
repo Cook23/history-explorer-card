@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [Unreleased]
+
+### Fixed — a pen gone out of hover range
+- A pen moved away from the screen while above something its hover showed sends nothing (no `pointerleave`) on some tablets: what the hover showed stayed (a magnifier twice as large, the hover dot, the tooltip and its mode, the Y labels shown on a hover, a text shown in full). A pen hovers only while it sends moves: `Chart.hecUi.penHover` ends its hover 1 s after its last move — one rule, used by the gesture engine on a graph (`_hecHoverLeft`, the same end as a genuine `mouseout`), the values over a graph and the magnifiers
+- *Tests (beta) ▸ Pen events*: the time between two moves of a pen hovering — mean, min, max, standard deviation, and how many reached 1 s
+- Test (`pen`): the pen gone out of range without leaving: the tooltip, the hover dot and the tooltip mode end 1 s after its last move; (`features`) the magnifier back to its size
+
+### Changed — the range selector 1 px to the right
+- The space before the range selector and the one after its arrow the same (the magnifier − 3 px from it, 2 before; the magnifier + 4 px, 5 before)
+
 ## [v1.2.50] - 2026-10-28
 
 ### Fixed — the magnifiers' zoom under a pen

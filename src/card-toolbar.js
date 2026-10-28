@@ -47,11 +47,11 @@ export function rangeControlsHtml(i, optionStyle, invertZoom)
     // what is clicked: hec-big, see wireToolbar)
     return `<style>.hec-mag svg{position:relative;z-index:2;transition:transform .12s}.hec-mag.hec-big svg{transform:scale(2)}</style>` +
         `<button id="bz_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 20)}</button>${zoomMenuHtml(i)}` +
-        `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:2px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
+        `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:3px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
         `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-7px">` +
             RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('') +
         `</select>` +
-        `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:5px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
+        `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
 }
 
 export class CardToolbar
@@ -150,11 +150,14 @@ export class CardToolbar
         this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
         // (a magnifier under the pointer shown twice as large — every pointer: a CSS hover rule
-        // would follow the device's primary pointer only, a tablet's pen left out)
+        // would follow the device's primary pointer only, a tablet's pen left out; a pen gone
+        // out of range without leaving it: back to its size all the same, Chart.hecUi.penHover)
         for( const id of ['bz', 'b4', 'b5'] ) {
             const b = this._this.querySelector(`#${id}_${i}`);
+            const _small = () => b.classList.remove('hec-big');
             b?.addEventListener('pointerenter', () => b.classList.add('hec-big'));
-            for( const ev of ['pointerleave', 'pointercancel'] ) b?.addEventListener(ev, () => b.classList.remove('hec-big'));
+            b?.addEventListener('pointermove', e => Chart.hecUi.penHover(b, e, _small));
+            for( const ev of ['pointerleave', 'pointercancel'] ) b?.addEventListener(ev, () => { Chart.hecUi.penHover(b, null); _small(); });
         }
         // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
         // back to the default range)

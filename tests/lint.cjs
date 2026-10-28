@@ -17,7 +17,7 @@ const GLOBALS = new Set([
     'window', 'document', 'navigator', 'location', 'screen', 'history', 'customElements', 'localStorage',
     'console', 'alert', 'confirm', 'performance', 'globalThis', 'arguments', 'this', 'undefined',
     'Math', 'Object', 'Array', 'Date', 'JSON', 'String', 'Number', 'Boolean', 'Symbol', 'Map', 'Set',
-    'Promise', 'RegExp', 'Error', 'Function', 'Intl', 'Infinity', 'NaN',
+    'Promise', 'WeakMap', 'RegExp', 'Error', 'Function', 'Intl', 'Infinity', 'NaN',
     'isNaN', 'isFinite', 'parseFloat', 'parseInt', 'encodeURIComponent', 'decodeURIComponent', 'btoa', 'atob',
     'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame', 'cancelAnimationFrame',
     'queueMicrotask', 'structuredClone', 'getComputedStyle', 'fetch', 'Blob', 'URL', 'FileReader',

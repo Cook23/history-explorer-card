@@ -709,10 +709,26 @@
     return (pointerType === 'touch' ? g.touch : g.mouse) || { longPressMs: 500, slop: pointerType === 'touch' ? 12 : 8 };
   };
 
+  // Each element's pen hover timer (hecUi.penHover)
+  var _penHoverTimers = new WeakMap();
+
   var hecUi = Chart.hecUi = {
 
     // How long a floating element takes to fade out (its CSS opacity transition)
     FADE: 1000,
+
+    // A pen above the screen hovers only while it sends moves: one gone out of range may
+    // send nothing (no pointerleave), what its hover showed would stay. Called with each move
+    // over el (a pointer event): a pen with no button, end() if no other move comes within
+    // PEN_HOVER_TIMEOUT; anything else — or e null: the hover ended otherwise — cancels it.
+    // For everything a hover shows, on a graph (the gesture engine) or off it
+    PEN_HOVER_TIMEOUT: 1000,
+    penHover: function (el, e, end) {
+      clearTimeout(_penHoverTimers.get(el));
+      _penHoverTimers.delete(el);
+      if (e && e.pointerType === 'pen' && !e.buttons)
+        _penHoverTimers.set(el, setTimeout(function () { _penHoverTimers.delete(el); end(); }, hecUi.PEN_HOVER_TIMEOUT));
+    },
 
     // How opaque the boxes drawn over a graph are (the Y labels inside the plot, the controls
     // over the legend, a text shown in full): as the tooltip
@@ -3116,6 +3132,9 @@
         _el.addEventListener('click', function (ev) { me._hecOnValuesClick(ev); });
         _el.addEventListener('mousemove', function (ev) { me._hecRevealValuesCut(ev.target, true); });
         _el.addEventListener('mouseleave', function () { Chart.hecUi.closeReveal(_el, true); });
+        // (a pen gone out of range without leaving: the text shown in full closed all the same)
+        _el.addEventListener('pointermove', function (ev) { Chart.hecUi.penHover(_el, ev, function () { Chart.hecUi.closeReveal(_el, true); }); });
+        _el.addEventListener('pointerleave', function () { Chart.hecUi.penHover(_el, null); });
       }
       if (_el.nextSibling !== _box || _el.parentNode !== _box.parentNode) _box.parentNode.insertBefore(_el, _box);
       var _narrow = v.layout === 'narrow';
@@ -3300,6 +3319,25 @@
       if (!!this._hecShowSamples === on) return;
       this._hecShowSamples = on;
       this.update();
+    },
+
+    // The hover over the chart ended (the pointer left the canvas, or a pen stopped hovering
+    // — hecUi.penHover): nothing it showed stays — the hover dot, the tooltip and its mode,
+    // a text shown in full, the Y labels shown on a hover, Alt's samples, a label's message
+    _hecHoverLeft: function () {
+      var me = this;
+      me.active = [];
+      me._hecLastHitXY = undefined;
+      me._hecEndTooltipMode();
+      me._hecUpdateHoverDot(null);
+      me._hecUpdateReveal(null);
+      me._hecSetLabelsHovered(null);
+      me._hecSetPointerOver(false);
+      me._hecForgetPointerDir();
+      me._hecSetShowSamples(false);
+      if (me.tooltip) me.tooltip._hecCloseTooltip();
+      Chart.hecUi.closeMessage(me.canvas);
+      me._hecHasMoved = false;
     },
 
     // The tooltip mode ends: no curve in it any more

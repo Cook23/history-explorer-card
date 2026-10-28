@@ -4708,33 +4708,25 @@
               // the browser's own internal hit-testing boundary not being obtainable from
               // script) — see the two mouseXXXX branches below for where this flag is set
               // and cleared.
-              if (me._hecHasMoved) {
-                me.active = [];
-                me._hecLastHitXY = undefined;
-                me._hecEndTooltipMode();
-                me._hecUpdateHoverDot(null);
-                me._hecUpdateReveal(null);
-                me._hecSetLabelsHovered(null);
-                me._hecSetPointerOver(false);
-                me._hecForgetPointerDir();
-                me._hecSetShowSamples(false);
-                // A genuine mouseout leaves the canvas entirely — close both the hover
-                // tooltip and a label message shown from this chart.
-                if (me.tooltip) me.tooltip._hecCloseTooltip();
-                Chart.hecUi.closeMessage(me.canvas);
-              }
+              // (a genuine mouseout leaves the canvas entirely: nothing the hover showed stays)
+              if (me._hecHasMoved) me._hecHoverLeft();
               me._hecHasMoved = false;
+              Chart.hecUi.penHover(me.canvas, null);
               // else: synthetic mouseout from a non-hover device's pointerup — ignore it,
               // active stays exactly what it was, same as a below-threshold mousemove.
             } else if (e.type === 'mouseup' || e.type === 'pointercancel') {
               me._hecHasMoved = false;
+              Chart.hecUi.penHover(me.canvas, null);
             } else if (e.type === 'mousedown') {
               me._hecHasMoved = false;
+              Chart.hecUi.penHover(me.canvas, null);
             } else if (e.type === 'mousemove') {
               // (only a move without contact — a hover — can carry the pointer out: the
               // pointerout a browser sends when it takes a contact over, or when a pen
               // lifts off, doesn't leave the graph)
               if (!e.native || !e.native.buttons) me._hecHasMoved = true;
+              // (a pen gone out of range without leaving the canvas: its hover ended all the same)
+              Chart.hecUi.penHover(me.canvas, e.native, function () { me._hecHoverLeft(); });
               var _searched = false;
               // (fork) curves whose tooltip a hover opens, without a click (hecTooltip 'nearest',
               // 'mixed' or 'all'); and a contact in progress — a press the gesture engine hasn't yet
