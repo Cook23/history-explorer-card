@@ -562,9 +562,9 @@ export class CardCharts
         return this.narrowCard();
     }
 
-    // Each graph's Y labels placed, its text sized and its controls laid out as the card's
-    // width now says (_yLabelsInside, _textSizes, _controlsBackdrop) — when the card
-    // crosses NARROW_CARD_PX
+    // Each graph's Y labels placed, its text sized, its controls laid out and its tooltip
+    // sized as the card's width now says (_yLabelsInside, _textSizes, _controlsBackdrop,
+    // tooltipSize) — when the card crosses NARROW_CARD_PX or SMALL_SCREEN_PX
     fitToCardWidth()
     {
         const _sizes = this._textSizes();
@@ -583,6 +583,7 @@ export class CardCharts
             }
             for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
             _set(o, { hecControlsBackdrop: this._controlsBackdrop() });
+            _set(o.tooltips, { hecFirstOnly: this.tooltipSize() === 'slim' });
             _set(o.legend?.labels, { fontSize: _sizes.text });
             _set(o.elements, { font: _sizes.timeline });
             if( _changed ) g.chart.update(0);
@@ -591,25 +592,64 @@ export class CardCharts
         }
     }
 
-    // The tooltip of a chart — every type alike, as a curve's: its title, where its first
-    // element comes from and its time (_tooltipTitle); a line per element shown, its series'
-    // name (tooltip.showLabel) and its value (_tooltipValue). Colors: a timeline's as
-    // tooltip.showColorsTimeline says, every other's as tooltip.showColorsLine
+    // The size of the tooltips (tooltip.size): 'full', 'compact' or 'slim' — 'auto' as the
+    // card's width now says: full on a large screen (SMALL_SCREEN_PX), compact on a small one
+    // (and in the info panel), slim on a narrow card (NARROW_CARD_PX)
+    tooltipSize()
+    {
+        const s = this.pconfig.tooltipSize;
+        if( s === 'full' || s === 'compact' || s === 'slim' ) return s;
+        const _w = this.cardWidth() || Infinity;
+        return _w < NARROW_CARD_PX ? 'slim' : this.infoPanel || _w < SMALL_SCREEN_PX ? 'compact' : 'full';
+    }
+
+    // The tooltip of a chart — every type alike, as a curve's —, as its size says
+    // (tooltipSize, read each time it's shown):
+    //   full — its title: where its first element comes from and its time (_tooltipTitle);
+    //     a line per element shown, its series' name (tooltip.showLabel) and its value
+    //     (_tooltipValue);
+    //   compact — its title: the time alone; a line per element, its series' name at its
+    //     shortest (the legend's shortened forms — src/legend-names.js —, the last one) and
+    //     its value;
+    //   slim — no title; its first element alone (Chart.js tooltips.hecFirstOnly, see
+    //     fitToCardWidth), on one line: its time — without its date when the X axis shows
+    //     the days (_tooltipDated) — and its value.
+    // Colors: a timeline's as tooltip.showColorsTimeline says, every other's as
+    // tooltip.showColorsLine
     _chartTooltips(graphtype)
     {
+        const _point = (data, item) => data.datasets[item.datasetIndex]?.data[item.index];
         return {
             callbacks: {
                 label: (item, data) => {
-                    const _ds = data.datasets[item.datasetIndex];
-                    const _name = this.pconfig.tooltipShowLabel ? ( _ds.name || '' ) : '';
-                    return ( _name ? _name + ': ' : '' ) + this._tooltipValue(graphtype, _ds, item);
+                    const _ds = data.datasets[item.datasetIndex], _value = this._tooltipValue(graphtype, _ds, item);
+                    const _size = this.tooltipSize();
+                    if( _size === 'slim' ) return `${this._tooltipTime(_point(data, item), item.xLabel, this._tooltipDated())}\u00a0\u00a0${_value}`;
+                    const _name = !this.pconfig.tooltipShowLabel ? '' :
+                                  _size === 'compact' ? this.shortNameForms(data.datasets)[item.datasetIndex]?.[3] ?? _ds.name : _ds.name;
+                    return ( _name ? _name + ': ' : '' ) + _value;
                 },
-                title: (items, data) => items.length ? this._tooltipTitle(data.datasets[items[0].datasetIndex]?.data[items[0].index], items[0].xLabel) : ''
+                title: (items, data) => {
+                    const _size = this.tooltipSize();
+                    if( !items.length || _size === 'slim' ) return '';
+                    const p = _point(data, items[0]);
+                    return _size === 'compact' ? this._tooltipTime(p, items[0].xLabel) : this._tooltipTitle(p, items[0].xLabel);
+                }
             },
+            hecFirstOnly: this.tooltipSize() === 'slim',
             yAlign: ( graphtype == 'line' || graphtype == 'bar' ) ? undefined : 'nocenter',
             caretPadding: 8,
             displayColors: this.pconfig.showTooltipColors[graphtype == 'timeline' ? 1 : 0]
         };
+    }
+
+    // Whether a slim tooltip's time shows its date: not when the window is a single day,
+    // nor when the X axis shows each day (its ticks in minutes or hours: every midnight
+    // ticked, its day labelled — see generate in deps/Chart.js)
+    _tooltipDated()
+    {
+        const _oneDay = moment(this.startTime).isSame(moment(this.endTime).subtract(1, 'ms'), 'day');
+        return !_oneDay && !['minute', 'hour'].includes(this.activeRange.tickStepUnit);
     }
 
     // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
@@ -639,23 +679,33 @@ export class CardCharts
     }
 
     // A tooltip's title: where its first element comes from — the history, or the statistics
-    // and their period (5 min, 1 h) — and its time: a value's own (xLabel); the time a column
-    // of values, a bar, a timeline's or arrowline's state covers (its end's date only when
-    // it's another day) — a state's duration after it with tooltip.showDuration
+    // and their period (5 min, 1 h) — and its time (_tooltipTime)
     _tooltipTitle(p, xLabel)
     {
-        // (a timeline's or arrowline's state: [start, end, state], from the history)
-        const _state = Array.isArray(p);
-        if( _state ) p = { columnFrom: moment(p[0]).valueOf(), columnTo: moment(p[1]).valueOf() };
-        if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return xLabel;
+        const _time = this._tooltipTime(p, xLabel);
+        // (a timeline's or arrowline's state, [start, end, state]: from the history)
+        if( Array.isArray(p) ) p = { x: p[0] };
+        if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return _time;
         // (statistics: their period too — 5 min, 1 h)
         const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : moment.duration(ms).humanize();
         const _source = p.statistics ? `${i18n('ui.label.source_statistics')}${p.statisticsPeriod ? ' ' + _period(p.statisticsPeriod) : ''}` : i18n('ui.label.source_history');
-        const _sep = i18n('ui.label.source_separator');
-        if( p.columnFrom == null ) return `${_source}${_sep}${xLabel}`;
-        const _fmt = this.i18n.styleDateTimeTooltip, _from = moment(p.columnFrom), _to = moment(p.columnTo);
+        return `${_source}${i18n('ui.label.source_separator')}${_time}`;
+    }
+
+    // An element's time in its tooltip: a value's own (xLabel); the time a column of values,
+    // a bar, a timeline's or arrowline's state covers — a state's duration after it with
+    // tooltip.showDuration. With its date (dated), else its time of day alone — a span over
+    // several days keeps its dates; its end's date only when it's another day
+    _tooltipTime(p, xLabel, dated = true)
+    {
+        const _state = Array.isArray(p);
+        if( _state ) p = { columnFrom: moment(p[0]).valueOf(), columnTo: moment(p[1]).valueOf() };
+        if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return xLabel;
+        const _fmt = this.i18n.styleDateTimeTooltip, _hour = this.i18n.styleTimeTooltip;
+        if( p.columnFrom == null ) return dated ? xLabel : moment(p.x).format(_hour);
+        const _from = moment(p.columnFrom), _to = moment(p.columnTo), _sameDay = _from.isSame(_to, 'day');
         const _duration = _state && this.pconfig.tooltipShowDuration ? ` (${this._durationText(p.columnTo - p.columnFrom)})` : '';
-        return `${_source}${_sep}${_from.format(_fmt)} – ${_to.format(_from.isSame(_to, 'day') ? this.i18n.styleTimeTooltip : _fmt)}${_duration}`;
+        return `${_from.format(dated || !_sameDay ? _fmt : _hour)} – ${_to.format(_sameDay ? _hour : _fmt)}${_duration}`;
     }
 
     // A duration as a tooltip shows it: its days (1 day, 2 days…), then hh:mm:ss

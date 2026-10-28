@@ -3250,7 +3250,8 @@
     // and 'all' ones, and those a click selected ('selected', 'mixed': the tooltip mode) —;
     // none: nothing shown. Then, on each other dataset that shows it — selected ('selected',
     // 'mixed'), or every one with 'all' —, its element at that one's time, within the
-    // picking margin along the time axis (_hecElementAtTime)
+    // picking margin along the time axis (_hecElementAtTime) — with tooltips.hecFirstOnly,
+    // the first one alone
     _hecHoverElements: function (e) {
       var me = this;
       var _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
@@ -3258,6 +3259,7 @@
       var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
       var _first = _at ? me._hecPointAt(e.x, e.y, function (i) { return _mode(i) !== 'selected' || _sel.indexOf(i) >= 0; }) : null;
       if (!_first) return [];
+      if (me.options.tooltips && me.options.tooltips.hecFirstOnly) return [_first];
       var _fi = _first._datasetIndex, _v = _first._view, _els = [_first];
       // (the first one's time: a point's, a box's middle)
       var _x = me.getDatasetMeta(_fi).dataset ? _v.x : (function (b) { return (b.l + b.r) / 2; })(_hecElementBox(_v));

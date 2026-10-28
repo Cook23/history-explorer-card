@@ -8,9 +8,25 @@ Changelog for the HA History Explorer Card.
 
 ### Changed — one tooltip layout, a curve's
 - Bars, timelines and arrowlines show their tooltip as a curve's: its title where its first value comes from — the history, or the statistics and their period — and its time — a value's own, or the time a column of values, a bar or a state covers (its end's date only when it's another day), a state's duration after it with `tooltip.showDuration` —; then a line per value, its color box, its series' name (`tooltip.showLabel`) and its value — a curve's or a bar's in its unit, a timeline's state, an arrowline's value. Before, a timeline's tooltip had its row's name as its title and its state, its start and its end each on a line ("(for …)" untranslated), a bar's its time alone (`_chartTooltips`, `_tooltipTitle`, `_tooltipValue`: one for every type; a bar's samples carry the time they cover)
-- `tooltip.size` accepted, with no effect; `tooltip.showColorsLine` for every graph but timelines (arrowlines' and bar graphs' tooltips: color boxes as curves')
+- `tooltip.size` for every tooltip (see below); `tooltip.showColorsLine` for every graph but timelines (arrowlines' and bar graphs' tooltips: color boxes as curves')
 - README_Full, full-reference-config.yaml: the tooltip's layout
 - Tests (`points`): a timeline's tooltip — the source and the time its state covers, then its name and its state; a bar's — the source and the time it covers
+
+### Added — the tooltip's sizes
+- `tooltip.size` acts on every tooltip — a curve's, a bar's, a timeline's, an arrowline's: `full` (the source and the time, then a line per value: its color box, its series' name, its value); `compact` (the time alone as its title; each series' name at its shortest — the legend's last shortened form, its shared prefix removed —, whether the legend is shortened or not); `slim` (no title, one value only — the one pointed at, whatever the tooltip mode —, on one line: its color box, its time and its value; the time without its date when the window is a single day or the time axis shows each day, a span over several days keeping its dates); `auto`, the default — by the card's width: `full` from 600 px, `compact` from 300 px and in the info panel, `slim` below, chosen again when the card's width crosses them (`tooltipSize`, `_chartTooltips`, `_tooltipTime`, `_tooltipDated`; Chart.js option `tooltips.hecFirstOnly`)
+- A timeline's graph at least as high as its tooltip's size: 130 px in `full`, 115 in `compact`, 90 in `slim`
+- README_Full, full-reference-config.yaml, Chart Custom.js.md: the tooltip's sizes
+- Tests (`features`): `auto` at 1000, 450 and 280 px — full, compact (the time, the shortest name), slim (no title, the time without its date, one value only with `all`); a size set, the same at every width
+
+### Fixed — the time axis over a change of daylight saving time
+- A window over a day of 25 hours (the end of summer time) or 23 hours (its start), ticked every few hours, lost every midnight — the ticks an hour off the clock from that day on (11:00, 23:00 instead of 00:00, 12:00): no day shown on the time axis. The hours are now stepped by the clock, day by day — every midnight ticked, its day labelled (Chart.js time scale `generate`)
+- Tests (`features`): 3 days over the change of time in October and in March (Paris) — every midnight a tick with its day, every tick on the clock's hours
+
+### Changed — the zoom buttons
+- The `-` and `+` buttons on each side of the time range selector are the magnifiers − and +; the three magnifiers of the same size, a little smaller than before (18 px, `magnifierSvg(mode, color, size)`), side by side; the range selector's text as far from the magnifier − as from its arrow (5 px further left: 15 px before, 10 px after it — now 12 and 12 for "3 Days")
+- The three magnifiers as high as the toolbar's other buttons (30 px), aligned at their top
+- README, README_Full, full-reference-config.yaml: the magnifiers − and +
+- Test (`features`): the toolbar narrowed down to 260 px — with the room the magnifiers leave, the date shortened only below 280 px
 
 ## [v1.2.47] - 2026-10-28
 

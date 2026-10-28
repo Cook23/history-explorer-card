@@ -349,7 +349,7 @@ graphs:
 
 ### Real time
 
-The window showing the present, on its right, is in real time: the curves grow and slide as new values come, and the window never goes past the present (the date's `>` is greyed). Every change of the range keeps the present on the right — the selector, the + / − buttons, the default range —, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; elsewhere, the wheel and a pinch zoom around the pointer or the fingers, and leave real time (a double-click on the date brings it back). Looking at the history, the selector and the buttons keep the middle of the window.
+The window showing the present, on its right, is in real time: the curves grow and slide as new values come, and the window never goes past the present (the date's `>` is greyed). Every change of the range keeps the present on the right — the selector, the magnifiers + and −, the default range —, and so do the wheel from the right 10 % of a graph and a pinch with a finger in its right 20 %; elsewhere, the wheel and a pinch zoom around the pointer or the fingers, and leave real time (a double-click on the date brings it back). Looking at the history, the selector and the buttons keep the middle of the window.
 
 ### Default range and persistence
 
@@ -800,7 +800,7 @@ uiLayout:
   toolbar: top         # top, bottom, both, hide
   selector: bottom
   sticky: top          # keep toolbar visible while scrolling
-  invertZoom: true     # swap + and - zoom buttons
+  invertZoom: true     # swap the magnifiers + and −
   interval: hide       # hide the bar interval selector
 
 labelsVisible: false      # no names left of the timelines' rows

@@ -111,11 +111,13 @@ export function optionsMenuHtml(i)
 }
 
 // The magnifier's modes (what the elastic box zooms — Chart.js zoomBoxAxes): the time (↔),
-// the Y axes (↕), both (⤢); each one's symbol in the magnifier's glass
+// the Y axes (↕), both (⤢); each one's symbol in the magnifier's glass — and the zoom
+// buttons' beside the range selector: out (−), in (+)
 export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
 const _ZOOM_BOX_SYMBOLS = { x: 'M6,9.5H13M6,9.5L7.8,7.9M6,9.5L7.8,11.1M13,9.5L11.2,7.9M13,9.5L11.2,11.1',
                             y: 'M9.5,6V13M9.5,6L7.9,7.8M9.5,6L11.1,7.8M9.5,13L7.9,11.2M9.5,13L11.1,11.2',
-                            xy: 'M6.8,12.2L12.2,6.8M12.2,6.8H9.8M12.2,6.8V9.2M6.8,12.2H9.2M6.8,12.2V9.8' };
+                            xy: 'M6.8,12.2L12.2,6.8M12.2,6.8H9.8M12.2,6.8V9.2M6.8,12.2H9.2M6.8,12.2V9.8',
+                            out: 'M6.5,9.5H12.5', in: 'M6.5,9.5H12.5M9.5,6.5V12.5' };
 
 // A magnifier (magnifierSvg) shown in another mode or color, its elements kept (a click and
 // the next one on the same element: a double-click)
@@ -127,11 +129,11 @@ export function paintMagnifier(svg, mode, color)
     _symbol.setAttribute('d', _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy);
 }
 
-// The magnifier of mode (ZOOM_BOX_MODES), in color: its glass and handle, its mode's symbol
-// in the glass
-export function magnifierSvg(mode, color = 'var(--primary-text-color)')
+// The magnifier of mode (ZOOM_BOX_MODES, or 'out', 'in'), in color, size px wide: its glass
+// and handle, its mode's symbol in the glass
+export function magnifierSvg(mode, color = 'var(--primary-text-color)', size = 24)
 {
-    return `<svg width="24" height="24" viewBox="0 0 24 24" style="vertical-align:middle;">` +
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:middle;">` +
         `<path fill="${color}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
         `<path fill="none" stroke="${color}" stroke-width="1.2" stroke-linecap="round" d="${_ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy}" /></svg>`;
 }
