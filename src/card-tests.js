@@ -144,6 +144,7 @@ const PEN_CHECKS = [
     ['keys',        'key event (keydown / keyup) — some pens send their button as a key'],
     ['select',      'text selection started (selectstart / selectionchange)'],
     ['leave',       'pointerleave / pointerout with no contact (pen moved away)'],
+    ['leaveNull',   'pointerleave / pointerout with no contact and no element entered (relatedTarget null: the pen gone from the screen)'],
 ];
 const PEN_PAD_EVENTS = ['pointerover', 'pointerenter', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerout', 'pointerleave',
                         'contextmenu', 'mousedown', 'mouseup', 'click', 'auxclick', 'dblclick'];
@@ -167,9 +168,10 @@ function buildPenEventsTest(body)
             <div class="pad" id="padScroll"><div><b>Like a graph</b>a vertical swipe may scroll</div></div>
             <div class="pad" id="padFree"><div><b>No scrolling</b>every gesture reaches the card</div></div>
         </div>
-        <section class="box"><h2>Pen hover: time between two moves</h2>
-            <p>Hold the pen still above a zone, then move it away: a pen hovers only while it sends moves (the card ends its hover after ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s without one).</p>
-            <div class="now mono" id="gaps">— no pen hover yet —</div></section>
+        <section class="box"><h2>Device</h2><pre class="log mono" id="device"></pre></section>
+        <section class="box"><h2>Hover: time between two moves</h2>
+            <p>Hold the pen still above a zone, then move it away: a pen hovers only while it sends moves (the card ends its hover after ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s without one). Every move with no contact counts, whatever type it's reported as.</p>
+            <div class="now mono" id="gaps">— no hover yet —</div></section>
         <section class="box"><h2>Last event</h2><div class="now mono" id="now">— nothing yet —</div></section>
         <section class="box">
             <h2>Event log (newest first)</h2>
@@ -195,7 +197,7 @@ function buildPenEventsTest(body)
     const gaps = [];
     let gapsLong = 0, lastHover = null;
     const gapsText = () => {
-        if( !gaps.length && !gapsLong ) return '— no pen hover yet —';
+        if( !gaps.length && !gapsLong ) return '— no hover yet —';
         const n = gaps.length, mean = n ? gaps.reduce((a, g) => a + g, 0) / n : 0;
         const sd = n ? Math.sqrt(gaps.reduce((a, g) => a + (g - mean) ** 2, 0) / n) : 0;
         const ms = v => `${Math.round(v)}ms`;
@@ -217,7 +219,11 @@ function buildPenEventsTest(body)
             const _l = lastContact[where];
             _extra = ` contact=${contact}, ` + ( _l ? `${Math.round(performance.now() - _l.t)}ms after the last contact here ended, ${dist(_l, e.clientX, e.clientY)}px from it` : 'no contact here yet' );
         }
-        return `${stamp()} ${where.padEnd(6)} ${e.type.padEnd(15)} ${String(e.pointerType ?? '-').padEnd(5)} btn=${String(e.button ?? '-').padStart(2)} btns=${String(e.buttons ?? '-').padStart(2)} p=${(e.pressure ?? 0).toFixed(2)}${_extra}`;
+        // (a pointer's id, tilt, altitude and contact size: what may tell a pen reported as
+        // a mouse; what a pointer leaving went to — null: it left the screen)
+        const _p = e.pointerId === undefined ? '' : ` id=${e.pointerId} tilt=${e.tiltX ?? '-'},${e.tiltY ?? '-'} alt=${e.altitudeAngle === undefined ? '-' : e.altitudeAngle.toFixed(2)} wh=${Math.round(e.width ?? 0)}x${Math.round(e.height ?? 0)}`;
+        const _to = /^pointer(out|leave)$/.test(e.type) ? ` to=${e.relatedTarget ? ( e.relatedTarget.id || e.relatedTarget.tagName?.toLowerCase() ) : 'null'}` : '';
+        return `${stamp()} ${where.padEnd(6)} ${e.type.padEnd(15)} ${String(e.pointerType ?? '-').padEnd(5)} btn=${String(e.button ?? '-').padStart(2)} btns=${String(e.buttons ?? '-').padStart(2)} p=${(e.pressure ?? 0).toFixed(2)}${_p}${_to}${_extra}`;
     };
     const push = (text) => {
         lines.unshift(text);
@@ -258,8 +264,8 @@ function buildPenEventsTest(body)
         if( pt === 'pen' ) seen.penType = true;
         if( pt === 'touch' && seen.penType ) seen.touchType = true;
         if( pt === 'mouse' ) seen.mouseType = true;
-        if( e.type === 'pointermove' && pt === 'pen' && b === 0 ) {
-            seen.hover = true;
+        if( e.type === 'pointermove' && pt === 'pen' && b === 0 ) seen.hover = true;
+        if( e.type === 'pointermove' && pt && pt !== 'touch' && b === 0 && (e.pressure ?? 0) === 0 ) {
             const _now = performance.now();
             if( lastHover && lastHover.where === where ) {
                 const _g = _now - lastHover.t;
@@ -274,6 +280,7 @@ function buildPenEventsTest(body)
         if( b & 32 ) seen.eraser = true;
         if( e.type === 'pointercancel' ) seen.cancel = true;
         if( ( e.type === 'pointerleave' || e.type === 'pointerout' ) && b === 0 ) seen.leave = true;
+        if( ( e.type === 'pointerleave' || e.type === 'pointerout' ) && b === 0 && !e.relatedTarget ) seen.leaveNull = true;
         if( e.type === 'contextmenu' ) { seen.ctx = true; e.preventDefault(); }
         if( e.pointerId !== undefined ) lastBtns[e.pointerId] = b;
         $('now').textContent = line(e, where, _extra);
@@ -301,10 +308,16 @@ function buildPenEventsTest(body)
         $('now').textContent = '— nothing yet —';
         renderChecks();
     });
+    // What the browser says of its pointers (the media queries) and of the device
+    const _mq = q => window.matchMedia(q).matches;
+    const deviceText = ['pointer', 'any-pointer'].map(f => `${f}: ${['coarse', 'fine', 'none'].filter(v => _mq(`(${f}: ${v})`)).join(' ') || '-'}`)
+        .concat(['hover', 'any-hover'].map(f => `${f}: ${['hover', 'none'].filter(v => _mq(`(${f}: ${v})`)).join(' ') || '-'}`))
+        .concat([`maxTouchPoints: ${navigator.maxTouchPoints}`, `devicePixelRatio: ${window.devicePixelRatio}`, navigator.userAgent]).join('\n');
+    $('device').textContent = deviceText;
     renderChecks();
 
     return {
-        report: () => PEN_CHECKS.map(([k, l]) => `${seen[k] ? 'YES' : ' - '}  ${l}`).join('\n') + '\n\nPen hover, time between two moves: ' + gapsText() + '\n\n' + lines.join('\n'),
+        report: () => PEN_CHECKS.map(([k, l]) => `${seen[k] ? 'YES' : ' - '}  ${l}`).join('\n') + '\n\nDevice:\n' + deviceText + '\n\nHover, time between two moves: ' + gapsText() + '\n\n' + lines.join('\n'),
         dispose: () => {
             for( const t of PEN_PAGE_EVENTS ) document.removeEventListener(t, onEvent);
             document.removeEventListener('selectionchange', onSelectionChange);

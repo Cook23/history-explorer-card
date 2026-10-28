@@ -4,6 +4,13 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [Unreleased]
+
+### Added — *Tests (beta) ▸ Pen events*: what may tell a pen reported as a mouse
+- Each pointer event's id, tilt (`tiltX`, `tiltY`, `altitudeAngle`) and contact size (`width × height`); a pointer leaving: the element it went to (`null`: it left the screen), and a check for that
+- The device: what the browser says of its pointers (`pointer`, `any-pointer`, `hover`, `any-hover`), `maxTouchPoints`, `devicePixelRatio`, the user agent
+- The time between two hover moves counted whatever type they're reported as (a pen's hover reported as a mouse by some browsers)
+
 ## [v1.2.51] - 2026-10-28
 
 ### Fixed — a pen gone out of hover range
