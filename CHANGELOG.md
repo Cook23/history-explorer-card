@@ -4,6 +4,30 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.49] - 2026-10-28
+
+### Added — `defaultMagnifierMode`
+- The magnifying glass's mode (what its box zooms: `x` the time, `y` the Y axis, `xy` both — the default) has its YAML default, handled as `defaultTimeRange`: applied where the options are read (`card-config`), kept or not as the time range is, the last one to speak winning (its YAML image `yaml_defaultMagnifierMode`, `_resolveZoomBox`); the info panel opens in it, *Default display* goes back to it. `ZOOM_BOX_MODES` moved to `history-options.js`
+- Test (`persistence`): a change of `defaultMagnifierMode` in the YAML wins, then the next choice made on the card; nothing persisted, the YAML's at each opening
+
+### Changed — the options' base names
+- An option grouped in a block — `tooltip:`, `timeTicks:`, `uiColors:`… — has its block as its base name, every other spelling a synonym, converted where the options are read (`normalizeOptions`), the base name winning when both are written: `tooltip.size` (`tooltipSize`), `tooltip.showDuration` (`tooltipShowDuration`), `tooltip.showColorsLine` / `showColorsTimeline` (`showTooltipColorsLine` / `Timeline`), `timeTicks.density` (`timeTickDensity`); in camelCase, `uiColors.gridLines` / `cursorLine` (`gridlines` / `cursorline`). A curve's tooltip options join the `tooltip:` block, at every level (card, graph, entity, `entityOptions`): `tooltip.largeScreen`, `tooltip.smallScreen`, `tooltip.behavior` (`largeScreenTooltip`, `smallScreenTooltip`, `tooltipBehavior`, and their snake_case spellings). `enablePersistence` and `enableMultidevicePersistence` in camelCase (`enable_persistence`, `enable_multidevice_persistence`). Nothing to change in a configuration: every former spelling keeps working; nothing saved changes (the persistence keeps values, never these names)
+- The theme's colors (`uimode`, `uiColors`) read with the other options (`applyTheme` reads them there)
+- README, README_Full, full-reference-config.yaml: the base names, their synonyms in the options table
+- Test (`options`): each former spelling gives the same values as the base name, the base name winning when both are written; `tooltip.behavior`, `tooltip.largeScreen` on a graph, an entity, in `entityOptions`
+
+### Changed — the toolbar's spacing
+- The time buttons (`<`, the date, `>`) and the zoom controls (the magnifiers, the range selector) about as far apart as each other, as they're seen: the time buttons side by side, the date's padding narrower (12 and 13 px apart; 17 and 18 before); the magnifiers apart by margins, the range's text 2 px further left (9 to 10 px apart; 5 to 9 before) — the two blocks' total width unchanged within a pixel (`timeButtonsHtml`, `rangeControlsHtml`)
+- `<` and `>` in bold
+- The three magnifiers (the box's, − and +) 20 px wide (18 before), their symbols (↔ ↕ ⤢, − +) larger and bolder; under a mouse or a pen above the screen, a magnifier shown twice as large, over its neighbours, the toolbar unchanged — to see what is clicked (`rangeControlsHtml`, `magnifierSvg`)
+- Test (`features`): each magnifier 20 px, 40 px under the mouse, the toolbar unchanged
+
+### Changed — the documentation
+- README.md rewritten short: each section what a user needs, then a 📖 link to its section of README_Full.md; the narrow card under UI configuration; the info panel turned on by its switch or `defaultInfoPanel` (`infoPanel:` is its own options)
+- README_Full.md reorganized: *Tooltip* and *Menus* sections under *Usage*; *Persistence* a section of its own (with the persistence of each entity); *A narrow card* under *Configuring the UI*; *Custom data processing functions* under *Entity options*; `showLine` and `fixedValue` under *Line modes*; the attributes as a list; the options table covering the card's own options too (`defaultTimeRange`, `labelsVisible`, `hour24`, `show`), synonyms only there; the table of contents regenerated from the headings
+- README_Full.md corrected: a timeline's states named for their device class by default (`stateTextMode: auto`); `defaultTimeRange` restored as the persistence says; the tooltip modes among an entity's persisted fields; the default header (*History explorer* and the version)
+- README_Full.md: removed what didn't help using the card (the differences from upstream, the pinch's dead band, `borderJoinStyle`, why no Fourier interpolation, repeated sentences)
+
 ## [v1.2.48] - 2026-10-28
 
 ### Changed — one tooltip layout, a curve's

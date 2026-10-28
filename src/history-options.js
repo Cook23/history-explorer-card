@@ -8,6 +8,10 @@ import { normalizeColor } from "./history-default-colors.js";
 // and helpers.canvas.lineTo in deps/Chart.js for bspline
 export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom', 'bspline'];
 
+// The magnifier's modes (what the elastic box zooms — Chart.js zoomBoxAxes): the time (x),
+// the Y axes (y), both (xy)
+export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
+
 // How each algorithm is named in the Interpolation submenu (names, not translated)
 export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom', bspline: 'B-spline' };
 
@@ -110,7 +114,24 @@ const OPTION_SYNONYMS = {
     largeScreenTooltip: ['large_screen_tooltip'],
     smallScreenTooltip: ['small_screen_tooltip'],
     tooltipBehavior  : ['tooltip_behavior'],
+    enablePersistence : ['enable_persistence'],
+    enableMultidevicePersistence : ['enable_multidevice_persistence'],
 };
+
+// The options grouped in a block (tooltip:, timeTicks:, uiColors:): each one's other
+// spellings — written flat, or under another name in its block — put in the block, under
+// its one name (see normalizeOptions)
+const BLOCK_SYNONYMS = {
+    tooltip  : { size: ['tooltipSize'], showDuration: ['tooltipShowDuration'], showColorsLine: ['showTooltipColorsLine'],
+                 showColorsTimeline: ['showTooltipColorsTimeline'] },
+    timeTicks: { density: ['timeTickDensity'] },
+};
+const BLOCK_KEY_SYNONYMS = { uiColors: { cursorLine: ['cursorline'], gridLines: ['gridlines'] } };
+// A curve's tooltip options (tooltip.largeScreen, smallScreen, behavior — at every level):
+// the names the card keeps them under (a curve's largeScreenTooltip, smallScreenTooltip:
+// what's saved of it)
+const CURVE_TOOLTIP_KEYS = { largeScreen: 'largeScreenTooltip', smallScreen: 'smallScreenTooltip', behavior: 'tooltipBehavior' };
+const _isBlock = v => !!v && typeof v === 'object' && !Array.isArray(v);
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
 // and how values are grouped (groupBy) — mini-graph-card's
@@ -191,6 +212,7 @@ const OPTION_VALUES = {
     colorTransition : v => v === 'smooth' || v === 'hard' ? v : undefined,
     showLine      : v => v !== false,
     hour24        : v => v === true || v === false ? v : undefined,
+    defaultMagnifierMode : v => ZOOM_BOX_MODES.includes(v) ? v : undefined,
     // (a graph's header — its name and its icon — and its values: see card-graphs.js
     // updateGraphHeader, card-values.js showValues)
     showName      : v => v !== false,
@@ -285,6 +307,22 @@ export function normalizeOptions(o)
         if( r[name] !== undefined ) continue;
         for( const a of aliases ) if( r[a] !== undefined ) { r[name] = r[a]; break; }
     }
+    // (the blocks: each option's other spellings under its one name — the block's own
+    // winning; a curve's tooltip options under the names the card keeps them)
+    for( const [block, keys] of Object.entries(BLOCK_SYNONYMS) )
+        for( const [k, flats] of Object.entries(keys) ) {
+            if( _isBlock(r[block]) && r[block][k] !== undefined ) continue;
+            const f = flats.find(f => r[f] !== undefined);
+            if( f ) r[block] = { ...( _isBlock(r[block]) ? r[block] : {} ), [k]: r[f] };
+        }
+    for( const [block, keys] of Object.entries(BLOCK_KEY_SYNONYMS) )
+        for( const [k, others] of Object.entries(keys) ) {
+            if( !_isBlock(r[block]) || r[block][k] !== undefined ) continue;
+            const a = others.find(a => r[block][a] !== undefined);
+            if( a ) r[block] = { ...r[block], [k]: r[block][a] };
+        }
+    if( _isBlock(r.tooltip) )
+        for( const [k, name] of Object.entries(CURVE_TOOLTIP_KEYS) ) if( r.tooltip[k] !== undefined ) r[name] = r.tooltip[k];
     // (grouped by day or by hour: a bar graph's interval too, unless set — as mini-graph-card
     // draws its bars)
     if( r.interval === undefined && ( r.groupBy === 'date' || r.groupBy === 'hour' ) ) r.interval = r.groupBy === 'date' ? 'daily' : 'hourly';
@@ -327,7 +365,7 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
 // else the card's
 export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader',
     'nameAdaptiveColor', 'iconAdaptiveColor', 'showStateFor', 'showStatsFor'];
-export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show'];
+export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show', 'tooltip'];
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)

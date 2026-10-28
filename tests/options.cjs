@@ -259,6 +259,40 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── The options' base names (blocks with several options, camelCase) and their
+    // synonyms: each old spelling giving the same value; the base name winning over it ──
+    {
+        const read = async (cfg) => {
+            const t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }], ...cfg }), { mock: { series: true } });
+            const v = await t.E(`(()=>{ const P=el.instance.pconfig, d=graphAt(0).chart.data.datasets[0];
+                return { size: P.tooltipSize, dur: P.tooltipShowDuration, colors: P.showTooltipColors.join(), density: P.timeTickDensity,
+                         grid: P.graphGridColor, cursor: P.cursorLineColor, local: [...(P.enablePersistence ?? [])].join(), multi: [...(P.enableMultidevicePersistence ?? [])].join(),
+                         tip: d.hecTooltip }; })()`);
+            done(await t.close());
+            return v;
+        };
+        const base = await read({ tooltip: { size: 'slim', showDuration: true, showColorsLine: false, showColorsTimeline: false, largeScreen: 'all' },
+            timeTicks: { density: 'low' }, uiColors: { gridLines: '#ff0000', cursorLine: '#00ff00' }, enablePersistence: ['range'], enableMultidevicePersistence: ['order'] });
+        const old = await read({ tooltipSize: 'slim', tooltipShowDuration: true, showTooltipColorsLine: false, showTooltipColorsTimeline: false, largeScreenTooltip: 'all',
+            timeTickDensity: 'low', uiColors: { gridlines: '#ff0000', cursorline: '#00ff00' }, enable_persistence: ['range'], enable_multidevice_persistence: ['order'] });
+        const both = await read({ tooltip: { size: 'slim', largeScreen: 'all' }, tooltipSize: 'full', largeScreenTooltip: 'nearest', timeTicks: { density: 'low' }, timeTickDensity: 'highest',
+            uiColors: { gridLines: '#ff0000', gridlines: '#0000ff' }, enablePersistence: ['range'], enable_persistence: ['order'] });
+        const levels = [];
+        for( const [where, cfg] of [['graph', { graphs: [{ type: 'line', options: { tooltip: { behavior: 'nearest' } }, entities: [{ entity: 'sensor.power' }] }] }],
+                                    ['entity', { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', tooltip: { largeScreen: 'nearest' } }] }] }],
+                                    ['entityOptions', { entityOptions: { 'sensor.power': { tooltip: { behavior: 'nearest' } } } }]] )
+            levels.push(where + ':' + (await read(cfg)).tip);
+        t = await openCard(card({}), { mock: { series: true } });
+        await t.step('the base names and their synonyms: tooltipSize, tooltipShowDuration, showTooltipColorsLine/Timeline, largeScreenTooltip — tooltip.size…, tooltip.largeScreen; timeTickDensity — timeTicks.density; uiColors.gridlines, cursorline — gridLines, cursorLine; enable_persistence, enable_multidevice_persistence — enablePersistence…: the same values, the base name winning; tooltip.behavior / largeScreen on a graph, an entity, in entityOptions', async () => {
+            const same = JSON.stringify(base) === JSON.stringify(old);
+            const wins = both.size === 'slim' && both.tip === 'all' && both.density === 'low' && both.grid === base.grid && both.local === 'range';
+            const lv = levels.join() === 'graph:nearest,entity:nearest,entityOptions:nearest';
+            return same && wins && lv && base.size === 'slim' && base.dur === true && base.colors === 'false,false' && base.density === 'low' && /255, ?0, ?0|ff0000/i.test(base.grid)
+                && /0, ?255, ?0|00ff00/i.test(base.cursor) && base.tip === 'all' && base.local === 'range' && base.multi === 'order' ? true : JSON.stringify({ base, old, both, levels });
+        });
+        done(await t.close());
+    }
+
     // ── The info panel reads its configuration as the card does (same code) ──
     t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curve', ylock: true, showSamples: 3 }, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);

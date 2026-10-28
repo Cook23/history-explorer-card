@@ -4,7 +4,8 @@
 // history-explorer-card.js).
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
-import { paintMagnifier, ZOOM_BOX_MODES } from "./card-menus.js";
+import { paintMagnifier } from "./card-menus.js";
+import { ZOOM_BOX_MODES } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
 // Valid time ranges in hours

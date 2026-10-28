@@ -73,7 +73,7 @@ graphs:
       # Otherwise defaults to the graph's, then $.entityOptions', then the card's value at $.interpolation
       interpolation: null
 
-      # Line width, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+      # Line width, otherwise defaults to the card's value at $.lineWidth
       lineWidth: null
 
       # If true, hide this entity from the graph
@@ -125,13 +125,13 @@ graphs:
 
       # Turns on persistence for this entity's fields — a specific list (e.g. [color, groupId]), or 'entities'/'all'
       # for every field, or 'none'. Local browser storage only, no cross-device sync. Falls back to the card-level
-      # setting when unset here. See $.enable_persistence for what this means and what it defaults to.
-      # (The 'order' category isn't available at entity level — it's card-only, see $.enable_persistence above)
-      enable_persistence: null
+      # setting when unset here. See $.enablePersistence for what this means and what it defaults to.
+      # (The 'order' category isn't available at entity level — it's card-only, see $.enablePersistence above)
+      enablePersistence: null
 
-      # Same as `enable_persistence` above, but also syncs across your other devices via your HA account.
-      # Where both cover the same field, this one always wins. See $.enable_multidevice_persistence
-      enable_multidevice_persistence: null
+      # Same as `enablePersistence` above, but also syncs across your other devices via your HA account.
+      # Where both cover the same field, this one always wins. See $.enableMultidevicePersistence
+      enableMultidevicePersistence: null
 
   # Each graph can be given its own title, by default they will not have one
   title: undefined
@@ -167,7 +167,7 @@ graphs:
     # (curves and smart modes) Interpolation algorithm for every entity in this graph — see $.interpolation
     interpolation: null
 
-    # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+    # Line width for every entity in this graph, otherwise defaults to the card's value at $.lineWidth
     lineWidth: null
 
     # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them), for every entity in this graph
@@ -283,7 +283,7 @@ entityOptions:
     # Style of the line in the graph. Can be: points, shortlines, longlines, pointline, or default which is a solid line
     dashMode: "solid"
 
-    # Line width, otherwise defaults to the card's value at $.lineWidth. `width` is also accepted as an alias
+    # Line width, otherwise defaults to the card's value at $.lineWidth
     lineWidth: null
 
     # (line graph only) Line interpolation mode, otherwise defaults to the card's value at $.lineMode
@@ -335,21 +335,17 @@ cursor:
 # Configuration related to the tooltip displaying
 tooltip:
   # Whether to show the colours of each data series in the tool tip on every graph but timelines
-  # (Can also be set with $.showTooltipColorsLine)
   showColorsLine: True
   
   # Whether to show the colours of each data series in the tool tip on timeline graphs
-  # (Can also be set with $.showTooltipColorsTimeline)
   showColorsTimeline: True
 
   # The size of every tooltip: full (the source and the time, then each name and value), compact (the time,
   # then each shortest name and value), slim (one line: the time and the value pointed at), or auto (by the
   # card's width: full from 600 px, compact from 300 px and in the info panel, slim below)
-  # (Can also be set with $.tooltipSize)
   size: "auto"
 
   # Whether to show how long a timeline's or arrowline's state lasted, after its time span in the tooltip's title
-  # (Can also be set with $.tooltipShowDuration)
   showDuration: False
 
   # Whether to show the name of the data series on the tooltip, before its value
@@ -357,6 +353,16 @@ tooltip:
 
   # Similar to $.stateTextMode config, but for the tooltip, defaults to matching $.stateTextMode, or auto
   stateTextMode: "auto"
+
+  # Each curve's tooltip mode on a large screen (a card 600 px wide or more): mixed (the default), nearest, selected
+  # or all — and on a small one (narrower, and the info panel): selected by default
+  # Also settable in $.entityOptions, on a graph and on an entity, in their own tooltip: block
+  largeScreen: "mixed"
+  smallScreen: "selected"
+
+  # Changes the default of largeScreen and smallScreen: selected, nearest, mixed or all, on both screens — auto (the
+  # default) leaves theirs. Also settable in $.entityOptions, on a graph and on an entity
+  behavior: "auto"
 
 # If timeline state colours have not been defined, this is used as a seed value when randomly generating the colours for each state value
 stateColorSeed: 137
@@ -394,12 +400,8 @@ lineMode: null
 # Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Interpolation)
 interpolation: "monotone"
 
-# Changes the default of largeScreenTooltip and smallScreenTooltip: selected, nearest, mixed or all, on both screens —
-# auto (the default) leaves theirs: mixed on a large screen (a card 600 px wide or more), selected on a small one
-# Also settable in $.entityOptions, on a graph and on an entity
-tooltipBehavior: "auto"
 
-# Line width for lines in line graphs. `width` is also accepted as an alias
+# Line width for lines in line graphs
 lineWidth: 2.0
 
 # The Y axis of every curve of the card: auto (the default — a line or bar graph with two groups of units shows
@@ -528,6 +530,9 @@ combineSameUnits: False
 # The default time range to display in the card. Can specify in minutes, hours, days, weeks, months or years. Defaults to being in hours if no unit suffix is given.
 defaultTimeRange: '24'
 
+# What the magnifying glass's elastic box zooms when the card opens: x (the time), y (the Y axis) or xy (both). Kept or not as the time range is.
+defaultMagnifierMode: 'xy'
+
 # By default, the right side of the graph will be the current time. Use this to offset the time range the graph should display. Using lower case suffices for relative offsets, and using upper case units to display the current hour, day, month or year.
 defaultTimeOffset: undefined
 
@@ -558,22 +563,21 @@ defaultInfoPanel: undefined
 # their display order always show exactly what YAML says. Two exceptions default to full persistence
 # instead, since they have no YAML value to fall back to: entities added dynamically through the UI (not
 # listed under $.graphs.entities), and — for time range and order specifically — a card with no static
-# entities at all. Set this (or $.enable_multidevice_persistence below) to change either default explicitly
+# entities at all. Set this (or $.enableMultidevicePersistence below) to change either default explicitly
 # Accepts 'range', 'entities', 'order', 'all' (every category), or 'none' (force off where something would
 # default on). 'order' controls the display order of graphs — card-level only, since a position only means
 # something relative to every other graph, not as a property of a single entity
-enable_persistence: undefined
+enablePersistence: undefined
 
-# Same as `enable_persistence` above, but also syncs the persisted value across your other devices via
+# Same as `enablePersistence` above, but also syncs the persisted value across your other devices via
 # your Home Assistant user account, instead of staying local to this browser/device only. Where both
 # options cover the same scope, this one always wins
-enable_multidevice_persistence: undefined
+enableMultidevicePersistence: undefined
 
 # Settings for the time ticks, the vertical lines in the background of the graph
 timeTicks:
   # The maximum density of time ticks, while allowing the actual density to be determined by the width of the graph on the display
   # Can be: low, medium, high, higher, highest
-  # (Can also be set with $.timeTickDensity)
   density: 'high'
   # An override of the time tick density to set the density without adjusting tick density for the screen size.
   # Has the same options as $.timeTicks.density: low, medium, high, higher, highest
@@ -638,10 +642,10 @@ uiColors:
   selector: undefined
   # Colour of the labels. Defaults to '#9b9b9b' if darkmode, '#333' otherwise.
   labels: undefined
-  # Colour of the gridlines on the graph. Defaults to 'rgba(255, 255, 255, 0.1)'' if darkmode, 'rgba(0, 0, 0, 0.1)'' otherwise
-  gridlines: undefined
-  # Colour of the vline under the cursor. Defaults to the gridline colour if not specified
-  cursorline: undefined
+  # Colour of the grid lines on the graph. Defaults to 'rgba(255, 255, 255, 0.1)'' if darkmode, 'rgba(0, 0, 0, 0.1)'' otherwise
+  gridLines: undefined
+  # Colour of the vline under the cursor. Defaults to the grid lines' colour if not specified
+  cursorLine: undefined
 
 # If you choose to enable history explorer graphs to override the default HA history info panel, config options here can be used to configure those graphs.
 # You will have to set the options here (which can be much the same as history explorer card options elsewhere in this config), then either click "Enable history info panel" on this card, or set $.defaultInfoPanel above, and all HA history info panels will be replaced with history explorer graphs

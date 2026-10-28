@@ -496,6 +496,21 @@ module.exports = async function()
         const [h0, h1] = await win();
         return h === 24 && mode === false && l6 && l24 && lInc && lDec && h0 === '2026-01-09T12:00:00' && h1 === '2026-01-11T12:00:00' ? true : JSON.stringify({ h, mode, l6, l24, lInc, lDec, h0, h1 });
     });
+    await t.step('the three magnifiers, 20 px: each twice as large under the mouse, drawn over its neighbours — every box of the toolbar keeping its place and its size; back to its size once left', async () => {
+        const size = id => t.E(`(()=>{ const r=el.querySelector('#${id} svg').getBoundingClientRect(); return Math.round(r.width); })()`);
+        const box = () => t.E(`JSON.stringify(['dl_0','dr_0','bz_0','b4_0','by_0','b5_0'].map(id=>{ const r=el.querySelector('#'+id).getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }))`);
+        const r = {};
+        await t.page.mouse.move(5, 5); await t.wait(400);
+        const b0 = await box();
+        for( const id of ['bz_0', 'b4_0', 'b5_0'] ) {
+            const rest = await size(id);
+            const c = await at('#' + id); await t.page.mouse.move(c.x, c.y); await t.wait(400);
+            const hover = await size(id), b1 = await box();
+            await t.page.mouse.move(5, 5); await t.wait(400);
+            r[id] = [rest, hover, await size(id), b1 === b0];
+        }
+        return Object.values(r).every(([a, b, c, same]) => a === 20 && b === 40 && c === 20 && same) ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     // ── One point per column of pixels: the mean of its values (weighted by how long each

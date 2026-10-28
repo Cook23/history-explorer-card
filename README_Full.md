@@ -7,11 +7,10 @@
 
 # History explorer card
 
-> **This is a custom history card for Home Assistant. It is a fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54 — see [Differences from upstream](#differences-from-upstream).
+> **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54.
+> 📖 [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md) — the short version · [Version highlights](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md#-version-highlights) · What this fork adds: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION_FR.md) 🇫🇷
 
-> For a shorter, user-focused version of this documentation, see [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md). The main versions and what each one brought: [Version highlights](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md#-version-highlights).
-
-This card offers a highly interactive and configurable way to view the history of your entities in HA. The card uses asynchronous stream caching, loads only what the screen can show — the hourly statistics, the 5-minute statistics or the history — and draws no more to hide the high latency of HA's history database accesses and tries to make it into a smooth interactive experience.
+A highly interactive way to view the history of your entities in Home Assistant: it loads only what the screen can show — the hourly statistics, the 5-minute statistics or the history — so that panning and zooming stay smooth.
 
 ![history-panel-sample](https://user-images.githubusercontent.com/60828821/147441073-5fbdeb2e-281a-4312-84f1-1ce5c835fc3d.png)
 
@@ -19,13 +18,15 @@ This card offers a highly interactive and configurable way to view the history o
 
 ## Table of contents
 
-- [Differences from upstream](#differences-from-upstream)
 - [Install and configuration](#install-and-configuration)
   - [HACS](#hacs)
   - [Manual install](#manual-install)
   - [Full configuration reference](#full-configuration-reference)
 - [Usage](#usage)
   - [Interactive navigation](#interactive-navigation)
+  - [Tooltip](#tooltip)
+  - [Menus](#menus)
+    - [The options menu](#the-options-menu)
   - [Adding entities](#adding-entities)
   - [Choosing an entity's display type](#choosing-an-entitys-display-type)
   - [Interactive graph management](#interactive-graph-management)
@@ -67,7 +68,6 @@ This card offers a highly interactive and configurable way to view the history o
   - [Showing the min/max statistical range](#showing-the-minmax-statistical-range)
   - [Text states as a curve](#text-states-as-a-curve)
   - [Line graphs and unavailable data](#line-graphs-and-unavailable-data)
-  - [Custom data processing functions](#custom-data-processing-functions)
 - [Long term statistics](#long-term-statistics)
 - [Data decimation and aggregation](#data-decimation-and-aggregation)
   - [Data decimation](#data-decimation)
@@ -76,15 +76,17 @@ This card offers a highly interactive and configurable way to view the history o
 - [mini-graph-card compatibility](#mini-graph-card-compatibility)
   - [Replacing mini-graph-card](#replacing-mini-graph-card)
 - [Default view and time ranges](#default-view-and-time-ranges)
-  - [Enabling persistence (enable_persistence / enable_multidevice_persistence)](#enabling-persistence-enable_persistence--enable_multidevice_persistence)
+- [Persistence](#persistence)
+  - [Enabling persistence (`enablePersistence` / `enableMultidevicePersistence`)](#enabling-persistence-enablepersistence--enablemultidevicepersistence)
+  - [Persistence for specific entities](#persistence-for-specific-entities)
 - [Auto refresh](#auto-refresh)
 - [Entity options](#entity-options)
-  - [Complete list of entityOptions properties](#complete-list-of-entityoptions-properties)
+  - [Complete list of options](#complete-list-of-options)
     - [The same options at every level](#the-same-options-at-every-level)
   - [Pattern-based entity options](#pattern-based-entity-options)
     - [Priority rules](#priority-rules)
+  - [Custom data processing functions](#custom-data-processing-functions)
 - [Configuring the UI](#configuring-the-ui)
-  - [The options menu](#the-options-menu)
   - [Gesture settings](#gesture-settings)
   - [Header text](#header-text)
   - [Dark mode](#dark-mode)
@@ -92,77 +94,14 @@ This card offers a highly interactive and configurable way to view the history o
   - [The cursor line](#the-cursor-line)
   - [Changing the UI layout](#changing-the-ui-layout)
   - [Graph sizes](#graph-sizes)
-  - [Configuring the tooltip popup](#configuring-the-tooltip-popup)
+  - [A narrow card](#a-narrow-card)
   - [The clock](#the-clock)
   - [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density)
 - [Multiple cards](#multiple-cards)
 - [Exporting data as CSV](#exporting-data-as-csv)
 - [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)
   - [Attributes](#attributes)
-  - [Persistence for specific entities](#persistence-for-specific-entities)
 - [Running as a panel in the sidebar](#running-as-a-panel-in-the-sidebar)
-
----
-
-## Differences from upstream
-
-This fork is based on version 1.0.54 of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card). Here is what it adds or changes compared with that version — each point is detailed in the sections below.
-
-**Adding entities**
-
-- **Entity selector** — one dropdown on desktop and mobile, showing friendly names and each entity's current state, filtering on both the friendly name and the entity ID (shown in a tooltip). Keyboard navigation (arrows, Enter, Escape); a click on an entry chooses it, as Enter does. A wildcard pattern shows its matches in bold and adds them all; an entity already shown is flagged with a tooltip and its graph outlined — then cancelled, or added as a second curve in another graph (the same entity in several YAML graphs too). `excludeFilterEntities` removes entities from what `filterEntities` lets through.
-- **Display type menu** — every entity added goes through it, with the most fitting type pre-selected, so nothing is added before you've checked how it will be shown: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline* (only *Timeline* for an entity whose state isn't a number). It reopens with a long-press (or a right click) on a label to change the type, choose the curve's interpolation or delete the entity, and in the info panel through a *Type* link. Its items open submenus — *Display*, *Appearance*, *Interpolation*, *Behavior* (*Tooltip*, *Y axis locked*, *Separate*, *Merge back*, *Cut*, *Delete*: every action of a gesture is also in a menu), and *Tests (beta)*: diagnostics of what the browser or app reports (*Pen events*) and of what the card costs on the device (*Performance*), sent as a report.
-- **Attributes** — an entity's attribute shown as a curve or a timeline, beside its state: `attribute:` in the YAML, or a submenu of the entity selector (*Value*, then the attributes); a number followed by a unit read as that number in that unit; an attribute can also hold or pick a curve's `color`; a sub-attribute too, by its path (`forecast.0.temperature`).
-- **YAML** — wildcard entities added in natural alphabetical order; `exclude`, `filterEntities` and `excludeFilterEntities` accept a string, a list of strings or the `{entity: ...}` form; a malformed entry is logged in the browser console and skipped instead of breaking the whole card.
-
-**Organizing graphs**
-
-- **Combining by unit** — with `combineSameUnits`, entities added from the card with compatible units, SI prefixes included (W and kW), share one graph; each value is shown in its own unit. A graph defined in YAML always shows all its entities together, whatever their units, bars and curves included (the curves drawn over the bars). Two groups of units get a Y axis each, left and right (`yAxis` chooses the side), the curves of the right one marked ▸ in the legend.
-- **Editing on the graphs** — a double-click on a label takes the curve into its own graph; a curve of a YAML graph, or one changed to a type its graph can't show, goes to a *linked* graph (chain icon), merged back by a double-click on the chain or by dragging the label back. Labels are dragged to reorder curves or move them to another graph, graphs by their ⠿ handle; timeline and arrowline labels the same way. A drag shows a ghost, insertion markers and the target graph highlighted, scrolls the page near its edges, and a refused drop says why. On a touch screen, a swipe on a graph always scrolls the page: a drag starts with a tap, then a second press right away (within the long-press duration). A long-press or a right click on a graph's ⠿ zone opens its menu (the Y axis lock, merge back, cut, delete), and *Cut* — of a graph, or of a curve from its type menu — then shows in every graph's ⠿ zone where it can go: everything a drag does can also be done from the menus.
-
-**Drawing**
-
-- **Line modes** — `smart` draws a curve while the sensor reports and flat dashed plateaus over its silences; `lines` and `stepped` pass exactly through every value (no overshoot); `curves` uses a monotone cubic by default, and the `interpolation` option chooses among five algorithms: `monotone`, `steffen`, `makima`, `catmullrom` and `bspline` (mini-graph-card's smoothing). Rounded corners and line ends. `line`, `curve` and `step` are accepted for `lines`, `curves` and `stepped`.
-- **Angles** — drawn without jumps at 0/360, automatically for `°` and `measurement_angle` — for an attribute in `°`, only when its name says it's a direction (`circular` option); arrowlines turn by the same period.
-- **`scale`, `unit` and `valueFactor`** — `scale` alone only changes how a curve is drawn, the real value being shown; with `unit`, it's a conversion into that unit; `valueFactor` multiplies by a power of 10 what is drawn and shown.
-- **Display options** — `showMinMax` (a lighter min/max band around the mean curve: everywhere, or only where it comes from the statistics, or from the history), `showPoints` (dots at each value, with a radius), `dashMode` with a custom dash array. Over a graph, each curve's value now (`showState`) and its minimum, average and maximum over the window shown (`showStats`); `showGrid`, `yLabels: inside`, `fill: fade`; `look: mini` for the look of mini-graph-card, with a table of how its options translate.
-- **The first point of a graph** is placed at the real time of the last known state, instead of at the left edge of the graph.
-- **Colors** — `color` takes a value or an entity holding it: a color (CSS, CSS variable, RGB triplet), thresholds on curves and bars alike (number keys, states, `default`), thresholds on the value of another entity (`entity:`), or an entity whose state holds the color; evaluated at each point, along that entity's history; the legend shows the color now.
-
-**Loading**
-
-- **What the screen can show, and no more** — the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts (an hour or more, 5 minutes or more, less — see [Long term statistics](#long-term-statistics)); one point per column, its mean with its min and max (computed from the history as Home Assistant compiles its statistics); a min/max band (`showMinMax`).
-- **Every action taken at once**, whatever is loading; real time always ending at the present; a page left open past midnight going on with the new day.
-- **mini-graph-card's aggregation** — `pointsPerHour`, `groupBy`, `aggregateFunc` (`points_per_hour`, `group_by`, `aggregate_func`).
-
-**Y axis**
-
-Dragging the label area pans the Y axis; a two-finger vertical pinch zooms it (a horizontal one zooms the time); `ylock` locks it against any interactive change; `axisAddMarginMin` / `axisAddMarginMax` add a margin below and above the curves. With two Y axes, dragging the labels of one moves that one; Shift, the pinch and the padlock act on both.
-
-**Touch, pen and mouse**
-
-- **Touch** — a swipe on a graph always scrolls the page, wherever it starts; to drag a label, a graph or the Y axis, tap it, then press it again right away (within the long-press duration) and drag; a pinch zooms the time and the Y axis, and pans both.
-- **Tooltip** — a click or a tap near a curve puts it in the tooltip (several curves can show theirs), opened on the value pointed at — real values only, never a point of the line between two —; it then moves to the value pointed at as the mouse (or a pen held above the screen) moves, and leaving the plot area closes it. A long-press (or a right click) near a curve shows or hides its points.
-- **Gesture settings** — for every card and every device: the long-press duration and the distance a pointer moves before it drags, for a mouse or a pen and for a finger (`gestures:`, or the options menu).
-- **Pen** — the tip works as a finger; where the browser passes its button on (Chrome, the Home Assistant app), a tap with it held on a label opens the type menu.
-- **Right click** on a label opens its type menu, as a long-press does; the browser's own menu never opens on a graph.
-- **Picking** — a label, a button, a curve, a bar or a state is picked when touched just beside it (within the pointer's precision, see [Gesture settings](#gesture-settings)), never when the touch is about halfway between two (in the middle third of the gap between them); two on the same pixel are one place, the one drawn on top.
-
-**Options**
-
-Every display option can be set on the card, in `entityOptions`, on a graph and on an entity, the most specific one winning; the options of a graph (its Y axis, height, stacking, time labels) can be set on its entities too. Every spelling of an option is accepted at every level. `entityOptions` also takes a list form, matching entities by a pattern on their entity ID. The automatic refresh is on by default, and reloads the recent data at most once every 2 seconds.
-
-**Persistence**
-
-What is changed from the card is saved in your Home Assistant user account and synced across your devices, browser storage being kept as a fallback. Entities added from the card are remembered by default; for the entities, time range and graph order defined in YAML, `enable_persistence` (this device) and `enable_multidevice_persistence` (every device) turn it on, card-wide or field by field. Between the YAML, this device and your other devices, the last one to speak wins. `defaultInfoPanel` and `defaultTimeRange` follow the same rule. The card is shown at once from what this device saved; your user account is read meanwhile, and what another device changed is taken then (on a device where the card was never shown, the account is read first).
-
-**Interface**
-
-The toolbar adapts its layout to the card's width — the date shortened first when the date and the range don't fit side by side (`20 Oct` for a longer one), the range's name only once they still don't; on a narrow card (a grid or a horizontal stack), the date, the range and the entity search each on a line of their own; menus and tooltips stay within the card and the screen, a tooltip's arrow on its point; the graph tooltip is an HTML element, readable at any size, closed as soon as a menu opens. A legend too narrow for its labels shortens the names, all of a graph's alike, and keeps each value: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`); then the start of the name abbreviated — the entity's device name, or the first words it shares with another curve of the graph (`Météo-France Villeveyrac Temperature (F)` and `Météo-France Villeveyrac Temperature` → `M-F V… Temperature (F)` and `M-F V… Temperature`); the articles removed; that start removed, where two curves don't then read the same; then '…' before the value. The handle, the padlock and the close button are floating icons: they keep room beside the legend's first line when its first label fits there; else they're drawn over the labels, in opaque boxes, and the label takes the whole line — the first line is never left empty. Scrolled under a sticky toolbar or the page's header, they're hidden with the graph. The full name stays in the tooltip. The time labels that wouldn't fit side by side are skipped.
-
-**Info panel**
-
-Loaded through `frontend: extra_module_url`, the card's file puts the info panel in an entity's popup on every page of Home Assistant; switching the panel on or off doesn't reload the page, and a new browser or device takes the choice from your Home Assistant user data.
 
 ---
 
@@ -194,46 +133,77 @@ To see a list of all possible configuration options, check the [Full reference c
 
 https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
 
-When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown, or the magnifiers − and + on each side of it) to zoom into or out of the history. A mouse's drag mostly up or down on a graph draws an elastic box (a finger's or a pen's vertical move scrolls the page) (a drag mostly sideways pans the time): released, the time zooms to it — the round duration that covers it, centred on it — and every Y axis of the graph to its values, the padlock closed; a box narrower or lower than the pointer's precision, or covering 90 % or more of the curves' area that way (it would hardly zoom), leaves that axis as it is — a box the whole height zooms the time only —, and Escape cancels it. The magnifying glass turns green while it's drawn; turned on (a click on it), any drag on a graph's curves draws the same box, with a finger too (the page doesn't scroll from a graph meanwhile). It goes off at the end of the next gesture on a graph — the box, or any other, which then does what it does —, a press outside the graphs, Escape, or a click on it again. A long press on the magnifying glass — or a right click, a pen's button — opens the menu of what the box zooms: the time (↔ — the box a band the curves' whole height, from the press to the pointer along the time), the Y axis (↕ — a band their whole width) or both (⤢, as above, the default); the glass shows its symbol. The choice is kept as the time range is (see the persistence options). Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
+The card opens on the last 24 hours (see [Default view and time ranges](#default-view-and-time-ranges)).
 
-**Real time** is the window showing the present, on its right: the curves grow and slide as new values come. The window never goes past the present — dragged towards the future, zoomed, the day after: it stops at the present, and is in real time again; the date selector's `>` is greyed then (there's nothing after). Dragged or moved back, the present is no longer shown: the window stays where it is while new values keep coming, `>` active again. With `defaultTimeOffset`, the present is the time it gives (`1h`: an hour after now, `1D`: the end of the day).
+- **Pan** — drag a graph left or right to slide it through time. The card loads what comes into view as you move (see [Long term statistics](#long-term-statistics)): on a slow database (on an SD card, for example), parts of the window may stay empty for a moment, filled as the data comes in. Released, the Y axes readjust to the new data, and every graph of the card shows the same time.
+- **Zoom** — the time range selector (top right), the magnifiers − and + on each side of it, or the mouse wheel with Ctrl. Under a mouse (or a pen above the screen), each magnifier is shown twice as large, to see which one is clicked.
+- **Elastic box** — with a mouse, a drag mostly up or down on a graph draws a box (a drag mostly sideways pans; a finger's or a pen's vertical move scrolls the page). Released, the time zooms to it — the round duration that covers it, centred on it — and every Y axis of the graph to its values, the padlock closed. A box narrower or lower than the pointer's precision, or covering 90 % or more of the curves' area that way, leaves that axis as it is — a box the whole height zooms the time only. Escape cancels it. The magnifying glass turns green while it's drawn.
+- **The magnifying glass** — a click turns it on: any drag on a graph's curves then draws the same box, with a finger too (the page doesn't scroll from a graph meanwhile). It goes off at the end of the next gesture on a graph, a press outside the graphs, Escape, or a click on it again. A double click brings the range back to `defaultTimeRange`, in real time. A long press — or a right click, a pen's button — opens the menu of what the box zooms: the time (↔ — a band the curves' whole height), the Y axis (↕ — a band their whole width) or both (⤢); the glass shows its symbol, kept as the time range is. Its default: `defaultMagnifierMode` (see [Default view and time ranges](#default-view-and-time-ranges)).
+- **Date** — the `<` `>` buttons move a day back or forward. The date shown is the window's first day: a click opens your browser's calendar, the day you choose starts the window, the range kept (a day whose window reaches the present: real time). A double click brings you back to the present, the zoom kept.
 
-Where a zoom keeps the time window depends on what you're doing:
-- **In real time** — the present shown, the window following it: every change of the range keeps the present on the right — the time range selector, the magnifiers − and +, the default range (a double click on the magnifier). The mouse wheel does too when the pointer is in the right 10 % of the graph's plot area, and a pinch when a finger is in its right 20 % at its start or at its end; elsewhere, they zoom around the pointer or the fingers, and the window stops following the present (the date button brings it back).
-- **Looking at the history**: the time range selector and the magnifiers − and + keep the middle of the window, whatever the duration; the wheel and a pinch zoom around the pointer or the fingers.
+**Real time** is the window showing the present, on its right: the curves grow and slide as new values come. The window never goes past the present — dragged towards the future, zoomed, the day after: it stops at the present, and is in real time again; the date's `>` is greyed then. Dragged or moved back, the window stays where it is while new values keep coming. With `defaultTimeOffset`, the present is the time it gives (`1h`: an hour after now, `1D`: the end of the day).
 
-Click or tap on a graph and drag left or right to slide it through time. The card loads what comes into view as you move along (see [Long term statistics](#long-term-statistics)): on a slow database (on an SD card, for example), parts of the window may stay empty for a moment, filled as the data comes in.
+Where a zoom keeps the window:
+- **In real time** — every change of the range keeps the present on the right: the selector, the magnifiers − and +, the default range. The wheel does too when the pointer is in the right 10 % of the plot area, and a pinch when a finger is in its right 20 % at its start or its end; elsewhere they zoom around the pointer or the fingers, and the window stops following the present (the date brings it back).
+- **Looking at the history** — the selector and the magnifiers − and + keep the middle of the window; the wheel and a pinch zoom around the pointer or the fingers.
 
-The last one to speak wins, whatever is loading: a range chosen, a zoom, a drag, a day before or after, a curve added while the card is still loading is taken at once — the window is the new one, drawn with what's already there, and what it lacks is asked; what was asked for the window before keeps coming and is kept. A page left open past midnight goes on with the new day.
+The last one to speak wins, whatever is loading: a range chosen, a zoom, a drag, a day before or after, a curve added while the card is still loading is taken at once — drawn with what's already there, the rest asked; what was asked before keeps coming and is kept. A page left open past midnight goes on with the new day.
 
-Once you release the mouse button after dragging (or release your finger from the chart), the card will automatically readjust the y axes on all charts to better reflect the new data. The card will also synchronize all other charts in the history to the same point in time. That way you will always see the same time range on all your data and everything will be aligned.
+**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same. To see what your browser or app reports of a pen: type menu, *Tests (beta) ▸ Pen events*.
 
-The date shown is the window's first day. Clicking it opens your browser's calendar, that day preselected: the day you choose starts the window shown, the range kept — a day whose window reaches the present brings you back to real time. A double click on the date selector brings you back to the current date and time (real time), without changing your zoom level. A double click on the magnifier brings the range back to the configured default range (`defaultTimeRange`), in real time kept there.
+### Tooltip
 
-Click a chart line or a state timeline to get a tooltip of the selected values or state. A click near a curve puts that curve in the tooltip; the tooltip shows the value pointed at — near a value, in time and in height: a tooltip shows real values, never a point of the line between two, so a click on the line far from its values shows none. A click near another curve adds it, so several curves can show their values together. Leaving the plot area closes it; a click beside the curves changes nothing. Bars, timelines and arrowlines work the same way, a bar, a state or an arrow being a value: the tooltip mode below applies to them — a hover or a click opens the tooltip of the element pointed at (under the pointer or just beside it), a click puts its series (its row) in the tooltip, and with `all` each other series' or row's element at that time joins it. A long-press (or a right click) near a curve shows all its points, or hides them — saved with it, as its `showPoints`: the YAML's value or the long-press, the last one to speak winning, kept on this device only (as the card's persistence options say for its fields — never synced across devices). Alt shows every point of the graph hovered on top of that, until it's released or the pointer leaves the graph. Hovering a curve (a mouse, or a pen above the screen) — or clicking, tapping it, for a pointer without hover — shows the point of its value nearest the pointer along the curve (from where the pointer is on its line, following the line) alone, a discreet guide to where the real values are (not on the tooltip's own point, drawn larger), when the curve's points aren't shown — the curve picked as a click picks it, on its line or just beside it. A text shortened or hidden — a legend's label shortened, a timeline's row name cut, a timeline's state too long for its bar — is shown in full where it is while hovered; a click or a tap on a row name or on a legend label shows it too, for a while.
+A click or a tap near a curve puts that curve in the tooltip, which shows the value pointed at — near a value, in time and in height. A tooltip shows real values, never a point of the line between two: a click on the line far from its values shows none. A click near another curve adds it, so several curves can show their values together; a click beside the curves changes nothing. Leaving the plot area closes it. Bars, timelines and arrowlines work the same way, a bar, a state or an arrow being a value: a hover or a click opens the tooltip of the element pointed at (under the pointer or just beside it), a click puts its series (its row) in the tooltip.
 
-The tooltip then moves to the value pointed at as the mouse — or a pen held above the screen, in the browsers that report it — moves over the curves; away from every value it stays where it is, and fades out after its reading time. Beside its point, the tooltip stands behind the pointer's move when there is room: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new value, then kept while it stays on it; with a finger, on the side of the point away from the graph's nearest edge; with no room on either side, above or below.
+The tooltip then moves to the value pointed at as the mouse — or a pen held above the screen, in the browsers that report it — moves over the curves; away from every value it stays where it is, and fades out after its reading time. Beside its point, it stands behind the pointer's move when there is room: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new value, kept while it stays on it; with a finger, on the side of the point away from the graph's nearest edge; with no room on either side, above or below. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
 
-Which curves the tooltip shows is each curve's tooltip mode — `largeScreenTooltip` on a large screen (a card 600 px wide or more), `smallScreenTooltip` on a small one (a card narrower, and the info panel), set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve) — the last one to speak winning, kept on this device only (as the card's persistence options say):
-- `selected` — the default on a small screen: the curves clicked, as above; a hover alone shows the dot of the value nearest it, never the tooltip;
-- `nearest` — the value pointed at, on any curve — near it, in time and in height —, at a hover too, without a click;
-- `mixed` — the default on a large screen: that value and the curves clicked — a hover shows the nearest one, a click on a curve adds it;
-- `all` — that value and, for each other curve of the graph, its value at the same time — or the nearest one, a few pixels away at most.
+**Which values it shows** is each curve's tooltip mode — `tooltip.largeScreen` on a large screen (a card 600 px wide or more), `tooltip.smallScreen` on a small one (narrower, and the info panel), set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets the mode of the screen the card is on — the last one to speak winning, kept on this device only:
+- `selected` — the default on a small screen: the curves clicked; a hover alone shows the dot of the value nearest it, never the tooltip;
+- `nearest` — the value pointed at, on any curve, at a hover too, without a click;
+- `mixed` — the default on a large screen: that value and the curves clicked;
+- `all` — that value and, for each other curve of the graph, its value at the same time — or the nearest one, a few pixels away at most (each other row's or series' element, on timelines and bars).
 
-*Behavior ▸ Tooltip ▸* sets the mode of the screen the card is on: `largeScreenTooltip` on a large screen, `smallScreenTooltip` on a small one; the other screen keeps its own.
-
-`tooltipBehavior` changes the default of `largeScreenTooltip` and `smallScreenTooltip` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs (`mixed`, `selected`). Like them, it can be set on the card, a graph, an entity or in `entityOptions`:
+A click opens it in every mode — a finger has no hover. `tooltip.behavior` changes the default of `tooltip.largeScreen` and `tooltip.smallScreen` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs. It can be set at the same levels:
 
 ```yaml
-tooltipBehavior: nearest        # every curve, on both screens, unless a screen's mode is set
-largeScreenTooltip: all         # on a large screen: all
+tooltip:
+  behavior: nearest      # every curve, on both screens, unless a screen's mode is set
+  largeScreen: all       # on a large screen: all
 ```
 
-A click opens it in every mode — a finger has no hover. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
+**Its size** (`tooltip.size`) — every tooltip has the same layout, in one of three sizes:
+- `full` — its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown: its color box, its series' name and its value — a curve's or a bar's in its unit (`min / mean / max` for a column of values, see [Data decimation](#data-decimation)), a timeline's state, an arrowline's value;
+- `compact` — its title is the time alone; then a line per value: its color box, its series' name at its shortest (as a narrow legend shortens it, see [Legend / entity labels](#legend--entity-labels)) and its value;
+- `slim` — no title; one value only, the one pointed at, whatever the mode, on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day; a span over several days keeps its dates;
+- `auto` (the default) — `full` on a card 600 px wide or more, `compact` from 300 px (and in the info panel), `slim` below.
 
-On a curve, the tooltip's first line tells where the value comes from: *History* and its time, or *Statistics* — with their period, `5 min` or `1 h` — and the time it covers (`History: 18:10`, `Statistics 1 h: 14:00 – 15:00`; in French `Historique : 18:10`). A point standing for several values (see [Data decimation](#data-decimation)) shows the interval of time it covers, `from – to` (the end's date only when it's another day), and `min / mean / max` with the unit.
+A timeline's graph is at least as high as its tooltip: 130 px in `full`, 115 in `compact`, 90 in `slim`.
 
-**With a pen**, the tip works as a finger (a swipe scrolls the page, tap then press again to drag, double tap, long-press). Its button isn't passed on to web pages by every browser: in Chrome and the Home Assistant app (Android), a tap with it held on a label opens its type menu, as a right click does; elsewhere, a long-press does the same. To see what your browser or app reports of a pen, and report it: type menu, *Tests (beta) ▸ Pen events*.
+```yaml
+tooltip:
+  size: compact               # full, compact, slim or auto
+  showColorsLine: false       # no color boxes in the tooltips of every graph but timelines
+  showColorsTimeline: false   # no color boxes in the tooltips of timelines
+  showDuration: true          # a timeline's or arrowline's state: how long it lasted, after its time
+  showLabel: false            # no series' name
+  stateTextMode: raw          # a state's name as in the timelines (stateTextMode) unless set here
+```
+
+### Menus
+
+A long-press — or a right click — opens a menu: on a curve's or a row's label (its [type menu](#choosing-an-entitys-display-type)), on a graph's ⠿ zone ([the graph menu](#the-graph-menu-cut-and-paste)); the ▾ button beside the entity selector opens the options menu. Every action of a gesture is also in a menu.
+
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A choice that changes what the menu shows — a display type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it (the new type in bold, the switch moved), then closes; another choice made meanwhile is applied too, and the half second starts again. An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color* (the picker takes over), a type for an entity being added (a second one would add it again) — closes the menu at once. A switch is a line with its name and, on its right, Home Assistant's switch: green and on the right when on, red and on the left when off. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page scrolls — or the dialog, the panel holding the card —, even under a sticky toolbar; a submenu follows its line when its menu scrolls (the entity list, a long list of attributes). Each shows in its zone: for a menu, the screen minus what covers it (a sticky toolbar, the page's header); for a submenu, its menu at the top and that same zone at the bottom. What goes past it, at the top or at the bottom, is masked; the menu closes once its own first line is wholly out of its zone — a submenu opened from a menu's first or last line isn't closed by the least scroll. A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
+
+#### The options menu
+
+The ▾ button beside the entity selector opens the options menu, in submenus:
+- **Display ▸**, **Appearance ▸** (its color aside), **Interpolation ▸**, **Behavior ▸** (*Tooltip ▸*, *Y axis locked*) — as in a graph's menu, for every curve of the card at once: the value all of them share in bold, a switch on when all of them show it; a choice in the card's menu, a graph's or a curve's applies to every curve it concerns, the last one made winning;
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
+- **Card ▸** — *Default graphs ▸*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display ▸*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu over *Card ▸*, right-aligned on it (*Confirm* / *Cancel*, Cancel marked: Enter changes nothing; Cancel, ← or Escape close it). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
+- **Global ▸** — what applies to every card of every dashboard, on every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red) — see `defaultInfoPanel` —, and the [gesture settings](#gesture-settings), entered right in the submenu.
+
+Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
 ### Adding entities
 
@@ -261,9 +231,18 @@ The entity selector shows friendly names and filters on both friendly name and e
 - **Enter** — choose the highlighted entry (with a `*` pattern, the first Enter selects every match, a second one adds them)
 - **Escape** — close the dropdown and clear the input field
 
-Clicking an entry chooses it, as Enter does — there is no separate `+` button to press afterwards.
+Clicking an entry chooses it, as Enter does.
 
-An entity can also be shown through one of its attributes (a thermostat's measured temperature, its setpoint, what it's doing…). Selecting an entity with attributes that can be shown opens a submenu first, over the list, level with the entity, which stays in bold while it's open — the same as the type menu's submenus: *Value* (the entity's own state) first, pre-selected — Enter takes it at once — then each attribute with its current value. Arrows move through it, Enter or a click chooses, ← or Escape goes back to the list. The attributes offered are those holding a number, a text or a yes/no — or a dictionary, or a list of dictionaries (a forecast), holding some: marked ▸, a click opens them in a submenu over the attributes, as every submenu (← or Escape closes it); not a list of plain values (`hvac_modes`: a set of choices), not Home Assistant's own (name, unit, icon, classes…), not a unit: an attribute `X_unit`, as weather entities give them (`temperature_unit`, `pressure_unit`, `visibility_unit`…), is never offered — the attributes are shown in it (see [Attributes](#attributes)); nor a reference to something else: an entity (`source: sensor.x`) or a web address (`release_url: https://…`); nor an attribute about a version or an update — its name says so (`installed_version`, `latest_version`, `auto_update`); nor a setting, a limit or a description of the entity, no value to follow (`display_precision`, `min_temp` / `max_temp`, `min` / `max` / `step`, `manufacturer`, `model`, `serial_number`, `code_format`… — Home Assistant's domains' usual ones); nor a date, with or without its time (`last_triggered`, `next_rising`, `last_seen`…). Any of them can still be shown, written in the YAML (`attribute:`). An entity without such attributes goes straight to the type menu. A wildcard pattern adds entities' states only.
+An entity can also be shown through one of its attributes (a thermostat's measured temperature, its setpoint, what it's doing…). Selecting an entity with attributes that can be shown opens a submenu first, over the list, level with the entity (in bold while it's open): *Value* (the entity's own state) first, pre-selected — Enter takes it at once — then each attribute with its current value. Arrows move through it, Enter or a click chooses, ← or Escape goes back to the list. An entity without such attributes goes straight to the type menu; a wildcard pattern adds entities' states only.
+
+The attributes offered hold a number, a text or a yes/no — or a dictionary, or a list of dictionaries (a forecast), holding some: marked ▸, a click opens them in a submenu over the attributes (← or Escape closes it). Not offered, though any of them can still be written in the YAML (`attribute:`):
+- a list of plain values (`hvac_modes`: a set of choices);
+- Home Assistant's own (name, unit, icon, classes…);
+- a unit: an attribute `X_unit` (`temperature_unit`, `pressure_unit`…) — the attributes are shown in it (see [Attributes](#attributes));
+- a reference to something else: an entity (`source: sensor.x`) or a web address (`release_url: https://…`);
+- a version or an update (`installed_version`, `latest_version`, `auto_update`);
+- a setting, a limit or a description of the entity (`display_precision`, `min_temp` / `max_temp`, `min` / `max` / `step`, `manufacturer`, `model`, `serial_number`, `code_format`…);
+- a date, with or without its time (`last_triggered`, `next_rising`, `last_seen`…).
 
 Choosing an entity (by click, or Enter) doesn't add it right away: the display type menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. The menu always opens, even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, the only way to show it, and lets you check before adding. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
 
@@ -305,12 +284,10 @@ The type menu has five items, each opening its submenu over the menu, level with
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
 
-  each list in a submenu over *Appearance* (← or Escape closes it), the value in use in bold — none when the curve has one the list doesn't hold (a fill of another color, a width of 1.5 px, dashes of its own). A choice is applied at once and saved with the entity as the matching option, as the interpolation is — a YAML entity's, when its options are saved (see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)); the last one to speak, the menu or the YAML, wins;
+  each list in a submenu over *Appearance* (← or Escape closes it), the value in use in bold — none when the curve has one the list doesn't hold (a fill of another color, a width of 1.5 px, dashes of its own). A choice is applied at once and saved with the entity as the matching option, as the interpolation is — a YAML entity's, when its options are saved (see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)); the last one to speak, the menu or the YAML, wins;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Behavior ▸** — *Tooltip ▸* (*Selected*, *Nearest*, *Mixed*, *All*: see [Interactive navigation](#interactive-navigation)), *Y axis locked* (a switch: its graph's padlock); opened by a long-press on a label, also *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card).
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; *Performance* measures what the card costs on this device with its entities — the graphs drawn again, the window loaded from Home Assistant (each request's wait and values), the real time — and when the page froze; the report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
-
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A choice that changes what the menu shows — a display type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it (the new type in bold, the switch moved), then closes; another choice made meanwhile is applied too, and the half second starts again. An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color* (the picker takes over), a type for an entity being added (a second one would add it again) — closes the menu at once. A switch is a line with its name and, on its right, Home Assistant's switch: green and on the right when on, red and on the left when off. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page scrolls — or the dialog, the panel holding the card —, even under a sticky toolbar; a submenu follows its line when its menu scrolls (the entity list, a long list of attributes). Each shows in its zone: for a menu, the screen minus what covers it (a sticky toolbar, the page's header); for a submenu, its menu at the top and that same zone at the bottom. What goes past it, at the top or at the bottom, is masked; the menu closes once its own first line is wholly out of its zone — a submenu opened from a menu's first or last line isn't closed by the least scroll. A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
 The type menu opens:
 
@@ -359,7 +336,7 @@ A graph defined manually in the YAML always shows all its entities on the same g
 
 A curve can be extracted from a grouped graph by double-clicking its label in the legend. The curve will be re-drawn as its own graph, placed immediately below the original. The ungrouped state is remembered in the HA user storage (with browser local storage as fallback) and survives a page refresh. Double-click another label on the same graph to extract further curves one by one.
 
-On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enable_persistence` / `enable_multidevice_persistence`, the `groupId` field) — by default the YAML layout is restored on reload.
+On a graph defined in the YAML, double-clicking a label also shows that curve in its own graph right below, but the new graph stays *linked* to the YAML graph (see *Linked graphs* below) so it can be put back at any time, whatever its unit. Whether this split survives a page refresh follows the card's persistence options for YAML entities (`enablePersistence` / `enableMultidevicePersistence`, the `groupId` field) — by default the YAML layout is restored on reload.
 
 A long-press (or a right click) on a legend label instead opens the [display type menu](#choosing-an-entitys-display-type) for that entity.
 
@@ -377,7 +354,7 @@ Within a group, curves can always be shown together again, as long as their disp
 
 A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see [Two Y axes](#two-y-axes)). Only the display type limits a drop: a curve can't go onto a timeline or arrowline graph, nor a timeline entity onto a line or bar graph — the drop is refused with a brief tooltip (e.g. `line ≠ timeline`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again right away and drag.
 
-A drop is saved only when the placement of both graphs is (the `entities` persistence of their entities, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)). A graph defined in YAML saves nothing by default: a curve dropped onto it, or taken out of it, is saved where it was before the drop, so a reload brings both graphs back as they were — nothing duplicated, nothing lost. Dropped back into its own graph, the curve is saved there again.
+A drop is saved only when the placement of both graphs is (the `entities` persistence of their entities, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)). A graph defined in YAML saves nothing by default: a curve dropped onto it, or taken out of it, is saved where it was before the drop, so a reload brings both graphs back as they were — nothing duplicated, nothing lost. Dropped back into its own graph, the curve is saved there again.
 
 #### Reordering curves within a graph
 
@@ -420,6 +397,8 @@ All drag operations show a ghost element and horizontal insertion marker for pre
 
 You can hide an entity in a graph by clicking its label on the top — its name, struck through then, not its value. Click it a second time to make the entity visible again. A click on its value — `(400 W)` at the end of its label — or on its value shown over the graph (`showState`) opens Home Assistant's dialog of the entity, with the [info panel](#info-panel--replacing-the-ha-more-info-popup) in it when it's on; so does *Info* in its menu. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced YAML example at the end of this readme). A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
 
+A text shortened or hidden — a legend's label shortened, a timeline's row name cut, a timeline's state too long for its bar — is shown in full where it is while hovered; a click or a tap on a row name or on a legend label shows it too, for a while.
+
 **Double-clicking** a label extracts the corresponding curve into its own graph (see the *Ungrouping a curve* section above).
 
 **Dragging** a label left or right on the same graph reorders curves within the graph.
@@ -435,7 +414,7 @@ legendVisible: false
 
 `legendVisible: auto` (on the card; `look: mini`'s default) shows a graph's legend only when it has several labels in it, as mini-graph-card does: a graph of one curve has none — its name is in the graph's header (see [Values over a graph, a compact look](#values-over-a-graph-a-compact-look)).
 
-On an entity (mini-graph-card's `show_legend: false`), `legendVisible: false` leaves only that entity out of the legend: its curve is drawn, the other labels take its room.
+On an entity, `legendVisible: false` leaves only that entity out of the legend: its curve is drawn, the other labels take its room.
 
 #### Showing current sensor values
 
@@ -449,7 +428,7 @@ showCurrentValues: false
 
 #### Rounding
 
-`rounding` (alias `decimals`) sets how many decimals the values are written with — in the legend, the tooltip, over the graph and in the entity selector: exactly that many (`rounding: 1` gives `20.0`, `rounding: 0` none). Not set, the values have at most 2 decimals (`20`, `20.5`, `20.25`). It can be set on the card, in `entityOptions`, on a graph or on an entity — the most specific one wins.
+`rounding` sets how many decimals the values are written with — in the legend, the tooltip, over the graph and in the entity selector: exactly that many (`rounding: 1` gives `20.0`, `rounding: 0` none). Not set, the values have at most 2 decimals (`20`, `20.5`, `20.25`). It can be set on the card, in `entityOptions`, on a graph or on an entity — the most specific one wins.
 
 ```yaml
 type: custom:history-explorer-card
@@ -464,17 +443,16 @@ The card is capable of replacing the history graph in the HA more info popup tha
 
 ### Enabling the info panel
 
-To enable the feature, add the following to the card's YAML configuration:
+The info panel is turned on or off with the switch *Global ▸ Enhanced native history* of the options menu (see [The options menu](#the-options-menu)), or from the YAML with `defaultInfoPanel` — the last one to speak wins: the YAML takes over only when its value changes. `infoPanel:` holds the panel's own options — the card's options, applied to its graphs:
 
 ```yaml
 type: custom:history-explorer-card
-infoPanel: true
-defaultInfoPanel: true   # optional: set default enabled state; user preference is otherwise preserved
+defaultInfoPanel: true   # the info panel on
+infoPanel:               # its own options
+  lineMode: lines
 ```
 
-Once enabled, clicking any entity anywhere on your Lovelace dashboard will open the more info popup with the history explorer graph instead of the default HA history chart.
-
-The `defaultInfoPanel` option uses "last one to speak wins" logic: changing the YAML value overrides the user preference only when the YAML value actually changes. The user can still toggle the info panel on or off through the card UI.
+Once on, clicking any entity anywhere on your dashboard opens the more info popup with the history explorer graph instead of the default HA history chart.
 
 Switching the info panel on or off applies the next time an entity's popup shows its history, without reloading the page. The choice is saved for your Home Assistant user: a browser or a device where no card was shown yet uses it too.
 
@@ -557,7 +535,7 @@ graphs:
       - entity: sensor.rain_amount
 ```
 
-`barSpacing` (mini-graph-card's `bar_spacing`) — on the card, a graph, an entity or in `entityOptions` (for its graph) — is the room between two bars, in pixels; without it, each bar leaves a small gap on both sides, in proportion to its interval.
+`barSpacing` — on the card, a graph, an entity or in `entityOptions` (for its graph) — is the room between two bars, in pixels; without it, each bar leaves a small gap on both sides, in proportion to its interval.
 
 #### Bars and curves on the same graph
 
@@ -613,13 +591,13 @@ graphs:
       showTimeLabels: false   # hide the time axis labels on this graph
 ```
 
-By default the state texts shown in a timeline chart represent the raw underlying state as used by Home Assistant internally. For example, binary sensors will show their state as `on`or `off`, regardless of their device class. If you prefer to see device class dependent states (like `Opened`/`Closed` for doors or `Detected`/`Clear` for motion sensors), you can change the state text display mode as shown in the YAML below:
+By default a timeline shows the states as Home Assistant names them for their device class (`Open`/`Closed` for a door, `Detected`/`Clear` for a motion sensor). The raw states (`on`/`off`) or no text at all can be chosen instead:
 
 ```yaml
 type: custom:history-explorer-card
-stateTextMode: raw    # Show the raw untranslated state names
-                      # or: auto — the automatically translated device class dependent state names (the default)
-                      # or: hide — hide all state text labels
+stateTextMode: raw    # the raw states
+                      # or: auto — the names of their device class (the default)
+                      # or: hide — no state text
 ```
 
 #### Customizing state colors
@@ -761,7 +739,7 @@ graphs:
         color: { '0': blue, '20': green, '30': red }
 ```
 
-**A color for each entity of a graph.** `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's (mini-graph-card's `line_color`).
+**A color for each entity of a graph.** `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's.
 
 ---
 
@@ -807,9 +785,9 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
 
-**Showing the labels** — `labelsLeft` (mini-graph-card's `show.labels`) for the left axis, `labelsRight` (`show.labels_secondary`) for the right one, on the card, in `entityOptions`, on a graph or on an entity (for its graph): `true` (the default), `false` — no labels nor unit, the plot taking their room, no drag there to move the axis —, or `hover` — shown while the pointer is over the graph, fading in and out; on a touch screen, a tap on the graph shows them for 3 s; hidden by `hover`, they keep their place, and a drag there still moves the axis. `look: mini` gives `hover` to both.
+**Showing the labels** — `labelsLeft` for the left axis, `labelsRight` for the right one, on the card, in `entityOptions`, on a graph or on an entity (for its graph): `true` (the default), `false` — no labels nor unit, the plot taking their room, no drag there to move the axis —, or `hover` — shown while the pointer is over the graph, fading in and out; on a touch screen, a tap on the graph shows them for 3 s; hidden by `hover`, they keep their place, and a drag there still moves the axis. `look: mini` gives `hover` to both.
 
-**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis. A pinch is never exactly horizontal, vertical or centred: of its four changes — the fingers' spread horizontally (the time's zoom) and vertically (the Y axis' zoom), their centre horizontally (the time's pan) and vertically (the Y axis' pan) — the one it's mostly made in, once beyond the finger's precision, is the only one at first; another joins it only beyond a dead band of 10 % of the plot area's smaller side.
+**On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
 By default, the Y axis of a line chart fits its curves exactly. A small margin can be added below and above them, to give some headroom (bar charts never get it):
 
@@ -871,11 +849,9 @@ Dragging the label area of one axis — left or right — pans that axis only. S
 
 Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`) are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve interpolation](#curve-interpolation). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
-All modes use `borderJoinStyle: round` for constant stroke width at corners and rounded ends.
-
 ![image](https://user-images.githubusercontent.com/60828821/148483356-aea06848-13d9-4e1e-bd06-485b44505d48.png)
 
-You can specify the line mode in the YAML global settings. Possible options are `curves` (or `curve`), `lines` (or `line`), `stepped` (or `step`) or `smart`. If the option is not present, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). When it's set, it applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep a mode for your YAML graphs only, set it under each graph's `options:` (or on each entity) instead.
+You can specify the line mode in the YAML global settings. Possible options are `curves`, `lines`, `stepped` or `smart`. If the option is not present, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the type menu pre-selects it). When it's set, it applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep a mode for your YAML graphs only, set it under each graph's `options:` (or on each entity) instead.
 
 ```yaml
 type: custom:history-explorer-card
@@ -883,6 +859,10 @@ lineMode: lines
 ```
 
 The line mode can also be set for fixed entities defined in the YAML and for dynamic entities or device classes (see [Entity options](#entity-options)).
+
+`showLine: false` draws a curve's points only, without the line between them (its points shown, unless `showPoints` says otherwise).
+
+`fixedValue: true` (on an entity or wherever an option is set) draws a curve's last value in the window shown — in real time, its value now — flat over the whole window, instead of its history.
 
 ### Curve interpolation
 
@@ -900,8 +880,6 @@ In `curves` and `smart` modes, the curve between two recorded values is rebuilt 
 type: custom:history-explorer-card
 interpolation: makima
 ```
-
-An interpolation from Fourier / Shannon reconstruction isn't offered: Home Assistant records a value when it changes, at irregular times, and many sensors jump (a set point, a power switching on) — a band-limited reconstruction would ring around every jump and show values the sensor never had.
 
 ### Smart mode: silences shown as flat dashed plateaus
 
@@ -996,13 +974,11 @@ type: custom:history-explorer-card
 lineWidth: 2
 ```
 
-`showLine: false` draws a curve's points only, without the line between them (its points shown, unless `showPoints` says otherwise).
-
-`fixedValue: true` (mini-graph-card's `fixed_value`, on an entity or wherever an option is set) draws a curve's last value in the window shown — in real time, its value now — flat over the whole window, instead of its history.
-
 ### Displaying individual samples
 
 Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints` (hidden: `hover`); so does the *Points* switch in the *Appearance* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
+
+The long-press's choice and the YAML's `showPoints`: the last one to speak wins, kept on this device only, never synced across devices. When a curve's points aren't shown, hovering it (a mouse, or a pen above the screen) — or clicking, tapping it, for a pointer without hover — shows the point of its value nearest the pointer along the curve alone, a discreet guide to where the real values are (not on the tooltip's own point, drawn larger).
 
 ![image](https://user-images.githubusercontent.com/60828821/221272054-abb884df-b95f-4c88-83f0-921ac8709a93.png)
 
@@ -1022,8 +998,6 @@ graphs:
       - entity: sensor.outside_temperature
         showPoints: 3     # show dots on this entity only, radius 3px
 ```
-
-The `showPoints` option is also available in `entityOptions` (see below), making it easy to apply uniformly across entity families.
 
 ### Showing the min/max statistical range
 
@@ -1051,18 +1025,6 @@ graphs:
         showMinMax: statistics   # band where the curve comes from the statistics only
 ```
 
-`showMinMax` is also available in `entityOptions`:
-
-```yaml
-type: custom:history-explorer-card
-entityOptions:
-  - match: "sensor.*temperature*"
-    showMinMax: true         # band for every sensor with temperature in its id
-  - match: "sensor.*_power"
-    showMinMax: history      # band where the curve comes from the history, for all power sensors
-    lineMode: lines
-```
-
 ### Text states as a curve
 
 An entity whose state is a text (a mode, a set of choices) is drawn as a curve with `stateMap`: each state at its place in the list — 0, 1, 2… —, its label in the legend, the tooltip, the values over the graph and on the Y axis; a state that isn't listed is a gap. A state is written as it is (`off`), or with a label (`{ value: off, label: Off }`).
@@ -1086,30 +1048,6 @@ If your history data contains an unavailable state, for example if a sensor went
 ```yaml
 type: custom:history-explorer-card
 showUnavailable: true
-```
-
-### Custom data processing functions
-
-The card supports user defined Javascript expressions modifying the data right before display through the `process` option. This can be used to filter or shape data, apply non-linear scaling or transform data from one graph type to another. The supplied JS expression is provided with the original input `state` value (can be a string or a number, depending on the graph and data source). The expression must evaluate to the desired new state. Complex custom processing functions can degrade rendering performance. 
-
-Custom processing functions work for dynamically added entities, manually defined YAML graphs and graphs in the more info panel.
-
-Example showing a humidity numerical entity as a timeline graph, where humidity below 30% appears as state `dry`, above 70% as `wet` and everything in between as `normal`:
-```yaml
-type: custom:history-explorer-card
-graphs:
-  - type: timeline
-    entities:
-      - entity: sensor.room_humidity
-        process: '( state < 30 ) ? "dry" : ( state > 70 ) ? "wet" : "normal"'
-```
-
-Example of a spike rejection filter for dynamic temperature entities, removing invalid  positive or negative temperature spikes, marking them invalid and letting the graph interpolate over them:
-```yaml
-type: custom:history-explorer-card
-entityOptions:
-  temperature:  
-    process: '( Math.abs(state) < 100 ) ? state : "unavailable"'
 ```
 
 ---
@@ -1154,8 +1092,6 @@ statistics:
 
 ### Data decimation
 
-`decimation` is accepted — on the card, a graph, an entity or in `entityOptions` — without effect: the card draws what the screen can show, and only that, for a faithful drawing with the best display performance.
-
 A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. So:
 
 - **Curves — one point per column of pixels.** The graph's width is cut into columns of one pixel each. A column holding several values — of the history, or an hour of statistics — is drawn as one point: their **mean**, each value weighted by how long it lasted. Computed as Home Assistant compiles its statistics: the value in force when the column starts counts too, from its start, in the mean, the minimum and the maximum — an hour of the history gives exactly that hour's statistics, and nothing shows where the history meets the statistics. Their **minimum** and **maximum** are kept with it: `showMinMax` draws them as a lighter band around the curve, and the tooltip shows `min / mean / max`, with the interval of time the point covers. A column holding a single value of the history draws it as is: zoomed in, every value is there, point by point. Whether the values come from the statistics or the history, see [Long term statistics](#long-term-statistics).
@@ -1164,9 +1100,11 @@ A long time window holds far more values than the graph has pixels: a week of a 
 
 ![image](https://user-images.githubusercontent.com/60828821/203882385-461d3376-58e1-4344-861f-852c150bd01a.png)
 
+`decimation` is accepted — on the card, a graph, an entity or in `entityOptions` — without effect: the card draws what the screen can show, and only that, for a faithful drawing with the best display performance.
+
 ### Aggregation
 
-Instead of a point per column of pixels, a curve can have a point per group of time you choose, each given by the function you choose — mini-graph-card's `points_per_hour`, `aggregate_func` and `group_by`, which are names of these options. On the card, a graph, an entity or in `entityOptions`:
+Instead of a point per column of pixels, a curve can have a point per group of time you choose, each given by the function you choose. On the card, a graph, an entity or in `entityOptions`:
 
 | Option | Values | |
 |---|---|---|
@@ -1210,9 +1148,9 @@ Above them, a graph's **header** — its name and its icon, as mini-graph-card s
 - **`alignHeader`** — `center` (the default), `default` (the name on the left, the icon on the right), `left`, `right`; **`alignIcon`** — `right` (the default), `left`, or `state`: with the values, at the end of their row;
 - **`fontSizeHeader`** — its size in pixels; **`nameAdaptiveColor`**, **`iconAdaptiveColor`** — the name, the icon in the color of the first curve now.
 
-`showCurrentValues: false` — on the card, a graph, an entity or in `entityOptions` — leaves a curve's value now out of its legend label (mini-graph-card's `show_legend_state`, on an entity, shows it).
+`showCurrentValues: false` — on the card, a graph, an entity or in `entityOptions` — leaves a curve's value now out of its legend label.
 
-`showGraph: false` on an entity (mini-graph-card's `show_graph`) leaves its curve undrawn and out of the legend; its value is still shown over the graph. On a graph or the card (mini-graph-card's `show.graph: false`), none of its curves is drawn: no plot, only the header and the values.
+`showGraph: false` on an entity leaves its curve undrawn and out of the legend; its value is still shown over the graph. On a graph or the card, none of its curves is drawn: no plot, only the header and the values.
 
 Three more options shape the graph itself:
 - **`showGrid: false`** — no grid lines;
@@ -1243,17 +1181,6 @@ graphs:
 
 *Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
 
-**A narrow card** — narrower than 300 px (two cards side by side on a phone, a grid of small cards), the card keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen. In detail:
-- the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
-- the Y labels inside the plot, each in a box of the card's background 80 % opaque (opaque while the pointer is near them), at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
-- the handle, the padlock, the chain icon and the close button each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
-- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
-- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the start of the name — the device's name, or the words shared with another curve — abbreviated (`M-F V…`), the articles removed, that start removed where two curves don't then read the same, then '…' before the value;
-- the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
-- a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
-
-The card follows its width as it changes (a screen turned, a window resized).
-
 > Thanks to [mini-graph-card](https://github.com/kalkih/mini-graph-card) (kalkih) for its good ideas on showing a graph in little room — the labels in boxes inside the plot and their size, the first value large and the others small, names cut rather than wrapped — which this card follows.
 
 ---
@@ -1277,7 +1204,7 @@ entities:
     y_axis: secondary
 ```
 
-Its options are aliases of the card's — names and values, each in the [complete list of options](#complete-list-of-entityoptions-properties) — mixed freely with the card's own names. `look: mini` only gives defaults: any option set, under either name, wins. Its forms are read as they are: `show:` (`show: { fill: false }` is `show_fill: false`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone; `unit`, `color` and `fill` on the card — every entity's. `height` is the graph's (the header's lines not counted); `update_interval` is the card's automatic refresh (on by default: each change, at most every 2 s). An entity's `attribute:` is the card's own (an attribute shown instead of the state, see [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)); `tap_action` is `tapAction`; a hover on a curve shows the value it's on over the graph, as mini-graph-card does (`showState`). `smoothing: true` draws curves (`lineMode: curves`), with mini-graph-card's interpolation under `look: mini` (`interpolation: bspline`).
+Its options are aliases of the card's — names and values, each in the [complete list of options](#complete-list-of-options) — mixed freely with the card's own names. `look: mini` only gives defaults: any option set, under either name, wins. Its forms are read as they are: `show:` (`show: { fill: false }` is `show_fill: false`); the card's own `entities` — one graph, `name` its title, `show: graph: bar` its type; an entity written as its entity_id alone; `unit`, `color` and `fill` on the card — every entity's. `height` is the graph's (the header's lines not counted); `update_interval` is the card's automatic refresh (on by default: each change, at most every 2 s). An entity's `attribute:` is the card's own (an attribute shown instead of the state, see [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)); `tap_action` is `tapAction`; a hover on a curve shows the value it's on over the graph, as mini-graph-card does (`showState`). `smoothing: true` draws curves (`lineMode: curves`), with mini-graph-card's interpolation under `look: mini` (`interpolation: bspline`).
 
 Written differently in the card's syntax:
 
@@ -1293,12 +1220,19 @@ Written differently in the card's syntax:
 
 When the dashboard is opened, the card will show the last 24 hours by default. You can select a different default time range in the YAML. Use m, h, d, and w to denote minutes, hours, days and weeks respectively. For longer time scale, o and y denote months and year. The maximum range is one year. If no postfix is given, hours are assumed.
 
-`defaultTimeRange` uses "last one to speak wins" logic: changing the YAML value overrides the user-adjusted time range only when the YAML value actually changes. The user-adjusted time range is otherwise preserved across reloads and devices via HA user storage.
+When the time range is persisted (see [Persistence](#persistence)), the card reopens at the range last chosen, and a change of `defaultTimeRange` in the YAML takes over — the last one to speak wins. Otherwise it always opens at `defaultTimeRange`.
 
 ```yaml
 type: custom:history-explorer-card
 defaultTimeRange: 4h     # show the last 4 hours when opening the card
                          # or: 15m (15 minutes), 2d (2 days), 3w (3 weeks), 6o (6 months), 1y (1 year)
+```
+
+The magnifying glass's mode — what its box zooms — has its default the same way, kept or not as the time range is:
+
+```yaml
+type: custom:history-explorer-card
+defaultMagnifierMode: x   # the time (↔); y: the Y axis (↕); xy: both (⤢, the default)
 ```
 
 By default the card will open the graphs with the current date and time aligned to the right of the chart. You can define a custom time offset using the `defaultTimeOffset` setting which will be applied when you open the card or click the date button. Both relative time offsets (denoted by lower case time identifiers such as `h,d,w,o,y`) and offsets snapped to the current hour, day, month or year are supported. The latter will use upper case time identifiers `H,D,O,Y`. For example:
@@ -1311,7 +1245,11 @@ defaultTimeOffset: 1h       # Add 1 hour of empty space after the current time
                             # or: 1O — show the entire current month, starting at the 1st
 ```
 
-### Enabling persistence (`enable_persistence` / `enable_multidevice_persistence`)
+---
+
+## Persistence
+
+### Enabling persistence (`enablePersistence` / `enableMultidevicePersistence`)
 
 By default, nothing about this card's state persists across reloads: the time range always reopens at `defaultTimeRange`, graphs always display in their YAML order, and every static (YAML-defined) entity always shows exactly what YAML says, regardless of any zoom, pan, reorder, or edit made through the UI on any device.
 
@@ -1322,44 +1260,65 @@ There are two exceptions to that default, because they'd otherwise behave in a w
 
 Everything else (the time range and graph order on a card that *does* have static entities, and every field of every static entity) defaults to `none`, i.e. always YAML.
 
-Three options let you change any of these defaults explicitly, at the card level (`enable_persistence`/`enable_multidevice_persistence` cover `range`, `entities`, and `order`) or per entity (individual fields only — see below):
+Three options let you change any of these defaults explicitly, at the card level (`enablePersistence`/`enableMultidevicePersistence` cover `range`, `entities`, and `order`) or per entity (individual fields only — see below):
 
 ```yaml
 type: custom:history-explorer-card
 defaultTimeRange: 24h
-enable_persistence: entities              # this device remembers on its own — no cross-device sync
-enable_multidevice_persistence: range     # this device's time range syncs across your devices via HA
+enablePersistence: entities              # this device remembers on its own — no cross-device sync
+enableMultidevicePersistence: range     # this device's time range syncs across your devices via HA
 ```
 
-- **`enable_persistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
-- **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. If YAML and another source both spoke, YAML wins. For an entity, a YAML edit replaces every UI customization of that entity (other entities are untouched); reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML doesn't set at all (e.g. no `defaultTimeRange`) never speaks. A device opening the card for the very first time (or after its browser storage was cleared) has no image of its own yet: with `enable_multidevice_persistence`, it compares the YAML with the image saved in your HA account, so it gets what your other devices saved — unless the YAML changed since, which then wins there too; with `enable_persistence` alone, it gets the YAML.
-- **`enable_multidevice_persistence`** — turns on persistence in both local storage *and* your Home Assistant user account, so this device's changes sync across all your other devices too. Where both options cover the same field, `enable_multidevice_persistence` always wins — that field syncs across devices, `enable_persistence` on the same field only matters for what `enable_multidevice_persistence` doesn't already cover.
+- **`enablePersistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
+- **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. If YAML and another source both spoke, YAML wins. For an entity, a YAML edit replaces every UI customization of that entity (other entities are untouched); reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML doesn't set at all (e.g. no `defaultTimeRange`) never speaks. A device opening the card for the very first time (or after its browser storage was cleared) has no image of its own yet: with `enableMultidevicePersistence`, it compares the YAML with the image saved in your HA account, so it gets what your other devices saved — unless the YAML changed since, which then wins there too; with `enablePersistence` alone, it gets the YAML.
+- **`enableMultidevicePersistence`** — turns on persistence in both local storage *and* your Home Assistant user account, so this device's changes sync across all your other devices too. Where both options cover the same field, `enableMultidevicePersistence` always wins — that field syncs across devices, `enablePersistence` on the same field only matters for what `enableMultidevicePersistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
 Both accept `range`, `entities`, `order` (the display order of your graphs — card-level only, since a position only means something relative to every other graph, not a property of one entity), or `all` at the card level (top-level YAML key, alongside `defaultTimeRange`):
 
 ```yaml
 type: custom:history-explorer-card
-enable_multidevice_persistence: all   # persist everything, synced across devices
+enableMultidevicePersistence: all   # persist everything, synced across devices
 ```
 
 If your card has only dynamic entities and you'd rather it behaved like a normal fixed dashboard (nothing remembered), turn the default persistence off explicitly:
 
 ```yaml
 type: custom:history-explorer-card
-enable_multidevice_persistence: none   # this device never syncs its dynamically-added entities, range, or order
-enable_persistence: none               # ...and doesn't remember them locally either
+enableMultidevicePersistence: none   # this device never syncs its dynamically-added entities, range, or order
+enablePersistence: none               # ...and doesn't remember them locally either
 ```
 
 Or keep local memory but drop cross-device sync for a dynamic card:
 
 ```yaml
 type: custom:history-explorer-card
-enable_multidevice_persistence: none   # no HA sync
-# enable_persistence left unset — defaults to 'all' for a purely dynamic card, so local memory stays on
+enableMultidevicePersistence: none   # no HA sync
+# enablePersistence left unset — defaults to 'all' for a purely dynamic card, so local memory stays on
 ```
 
 See [Persistence for specific entities](#persistence-for-specific-entities) for the entity-level syntax (a precise list of fields, or `entities`/`all`/`none`, falling back to the card-level default above when unset — `order` isn't available at this level, see above).
+
+### Persistence for specific entities
+
+Any static entity inside `graphs:` can declare its own `enablePersistence` and/or `enableMultidevicePersistence`, either as a precise list of fields to cover, or `entities`/`all` as a shorthand for every field, or `none` to explicitly cover nothing — see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence) for what each option does at the card level. A field without its own entity-level setting falls back to the card-level default for that option — which, for a static entity, is `none` (always YAML) unless the card explicitly says otherwise:
+
+```yaml
+graphs:
+  - type: line
+    entities:
+      - entity: sensor.living_room_target_temp
+        color: '#3e95cd'
+        enableMultidevicePersistence: [color, groupId]   # sync this device's color and grouping choices
+                                                             # across your other devices too
+      - entity: sensor.boiler_state
+        enablePersistence: all                             # this device remembers everything about this
+                                                             # entity on its own — no cross-device sync
+```
+
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden`, `showPoints` and the tooltip modes are never synced across devices: `enableMultidevicePersistence` keeps them on this device only, as `enablePersistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+
+This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a purely dynamic card, see above).
 
 ---
 
@@ -1416,9 +1375,9 @@ entityOptions:
     fill: rgba(0,0,0,0.2)   # Optional background color for the arrows
 ```
 
-### Complete list of entityOptions properties
+### Complete list of options
 
-All of the following properties can be used under `entityOptions` (keyed by entity id, device class or domain), and directly on entities in manually defined `graphs`.
+Each option can be set on the card, in `entityOptions` (keyed by entity id, device class or domain), on a graph (under `options:`) or on an entity in `graphs` — except where its description says otherwise, see [The same options at every level](#the-same-options-at-every-level).
 
 | Property | Type | Name aliases | Value aliases | Description |
 |---|---|---|---|---|
@@ -1433,10 +1392,10 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `dashMode` | string or array | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | Stroke style: `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
 | `showLine` | boolean | `show_line` | | `false`: its points only, no line between them |
 | `showGraph` | boolean | `show_graph` | `show.graph: bar` / `line`: drawn | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line stroke style](#line-stroke-style) |
-| `largeScreenTooltip` | string | `large_screen_tooltip` | | The curve's tooltip on a large screen (a card 600 px wide or more): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
-| `smallScreenTooltip` | string | `small_screen_tooltip` | | The same on a small screen (a card narrower than 600 px, and the info panel): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
-| `tooltipBehavior` | string | `tooltip_behavior` | | Changes the default of `largeScreenTooltip` and `smallScreenTooltip`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
+| `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line modes](#line-modes) |
+| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a card 600 px wide or more): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
+| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a card narrower than 600 px, and the info panel): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
+| `tooltip.behavior` | string | `tooltipBehavior`, `tooltip_behavior` | | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
 | `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
@@ -1482,9 +1441,12 @@ All of the following properties can be used under `entityOptions` (keyed by enti
 | `stateAdaptiveColor` | boolean | `state_adaptive_color` | | `false`: its values over the graph in the text's color |
 | `showGrid` | boolean | | | `false`: no grid lines on the graph |
 | `yLabels` | string | | | `inside`: the Y labels inside the plot, which takes the whole width |
+| `defaultTimeRange` | string | `hours_to_show` | a number alone: hours | On the card: the time range shown when the card opens — see [Default view and time ranges](#default-view-and-time-ranges) |
+| `defaultMagnifierMode` | string | | | On the card: what the magnifying glass's box zooms when the card opens — `x` the time, `y` the Y axis, `xy` both (default) — see [Default view and time ranges](#default-view-and-time-ranges) |
+| `labelsVisible` | boolean | | | On the card: `false` hides the entity names left of the timelines' rows |
+| `hour24` | boolean | | | On the card: the 24-hour clock (`true`) or the 12-hour one (`false`) — see [The clock](#the-clock) |
+| `show` | block | | | mini-graph-card's block, read as the options it names: `show: { points: true }` is `showPoints: true` |
 | `exclude` | string, list, or `{entity: ...}` | | | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
-
-Options of the card only, with aliases: `defaultTimeRange` (`hours_to_show`), `labelsVisible`; and `hour24` — see [The clock](#the-clock). mini-graph-card's `show:` is read as its options: `show: { points: true }` is `show_points: true`.
 
 #### The same options at every level
 
@@ -1572,19 +1534,33 @@ The `match` field accepts a single glob pattern string or a list of patterns. `*
 
 Either way, an option set on a graph or on the entity itself wins over `entityOptions` (see [The same options at every level](#the-same-options-at-every-level)).
 
+### Custom data processing functions
+
+The card supports user defined Javascript expressions modifying the data right before display through the `process` option. This can be used to filter or shape data, apply non-linear scaling or transform data from one graph type to another. The supplied JS expression is provided with the original input `state` value (can be a string or a number, depending on the graph and data source). The expression must evaluate to the desired new state. Complex custom processing functions can degrade rendering performance. 
+
+Custom processing functions work for dynamically added entities, manually defined YAML graphs and graphs in the more info panel.
+
+Example showing a humidity numerical entity as a timeline graph, where humidity below 30% appears as state `dry`, above 70% as `wet` and everything in between as `normal`:
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: timeline
+    entities:
+      - entity: sensor.room_humidity
+        process: '( state < 30 ) ? "dry" : ( state > 70 ) ? "wet" : "normal"'
+```
+
+Example of a spike rejection filter for dynamic temperature entities, removing invalid  positive or negative temperature spikes, marking them invalid and letting the graph interpolate over them:
+```yaml
+type: custom:history-explorer-card
+entityOptions:
+  temperature:  
+    process: '( Math.abs(state) < 100 ) ? state : "unavailable"'
+```
+
 ---
 
 ## Configuring the UI
-
-### The options menu
-
-The ▾ button beside the entity selector opens the options menu, in submenus:
-- **Display ▸**, **Appearance ▸** (its color aside), **Interpolation ▸**, **Behavior ▸** (*Tooltip ▸*, *Y axis locked*) — as in a graph's menu, for every curve of the card at once: the value all of them share in bold, a switch on when all of them show it; a choice in the card's menu, a graph's or a curve's applies to every curve it concerns, the last one made winning;
-- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
-- **Card ▸** — *Default graphs ▸*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display ▸*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu over *Card ▸*, right-aligned on it (*Confirm* / *Cancel*, Cancel marked: Enter changes nothing; Cancel, ← or Escape close it). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
-- **Global ▸** — what applies to every card of every dashboard, on every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red) — see `defaultInfoPanel` —, and the gesture settings below, entered right in the submenu.
-
-Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
 ### Gesture settings
 
@@ -1607,7 +1583,7 @@ A value out of bounds is brought within them. They apply to every card and info 
 
 ### Header text
 
-The default *History Explorer* header can be changed or removed using the header setting in the YAML:
+The default header (*History explorer* and the card's version) can be changed or removed using the header setting in the YAML:
 ```yaml
 type: custom:history-explorer-card
 header: 'My sample history'
@@ -1617,7 +1593,7 @@ header: 'My sample history'
 
 ### Dark mode
 
-The card will try to adapt its UI colors to the currently active theme. But for best results, it will have to know if you're running a dark or a light theme. By default the card asks HA for this information. If you're using the default Lovelace theme, or another modern theme that properly sets the dark mode flag, then you should be all set with the default settings. If you are using an older theme that uses the legacy format and doesn't properly set the dark mode flag, the card may end up in the wrong mode. You can override the mode by adding this YAML to the global card settings (see below) to force either dark or light mode:
+The card will try to adapt its UI colors to the currently active theme. But for best results, it will have to know if you're running a dark or a light theme. By default the card asks HA for this information. If you're using the default Lovelace theme, or another modern theme that properly sets the dark mode flag, then you should be all set with the default settings. If you are using an older theme that uses the legacy format and doesn't properly set the dark mode flag, the card may end up in the wrong mode. You can override the mode by adding this YAML to the card to force either dark or light mode:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1632,12 +1608,12 @@ The color for various elements of the UI can be customized further:
 ```yaml
 type: custom:history-explorer-card
 uiColors:
-  gridlines: '#ff000040'
+  gridLines: '#ff000040'
   labels: green
   buttons: '#80f00050'
   selector: 'rgba(255,255,255,255)'
   closeButton: '#0000001f'  # the bar interval selector's background
-  cursorline: '#ff000080'   # Color of the vertical cursor line (see The cursor line below)
+  cursorLine: '#ff000080'   # Color of the vertical cursor line (see The cursor line below)
 ```
 
 ### The cursor line
@@ -1653,7 +1629,7 @@ cursor:
   types: [timeline]   # the graphs that show it, by type: timeline (the default), line, bar,
                       # arrowline — or all
 uiColors:
-  cursorline: '#ff000080'   # its color (the gridlines' color by default)
+  cursorLine: '#ff000080'   # its color (the grid lines' color by default)
 ```
 
 With `mode: all`, the line follows the pointer on every graph of the card as soon as the pointer is over a graph whose type is listed in `types`. For example, to line up a heating timeline with the temperature curves:
@@ -1726,48 +1702,18 @@ graphs:
       - entity: sensor.outside_temperature
 ```
 
-### Configuring the tooltip popup
+### A narrow card
 
-Every tooltip — a curve's, a bar's, a timeline's or an arrowline's — has the same layout, in one of three sizes (`tooltip.size`):
+A card narrower than 300 px (two cards side by side on a phone, a grid of small cards) keeps its graphs readable, as mini-graph-card does: the toolbar's date, range and search each on a line of their own; the Y labels inside the plot (as `yLabels: inside`, `yLabels: outside` keeping them beside it), which keeps its width; the text a little smaller; the legend's names shortened, each value kept; the values over a graph, the first one large, the others small on its right. A menu takes the room there is, a tooltip stays within the screen. In detail:
+- the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
+- the Y labels inside the plot, each in a box of the card's background 80 % opaque (opaque while the pointer is near them), at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
+- the handle, the padlock, the chain icon and the close button each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
+- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
+- the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the start of the name — the device's name, or the words shared with another curve — abbreviated (`M-F V…`), the articles removed, that start removed where two curves don't then read the same, then '…' before the value;
+- the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
+- a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
 
-- `full` — its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown, its color box, its series' name and its value: a curve's or a bar's in its unit (`min / mean / max` for a column of values), a timeline's state, an arrowline's value.
-- `compact` — its title is the time alone; then a line per value, its color box, its series' name at its shortest — the legend's shortened form, its shared prefix removed (see the legend), whether the legend itself is shortened or not — and its value.
-- `slim` — no title; one value only, the one pointed at, whatever the tooltip mode (`all`, `mixed` and the curves clicked show nothing more), on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day (ticks in hours or minutes); a span over several days keeps its dates.
-- `auto` (the default) — as the card's width says: `full` from 600 px, `compact` from 300 px (and in the info panel), `slim` below.
-
-A timeline's graph is at least as high as its tooltip: 130 px in `full`, 115 in `compact`, 90 in `slim`.
-
-```yaml
-tooltip:
-  size: compact   # full, compact, slim or auto
-```
-
-The color boxes in the tooltips can be hidden for timelines, or for every other graph (lines, bars, arrowlines), or both:
-
-```yaml
-tooltip:
-  showColorsLine: false       # hide the color boxes in the tooltips of every graph but timelines
-  showColorsTimeline: false   # hide the color boxes in the tooltips of timelines
-```
-
-The tooltip of a timeline's or an arrowline's state can show how long it lasted, after the time it covers:
-```yaml
-tooltip:
-  showDuration: true
-```
-
-The series' name can be hidden in every tooltip, to make it even more compact:
-```yaml
-tooltip:
-  showLabel: false
-```
-
-The way state names are shown on the tooltip (raw or translated / device class dependent) will normally follow the mode set by `stateTextMode` for timeline charts on the card level. If you want the tooltips to use another mode, then it can be overridden. For example:
-
-```yaml
-tooltip:
-  stateTextMode: raw      # Show raw state names in the tooltip even if timelines show translated states
-```
+The card follows its width as it changes (a screen turned, a window resized).
 
 ### The clock
 
@@ -1826,7 +1772,7 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History* (*Export ▸ Statistics* for the long-term statistics). Note that CSV exporting does not work in the HA Companion app. Both history and long term statistics can be exported.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History* (*Export ▸ Statistics* for the long-term statistics). CSV export does not work in the HA Companion app.
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 
@@ -1845,7 +1791,7 @@ csv:
 
 ## YAML configuration for preconfigured graphs
 
-YAML configuration is optional. And while the interactive configuration is preferable, it can sometimes be useful to keep a set of predefined entities.
+YAML configuration is optional: it keeps a set of predefined entities.
 
 Here's a basic example configuration:
 
@@ -1906,7 +1852,7 @@ graphs:
           - entity: sensor.cpu_temperature
 ```
 
-The same string/list/object forms are accepted by `filterEntities` and `excludeFilterEntities` (see [Adding entities](#adding-entities)). `exclude` can also be set once under a graph's `options:` to apply to every wildcard entity in that graph — see [Complete list of entityOptions properties](#complete-list-of-entityoptions-properties).
+The same string/list/object forms are accepted by `filterEntities` and `excludeFilterEntities` (see [Adding entities](#adding-entities)). `exclude` can also be set once under a graph's `options:` to apply to every wildcard entity in that graph — see [Complete list of entityOptions properties](#complete-list-of-options).
 
 And a more advanced example:
 
@@ -1971,7 +1917,17 @@ Replace the entities and structure as needed.
 
 ### Attributes
 
-`attribute:` shows one of an entity's attributes instead of its state — the same entity can be shown several times, its state and some of its attributes. A number is shown as a curve, anything else as a timeline; a number followed by a text that isn't one (`45.2 %`, `21.5 °C`, `3 days` — not a time, a date or a range) is that number, in that unit. The curve is named after the entity, a colon and the attribute — `salon : Current temperature`, the colon telling an attribute from an entity (`name:` to change it). Otherwise its unit is the one Home Assistant shows it in (the tables of its frontend). On a weather entity: `temperature_unit` for `temperature`, `apparent_temperature`, `dew_point` and `templow`, `wind_speed_unit` for `wind_speed` and `wind_gust_speed`, `pressure_unit`, `visibility_unit` and `precipitation_unit` for their own, `%` for `humidity`, `cloud_coverage` and `precipitation_probability`, `°` for `wind_bearing` (which Home Assistant gives without a unit). On any other entity: in your temperature unit, `temperature`, `current_temperature`, `target_temperature`, `target_temp_high`, `target_temp_low`, `target_temp_step`, `min_temp` and `max_temp`; in %, a climate's or a humidifier's humidities (`humidity`, `current_humidity`, `min_humidity`…), a cover's or a valve's `current_position` (and a cover's `current_tilt_position`), a fan's `percentage`, a sensor's `battery_level`, a light's `brightness` and a media player's `volume_level` — those two converted, from 0–255 and 0–1, the curve, the selector and the tooltip all in %; a light's `color_temp_kelvin` (and its min and max) in K, its `color_temp` (and `min_mireds`, `max_mireds`) in mired; the sun's `azimuth` and `elevation` in °. Otherwise, as some integrations give them, an attribute `X_unit` is the unit of every attribute with `X` in its name (`speed_unit: km/h` for `speed` and `max_speed`, the longest `X` when several match). Else set `unit:`; `unit:` always wins. Home Assistant gives an attribute no long-term statistics: an attribute's curve only covers what the history keeps. Its history is asked with every change of the entity's attributes (Home Assistant otherwise leaves out the changes of an attribute alone), only for the entities that have an attribute shown. Writing the attribute after the entity id is the same: `entity: climate.salon.current_temperature`. A sub-attribute, in a dictionary or a list, is written by its path, as mini-graph-card writes it: `attribute: forecast.0.temperature` (the attribute, then each level's key or index); named after each level (`Villeveyrac : Forecast › 0 › Temperature`), in the unit of its last name (`temperature`). In the entity selector, an attribute holding some is marked ▸: a click shows them in the same submenu, over the attributes (← or Escape: the level before; the entity's line again: its attributes). A list of plain values (`hvac_modes`) is not offered: a set of choices, nothing to follow.
+`attribute:` shows one of an entity's attributes instead of its state — the same entity can be shown several times, its state and some of its attributes. Writing the attribute after the entity id is the same: `entity: climate.salon.current_temperature`.
+
+- **Drawing** — a number is shown as a curve, anything else as a timeline; a number followed by a text that isn't one (`45.2 %`, `21.5 °C`, `3 days` — not a time, a date or a range) is that number, in that unit.
+- **Name** — the entity, a colon and the attribute: `salon : Current temperature`, the colon telling an attribute from an entity (`name:` to change it).
+- **Unit** — `unit:` always wins. Otherwise the unit the value holds, else the one Home Assistant shows it in (the tables of its frontend):
+  - on a weather entity: `temperature_unit` for `temperature`, `apparent_temperature`, `dew_point` and `templow`, `wind_speed_unit` for `wind_speed` and `wind_gust_speed`, `pressure_unit`, `visibility_unit` and `precipitation_unit` for their own, `%` for `humidity`, `cloud_coverage` and `precipitation_probability`, `°` for `wind_bearing` (which Home Assistant gives without a unit);
+  - on any other entity: in your temperature unit, `temperature`, `current_temperature`, `target_temperature`, `target_temp_high`, `target_temp_low`, `target_temp_step`, `min_temp` and `max_temp`; in %, a climate's or a humidifier's humidities (`humidity`, `current_humidity`, `min_humidity`…), a cover's or a valve's `current_position` (and a cover's `current_tilt_position`), a fan's `percentage`, a sensor's `battery_level`, a light's `brightness` and a media player's `volume_level` — those two converted, from 0–255 and 0–1, the curve, the selector and the tooltip all in %; a light's `color_temp_kelvin` (and its min and max) in K, its `color_temp` (and `min_mireds`, `max_mireds`) in mired; the sun's `azimuth` and `elevation` in °;
+  - else, as some integrations give them, an attribute `X_unit` is the unit of every attribute with `X` in its name (`speed_unit: km/h` for `speed` and `max_speed`, the longest `X` when several match).
+- **History** — Home Assistant gives an attribute no long-term statistics: an attribute's curve only covers what the history keeps. Its history is asked with every change of the entity's attributes (Home Assistant otherwise leaves out the changes of an attribute alone), only for the entities that have an attribute shown.
+- **Sub-attributes** — in a dictionary or a list, written by their path, as mini-graph-card writes it: `attribute: forecast.0.temperature` (the attribute, then each level's key or index); named after each level (`Villeveyrac : Forecast › 0 › Temperature`), in the unit of its last name (`temperature`).
+- **Entity selector** — an attribute holding sub-attributes is marked ▸: a click shows them in the same submenu, over the attributes (← or Escape: the level before; the entity's line again: its attributes). A list of plain values (`hvac_modes`) is not offered: a set of choices, nothing to follow.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1991,27 +1947,6 @@ graphs:
       - entity: climate.salon
         attribute: hvac_action          # heating, idle…
 ```
-
-### Persistence for specific entities
-
-Any static entity inside `graphs:` can declare its own `enable_persistence` and/or `enable_multidevice_persistence`, either as a precise list of fields to cover, or `entities`/`all` as a shorthand for every field, or `none` to explicitly cover nothing — see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence) for what each option does at the card level. A field without its own entity-level setting falls back to the card-level default for that option — which, for a static entity, is `none` (always YAML) unless the card explicitly says otherwise:
-
-```yaml
-graphs:
-  - type: line
-    entities:
-      - entity: sensor.living_room_target_temp
-        color: '#3e95cd'
-        enable_multidevice_persistence: [color, groupId]   # sync this device's color and grouping choices
-                                                             # across your other devices too
-      - entity: sensor.boiler_state
-        enable_persistence: all                             # this device remembers everything about this
-                                                             # entity on its own — no cross-device sync
-```
-
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enable_persistence--enable_multidevice_persistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden` and `showPoints` are never synced across devices: `enable_multidevice_persistence` keeps them on this device only, as `enable_persistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
-
-This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enable_persistence`/`enable_multidevice_persistence` (which default to `all` for a purely dynamic card, see above).
 
 ---
 

@@ -154,15 +154,16 @@ export class HistoryCardState {
     // Dark or light: Home Assistant's theme (or a dark background behind the card), unless
     // uimode says; then the colors of the labels, grid and cursor line (uiColors, else the
     // mode's)
-    applyTheme(config, darkBackground = false)
+    applyTheme(darkBackground = false)
     {
+        const P = this.pconfig;
         this.ui.darkMode = !!( (this._hass.selectedTheme && this._hass.selectedTheme.dark) || (this._hass.themes && this._hass.themes.darkMode) ) || darkBackground;
-        if( config.uimode === 'dark' ) this.ui.darkMode = true; else
-        if( config.uimode === 'light' ) this.ui.darkMode = false;
+        if( P.uimode === 'dark' ) this.ui.darkMode = true; else
+        if( P.uimode === 'light' ) this.ui.darkMode = false;
 
-        this.pconfig.graphLabelColor = parseColor(config.uiColors?.labels ?? (this.ui.darkMode ? '#9b9b9b' : '#333'));
-        this.pconfig.graphGridColor  = parseColor(config.uiColors?.gridlines ?? (this.ui.darkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"));
-        this.pconfig.cursorLineColor = parseColor(config.uiColors?.cursorline ?? this.pconfig.graphGridColor);
+        P.graphLabelColor = parseColor(P.uiColors.labels ?? (this.ui.darkMode ? '#9b9b9b' : '#333'));
+        P.graphGridColor  = parseColor(P.uiColors.gridLines ?? (this.ui.darkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"));
+        P.cursorLineColor = parseColor(P.uiColors.cursorLine ?? P.graphGridColor);
     }
 
     // --------------------------------------------------------------------------------------
@@ -185,7 +186,7 @@ export class HistoryCardState {
 
             let bgcol = getComputedStyle(this._this.querySelector('#maincard')).backgroundColor.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
 
-            this.applyTheme(this._this.config, !!( bgcol && bgcol.length == 4 && (((+bgcol[1]) + (+bgcol[2]) + (+bgcol[3])) / 3 <= 100) ));
+            this.applyTheme(!!( bgcol && bgcol.length == 4 && (((+bgcol[1]) + (+bgcol[2]) + (+bgcol[3])) / 3 <= 100) ));
 
             this.clearGraphs();
 
@@ -427,8 +428,9 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.applyConfig(config);
         // (the card's own: what's saved and how, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
-        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enable_multidevice_persistence, ['range', 'entities', 'order']);
-        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enable_persistence, ['range', 'entities', 'order']);
+        this.instance.pconfig.yamlDefaultMagnifierMode = config.defaultMagnifierMode;
+        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, ['range', 'entities', 'order']);
+        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, ['range', 'entities', 'order']);
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 

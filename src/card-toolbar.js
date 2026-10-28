@@ -25,30 +25,32 @@ const RANGES = [
 const BUTTON_STYLE = 'margin:0px;border:0px solid black;color:inherit;background-color:#00000000';
 
 // The toolbar's time buttons, its left part (#dl_N's content): '<', the date, '>' — the
-// card's and the info panel's
+// card's and the info panel's. (Side by side, '<' and '>' in bold, the date's padding
+// narrower: about as far from each other as the zoom controls are — see rangeControlsHtml)
 export function timeButtonsHtml(i)
 {
-    return `
-        <button id="b1_${i}" style="${BUTTON_STYLE};height:30px"><</button>
-        <button id="bx_${i}" style="${BUTTON_STYLE};height:30px">-</button>
-        <button id="b2_${i}" style="${BUTTON_STYLE};height:30px">></button>`;
+    return `<button id="b1_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold"><</button>` +
+        `<button id="bx_${i}" style="${BUTTON_STYLE};height:30px;padding:1px 5px">-</button>` +
+        `<button id="b2_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold">></button>`;
 }
 
 // The toolbar's zoom controls, its right part (#dr_N's content): the magnifier (and its
 // modes' menu, ez_N), the magnifier −, the range selector, the magnifier + (their actions
-// swapped by invertZoom; the three of the same size, close together) — the card's and the
-// info panel's
+// swapped by invertZoom; the three of the same size) — the card's and the info panel's
 export function rangeControlsHtml(i, optionStyle, invertZoom)
 {
-    // (no space between them: side by side; the selector's text 5 px to the left — centred
-    // by the browser left of its arrow, it would look too far right, between the magnifier −
-    // and the arrow)
-    return `<button id="bz_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 18)}</button>${zoomMenuHtml(i)}` +
-        `<button id="b${invertZoom ? 5 : 4}_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 18)}</button>` +
-        `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-5px">` +
+    // (side by side, about 10 px apart as they're seen — as the time buttons are: margins
+    // between the magnifiers; the selector's text 7 px to the left — centred by the browser
+    // left of its arrow, it would look too far right, between the magnifier − and the arrow)
+    // (each magnifier twice as large under a mouse or a pen above the screen — drawn over its
+    // neighbours, the layout unchanged —, so as to see what is clicked)
+    return `<style>@media (hover:hover){.hec-mag svg{position:relative;z-index:2;transition:transform .12s}.hec-mag:hover svg{transform:scale(2)}}</style>` +
+        `<button id="bz_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 20)}</button>${zoomMenuHtml(i)}` +
+        `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:2px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
+        `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-7px">` +
             RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('') +
         `</select>` +
-        `<button id="b${invertZoom ? 4 : 5}_${i}" style="${BUTTON_STYLE};height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 18)}</button>`;
+        `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:5px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
 }
 
 export class CardToolbar

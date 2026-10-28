@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -110,13 +110,11 @@ export function optionsMenuHtml(i)
     return menuBoxesHtml(`eo_${i}`, Object.keys(_OPTIONS_SUBMENUS), 150, 1);
 }
 
-// The magnifier's modes (what the elastic box zooms — Chart.js zoomBoxAxes): the time (↔),
-// the Y axes (↕), both (⤢); each one's symbol in the magnifier's glass — and the zoom
-// buttons' beside the range selector: out (−), in (+)
-export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
-const _ZOOM_BOX_SYMBOLS = { x: 'M6,9.5H13M6,9.5L7.8,7.9M6,9.5L7.8,11.1M13,9.5L11.2,7.9M13,9.5L11.2,11.1',
-                            y: 'M9.5,6V13M9.5,6L7.9,7.8M9.5,6L11.1,7.8M9.5,13L7.9,11.2M9.5,13L11.1,11.2',
-                            xy: 'M6.8,12.2L12.2,6.8M12.2,6.8H9.8M12.2,6.8V9.2M6.8,12.2H9.2M6.8,12.2V9.8',
+// The symbol of each magnifier's mode (ZOOM_BOX_MODES) in its glass: the time (↔), the Y axes
+// (↕), both (⤢) — and the zoom buttons' beside the range selector: out (−), in (+)
+const _ZOOM_BOX_SYMBOLS = { x: 'M6.5,9.5H12.5M6.5,9.5L8.3,7.7M6.5,9.5L8.3,11.3M12.5,9.5L10.7,7.7M12.5,9.5L10.7,11.3',
+                            y: 'M9.5,6.5V12.5M9.5,6.5L7.7,8.3M9.5,6.5L11.3,8.3M9.5,12.5L7.7,10.7M9.5,12.5L11.3,10.7',
+                            xy: 'M7.2,11.8L11.8,7.2M11.8,7.2H9.5M11.8,7.2V9.5M7.2,11.8H9.5M7.2,11.8V9.5',
                             out: 'M6.5,9.5H12.5', in: 'M6.5,9.5H12.5M9.5,6.5V12.5' };
 
 // A magnifier (magnifierSvg) shown in another mode or color, its elements kept (a click and
@@ -135,7 +133,7 @@ export function magnifierSvg(mode, color = 'var(--primary-text-color)', size = 2
 {
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:middle;">` +
         `<path fill="${color}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
-        `<path fill="none" stroke="${color}" stroke-width="1.2" stroke-linecap="round" d="${_ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy}" /></svg>`;
+        `<path fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" d="${_ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy}" /></svg>`;
 }
 
 // The magnifier's menu ez_N: its modes

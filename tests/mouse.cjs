@@ -296,6 +296,8 @@ module.exports = async function()
         const c = await bz(); await t.page.mouse.click(c.x, c.y, { button: 'right' }); await t.wait(300);
         await t.E(`el.querySelector('#ez_0_x').click()`); await t.wait(900);
         const mode = await E('el.instance.state.zoomBox'), axes = await E(`graphAt(${li}).chart.options.zoomBoxAxes`), closed = (await zoomMenu()) === null;
+        // (the pointer away: a magnifier under it is shown twice as large)
+        await t.page.mouse.move(5, 5); await t.wait(300);
         const sizes = await E(`['#bz_0', '#b4_0', '#b5_0'].map(id => Math.round(el.querySelector(id + ' svg').getBoundingClientRect().width))`);
         const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
         const w0 = await win(), y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
