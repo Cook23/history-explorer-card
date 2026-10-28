@@ -74,6 +74,17 @@ module.exports = async function()
         const t2 = await E(TIP(gi));
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
+    await t.step('the pen gone out of hover range without leaving (no more moves, no pointerleave): what its hover showed ends 1 s after its last move, as if it had left', async () => {
+        const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
+        await t.penTap(p1); await t.wait(400);
+        await t.penHover(p1, p2); await t.wait(600);
+        const t1 = await E(TIP(gi));                        // (still hovering: 0.6 s after its last move)
+        await t.wait(1700);                                  // (1 s, then the tooltip's fade)
+        const t2 = await E(TIP(gi)), dot = await E(`graphAt(${gi}).chart._hecHoverDot ?? null`);
+        await t.penHover({ x: p2.x - 100, y: p2.y }, p2); await t.wait(400);
+        const t3 = await E(TIP(gi));                         // (its mode ended: hovering back opens nothing)
+        return t1 && t2 === null && t3 === null && !dot ? true : JSON.stringify({ t1, t2, t3, dot });
+    });
     await t.step('a tap the browser takes over (pointercancel), then a hover reported as a mouse: the tooltip stays open and follows', async () => {
         const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
         await t.pen('pointerdown', p1, 1, 0); await t.pen('pointermove', { x: p1.x + 2, y: p1.y }, 1);

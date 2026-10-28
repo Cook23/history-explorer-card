@@ -5,6 +5,7 @@
 // issue.
 
 import { Version } from "./version.js";
+const Chart = window.HXLocal_Chart;
 
 const ISSUE_URL = 'https://github.com/Cook23/history-explorer-card/issues/new';
 // (a longer link may be refused: the whole report is in the copied one)
@@ -166,6 +167,9 @@ function buildPenEventsTest(body)
             <div class="pad" id="padScroll"><div><b>Like a graph</b>a vertical swipe may scroll</div></div>
             <div class="pad" id="padFree"><div><b>No scrolling</b>every gesture reaches the card</div></div>
         </div>
+        <section class="box"><h2>Pen hover: time between two moves</h2>
+            <p>Hold the pen still above a zone, then move it away: a pen hovers only while it sends moves (the card ends its hover after ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s without one).</p>
+            <div class="now mono" id="gaps">— no pen hover yet —</div></section>
         <section class="box"><h2>Last event</h2><div class="now mono" id="now">— nothing yet —</div></section>
         <section class="box">
             <h2>Event log (newest first)</h2>
@@ -186,6 +190,18 @@ function buildPenEventsTest(body)
     const scroller = body.closest('.dlg');
     const scrollPos = () => ( scroller ? scroller.scrollTop : 0 ) + window.scrollY;
     const dist = (a, x, y) => Math.round(Math.hypot(x - a.x, y - a.y));
+    // The time between two moves of a pen hovering (on the same zone, no contact, no leaving
+    // between them): those shorter than the card's timeout, and how many reached it
+    const gaps = [];
+    let gapsLong = 0, lastHover = null;
+    const gapsText = () => {
+        if( !gaps.length && !gapsLong ) return '— no pen hover yet —';
+        const n = gaps.length, mean = n ? gaps.reduce((a, g) => a + g, 0) / n : 0;
+        const sd = n ? Math.sqrt(gaps.reduce((a, g) => a + (g - mean) ** 2, 0) / n) : 0;
+        const ms = v => `${Math.round(v)}ms`;
+        return n ? `${n} gaps: mean ${ms(mean)}, min ${ms(Math.min(...gaps))}, max ${ms(Math.max(...gaps))}, standard deviation ${ms(sd)}; ${gapsLong} of ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s or more`
+                 : `${gapsLong} gaps of ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s or more`;
+    };
 
     const renderChecks = () => {
         $('checks').innerHTML = PEN_CHECKS.map(([k, label]) => {
@@ -242,7 +258,17 @@ function buildPenEventsTest(body)
         if( pt === 'pen' ) seen.penType = true;
         if( pt === 'touch' && seen.penType ) seen.touchType = true;
         if( pt === 'mouse' ) seen.mouseType = true;
-        if( e.type === 'pointermove' && pt === 'pen' && b === 0 ) seen.hover = true;
+        if( e.type === 'pointermove' && pt === 'pen' && b === 0 ) {
+            seen.hover = true;
+            const _now = performance.now();
+            if( lastHover && lastHover.where === where ) {
+                const _g = _now - lastHover.t;
+                if( _g < Chart.hecUi.PEN_HOVER_TIMEOUT ) gaps.push(_g); else gapsLong++;
+                $('gaps').textContent = gapsText();
+            }
+            lastHover = { where, t: _now };
+        }
+        if( e.type === 'pointerdown' || e.type === 'pointerleave' || e.type === 'pointercancel' ) lastHover = null;
         if( e.type === 'pointerdown' && (b & 2) ) seen.barrelDown = true;
         if( e.type === 'pointermove' && (lastBtns[e.pointerId] & 1) && (b & 2) && !(lastBtns[e.pointerId] & 2) ) seen.barrelChord = true;
         if( b & 32 ) seen.eraser = true;
@@ -268,6 +294,8 @@ function buildPenEventsTest(body)
     for( const [k, l] of PEN_MARKS ) $(`mark_${k}`).addEventListener('click', () => mark(`next: ${l}`));
     $('clear').addEventListener('click', () => {
         lines.length = 0;
+        gaps.length = 0; gapsLong = 0; lastHover = null;
+        $('gaps').textContent = gapsText();
         for( const k in seen ) delete seen[k];
         $('log').textContent = '';
         $('now').textContent = '— nothing yet —';
@@ -276,7 +304,7 @@ function buildPenEventsTest(body)
     renderChecks();
 
     return {
-        report: () => PEN_CHECKS.map(([k, l]) => `${seen[k] ? 'YES' : ' - '}  ${l}`).join('\n') + '\n\n' + lines.join('\n'),
+        report: () => PEN_CHECKS.map(([k, l]) => `${seen[k] ? 'YES' : ' - '}  ${l}`).join('\n') + '\n\nPen hover, time between two moves: ' + gapsText() + '\n\n' + lines.join('\n'),
         dispose: () => {
             for( const t of PEN_PAGE_EVENTS ) document.removeEventListener(t, onEvent);
             document.removeEventListener('selectionchange', onSelectionChange);
