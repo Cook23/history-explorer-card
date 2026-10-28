@@ -258,11 +258,11 @@ module.exports = async function()
     // on as usual), a press outside the graphs, Escape, or a click on it again ──
     const zoomOn = () => E('el.instance.state.zoomMode');
     const glass = () => E(`el.querySelector('#bz_0 path').getAttribute('fill')`);
-    await t.step('the magnifier: green while on, in the text\'s color while off; a click on it again turns it off', async () => {
+    await t.step('the magnifier: green while on, grey while off; a click on it again turns it off', async () => {
         const off0 = await glass(); await t.page.click('#bz_0'); await t.wait(300);
         const on = await zoomOn(), green = await glass(); await t.page.click('#bz_0'); await t.wait(300);
         const off = !(await zoomOn()), off1 = await glass();
-        return /primary-text-color/.test(off0) && on && /success-color/.test(green) && off && off1 === off0 ? true : JSON.stringify({ off0, on, green, off, off1 });
+        return /secondary-text-color/.test(off0) && on && /success-color/.test(green) && off && off1 === off0 ? true : JSON.stringify({ off0, on, green, off, off1 });
     });
     await t.step('the magnifier on: a click on a legend label turns it off and shows/hides its curve as usual', async () => {
         const li = await boxGraph(); await t.page.click('#bz_0'); await t.wait(300);

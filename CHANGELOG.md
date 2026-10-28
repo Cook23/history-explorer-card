@@ -4,15 +4,20 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [Unreleased]
+## [v1.2.51] - 2026-10-28
 
 ### Fixed — a pen gone out of hover range
 - A pen moved away from the screen while above something its hover showed sends nothing (no `pointerleave`) on some tablets: what the hover showed stayed (a magnifier twice as large, the hover dot, the tooltip and its mode, the Y labels shown on a hover, a text shown in full). A pen hovers only while it sends moves: `Chart.hecUi.penHover` ends its hover 1 s after its last move — one rule, used by the gesture engine on a graph (`_hecHoverLeft`, the same end as a genuine `mouseout`), the values over a graph and the magnifiers
 - *Tests (beta) ▸ Pen events*: the time between two moves of a pen hovering — mean, min, max, standard deviation, and how many reached 1 s
 - Test (`pen`): the pen gone out of range without leaving: the tooltip, the hover dot and the tooltip mode end 1 s after its last move; (`features`) the magnifier back to its size
 
-### Changed — the range selector 1 px to the right
-- The space before the range selector and the one after its arrow the same (the magnifier − 3 px from it, 2 before; the magnifier + 4 px, 5 before)
+### Fixed — the range selector's name cut
+- A range name filling the selector (« 4 Jours ») had its first character cut: its text was shifted 7 px to the left of where the browser centres it (`text-indent: -7px`). Removed: the name centred in the selector, as the browser sizes it
+
+### Changed — the magnifiers
+- Every magnifier (the toolbar's, the info panel's, its modes' menu) drawn in the theme's grey (`--secondary-text-color`), its symbol (↔ ↕ ⤢ − +) in the text's color, about half as large again, over the glass's ring, outlined in the toolbar's background (opaque: its color over the card's); all green while the zoom box is on, as before
+- The symbol's stroke and its outline's a whole number of the screen's pixels (from `devicePixelRatio`): sharp
+- Test (`mouse`): the magnifier grey while off
 
 ## [v1.2.50] - 2026-10-28
 

@@ -112,28 +112,44 @@ export function optionsMenuHtml(i)
 
 // The symbol of each magnifier's mode (ZOOM_BOX_MODES) in its glass: the time (↔), the Y axes
 // (↕), both (⤢) — and the zoom buttons' beside the range selector: out (−), in (+)
-const _ZOOM_BOX_SYMBOLS = { x: 'M6.5,9.5H12.5M6.5,9.5L8.3,7.7M6.5,9.5L8.3,11.3M12.5,9.5L10.7,7.7M12.5,9.5L10.7,11.3',
-                            y: 'M9.5,6.5V12.5M9.5,6.5L7.7,8.3M9.5,6.5L11.3,8.3M9.5,12.5L7.7,10.7M9.5,12.5L11.3,10.7',
-                            xy: 'M7.2,11.8L11.8,7.2M11.8,7.2H9.5M11.8,7.2V9.5M7.2,11.8H9.5M7.2,11.8V9.5',
-                            out: 'M6.5,9.5H12.5', in: 'M6.5,9.5H12.5M9.5,6.5V12.5' };
-
-// A magnifier (magnifierSvg) shown in another mode or color, its elements kept (a click and
-// the next one on the same element: a double-click)
-export function paintMagnifier(svg, mode, color)
+// (the symbol larger than the glass's hole, over its ring: the glass grey, the symbol in the
+// text's color stands out)
+const _ZOOM_BOX_SYMBOLS = { x: 'M5,9.5H14M5,9.5L7.7,6.8M5,9.5L7.7,12.2M14,9.5L11.3,6.8M14,9.5L11.3,12.2',
+                            y: 'M9.5,5V14M9.5,5L6.8,7.7M9.5,5L12.2,7.7M9.5,14L6.8,11.3M9.5,14L12.2,11.3',
+                            xy: 'M6.05,12.95L12.95,6.05M12.95,6.05H9.5M12.95,6.05V9.5M6.05,12.95H9.5M6.05,12.95V9.5',
+                            out: 'M5,9.5H14', in: 'M5,9.5H14M9.5,5V14' };
+// A magnifier's colors: its glass grey, its symbol in the text's color — or both in color —,
+// outlined in the background's (--hec-mag-bg: the toolbar's, opaque — see _paintMagnifiers)
+const _GLASS = 'var(--secondary-text-color)', _SYMBOL = 'var(--primary-text-color)';
+const _OUTLINE = 'var(--hec-mag-bg, var(--card-background-color))';
+// The symbol's stroke and its outline's (the stroke and a border on each side), each a whole
+// number of the screen's pixels: in the 24 units of a magnifier size px wide
+function _magnifierStrokes(size)
 {
-    const [_glass, _symbol] = svg.querySelectorAll('path');
-    _glass.setAttribute('fill', color);
-    _symbol.setAttribute('stroke', color);
-    _symbol.setAttribute('d', _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy);
+    const dpr = window.devicePixelRatio || 1, units = px => px / dpr * 24 / size;
+    const _line = Math.max(1, Math.round(4 / 3 * dpr)), _border = Math.max(1, Math.round(3 / 4 * dpr));
+    return { line: units(_line), outline: units(_line + 2 * _border) };
 }
 
-// The magnifier of mode (ZOOM_BOX_MODES, or 'out', 'in'), in color, size px wide: its glass
-// and handle, its mode's symbol in the glass
-export function magnifierSvg(mode, color = 'var(--primary-text-color)', size = 24)
+// A magnifier (magnifierSvg) shown in another mode or color (none: its own colors), its
+// elements kept (a click and the next one on the same element: a double-click)
+export function paintMagnifier(svg, mode, color)
 {
+    const [_glass, _outline, _symbol] = svg.querySelectorAll('path');
+    _glass.setAttribute('fill', color ?? _GLASS);
+    _symbol.setAttribute('stroke', color ?? _SYMBOL);
+    for( const p of [_outline, _symbol] ) p.setAttribute('d', _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy);
+}
+
+// The magnifier of mode (ZOOM_BOX_MODES, or 'out', 'in'), size px wide: its glass and handle
+// grey, its mode's symbol over the glass in the text's color — or both in color —, outlined
+export function magnifierSvg(mode, color, size = 24)
+{
+    const _d = _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy, _w = _magnifierStrokes(size);
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:middle;">` +
-        `<path fill="${color}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
-        `<path fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" d="${_ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy}" /></svg>`;
+        `<path fill="${color ?? _GLASS}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
+        `<path fill="none" stroke="${_OUTLINE}" stroke-width="${_w.outline}" stroke-linecap="round" d="${_d}" />` +
+        `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
 }
 
 // The magnifier's menu ez_N: its modes
