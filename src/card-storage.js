@@ -168,6 +168,7 @@ export class CardStorage
             zoomBox             : this.state.zoomBox,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
             yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
+            yaml_defaultMagnifierMode : this.pconfig.yamlDefaultMagnifierMode,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_gestures          : this.pconfig.gestures,
             yaml_entities          : this._pureYamlEntities ?? this.store.statics(),
@@ -270,7 +271,7 @@ export class CardStorage
 
         this._resolveEntities(_ls, _haCard, _yamlImage, _noStatics);
         this._resolveTimeRange(_ls, _haCard, _yamlImage, _noStatics);
-        this._resolveZoomBox(_ls, _haCard, _noStatics);
+        this._resolveZoomBox(_ls, _haCard, _yamlImage, _noStatics);
         const _infoPanelChanged = this._resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage);
         this._resolveGestures(_ls, _haGestures, _yamlImage);
 
@@ -526,14 +527,19 @@ export class CardStorage
     }
 
     // --- Last one to speak wins — the magnifier's mode ---
-    // Kept as the time range is (_cardPersists('range')): Home Assistant's value when it
-    // changed (persisted across devices), else this device's; nothing kept: both axes
-    _resolveZoomBox(_ls, _haCard, noStatics)
+    // Resolved as the time range is (_cardPersists('range')), its YAML being
+    // defaultMagnifierMode: nothing kept, the YAML's; the YAML when it changed (winning if
+    // both did), else Home Assistant's when it changed (persisted across devices), else
+    // this device's
+    _resolveZoomBox(_ls, _haCard, _yamlImage, noStatics)
     {
         const _range = this._cardPersists('range', noStatics);
         const _haChanged = _range.multi && _haCard?.zoomBox !== undefined && _haCard.zoomBox !== _ls?.ha_zoomBox;
-        const _mode = _haChanged ? _haCard.zoomBox : ( _range.multi || _range.local ) ? _ls?.zoomBox : undefined;
-        this.setZoomBoxMode(_mode ?? 'xy', false);
+        const _yamlChanged = this.pconfig.yamlDefaultMagnifierMode !== undefined &&
+                             this.pconfig.yamlDefaultMagnifierMode !== _yamlImage?.yaml_defaultMagnifierMode;
+        const _mode = !_range.multi && !_range.local || _yamlChanged ? this.pconfig.defaultMagnifierMode
+                    : _haChanged ? _haCard.zoomBox : _ls?.zoomBox;
+        this.setZoomBoxMode(_mode ?? this.pconfig.defaultMagnifierMode, false);
     }
 
     // --- Last one to speak wins — the info panel's switch ---

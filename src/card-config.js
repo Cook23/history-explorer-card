@@ -85,14 +85,18 @@ export class CardConfig
         P.legendAuto =             c.legendVisible === 'auto';
         P.cursorMode =             c.cursor?.mode ?? d('cursorMode', 'auto');
         P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', ['timeline']);
-        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? c.showTooltipColorsLine ?? true;
-        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? c.showTooltipColorsTimeline ?? true;
-        P.tooltipSize =            c.tooltip?.size ?? c.tooltipSize ?? 'auto';
-        P.tooltipShowDuration =    c.tooltip?.showDuration ?? c.tooltipShowDuration ?? d('tooltipShowDuration', false);
+        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? true;
+        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? true;
+        P.tooltipSize =            c.tooltip?.size ?? 'auto';
+        P.tooltipShowDuration =    c.tooltip?.showDuration ?? d('tooltipShowDuration', false);
         P.tooltipShowLabel =       c.tooltip?.showLabel ?? true;
         P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? 'auto';
         P.colorSeed =              c.stateColorSeed ?? 137;
         P.stateTextMode =          c.stateTextMode ?? 'auto';
+        // (the theme: dark, light or Home Assistant's; the colors of the labels, grid and cursor
+        // line — see applyTheme)
+        P.uimode =                 c.uimode;
+        P.uiColors =               c.uiColors ?? {};
         P.rounding =               c.rounding;
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
@@ -137,7 +141,8 @@ export class CardConfig
         P.combineSameUnits =       c.combineSameUnits === true;
         P.defaultTimeRange =       c.defaultTimeRange ?? '24h';
         P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
-        P.timeTickDensity =        c.timeTicks?.density ?? c.timeTickDensity ?? 'high';
+        P.defaultMagnifierMode =   c.defaultMagnifierMode ?? 'xy';
+        P.timeTickDensity =        c.timeTicks?.density ?? 'high';
         P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;
         P.timeTickShortDate =      c.timeTicks?.dateFormat === 'short';
         // (on by default since 1.1.49: `automatic: false` turns it off)
@@ -428,8 +433,8 @@ export class CardConfig
             fixedValue        : ent.fixedValue,
             stateAdaptiveColor: ent.stateAdaptiveColor,
             showCurrentValues : ent.showCurrentValues,
-            enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enable_multidevice_persistence),
-            enablePersistence: this.resolveEntityPersistenceFields(ent.enable_persistence),
+            enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enableMultidevicePersistence),
+            enablePersistence: this.resolveEntityPersistenceFields(ent.enablePersistence),
         };
     }
 

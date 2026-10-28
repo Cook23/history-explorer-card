@@ -203,6 +203,28 @@ module.exports = async function()
         const r = await range();
         return r.startsWith('12:') ? true : r;
     });
+    await t.step('the magnifier\'s mode: a change of defaultMagnifierMode in the YAML wins, then the next choice made on the card', async () => {
+        const mode = () => t.E('el.instance.state.zoomBox + "/" + graphAt(0).chart.options.zoomBoxAxes');
+        await reload(YAML({ enable_multidevice_persistence: 'range', defaultTimeRange: '12', defaultMagnifierMode: 'x' }));
+        const m1 = await mode();
+        await t.E(`(()=>{ const r=el.querySelector('#bz_0'); r.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })); })()`); await t.wait(300);
+        await t.E(`el.querySelector('#ez_0_y').click()`); await t.wait(1500);
+        await reload(); const m2 = await mode();
+        return m1 === 'x/x' && m2 === 'y/y' ? true : [m1, m2].join(' → ');
+    });
+    done(await t.close());
+
+    // ── The magnifier's mode, nothing persisted: always the YAML's (defaultMagnifierMode) ──
+    t = await openCard(YAML({ defaultMagnifierMode: 'y' }), { mock: { series: true }, height: 1200 });
+    await t.step('the magnifier\'s mode, nothing persisted: the YAML\'s at each opening, whatever was chosen on the card', async () => {
+        const mode = () => t.E('el.instance.state.zoomBox + "/" + graphAt(0).chart.options.zoomBoxAxes');
+        const m0 = await mode();
+        await t.E(`(()=>{ const r=el.querySelector('#bz_0'); r.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true })); })()`); await t.wait(300);
+        await t.E(`el.querySelector('#ez_0_x').click()`); await t.wait(1500);
+        const m1 = await mode();
+        await reload(); const m2 = await mode();
+        return m0 === 'y/y' && m1 === 'x/x' && m2 === 'y/y' ? true : [m0, m1, m2].join(' → ');
+    });
     done(await t.close());
 
     // ── Entities added from the card: always kept, and on every device ──

@@ -178,7 +178,7 @@ function hxHookInfoPanel()
         });
         instance.statistics.force = undefined;
 
-        instance.applyTheme(config);
+        instance.applyTheme();
 
         this._setEntityOptions(instance);
 
@@ -202,6 +202,7 @@ function hxHookInfoPanel()
         instance.databaseCallback = this._databaseCallback.bind(this);
 
         instance.setTimeRangeFromString(instance.pconfig.defaultTimeRange);
+        instance.setZoomBoxMode(instance.pconfig.defaultMagnifierMode, false);
 
         instance.today(false);
 

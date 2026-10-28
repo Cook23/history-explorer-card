@@ -479,13 +479,14 @@ export class CardOperations
 
     // "Default display": back to the YAML — the graphs added from the card removed, every
     // change made from the card to the YAML's forgotten (their order, their types, colors,
-    // splits, hidden curves, points…), the YAML's time range. Saved as any change: the last
+    // splits, hidden curves, points…), the YAML's time range and magnifier's mode. Saved as any change: the last
     // one to speak, it reaches the other devices for what they share
     defaultDisplay()
     {
         this.removeGraphs([...this.graphs]);
         this.store.reset(JSON.parse(JSON.stringify(this._pureYamlEntities ?? [])));
         this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
+        this.setZoomBoxMode(this.pconfig.defaultMagnifierMode, false);
         this.setPresentWindow();
         this.buildGraphsFromStore();
         this.refreshGraphControls();
