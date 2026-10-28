@@ -144,10 +144,15 @@ const PEN_CHECKS = [
     ['keys',        'key event (keydown / keyup) — some pens send their button as a key'],
     ['select',      'text selection started (selectstart / selectionchange)'],
     ['leave',       'pointerleave / pointerout with no contact (pen moved away)'],
+    ['mouseHover',  'mousemove with no button (a hover sent as mouse events)'],
+    ['mozPen',      'Firefox: mozInputSource 2 (a pen) on an event'],
+    ['touchCaps',   'sourceCapabilities.firesTouchEvents true on a hover move (no contact)'],
     ['leaveNull',   'pointerleave / pointerout with no contact and no element entered (relatedTarget null: the pen gone from the screen)'],
 ];
-const PEN_PAD_EVENTS = ['pointerover', 'pointerenter', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerout', 'pointerleave',
-                        'contextmenu', 'mousedown', 'mouseup', 'click', 'auxclick', 'dblclick'];
+const PEN_PAD_EVENTS = ['pointerover', 'pointerenter', 'pointerdown', 'pointermove', 'pointerrawupdate', 'pointerup', 'pointercancel', 'pointerout', 'pointerleave',
+                        'gotpointercapture', 'lostpointercapture',
+                        'mouseover', 'mouseenter', 'mousemove', 'mousedown', 'mouseup', 'mouseout', 'mouseleave', 'click', 'auxclick', 'dblclick', 'contextmenu',
+                        'touchstart', 'touchmove', 'touchend', 'touchcancel'];
 const PEN_PAGE_EVENTS = ['keydown', 'keyup', 'selectstart'];
 const PEN_LOG_MAX = 300;
 const PEN_MOVE_LOG_MS = 120;   // (moves logged at most this often, so that the log stays readable)
@@ -186,7 +191,7 @@ function buildPenEventsTest(body)
     const lines = [];
     const lastBtns = {};
     const t0 = performance.now();
-    let lastMoveLog = 0, contact = false, lastSel = 0;
+    const lastMoveLog = {}; let contact = false, lastSel = 0;
     // The contacts under way (by pointerId), and each zone's last one, ended
     const contacts = {}, lastContact = {};
     const scroller = body.closest('.dlg');
@@ -222,8 +227,13 @@ function buildPenEventsTest(body)
         // (a pointer's id, tilt, altitude and contact size: what may tell a pen reported as
         // a mouse; what a pointer leaving went to — null: it left the screen)
         const _p = e.pointerId === undefined ? '' : ` id=${e.pointerId} tilt=${e.tiltX ?? '-'},${e.tiltY ?? '-'} alt=${e.altitudeAngle === undefined ? '-' : e.altitudeAngle.toFixed(2)} wh=${Math.round(e.width ?? 0)}x${Math.round(e.height ?? 0)}`;
-        const _to = /^pointer(out|leave)$/.test(e.type) ? ` to=${e.relatedTarget ? ( e.relatedTarget.id || e.relatedTarget.tagName?.toLowerCase() ) : 'null'}` : '';
-        return `${stamp()} ${where.padEnd(6)} ${e.type.padEnd(15)} ${String(e.pointerType ?? '-').padEnd(5)} btn=${String(e.button ?? '-').padStart(2)} btns=${String(e.buttons ?? '-').padStart(2)} p=${(e.pressure ?? 0).toFixed(2)}${_p}${_to}${_extra}`;
+        // (Firefox: the event's real source — 1 mouse, 2 pen, 5 touch; Chromium: whether its
+        // device fires touch events)
+        const _src = ( e.mozInputSource !== undefined ? ` moz=${e.mozInputSource}` : '' ) +
+                     ( e.sourceCapabilities ? ` touchCaps=${e.sourceCapabilities.firesTouchEvents}` : '' ) +
+                     ( e.touches ? ` touches=${e.touches.length}${e.touches[0]?.touchType ? ' ' + e.touches[0].touchType : ''}${e.touches[0]?.force !== undefined ? ' f=' + e.touches[0].force.toFixed(2) : ''}` : '' );
+        const _to = /^(pointer|mouse)(out|leave)$/.test(e.type) ? ` to=${e.relatedTarget ? ( e.relatedTarget.id || e.relatedTarget.tagName?.toLowerCase() ) : 'null'}` : '';
+        return `${stamp()} ${where.padEnd(6)} ${e.type.padEnd(15)} ${String(e.pointerType ?? '-').padEnd(5)} btn=${String(e.button ?? '-').padStart(2)} btns=${String(e.buttons ?? '-').padStart(2)} p=${(e.pressure ?? 0).toFixed(2)}${_p}${_src}${_to}${_extra}`;
     };
     const push = (text) => {
         lines.unshift(text);
@@ -281,12 +291,16 @@ function buildPenEventsTest(body)
         if( e.type === 'pointercancel' ) seen.cancel = true;
         if( ( e.type === 'pointerleave' || e.type === 'pointerout' ) && b === 0 ) seen.leave = true;
         if( ( e.type === 'pointerleave' || e.type === 'pointerout' ) && b === 0 && !e.relatedTarget ) seen.leaveNull = true;
+        if( e.type === 'mousemove' && b === 0 ) seen.mouseHover = true;
+        if( e.mozInputSource === 2 ) seen.mozPen = true;
+        if( /move$/.test(e.type) && b === 0 && e.sourceCapabilities?.firesTouchEvents ) seen.touchCaps = true;
         if( e.type === 'contextmenu' ) { seen.ctx = true; e.preventDefault(); }
         if( e.pointerId !== undefined ) lastBtns[e.pointerId] = b;
         $('now').textContent = line(e, where, _extra);
         const _now = performance.now();
-        if( e.type !== 'pointermove' || _now - lastMoveLog > PEN_MOVE_LOG_MS || ( b !== 0 && e.button >= 0 ) ) {
-            if( e.type === 'pointermove' ) lastMoveLog = _now;
+        const _move = /(move|rawupdate)$/.test(e.type);
+        if( !_move || _now - ( lastMoveLog[e.type] ?? 0 ) > PEN_MOVE_LOG_MS || ( b !== 0 && e.button >= 0 ) ) {
+            if( _move ) lastMoveLog[e.type] = _now;
             push(line(e, where, _extra));
         }
         renderChecks();
