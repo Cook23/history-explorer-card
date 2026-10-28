@@ -394,6 +394,11 @@ lineMode: null
 # Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Interpolation)
 interpolation: "monotone"
 
+# Changes the default of largeScreenTooltip and smallScreenTooltip: selected, nearest, mixed or all, on both screens —
+# auto (the default) leaves theirs: mixed on a large screen (a card 600 px wide or more), selected on a small one
+# Also settable in $.entityOptions, on a graph and on an entity
+tooltipBehavior: "auto"
+
 # Line width for lines in line graphs. `width` is also accepted as an alias
 lineWidth: 2.0
 

@@ -116,6 +116,20 @@ show it, and the conductor starts the card and wires the parts together.
    where the card, `entityOptions`, a graph and an entity are read; the rest of the card
    only ever tests the one form, and that form is what is saved (so an alias written
    instead of its value isn't a change).
+8. **An option's default is applied by the code that reads and normalizes it**, never where
+   it's used. Where an option has a fixed default, the reading code sets it. The same holds
+   when another option only changes that default (`tooltipBehavior` sets the default of
+   `largeScreenTooltip` and `smallScreenTooltip`): the reading code applies it, and the
+   rest of the card knows only the option itself. When what an option's absence does
+   depends on business conditions (`lineMode` taken from the type, `circular` detected,
+   `hour24` from the language, a curve's color from the palette), the option has no
+   default: its absence has a meaning of its own. It stays undefined, and the code that
+   uses it decides. The fixed defaults are one table, `history-options.js`
+   `OPTION_DEFAULTS`, applied by `card-config.js` alone: `applyConfig` (the card's own
+   options, a graph's under the card's — `cardGraphDefaults`), `resolveOption` and
+   `graphOption`, after the persistence's merge (what is saved stays as it was set,
+   nothing when it never was). A host's own defaults (the info panel's) go through
+   `applyConfig`'s `defaults`.
 
 ## Where a change goes
 
@@ -149,7 +163,9 @@ show it, and the conductor starts the card and wires the parts together.
   entity list changes through the store; a graph's datasets are `card-charts.js`'s; a
   gesture on a graph is Chart.js's; a menu's elements are `card-menus.js`'s; rendering is
   Chart.js's; a part calls another part's public methods only; each field of the state has
-  one owner; the inputs never change what's shown themselves. An exception is written in
+  one owner; the inputs never change what's shown themselves; an option's default is
+  applied only where the options are read — never given or compared where it's used, never
+  set again by the card's constructor. An exception is written in
   the test with its reason, and fails once it's no longer needed;
 - **store** — the entity store on its own, no browser;
 - the other suites — the built card in Chromium against a mocked Home Assistant: every

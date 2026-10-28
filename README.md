@@ -703,6 +703,7 @@ graphs:
 | `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
 | `largeScreenTooltip` | `large_screen_tooltip` | | ✓ | ✓ | ✓ | The tooltip on a large screen (a card 600 px wide or more): `mixed` (default) the value pointed at on any curve, at a hover or a click, and the curves clicked; `nearest` that value only; `selected` the curves clicked only; `all` that value and each other curve's value at the same time (or nearest, a few pixels away at most). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
 | `smallScreenTooltip` | `small_screen_tooltip` | | ✓ | ✓ | ✓ | The same on a small screen (a card narrower than 600 px, and the info panel): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
+| `tooltipBehavior` | `tooltip_behavior` | | ✓ | ✓ | ✓ | Changes the default of `largeScreenTooltip` and `smallScreenTooltip`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) |
 | `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
 | `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
 | `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |

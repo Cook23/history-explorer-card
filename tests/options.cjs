@@ -233,6 +233,32 @@ module.exports = async function()
     }
     done(await t.close());
 
+    // ── tooltipBehavior: the default of smallScreenTooltip and largeScreenTooltip, at every
+    // level; auto, the screen's own (a large one here: mixed) ──
+    {
+        const modes = async (cfg) => {
+            const t = await openCard(card(cfg), { mock: { series: true } });
+            const m = await t.E(`el.instance.graphs.map(g => g.chart.data.datasets.map(d => d.hecTooltip).join('+')).join(' | ')`);
+            done(await t.close());
+            return m;
+        };
+        const two = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] };
+        const r = {
+            none: await modes(two),
+            auto: await modes({ ...two, tooltipBehavior: 'auto' }),
+            card: await modes({ ...two, tooltip_behavior: 'Nearest' }),
+            levels: await modes({ tooltipBehavior: 'all', entityOptions: { 'sensor.rain': { tooltipBehavior: 'selected' } },
+                graphs: [{ type: 'line', options: { tooltipBehavior: 'nearest' }, entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }),
+            explicit: await modes({ ...two, tooltipBehavior: 'nearest', largeScreenTooltip: 'all' }),
+            entityWins: await modes({ tooltipBehavior: 'nearest', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', tooltipBehavior: 'all' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }),
+        };
+        t = await openCard(card({}), { mock: { series: true } });
+        await t.step('tooltipBehavior changes the default of largeScreenTooltip / smallScreenTooltip — absent or auto, theirs (mixed on a large screen); at every level and spelling; largeScreenTooltip set', async () =>
+            r.none === 'mixed | mixed' && r.auto === 'mixed | mixed' && r.card === 'nearest | nearest' && r.levels === 'nearest | selected'
+            && r.explicit === 'all | all' && r.entityWins === 'all | nearest' ? true : JSON.stringify(r));
+        done(await t.close());
+    }
+
     // ── The info panel reads its configuration as the card does (same code) ──
     t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curve', ylock: true, showSamples: 3 }, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);

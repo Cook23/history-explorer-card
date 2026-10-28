@@ -43,8 +43,8 @@ class CSVExporter {
 
     exportFile(cardstate)
     {
-        this.separator = cardstate.pconfig.exportSeparator ?? ',';
-        this.timeFormat = cardstate.pconfig.exportTimeFormat ?? 'YYYY-MM-DD HH:mm:ss';
+        this.separator = cardstate.pconfig.exportSeparator;
+        this.timeFormat = cardstate.pconfig.exportTimeFormat;
         this.numberLocale = cardstate.pconfig.exportNumberLocale;
 
         const t0 = cardstate.startTime.replace('+', '%2b');
@@ -161,7 +161,7 @@ export class StatisticsCSVExporter extends CSVExporter {
 
     _request(cardstate, l, t0, t1)
     {
-        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod ?? 'hour'));
+        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod));
     }
 
     exportCallback(result)

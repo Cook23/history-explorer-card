@@ -109,6 +109,7 @@ const OPTION_SYNONYMS = {
     stateAdaptiveColor: ['state_adaptive_color'],
     largeScreenTooltip: ['large_screen_tooltip'],
     smallScreenTooltip: ['small_screen_tooltip'],
+    tooltipBehavior  : ['tooltip_behavior'],
 };
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -157,6 +158,8 @@ const _tooltipMode = v => {
     console.warn(`history-explorer-card: invalid tooltip mode ${JSON.stringify(v)} — expected ${TOOLTIP_MODES.join(', ')}`);
     return undefined;
 };
+// (tooltipBehavior: a tooltip mode, or auto — each screen's own default)
+const _tooltipBehavior = v => String(v).trim().toLowerCase() === 'auto' ? 'auto' : _tooltipMode(v);
 
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
@@ -247,6 +250,7 @@ const OPTION_VALUES = {
     groupBy       : v => GROUP_BY.find(f => f === String(v).trim().toLowerCase()),
     largeScreenTooltip : _tooltipMode,
     smallScreenTooltip : _tooltipMode,
+    tooltipBehavior    : _tooltipBehavior,
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
     circular      : v => {
@@ -285,8 +289,29 @@ export function normalizeOptions(o)
     // draws its bars)
     if( r.interval === undefined && ( r.groupBy === 'date' || r.groupBy === 'hour' ) ) r.interval = r.groupBy === 'date' ? 'daily' : 'hourly';
     for( const [name, fn] of Object.entries(OPTION_VALUES) ) if( r[name] !== undefined && r[name] !== null ) r[name] = fn(r[name]);
+    // (tooltipBehavior: the default of largeScreenTooltip and smallScreenTooltip — auto, theirs)
+    if( r.tooltipBehavior && r.tooltipBehavior !== 'auto' ) { r.largeScreenTooltip ??= r.tooltipBehavior; r.smallScreenTooltip ??= r.tooltipBehavior; }
     return r;
 }
+
+// The options' fixed defaults (ARCHITECTURE.md, rule 8): applied by card-config.js, where
+// the options are read and resolved — never where they're used. An option whose absence the
+// card handles by its own rules has none (lineMode from the type, circular detected, hour24
+// from the language, a curve's color from the palette): it stays undefined
+export const OPTION_DEFAULTS = {
+    // (a curve's — CardConfig.resolveOption)
+    largeScreenTooltip: 'mixed', smallScreenTooltip: 'selected', showPoints: 'hover', dashMode: 'solid', netBars: false,
+    showLine: true, showGraph: true, fixedValue: false, stateAdaptiveColor: true, showIndicator: false, valueFactor: 0,
+    // (a graph's — CardConfig.applyConfig, cardGraphDefaults)
+    showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true,
+    // (a graph's header — CardConfig.graphOption)
+    showIcon: false,
+    // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
+    interval: 1,
+};
+// (the graph's ones, given to every graph under the card's own)
+const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight'];
+export const GRAPH_DEFAULTS = Object.fromEntries(_GRAPH_DEFAULT_KEYS.map(k => [k, OPTION_DEFAULTS[k]]));
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
@@ -296,7 +321,7 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
-    'largeScreenTooltip', 'smallScreenTooltip'];
+    'largeScreenTooltip', 'smallScreenTooltip', 'tooltipBehavior'];
 
 // A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
 // else the card's

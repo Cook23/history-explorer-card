@@ -18,6 +18,16 @@ Changelog for the HA History Explorer Card.
 - README_Full, full-reference-config.yaml, Chart Custom.js.md: the tooltip's sizes
 - Tests (`features`): `auto` at 1000, 450 and 280 px — full, compact (the time, the shortest name), slim (no title, the time without its date, one value only with `all`); a size set, the same at every width
 
+### Added — tooltipBehavior
+- `tooltipBehavior` (`tooltip_behavior`): changes the default of `largeScreenTooltip` and `smallScreenTooltip` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs (`mixed`, `selected`). At every level, as they are (card, graph, entity, `entityOptions`): read with the options (`normalizeOptions`), the rest of the card knowing only `largeScreenTooltip` and `smallScreenTooltip`
+- README, README_Full, full-reference-config.yaml: `tooltipBehavior`
+- Test (`options`): absent and `auto` — `mixed` on a large screen; a mode on the card (synonym, any case); on a graph, an entity, in `entityOptions`; with `largeScreenTooltip` set
+
+### Changed — the options' defaults in one place
+- Every option's fixed default is in one table (`history-options.js` `OPTION_DEFAULTS`), applied by `card-config.js` alone where the options are read and resolved (`applyConfig`, `cardGraphDefaults`, `resolveOption`, `graphOption`), after the persistence's merge — no longer repeated where each option is used: the tooltip modes (`mixed`, `selected`), `showPoints` (`hover`), `dashMode`, `netBars`, `showLine`, `showGraph`, `fixedValue`, `stateAdaptiveColor`, `showIndicator`, `valueFactor`, a graph's `showGrid`, `showTimeLabels`, `stacked`, `logarithmic`, `ylock`, `labelsLeft`, `labelsRight`, `showIcon`, a bar graph's `interval`; the CSV export's (`csv.separator`, `timeFormat`, `statisticsPeriod`) read with the other options; the info panel's line width through its own defaults. An option whose absence the card handles by its own rules (`lineMode`, `circular`, `hour24`, a curve's color, `showName`) has none. The card's constructor no longer sets defaults of its own over them (47 of them, some different: `showUnavailable`, `showCurrentValues`, `refresh.automatic`…)
+- ARCHITECTURE.md: rule 8 — an option's default applied where it's read
+- Tests (`architecture`): `option-defaults` — outside card-config.js and history-options.js, no option of OPTION_DEFAULTS given a fixed value (`?? 'hover'`, `?? 1`…) nor compared with the boolean its default stands for (`!== false`), no value resolved by `resolveOption` / `graphOption` completed or compared so, no `pconfig` option given a fixed value; `option-defaults-once` — the card's constructor sets no option `applyConfig` sets (both fail on the code before this change)
+
 ### Fixed — the time axis over a change of daylight saving time
 - A window over a day of 25 hours (the end of summer time) or 23 hours (its start), ticked every few hours, lost every midnight — the ticks an hour off the clock from that day on (11:00, 23:00 instead of 00:00, 12:00): no day shown on the time axis. The hours are now stepped by the clock, day by day — every midnight ticked, its day labelled (Chart.js time scale `generate`)
 - Tests (`features`): 3 days over the change of time in October and in March (Paris) — every midnight a tick with its day, every tick on the clock's hours

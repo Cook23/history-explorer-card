@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -98,10 +98,10 @@ export class CardConfig
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
         P.defaultLineMode =        c.lineMode ?? d('defaultLineMode', undefined);
         P.defaultInterpolation =   c.interpolation ?? 'monotone';
-        P.defaultLineWidth =       c.lineWidth ?? 2.0;
+        P.defaultLineWidth =       c.lineWidth ?? d('defaultLineWidth', 2.0);
         P.defaultDashMode =        c.dashMode;
         P.defaultNetBars =         c.netBars;
-        P.defaultInterval =        c.interval;
+        P.defaultInterval =        c.interval ?? OPTION_DEFAULTS.interval;
         P.defaultShowMinMax =      c.showMinMax;
         // (aggregation — see resolveAggregation)
         P.defaultPointsPerHour =   c.pointsPerHour;
@@ -116,9 +116,10 @@ export class CardConfig
         // see resolveOption; hour24, the card's)
         P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', 'largeScreenTooltip', 'smallScreenTooltip', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
-        // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card)
-        P.cardGraphDefaults =      Object.fromEntries(
-            ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card;
+        // a graph's options the card doesn't set, their defaults)
+        P.cardGraphDefaults =      { ...GRAPH_DEFAULTS, ...Object.fromEntries(
+            ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]])) };
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
         // barGraphHeight set their own)
         P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
@@ -142,6 +143,12 @@ export class CardConfig
         // (on by default since 1.1.49: `automatic: false` turns it off)
         P.refreshEnabled =         c.refresh?.automatic ?? true;
         P.refreshInterval =        c.refresh?.interval ?? undefined;
+        // (the CSV export — see history-csv-exporter.js)
+        P.exportSeparator =        c.csv?.separator ?? ',';
+        P.exportTimeFormat =       c.csv?.timeFormat ?? 'YYYY-MM-DD HH:mm:ss';
+        P.exportAttributes =       c.csv?.exportAttributes;
+        P.exportStatsPeriod =      c.csv?.statisticsPeriod ?? 'hour';
+        P.exportNumberLocale =     c.csv?.numberLocale;
 
         this.statistics.enabled =   c.statistics?.enabled ?? true;
         this.statistics.mode =      c.statistics?.mode ?? 'mean';
@@ -226,18 +233,18 @@ export class CardConfig
     }
 
     // Option k of entity e: its own, else its graph's, else entityOptions', else the card's
-    // (P.cardOptions) — resolved when used, never copied onto the entity: a curve moved to
-    // another graph takes that graph's
+    // (P.cardOptions), else its default (OPTION_DEFAULTS) — resolved when used, never copied
+    // onto the entity: a curve moved to another graph takes that graph's
     resolveOption(e, k)
     {
-        return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k];
+        return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
     }
 
     // Option k of the graph of group groupId (its header, its values — GRAPH_HEADER_KEYS):
-    // the graph's, else the card's
+    // the graph's, else the card's, else its default (OPTION_DEFAULTS)
     graphOption(groupId, k)
     {
-        return this.pconfig.graphs[groupId]?.[k] ?? this.pconfig.cardOptions?.[k];
+        return this.pconfig.graphs[groupId]?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
     }
 
     // Whether entity e's value now is shown after its name in the legend: its own
@@ -253,7 +260,7 @@ export class CardConfig
     // valueFactor (mini-graph-card's value_factor — a factor shown too: see shownScaleOf)
     drawScaleOf(e)
     {
-        return ( e?.scale ?? 1 ) * 10 ** ( this.resolveOption(e, 'valueFactor') ?? 0 );
+        return ( e?.scale ?? 1 ) * 10 ** this.resolveOption(e, 'valueFactor');
     }
 
     // The factor between entity e's value and the value shown (legend, tooltip, values over
@@ -261,7 +268,7 @@ export class CardConfig
     // changes how it's drawn); times 10 to the power of its valueFactor either way
     shownScaleOf(e)
     {
-        return ( e?.unit !== undefined ? ( e?.scale ?? 1 ) : 1 ) * 10 ** ( this.resolveOption(e, 'valueFactor') ?? 0 );
+        return ( e?.unit !== undefined ? ( e?.scale ?? 1 ) : 1 ) * 10 ** this.resolveOption(e, 'valueFactor');
     }
 
     // How an entity's values are grouped into points (mini-graph-card's aggregation):

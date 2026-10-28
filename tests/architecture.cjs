@@ -21,6 +21,11 @@ function code(file)
     return out.join('');
 }
 
+// The options' fixed defaults (history-options.js OPTION_DEFAULTS): their names
+const DEFAULTED = [...code('src/history-options.js').match(/export const OPTION_DEFAULTS = \{([\s\S]*?)\n\};/)[1].matchAll(/\b(\w+)\s*:/g)].map(m => m[1]);
+// What a function of a source sets on its object, by name (P.x = — this.pconfig.x =)
+const setIn = (s, from, to, re) => { const b = s.slice(s.indexOf(from), s.indexOf(to, s.indexOf(from))); return new Set([...b.matchAll(re)].map(m => m[1])); };
+
 // Stock Chart.js API the card may use on a chart or on Chart (chartjs.org, 2.7)
 const STOCK = new Set(['data', 'options', 'config', 'update', 'resize', 'destroy', 'helpers', 'defaults']);
 
@@ -107,6 +112,18 @@ const RULES = [
     { id: 'options-read', why: "the options are put in their one form where they're read (card-config.js, history-options.js's normalizeOptions): the rest of the card only knows that form",
       files: CARD.filter(f => !['src/card-config.js', 'src/history-options.js', 'src/history-default-colors.js'].includes(f)),
       re: /\bnormalize(Options|Color|LineMode|Interpolation|YAxis|Stats)\b|\bparseIntervalConfig\b/g },
+    // (an option's default applied where it's read, never where it's used — ARCHITECTURE.md rule 8)
+    { id: 'option-defaults', why: "an option's fixed default is applied where the options are read (card-config.js, from history-options.js OPTION_DEFAULTS): where it's used, the option is never given a value of its own nor compared with one its default stands for",
+      files: CARD.filter(f => !['src/card-config.js', 'src/history-options.js'].includes(f)),
+      re: new RegExp('\\b(?:resolveOption|graphOption)\\([^()]*\\)\\s*(?:\\?\\?|[!=]==\\s*(?:true|false)\\b)'
+          + '|\\.(?:' + DEFAULTED.join('|') + ')\\s*(?:\\?\\?\\s*(?:true|false|-?\\d|[\'"`])|[!=]==\\s*(?:true|false)\\b)'
+          + '|\\bpconfig\\.\\w+\\s*\\?\\?\\s*(?:true|false|-?\\d|[\'"`])', 'g') },
+    { id: 'option-defaults-once', why: "the card's constructor gives no option a value of its own: applyConfig (card-config.js) sets them, with their defaults",
+      files: ['src/history-explorer-card.js'],
+      check: (s, f) => {
+          const _applied = setIn(code('src/card-config.js'), 'applyConfig(config', 'Object.assign(P, fixed)', /\bP\.(\w+)\s*=(?!=)/g);
+          return [...s.matchAll(/this\.pconfig\.(\w+)\s*=(?!=)/g)].filter(m => _applied.has(m[1])).map(m => ({ index: m.index, text: m[0] }));
+      } },
     { id: 'element-ids', why: "an element's id is the card's own name, never a piece of data (an entity_id isn't always a valid CSS identifier): data goes in dataset",
       files: CARD, re: /(?<!\bthis|\binstance)\.id\s*=(?!=)\s*(?!['"`])/g },
     { id: 'inputs', why: "the gestures, the menus, the selector and the toolbar ask card-operations.js for a change of what's shown: they never change the entity list or the graphs themselves",
