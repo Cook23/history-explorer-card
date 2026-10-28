@@ -10,6 +10,7 @@ Changelog for the HA History Explorer Card.
 - Each pointer event's id, tilt (`tiltX`, `tiltY`, `altitudeAngle`) and contact size (`width × height`); a pointer leaving: the element it went to (`null`: it left the screen), and a check for that
 - The device: what the browser says of its pointers (`pointer`, `any-pointer`, `hover`, `any-hover`), `maxTouchPoints`, `devicePixelRatio`, the user agent
 - The time between two hover moves counted whatever type they're reported as (a pen's hover reported as a mouse by some browsers)
+- Every pointer, mouse and touch event listened to (`pointerrawupdate`, the pointer capture, `mousemove`, `mouseover`, `mouseout`, `touchstart`…), each with the source it gives: `mozInputSource` (Firefox: 2 a pen), `sourceCapabilities.firesTouchEvents` (Chromium), a touch's `touchType` and force; checks for a hover sent as `mousemove`, a Firefox pen, a hover from a device that fires touch events
 
 ## [v1.2.51] - 2026-10-28
 
