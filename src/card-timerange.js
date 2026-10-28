@@ -7,6 +7,7 @@ import { RIGHT_Y_AXIS } from "./card-charts.js";
 import { paintMagnifier } from "./card-menus.js";
 import { ZOOM_BOX_MODES } from "./history-options.js";
 const moment = window.HXLocal_moment;
+const Chart = window.HXLocal_Chart;
 
 // Valid time ranges in hours
 const ranges = [1, 2, 6, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368, 8760];
@@ -156,12 +157,15 @@ export class CardTimeRange
     }
 
     // The magnifiers (#bz_N): their mode's symbol (state.zoomBox), green while the elastic
-    // box's mode is on
+    // box's mode is on; the magnifiers' outlines in the toolbar's background, opaque: its color
+    // (faint) over the card's (--hec-mag-bg)
     _paintMagnifiers()
     {
         for( const b of this.ui.zoomButton ) {
+            const _box = b?.parentNode;
+            if( _box ) _box.style.setProperty('--hec-mag-bg', Chart.hecUi.opaqueBackground(_box));
             const _svg = b?.querySelector('svg');
-            if( _svg ) paintMagnifier(_svg, this.state.zoomBox, this.state.zoomMode ? 'var(--success-color, #4caf50)' : 'var(--primary-text-color)');
+            if( _svg ) paintMagnifier(_svg, this.state.zoomBox, this.state.zoomMode ? 'var(--success-color, #4caf50)' : null);
         }
     }
 

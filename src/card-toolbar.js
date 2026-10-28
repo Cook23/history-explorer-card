@@ -40,18 +40,18 @@ export function timeButtonsHtml(i)
 export function rangeControlsHtml(i, optionStyle, invertZoom)
 {
     // (side by side, about 10 px apart as they're seen — as the time buttons are: margins
-    // between the magnifiers; the selector's text 7 px to the left — centred by the browser
+    // between the magnifiers; the selector's text centred — by the browser
     // left of its arrow, it would look too far right, between the magnifier − and the arrow)
     // (each magnifier twice as large under the pointer — a mouse, a pen above the screen, a
     // finger while it presses —, drawn over its neighbours, the layout unchanged, so as to see
     // what is clicked: hec-big, see wireToolbar)
     return `<style>.hec-mag svg{position:relative;z-index:2;transition:transform .12s}.hec-mag.hec-big svg{transform:scale(2)}</style>` +
         `<button id="bz_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 20)}</button>${zoomMenuHtml(i)}` +
-        `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:3px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
-        `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center;text-indent:-7px">` +
+        `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:2px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
+        `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center">` +
             RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('') +
         `</select>` +
-        `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
+        `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:5px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
 }
 
 export class CardToolbar

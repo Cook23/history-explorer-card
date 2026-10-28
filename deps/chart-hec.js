@@ -752,6 +752,14 @@
       return 'rgba(' + _rgb.join(',') + ',' + (alpha === undefined ? 1 : alpha) + ')';
     },
 
+    // What el's background looks like, opaque: its own color (see-through, as the toolbars')
+    // over the background it's drawn on (background) — the card's magnifiers' outline
+    opaqueBackground: function (el) {
+      var _n = function (s) { return (s.match(/[\d.]+/g) || []).map(Number); };
+      var c = _n(getComputedStyle(el).backgroundColor), b = _n(hecUi.background(el.parentNode || el.host)), a = c[3] === undefined ? 1 : c[3];
+      return 'rgb(' + [0, 1, 2].map(function (k) { return Math.round((c[k] || 0) * a + b[k] * (1 - a)); }).join(',') + ')';
+    },
+
     // How long a message stays up: 1 s, plus 0.5 s per word (isWord; words split on
     // spaces and underscores — entity ids read as words).
     readingTime: function (text) {
