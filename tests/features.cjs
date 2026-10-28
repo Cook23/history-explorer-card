@@ -511,6 +511,16 @@ module.exports = async function()
         }
         return Object.values(r).every(([a, b, c, same]) => a === 20 && b === 40 && c === 20 && same) ? true : JSON.stringify(r);
     });
+    await t.step('a pen above the screen, a finger while it presses: the magnifier twice as large too, back to its size once left', async () => {
+        const size = () => t.E(`Math.round(el.querySelector('#b5_0 svg').getBoundingClientRect().width)`);
+        const send = (type, pointerType) => t.E(`el.querySelector('#b5_0').dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: '${pointerType}', isPrimary: true, buttons: 0 }))`);
+        await t.page.mouse.move(5, 5); await t.wait(300);
+        await send('pointerenter', 'pen'); await t.wait(400); const pen = await size();
+        await send('pointerleave', 'pen'); await t.wait(400); const left = await size();
+        await send('pointerenter', 'touch'); await t.wait(400); const finger = await size();
+        await send('pointerleave', 'touch'); await t.wait(400); const up = await size();
+        return pen === 40 && left === 20 && finger === 40 && up === 20 ? true : JSON.stringify({ pen, left, finger, up });
+    });
     done(await t.close());
 
     // ── One point per column of pixels: the mean of its values (weighted by how long each

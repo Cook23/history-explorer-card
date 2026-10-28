@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.50] - 2026-10-28
+
+### Fixed — the magnifiers' zoom under a pen
+- A magnifier under a pen above the screen wasn't shown twice as large on a tablet: the CSS hover rule (`@media (hover:hover)`) follows the device's primary pointer, a finger there. Now set by the pointer itself (`pointerenter` / `pointerleave`, the class `hec-big` — `wireToolbar`), for every pointer: a mouse, a pen above the screen, a finger while it presses
+- Test (`features`): a pen above a magnifier, a finger pressing it: twice as large, back to its size once left
+
 ## [v1.2.49] - 2026-10-28
 
 ### Added — `defaultMagnifierMode`

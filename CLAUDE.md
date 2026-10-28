@@ -3,6 +3,19 @@
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
 
+## How to work — set by the user, not negotiable
+
+- **Code what is asked, exactly.** A problem detected, something to correct, a case the
+  instruction doesn't cover (a device, a pointer, a condition, an exception): say it and ask
+  before coding it — never decide it alone, even when it looks obvious.
+- **An instruction unclear:** reformulate it and wait for the answer — don't interpret.
+- **The full suite:** only when the user says the modifications are finished, or asks for it —
+  never during modifications, never on your own initiative. Meanwhile, targeted tests only.
+- **Never without being asked:** a version bump, a commit, a push, a PR, a merge.
+- **A question or a doubt about what is being done** ("why", "who asked for that"), or an
+  interruption: answering it comes first, before continuing anything. Answer it and stop —
+  no code, no test, no commit until the user gives the next instruction.
+
 ## Architecture (1.2) — set by the user, not negotiable
 
 Read `ARCHITECTURE.md` before changing any code, and keep to it: the card gives data and
