@@ -77,7 +77,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 
 ## Usage
 
-https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
+https://github.com/user-attachments/assets/b2a51086-47ad-42dc-a503-f71110835146
 
 ### Navigation
 
