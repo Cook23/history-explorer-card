@@ -155,7 +155,7 @@ To see a list of all possible configuration options, check the [Full reference c
 
 ### Interactive navigation
 
-https://user-images.githubusercontent.com/60828821/147440026-13a5ba52-dc43-4ff7-a944-9c2784e4a2f7.mp4
+https://github.com/user-attachments/assets/b2a51086-47ad-42dc-a503-f71110835146
 
 When the card is opened, it will display the history of the configured entities for the last 24 hours starting at the current date and time. On the top left you will find the date selector previous and next buttons, use them to quickly browse through the days. You can use the right side time range selector (dropdown or plus / minus buttons) to zoom into or out of the history. You can also use the interactive zoom mode (magnifying glass icon) to select a region on a graph to zoom into. Another convenient way to zoom in and out of the graphs is by using the mouse wheel while holding the CTRL key.
 
