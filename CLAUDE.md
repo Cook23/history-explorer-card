@@ -15,6 +15,24 @@ Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split 
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
+- **What the user observes is a fact, not a hypothesis.** The user sees the card, the device,
+  the browser; Claude doesn't. What the user says they saw weighs as much as a screenshot.
+  Past sessions kept their own idea against the user's repeated observations, until a
+  screenshot stopped them — a tunnel effect (fixation on one explanation, the facts that
+  don't fit it set aside). So:
+  - an observation of the user's that contradicts Claude's idea: the idea is wrong until
+    proven otherwise — drop it, or ask a question that names the contradiction; never go on
+    as if it hadn't been said;
+  - "it has nothing to do with it", said once: stop that track — don't bring it back in
+    another form;
+  - the user can be wrong too, or caught in a tunnel of their own: then say so plainly,
+    with the fact that contradicts them (a test, a measure, a line of code), and let them
+    decide — never bend what they said to make it fit.
+- **A text written in the user's name** (a bug report, an answer to a user, release notes,
+  a comment): built from the user's own words. Before showing it, check every statement
+  against what the user said or a result both have seen; what can't be traced to them is
+  removed, or shown as Claude's own. Never make a case look like another one (a known bug,
+  a reproduction) to make it more convincing.
 
 ## Architecture (1.2) — set by the user, not negotiable
 
