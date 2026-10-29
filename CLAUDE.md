@@ -3,6 +3,37 @@
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
 
+## How to work — set by the user, not negotiable
+
+- **Code what is asked, exactly.** A problem detected, something to correct, a case the
+  instruction doesn't cover (a device, a pointer, a condition, an exception): say it and ask
+  before coding it — never decide it alone, even when it looks obvious.
+- **An instruction unclear:** reformulate it and wait for the answer — don't interpret.
+- **The full suite:** only when the user says the modifications are finished, or asks for it —
+  never during modifications, never on your own initiative. Meanwhile, targeted tests only.
+- **Never without being asked:** a version bump, a commit, a push, a PR, a merge.
+- **A question or a doubt about what is being done** ("why", "who asked for that"), or an
+  interruption: answering it comes first, before continuing anything. Answer it and stop —
+  no code, no test, no commit until the user gives the next instruction.
+- **What the user observes is a fact, not a hypothesis.** The user sees the card, the device,
+  the browser; Claude doesn't. What the user says they saw weighs as much as a screenshot.
+  Past sessions kept their own idea against the user's repeated observations, until a
+  screenshot stopped them — a tunnel effect (fixation on one explanation, the facts that
+  don't fit it set aside). So:
+  - an observation of the user's that contradicts Claude's idea: the idea is wrong until
+    proven otherwise — drop it, or ask a question that names the contradiction; never go on
+    as if it hadn't been said;
+  - "it has nothing to do with it", said once: stop that track — don't bring it back in
+    another form;
+  - the user can be wrong too, or caught in a tunnel of their own: then say so plainly,
+    with the fact that contradicts them (a test, a measure, a line of code), and let them
+    decide — never bend what they said to make it fit.
+- **A text written in the user's name** (a bug report, an answer to a user, release notes,
+  a comment): built from the user's own words. Before showing it, check every statement
+  against what the user said or a result both have seen; what can't be traced to them is
+  removed, or shown as Claude's own. Never make a case look like another one (a known bug,
+  a reproduction) to make it more convincing.
+
 ## A README is not a changelog — set by the user, not negotiable (said more than ten times)
 
 Three documents, three roles — never mixed. The README answers the user's needs: "how do I use
