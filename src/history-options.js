@@ -113,6 +113,8 @@ const OPTION_SYNONYMS = {
     stateAdaptiveColor: ['state_adaptive_color'],
     largeScreenTooltip: ['large_screen_tooltip'],
     smallScreenTooltip: ['small_screen_tooltip'],
+    largeChartTooltip: ['large_chart_tooltip'],
+    smallChartTooltip: ['small_chart_tooltip'],
     tooltipBehavior  : ['tooltip_behavior'],
     enablePersistence : ['enable_persistence'],
     enableMultidevicePersistence : ['enable_multidevice_persistence'],
@@ -127,10 +129,12 @@ const BLOCK_SYNONYMS = {
     timeTicks: { density: ['timeTickDensity'] },
 };
 const BLOCK_KEY_SYNONYMS = { uiColors: { cursorLine: ['cursorline'], gridLines: ['gridlines'] } };
-// A curve's tooltip options (tooltip.largeScreen, smallScreen, behavior — at every level):
-// the names the card keeps them under (a curve's largeScreenTooltip, smallScreenTooltip:
-// what's saved of it)
-const CURVE_TOOLTIP_KEYS = { largeScreen: 'largeScreenTooltip', smallScreen: 'smallScreenTooltip', behavior: 'tooltipBehavior' };
+// A curve's tooltip options (tooltip.largeScreen, smallScreen, largeChart, smallChart,
+// behavior — at every level): the names the card keeps them under (a curve's
+// largeScreenTooltip, smallScreenTooltip, largeChartTooltip, smallChartTooltip: what's saved
+// of it)
+const CURVE_TOOLTIP_KEYS = { largeScreen: 'largeScreenTooltip', smallScreen: 'smallScreenTooltip', largeChart: 'largeChartTooltip',
+                             smallChart: 'smallChartTooltip', behavior: 'tooltipBehavior' };
 const _isBlock = v => !!v && typeof v === 'object' && !Array.isArray(v);
 
 // How a group of values gives its point (aggregateFunc, see card-datasets.js _aggregate),
@@ -272,6 +276,8 @@ const OPTION_VALUES = {
     groupBy       : v => GROUP_BY.find(f => f === String(v).trim().toLowerCase()),
     largeScreenTooltip : _tooltipMode,
     smallScreenTooltip : _tooltipMode,
+    largeChartTooltip  : _tooltipMode,
+    smallChartTooltip  : _tooltipMode,
     tooltipBehavior    : _tooltipBehavior,
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
@@ -359,7 +365,7 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
-    'largeScreenTooltip', 'smallScreenTooltip', 'tooltipBehavior'];
+    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'tooltipBehavior'];
 
 // A graph's header and values options (see card-graphs.js updateGraphHeader): the graph's,
 // else the card's

@@ -6,6 +6,21 @@ Changelog for the HA History Explorer Card.
 
 ## [Unreleased]
 
+## [v1.2.52] - 2026-10-29
+
+### Added — the tooltip by the card's room
+- Two more tooltip modes per curve, by the card's room: `largeChartTooltip` (a card 600 px wide or more) and `smallChartTooltip` (narrower, and the info panel), `large_chart_tooltip` / `small_chart_tooltip`, in a `tooltip:` block `largeChart` / `smallChart`. Set, the card's room's wins over the screen's — the more precise; no default: unset, the screen's applies. On the card, a graph, an entity or in `entityOptions`; kept on this device only (`tooltipFields`, `resolveTooltipOption`)
+- *Behavior ▸ Tooltip ▸* (a curve's, a graph's, the card's menu) still one line: it sets both the mode of the card's room and the mode of the screen where the card is
+- Tests (`options`): the room's winning over the screen's, on an entity and on a graph; the spellings; a narrow card on a large screen, with and without the room's set; the menu setting both
+
+### Changed — the tooltip by the screen: the window's width
+- `largeScreenTooltip` / `smallScreenTooltip` follow the window's width (small under 640 px: about a 600 px card alone across the screen, with Home Assistant's margins), no longer the card's: every card of a window alike, whatever its width. The info panel is small by its room (`smallChartTooltip`), its screen's as any card's. `tooltipBehavior` still sets the screen's defaults only
+- The tooltip's size (`tooltip.size: auto`) still follows the card's width
+- Tests (`values`, `yaxes`): a hover in a narrow card in a large window — its tooltip set `selected` (`smallChartTooltip`), as the test means
+
+### Changed — the magnifiers' look
+- The glass larger (its ring's outer radius 8.5, inner 6.5, of a 20-unit icon), its handle shorter; the symbol (↔ ↕ ⤢ − +) a little larger, just over the ring; the arrowheads smaller
+
 ### Changed — the documentation's images
 - Every image of README.md and README_Full.md redone with the current card, its scenes kept; new ones for the menus (a curve's, a graph's, a timeline row's, the options menu, the type menu of an entity being added, an entity's attributes), drag and drop (a curve onto another graph, a graph, a timeline row, the Y axis), the tooltip and two Y axes. The images are stored on `main` (`images/screenshots/`), the READMEs pointing there
 - `tools/docs-images/`: the scripts rendering them (the built card against the tests' mocked Home Assistant, realistic entities and histories): `node tools/docs-images/render.cjs [scene…]`

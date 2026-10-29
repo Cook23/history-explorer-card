@@ -196,7 +196,8 @@ module.exports = async function()
     // Where curve 0 (power, left axis) and curve 1 (rain, right axis) are drawn: a value's height of each
     const drawn = () => t.E(`[0,1].map(i=>{ const d=graphAt(0).chart.getDatasetMeta(i).data.filter(p=>!p._model.skip); return Math.round(d[Math.floor(d.length/2)]._model.y); })`);
 
-    t = await openCard(twoAxes, { height: 800, mock: { series: true } });
+    // (a narrow card's tooltip: selected — a hover shows the dot, never the tooltip)
+    t = await openCard({ ...twoAxes, smallChartTooltip: 'selected' }, { height: 800, mock: { series: true } });
     await narrow();
     await t.step('labels inside: a column along each axis\' labels, as wide as their boxes and the pointer\'s precision', async () => {
         const r = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, m=c._hecInsideLabelColumns('mouse'), f=c._hecInsideLabelColumns('touch'), b=c.scales['y-axis-0']._hecLabelBoxes||[];

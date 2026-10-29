@@ -107,6 +107,8 @@ const ENTITY_FIELD_SCOPE = {
     showPoints    : 'local',
     largeScreenTooltip : 'local',
     smallScreenTooltip : 'local',
+    largeChartTooltip  : 'local',
+    smallChartTooltip  : 'local',
     showMinMax    : 'devices',
     unit          : 'devices',
     process       : 'devices',

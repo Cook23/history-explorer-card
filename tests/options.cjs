@@ -259,6 +259,37 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── small/largeChartTooltip, by the card's room, win over small/largeScreenTooltip, by the
+    // window, when set — at any level, under any spelling; the menu sets both where the card
+    // is ──
+    {
+        const modes = async (cfg, width) => {
+            const t = await openCard(card(cfg), { mock: { series: true },
+                init: width ? `document.addEventListener("DOMContentLoaded",()=>document.getElementById("host").style.width="${width}px");` : '' });
+            const m = await t.E(`el.instance.graphs.map(g => g.chart.data.datasets.map(d => d.hecTooltip).join('+')).join(' | ')`);
+            done(await t.close());
+            return m;
+        };
+        const two = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] };
+        const r = {
+            chartWins: await modes({ ...two, largeScreenTooltip: 'all', largeChartTooltip: 'nearest' }),
+            graphChart: await modes({ largeScreenTooltip: 'all', graphs: [{ type: 'line', options: { largeChartTooltip: 'selected' }, entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }),
+            spellings: await modes({ tooltip: { largeChart: 'nearest' }, entityOptions: { 'sensor.rain': { large_chart_tooltip: 'all' } }, ...two }),
+            smallCardScreen: await modes({ ...two, largeScreenTooltip: 'all', largeChartTooltip: 'selected' }, 400),
+            smallCardChart: await modes({ ...two, largeScreenTooltip: 'all', smallChartTooltip: 'nearest' }, 400),
+        };
+        t = await openCard(card(two), { mock: { series: true } });
+        await t.step('largeChartTooltip / smallChartTooltip (the card\'s room) win over largeScreenTooltip / smallScreenTooltip (the window) when set, at every level and spelling; a card under 600 px in a large window: smallChartTooltip, else largeScreenTooltip', async () =>
+            r.chartWins === 'nearest | nearest' && r.graphChart === 'selected | all' && r.spellings === 'nearest | all'
+            && r.smallCardScreen === 'all | all' && r.smallCardChart === 'nearest | nearest' ? true : JSON.stringify(r));
+        await t.step('the menu sets the mode of both options where the card is: largeChartTooltip and largeScreenTooltip here', async () => {
+            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'all');
+                const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, e.smallChartTooltip, e.smallScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
+            return v === 'all,all,,,all' ? true : v;
+        });
+        done(await t.close());
+    }
+
     // ── The options' base names (blocks with several options, camelCase) and their
     // synonyms: each old spelling giving the same value; the base name winning over it ──
     {

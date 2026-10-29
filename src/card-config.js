@@ -118,7 +118,7 @@ export class CardConfig
         P.tapAction =              c.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', 'largeScreenTooltip', 'smallScreenTooltip', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', 'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card;
         // a graph's options the card doesn't set, their defaults)
@@ -243,6 +243,15 @@ export class CardConfig
     resolveOption(e, k)
     {
         return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
+    }
+
+    // The tooltip's mode of entity e from fields (card-charts.js tooltipFields): its room's
+    // option (fields.chart) when set — the more precise —, else its screen's (fields.screen);
+    // each its own, else its graph's, its entityOptions', the card's, else (the screen's only)
+    // its default (resolveOption)
+    resolveTooltipOption(e, fields)
+    {
+        return this.resolveOption(e, fields.chart) ?? this.resolveOption(e, fields.screen);
     }
 
     // Option k of the graph of group groupId (its header, its values — GRAPH_HEADER_KEYS):
@@ -403,6 +412,8 @@ export class CardConfig
             showPoints        : ent.showPoints,
             largeScreenTooltip: ent.largeScreenTooltip,
             smallScreenTooltip: ent.smallScreenTooltip,
+            largeChartTooltip : ent.largeChartTooltip,
+            smallChartTooltip : ent.smallChartTooltip,
             showMinMax        : ent.showMinMax,
             showState         : ent.showState,
             showStats         : ent.showStats,
@@ -566,6 +577,8 @@ export class CardConfig
                 showPoints     : _opts.showPoints,
                 largeScreenTooltip : _opts.largeScreenTooltip,
                 smallScreenTooltip : _opts.smallScreenTooltip,
+                largeChartTooltip  : _opts.largeChartTooltip,
+                smallChartTooltip  : _opts.smallChartTooltip,
                 netBars        : _opts.netBars,
                 yAxis          : _opts.yAxis,
                 rounding       : _opts.rounding,

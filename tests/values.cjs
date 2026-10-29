@@ -182,7 +182,8 @@ module.exports = async function()
     done(await t.close());
 
     // ── A hover: the value it's on in its curve's place, texts cut shown in full, the Y labels near it opaque ──
-    t = await openCard(card({ look: 'mini', showStateFor: 'all', showStatsFor: 'all', showStats: ['min', 'max'], graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', name: 'Rafales du vent mesurées au sommet du mât' },
+    // (a narrow card's tooltip: selected — a hover shows the dot and its value, never the tooltip)
+    t = await openCard(card({ look: 'mini', smallChartTooltip: 'selected', showStateFor: 'all', showStatsFor: 'all', showStats: ['min', 'max'], graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', name: 'Rafales du vent mesurées au sommet du mât' },
         { entity: 'sensor.power2', name: 'Vitesse moyenne du vent mesurée au sommet du mât' }] }] }), { mock: { series: true }, height: 700 });
     await t.E(`(()=>{ document.body.style.width='200px'; document.getElementById('host').style.width='200px'; })()`); await t.wait(1500);
     const first = () => t.E(`(()=>{ const s=graphAt(0).chart._hecValuesEl.querySelector('.hec-state[data-curve="0"]'); return { text: s.textContent, time: !!s.querySelector('.hec-time') }; })()`);
