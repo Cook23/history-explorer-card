@@ -354,11 +354,16 @@ tooltip:
   # Similar to $.stateTextMode config, but for the tooltip, defaults to matching $.stateTextMode, or auto
   stateTextMode: "auto"
 
-  # Each curve's tooltip mode on a large screen (a card 600 px wide or more): mixed (the default), nearest, selected
-  # or all — and on a small one (narrower, and the info panel): selected by default
-  # Also settable in $.entityOptions, on a graph and on an entity, in their own tooltip: block
+  # Each curve's tooltip mode on a large screen (a window 640 px wide or more): mixed (the default), nearest,
+  # selected or all — and on a small one (narrower): selected by default
   largeScreen: "mixed"
   smallScreen: "selected"
+
+  # The same by the card's room, winning over the screen's when set: in a card 600 px wide or more, and in a
+  # narrower one or the info panel. No default: unset, the screen's applies
+  # All four also settable in $.entityOptions, on a graph and on an entity, in their own tooltip: block
+  # largeChart: "all"
+  # smallChart: "selected"
 
   # Changes the default of largeScreen and smallScreen: selected, nearest, mixed or all, on both screens — auto (the
   # default) leaves theirs. Also settable in $.entityOptions, on a graph and on an entity

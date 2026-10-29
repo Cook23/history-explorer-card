@@ -159,18 +159,23 @@ A click or a tap near a curve puts that curve in the tooltip, which shows the va
 
 The tooltip then moves to the value pointed at as the mouse — or a pen held above the screen, in the browsers that report it — moves over the curves; away from every value it stays where it is, and fades out after its reading time. Beside its point, it stands behind the pointer's move when there is room: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new value, kept while it stays on it; with a finger, on the side of the point away from the graph's nearest edge; with no room on either side, above or below. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
 
-**Which values it shows** is each curve's tooltip mode — `tooltip.largeScreen` on a large screen (a card 600 px wide or more), `tooltip.smallScreen` on a small one (narrower, and the info panel), set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets the mode of the screen the card is on — the last one to speak winning, kept on this device only:
+**Which values it shows** is each curve's tooltip mode, set by the screen or by the card's room:
+- by the screen: `tooltip.largeScreen` in a window 640 px wide or more, `tooltip.smallScreen` in a narrower one — every card of the window alike, whatever its width;
+- by the card's room: `tooltip.largeChart` in a card 600 px wide or more, `tooltip.smallChart` in a narrower one and in the info panel. When set, it wins over the screen's; unset (the default), the screen's applies.
+
+Each is set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets both the mode of the card's room and the mode of the screen where the card is — so, the room's winning, a mode chosen from a menu follows the card's room; the screen's applies where the room's isn't set (the same curve in a card of the other size). The last one to speak wins, kept on this device only:
 - `selected` — the default on a small screen: the curves clicked; a hover alone shows the dot of the value nearest it, never the tooltip;
 - `nearest` — the value pointed at, on any curve, at a hover too, without a click;
 - `mixed` — the default on a large screen: that value and the curves clicked;
 - `all` — that value and, for each other curve of the graph, its value at the same time — or the nearest one, a few pixels away at most (each other row's or series' element, on timelines and bars).
 
-A click opens it in every mode — a finger has no hover. `tooltip.behavior` changes the default of `tooltip.largeScreen` and `tooltip.smallScreen` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs. It can be set at the same levels:
+A click opens it in every mode — a finger has no hover. `tooltip.behavior` changes the default of `tooltip.largeScreen` and `tooltip.smallScreen` — `selected`, `nearest`, `mixed` or `all`, on both screens; `auto`, the default, leaves theirs. `tooltip.largeChart` and `tooltip.smallChart` have no default. They can be set at the same levels:
 
 ```yaml
 tooltip:
   behavior: nearest      # every curve, on both screens, unless a screen's mode is set
   largeScreen: all       # on a large screen: all
+  smallChart: selected   # in a narrow card and in the info panel: selected, whatever the screen
 ```
 
 **Its size** (`tooltip.size`) — every tooltip has the same layout, in one of three sizes:
@@ -1340,7 +1345,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden`, `showPoints` and the tooltip modes are never synced across devices: `enableMultidevicePersistence` keeps them on this device only, as `enablePersistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden`, `showPoints` and the tooltip modes are never synced across devices: `enableMultidevicePersistence` keeps them on this device only, as `enablePersistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a purely dynamic card, see above).
 
@@ -1417,8 +1422,10 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `showLine` | boolean | `show_line` | | `false`: its points only, no line between them |
 | `showGraph` | boolean | `show_graph` | `show.graph: bar` / `line`: drawn | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line modes](#line-modes) |
-| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a card 600 px wide or more): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
-| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a card narrower than 600 px, and the info panel): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
+| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a window 640 px wide or more), unless the card's room has its own (`tooltip.largeChart`, `tooltip.smallChart`): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
+| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
+| `tooltip.largeChart` | string | `largeChartTooltip`, `large_chart_tooltip` | | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card; kept on this device only |
+| `tooltip.smallChart` | string | `smallChartTooltip`, `small_chart_tooltip` | | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card |
 | `tooltip.behavior` | string | `tooltipBehavior`, `tooltip_behavior` | | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
 | `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |

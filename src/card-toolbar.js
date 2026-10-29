@@ -248,8 +248,9 @@ export class CardToolbar
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
             this.fitToCardWidth();
-            // (a card crossing SMALL_SCREEN_PX: its curves' tooltip as that screen's)
-            if( this._tooltipField !== this.tooltipField() ) { this._tooltipField = this.tooltipField(); this.applyTooltipModes(); }
+            // (a card crossing SMALL_CHART_PX, a window SMALL_SCREEN_PX: its curves' tooltip as there)
+            const _tf = Object.values(this.tooltipFields()).join();
+            if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipModes(); }
             const _tbEl = this._this.querySelector('#tb_0');
             if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
         }

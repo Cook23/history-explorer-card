@@ -114,10 +114,10 @@ export function optionsMenuHtml(i)
 // (↕), both (⤢) — and the zoom buttons' beside the range selector: out (−), in (+)
 // (the symbol larger than the glass's hole, over its ring: the glass grey, the symbol in the
 // text's color stands out)
-const _ZOOM_BOX_SYMBOLS = { x: 'M5,9.5H14M5,9.5L7.7,6.8M5,9.5L7.7,12.2M14,9.5L11.3,6.8M14,9.5L11.3,12.2',
-                            y: 'M9.5,5V14M9.5,5L6.8,7.7M9.5,5L12.2,7.7M9.5,14L6.8,11.3M9.5,14L12.2,11.3',
-                            xy: 'M6.05,12.95L12.95,6.05M12.95,6.05H9.5M12.95,6.05V9.5M6.05,12.95H9.5M6.05,12.95V9.5',
-                            out: 'M5,9.5H14', in: 'M5,9.5H14M9.5,5V14' };
+const _ZOOM_BOX_SYMBOLS = { x: 'M4.18,9.5H14.82M4.18,9.5L6.38,7.3M4.18,9.5L6.38,11.7M14.82,9.5L12.62,7.3M14.82,9.5L12.62,11.7',
+                            y: 'M9.5,4.18V14.82M9.5,4.18L7.3,6.38M9.5,4.18L11.7,6.38M9.5,14.82L7.3,12.62M9.5,14.82L11.7,12.62',
+                            xy: 'M5.42,13.58L13.58,5.42M13.58,5.42H10.77M13.58,5.42V8.23M5.42,13.58H8.23M5.42,13.58V10.77',
+                            out: 'M4.18,9.5H14.82', in: 'M4.18,9.5H14.82M9.5,4.18V14.82' };
 // A magnifier's colors: its glass grey, its symbol in the text's color — or both in color —,
 // outlined in the background's (--hec-mag-bg: the toolbar's, opaque — see _paintMagnifiers)
 const _GLASS = 'var(--secondary-text-color)', _SYMBOL = 'var(--primary-text-color)';
@@ -147,7 +147,7 @@ export function magnifierSvg(mode, color, size = 24)
 {
     const _d = _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy, _w = _magnifierStrokes(size);
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:middle;">` +
-        `<path fill="${color ?? _GLASS}" d="M15.5,14L20.5,19L19,20.5L14,15.5V14.71L13.73,14.43C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.43,13.73L14.71,14H15.5M9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14Z" />` +
+        `<path fill="${color ?? _GLASS}" d="M15.9,14.27L19.22,17.6L17.6,19.22L14.27,15.9ZM9.5,1A8.5,8.5 0 1,1 9.5,18A8.5,8.5 0 1,1 9.5,1ZM9.5,3A6.5,6.5 0 1,0 9.5,16A6.5,6.5 0 1,0 9.5,3Z" />` +
         `<path fill="none" stroke="${_OUTLINE}" stroke-width="${_w.outline}" stroke-linecap="round" d="${_d}" />` +
         `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
 }

@@ -19,10 +19,15 @@ export const RIGHT_Y_AXIS = 'y-axis-1';
 // _yLabelsInside), their text a little smaller (NARROW_FONT_PX)
 export const NARROW_CARD_PX = 300;
 
-// A card narrower than this (px) is on a small screen — a phone, or a part of a screen no
-// wider —: its curves' tooltip follows smallScreenTooltip, else largeScreenTooltip (see
-// tooltipModeOf); the info panel is always on a small screen
-const SMALL_SCREEN_PX = 600;
+// A card narrower than this (px) has little room: its curves' tooltip follows
+// smallChartTooltip, else largeChartTooltip (see tooltipModeOf)
+const SMALL_CHART_PX = 600;
+// A window narrower than this (px) is a small screen: its curves' tooltip follows
+// smallScreenTooltip, else largeScreenTooltip — about a card SMALL_CHART_PX wide when it's
+// the only one across the screen, Home Assistant's margins around it (an order of size, not
+// every layout's exact width). The info panel is always small by its room, its screen's
+// as any card's
+const SMALL_SCREEN_PX = 640;
 // Where a bar graph's interval selector is: this far from the graph's right edge (px)
 // The graphs' text, in px: Chart.js's own (12), a timeline's states (13); on a narrow card,
 // a little smaller; the Y labels drawn inside the plot at mini-graph-card's size, its
@@ -487,7 +492,7 @@ export class CardCharts
     }
 
     // The card's width (px): what every choice made from it reads — narrow (NARROW_CARD_PX),
-    // a small screen (SMALL_SCREEN_PX), the toolbar's forms, the time labels, a menu's room;
+    // little room (SMALL_CHART_PX), the toolbar's forms, the time labels, a menu's room;
     // 0 before it's laid out
     cardWidth()
     {
@@ -500,24 +505,24 @@ export class CardCharts
         return ( this.cardWidth() || Infinity ) < NARROW_CARD_PX;
     }
 
-    // The option the curves' tooltip follows on the screen the card is on now: the info
-    // panel's, or a card narrower than SMALL_SCREEN_PX — smallScreenTooltip —, else
+    // The options the curves' tooltip follows where the card is now: by its room — the info
+    // panel, or a card narrower than SMALL_CHART_PX: smallChartTooltip, else largeChartTooltip
+    // —, by the screen — a window narrower than SMALL_SCREEN_PX: smallScreenTooltip, else
     // largeScreenTooltip
-    tooltipField()
+    tooltipFields()
     {
         const _w = this.cardWidth() || Infinity;
-        return this.infoPanel || _w < SMALL_SCREEN_PX ? 'smallScreenTooltip' : 'largeScreenTooltip';
+        return { chart: this.infoPanel || _w < SMALL_CHART_PX ? 'smallChartTooltip' : 'largeChartTooltip',
+                 screen: window.innerWidth < SMALL_SCREEN_PX ? 'smallScreenTooltip' : 'largeScreenTooltip' };
     }
 
-    // How entity e's curve enters its graph's tooltip, on the screen the card is on now
-    // (tooltipField) — its own mode, else its graph's, its entityOptions', the card's, else
-    // that screen's default (resolveOption): 'selected' — once a click on it selected it —,
-    // 'nearest' — while it's the curve nearest the pointer —, 'mixed' — either —, 'all' —
-    // whenever a curve is that near (Chart.js hecTooltip)
+    // How entity e's curve enters its graph's tooltip where the card is now (tooltipFields):
+    // the mode set for its room when there's one — the more precise —, else the one for the
+    // screen (resolveTooltipOption): 'selected' — once a click on it selected it —,
+    // 'nearest' — while it's the curve nearest the pointer —, 'mixed' — either —, 'all' — whenever a curve is that near (Chart.js hecTooltip)
     tooltipModeOf(e)
     {
-        const _f = this.tooltipField();
-        return this.resolveOption(e, _f);
+        return this.resolveTooltipOption(e, this.tooltipFields());
     }
 
     // Graph g's curves given their tooltip mode as it is now (tooltipModeOf) — each graph's
@@ -562,7 +567,7 @@ export class CardCharts
 
     // Each graph's Y labels placed, its text sized, its controls laid out and its tooltip
     // sized as the card's width now says (_yLabelsInside, _textSizes, _controlsBackdrop,
-    // tooltipSize) — when the card crosses NARROW_CARD_PX or SMALL_SCREEN_PX
+    // tooltipSize) — when the card crosses NARROW_CARD_PX or SMALL_CHART_PX
     fitToCardWidth()
     {
         const _sizes = this._textSizes();
@@ -591,14 +596,14 @@ export class CardCharts
     }
 
     // The size of the tooltips (tooltip.size): 'full', 'compact' or 'slim' — 'auto' as the
-    // card's width now says: full on a large screen (SMALL_SCREEN_PX), compact on a small one
+    // card's width now says: full with room (SMALL_CHART_PX), compact with little
     // (and in the info panel), slim on a narrow card (NARROW_CARD_PX)
     tooltipSize()
     {
         const s = this.pconfig.tooltipSize;
         if( s === 'full' || s === 'compact' || s === 'slim' ) return s;
         const _w = this.cardWidth() || Infinity;
-        return _w < NARROW_CARD_PX ? 'slim' : this.infoPanel || _w < SMALL_SCREEN_PX ? 'compact' : 'full';
+        return _w < NARROW_CARD_PX ? 'slim' : this.infoPanel || _w < SMALL_CHART_PX ? 'compact' : 'full';
     }
 
     // The tooltip of a chart — every type alike, as a curve's —, as its size says
