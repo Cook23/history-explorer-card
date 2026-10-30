@@ -36,6 +36,33 @@ Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split 
   removed, or shown as Claude's own. Never make a case look like another one (a known bug,
   a reproduction) to make it more convincing.
 
+## Versions — set by the user, not negotiable
+
+- **The version is in the source and shown on the card.** Its number is written in the source
+  (and so in the built file) and shown in the card's title (`History explorer v1.1.56`), so as
+  to be sure which version is running despite the browser's cache. A wrong number there is a
+  wrong version for the user.
+- **A release publishes the merged files as they are.** The user releases the line's branch,
+  under the version it carries; the release changes nothing in the files. So every merge must
+  be publishable as is: its version number, CHANGELOG and docs final — no build number, no
+  `[Unreleased]`, nothing left to fix at the release.
+- **The version number is the last release's + 1.** Before each merge, check on GitHub which
+  version was released last (its releases) and which versions are dead (its tags: a tag
+  without a release); the version merged — everywhere it's written: `package.json`, the source `src/history-explorer-card.js`, the built `history-explorer-card.js` and
+  the CHANGELOG — must be the last release + 1, past any dead version (`1.1.55` released → `1.1.56`). Several merges can carry
+  it, until the user releases it. A released number is never carried again.
+- **A dead version.** The user says when a version is dead (GitHub sometimes fails a release):
+  the version goes to the next number — everywhere it's written (`package.json`, the source `src/history-explorer-card.js`, the built `history-explorer-card.js`), the CHANGELOG (its section takes
+  the new number), the docs if they name it — and a new merge is made; the dead one is meant
+  never to have existed. On GitHub it shows as a discrepancy: the last tag exists, its release
+  doesn't. Seeing that discrepancy without the user having said so: ask them whether that
+  version is dead, before merging.
+- **The CHANGELOG's section is the version's number** (`## [v1.1.56] - 2026-10-12`), released or not — never
+  `[Unreleased]`. Whether a version is released is on GitHub (its releases), not in the files.
+- **Build numbers** (`1.1.56b1`, `b2`…) only in Claude's working copy and in discussions with
+  the user — never merged: not in `package.json`, `src/history-explorer-card.js`, the built `history-explorer-card.js`, the CHANGELOG, the docs, a code comment, or a commit
+  or PR title.
+
 ## A README is not a changelog — set by the user, not negotiable (said more than ten times)
 
 Three documents, three roles — never mixed. The README answers the user's needs: "how do I use
