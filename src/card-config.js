@@ -254,6 +254,13 @@ export class CardConfig
         return this.resolveOption(e, fields.chart) ?? this.resolveOption(e, fields.screen);
     }
 
+    // The option giving entity e's tooltip mode from fields (resolveTooltipOption): its room's
+    // when set at any level, else its screen's — the one a menu choice changes
+    tooltipFieldOf(e, fields)
+    {
+        return this.resolveOption(e, fields.chart) != null ? fields.chart : fields.screen;
+    }
+
     // Option k of the graph of group groupId (its header, its values — GRAPH_HEADER_KEYS):
     // the graph's, else the card's, else its default (OPTION_DEFAULTS)
     graphOption(groupId, k)

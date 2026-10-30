@@ -163,7 +163,7 @@ The tooltip then moves to the value pointed at as the mouse — or a pen held ab
 - by the screen: `tooltip.largeScreen` in a window 640 px wide or more, `tooltip.smallScreen` in a narrower one — every card of the window alike, whatever its width;
 - by the card's room: `tooltip.largeChart` in a card 600 px wide or more, `tooltip.smallChart` in a narrower one and in the info panel. When set, it wins over the screen's; unset (the default), the screen's applies.
 
-Each is set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets both the mode of the card's room and the mode of the screen where the card is — so, the room's winning, a mode chosen from a menu follows the card's room; the screen's applies where the room's isn't set (the same curve in a card of the other size). The last one to speak wins, kept on this device only:
+Each is set on the card, a graph, an entity or in `entityOptions`, or from a menu: *Behavior ▸ Tooltip ▸* of a curve, of a graph (all its curves) or of the card's options menu (every curve), which sets the one giving each curve's mode where the card is: the card's room's when it's set (at any level), else the screen's — so, by default, a mode chosen from a menu follows the window's size. The last one to speak wins, kept on this device only:
 - `selected` — the default on a small screen: the curves clicked; a hover alone shows the dot of the value nearest it, never the tooltip;
 - `nearest` — the value pointed at, on any curve, at a hover too, without a click;
 - `mixed` — the default on a large screen: that value and the curves clicked;
@@ -1422,10 +1422,10 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `showLine` | boolean | `show_line` | | `false`: its points only, no line between them |
 | `showGraph` | boolean | `show_graph` | `show.graph: bar` / `line`: drawn | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line modes](#line-modes) |
-| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a window 640 px wide or more), unless the card's room has its own (`tooltip.largeChart`, `tooltip.smallChart`): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen; kept on this device only |
-| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen |
-| `tooltip.largeChart` | string | `largeChartTooltip`, `large_chart_tooltip` | | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card; kept on this device only |
-| `tooltip.smallChart` | string | `smallChartTooltip`, `small_chart_tooltip` | | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card |
+| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a window 640 px wide or more), unless the card's room has its own (`tooltip.largeChart`, `tooltip.smallChart`): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
+| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
+| `tooltip.largeChart` | string | `largeChartTooltip`, `large_chart_tooltip` | | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
+| `tooltip.smallChart` | string | `smallChartTooltip`, `small_chart_tooltip` | | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
 | `tooltip.behavior` | string | `tooltipBehavior`, `tooltip_behavior` | | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
 | `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
@@ -1758,6 +1758,8 @@ hour24: true
 ### Changing the horizontal time tick density
 
 By default, time tick density is automatic and adjusts to the width of your screen. That's always a compromise between looking good (no clipping), being readable at all screen sizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
+
+The year of the window's left end is shown in bold, in the margin left of the plot, on the line of the time labels — on every graph that shows its time labels and has room for it there (none when its Y labels are inside the plot, as on a narrow card). When the axis already shows that year at its left end (a window ticked by month starting on 1 January), the margin shows none.
 
 ```yaml
 timeTicks:

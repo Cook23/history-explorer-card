@@ -430,6 +430,51 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // A label in the margin left of the plot, on the line of the time labels (an X axis'
+  // ticks.hecLeftLabel(min): its text for the axis' left end — the card's: its year), in
+  // the font of the major ones (the days'): right of the margin, clear of the first time
+  // label; none where it doesn't fit, nor when the first time label is that text already (a
+  // month axis' year at its left end: the year twice side by side)
+  Chart.plugins.register({
+    id: 'hecLeftLabel',
+    afterDatasetsDraw: function (chart) {
+      var _area = chart.chartArea;
+      helpers.each(chart.scales, function (xs) {
+        var o = xs.options.ticks, f = o && o.hecLeftLabel;
+        if (!f || !xs.isHorizontal() || xs.options.position !== 'bottom' || !o.display) return;
+        var _text = f(xs.min);
+        if (!_text) return;
+        var ctx = chart.ctx, gd = Chart.defaults.global, m = o.major || {};
+        var _font = function (t) {
+          return helpers.fontString(helpers.valueOrDefault(t.fontSize, gd.defaultFontSize), helpers.valueOrDefault(t.fontStyle, gd.defaultFontStyle),
+            helpers.valueOrDefault(t.fontFamily, gd.defaultFontFamily));
+        };
+        ctx.save();
+        // (the first time label drawn — the ticks skipped have none —: its left edge)
+        var _right = _area.left - 4;
+        var _ticks = xs.getTicks();
+        for (var i = 0; i < _ticks.length; i++) {
+          if (helpers.isNullOrUndef(_ticks[i].label)) continue;
+          ctx.font = _font(_ticks[i].major ? m : o);
+          var _x = xs.getPixelForTick(i);
+          if (_x < _area.left - 1) continue;
+          if (String(_ticks[i].label) === _text) { ctx.restore(); return; }
+          _right = Math.min(_right, _x - ctx.measureText(String(_ticks[i].label)).width / 2 - 6);
+          break;
+        }
+        ctx.font = _font(m);
+        if (ctx.measureText(_text).width > _right - 2) { ctx.restore(); return; }
+        var _tl = xs.options.gridLines.drawTicks ? xs.options.gridLines.tickMarkLength : 0;
+        if (chart._hecLabelsAlphaOf) ctx.globalAlpha *= chart._hecLabelsAlphaOf(xs);
+        ctx.fillStyle = helpers.valueOrDefault(m.fontColor, gd.defaultFontColor);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        ctx.fillText(_text, _right, xs.top + _tl + o.padding);
+        ctx.restore();
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Cursor line — options.plugins.hecCursorLine { show, shared, color }: while the
   // pointer is over the plot area of a chart whose show is true, a vertical line under it
   // — on that chart, or with shared on every chart of its dragScope, at the same x

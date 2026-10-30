@@ -6,6 +6,18 @@ Changelog for the HA History Explorer Card.
 
 ## [Unreleased]
 
+### Added — the year in the margin
+- On every graph showing its time labels, the year of the window's left end in the margin left of the plot, on the line of the time labels, in bold as the days; right-aligned against the plot, clear of the first time label; none where it doesn't fit (the Y labels inside the plot, a narrow card), nor when the axis' first label is that year already (a month axis starting on 1 January: the year twice side by side). Chart.js `ticks.hecLeftLabel` (plugin `hecLeftLabel`, `deps/Chart Custom.js.md`), the card giving the year
+- Tests (`features`): the year (2025 for a window from December 2025 to January 2026) on a curves' graph and a timeline, bold, in the margin, on the time labels' line; a narrow card: none on the curves' graph, the timeline's kept; `showTimeLabels: false`: none; a month axis from 25 December 2025: 2026 on the axis, 2025 in the margin; from 1 January 2026: 2026 on the axis only
+
+### Changed — the magnifiers centred
+- Every magnifier's drawing 2 px lower and 1 px to the right in its box (the drawing in the top left of its 24 units): centred in the toolbar
+
+### Changed — the tooltip menu sets the option that acts
+- *Behavior ▸ Tooltip ▸* (a curve's, a graph's, the card's menu) sets, for each curve, only the option giving its mode where the card is: its room's (`largeChartTooltip` / `smallChartTooltip`) when set at any level — the curve's own then —, else its screen's (`largeScreenTooltip` / `smallScreenTooltip`); no longer both (`tooltipFieldOf`)
+- Tests (`options`): no room's mode set: the screen's alone; a room's set on the graph: the curve's own room's, its screen's untouched; a tooltip mode chosen from the menu kept after a reload
+- The info panel's comment on its tooltip: small by its room (`smallChartTooltip`)
+
 ## [v1.2.52] - 2026-10-29
 
 ### Added — the tooltip by the card's room

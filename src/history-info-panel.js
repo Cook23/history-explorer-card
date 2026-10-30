@@ -137,7 +137,7 @@ function hxHookInfoPanel()
     {
         instance.initLocalization();
 
-        // (always on a small screen: its curve's tooltip as smallScreenTooltip says)
+        // (always small by its room: its curve's tooltip as smallChartTooltip says, else its screen's)
         instance.infoPanel = true;
 
         // (the toolbar's buttons and range selector: the card's markup)

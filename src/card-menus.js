@@ -142,11 +142,13 @@ export function paintMagnifier(svg, mode, color)
 }
 
 // The magnifier of mode (ZOOM_BOX_MODES, or 'out', 'in'), size px wide: its glass and handle
-// grey, its mode's symbol over the glass in the text's color — or both in color —, outlined
+// grey, its mode's symbol over the glass in the text's color — or both in color —, outlined;
+// drawn 2 px lower and 1 px to the right in its box (the drawing in the top left of its 24
+// units: centred, about)
 export function magnifierSvg(mode, color, size = 24)
 {
     const _d = _ZOOM_BOX_SYMBOLS[mode] ?? _ZOOM_BOX_SYMBOLS.xy, _w = _magnifierStrokes(size);
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:middle;">` +
+    return `<svg width="${size}" height="${size}" viewBox="${-24 / size} ${-2 * 24 / size} 24 24" style="vertical-align:middle;">` +
         `<path fill="${color ?? _GLASS}" d="M15.9,14.27L19.22,17.6L17.6,19.22L14.27,15.9ZM9.5,1A8.5,8.5 0 1,1 9.5,18A8.5,8.5 0 1,1 9.5,1ZM9.5,3A6.5,6.5 0 1,0 9.5,16A6.5,6.5 0 1,0 9.5,3Z" />` +
         `<path fill="none" stroke="${_OUTLINE}" stroke-width="${_w.outline}" stroke-linecap="round" d="${_d}" />` +
         `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
