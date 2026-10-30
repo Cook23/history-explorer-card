@@ -112,6 +112,60 @@ module.exports = async function()
         return entries === 'Pen events,Performance' && title === 'Pen events' && /^yes/.test(check) && /free\s+pointerdown\s+pen/.test(log) && /pointerup .* d=0px max=0px \d+ms/.test(log) && !menuOpen && gone
             ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
     });
+    await t.step('Tests ▸ Pen events: the time between two hover moves, each kind of event apart (pointermove, pointerrawupdate, mousemove)', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        // (3 hover moves, each a pointerrawupdate, a pointermove and a mousemove, 50 ms apart)
+        for( let i = 0; i < 3; i++ ) {
+            await t.E(`(()=>{ const p=${dlg}.shadowRoot.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
+                p.dispatchEvent(new PointerEvent('pointerrawupdate', o)); p.dispatchEvent(new PointerEvent('pointermove', o)); p.dispatchEvent(new MouseEvent('mousemove', { buttons: 0, bubbles: true })); })()`);
+            await t.wait(50);
+        }
+        const gaps = await t.E(`${dlg}.shadowRoot.getElementById('gaps').textContent`);
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        const ok = ['pointermove', 'pointerrawupdate', 'mousemove'].every(k => new RegExp('^' + k + ': 2 gaps: mean \\d+ms', 'm').test(gaps));
+        return ok ? true : gaps;
+    });
+    await t.step('Tests ▸ Pen events: hover gaps in two regimes (moving fast, nearly still): each one\'s share, mean and standard deviation; one regime: no split', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        // (pointermove: 30 moves 20 ms apart, then 10 moves 130 ms apart — the clock driven by hand)
+        const r = await t.E(`(()=>{ const p=${dlg}.shadowRoot.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
+            const _now=performance.now; let t=0; performance.now=()=>t;
+            const move=()=>p.dispatchEvent(new PointerEvent('pointermove', o));
+            for( let i=0;i<30;i++ ){ move(); t+=18+(i%5); }
+            for( let i=0;i<10;i++ ){ move(); t+=125+(i%4)*3; }
+            const two=${dlg}.shadowRoot.getElementById('gaps').textContent;
+            ${dlg}.shadowRoot.getElementById('clear').click();
+            for( let i=0;i<40;i++ ){ move(); t+=18+(i%5); }
+            const one=${dlg}.shadowRoot.getElementById('gaps').textContent;
+            performance.now=_now; return { two, one }; })()`);
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        return /two regimes — fast: 30 gaps \(77 %\): mean 20ms.*slow: 9 gaps \(23 %\): mean 1[23]\dms/.test(r.two) && !/two regimes/.test(r.one) ? true : JSON.stringify(r);
+    });
+    await t.step('Tests ▸ Pen events: "Copy the stats" copies the stats only; "Clear all, start again" clears everything, its clock back to 0', async () => {
+        await t.longPress(await t.E('legendPt(0,0)'));
+        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(1200);
+        const r = await t.E(`(async()=>{ const d=${dlg}.shadowRoot, p=d.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
+            for( let i=0;i<3;i++ ){ p.dispatchEvent(new PointerEvent('pointermove', o)); await new Promise(r=>setTimeout(r,30)); }
+            let copied=null; const _c=navigator.clipboard; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copied=t; return Promise.resolve(); } } });
+            d.getElementById('copyStats').click(); await new Promise(r=>setTimeout(r,50));
+            Object.defineProperty(navigator, 'clipboard', { configurable: true, value: _c });
+            const hint=d.getElementById('statsHint').textContent;
+            d.getElementById('restart').click();
+            const cleared={ gaps: d.getElementById('gaps').textContent, log: d.getElementById('log').textContent, yes: d.querySelectorAll('#checks .yes').length };
+            p.dispatchEvent(new PointerEvent('pointerdown', { ...o, buttons: 1, button: 0 })); await new Promise(r=>setTimeout(r,200));
+            const logText=d.getElementById('log').textContent;
+            return { copied, hint, cleared, logText: logText.slice(0,80) }; })()`);
+        r.first = parseInt(r.logText, 10);
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        const ok = /^Hover, time between two moves:\npointermove: 2 gaps/.test(r.copied) && !/YES|Device|pointerdown/.test(r.copied) && r.hint === 'Copied.'
+            && r.cleared.gaps === '— no hover yet —' && r.cleared.log === '' && r.cleared.yes === 0 && r.first < 300;
+        return ok ? true : JSON.stringify(r);
+    });
     await t.step('Tests ▸ Performance: the graphs drawn again, the window loaded again, the real time — each timed in its report, the page\'s freezes counted', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);

@@ -63,6 +63,31 @@ Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split 
   the user — never merged: not in `package.json`, `src/version.js`, the built `history-explorer-card.js`, the CHANGELOG, the docs, a code comment, or a commit
   or PR title.
 
+## The pen — what the browsers send (measured on the user's tablet), set by the user
+
+- **A pen is known only by `pointerType: "pen"`.** An event reported as `mouse` (or `touch`)
+  is treated as such: the card can't tell, and never guesses.
+- **Chrome stable 156** (Android 16, Samsung SM-X716B): no hover event at all — a Chrome bug,
+  reported ([issue 579057746](https://issues.chromium.org/issues/579057746)); Samsung Internet
+  sends them.
+- **Chrome beta 158**: hover moves as `pointermove` / `pointerrawupdate` of type `pen` (its own
+  `pointerId`, tilt, `buttons` 0), each followed by a `mousemove`; but `pointerover` /
+  `pointerenter` / `pointerout` / `pointerleave` of type `mouse` (`pointerId` 1); and the media
+  queries say `hover: none`, `any-hover: none`.
+- **Firefox**: the pen's hover as a mouse — pointer events of type `mouse`, each followed by its
+  mouse event; a contact as `touch`.
+- **A pen going out of range sends no leaving**: it just stops sending moves. Back in range, it
+  sends moves again, but no new entry.
+- **A hovering pen is never still** (the hand trembles): still for 0.5 s (`PEN_HOVER_TIMEOUT`),
+  its hover ends — as if it had left; moving again, it hovers again — as if it had entered.
+  Measured: a pen nearly still still sends a move every ~130 ms (its tilt changing), far more
+  often while it moves; 0.5 s is the user's choice.
+- **So, every hover goes through one place**: an element's through `Chart.hecUi.hover(el, start,
+  end)` (started by its entry or any move over it, ended by its leaving, a cancel, or the pen
+  still), a chart's through `Chart.hecUi.penHover` in its handling of the moves. Never a hover
+  started by `pointerenter` alone, never `@media (hover)` nor `:hover` (they follow the primary
+  pointer, a tablet's pen left out). `tests/pen.cjs` simulates each of these browsers.
+
 ## Architecture (1.2) — set by the user, not negotiable
 
 Read `ARCHITECTURE.md` before changing any code, and keep to it: the card gives data and

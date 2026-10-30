@@ -107,10 +107,15 @@ class Tester
     // the card's logic, not the browser's own handling of a real pen) ──
     // buttons: 1 the tip, 2 the barrel button, 3 both, 0 hovering
     // pointerType: 'pen', or 'mouse' as some browsers report a pen's hover (Firefox on Android)
-    pen(type, q, buttons, button, pointerType = 'pen') {
+    pen(type, q, buttons, button, pointerType = 'pen', pointerId = 7) {
         return this.E(`(()=>{ const t=document.elementFromPoint(${q.x},${q.y});
-            t.dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: '${pointerType}', isPrimary: true, bubbles: true, cancelable: true,
+            t.dispatchEvent(new PointerEvent('${type}', { pointerId: ${pointerId}, pointerType: '${pointerType}', isPrimary: true, bubbles: true, cancelable: true,
                 composed: true, clientX: ${q.x}, clientY: ${q.y}, buttons: ${buttons}, button: ${button ?? -1}, pressure: ${buttons & 1 ? 0.5 : 0} })); })()`);
+    }
+    // A mouse event (no pointer event) at q, as a browser's compatibility events: no button
+    mouseEv(type, q) {
+        return this.E(`(()=>{ const t=document.elementFromPoint(${q.x},${q.y});
+            t.dispatchEvent(new MouseEvent('${type}', { bubbles: true, cancelable: true, composed: true, clientX: ${q.x}, clientY: ${q.y}, buttons: 0, button: 0 })); })()`);
     }
     async penTap(q, barrel) { await this.pen('pointerdown', q, barrel ? 3 : 1, barrel ? 2 : 0); await this.wait(60); await this.pen('pointerup', q, 0, barrel ? 2 : 0); }
     async penDrag(a, c, barrel, steps = 14) {

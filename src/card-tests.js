@@ -13,6 +13,24 @@ const ISSUE_BODY_MAX = 6000;
 
 // The tests, in the submenu's order: its entry (i18n key), its dialog's title, and
 // build(body, card), which fills the dialog's body and returns { report(), dispose() }
+
+// text copied to the clipboard, hint (an element) saying so — the clipboard refused (outside
+// a secure context): copied through a selection, in a text box in hint's place
+function copyText(text, hint)
+{
+    const done = () => { hint.textContent = 'Copied.'; };
+    const byHand = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.className = 'mono';
+        ta.rows = 8;
+        hint.replaceWith(ta);
+        ta.select();
+        if( !document.execCommand?.('copy') ) ta.insertAdjacentHTML('afterend', '<span class="hint">Copy it by hand.</span>');
+    };
+    if( navigator.clipboard?.writeText ) navigator.clipboard.writeText(text).then(done, byHand);
+    else byHand();
+}
 export const CARD_TESTS = {
     pen: { label: 'ui.menu.test_pen', title: 'Pen events', build: buildPenEventsTest },
     perf: { label: 'ui.menu.test_perf', title: 'Performance', build: buildPerformanceTest },
@@ -70,22 +88,7 @@ export function openCardTest(key, card)
     const test = def.build(root.querySelector('.body'), card);
     const report = () => `${def.title} — history-explorer-card ${Version}\n${navigator.userAgent}\n\n${test.report()}`;
 
-    $('copy').addEventListener('click', () => {
-        const text = report();
-        const done = () => { $('reportHint').textContent = 'Copied.'; };
-        // (the clipboard is refused outside a secure context: copied through a selection)
-        const byHand = () => {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.className = 'mono';
-            ta.rows = 8;
-            $('reportHint').replaceWith(ta);
-            ta.select();
-            if( !document.execCommand?.('copy') ) ta.insertAdjacentHTML('afterend', '<span class="hint">Copy it by hand.</span>');
-        };
-        if( navigator.clipboard?.writeText ) navigator.clipboard.writeText(text).then(done, byHand);
-        else byHand();
-    });
+    $('copy').addEventListener('click', () => copyText(report(), $('reportHint')));
     $('issue').addEventListener('click', () => {
         let body = report();
         if( body.length > ISSUE_BODY_MAX ) body = body.slice(0, ISSUE_BODY_MAX) + '\n… (cut: paste the copied report for the whole log)';
@@ -175,8 +178,13 @@ function buildPenEventsTest(body)
         </div>
         <section class="box"><h2>Device</h2><pre class="log mono" id="device"></pre></section>
         <section class="box"><h2>Hover: time between two moves</h2>
-            <p>Hold the pen still above a zone, then move it away: a pen hovers only while it sends moves (the card ends its hover after ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s without one). Every move with no contact counts, whatever type it's reported as.</p>
-            <div class="now mono" id="gaps">— no hover yet —</div></section>
+            <p>Hold the pen still above a zone, then move it away: a pen hovers only while it sends moves (the card ends its hover after ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s without one). Every move with no contact counts, whatever type it's reported as, each kind of event apart.</p>
+            <div class="now mono" id="gaps" style="white-space:pre-line">— no hover yet —</div>
+            <div class="row">
+                <button id="copyStats" type="button">Copy the stats</button>
+                <button id="restart" type="button">Clear all, start again</button>
+            </div>
+            <span class="hint" id="statsHint"></span></section>
         <section class="box"><h2>Last event</h2><div class="now mono" id="now">— nothing yet —</div></section>
         <section class="box">
             <h2>Event log (newest first)</h2>
@@ -190,24 +198,53 @@ function buildPenEventsTest(body)
     const seen = {};
     const lines = [];
     const lastBtns = {};
-    const t0 = performance.now();
+    let t0 = performance.now();
     const lastMoveLog = {}; let contact = false, lastSel = 0;
     // The contacts under way (by pointerId), and each zone's last one, ended
     const contacts = {}, lastContact = {};
     const scroller = body.closest('.dlg');
     const scrollPos = () => ( scroller ? scroller.scrollTop : 0 ) + window.scrollY;
     const dist = (a, x, y) => Math.round(Math.hypot(x - a.x, y - a.y));
-    // The time between two moves of a pen hovering (on the same zone, no contact, no leaving
-    // between them): those shorter than the card's timeout, and how many reached it
-    const gaps = [];
-    let gapsLong = 0, lastHover = null;
+    // The time between two hover moves (on the same zone, no contact, no leaving between
+    // them), for each kind of event apart — pointermove, pointerrawupdate, mousemove: those
+    // shorter than the card's timeout, and how many reached it
+    const GAP_TYPES = ['pointermove', 'pointerrawupdate', 'mousemove'];
+    const gapsOf = {};
+    const gapsReset = () => { for( const k of GAP_TYPES ) gapsOf[k] = { gaps: [], long: 0, last: null }; };
+    gapsReset();
+    // (count, mean and standard deviation of values)
+    const gapStats = v => { const n = v.length, m = v.reduce((a, g) => a + g, 0) / n;
+        return { n, mean: m, sd: Math.sqrt(v.reduce((a, g) => a + (g - m) ** 2, 0) / n) }; };
+    // Two regimes in gaps (the pen moving, the pen nearly still), when they look like two
+    // gaussians: the split of the sorted gaps leaving the least spread within each side; kept
+    // when each side holds 5 % of them at least and they stand apart — Ashman's D, the gap
+    // between their means against their spreads, above 4 (one gaussian split at its mean
+    // already gives 2.65, a skewed single regime more). Else null: one regime
+    const gapRegimes = gaps => {
+        const v = [...gaps].sort((a, b) => a - b), n = v.length;
+        if( n < 20 ) return null;
+        let best = null, sum = 0, sq = 0;
+        const tot = v.reduce((a, g) => a + g, 0), totSq = v.reduce((a, g) => a + g * g, 0);
+        for( let i = 1; i < n; i++ ) {
+            sum += v[i - 1]; sq += v[i - 1] ** 2;
+            const _within = (sq - sum * sum / i) + ((totSq - sq) - (tot - sum) ** 2 / (n - i));
+            if( !best || _within < best.w ) best = { w: _within, i };
+        }
+        const lo = gapStats(v.slice(0, best.i)), hi = gapStats(v.slice(best.i));
+        const d = Math.SQRT2 * Math.abs(hi.mean - lo.mean) / Math.sqrt(lo.sd ** 2 + hi.sd ** 2 || 1);
+        return lo.n >= n * 0.05 && hi.n >= n * 0.05 && d > 4 ? [lo, hi] : null;
+    };
     const gapsText = () => {
-        if( !gaps.length && !gapsLong ) return '— no hover yet —';
-        const n = gaps.length, mean = n ? gaps.reduce((a, g) => a + g, 0) / n : 0;
-        const sd = n ? Math.sqrt(gaps.reduce((a, g) => a + (g - mean) ** 2, 0) / n) : 0;
-        const ms = v => `${Math.round(v)}ms`;
-        return n ? `${n} gaps: mean ${ms(mean)}, min ${ms(Math.min(...gaps))}, max ${ms(Math.max(...gaps))}, standard deviation ${ms(sd)}; ${gapsLong} of ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s or more`
-                 : `${gapsLong} gaps of ${Chart.hecUi.PEN_HOVER_TIMEOUT / 1000} s or more`;
+        const ms = v => `${Math.round(v)}ms`, _t = Chart.hecUi.PEN_HOVER_TIMEOUT / 1000;
+        const _lines = GAP_TYPES.filter(k => gapsOf[k].gaps.length || gapsOf[k].long).map(k => {
+            const { gaps, long } = gapsOf[k];
+            if( !gaps.length ) return `${k}: ${long} gaps of ${_t} s or more`;
+            const all = gapStats(gaps), two = gapRegimes(gaps);
+            const regime = r => `${r.n} gaps (${Math.round(100 * r.n / all.n)} %): mean ${ms(r.mean)}, standard deviation ${ms(r.sd)}`;
+            return `${k}: ${all.n} gaps: mean ${ms(all.mean)}, min ${ms(Math.min(...gaps))}, max ${ms(Math.max(...gaps))}, standard deviation ${ms(all.sd)}; ${long} of ${_t} s or more`
+                + ( two ? `\n  two regimes — fast: ${regime(two[0])}; slow: ${regime(two[1])}` : '' );
+        });
+        return _lines.length ? _lines.join('\n') : '— no hover yet —';
     };
 
     const renderChecks = () => {
@@ -275,16 +312,17 @@ function buildPenEventsTest(body)
         if( pt === 'touch' && seen.penType ) seen.touchType = true;
         if( pt === 'mouse' ) seen.mouseType = true;
         if( e.type === 'pointermove' && pt === 'pen' && b === 0 ) seen.hover = true;
-        if( e.type === 'pointermove' && pt && pt !== 'touch' && b === 0 && (e.pressure ?? 0) === 0 ) {
-            const _now = performance.now();
-            if( lastHover && lastHover.where === where ) {
-                const _g = _now - lastHover.t;
-                if( _g < Chart.hecUi.PEN_HOVER_TIMEOUT ) gaps.push(_g); else gapsLong++;
+        // (a hover move: no contact — a pointer event not from a finger, or a mouse event)
+        if( gapsOf[e.type] && b === 0 && (pt ? pt !== 'touch' && (e.pressure ?? 0) === 0 : true) ) {
+            const _g = gapsOf[e.type], _now = performance.now();
+            if( _g.last && _g.last.where === where ) {
+                const _d = _now - _g.last.t;
+                if( _d < Chart.hecUi.PEN_HOVER_TIMEOUT ) _g.gaps.push(_d); else _g.long++;
                 $('gaps').textContent = gapsText();
             }
-            lastHover = { where, t: _now };
+            _g.last = { where, t: _now };
         }
-        if( e.type === 'pointerdown' || e.type === 'pointerleave' || e.type === 'pointercancel' ) lastHover = null;
+        if( e.type === 'pointerdown' || e.type === 'pointerleave' || e.type === 'pointercancel' ) for( const k of GAP_TYPES ) gapsOf[k].last = null;
         if( e.type === 'pointerdown' && (b & 2) ) seen.barrelDown = true;
         if( e.type === 'pointermove' && (lastBtns[e.pointerId] & 1) && (b & 2) && !(lastBtns[e.pointerId] & 2) ) seen.barrelChord = true;
         if( b & 32 ) seen.eraser = true;
@@ -313,15 +351,22 @@ function buildPenEventsTest(body)
     document.addEventListener('selectionchange', onSelectionChange);
     const mark = (text) => push(`${stamp()} ---- ${text} ----`);
     for( const [k, l] of PEN_MARKS ) $(`mark_${k}`).addEventListener('click', () => mark(`next: ${l}`));
-    $('clear').addEventListener('click', () => {
+    // (everything cleared, the acquisition started again from 0 — its clock too)
+    const restart = () => {
         lines.length = 0;
-        gaps.length = 0; gapsLong = 0; lastHover = null;
+        gapsReset();
         $('gaps').textContent = gapsText();
-        for( const k in seen ) delete seen[k];
+        for( const o of [seen, lastBtns, lastMoveLog, contacts, lastContact] ) for( const k in o ) delete o[k];
+        contact = false; lastSel = 0;
+        t0 = performance.now();
         $('log').textContent = '';
         $('now').textContent = '— nothing yet —';
+        $('statsHint').textContent = '';
         renderChecks();
-    });
+    };
+    $('clear').addEventListener('click', restart);
+    $('restart').addEventListener('click', restart);
+    $('copyStats').addEventListener('click', () => copyText('Hover, time between two moves:\n' + gapsText(), $('statsHint')));
     // What the browser says of its pointers (the media queries) and of the device
     const _mq = q => window.matchMedia(q).matches;
     const deviceText = ['pointer', 'any-pointer'].map(f => `${f}: ${['coarse', 'fine', 'none'].filter(v => _mq(`(${f}: ${v})`)).join(' ') || '-'}`)

@@ -6,6 +6,13 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.53] - 2026-10-30
 
+### Fixed — a pen's hover over a magnifier, back in range or moving again
+- A magnifier grew only when a pointer entered it. A pen gone out of range (or held still) shrank it back after 1 s, but coming back over it sends moves and no new entry: it stayed small until the pen left and came back. Every hover over an element now goes through one rule, `Chart.hecUi.hover(el, start, end)`: started by its entry or any move over it, ended by its leaving, a cancel, or a pen still for 0.5 s (was 1 s) — a hovering pen is never still. Used by the magnifiers and the values over a graph; a graph's hover (`penHover`) already started again with the next move
+- Tests (`pen`): Chrome 158's hover (moves as "pen", entering and leaving as "mouse", a mousemove after each move) — a magnifier and the tooltip; Firefox's (all as "mouse"); a magnifier and a graph's hover dot gone with the pen still, back when it moves again
+- *Tests (beta) ▸ Pen events*: the time between two hover moves for each kind of event apart — `pointermove`, `pointerrawupdate`, `mousemove`; when they fall in two regimes (the pen moving, the pen nearly still — two gaussians standing apart: Ashman's D above 4), each one's count, share of the gaps, mean and standard deviation
+- *Tests (beta) ▸ Pen events*: *Copy the stats* (the hover stats alone) and *Clear all, start again* (everything cleared, the log's clock back to 0) by the stats
+- Tests (`cards`): the gaps of each kind of event; two regimes found and measured, a single one not split; the stats copied alone, everything cleared and the clock back to 0
+
 ### Added — the year in the margin
 - On every graph showing its time labels, the year of the window's left end in the margin left of the plot, on the line of the time labels, in bold as the days; right-aligned against the plot, clear of the first time label; none where it doesn't fit (the Y labels inside the plot, a narrow card), nor when the axis' first label is that year already (a month axis starting on 1 January: the year twice side by side). Chart.js `ticks.hecLeftLabel` (plugin `hecLeftLabel`, `deps/Chart Custom.js.md`), the card giving the year
 - Tests (`features`): the year (2025 for a window from December 2025 to January 2026) on a curves' graph and a timeline, bold, in the margin, on the time labels' line; a narrow card: none on the curves' graph, the timeline's kept; `showTimeLabels: false`: none; a month axis from 25 December 2025: 2026 on the axis, 2025 in the margin; from 1 January 2026: 2026 on the axis only

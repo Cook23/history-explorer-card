@@ -74,12 +74,12 @@ module.exports = async function()
         const t2 = await E(TIP(gi));
         return t1 === null && t2 === null ? true : `${t1} / ${t2}`;
     });
-    await t.step('the pen gone out of hover range without leaving (no more moves, no pointerleave): what its hover showed ends 1 s after its last move, as if it had left', async () => {
+    await t.step('the pen gone out of hover range without leaving (no more moves, no pointerleave): what its hover showed ends 0.5 s after its last move, as if it had left', async () => {
         const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
         await t.penTap(p1); await t.wait(400);
-        await t.penHover(p1, p2); await t.wait(600);
-        const t1 = await E(TIP(gi));                        // (still hovering: 0.6 s after its last move)
-        await t.wait(1700);                                  // (1 s, then the tooltip's fade)
+        await t.penHover(p1, p2); await t.wait(250);
+        const t1 = await E(TIP(gi));                        // (still hovering: 0.25 s after its last move)
+        await t.wait(1600);                                  // (0.5 s, then the tooltip's fade)
         const t2 = await E(TIP(gi)), dot = await E(`graphAt(${gi}).chart._hecHoverDot ?? null`);
         await t.penHover({ x: p2.x - 100, y: p2.y }, p2); await t.wait(400);
         const t3 = await E(TIP(gi));                         // (its mode ended: hovering back opens nothing)
@@ -94,6 +94,100 @@ module.exports = async function()
         await t.pen('pointerout', p2, 0, -1, 'mouse'); await t.wait(1300);
         return t1 && t2 && t1 !== t2 ? true : `${t1} / ${t2}`;
     });
+    // ── A hover the browser reports oddly ──
+    // Chrome 158 (Android, a Samsung tablet): the pen's moves as "pen" (pointerId 7), its
+    // pointerover / pointerenter / pointerout / pointerleave as "mouse" (pointerId 1), and a
+    // mousemove after each move. Firefox: the pen's hover as a mouse — pointer events typed
+    // "mouse", each followed by its mouse event.
+    const mag = id => E(`(()=>{ const r=el.querySelector('#${id}_0').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
+    const big = id => E(`el.querySelector('#${id}_0').classList.contains('hec-big')`);
+    // (a Chrome hover from a to c: each pen move followed by its mousemove)
+    const chromeHover = async (a, c, steps = 10) => {
+        for( let i = 1; i <= steps; i++ ) {
+            const q = { x: a.x + (c.x - a.x) * i / steps, y: a.y + (c.y - a.y) * i / steps };
+            await t.pen('pointermove', q, 0, -1, 'pen', 7); await t.mouseEv('mousemove', q); await t.wait(25);
+        }
+    };
+    await t.step('Chrome: a magnifier entered by a "mouse", hovered by a "pen": twice as large; left by a "mouse": back to its size', async () => {
+        const b = await mag('b5');
+        await t.pen('pointerover', b, 0, -1, 'mouse', 1); await t.pen('pointerenter', b, 0, -1, 'mouse', 1);
+        await chromeHover({ x: b.x - 3, y: b.y }, { x: b.x + 3, y: b.y }, 4);
+        const on = await big('b5');
+        await t.pen('pointerout', b, 0, -1, 'mouse', 1); await t.pen('pointerleave', b, 0, -1, 'mouse', 1); await t.wait(200);
+        const off = await big('b5');
+        return on && !off ? true : JSON.stringify({ on, off });
+    });
+    await t.step('Chrome: a magnifier entered by a "mouse", the "pen" gone out of range without leaving: back to its size 0.5 s after its last move', async () => {
+        const b = await mag('b5');
+        await t.pen('pointerover', b, 0, -1, 'mouse', 1); await t.pen('pointerenter', b, 0, -1, 'mouse', 1);
+        await chromeHover({ x: b.x - 3, y: b.y }, { x: b.x + 3, y: b.y }, 4);
+        await t.wait(250); const still = await big('b5');
+        await t.wait(500); const after = await big('b5');
+        return still && !after ? true : JSON.stringify({ still, after });
+    });
+    await t.step('Chrome: a magnifier the "pen" went out of range of, back to its size; the pen back in range above it (moves, no new entry): twice as large again', async () => {
+        const b = await mag('b5');
+        await t.pen('pointerover', b, 0, -1, 'mouse', 1); await t.pen('pointerenter', b, 0, -1, 'mouse', 1);
+        await chromeHover({ x: b.x - 3, y: b.y }, { x: b.x + 3, y: b.y }, 4);
+        await t.wait(1400); const gone = await big('b5');
+        await chromeHover({ x: b.x + 3, y: b.y }, { x: b.x - 3, y: b.y }, 4);
+        const back = await big('b5');
+        await t.pen('pointerout', b, 0, -1, 'mouse', 1); await t.pen('pointerleave', b, 0, -1, 'mouse', 1); await t.wait(200);
+        return !gone && back ? true : JSON.stringify({ gone, back });
+    });
+    await t.step('a pen held still above a magnifier (a hovering pen never is): back to its size after 0.5 s; moving again: twice as large again', async () => {
+        const b = await mag('b4');
+        await t.pen('pointerenter', b, 0, -1, 'pen', 7);
+        await t.penHover({ x: b.x - 3, y: b.y }, { x: b.x + 3, y: b.y }, 4);
+        const on = await big('b4');
+        await t.wait(1300); const still = await big('b4');
+        await t.penHover({ x: b.x + 3, y: b.y }, { x: b.x - 3, y: b.y }, 4); const again = await big('b4');
+        await t.pen('pointerleave', b, 0, -1, 'pen', 7); await t.wait(200);
+        return on && !still && again ? true : JSON.stringify({ on, still, again });
+    });
+    await t.step('a pen held still above a graph: its hover dot goes after 0.5 s; moving again: the dot of the value under it again', async () => {
+        const p1 = await E(`pointPt(${gi},0.4)`), p2 = await E(`pointPt(${gi},0.45)`);
+        const dot = () => E(`graphAt(${gi}).chart._hecHoverDot ? true : false`);
+        await t.penHover({ x: p1.x - 30, y: p1.y }, p1); await t.wait(200);
+        const on = await dot();
+        await t.wait(1300); const still = await dot();
+        await t.penHover(p1, p2); await t.wait(200); const again = await dot();
+        await t.pen('pointerout', p2, 0, -1, 'pen', 7); await t.pen('pointerleave', p2, 0, -1, 'pen', 7); await t.wait(300);
+        return on && !still && again ? true : JSON.stringify({ on, still, again });
+    });
+    await t.step('Chrome: the tooltip opened by a tap follows a "pen" hover entered by a "mouse", with its mousemoves; left by a "mouse": it closes', async () => {
+        const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
+        await t.penTap(p1); await t.wait(400);
+        const t1 = await E(TIP(gi));
+        await t.pen('pointerover', p1, 0, -1, 'mouse', 1); await t.pen('pointerenter', p1, 0, -1, 'mouse', 1);
+        await chromeHover(p1, p2); await t.wait(400);
+        const t2 = await E(TIP(gi));
+        await t.pen('pointerout', p2, 0, -1, 'mouse', 1); await t.pen('pointerleave', p2, 0, -1, 'mouse', 1); await t.wait(1300);
+        const t3 = await E(TIP(gi));
+        return t1 && t2 && t1 !== t2 && t3 === null ? true : JSON.stringify({ t1, t2, t3 });
+    });
+    await t.step('Firefox: a magnifier hovered by a pen reported as a mouse: twice as large; left: back to its size', async () => {
+        const b = await mag('b4');
+        await t.pen('pointerover', b, 0, -1, 'mouse', 0); await t.pen('pointerenter', b, 0, -1, 'mouse', 0);
+        await t.pen('pointermove', b, 0, -1, 'mouse', 0); await t.mouseEv('mousemove', b);
+        const on = await big('b4');
+        await t.pen('pointerout', b, 0, -1, 'mouse', 0); await t.pen('pointerleave', b, 0, -1, 'mouse', 0); await t.wait(200);
+        const off = await big('b4');
+        return on && !off ? true : JSON.stringify({ on, off });
+    });
+    await t.step('Firefox: the tooltip opened by a tap follows a pen hover reported as a mouse, pointer and mouse events', async () => {
+        const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
+        await t.penTap(p1); await t.wait(400);
+        const t1 = await E(TIP(gi));
+        for( let i = 1; i <= 10; i++ ) {
+            const q = { x: p1.x + (p2.x - p1.x) * i / 10, y: p1.y + (p2.y - p1.y) * i / 10 };
+            await t.pen('pointermove', q, 0, -1, 'mouse', 0); await t.mouseEv('mousemove', q); await t.wait(25);
+        }
+        await t.wait(400); const t2 = await E(TIP(gi));
+        await t.pen('pointerout', p2, 0, -1, 'mouse', 0); await t.pen('pointerleave', p2, 0, -1, 'mouse', 0); await t.wait(1300);
+        return t1 && t2 && t1 !== t2 ? true : JSON.stringify({ t1, t2 });
+    });
+
     // A tap with the pen's button (Chrome and its web views, the Home Assistant app): no
     // contact reported at all, only a context menu, a moment later, where the pen is
     const menuOpen = () => E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);

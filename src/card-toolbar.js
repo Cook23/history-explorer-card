@@ -150,14 +150,11 @@ export class CardToolbar
         this._this.querySelector(`#by_${i}`)?.addEventListener('change', this.timeRangeSelected.bind(this));
         this._this.querySelector(`#bz_${i}`)?.addEventListener('click', this.toggleZoom.bind(this), false);
         // (a magnifier under the pointer shown twice as large — every pointer: a CSS hover rule
-        // would follow the device's primary pointer only, a tablet's pen left out; a pen gone
-        // out of range without leaving it: back to its size all the same, Chart.hecUi.penHover)
+        // would follow the device's primary pointer only, a tablet's pen left out; a pen still
+        // or gone out of range: back to its size, moving again: large again — Chart.hecUi.hover)
         for( const id of ['bz', 'b4', 'b5'] ) {
             const b = this._this.querySelector(`#${id}_${i}`);
-            const _small = () => b.classList.remove('hec-big');
-            b?.addEventListener('pointerenter', () => b.classList.add('hec-big'));
-            b?.addEventListener('pointermove', e => Chart.hecUi.penHover(b, e, _small));
-            for( const ev of ['pointerleave', 'pointercancel'] ) b?.addEventListener(ev, () => { Chart.hecUi.penHover(b, null); _small(); });
+            if( b ) Chart.hecUi.hover(b, () => b.classList.add('hec-big'), () => b.classList.remove('hec-big'));
         }
         // (the magnifier: a double-click — its two clicks toggling the zoom mode back as it was —
         // back to the default range)
