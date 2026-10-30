@@ -99,7 +99,7 @@ Add this repository as a custom repository in HACS: `https://github.com/Cook23/h
 
 ## Basic usage
 
-https://github.com/user-attachments/assets/b2a51086-47ad-42dc-a503-f71110835146
+https://github.com/user-attachments/assets/4ac02035-d090-4e00-aa9e-e1f004a9bcb8
 
 - **Pan**: click and drag left or right on any graph
 - **Zoom**: use the time range selector (top right), mouse wheel + CTRL, or the magnifying glass icon to draw a zoom region

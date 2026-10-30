@@ -9,6 +9,8 @@ Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split 
   instruction doesn't cover (a device, a pointer, a condition, an exception): say it and ask
   before coding it — never decide it alone, even when it looks obvious.
 - **An instruction unclear:** reformulate it and wait for the answer — don't interpret.
+- **An instruction too summarized** to be coded as is: say so and ask the user to detail it, before
+  coding.
 - **The full suite:** only when the user says the modifications are finished, or asks for it —
   never during modifications, never on your own initiative. Meanwhile, targeted tests only.
 - **Never without being asked:** a version bump, a commit, a push, a PR, a merge.
