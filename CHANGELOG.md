@@ -4,7 +4,7 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
-## [Unreleased]
+## [v1.2.53] - 2026-10-30
 
 ### Added — the year in the margin
 - On every graph showing its time labels, the year of the window's left end in the margin left of the plot, on the line of the time labels, in bold as the days; right-aligned against the plot, clear of the first time label; none where it doesn't fit (the Y labels inside the plot, a narrow card), nor when the axis' first label is that year already (a month axis starting on 1 January: the year twice side by side). Chart.js `ticks.hecLeftLabel` (plugin `hecLeftLabel`, `deps/Chart Custom.js.md`), the card giving the year
