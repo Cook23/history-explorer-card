@@ -767,12 +767,26 @@
     // over el (a pointer event): a pen with no button, end() if no other move comes within
     // PEN_HOVER_TIMEOUT; anything else — or e null: the hover ended otherwise — cancels it.
     // For everything a hover shows, on a graph (the gesture engine) or off it
-    PEN_HOVER_TIMEOUT: 1000,
+    PEN_HOVER_TIMEOUT: 500,
     penHover: function (el, e, end) {
       clearTimeout(_penHoverTimers.get(el));
       _penHoverTimers.delete(el);
       if (e && e.pointerType === 'pen' && !e.buttons)
         _penHoverTimers.set(el, setTimeout(function () { _penHoverTimers.delete(el); end(); }, hecUi.PEN_HOVER_TIMEOUT));
+    },
+
+    // el's hover, every pointer alike: start() when one comes over el — its entry, or any
+    // move over it (a pen back in range, or moving again, sends moves but no new entry) —,
+    // end() when it goes — its leaving, a cancel, or a pen still (penHover: a hovering pen is
+    // never still, the hand trembles; it may also have gone out of range, sending nothing).
+    // Each called once per hover
+    hover: function (el, start, end) {
+      var _on = false;
+      var _start = function () { if (!_on) { _on = true; start(); } };
+      var _end = function () { if (_on) { _on = false; end(); } };
+      el.addEventListener('pointerenter', _start);
+      el.addEventListener('pointermove', function (e) { _start(); hecUi.penHover(el, e, _end); });
+      ['pointerleave', 'pointercancel'].forEach(function (t) { el.addEventListener(t, function () { hecUi.penHover(el, null); _end(); }); });
     },
 
     // How opaque the boxes drawn over a graph are (the Y labels inside the plot, the controls
@@ -3185,9 +3199,9 @@
         _el.addEventListener('click', function (ev) { me._hecOnValuesClick(ev); });
         _el.addEventListener('mousemove', function (ev) { me._hecRevealValuesCut(ev.target, true); });
         _el.addEventListener('mouseleave', function () { Chart.hecUi.closeReveal(_el, true); });
-        // (a pen gone out of range without leaving: the text shown in full closed all the same)
-        _el.addEventListener('pointermove', function (ev) { Chart.hecUi.penHover(_el, ev, function () { Chart.hecUi.closeReveal(_el, true); }); });
-        _el.addEventListener('pointerleave', function () { Chart.hecUi.penHover(_el, null); });
+        // (a pen still, or gone out of range without leaving: the text shown in full closed all
+        // the same — moving again, the next mousemove shows it again)
+        Chart.hecUi.hover(_el, function () {}, function () { Chart.hecUi.closeReveal(_el, true); });
       }
       if (_el.nextSibling !== _box || _el.parentNode !== _box.parentNode) _box.parentNode.insertBefore(_el, _box);
       var _narrow = v.layout === 'narrow';
