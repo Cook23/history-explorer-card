@@ -131,7 +131,7 @@ To see a list of all possible configuration options, check the [Full reference c
 
 ### Interactive navigation
 
-https://github.com/user-attachments/assets/4ac02035-d090-4e00-aa9e-e1f004a9bcb8
+https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 
 The card opens on the last 24 hours (see [Default view and time ranges](#default-view-and-time-ranges)).
 
