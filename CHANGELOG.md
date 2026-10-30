@@ -10,6 +10,9 @@ Changelog for the HA History Explorer Card.
 - `rounding: 0` was taken as no `rounding` at all: values kept 2 decimals, in the tooltip and in the legend. It now shows them rounded to the unit
 - Tests: the value in the legend with no `rounding`, `rounding: 1` and `rounding: 0`
 
+### Changed — the README: the 1.1 line ends
+- The box at the top of the README: the 1.1 line ends, version 1.2 follows it — what it brings, and how to move to it in HACS
+
 ## [v1.1.55] - 2026-10-11
 
 ### Fixed — the padlock keeps the Y axis where it is
