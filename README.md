@@ -18,7 +18,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 ---
 
 > [!IMPORTANT]
-> **Version 1.2 is available as a beta**, alongside this 1.1 line. It brings:
+> **The 1.1 line ends here: version 1.2 follows it.** Over 1.1, it brings:
 > - **touch, pen and mouse reworked**: a swipe on a graph always scrolls the page, a drag starts with a tap; gesture settings; every gesture also in a menu (the type menu in submenus, a graph's menu, cut and paste);
 > - **two Y axes** on a graph, and **colors** from thresholds or from another entity;
 > - **an entity's attributes**, sub-attributes included, as curves or timelines;
@@ -26,7 +26,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 > - **mini-graph-card compatibility**: its YAML read as the card's own, `look: mini`, values over a graph, aggregation;
 > - **the info panel on every page** of Home Assistant.
 >
-> To try it, enable *Show beta versions* for this repository in HACS and download the latest 1.2; to go back, download the latest 1.1 the same way.
+> To move to it, download the latest 1.2 in HACS (while it is published as a pre-release, enable *Show beta versions* for this repository first); to go back, download the latest 1.1 the same way.
 
 *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
