@@ -958,6 +958,53 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── The year of the window's left end, in the margin left of the plot (Chart.js
+    // hecLeftLabel): a window from December 2025 to January 2026 ──
+    const yearCard = o => openCard(card({ defaultTimeRange: '3d', statistics: { enabled: false }, graphs: [{ type: 'line', ...o, entities: [{ entity: 'sensor.power' }] },
+            { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true }, clock: '2026-01-01T05:44:00+01:00', timezone: 'Europe/Paris' });
+    // (the texts graph gi draws, as it's redrawn: each with its place, font and alignment; its
+    // plot's left, the line of its time labels)
+    const drawnTexts = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, P=CanvasRenderingContext2D.prototype, f=P.fillText, out=[];
+        P.fillText=function(s,x,y){ if( this.canvas===c.canvas ) out.push({ text:String(s), x, y, font:this.font, align:this.textAlign, w:this.measureText(String(s)).width }); return f.apply(this,arguments); };
+        try { c.render({ duration: 0 }); } finally { P.fillText=f; }
+        const xs=c.scales[c.options.scales.xAxes[0].id], o=xs.options;
+        return { texts: out, left: c.chartArea.left, line: xs.top+(o.gridLines.drawTicks?o.gridLines.tickMarkLength:0)+o.ticks.padding }; })()`);
+    t = await yearCard({});
+    await t.wait(1500);
+    await t.step('the year of the window\'s left end (2025, the window ending in 2026) on every graph: in bold, in the margin left of the plot, on the line of the time labels', async () => {
+        const r = [await drawnTexts(0), await drawnTexts(1)].map(d => ({ year: d.texts.filter(x => /^\d{4}$/.test(x.text)), left: d.left, line: d.line }));
+        const ok = r.every(d => d.year.length === 1 && d.year[0].text === '2025' && /bold/.test(d.year[0].font) && d.year[0].align === 'right'
+            && d.year[0].x <= d.left && d.year[0].x - d.year[0].w >= 0 && Math.abs(d.year[0].y - d.line) < 0.5);
+        return ok ? true : JSON.stringify(r);
+    });
+    // (graph gi from start to end, ticked by month — its labels as Chart.js gives them)
+    const sixMonths = (gi, start, end) => t.E(`(()=>{ const c=graphAt(${gi}).chart, tm=c.options.scales.xAxes[0].time;
+        Object.assign(tm, { min: '${start}', max: '${end}', unit: 'month', stepSize: 1 }); c.update(0); })()`);
+    const firstLabel = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, xs=c.scales[c.options.scales.xAxes[0].id], k=xs.getTicks().findIndex((k,i)=>k.label!=null && xs.getPixelForTick(i)>=c.chartArea.left-1); return k<0?null:String(xs.getTicks()[k].label); })()`);
+    await t.step('a month axis whose year changes after its left end (25 Dec 2025): its year 2026 on the axis, the margin\'s 2025 — the left end\'s', async () => {
+        await sixMonths(0, '2025-12-25T00:00:00', '2026-06-25T00:00:00');
+        const year = (await drawnTexts(0)).texts.filter(x => /^\d{4}$/.test(x.text)).map(x => x.text).sort().join(), first = await firstLabel(0);
+        return year === '2025,2026' && first === '2026' ? true : JSON.stringify({ year, first });
+    });
+    await t.step('a month axis starting with its year (1 Jan 2026): the year at its left end, none in the margin — never twice side by side', async () => {
+        await sixMonths(0, '2026-01-01T00:00:00', '2026-07-01T00:00:00');
+        const year = (await drawnTexts(0)).texts.filter(x => /^\d{4}$/.test(x.text)).map(x => x.text).join(), first = await firstLabel(0);
+        return year === '2026' && first === '2026' ? true : JSON.stringify({ year, first });
+    });
+    await t.step('no room — a card so narrow its Y labels are inside the plot: no year on its curves\' graph, the timeline\'s (its rows\' names beside it) still has it', async () => {
+        await t.E(`(()=>{ document.body.style.width='260px'; document.getElementById('host').style.width='260px'; })()`); await t.wait(1500);
+        const r = [await drawnTexts(0), await drawnTexts(1)].map(d => d.texts.filter(x => /^\d{4}$/.test(x.text)).map(x => x.text).join());
+        return r[0] === '' && r[1] === '2025' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await yearCard({ showTimeLabels: false });
+    await t.wait(1500);
+    await t.step('no time labels (showTimeLabels: false): no year', async () => {
+        const r = (await drawnTexts(0)).texts.filter(x => /^\d{4}$/.test(x.text)).map(x => x.text).join();
+        return r === '' ? true : r;
+    });
+    done(await t.close());
+
     // ── The tooltip's size: full, compact, slim — auto as the card's width says ──
     t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [
             { entity: 'sensor.power', name: 'Météo-France Villeveyrac Temperature (Filtered)' },

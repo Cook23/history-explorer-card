@@ -125,6 +125,9 @@ export class CardCharts
                                 displayFormats: { 'day': this.i18n.styleDateTicks },
                             },
                             maxRotation: 0,
+                            // (the year of the window's left end, in the margin left of the
+                            // plot where there's room — Chart.js hecLeftLabel)
+                            ...( config.showTimeLabels ? { hecLeftLabel: t => moment(t).format('YYYY') } : {} ),
                             // (labels that don't fit side by side — a narrow plot — skipped,
                             // never drawn over each other)
                             autoSkip: true,

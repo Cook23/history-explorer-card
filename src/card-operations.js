@@ -417,13 +417,13 @@ export class CardOperations
     }
 
     // The tooltip's mode of the curves among entities of graph g (see tooltipModeOf) — for
-    // where the card is now, both its room's and its screen's (tooltipFields): saved so, on
-    // this device only
+    // where the card is now, in the option giving each one's mode (tooltipFieldOf): its
+    // room's when set, else its screen's; saved so, on this device only
     setCurvesTooltip(g, entities, mode)
     {
         const _f = this.tooltipFields();
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        for( const e of _curves ) { e[_f.chart] = mode; e[_f.screen] = mode; }
+        for( const e of _curves ) e[this.tooltipFieldOf(e, _f)] = mode;
         this.applyTooltipModes(g);
         this.writeLocalState();
     }

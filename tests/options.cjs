@@ -95,6 +95,14 @@ module.exports = async function()
         const after = await t.E(all);
         return /makima/.test(before) && after === before ? true : before + ' => ' + after;
     });
+    await t.step('a Tooltip choice is kept after a reload', async () => {
+        const modes = `JSON.stringify(el.instance.graphs.flatMap(g=>g.entities.map(e=>[e.largeChartTooltip ?? null, e.largeScreenTooltip, el.instance.tooltipModeOf(e)])))`;
+        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest'); })()`); await t.wait(800);
+        const before = await t.E(modes);
+        await t.page.reload(); await t.wait(3500);
+        const after = await t.E(modes);
+        return /\[null,"nearest","nearest"\]/.test(before) && after === before ? true : before + ' => ' + after;
+    });
     done(await t.close());
 
     // ── The info panel: same submenu, `interpolation` in its configuration ──
@@ -260,8 +268,8 @@ module.exports = async function()
     }
 
     // ── small/largeChartTooltip, by the card's room, win over small/largeScreenTooltip, by the
-    // window, when set — at any level, under any spelling; the menu sets both where the card
-    // is ──
+    // window, when set — at any level, under any spelling; the menu sets the one giving the
+    // mode where the card is ──
     {
         const modes = async (cfg, width) => {
             const t = await openCard(card(cfg), { mock: { series: true },
@@ -282,10 +290,17 @@ module.exports = async function()
         await t.step('largeChartTooltip / smallChartTooltip (the card\'s room) win over largeScreenTooltip / smallScreenTooltip (the window) when set, at every level and spelling; a card under 600 px in a large window: smallChartTooltip, else largeScreenTooltip', async () =>
             r.chartWins === 'nearest | nearest' && r.graphChart === 'selected | all' && r.spellings === 'nearest | all'
             && r.smallCardScreen === 'all | all' && r.smallCardChart === 'nearest | nearest' ? true : JSON.stringify(r));
-        await t.step('the menu sets the mode of both options where the card is: largeChartTooltip and largeScreenTooltip here', async () => {
+        await t.step('the menu sets the option giving the mode where the card is: no largeChartTooltip set, largeScreenTooltip alone', async () => {
             const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'all');
                 const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, e.smallChartTooltip, e.smallScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
-            return v === 'all,all,,,all' ? true : v;
+            return v === ',all,,,all' ? true : v;
+        });
+        done(await t.close());
+        t = await openCard(card({ ...two, graphs: [{ ...two.graphs[0], options: { largeChartTooltip: 'selected' } }, two.graphs[1]] }), { mock: { series: true } });
+        await t.step('largeChartTooltip set (on its graph): the menu sets the curve\'s own largeChartTooltip, its largeScreenTooltip untouched', async () => {
+            const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest');
+                const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
+            return v === 'nearest,,nearest' ? true : v;
         });
         done(await t.close());
     }
