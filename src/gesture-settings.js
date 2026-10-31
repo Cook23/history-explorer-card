@@ -8,7 +8,9 @@
 //   precision (mouse and pen), precisionTouch (finger) — px: the pointer's precision. A pointer that
 //     moved more than this is dragging; a second press of a double-click lands within it of
 //     the first one; a target (a label, a button, a curve) within it of the pointer can be
-//     picked.
+//     picked;
+//   readingTimePerWord (every pointer) — ms: how long a word of a tooltip or a message is
+//     given to be read, after a fixed 0.5 s (Chart.hecUi.readingTime).
 
 const Chart = window.HXLocal_Chart;
 
@@ -17,6 +19,7 @@ export const GESTURE_SETTINGS = {
     longPressTouch : { pointer: 'touch', key: 'longPressMs', def: 500, min: 200, max: 2000, step: 50, unit: 'ms', label: 'ui.menu.gesture_long_press_touch' },
     precision      : { pointer: 'mouse', key: 'slop',        def: 8,   min: 4,   max: 20,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision' },
     precisionTouch : { pointer: 'touch', key: 'slop',        def: 12,  min: 4,   max: 20,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision_touch' },
+    readingTimePerWord : { pointer: null, key: 'readingWordMs', def: 300, min: 100, max: 1000, step: 50, unit: 'ms', label: 'ui.menu.gesture_reading_word' },
 };
 
 // A setting's value brought within its bounds (rounded to its step); undefined when it
@@ -41,6 +44,10 @@ export function gestureSettings(saved)
 export function applyGestures(values)
 {
     const _g = { mouse: {}, touch: {} };
-    for( const k in GESTURE_SETTINGS ) _g[GESTURE_SETTINGS[k].pointer][GESTURE_SETTINGS[k].key] = values[k];
+    // (a pointer's own, or — pointer null — every pointer's)
+    for( const k in GESTURE_SETTINGS ) {
+        const _s = GESTURE_SETTINGS[k];
+        if( _s.pointer ) _g[_s.pointer][_s.key] = values[k]; else _g[_s.key] = values[k];
+    }
     Chart.defaults.global.gestures = _g;
 }

@@ -747,7 +747,8 @@
   //   slop        — a pointer that moved more than this (px, x + y) is dragging; a second
   //                 press of a double-click lands within it of the first one.
   //                 Also how near a target must be to be picked (_hecPick).
-  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 8 }, touch: { longPressMs: 500, slop: 12 } };
+  // And, for every pointer, readingWordMs — the reading time of a word (hecUi.readingTime).
+  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 8 }, touch: { longPressMs: 500, slop: 12 }, readingWordMs: 300 };
   // The thresholds of a pointer type ('mouse', 'pen' — a mouse's —, 'touch')
   Chart.hecGestures = function (pointerType) {
     var g = Chart.defaults.global.gestures || {};
@@ -819,11 +820,13 @@
       return 'rgb(' + [0, 1, 2].map(function (k) { return Math.round((c[k] || 0) * a + b[k] * (1 - a)); }).join(',') + ')';
     },
 
-    // How long a message stays up: 1 s, plus 0.5 s per word (isWord; words split on
-    // spaces and underscores — entity ids read as words).
+    // How long a message or a tooltip stays up: 0.5 s, plus the reading time of a word —
+    // Chart.defaults.global.gestures.readingWordMs, 300 ms by default — per word (isWord;
+    // words split on spaces and underscores — entity ids read as words).
     readingTime: function (text) {
       var _words = String(text || '').split(/[\s_]+/).filter(hecUi.isWord).length;
-      return 1000 + 500 * _words;
+      var _g = Chart.defaults.global.gestures, _perWord = _g && _g.readingWordMs !== undefined ? _g.readingWordMs : 300;
+      return 500 + _perWord * _words;
     },
 
     // The picking rule (_hecPick) on page elements — small buttons: of `elements`, the one
@@ -3859,6 +3862,9 @@
     _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onFade) {
       var me = this;
       var _el = this._hecHoverTooltipEl;
+      // (a graph no longer in the page — Home Assistant showing another view —: no tooltip,
+      // never one hung on the page's body over that view, a refresh drawing it again)
+      if (!anchorEl || !anchorEl.isConnected) { if (_el) Chart.hecUi.closeFloating(_el); return; }
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';

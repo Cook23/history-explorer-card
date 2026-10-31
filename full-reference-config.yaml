@@ -556,6 +556,9 @@ gestures:
   precision: 8
   # The same, for a finger
   precisionTouch: 12
+  # How long a word of a tooltip or a message is given to be read (ms): it stays up 0.5 s, plus this per
+  # word (100 to 1000)
+  readingTimePerWord: 300
 
 # Whether the info panel (see $.infoPanel below) is enabled by default, replacing HA's native more-info
 # history for every entity — a super-global setting shared by every History Explorer card on the page/HA

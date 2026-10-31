@@ -591,5 +591,22 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── A tooltip of curves chosen by a click, then Home Assistant showing another view: the
+    // card out of the page; the data's next refresh draws the graph again ──
+    {
+        const t = await openCard(card(), { height: 1300, mock: { series: true } });
+        const tipEl = () => t.E(`(()=>{ const e=document.getElementById('hec-tooltip-hover'); return e && e.isConnected && getComputedStyle(e).display!=='none' && +getComputedStyle(e).opacity > 0 ? e.parentNode.tagName : null; })()`);
+        await t.step('a tooltip of curves chosen by a click, the card taken out of the page (another view), then a refresh: no tooltip left over the page', async () => {
+            const a = await t.E('pointPt(1,0.4)'), b = await t.E('pointPt(1,0.6)');
+            await t.page.mouse.click(a.x, a.y); await t.wait(300); await t.page.mouse.click(b.x, b.y); await t.wait(400);
+            const shown = await tipEl();
+            await t.E('el.remove()'); await t.wait(300);
+            await t.E('graphAt(1).chart.update()'); await t.wait(400);
+            const after = await tipEl();
+            return shown && after === null ? true : JSON.stringify({ shown, after });
+        });
+        done(await t.close());
+    }
+
     return { passed, failed };
 };

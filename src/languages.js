@@ -82,7 +82,8 @@ const lang_en =
             "gesture_long_press" : "Long press, mouse and pen (ms)",
             "gesture_long_press_touch" : "Long press, finger (ms)",
             "gesture_precision" : "Precision, mouse and pen (px)",
-            "gesture_precision_touch" : "Precision, finger (px)"
+            "gesture_precision_touch" : "Precision, finger (px)",
+            "gesture_reading_word" : "Reading time per word (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -196,7 +197,8 @@ const lang_fr =
             "gesture_long_press" : "Appui long, souris et stylet (ms)",
             "gesture_long_press_touch" : "Appui long, doigt (ms)",
             "gesture_precision" : "Précision, souris et stylet (px)",
-            "gesture_precision_touch" : "Précision, doigt (px)"
+            "gesture_precision_touch" : "Précision, doigt (px)",
+            "gesture_reading_word" : "Temps de lecture par mot (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -310,7 +312,8 @@ const lang_de =
             "gesture_long_press" : "Langes Drücken, Maus und Stift (ms)",
             "gesture_long_press_touch" : "Langes Drücken, Finger (ms)",
             "gesture_precision" : "Genauigkeit, Maus und Stift (px)",
-            "gesture_precision_touch" : "Genauigkeit, Finger (px)"
+            "gesture_precision_touch" : "Genauigkeit, Finger (px)",
+            "gesture_reading_word" : "Lesezeit pro Wort (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -424,7 +427,8 @@ const lang_es =
             "gesture_long_press" : "Pulsación larga, ratón y lápiz (ms)",
             "gesture_long_press_touch" : "Pulsación larga, dedo (ms)",
             "gesture_precision" : "Precisión, ratón y lápiz (px)",
-            "gesture_precision_touch" : "Precisión, dedo (px)"
+            "gesture_precision_touch" : "Precisión, dedo (px)",
+            "gesture_reading_word" : "Tiempo de lectura por palabra (ms)"
         },
         "values" : {
             "min" : "Mín",
@@ -538,7 +542,8 @@ const lang_nl =
             "gesture_long_press" : "Lang drukken, muis en pen (ms)",
             "gesture_long_press_touch" : "Lang drukken, vinger (ms)",
             "gesture_precision" : "Precisie, muis en pen (px)",
-            "gesture_precision_touch" : "Precisie, vinger (px)"
+            "gesture_precision_touch" : "Precisie, vinger (px)",
+            "gesture_reading_word" : "Leestijd per woord (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -652,7 +657,8 @@ const lang_pl =
             "gesture_long_press" : "Długie naciśnięcie, mysz i pióro (ms)",
             "gesture_long_press_touch" : "Długie naciśnięcie, palec (ms)",
             "gesture_precision" : "Precyzja, mysz i pióro (px)",
-            "gesture_precision_touch" : "Precyzja, palec (px)"
+            "gesture_precision_touch" : "Precyzja, palec (px)",
+            "gesture_reading_word" : "Czas czytania na słowo (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -766,7 +772,8 @@ const lang_sv =
             "gesture_long_press" : "Långt tryck, mus och penna (ms)",
             "gesture_long_press_touch" : "Långt tryck, finger (ms)",
             "gesture_precision" : "Precision, mus och penna (px)",
-            "gesture_precision_touch" : "Precision, finger (px)"
+            "gesture_precision_touch" : "Precision, finger (px)",
+            "gesture_reading_word" : "Lästid per ord (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -880,7 +887,8 @@ const lang_da =
             "gesture_long_press" : "Langt tryk, mus og pen (ms)",
             "gesture_long_press_touch" : "Langt tryk, finger (ms)",
             "gesture_precision" : "Præcision, mus og pen (px)",
-            "gesture_precision_touch" : "Præcision, finger (px)"
+            "gesture_precision_touch" : "Præcision, finger (px)",
+            "gesture_reading_word" : "Læsetid pr. ord (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -994,7 +1002,8 @@ const lang_sk =
             "gesture_long_press" : "Dlhé stlačenie, myš a pero (ms)",
             "gesture_long_press_touch" : "Dlhé stlačenie, prst (ms)",
             "gesture_precision" : "Presnosť, myš a pero (px)",
-            "gesture_precision_touch" : "Presnosť, prst (px)"
+            "gesture_precision_touch" : "Presnosť, prst (px)",
+            "gesture_reading_word" : "Čas čítania na slovo (ms)"
         },
         "values" : {
             "min" : "Min",
@@ -1108,7 +1117,8 @@ const lang_ru =
             "gesture_long_press" : "Долгое нажатие, мышь и перо (мс)",
             "gesture_long_press_touch" : "Долгое нажатие, палец (мс)",
             "gesture_precision" : "Точность, мышь и перо (пикс.)",
-            "gesture_precision_touch" : "Точность, палец (пикс.)"
+            "gesture_precision_touch" : "Точность, палец (пикс.)",
+            "gesture_reading_word" : "Время чтения на слово (мс)"
         },
         "values" : {
             "min" : "Мин",
