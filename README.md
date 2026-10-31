@@ -109,7 +109,7 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
 
-The gesture settings (long-press duration, pointer precision, for a mouse or a pen and for a finger) apply to every card, on every device:
+The gesture settings (long-press duration, pointer precision, for a mouse or a pen and for a finger; the reading time of a word of a tooltip or a message) apply to every card, on every device:
 
 ```yaml
 gestures:
@@ -117,6 +117,7 @@ gestures:
   longPressTouch: 500   # ms, finger
   precision: 8          # px, mouse and pen
   precisionTouch: 12    # px, finger
+  readingTimePerWord: 300   # ms per word of a tooltip or a message
 ```
 
 📖 [Menus](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#menus) · [Gesture settings](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#gesture-settings)

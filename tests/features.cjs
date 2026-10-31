@@ -550,6 +550,11 @@ module.exports = async function()
     };
     // (the steps below on a page of their own: each test opens its card)
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }));
+    await t.step('a column\'s tooltip value: min / mean / max when they differ as shown (rounded); all three the same as shown: the mean alone', async () => {
+        const r = await t.E(`(()=>{ const I=el.instance, ds={ unit: 'kW', rounding: 2, data: [{ y: 1.331, columnMin: 1.32, columnMax: 1.333 }, { y: 1.331, columnMin: 1.329, columnMax: 1.334 }, { y: 1.331 }] };
+            return [0, 1, 2].map(i => I._tooltipValue('line', ds, { index: i, yLabel: ds.data[i].y })); })()`);
+        return r[0] === '1.32 / 1.33 / 1.33 kW' && r[1] === '1.33 kW' && r[2] === '1.33 kW' ? true : JSON.stringify(r);
+    });
     for( const dec of ['fast', false] )
         await t.step(`decimation ${dec} (ignored): one point per column of pixels — the mean of its values, between their min and max; the lowest and highest of the window kept; no band without showMinMax`, async () => {
             const r = await columns(dec);

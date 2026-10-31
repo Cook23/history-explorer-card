@@ -48,19 +48,20 @@ module.exports = async function()
         const dragged = { tip: await tip(), mode: await mode() };
         return pressed.tip === null && !pressed.mode && dragged.tip === null && !dragged.mode ? true : JSON.stringify({ pressed, dragged });
     });
-    await t.step('left still, the tooltip stays its reading time (1 s, plus 0.5 s a word), then fades out with the highlighted point', async () => {
+    await t.step('left still, the tooltip stays its reading time (0.5 s, plus 300 ms a word by default), then fades out with the highlighted point', async () => {
         const p1 = await E('pointPt(0,0.4)');
         await t.page.mouse.click(p1.x, p1.y); await t.wait(300);
         // (the graph redrawn once the tooltip goes: without it, the point stays on screen)
         const r0 = await E(`(()=>{ const c=graphAt(0).chart; window.__draws=0; const d=c.draw; c.draw=function(){ window.__draws++; return d.apply(c, arguments); };
             return { text: c.tooltip._hecHoverTooltipEl.textContent }; })()`);
         const ms = await E(`graphAt(0).chart.constructor.hecUi.readingTime(${JSON.stringify(r0.text)})`);
+        const words = await E(`${JSON.stringify(r0.text)}.split(/[\\s_]+/).filter(graphAt(0).chart.constructor.hecUi.isWord).length`);
         await t.wait(ms - 800);
         const shown = await tip();
         await t.wait(800 + 1000 + 500);
         const r1 = await E(`(()=>{ const c=graphAt(0).chart; return { active: c.active.length, draws: __draws }; })()`);
         const gone = await tip();
-        return ms >= 3000 && shown && gone === null && r1.active === 0 && r1.draws > 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
+        return ms === 500 + 300 * words && words > 0 && shown && gone === null && r1.active === 0 && r1.draws > 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
     });
     await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
         const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);

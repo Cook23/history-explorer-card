@@ -681,7 +681,11 @@ export class CardCharts
             return formatNumber(_circQ ? Chart.hecCircular.wrap(v, _circQ * Math.abs(_tf)) : v, ds.rounding);
         };
         const _p = ds.data[item.index];
-        return ( _p?.columnMin != null ? `${_shown(_p.columnMin)} / ${_shown(item.yLabel)} / ${_shown(_p.columnMax)}` : _shown(item.yLabel) ) + _unit;
+        // (a column's min / mean / max — only when they differ as shown, rounded: else its mean)
+        const _mean = _shown(item.yLabel);
+        if( _p?.columnMin == null ) return _mean + _unit;
+        const _min = _shown(_p.columnMin), _max = _shown(_p.columnMax);
+        return ( _min === _mean && _max === _mean ? _mean : `${_min} / ${_mean} / ${_max}` ) + _unit;
     }
 
     // A tooltip's title: where its first element comes from — the history, or the statistics

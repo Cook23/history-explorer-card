@@ -100,7 +100,7 @@ or `maintainAspectRatio`.
 
 ### Global option: `Chart.defaults.global.gestures`
 
-`{ mouse: { longPressMs, slop }, touch: { longPressMs, slop } }` (default 500 ms each, 8 px for a mouse or a pen and 12 px for a finger) — the two thresholds every gesture is told apart by, for a mouse or a pen (`mouse`) and for a finger (`touch`), the same for every chart of the page (`Chart.hecGestures(pointerType)` reads them). `longPressMs`: a press held that long is a `longpress`; a second press within that long of a release — and within `slop` of it — is a `dblclickdown`; a click on a draggable zone keeps `touch-action: none` there that long (§5); the barrel button pressed twice within it is a `dblclick`. `slop`: a pointer that moved more than this (px, x + y) is dragging; a swipe on `handleButtons` shorter than it is none; a target within it of the pointer can be picked (`_hecPick`). The card sets them from its `gestures` settings.
+`{ mouse: { longPressMs, slop }, touch: { longPressMs, slop }, readingWordMs }` (default 500 ms each, 8 px for a mouse or a pen and 12 px for a finger; `readingWordMs` 300: the reading time of a word, every pointer alike — `Chart.hecUi.readingTime`) — the two thresholds every gesture is told apart by, for a mouse or a pen (`mouse`) and for a finger (`touch`), the same for every chart of the page (`Chart.hecGestures(pointerType)` reads them). `longPressMs`: a press held that long is a `longpress`; a second press within that long of a release — and within `slop` of it — is a `dblclickdown`; a click on a draggable zone keeps `touch-action: none` there that long (§5); the barrel button pressed twice within it is a `dblclick`. `slop`: a pointer that moved more than this (px, x + y) is dragging; a swipe on `handleButtons` shorter than it is none; a target within it of the pointer can be picked (`_hecPick`). The card sets them from its `gestures` settings.
 
 None of these existed in stock 2.7.1 — `options.hover.mode`,
 `options.scales.yAxes[0].ticks.min/max`, `options.legend`, etc. are all
@@ -497,7 +497,7 @@ is passed in).
 |---|---|
 | `FADE` | How long a floating element takes to fade out — the hover tooltip's, and its highlighted points' with it. |
 | `pick(clientX, clientY, elements)` | The picking rule (`_hecPick`) on page elements — the card's small toolbar buttons: the index of the one picked, `-1`, or `-2` (between two). |
-| `readingTime(text)` | How long a message stays up: 1 s + 0.5 s per word (`isWord`; words split on spaces and underscores). |
+| `readingTime(text)` | How long a message or a tooltip stays up: 0.5 s + `Chart.defaults.global.gestures.readingWordMs` (300 ms by default) per word (`isWord`; words split on spaces and underscores). |
 | `isWord(token)` | Is a piece of text a word: two letters or digits at least — not a single letter, a punctuation mark or a symbol on its own. The card counts words with it too (the graph menu's title). |
 | `clampToViewport(el, boundsEl)` | Nudges an already-positioned element back inside: left/right/top within the most restrictive of `boundsEl` and the viewport, bottom within the viewport only; `boundsEl` null = viewport only. |
 | `attachFloating(el, anchorEl)` | Places `el` against `anchorEl`'s `offsetParent` (absolute), or `document.body` (fixed) when there's none, so it scrolls with its anchor; closes it by itself (`closeFloating`) when the anchor disappears or is hidden. |

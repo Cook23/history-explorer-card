@@ -20,13 +20,13 @@ module.exports = async function()
     const names = s => s.replace(/^.:|@.*$/g, '').split('+').sort().join();
 
     await t.step('barrel button held: a drag moves a curve label right away (no tap first)', async () => {
-        const g0 = await t.graphs(); const a = await E('legendPt(0,0)'); const c = await E('legendPt(0,2)');
+        const g0 = await t.graphs(); const a = await E('legendNamePt(0,0)'); const c = await E('legendNamePt(0,2)');
         await t.penDrag(a, { x: c.x + 5, y: c.y }, true);
         const g1 = await t.graphs();
         return g1.length === g0.length && g1[0] !== g0[0] && names(g1[0]) === names(g0[0]) && !/\(h\)/.test(g1[0]) ? true : `${g0[0]} -> ${g1.join(' | ')}`;
     });
     await t.step('barrel button held: a tap on a curve label opens its type menu, no browser menu', async () => {
-        const a = await E('legendPt(0,1)');
+        const a = await E('legendNamePt(0,1)');
         await E(`window.__ctx=0; document.addEventListener('contextmenu', e => { if( !e.defaultPrevented ) window.__ctx++; }, { once: true })`);
         await t.penTap(a, true);
         await E(`graphAt(0).canvas.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: ${a.x}, clientY: ${a.y} }))`);
@@ -38,12 +38,12 @@ module.exports = async function()
     });
     await t.step('tip on a YAML curve label, barrel button pressed twice: split into a linked graph', async () => {
         const n0 = (await t.graphs()).length;
-        await t.penBarrelDouble(await E('legendPt(0,0)'));
+        await t.penBarrelDouble(await E('legendNamePt(0,0)'));
         const g1 = await t.graphs();
         return g1.length === n0 + 1 && !g1.some(x => /\(h\)/.test(x)) ? true : g1.join(' | ');
     });
     await t.step('tip tap on a curve label: shows/hides it, as a finger does', async () => {
-        const a = await E('legendPt(0,0)');
+        const a = await E('legendNamePt(0,0)');
         await t.penTap(a); await t.wait(800); const g1 = (await t.graphs())[0];
         await t.wait(500);
         await t.penTap(a); await t.wait(800); const g2 = (await t.graphs())[0];
@@ -193,14 +193,14 @@ module.exports = async function()
     const menuOpen = () => E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300); };
     await t.step('a tap with the pen\'s button on a curve label (only a context menu): its type menu, no browser menu', async () => {
-        const a = await E('legendPt(0,0)');
+        const a = await E('legendNamePt(0,0)');
         const prevented = await t.contextMenu(a); await t.wait(400);
         const open = await menuOpen(); const g = await t.graphs();
         await closeMenu();
         return open && prevented && !g.some(x => /\(h\)/.test(x)) ? true : JSON.stringify({ open, prevented, g });
     });
     await t.step('a tap on a curve label, then a tap with the pen\'s button on it: the curve stays hidden, its type menu', async () => {
-        const a = await E('legendPt(0,0)');
+        const a = await E('legendNamePt(0,0)');
         await t.penTap(a); await t.wait(800);
         const g1 = await t.graphs();
         await t.contextMenu(a); await t.wait(400);
@@ -210,7 +210,7 @@ module.exports = async function()
         return open && /\(h\)/.test(g1[0]) && g2[0] === g1[0] ? true : JSON.stringify({ open, g1, g2 });
     });
     await t.step('a long press, then the context menu a browser reports at the release: one long press only', async () => {
-        const a = await E('legendPt(0,1)');
+        const a = await E('legendNamePt(0,1)');
         await E(`(()=>{ window.__lp=0; const c=graphAt(0).chart; const f=c.options.customEvent; c.options.customEvent=(p)=>{ if( p.gestureType==='longpress' ) window.__lp++; return f(p); }; })()`);
         await t.pen('pointerdown', a, 1, 0); await t.wait(900); await t.pen('pointerup', a, 0, 0);
         await t.contextMenu(a); await t.wait(400);

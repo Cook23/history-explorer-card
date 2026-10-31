@@ -6,6 +6,20 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.53] - 2026-10-30
 
+### Changed — a column's min / mean / max in the tooltip, when they differ
+- A value of a column of pixels (statistics, or a history aggregated) showed its min / mean / max even when, rounded as shown, all three were the same (`1.33 / 1.33 / 1.33 kW`): only its mean then (`_tooltipValue`)
+- Test (`features`): three values differing as shown, the same as shown, a single value
+
+### Fixed — a tooltip left over another view
+- A tooltip of curves chosen by a click stayed up over another view of Home Assistant until it faded: leaving the view closed it, but the next refresh of the data drew it again, hung on the page's body, the graph being no longer in the page. A graph no longer in the page shows no tooltip (`_hecShowTooltip`)
+- Test (`points`): the card taken out of the page, then a refresh: no tooltip
+
+### Added — the reading time of a word
+- `gestures: readingTimePerWord` (ms, 100 to 1000, default 300), in *Global ▸* of the options menu as the other gesture settings, super-global as them: a tooltip or a message stays up 0.5 s plus this per word it holds (was 1 s plus 0.5 s per word) — Chart.js `Chart.defaults.global.gestures.readingWordMs`, `Chart.hecUi.readingTime`
+- Tests (`settings`): the setting in the menu, its default, bounds and saving as the others; the reading time of a text
+- Test (`mouse`): a tooltip left still stays 0.5 s plus 300 ms a word
+- Tests (`pen`): a tap on a curve label aims at its name (`legendNamePt`): the label's middle could fall on its value, which opens the entity's dialog instead of hiding the curve — as it did with longer values
+
 ### Fixed — a pen's hover over a magnifier, back in range or moving again
 - A magnifier grew only when a pointer entered it. A pen gone out of range (or held still) shrank it back after 1 s, but coming back over it sends moves and no new entry: it stayed small until the pen left and came back. Every hover over an element now goes through one rule, `Chart.hecUi.hover(el, start, end)`: started by its entry or any move over it, ended by its leaving, a cancel, or a pen still for 0.5 s (was 1 s) — a hovering pen is never still. Used by the magnifiers and the values over a graph; a graph's hover (`penHover`) already started again with the next move
 - Tests (`pen`): Chrome 158's hover (moves as "pen", entering and leaving as "mouse", a mousemove after each move) — a magnifier and the tooltip; Firefox's (all as "mouse"); a magnifier and a graph's hover dot gone with the pen still, back when it moves again

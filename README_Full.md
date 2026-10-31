@@ -179,7 +179,7 @@ tooltip:
 ```
 
 **Its size** (`tooltip.size`) — every tooltip has the same layout, in one of three sizes:
-- `full` — its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown: its color box, its series' name and its value — a curve's or a bar's in its unit (`min / mean / max` for a column of values, see [Data decimation](#data-decimation)), a timeline's state, an arrowline's value;
+- `full` — its title says where its first value comes from — `History`, or `Statistics` and their period (`5 min`, `1 h`) — and its time: a value's own, or the time a column of values, a bar or a state covers (`27 Oct, 05:10:43 – 19:37:05`, the end's date only when it's another day). Then a line per value shown: its color box, its series' name and its value — a curve's or a bar's in its unit (`min / mean / max` for a column of values — its mean alone when the three are the same as shown —, see [Data decimation](#data-decimation)), a timeline's state, an arrowline's value;
 - `compact` — its title is the time alone; then a line per value: its color box, its series' name at its shortest (as a narrow legend shortens it, see [Legend / entity labels](#legend--entity-labels)) and its value;
 - `slim` — no title; one value only, the one pointed at, whatever the mode, on one line: its color box, its time and its value. The time leaves out its date when the window shown is a single day, or when the time axis shows each day; a span over several days keeps its dates;
 - `auto` (the default) — `full` on a card 600 px wide or more, `compact` from 300 px (and in the info panel), `slim` below.
@@ -1123,7 +1123,7 @@ statistics:
 
 A long time window holds far more values than the graph has pixels: a week of a sensor reporting every few seconds is hundreds of thousands of values over some 900 pixels. Drawing them all froze the page for nothing — they land on the same pixels. So:
 
-- **Curves — one point per column of pixels.** The graph's width is cut into columns of one pixel each. A column holding several values — of the history, or an hour of statistics — is drawn as one point: their **mean**, each value weighted by how long it lasted. Computed as Home Assistant compiles its statistics: the value in force when the column starts counts too, from its start, in the mean, the minimum and the maximum — an hour of the history gives exactly that hour's statistics, and nothing shows where the history meets the statistics. Their **minimum** and **maximum** are kept with it: `showMinMax` draws them as a lighter band around the curve, and the tooltip shows `min / mean / max`, with the interval of time the point covers. A column holding a single value of the history draws it as is: zoomed in, every value is there, point by point. Whether the values come from the statistics or the history, see [Long term statistics](#long-term-statistics).
+- **Curves — one point per column of pixels.** The graph's width is cut into columns of one pixel each. A column holding several values — of the history, or an hour of statistics — is drawn as one point: their **mean**, each value weighted by how long it lasted. Computed as Home Assistant compiles its statistics: the value in force when the column starts counts too, from its start, in the mean, the minimum and the maximum — an hour of the history gives exactly that hour's statistics, and nothing shows where the history meets the statistics. Their **minimum** and **maximum** are kept with it: `showMinMax` draws them as a lighter band around the curve, and the tooltip shows `min / mean / max` (the mean alone when, rounded, the three are the same), with the interval of time the point covers. A column holding a single value of the history draws it as is: zoomed in, every value is there, point by point. Whether the values come from the statistics or the history, see [Long term statistics](#long-term-statistics).
 - **Aggregated — groups of your own.** See [Aggregation](#aggregation): a point a day, an hour, or `pointsPerHour` points an hour, each the function you choose.
 - **Timelines — merged under 2 pixels.** States following each other that are each narrower than 2 pixels — too thin to tell apart, or to point at — are merged into one *multiple* block; zoom in and they appear. A state 2 pixels wide or more is always drawn, and a short state alone, between two longer ones, keeps its own color. A timeline of directions (`arrowline`), or with a `process` function, is never merged.
 
@@ -1599,7 +1599,9 @@ Every gesture is told apart by two thresholds, one pair for a mouse or a pen, on
 - **the long-press duration** — a press held this long is a long-press; a second press this soon after a release, at the same place, is a double-click (or a tap-then-drag); after a tap on a label, a graph's ⠿ zone or the Y axis, the page doesn't scroll from there for that long, so that a drag can follow;
 - **the precision** — a pointer that moved further than this is dragging; a second press within it of the first is at the same place; a label, a button or a curve within it of the pointer can be picked.
 
-Raise them for a less steady or slower hand. In the YAML (any card), or in *Global ▸* of the options menu:
+And, for every pointer, **the reading time of a word**: a tooltip or a message stays up 0.5 s, plus this per word it holds.
+
+Raise them for a less steady or slower hand, or a slower reading. In the YAML (any card), or in *Global ▸* of the options menu:
 
 ```yaml
 type: custom:history-explorer-card
@@ -1608,6 +1610,7 @@ gestures:
   longPressTouch: 500   # ms, finger
   precision: 8          # px, mouse and pen (4 to 20; default 8)
   precisionTouch: 12    # px, finger (4 to 20; default 12)
+  readingTimePerWord: 300   # ms per word of a tooltip or a message (100 to 1000; default 300)
 ```
 
 A value out of bounds is brought within them. They apply to every card and info panel of the page: whether set in a card's YAML or in the menu, the last one to speak wins, and they are kept on every device, whatever the card's persistence options — as the info panel's switch.
