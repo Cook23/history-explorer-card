@@ -49,6 +49,9 @@ reset to its line after a merge.
   under the version it carries; the release changes nothing in the files. So every merge must
   be publishable as is: its version number, CHANGELOG and docs final — no build number, no
   `[Unreleased]`, nothing left to fix at the release.
+- **The version is the software's and its docs'.** A merge that touches neither the source nor
+  the docs — only Claude's own files (`CLAUDE.md`, `BRANCH.md`) — keeps the version as it is,
+  released or not.
 - **The version number is the last release's + 1.** Before each merge, check on GitHub which
   version was released last (its releases) and which versions are dead (its tags: a tag
   without a release); the version merged — everywhere it's written: `package.json`, the source `src/history-explorer-card.js`, the built `history-explorer-card.js` and
