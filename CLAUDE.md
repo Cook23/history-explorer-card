@@ -2,6 +2,9 @@
 
 Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
 `src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
+Work branches for pull requests: `claude/v1.1-port` (from `main`) and `claude/v1.2-dev-port`
+(from `v1.2-dev`) — always these two, never a new one, whatever name a session is given; each
+reset to its line after a merge.
 
 ## How to work — set by the user, not negotiable
 
