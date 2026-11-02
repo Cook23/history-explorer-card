@@ -48,7 +48,7 @@ module.exports = async function()
         const dragged = { tip: await tip(), mode: await mode() };
         return pressed.tip === null && !pressed.mode && dragged.tip === null && !dragged.mode ? true : JSON.stringify({ pressed, dragged });
     });
-    await t.step('left still, the tooltip stays its reading time (0.5 s, plus 300 ms a word by default), then fades out with the highlighted point', async () => {
+    await t.step('left still, the tooltip stays its reading time (0.5 s, plus 400 ms a word by default), then fades out with the highlighted point', async () => {
         const p1 = await E('pointPt(0,0.4)');
         await t.page.mouse.click(p1.x, p1.y); await t.wait(300);
         // (the graph redrawn once the tooltip goes: without it, the point stays on screen)
@@ -61,7 +61,7 @@ module.exports = async function()
         await t.wait(800 + 1000 + 500);
         const r1 = await E(`(()=>{ const c=graphAt(0).chart; return { active: c.active.length, draws: __draws }; })()`);
         const gone = await tip();
-        return ms === 500 + 300 * words && words > 0 && shown && gone === null && r1.active === 0 && r1.draws > 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
+        return ms === 500 + 400 * words && words > 0 && shown && gone === null && r1.active === 0 && r1.draws > 0 ? true : JSON.stringify({ ms, shown, gone, r0, r1 });
     });
     await t.step('picking a label: on it, just beside it; none clearly beside, halfway between two, or on the curves', async () => {
         const r = await E(`(()=>{ const c=graphAt(0).chart; const b=c.legend.legendHitBoxes; const at=(x,y)=>c._hecLegendIndexAt(x,y);

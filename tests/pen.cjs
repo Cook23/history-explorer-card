@@ -155,6 +155,61 @@ module.exports = async function()
         await t.pen('pointerout', p2, 0, -1, 'pen', 7); await t.pen('pointerleave', p2, 0, -1, 'pen', 7); await t.wait(300);
         return on && !still && again ? true : JSON.stringify({ on, still, again });
     });
+    // ── Entries with no move: the browser's, when the page moves under a pointer still or gone
+    // (a scroll) — nothing starts on them ──
+    await t.step('an entry with no move (the page scrolled under a pointer gone): the magnifier stays small; a move: twice as large', async () => {
+        const b = await mag('b4');
+        await t.pen('pointerover', b, 0, -1, 'mouse', 1); await t.pen('pointerenter', b, 0, -1, 'mouse', 1); await t.wait(300);
+        const entered = await big('b4');
+        await chromeHover({ x: b.x - 2, y: b.y }, { x: b.x + 2, y: b.y }, 2); const moved = await big('b4');
+        await t.pen('pointerout', b, 0, -1, 'mouse', 1); await t.pen('pointerleave', b, 0, -1, 'mouse', 1); await t.wait(200);
+        return !entered && moved ? true : JSON.stringify({ entered, moved });
+    });
+    await t.step('a finger on a magnifier: twice as large while it presses (a contact, no move); lifted: back to its size', async () => {
+        const b = await mag('b5');
+        await t.pen('pointerover', b, 1, 0, 'touch', 9); await t.pen('pointerenter', b, 1, 0, 'touch', 9); await t.pen('pointerdown', b, 1, 0, 'touch', 9); await t.wait(100);
+        const pressed = await big('b5');
+        await t.pen('pointerup', b, 0, 0, 'touch', 9); await t.pen('pointerout', b, 0, -1, 'touch', 9); await t.pen('pointerleave', b, 0, -1, 'touch', 9); await t.wait(200);
+        const lifted = await big('b5');
+        return pressed && !lifted ? true : JSON.stringify({ pressed, lifted });
+    });
+    await t.step('a graph: an entry with no move (the page scrolled under a pointer gone): no hover dot, no hover; a move: its dot', async () => {
+        const p = await E(`pointPt(${gi},0.5)`);
+        const st = () => E(`(()=>{ const c=graphAt(${gi}).chart; return { dot: !!c._hecHoverDot, over: !!c._hecPointerOver }; })()`);
+        await t.pen('pointerover', p, 0, -1, 'mouse', 1); await t.pen('pointerenter', p, 0, -1, 'mouse', 1); await t.wait(300);
+        const entered = await st();
+        await t.penHover({ x: p.x - 20, y: p.y }, p, 4); await t.wait(200); const moved = await st();
+        await t.pen('pointerout', p, 0, -1, 'mouse', 1); await t.pen('pointerleave', p, 0, -1, 'mouse', 1); await t.wait(300);
+        return !entered.dot && !entered.over && moved.dot && moved.over ? true : JSON.stringify({ entered, moved });
+    });
+    await t.step('the entity selector: an entry the list brings under a pointer with no move previews nothing; a move over it: its preview, once', async () => {
+        await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('power'); await t.wait(500);
+        const a = await E(`(()=>{ const e=el.querySelector('#es_0 a[data-entity]:not([style*="display: none"])'); const r=e.getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2, id: e.dataset.entity }; })()`);
+        await E(`window.__msgs=[]; window.__show=window.__show||el.instance.showMessage.bind(el.instance); el.instance.showMessage=(...m)=>{ __msgs.push(m[0]); return __show(...m); }`);
+        await t.pen('pointerover', a, 0, -1, 'mouse', 1); await t.pen('pointerenter', a, 0, -1, 'mouse', 1); await t.wait(200);
+        const entered = await E('__msgs.length');
+        for( let i = 0; i < 3; i++ ) { await t.pen('pointermove', { x: a.x + i, y: a.y }, 0, -1, 'pen', 7); await t.wait(30); }
+        const moved = await E('JSON.stringify(__msgs)');
+        await t.pen('pointerleave', a, 0, -1, 'mouse', 1);
+        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(300);
+        return entered === 0 && JSON.parse(moved).length === 1 && JSON.parse(moved)[0].includes(a.id) ? true : JSON.stringify({ entered, moved, id: a.id });
+    });
+    await t.step('the entity selector: a finger\'s contact previews its entry; moves within it: no other preview; another entry: its preview; the list left, then the first again: previewed again', async () => {
+        await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('power'); await t.wait(500);
+        const ids = await E(`[...el.querySelectorAll('#es_0 a[data-entity]')].filter(e=>e.style.display!=='none').slice(0,2).map(e=>e.dataset.entity)`);
+        if( ids.length < 2 ) return 'fewer than 2 entries: ' + JSON.stringify(ids);
+        // (an entry's place, read just before each event: the list may move)
+        const at = (id, dx = 0) => E(`(()=>{ const r=el.querySelector('#es_0 a[data-entity="${id}"]').getBoundingClientRect(); return { x: r.left+20+${dx}, y: r.top+r.height/2 }; })()`);
+        await E(`window.__msgs=[]; window.__show=window.__show||el.instance.showMessage.bind(el.instance); el.instance.showMessage=(...m)=>{ __msgs.push(m[0]); return __show(...m); }`);
+        await t.pen('pointerdown', await at(ids[0]), 1, 0, 'touch', 9);
+        await t.pen('pointermove', await at(ids[0], 3), 1, -1, 'touch', 9); await t.pen('pointermove', await at(ids[0], 6), 1, -1, 'touch', 9);
+        await t.pen('pointermove', await at(ids[1]), 1, -1, 'touch', 9); await t.pen('pointercancel', await at(ids[1]), 0, -1, 'touch', 9);
+        await t.pen('pointerleave', await at(ids[1]), 0, -1, 'mouse', 1);
+        await t.pen('pointermove', await at(ids[0]), 0, -1, 'pen', 7); await t.wait(100);
+        const m = JSON.parse(await E('JSON.stringify(__msgs)'));
+        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(300);
+        return m.length === 3 && m[0].endsWith(ids[0]) && m[1].endsWith(ids[1]) && m[2].endsWith(ids[0]) ? true : JSON.stringify({ ids, m });
+    });
     await t.step('Chrome: the tooltip opened by a tap follows a "pen" hover entered by a "mouse", with its mousemoves; left by a "mouse": it closes', async () => {
         const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
         await t.penTap(p1); await t.wait(400);

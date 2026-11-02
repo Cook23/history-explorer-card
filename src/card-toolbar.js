@@ -183,22 +183,18 @@ export class CardToolbar
         // stays on pointerdown/pointerup, see the dropdown entry's own handling).
         // Delegated on the dropdown container so it survives entries being
         // recreated on every re-filter, instead of re-attaching per entry.
-        this._this.querySelector(`#es_${i}`)?.addEventListener('pointerover', (e) => {
-            if( e.pointerType === 'touch' ) return;
+        // (the entry a pointer is over previewed — once per entry —, on a sign that a pointer
+        // is there: a move — a mouse's or a pen's hover, a finger dragged along the list —, or
+        // a contact; never on an entry the list's scrolling brings under a pointer still or
+        // gone. Choosing still happens on the entry's own click)
+        const _list = this._this.querySelector(`#es_${i}`);
+        let _previewed = null;
+        const _preview = (e) => {
             const _a = e.target.closest('a[data-entity]');
-            if( _a ) this.previewEntityTooltip(_a.dataset.entity, i);
-        });
-        // Touch has no hover event at all — preview on pointerdown/pointermove
-        // instead, while the finger can still be dragged to a different entry
-        // before lifting. Actual selection still only happens on the entry's own
-        // click handler (pointerup), unchanged.
-        const _touchPreview = (e) => {
-            if( e.pointerType !== 'touch' ) return;
-            const _a = e.target.closest('a[data-entity]');
-            if( _a ) this.previewEntityTooltip(_a.dataset.entity, i);
+            if( _a && _a !== _previewed ) { _previewed = _a; this.previewEntityTooltip(_a.dataset.entity, i); }
         };
-        this._this.querySelector(`#es_${i}`)?.addEventListener('pointerdown', _touchPreview);
-        this._this.querySelector(`#es_${i}`)?.addEventListener('pointermove', _touchPreview);
+        for( const t of ['pointerdown', 'pointermove'] ) _list?.addEventListener(t, _preview);
+        for( const t of ['pointerleave', 'pointercancel'] ) _list?.addEventListener(t, () => { _previewed = null; });
 
         this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
         this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);

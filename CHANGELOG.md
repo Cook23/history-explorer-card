@@ -4,6 +4,28 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.54] - 2026-11-02
+
+### Changed — the reading time of a word: 400 ms by default
+- `gestures: readingTimePerWord`: 400 ms by default (was 300): a tooltip or a message stays up 0.5 s plus 400 ms per word it holds
+- Tests (`settings`, `mouse`): the default of 400 ms; a value entered in the menu, 500 ms
+- Code: a gesture setting's default written once in Chart.js (`Chart.defaults.global.gestures`), no more again where it's read (`hecUi.readingTime`, `Chart.hecGestures`); `ARCHITECTURE.md` rule 9 — a business default in one place
+
+### Fixed — a tooltip shown again, for good, back on the view
+- A tooltip of curves chosen by a click, Home Assistant switched to another view then back to the card's: the next refresh of the data showed the tooltip again, and it never went away. Whatever ends the tooltip — its reading time over, the graph gone from the page, a menu opened — now ends the hover with it (`Chart.hecUi.endFloating`, the one end of a floating element); only a gesture opens a tooltip, a refresh only updates one shown. The check of 1.2.53 in `_hecShowTooltip` is gone, taken into `attachFloating`
+- Test (`points`): the card taken out of the page, then a refresh: no tooltip; back in the page, then a refresh: none either, the hover ended; a click opens it again
+
+### Fixed — a circular curve jumping back and forth over the edge of its turn
+- A circular curve going round more than a turn in the window, put in a one-turn band, jumped a turn each time it crossed the band's edge — back and forth, dashed, for a wind swinging around that direction. It now goes on past the edge, up to a twentieth of a turn on either side, and comes back with no jump; it jumps only when it goes further: a turn and a tenth at most on the Y axis (`Chart.hecCircular.place`, `HYSTERESIS`). A Y range set by hand keeps each value within its turn, as before
+- Test (`yaxes`): a wind swinging over the edge, then going further: one jump, a turn and a tenth at most
+
+### Fixed — a hover started by the page scrolling
+- A magnifier shrunk after the pen went away grew again when the page scrolled: the browser sends an entry (`pointerover` / `pointerenter`, typed `mouse`) when the page moves under a pointer still or gone, with no move. A hover now starts only on a sign that a pointer is there — a move, or a contact for a finger —, never on an entry alone (`Chart.hecUi.hover`); it still ends on a leaving, a cancel, or a pen still for 0.5 s
+- The values over a graph: a text cut shown in full on a pointer's move (`pointermove`, a mouse's or a pen's), no longer on the mouse events' copies
+- The entity selector: an entry previewed on a move over it or a contact — once per entry —, every pointer alike; no longer on an entry the list's scrolling brings under a pointer
+- Tests (`pen`): an entry with no move — the magnifier stays small, a move makes it large; a graph — no hover dot, no hover; a finger on a magnifier — large while it presses, small once lifted; the entity selector — no preview on an entry alone, one on a move; a finger's contact previews its entry, its moves within it nothing more, another entry its own, the list left then the first again: previewed again
+- Test (`values`): a name cut — an entry with no move, a mousemove alone, a finger's move: not shown; a pen's move: shown; the pen then still: closed
+
 ## [v1.2.53] - 2026-10-30
 
 ### Changed — a column's min / mean / max in the tooltip, when they differ

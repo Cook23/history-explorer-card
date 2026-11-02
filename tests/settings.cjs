@@ -42,7 +42,7 @@ module.exports = async function()
         await closeMenus();
         return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸' && r.ex === 'History' && r.exportClosed
             && /Enhanced native history/.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all) && /Reading time per word/.test(r.all)
-            && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12, readingTimePerWord: 300 }) ? true : JSON.stringify(r);
+            && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12, readingTimePerWord: 400 }) ? true : JSON.stringify(r);
     });
     // With submenu sub of menu open: '' when the menu's lines are readable beside it (its
     // text clear of the submenu) — the last line's submenu: no wider than the menu —, else
@@ -87,12 +87,12 @@ module.exports = async function()
         const v = await inputs(), g = JSON.parse(await chartG()); await closeMenus();
         return v.longPress === 2000 && v.precision === 4 && g.mouse.longPressMs === 2000 && g.mouse.slop === 4 && g.touch.longPressMs === 500 ? true : JSON.stringify({ v, g });
     });
-    await t.step('the reading time of a word: 300 ms by default — a text of 3 words up 0.5 s + 3 × 300 ms; entered 99999: kept at 1000, given to Chart.js; 400: 0.5 s + 3 × 400 ms', async () => {
+    await t.step('the reading time of a word: 400 ms by default — a text of 3 words up 0.5 s + 3 × 400 ms; entered 99999: kept at 1000, given to Chart.js; 500: 0.5 s + 3 × 500 ms', async () => {
         const time = () => t.E(`graphAt(0).chart.constructor.hecUi.readingTime('Outside temperature now')`);
         const d = await time();
         await openAll(); await enter('readingTimePerWord', 99999); const v = await inputs(), g = JSON.parse(await chartG());
-        await enter('readingTimePerWord', 400); await closeMenus(); const s = await time();
-        return d === 1400 && v.readingTimePerWord === 1000 && g.readingWordMs === 1000 && s === 1700 ? true : JSON.stringify({ d, v, g, s });
+        await enter('readingTimePerWord', 500); await closeMenus(); const s = await time();
+        return d === 1700 && v.readingTimePerWord === 1000 && g.readingWordMs === 1000 && s === 2000 ? true : JSON.stringify({ d, v, g, s });
     });
     await t.step('the long press duration: 1200 ms — a press of 800 ms opens no type menu, one of 1500 ms does', async () => {
         await openAll(); await enter('longPress', 1200); await enter('precision', 10); await closeMenus();
@@ -132,7 +132,7 @@ module.exports = async function()
     await t.step('another device changes it (in Home Assistant): this device takes it at its next load', async () => {
         await t.E(`window.__setUD('history-explorer-gestures', { longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20 })`);
         await reload(YAML({ gestures: { longPress: 800 } })); await openAll(); const v = await inputs(); await closeMenus();
-        return JSON.stringify(v) === JSON.stringify({ longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20, readingTimePerWord: 400 }) ? true : JSON.stringify(v);
+        return JSON.stringify(v) === JSON.stringify({ longPress: 700, longPressTouch: 900, precision: 12, precisionTouch: 20, readingTimePerWord: 500 }) ? true : JSON.stringify(v);
     });
     await t.step('the info panel switch (Enhanced native history): no confirmation, a click switches it; saved on every device without any persistence option', async () => {
         const sw = () => t.E(`el.querySelector('#ei_0').getAttribute('aria-checked')`);

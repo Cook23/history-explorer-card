@@ -513,12 +513,12 @@ module.exports = async function()
     });
     await t.step('a pen above the screen, a finger while it presses: the magnifier twice as large too, back to its size once left', async () => {
         const size = () => t.E(`Math.round(el.querySelector('#b5_0 svg').getBoundingClientRect().width)`);
-        const send = (type, pointerType) => t.E(`el.querySelector('#b5_0').dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: '${pointerType}', isPrimary: true, buttons: 0 }))`);
+        const send = (type, pointerType, buttons = 0) => t.E(`el.querySelector('#b5_0').dispatchEvent(new PointerEvent('${type}', { pointerId: 7, pointerType: '${pointerType}', isPrimary: true, buttons: ${buttons} }))`);
         await t.page.mouse.move(5, 5); await t.wait(300);
-        await send('pointerenter', 'pen'); await t.wait(400); const pen = await size();
+        await send('pointerenter', 'pen'); await send('pointermove', 'pen'); await t.wait(400); const pen = await size();
         await send('pointerleave', 'pen'); await t.wait(400); const left = await size();
-        await send('pointerenter', 'touch'); await t.wait(400); const finger = await size();
-        await send('pointerleave', 'touch'); await t.wait(400); const up = await size();
+        await send('pointerenter', 'touch', 1); await send('pointerdown', 'touch', 1); await t.wait(400); const finger = await size();
+        await send('pointerup', 'touch'); await send('pointerleave', 'touch'); await t.wait(400); const up = await size();
         return pen === 40 && left === 20 && finger === 40 && up === 20 ? true : JSON.stringify({ pen, left, finger, up });
     });
     await t.step('a pen gone out of hover range over a magnifier (no more moves, no pointerleave): back to its size 0.5 s after its last move', async () => {

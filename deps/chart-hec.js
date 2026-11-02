@@ -516,6 +516,9 @@
   // card (its samples, before they're grouped by column: a mean across 0 needs them
   // continuous) and for the plugin hecCircularView below (Chart Custom.js.md §1)
   Chart.hecCircular = {
+    // How far past a turn's edge a curve put in a turn goes on (place), on either side: a
+    // twentieth of a turn
+    HYSTERESIS: 0.05,
     // A value brought into [0, Q) — as the tooltip, the values over the graph and the Y axis'
     // labels show it (359 for -1)
     wrap: function (v, Q) {
@@ -526,7 +529,11 @@
     // moved by whole turns for the mean of those of the window shown (indices first to last)
     // to sit nearest target (undefined: their circular mean, in [0, Q)); those outside the
     // window put in the same turn, out of sight. Spanning more than a turn in the window:
-    // each value put in the one turn around target instead (band). → { values, band }
+    // each value put in the one turn around target instead (band). With no target (the Y
+    // axis automatic), with a hysteresis — a value crossing the turn's edge goes on past
+    // it, up to HYSTERESIS of a turn, and comes back with no jump; only further does it jump
+    // a turn: no jumps back and forth over the edge, a turn and a tenth at most shown. A
+    // target (a Y range set by hand) keeps each value within its turn. → { values, band }
     place: function (values, Q, first, last, target) {
       var n = values.length, mod = function (v) { return Chart.hecCircular.wrap(v, Q); };
       if (!n) return { values: [], band: false };
@@ -549,7 +556,13 @@
       var base, into = function (v) { var p = mod(v - base); return base + (Q - p < Q * 1e-9 ? 0 : p); };
       if (hi - lo > Q) {
         base = c - Q / 2;
-        return { values: r.map(into), band: true };
+        if (target != null) return { values: r.map(into), band: true };
+        var h = Chart.hecCircular.HYSTERESIS * Q, prev;
+        return { values: r.map(function (v, j) {
+          var go = j ? prev + v - r[j - 1] - Math.round((v - r[j - 1]) / Q) * Q : NaN;
+          prev = go >= base - h && go < base + Q + h ? go : into(v);
+          return prev;
+        }), band: true };
       }
       var mean = sum / (last - first + 1), k = Math.round((c - mean) / Q) * Q;
       base = mean + k - Q / 2;
@@ -748,11 +761,11 @@
   //                 press of a double-click lands within it of the first one.
   //                 Also how near a target must be to be picked (_hecPick).
   // And, for every pointer, readingWordMs — the reading time of a word (hecUi.readingTime).
-  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 8 }, touch: { longPressMs: 500, slop: 12 }, readingWordMs: 300 };
+  Chart.defaults.global.gestures = { mouse: { longPressMs: 500, slop: 8 }, touch: { longPressMs: 500, slop: 12 }, readingWordMs: 400 };
   // The thresholds of a pointer type ('mouse', 'pen' — a mouse's —, 'touch')
   Chart.hecGestures = function (pointerType) {
-    var g = Chart.defaults.global.gestures || {};
-    return (pointerType === 'touch' ? g.touch : g.mouse) || { longPressMs: 500, slop: pointerType === 'touch' ? 12 : 8 };
+    var g = Chart.defaults.global.gestures;
+    return pointerType === 'touch' ? g.touch : g.mouse;
   };
 
   // Each element's pen hover timer (hecUi.penHover)
@@ -776,16 +789,17 @@
         _penHoverTimers.set(el, setTimeout(function () { _penHoverTimers.delete(el); end(); }, hecUi.PEN_HOVER_TIMEOUT));
     },
 
-    // el's hover, every pointer alike: start() when one comes over el — its entry, or any
-    // move over it (a pen back in range, or moving again, sends moves but no new entry) —,
-    // end() when it goes — its leaving, a cancel, or a pen still (penHover: a hovering pen is
-    // never still, the hand trembles; it may also have gone out of range, sending nothing).
-    // Each called once per hover
+    // el's hover, every pointer alike: start() on a sign that a pointer is over el — a move
+    // over it, or a contact (a finger, which has no hover) —, never on its entry alone (the
+    // browser sends one when the page moves under a pointer still or gone: a scroll);
+    // end() on any sign that it's gone — its leaving, a cancel, or a pen still (penHover: a
+    // hovering pen is never still, the hand trembles; it may also have gone out of range,
+    // sending nothing). Each called once per hover
     hover: function (el, start, end) {
       var _on = false;
       var _start = function () { if (!_on) { _on = true; start(); } };
       var _end = function () { if (_on) { _on = false; end(); } };
-      el.addEventListener('pointerenter', _start);
+      el.addEventListener('pointerdown', _start);
       el.addEventListener('pointermove', function (e) { _start(); hecUi.penHover(el, e, _end); });
       ['pointerleave', 'pointercancel'].forEach(function (t) { el.addEventListener(t, function () { hecUi.penHover(el, null); _end(); }); });
     },
@@ -821,12 +835,11 @@
     },
 
     // How long a message or a tooltip stays up: 0.5 s, plus the reading time of a word —
-    // Chart.defaults.global.gestures.readingWordMs, 300 ms by default — per word (isWord;
+    // Chart.defaults.global.gestures.readingWordMs — per word (isWord;
     // words split on spaces and underscores — entity ids read as words).
     readingTime: function (text) {
       var _words = String(text || '').split(/[\s_]+/).filter(hecUi.isWord).length;
-      var _g = Chart.defaults.global.gestures, _perWord = _g && _g.readingWordMs !== undefined ? _g.readingWordMs : 300;
-      return 500 + _perWord * _words;
+      return 500 + Chart.defaults.global.gestures.readingWordMs * _words;
     },
 
     // The picking rule (_hecPick) on page elements — small buttons: of `elements`, the one
@@ -882,8 +895,11 @@
     // ancestor the browser already resolved — never forcing position onto someone
     // else's container), so it scrolls with its anchor; document.body + fixed when
     // there's none. It closes by itself (closeFloating) when anchorEl disappears or is
-    // hidden: a ResizeObserver reports a zero size then, with no help from anyone.
+    // hidden: a ResizeObserver reports a zero size then, with no help from anyone. An
+    // anchorEl out of the page (Home Assistant showing another view): el closed at once,
+    // never hung on the page's body over that view. → whether el is attached.
     attachFloating: function (el, anchorEl) {
+      if (!anchorEl.isConnected) { hecUi.closeFloating(el); return false; }
       var _offsetParent = anchorEl.offsetParent;
       var _targetParent = _offsetParent || document.body;
       if (el.parentNode !== _targetParent) _targetParent.appendChild(el);
@@ -900,6 +916,7 @@
         });
         el._hecObserver.observe(anchorEl);
       }
+      return true;
     },
 
     // (Re)shows el and arms its fade-out: fades in (the two opacity writes must land
@@ -913,14 +930,13 @@
       hecUi.startFade(el, duration);
     },
 
-    // Fades el out after duration — calling el._hecOnFade then, if its owner set one, for
-    // what must go with it — then closes it.
+    // Fades el out after duration, then closes it.
     startFade: function (el, duration) {
       clearTimeout(el._hecFadeTimer);
       clearTimeout(el._hecRemoveTimer);
       el._hecFadeTimer = setTimeout(function () {
         el.style.opacity = '0';
-        if (typeof el._hecOnFade === 'function') el._hecOnFade();
+        hecUi.endFloating(el);
       }, duration);
       el._hecRemoveTimer = setTimeout(function () { hecUi.closeFloating(el); }, duration + hecUi.FADE);
     },
@@ -931,6 +947,16 @@
       clearTimeout(el._hecRemoveTimer);
       if (el._hecObserver) el._hecObserver.disconnect();
       if (el.parentNode) el.remove();
+      hecUi.endFloating(el);
+    },
+
+    // The one end of a floating element, whatever ends it — its fade-out, or closed at once
+    // (its anchor gone, a menu opened): el._hecOnEnd called once, if its owner set one, for
+    // what must go with it (the tooltip: the hover of its chart).
+    endFloating: function (el) {
+      var _onEnd = el._hecOnEnd;
+      el._hecOnEnd = null;
+      if (typeof _onEnd === 'function') _onEnd();
     },
 
     // A short text message near a point — a refused drop, an entity already added, a
@@ -3200,8 +3226,8 @@
         _el = me._hecValuesEl = document.createElement('div');
         _el.style.cssText = 'padding:0 10px 4px 10px;color:var(--primary-text-color)';
         _el.addEventListener('click', function (ev) { me._hecOnValuesClick(ev); });
-        _el.addEventListener('mousemove', function (ev) { me._hecRevealValuesCut(ev.target, true); });
-        _el.addEventListener('mouseleave', function () { Chart.hecUi.closeReveal(_el, true); });
+        // (a text cut shown in full under a hover — a mouse's or a pen's move, not a finger's)
+        _el.addEventListener('pointermove', function (ev) { if (ev.pointerType !== 'touch') me._hecRevealValuesCut(ev.target, true); });
         // (a pen still, or gone out of range without leaving: the text shown in full closed all
         // the same — moving again, the next mousemove shows it again)
         Chart.hecUi.hover(_el, function () {}, function () { Chart.hecUi.closeReveal(_el, true); });
@@ -3859,20 +3885,20 @@
   // ── The hover tooltip, shown as a floating element (methods added to Chart.Tooltip) ──
 
   helpers.extend(Chart.Tooltip.prototype, {
-    _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onFade) {
+    // Only a gesture (justMoved) opens it; a redraw (a refresh of the data) only updates one
+    // shown. onEnd: what goes with it when it ends, whatever ends it (Chart.hecUi.endFloating).
+    _hecShowTooltip: function (content, x, y, anchorEl, backgroundColor, borderColor, textColor, caret, justMoved, onEnd) {
       var me = this;
       var _el = this._hecHoverTooltipEl;
-      // (a graph no longer in the page — Home Assistant showing another view —: no tooltip,
-      // never one hung on the page's body over that view, a refresh drawing it again)
-      if (!anchorEl || !anchorEl.isConnected) { if (_el) Chart.hecUi.closeFloating(_el); return; }
+      if (!justMoved && !(_el && _el.parentNode)) return;
       if (!_el) {
         _el = document.createElement('div');
         _el.id = 'hec-tooltip-hover';
         _el.style.cssText = 'position:absolute;z-index:9999;pointer-events:none;border-radius:4px;font-size:12px;line-height:1.4;box-shadow:0 2px 6px rgba(0,0,0,0.25);width:max-content;max-width:calc(100vw - 8px);transition:opacity ' + Chart.hecUi.FADE / 1000 + 's ease;opacity:0;';
         this._hecHoverTooltipEl = _el;
       }
-      _el._hecOnFade = onFade;
-      Chart.hecUi.attachFloating(_el, anchorEl);
+      _el._hecOnEnd = onEnd;
+      if (!Chart.hecUi.attachFloating(_el, anchorEl)) return;
       _el.style.background = backgroundColor;
       _el.style.border = borderColor ? (borderWidth(caret) + 'px solid ' + borderColor) : 'none';
       _el.style.color = textColor;
@@ -4023,7 +4049,7 @@
         { size: _vm.caretSize, xAlign: _vm.xAlign, yAlign: _vm.yAlign, cornerRadius: _vm.cornerRadius, borderWidth: _vm.borderWidth,
           padding: _vm.caretPadding, x: _canvasRect.left + _vm.caretX, y: _canvasRect.top + _vm.caretY },
         _justMoved,
-        // (as it fades out, the highlighted point fades out with it)
+        // (as it ends, the hover ends with it: the highlighted point fades out)
         function () { _chart._hecEndHover(); }
       );
     }

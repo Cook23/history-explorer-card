@@ -69,30 +69,50 @@ reset to its line after a merge.
   the user — never merged: not in `package.json`, `src/version.js`, the built `history-explorer-card.js`, the CHANGELOG, the docs, a code comment, or a commit
   or PR title.
 
-## The pen — what the browsers send (measured on the user's tablet), set by the user
+## Pointer events — what the browsers send (measured on the user's tablet), set by the user
 
-- **A pen is known only by `pointerType: "pen"`.** An event reported as `mouse` (or `touch`)
-  is treated as such: the card can't tell, and never guesses.
-- **Chrome stable 156** (Android 16, Samsung SM-X716B): no hover event at all — a Chrome bug,
-  reported ([issue 579057746](https://issues.chromium.org/issues/579057746)); Samsung Internet
-  sends them.
-- **Chrome beta 158**: hover moves as `pointermove` / `pointerrawupdate` of type `pen` (its own
-  `pointerId`, tilt, `buttons` 0), each followed by a `mousemove`; but `pointerover` /
-  `pointerenter` / `pointerout` / `pointerleave` of type `mouse` (`pointerId` 1); and the media
-  queries say `hover: none`, `any-hover: none`.
-- **Firefox**: the pen's hover as a mouse — pointer events of type `mouse`, each followed by its
-  mouse event; a contact as `touch`.
-- **A pen going out of range sends no leaving**: it just stops sending moves. Back in range, it
-  sends moves again, but no new entry.
-- **A hovering pen is never still** (the hand trembles): still for 0.5 s (`PEN_HOVER_TIMEOUT`),
-  its hover ends — as if it had left; moving again, it hovers again — as if it had entered.
-  Measured: a pen nearly still still sends a move every ~130 ms (its tilt changing), far more
-  often while it moves; 0.5 s is the user's choice.
-- **So, every hover goes through one place**: an element's through `Chart.hecUi.hover(el, start,
-  end)` (started by its entry or any move over it, ended by its leaving, a cancel, or the pen
-  still), a chart's through `Chart.hecUi.penHover` in its handling of the moves. Never a hover
-  started by `pointerenter` alone, never `@media (hover)` nor `:hover` (they follow the primary
-  pointer, a tablet's pen left out). `tests/pen.cjs` simulates each of these browsers.
+What the browsers send, as measured (*Tests (beta) ▸ Pen events*, a Samsung SM-X716B tablet
+under Android 16, its S Pen, a finger; Chrome 156 and 158 beta, Firefox, Samsung Internet):
+
+- **Chrome stable 156**: no hover event at all for the pen — a Chrome bug, reported
+  ([issue 579057746](https://issues.chromium.org/issues/579057746)). Samsung Internet sends them.
+- **Chrome beta 158**: the pen's hover moves as `pointerrawupdate` then `pointermove` of type
+  `pen` (its own `pointerId`, tilt, `buttons` 0, pressure 0), each followed by a `mousemove`;
+  but its `pointerover` / `pointerenter` / `pointerout` / `pointerleave` of type `mouse`
+  (`pointerId` 1, no tilt) — the type of an entry or a leaving is not the pen's.
+- **Firefox**: the pen's hover as a mouse — pointer events of type `mouse` (`mozInputSource`
+  1), each followed by its mouse event; a contact as `touch`.
+- **The media queries lie**: `hover: none`, `any-hover: none` on that tablet, though the pen
+  hovers (Firefox: `any-hover: hover`).
+- **A pen going out of range sends nothing**: no leaving, no last move — it just stops. Back in
+  range, it sends moves again, but no new entry. A leaving may come much later (seen 1.9 s
+  after the last move), or not at all.
+- **A hovering pen is never still** (the hand trembles): nearly still, it still sends a move
+  every ~130 ms, its tilt changing; moving, every ~16–20 ms.
+- **Entries and leavings are computed by the browser**, from the pointer's last known place:
+  when the page moves under a pointer that is still, or gone — a scroll, a layout change —, it
+  sends `pointerover` / `pointerenter` / `pointerout` / `pointerleave` (and their mouse
+  events) with no move at all. They prove nothing about a pointer being there.
+- **Mouse events are compatibility copies** of the pointer events (`mousemove` after each
+  `pointermove`…), without the pointer's type.
+
+**How the card reads them — one rule, everywhere (the graph, the magnifiers, the values over a
+graph, the entity selector's preview):**
+
+1. **A hover starts only on a sign that a pointer is there**: a move (`pointermove`), or a
+   contact (`pointerdown`) for a finger, which has no hover. Never on an entry alone.
+2. **It ends on any sign that it's gone**: a leaving, a cancel (`pointercancel`), or a pen
+   silent for 0.5 s (`PEN_HOVER_TIMEOUT` — as if it had left; moving again, it hovers again).
+   Ending wrongly costs nothing (the next move starts it again); starting wrongly leaves
+   something shown with no pointer there.
+3. **A pointer's type is read on its moves and contacts only** — never on an entry or a
+   leaving. A pen is known only by `pointerType: "pen"`; reported as `mouse` or `touch`, it is
+   treated as such: the card can't tell, and never guesses.
+4. **Pointer events only** — not their mouse copies; never `@media (hover)` nor `:hover` (they
+   follow the primary pointer, a tablet's pen left out).
+5. **In one place**: an element's hover through `Chart.hecUi.hover(el, start, end)`; a chart's
+   through its handling of the moves (Chart.js `handleEvent`), ending through the same
+   `Chart.hecUi.penHover`. `tests/pen.cjs` simulates each of these browsers.
 
 ## Architecture (1.2) — set by the user, not negotiable
 
@@ -111,6 +131,9 @@ it each time. So:
 - a deviation the test can't see, found by reading: fix it, and add a rule that catches
   its kind;
 - split code only when it reads better split — never for its size.
+- a business default in one place (`ARCHITECTURE.md` rule 9) — two at most, when they
+  differ before and after the persistence; Chart.js's own default of a setting the card
+  gives it is accepted, never a third copy where the value is used.
 
 ## mini-graph-card — the product's direction, set by the user, not negotiable
 
