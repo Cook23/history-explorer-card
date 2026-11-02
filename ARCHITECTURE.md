@@ -130,6 +130,16 @@ show it, and the conductor starts the card and wires the parts together.
    `graphOption`, after the persistence's merge (what is saved stays as it was set,
    nothing when it never was). A host's own defaults (the info panel's) go through
    `applyConfig`'s `defaults`.
+9. **Every business default is written in one place** — or in two when they have to differ
+   before and after the persistence (what is read and saved, what is applied) —, never
+   again where the value is used. The options' are `history-options.js`
+   `OPTION_DEFAULTS` (rule 8); the gesture settings' are `gesture-settings.js`
+   `GESTURE_SETTINGS`; the default colors are `history-default-colors.js`. Chart.js (the
+   fork, `deps/chart-hec.js`) may keep its own default of a setting the card gives it
+   (`Chart.defaults.global.gestures`), so as to work without the card: it never serves,
+   the card always setting it, and the card's is the business default. Nowhere else a
+   value standing for a default: no `?? 400`, no `!== undefined ? … : 400` where the
+   value is read — the code reads the one place that holds it.
 
 ## Where a change goes
 

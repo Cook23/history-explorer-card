@@ -19,7 +19,7 @@ export const GESTURE_SETTINGS = {
     longPressTouch : { pointer: 'touch', key: 'longPressMs', def: 500, min: 200, max: 2000, step: 50, unit: 'ms', label: 'ui.menu.gesture_long_press_touch' },
     precision      : { pointer: 'mouse', key: 'slop',        def: 8,   min: 4,   max: 20,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision' },
     precisionTouch : { pointer: 'touch', key: 'slop',        def: 12,  min: 4,   max: 20,   step: 1,  unit: 'px', label: 'ui.menu.gesture_precision_touch' },
-    readingTimePerWord : { pointer: null, key: 'readingWordMs', def: 300, min: 100, max: 1000, step: 50, unit: 'ms', label: 'ui.menu.gesture_reading_word' },
+    readingTimePerWord : { pointer: null, key: 'readingWordMs', def: 400, min: 100, max: 1000, step: 50, unit: 'ms', label: 'ui.menu.gesture_reading_word' },
 };
 
 // A setting's value brought within its bounds (rounded to its step); undefined when it

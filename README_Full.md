@@ -962,7 +962,7 @@ The same values as the `circular` option of the [lowpass_dt](https://github.com/
 How it's drawn:
 - each value is first brought into [0, period); a step of more than half a period from the previous value is a crossing of 0, and the curve goes on below 0 (or above the period) instead of jumping;
 - the whole curve is then placed around its average direction, so a wind around the north is drawn around 0 whatever the start of the time range;
-- should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus);
+- should the curve go round more than a whole turn over the time range (very unlikely for a wind), it's drawn within a one-turn band centered on its average direction instead, and the jump where it crosses the band's edge is drawn dashed — the same dashes as the [smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus). A curve swinging back and forth over that edge doesn't jump each time: it goes on past the edge, up to a twentieth of a turn, and jumps only when it goes further — the Y axis then shows a turn and a tenth at most;
 - the average direction, the span and the turn are those of the time window shown, what is loaded around it put in the same turn: zoomed or moved in time, the curve is placed again for what is seen;
 - the Y axis moved by hand (a drag of its labels, a pinch, the padlock), the turn shown is the one of its range: the curve, continuous, moved by whole turns to sit around the range's middle — or, going round more than a turn in the window, each value put in the turn around that middle, its jumps dashed; released, back as above;
 - the Y axis labels show the real values only when every curve of the graph is circular with the same period;
@@ -1610,7 +1610,7 @@ gestures:
   longPressTouch: 500   # ms, finger
   precision: 8          # px, mouse and pen (4 to 20; default 8)
   precisionTouch: 12    # px, finger (4 to 20; default 12)
-  readingTimePerWord: 300   # ms per word of a tooltip or a message (100 to 1000; default 300)
+  readingTimePerWord: 400   # ms per word of a tooltip or a message (100 to 1000; default 400)
 ```
 
 A value out of bounds is brought within them. They apply to every card and info panel of the page: whether set in a card's YAML or in the menu, the last one to speak wins, and they are kept on every device, whatever the card's persistence options — as the info panel's switch.

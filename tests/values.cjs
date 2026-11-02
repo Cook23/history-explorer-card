@@ -203,6 +203,18 @@ module.exports = async function()
         const shown = await t.E('reveal()'); await t.page.mouse.move(5, 5); await t.wait(300);
         return shown === n.text ? true : JSON.stringify({ n, shown });
     });
+    await t.step('a name cut, the rule of a hover: an entry with no move, a mousemove alone (a copy), a finger\'s move: not shown; a pen\'s move: shown; the pen then still 0.5 s: closed', async () => {
+        const n = await t.E(`(()=>{ const c=[...graphAt(0).chart._hecValuesEl.querySelectorAll('.hec-cut')].find(e=>e.scrollWidth>e.clientWidth&&!e.classList.contains('hec-state')); if(!c) return null; const r=c.getBoundingClientRect(); return {x:r.left+r.width/2, y:r.top+r.height/2, text:c.textContent}; })()`);
+        if( !n ) return 'no name cut';
+        await t.page.mouse.move(5, 5); await t.wait(300);
+        await t.pen('pointerover', n, 0, -1, 'mouse', 1); await t.pen('pointerenter', n, 0, -1, 'mouse', 1); await t.wait(200); const entered = await t.E('reveal()');
+        await t.mouseEv('mousemove', n); await t.wait(200); const copy = await t.E('reveal()');
+        await t.pen('pointermove', n, 1, -1, 'touch', 9); await t.wait(200); const finger = await t.E('reveal()');
+        await t.pen('pointerup', n, 0, 0, 'touch', 9); await t.pen('pointerleave', n, 0, -1, 'touch', 9); await t.wait(200);
+        await t.pen('pointermove', n, 0, -1, 'pen', 7); await t.wait(200); const pen = await t.E('reveal()');
+        await t.wait(1300); const still = await t.E('reveal()');
+        return entered === null && copy === null && finger === null && pen === n.text && still === null ? true : JSON.stringify({ n, entered, copy, finger, pen, still });
+    });
     await t.step('the pointer near the Y labels inside the plot: their boxes opaque; away: as before', async () => {
         const col = await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect(), k=c._hecInsideLabelColumns('mouse').find(k=>k.side==='left'); return {x:r.left+k.left+4, y:r.top+(A.top+A.bottom)/2}; })()`);
         await t.page.mouse.move(col.x, col.y, { steps: 3 }); await t.wait(300);

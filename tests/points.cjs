@@ -596,14 +596,19 @@ module.exports = async function()
     {
         const t = await openCard(card(), { height: 1300, mock: { series: true } });
         const tipEl = () => t.E(`(()=>{ const e=document.getElementById('hec-tooltip-hover'); return e && e.isConnected && getComputedStyle(e).display!=='none' && +getComputedStyle(e).opacity > 0 ? e.parentNode.tagName : null; })()`);
-        await t.step('a tooltip of curves chosen by a click, the card taken out of the page (another view), then a refresh: no tooltip left over the page', async () => {
+        await t.step('a tooltip of curves chosen by a click, the card taken out of the page (another view), then a refresh: no tooltip left over the page; the card back, then a refresh: none either, the hover ended; a click opens it again', async () => {
             const a = await t.E('pointPt(1,0.4)'), b = await t.E('pointPt(1,0.6)');
             await t.page.mouse.click(a.x, a.y); await t.wait(300); await t.page.mouse.click(b.x, b.y); await t.wait(400);
             const shown = await tipEl();
-            await t.E('el.remove()'); await t.wait(300);
+            await t.E('window.__parent = el.parentNode; el.remove()'); await t.wait(300);
             await t.E('graphAt(1).chart.update()'); await t.wait(400);
-            const after = await tipEl();
-            return shown && after === null ? true : JSON.stringify({ shown, after });
+            const away = await tipEl();
+            await t.E('__parent.appendChild(el)'); await t.wait(300);
+            await t.E('graphAt(1).chart.update()'); await t.wait(400);
+            const back = await tipEl(), hover = await t.E('graphAt(1).chart.active.length');
+            const c = await t.E('pointPt(1,0.5)'); await t.page.mouse.click(c.x, c.y); await t.wait(400);
+            const again = await tipEl();
+            return shown && away === null && back === null && hover === 0 && again ? true : JSON.stringify({ shown, away, back, hover, again });
         });
         done(await t.close());
     }

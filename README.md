@@ -117,7 +117,7 @@ gestures:
   longPressTouch: 500   # ms, finger
   precision: 8          # px, mouse and pen
   precisionTouch: 12    # px, finger
-  readingTimePerWord: 300   # ms per word of a tooltip or a message
+  readingTimePerWord: 400   # ms per word of a tooltip or a message
 ```
 
 📖 [Menus](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#menus) · [Gesture settings](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#gesture-settings)

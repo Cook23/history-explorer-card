@@ -349,6 +349,12 @@ module.exports = async function()
         const r = await t.E(`[680, 680.0000000000001, 679.9999999999999].map(c => window.HXLocal_Chart.hecCircular.place([0, 120, 240, 0, 140], 360, 0, 4, c).values)`);
         return r.every((v, i) => v.every(x => x >= [680, 680.0000000000001, 679.9999999999999][i] - 180 && x < 860) && v[4] < 501) ? true : JSON.stringify(r);
     });
+    await t.step('a wind swinging back and forth over the edge of the turn (185° / 195°, the edge at 190°), the Y axis automatic: no jump back and forth — past the edge by a twentieth of a turn at most; one jump once it goes further (260°); a turn and a tenth at most', async () => {
+        const r = await t.E(`(()=>{ const s = [0, 10, 350, 0, 20, 340, 0, 60, 120, 170, 185, 195, 185, 195, 185, 195, 185, 195, 260, 320, 0, 40, 60, 0, 350, 10];
+            const v = window.HXLocal_Chart.hecCircular.place(s, 360, 0, s.length - 1).values;
+            return { jumps: v.filter((x, i) => i && Math.abs(x - v[i - 1]) > 180).length, at: v.findIndex((x, i) => i && Math.abs(x - v[i - 1]) > 180), span: Math.max(...v) - Math.min(...v) }; })()`);
+        return r.jumps === 1 && r.at === 18 && r.span <= 396 ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     return { passed, failed };
