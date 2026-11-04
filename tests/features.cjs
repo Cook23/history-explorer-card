@@ -1138,5 +1138,25 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── Timelines and arrowlines: their rows moved down when they fill the graph, clear of the
+    // icons at its top; a numeric state in its unit ──
+    {
+        const t = await openCard(card({ statistics: { enabled: false }, graphs: [
+            { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }, { entity: 'binary_sensor.b' }, { entity: 'climate.salon' }] },
+            { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind' }, { entity: 'sensor.wind_rad' }, { entity: 'sensor.wind_grad' }] },
+            { type: 'timeline', entities: [{ entity: 'sensor.tank' }, { entity: 'sensor.days_to_watering' }] }] }), { height: 1100 });
+        await t.step('3 rows filling the graph — a timeline, an arrowline —: moved down by 5 px, the graph 5 px higher; a single row: as it was', async () => {
+            const r = await t.E(`[0, 1, 2].map(i => { const c = graphAt(i).chart; return [c.height, c.chartArea.top]; })`);
+            return JSON.stringify(r) === JSON.stringify([[159, 11], [130, 6], [159, 11]]) ? true : JSON.stringify(r);
+        });
+        await t.step('a timeline of numbers: each state in its unit, in its row and in its tooltip; a state that isn\'t a number as it is', async () => {
+            const r = await t.E(`(()=>{ const c = graphAt(3).chart, I = el.instance, f = c.options.elements.textFunction, ds = c.data.datasets;
+                return { row: f('800', ds, 0), tip: I._tooltipValue('timeline', ds[0], { index: 0 }), state: f('on', graphAt(1).chart.data.datasets, 0) }; })()`);
+            return r.row === '800 L' && /^\d+(\.\d+)? L$/.test(r.tip) && r.state === 'on' ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
     return { passed, failed };
 };

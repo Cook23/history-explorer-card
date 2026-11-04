@@ -741,6 +741,10 @@
     ['touchstart', 'touchmove'].forEach(function (t) {
       el.addEventListener(t, function (ev) { if (el.style.touchAction === 'none') ev.stopPropagation(); });
     });
+    // (a press held on it is the card's long press, never the system's own selection of
+    // what's under the finger — on Apple, the whole graph selected as an image — nor its menu)
+    el.style.userSelect = el.style.webkitUserSelect = 'none';
+    el.style.webkitTouchCallout = 'none';
   }
 
   // ---------------------------------------------------------------------------

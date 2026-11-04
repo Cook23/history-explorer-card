@@ -146,7 +146,8 @@ function statistics(d){
 function mkHass(){ return {
   states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
-  user:{id:'u1',name:'u'}, localize:(k)=>k,
+  // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
+  user:{id:'u1',name:'u'}, localize:()=>'',
   // (the actions performed: [domain.service, data, target])
   callService:(d,sv,data,target)=>{ (window.__services=window.__services||[]).push([d+'.'+sv, data, target]); return Promise.resolve(); },
   // the entity and device registries (an entity's device: its name)

@@ -257,6 +257,11 @@ module.exports = async function()
         const name = await E2('reveal()');
         return label === 'Ecowitt Vitesse du vent (Filtered) (400 W)' && hidden && /garden shed near the pool/.test(name || '') ? true : JSON.stringify({ label, hidden, name });
     });
+    await t2.step('a press held on a graph is the card\'s: the system selects nothing under the finger (no text, no image — Apple), opens no menu of its own — the canvas and its touch zones', async () => {
+        const r = await t2.E(`(()=>{ const c = graphAt(0).chart; const els = [c.canvas, ...[...c.canvas.parentNode.children].filter(e => e !== c.canvas && e.tagName === 'DIV' && e.style.touchAction !== undefined && e._hecChart)];
+            return els.map(e => e.style.userSelect + '/' + e.style.webkitTouchCallout); })()`);
+        return r.length > 1 && r.every(x => x === 'none/none') ? true : JSON.stringify(r);
+    });
     const r2 = await t2.close();
     return { passed: r.passed + r2.passed, failed: r.failed + r2.failed };
 };

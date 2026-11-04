@@ -167,6 +167,8 @@ export class CardCharts
                     // style updates (point/line highlighting), not just the tooltip.
                     animationDuration: 0
                 },
+                // (a timeline's or arrowline's rows moved down when they fill the graph: rowsTopRoom)
+                ...( graphtype == 'timeline' || graphtype == 'arrowline' ? { layout: { padding: { top: this.rowsTopPadding(datasets.length) } } } : {} ),
                 legend: {
                     display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true &&
                              // (legendVisible: auto — only for several labels in it)
@@ -184,13 +186,8 @@ export class CardCharts
                     },
                 },
                 elements: {
-                    textFunction: (text, datasets, index) => {
-                        switch( this.pconfig.stateTextMode ) {
-                          case 'auto' : return this.getLocalizedState(text, datasets[index].domain, datasets[index].device_class, datasets[index].entity_id);
-                          case 'hide' : return '';
-                          default: return text;
-                        }
-                    },
+                    textFunction: (text, datasets, index) =>
+                        this.pconfig.stateTextMode == 'hide' ? '' : this._stateText(text, datasets[index], this.pconfig.stateTextMode),
                     colorFunction: (text, data, datasets, index) => {
                         // * check device_class.state first (if it exists)
                         // * if not found, then check domain.state
@@ -562,7 +559,9 @@ export class CardCharts
     // narrow card: their boxes as opaque as the Y labels', over the legend or the rows
     // (Chart.js hecControlsBackdrop) — else false: half see-through, dimming what is under
     // them (a timeline's first row, the Y labels), beside the legend's first line when it
-    // fits there. Never any room of their own
+    // fits there. No room of their own over curves; over a timeline's or arrowline's rows
+    // filling the graph, a minimal one, less than half their height — the rows moved down
+    // (rowsTopRoom)
     _controlsBackdrop()
     {
         return this.narrowCard();
@@ -668,7 +667,7 @@ export class CardCharts
         if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
             const _state = ds.data[item.index][2];
             if( graphtype == 'arrowline' ) return formatNumber(_state, ds.rounding) + _unit;
-            return this.pconfig.tooltipStateTextMode == 'auto' ? this.getLocalizedState(_state, ds.domain, ds.device_class, ds.entity_id) : _state;
+            return this._stateText(_state, ds, this.pconfig.tooltipStateTextMode);
         }
         const _siFactor = ds.siConversionFactor ?? 1;
         // (from the value drawn back to the value shown: see shownScale)
@@ -686,6 +685,15 @@ export class CardCharts
         if( _p?.columnMin == null ) return _mean + _unit;
         const _min = _shown(_p.columnMin), _max = _shown(_p.columnMax);
         return ( _min === _mean && _max === _mean ? _mean : `${_min} / ${_mean} / ${_max}` ) + _unit;
+    }
+
+    // A timeline's state as it is shown (its segment, its tooltip): named as Home Assistant
+    // names it with mode auto (getLocalizedState), else as it is; a number in its unit
+    _stateText(state, ds, mode)
+    {
+        const _text = mode == 'auto' ? this.getLocalizedState(state, ds.domain, ds.device_class, ds.entity_id) : state;
+        const _numeric = state !== null && state !== '' && isFinite(Number(state));
+        return _numeric && ds.unit ? `${_text} ${ds.unit}` : _text;
     }
 
     // A tooltip's title: where its first element comes from — the history, or the statistics

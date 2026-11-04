@@ -16,6 +16,12 @@ const DEVICE_CLASS_ICONS = { humidity: 'mdi:water-percent', illuminance: 'mdi:br
 import { baseTypePure } from "./card-config.js";
 const Chart = window.HXLocal_Chart;
 
+// The room above a timeline's or arrowline's rows when they fill the graph, in px (rowsTopRoom):
+// minimal, less than half the height of the icons at the graph's top;
+// and the plot's top then: Chart.js keeps ROWS_LABELS_ROOM above them anyway (half their
+// labels' height — a smaller padding changes nothing), the room added above it
+const ROWS_TOP_ROOM = 5, ROWS_LABELS_ROOM = 6;
+
 export class CardGraphs
 {
     // --------------------------------------------------------------------------------------
@@ -28,9 +34,34 @@ export class CardGraphs
             case 'line': return ( h ? h : this.pconfig.lineGraphHeight );
             case 'bar':  return ( h ? h : this.pconfig.barGraphHeight ) + 24;
             default:
-                // (room for its tooltip, as large as its size says — see tooltipSize)
-                return Math.max(34 + n * this.pconfig.timelineBarSpacing, { full: 130, compact: 115, slim: 90 }[this.tooltipSize()]);
+                // (room for its tooltip, as large as its size says — see tooltipSize; its rows
+                // moved down when they fill it — rowsTopRoom)
+                return Math.max(34 + n * this.pconfig.timelineBarSpacing, this._rowsGraphMinHeight()) + this.rowsTopRoom(n);
         }
+    }
+
+    // A timeline's or arrowline's least height: room for its tooltip, as large as its size
+    // says (tooltipSize)
+    _rowsGraphMinHeight()
+    {
+        return { full: 130, compact: 115, slim: 90 }[this.tooltipSize()];
+    }
+
+    // The room above a timeline's or arrowline's n rows, in px: when they fill the graph (its
+    // least height doesn't leave some above the first one), ROWS_TOP_ROOM — its first row
+    // clear of the icons at the graph's top (the handle, the padlock, the close button);
+    // else none
+    rowsTopRoom(n)
+    {
+        return 34 + n * this.pconfig.timelineBarSpacing >= this._rowsGraphMinHeight() ? ROWS_TOP_ROOM : 0;
+    }
+
+    // The top padding of a timeline's or arrowline's chart of n rows (Chart.js layout.padding):
+    // its rows moved down by rowsTopRoom
+    rowsTopPadding(n)
+    {
+        const _room = this.rowsTopRoom(n);
+        return _room ? ROWS_LABELS_ROOM + _room : 0;
     }
 
     // A graph's header (mini-graph-card's): its name — its title, else, with showName, its

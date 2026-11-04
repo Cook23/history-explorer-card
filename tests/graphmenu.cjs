@@ -135,11 +135,11 @@ module.exports = async function()
         r.scissors = await buttons(); r.layout = await layout();
         return [r.outside, r.escape, r.scissors].every(b => b === ' |  |  | ') && r.layout === L0 ? true : JSON.stringify(r);
     });
-    await t.step('cut a curve (its type menu, Behavior): 📋 on the graphs it can go to, struck through on a timeline', async () => {
+    await t.step('cut a curve (its type menu, Behavior): 📋 on the graphs it can go to — a timeline too, a number shown as a row there, as for a drag', async () => {
         await t.longPress(await t.E(`legendPt(${await gi('rain')},0)`));
         await click('behavior'); await click('cut');
         const b = await buttons();
-        return b === 'paste | -paste | cancel | paste' ? true : b;
+        return b === 'paste | paste | cancel | paste' ? true : b;
     });
     await t.step('📋 on a graph: the curve moved there, at the end of its legend', async () => {
         await pressButton(0, 0);
