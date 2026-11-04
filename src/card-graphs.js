@@ -645,6 +645,15 @@ export class CardGraphs
         }
     }
 
+    // Each graph's graphIndex its place in the display order, 1 for the topmost — what a
+    // load's rebuild gives them (buildGraphsFromStore): saved so, a device that only loads
+    // the card finds them as they were saved, with nothing to save again (a new graph's
+    // index is meanwhile an average — _newGraphIndex)
+    renumberGraphs()
+    {
+        this.graphsInDisplayOrder().forEach((g, i) => g.entities.forEach(e => { e.graphIndex = i + 1; }));
+    }
+
     // graphIndex of a new graph: a real number giving each graph's display order (1 =
     // topmost page-wide), tracked per entity (all entities of one displayed graph share the
     // same value) since there's no separate per-graph persisted structure. A new graph is

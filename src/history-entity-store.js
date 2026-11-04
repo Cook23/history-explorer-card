@@ -242,55 +242,75 @@ export class EntityStore
         this.list = rest;
     }
 
-    // Repairs the group ids of a loaded list (older versions' bugs), then sets nextGroupId.
-    // typeOf(entry): the entry's type (to tell two graphs of one group apart).
+    // Repairs the group ids of a loaded list (older versions' bugs: repairedGroupIds), then
+    // sets nextGroupId
     normalizeGroupIds(typeOf)
     {
-        const dyn = e => !e.isStatic;
-        const grouped = e => e.groupId !== null && e.groupId !== undefined;
+        this.list = repairedGroupIds(this.list, typeOf);
+        this.setNextGroupId();
+    }
 
-        // Dynamic groups used ids below 1000, which could collide with the YAML ones
-        // (assigned 0, 1, 2... in order): moved to id + 1000. (null is "no group", not
-        // group 0 — null < 1000 is true in JS, so it's excluded explicitly.)
-        if( this.list.some(e => dyn(e) && grouped(e) && e.groupId < 1000) )
-            this.list = this.list.map(e => ( dyn(e) && grouped(e) && e.groupId < 1000 ) ? { ...e, groupId: e.groupId + 1000 } : e);
-
-        const next = () => Math.max(1000, ...this.list.map(e => e.groupId ?? 0)) + 1;
-
-        // Dynamic entities without a group (left by a duplicate-entry bug fixed in 1.1.43):
-        // one new group per graph, graphs told apart by their saved graphIndex
-        if( this.list.some(e => dyn(e) && !grouped(e)) ) {
-            let n = next();
-            const byIndex = new Map();
-            this.list = this.list.map(e => {
-                if( !dyn(e) || grouped(e) ) return e;
-                const k = e.graphIndex ?? Symbol();
-                if( !byIndex.has(k) ) byIndex.set(k, n++);
-                return { ...e, groupId: byIndex.get(k) };
-            });
-        }
-
-        // The old renumbering also caught null (fixed in 1.1.43), putting every ungrouped
-        // dynamic entity into one group 1000, each graph linked to the next. Its signature:
-        // one dynamic group with two graphs (told apart by graphIndex) of the same type —
-        // impossible otherwise, since same-type graphs of a dynamic group always combine.
-        // Such a group is split back into one group per graph.
-        const groups = new Map();
-        for( const e of this.list ) {
-            if( !dyn(e) || !grouped(e) ) continue;
-            if( !groups.has(e.groupId) ) groups.set(e.groupId, new Map());
-            const graphs = groups.get(e.groupId);
-            const k = e.graphIndex ?? Symbol();
-            if( !graphs.has(k) ) graphs.set(k, typeOf(e));
-        }
-        let n = next();
-        for( const [groupId, graphs] of groups ) {
-            const types = [...graphs.values()];
-            if( new Set(types).size === types.length ) continue;
-            const ids = new Map([...graphs.keys()].map(k => [k, n++]));
-            this.list = this.list.map(e => ( dyn(e) && e.groupId === groupId && ids.has(e.graphIndex) ) ? { ...e, groupId: ids.get(e.graphIndex) } : e);
-        }
-
+    // The next free dynamic group id: above every id in use, 1000 at least
+    setNextGroupId()
+    {
         this.nextGroupId = Math.max(1000, Math.max(0, ...this.list.map(e => e.groupId ?? 0)) + 1);
     }
+}
+
+// A list of entries as it was saved, its group ids left wrong by older versions repaired —
+// one saved list at a time, as it was read (a device's own, Home Assistant's, this device's
+// image of Home Assistant's), never a merge of them: there, an entry's group comes from one
+// source and its graphIndex from another, and two graphs of one type in a dynamic group —
+// what the third repair takes for the old bug — are only a regroup made elsewhere.
+// typeOf(entry): the entry's type (to tell two graphs of one group apart). → the list
+// repaired (a new one when anything was)
+export function repairedGroupIds(list, typeOf)
+{
+    const dyn = e => !e.isStatic;
+    const grouped = e => e.groupId !== null && e.groupId !== undefined;
+
+    // Dynamic groups used ids below 1000, which could collide with the YAML ones
+    // (assigned 0, 1, 2... in order): moved to id + 1000. (null is "no group", not
+    // group 0 — null < 1000 is true in JS, so it's excluded explicitly.)
+    if( list.some(e => dyn(e) && grouped(e) && e.groupId < 1000) )
+        list = list.map(e => ( dyn(e) && grouped(e) && e.groupId < 1000 ) ? { ...e, groupId: e.groupId + 1000 } : e);
+
+    const next = () => Math.max(1000, ...list.map(e => e.groupId ?? 0)) + 1;
+
+    // Dynamic entities without a group (left by a duplicate-entry bug fixed in 1.1.43):
+    // one new group per graph, graphs told apart by their saved graphIndex
+    if( list.some(e => dyn(e) && !grouped(e)) ) {
+        let n = next();
+        const byIndex = new Map();
+        list = list.map(e => {
+            if( !dyn(e) || grouped(e) ) return e;
+            const k = e.graphIndex ?? Symbol();
+            if( !byIndex.has(k) ) byIndex.set(k, n++);
+            return { ...e, groupId: byIndex.get(k) };
+        });
+    }
+
+    // The old renumbering also caught null (fixed in 1.1.43), putting every ungrouped
+    // dynamic entity into one group 1000, each graph linked to the next. Its signature:
+    // one dynamic group with two graphs (told apart by graphIndex) of the same type —
+    // impossible otherwise in a saved list, since same-type graphs of a dynamic group always
+    // combine.
+    // Such a group is split back into one group per graph.
+    const groups = new Map();
+    for( const e of list ) {
+        if( !dyn(e) || !grouped(e) ) continue;
+        if( !groups.has(e.groupId) ) groups.set(e.groupId, new Map());
+        const graphs = groups.get(e.groupId);
+        const k = e.graphIndex ?? Symbol();
+        if( !graphs.has(k) ) graphs.set(k, typeOf(e));
+    }
+    let n = next();
+    for( const [groupId, graphs] of groups ) {
+        const types = [...graphs.values()];
+        if( new Set(types).size === types.length ) continue;
+        const ids = new Map([...graphs.keys()].map(k => [k, n++]));
+        list = list.map(e => ( dyn(e) && e.groupId === groupId && ids.has(e.graphIndex) ) ? { ...e, groupId: ids.get(e.graphIndex) } : e);
+    }
+
+    return list;
 }

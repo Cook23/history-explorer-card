@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.56] - 2026-11-04
+
+### Fixed — graphs grouped again on one device, split again by another one
+- Entities added from the card, split then grouped again on one device (a drop onto their graph): another device, which last saw them split, loaded them split again, and wrote that back to Home Assistant — every device then showed them split. Loading, it took each entity's group from Home Assistant, but its place among the group's graphs (`graphIndex`) from its own storage: the entities of one graph looked like several graphs, that the load rebuilt apart, and that the repair of the 1.1.43 bug took for that bug's leftovers. An entity's place among the graphs of its group now follows its group, whichever source it comes from (`_resolveEntity`); the repair of the 1.1.43 bug runs on each saved list as it was read — this device's, Home Assistant's, this device's image of it —, never on their merge (`repairedGroupIds`)
+- Test (`persistence`): 3 timelines split, grouped again by drags on one device; the other device, which saw them split, shows them grouped, Home Assistant too, and so does the first after a reload
+
+### Fixed — a device that only loads the card no longer writes to Home Assistant
+- A curve split, a curve whose type took it to a graph of its own, a graph moved: the new graph's place was saved halfway between its neighbours' (1.5); a device loading the card numbered the graphs again (1, 2, 3) and wrote them to Home Assistant, as if it had changed them. The graphs' places are now saved as a load numbers them (`renumberGraphs`)
+- Test (`persistence`): a curve split, a curve made a timeline, a graph moved on one device; another device loading the card leaves Home Assistant as it was
+
 ## [v1.2.55] - 2026-11-04
 
 ### Added — a curve dropped onto a graph of another type

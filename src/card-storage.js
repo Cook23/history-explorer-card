@@ -4,7 +4,7 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { keyOf } from "./history-entity-store.js";
+import { keyOf, repairedGroupIds } from "./history-entity-store.js";
 import { GESTURE_SETTINGS, clampGesture, gestureSettings, applyGestures } from "./gesture-settings.js";
 
 // --------------------------------------------------------------------------------------
@@ -130,6 +130,8 @@ export class CardStorage
         // overwrite what another device saved there and this one hasn't seen yet — see
         // readLocalState)
         if( this._haSavedRead ) await this._haSavedRead;
+        // (the graphs' places saved as a load rebuilds them: see renumberGraphs)
+        this.renumberGraphs();
         const data = this._keepLocal();
 
         // Write to HA user storage (persists across devices for same user). HA's image (ha_*)
@@ -351,8 +353,12 @@ export class CardStorage
     // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
     _resolveEntities(_ls, _haCard, _yamlImage, _noStaticsDefaultAll)
     {
-        const _lsEntities   = (_ls?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
-        const _haEntities   = (_haCard?.entities ?? []).map(e => typeof e === 'string' ? { entity: e } : e);
+        // (each saved list repaired as it was read — group ids left wrong by older versions —,
+        // before they're merged: see repairedGroupIds)
+        const _typeOf = e => e.type ?? this.detectDefaultType(e.entity).type;
+        const _read = list => repairedGroupIds((list ?? []).map(e => typeof e === 'string' ? { entity: e } : e), _typeOf);
+        const _lsEntities   = _read(_ls?.entities);
+        const _haEntities   = _read(_haCard?.entities);
         const _yamlEntities = this.store.statics();
         // Saved as-is (pure, pre-merge) for writeLocalState — the yaml_entities mirror must
         // reflect only what YAML said, uncontaminated by whichever field values HA/local
@@ -363,7 +369,7 @@ export class CardStorage
         // back to, see defaultDisplay)
         this._pureYamlEntities = JSON.parse(JSON.stringify(_yamlEntities));
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
-        const _haMirror     = _ls?.ha_entities ?? [];
+        const _haMirror     = _read(_ls?.ha_entities);
         const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(keyOf);
 
         // Union of entity ids to resolve: current YAML statics, always. A genuinely dynamic
@@ -418,8 +424,8 @@ export class CardStorage
         this.store.reset([..._entityIds].map(id => this._resolveEntity(
             _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id))));
 
-        // Group ids left wrong by older versions repaired; next free dynamic group id set
-        this.store.normalizeGroupIds(e => e.type ?? this.detectDefaultType(e.entity).type);
+        // (the next free dynamic group id — the saved lists repaired above, never the merge)
+        this.store.setNextGroupId();
     }
 
     // One entity's entry, from its YAML entry and its image, its HA entry and its image, and
@@ -467,13 +473,14 @@ export class CardStorage
             for( const _f of _multiFields )
                 _take(_haE, _f);
         // graphKey (which linked graph of its group the entity is shown in — see
-        // splitCurve) isn't a field of its own: it's part of the grouping, so it
-        // follows whichever source won groupId above. graphIndex is NOT taken over per
-        // entity: it's a position relative to the other graphs of the block, so taking
-        // it from different sources for different entities would mix two coordinate
-        // systems and shuffle the block. The order inside a block is carried by the
-        // entities' order instead (resolved as a whole, see 'order' — and kept in step
-        // with the display by _syncGroupOrder).
+        // splitCurve) and graphIndex (which graph of its group: the rebuild only combines
+        // again the entities saved with one graphIndex — see buildGraphsFromStore) aren't
+        // fields of their own: they're part of the grouping, so they follow whichever
+        // source won groupId above. Home Assistant's group with this device's graphIndex
+        // would put an entity grouped again elsewhere in a graph of its own, which this
+        // device would then save as if it had split it. (The order inside a block is
+        // carried by the entities' order — resolved as a whole, see 'order' — and kept in
+        // step with the display by _syncGroupOrder.)
         // A field kept on this device only: this device's own value when saved here, else
         // the YAML's — never one that came from another device
         for( const _f of LOCAL_ONLY_FIELDS ) {
@@ -484,8 +491,10 @@ export class CardStorage
         const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                         ( _enabledFields.has('groupId') ? _localE : null );
         if( _keySrc ) {
-            if( _keySrc.graphKey !== undefined ) _result.graphKey = _keySrc.graphKey;
-            else delete _result.graphKey;
+            for( const _f of ['graphKey', 'graphIndex'] ) {
+                if( _keySrc[_f] !== undefined ) _result[_f] = _keySrc[_f];
+                else delete _result[_f];
+            }
         }
         return _result;
     }
