@@ -22,6 +22,9 @@ Changelog for the HA History Explorer Card.
 - The rows of a timeline or an arrowline filling the graph (3 rows and more by default) started right under the handle, the padlock and the close button, which covered the first row's label. They are now moved down by 5 px, the graph 5 px higher (`rowsTopRoom`); with fewer rows, there was room already and nothing changes
 - Test (`features`): 3 rows, a timeline and an arrowline, moved down by 5 px; a single row, as it was
 
+### Changed — the 1.2 line out of beta
+- README: the history explorer part of the card is stable; the mini-graph-card part is in beta
+
 ### Tests
 - The mock of Home Assistant gives an empty string for a translation it doesn't have, as Home Assistant does — it gave the key itself, shown in the timelines' rows
 
