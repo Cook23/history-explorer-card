@@ -17,7 +17,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 ---
 
 > [!IMPORTANT]
-> **This is a beta.** The history explorer part of the card is relatively stable; the mini-graph-card part — its YAML, `look: mini`, the values over a graph, the aggregation — is in beta. Feedback is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues).
+> **The history explorer part of the card is stable; the mini-graph-card part is in beta** — its YAML, `look: mini`, the values over a graph, the aggregation. Feedback is welcome in the [discussions](https://github.com/Cook23/history-explorer-card/discussions) or in an [issue](https://github.com/Cook23/history-explorer-card/issues).
 
 *Developed with Claude Code, which modifies, reviews and tests the card, and runs its automated tests in a real browser against a simulated Home Assistant, with mouse and touch input.*
 
