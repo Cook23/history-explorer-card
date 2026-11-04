@@ -4,6 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.55] - 2026-11-04
+
+### Added — a curve dropped onto a graph of another type
+- An entity whose state is a number, dropped or pasted onto a graph of another display type, takes that graph's instead of being refused: a curve dropped onto a timeline becomes one of its rows, an arrowline's entity dropped onto a line graph becomes a curve — its own default display (`detectDefaultType`) when it fits that graph, else the graph's (a curve in its own default line mode). An entity whose state isn't a number still only goes onto a timeline (`typeInto`, used by `curveMoveRefusal` and `moveCurve`)
+- Tests (`cards`): a row of states that aren't numbers refused on a graph of curves; a curve dropped onto a timeline, a row of it, saved as a timeline; an angle dropped from its arrowline onto a graph of curves, a curve in its own default line mode. Test (`graphmenu`): a cut curve's 📋 on a timeline too
+
+### Added — a numeric timeline's states in their unit
+- A timeline state that is a number is shown in its unit (`19.5 °C`), in its row and in its tooltip (`_stateText`)
+- Test (`features`): a timeline of numbers, each state in its unit, in its row and its tooltip; a state that isn't a number as it is
+
+### Fixed — the system's selection on a long press (Apple)
+- On an Apple device, a long press on a graph (to show a curve's points) also selected the whole graph as an image — in the info panel at least. The canvas and its touch zones now refuse the system's selection and its menu (`user-select`, `-webkit-touch-callout`)
+- Test (`touch`): the canvas and its touch zones
+
+### Fixed — a timeline's first row under the icons
+- The rows of a timeline or an arrowline filling the graph (3 rows and more by default) started right under the handle, the padlock and the close button, which covered the first row's label. They are now moved down by 5 px, the graph 5 px higher (`rowsTopRoom`); with fewer rows, there was room already and nothing changes
+- Test (`features`): 3 rows, a timeline and an arrowline, moved down by 5 px; a single row, as it was
+
+### Tests
+- The mock of Home Assistant gives an empty string for a translation it doesn't have, as Home Assistant does — it gave the key itself, shown in the timelines' rows
+
 ## [v1.2.54] - 2026-11-02
 
 ### Changed — the reading time of a word: 400 ms by default

@@ -22,17 +22,31 @@ export class CardOperations
 
     // Why entity idx of graph src can't go into graph tgt — null when it can: never into a
     // graph already showing its series (a curve once per graph); otherwise whenever tgt can
-    // show it — curves and bars together, a timeline row on a timeline, an arrowline row on
-    // an arrowline — whatever the units (two groups of units get an axis each, more share
-    // one) and whichever graphs, YAML ones included (a move onto a graph whose placement
-    // isn't saved isn't saved either: see moveCurve)
+    // show it (typeInto) — whatever the units (two groups of units get an axis each, more
+    // share one) and whichever graphs, YAML ones included (a move onto a graph whose
+    // placement isn't saved isn't saved either: see moveCurve)
     curveMoveRefusal(src, idx, tgt)
     {
         const _e = src.entities[idx];
         if( tgt !== src && tgt.entities.some(e => e.entity === _e.entity) ) return i18n('ui.label.already_exists');
-        // (its own type: a bar graph can also hold line entities)
+        return this.typeInto(src, idx, tgt) ? null : `${_e.type ?? src.type} ≠ ${tgt.type}`;
+    }
+
+    // How entity idx of graph src is shown in graph tgt → { type, lineMode }, null when tgt
+    // can't show it: as it is when tgt can — curves and bars together, a timeline row on a
+    // timeline, an arrowline row on an arrowline (its own type: a bar graph can also hold
+    // line entities) —; else, a number, as tgt shows its entities — its own default
+    // (detectDefaultType) when that one fits, else tgt's type (a curve: in its own default
+    // line mode); a state that isn't a number only ever on a timeline
+    typeInto(src, idx, tgt)
+    {
+        const _e = src.entities[idx];
         const _type = _e.type ?? src.type;
-        return typesCompatible(_type, tgt.type) ? null : `${_type} ≠ ${tgt.type}`;
+        if( typesCompatible(_type, tgt.type) ) return { type: _type, lineMode: _e.lineMode };
+        if( !this.isNumericEntity(_e.entity) ) return tgt.type === 'timeline' ? { type: 'timeline', lineMode: null } : null;
+        const _det = this.detectDefaultType(_e.entity);
+        if( typesCompatible(_det.type, tgt.type) ) return _det;
+        return { type: tgt.type === 'bar' ? 'line' : tgt.type, lineMode: _det.lineMode };
     }
 
     // Entity idx of graph src moved to index insertIdx (-1: the end) of graph tgt's — a
@@ -44,6 +58,9 @@ export class CardOperations
         const _refusal = tgt === src ? null : this.curveMoveRefusal(src, idx, tgt);
         if( _refusal ) return _refusal;
         const _entity = src.entities[idx];
+        // (shown another way when tgt can't show it as it is: typeInto)
+        const _to = tgt === src ? null : this.typeInto(src, idx, tgt);
+        const _into = _to && _to.type !== ( _entity.type ?? src.type ) ? _to : null;
         if( tgt === src ) {
             const _list = src.entities.filter((_, i) => i !== idx);
             // (insertIdx counts the moved entity itself)
@@ -72,7 +89,9 @@ export class CardOperations
                 const _saved = ( this.graphPlacementPersisted(src) && this.graphPlacementPersisted(tgt) ) || _tgtGroupId === _entry.unsavedFrom?.groupId;
                 if( _saved ) delete _entry.unsavedFrom;
                 else _entry.unsavedFrom ??= this.store.placementOf(_entry);
-                // Every other persisted field (type, lineMode, hidden...) stays
+                // Every other persisted field (hidden...) stays — its type and line mode too,
+                // unless tgt shows it another way
+                if( _into ) { _entry.type = _into.type; _entry.lineMode = _into.lineMode; }
                 this.store.moveToGroup(_entry, _tgtGroupId);
                 // Joins the target's own sub-graph of that group (see splitCurve)
                 this.store.setGraphKey(_entry, tgt.entities[0].graphKey);
@@ -80,6 +99,7 @@ export class CardOperations
                 _entry.fill = _entity.fill;
             }
             this.detachAndRebuildRemaining(src, idx, _srcNext);
+            if( _into ) { _entity.type = _into.type; _entity.lineMode = _into.lineMode; }
             _entity.siConversionFactor = undefined;
             tgt.entities.forEach(en => { en.siConversionFactor = undefined; });
             const _tgtNext = this.nextGraph(tgt);

@@ -367,7 +367,7 @@ Within a group, curves can always be shown together again, as long as their disp
 
 #### Moving curves between graphs
 
-A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see [Two Y axes](#two-y-axes)). Only the display type limits a drop: a curve can't go onto a timeline or arrowline graph, nor a timeline entity onto a line or bar graph — the drop is refused with a brief tooltip (e.g. `line ≠ timeline`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again right away and drag.
+A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see [Two Y axes](#two-y-axes)). Dropped onto a graph of another display type, an entity whose state is a number takes that graph's: a curve dropped onto a timeline becomes one of its rows, an arrowline's entity dropped onto a line graph becomes a curve — its own default display when it fits that graph (*Smart* or the line mode set for it, *Bar* for a quantity that adds up), else the graph's. An entity whose state isn't a number (on/off, text) can only be shown as a timeline: dropped onto any other graph, the drop is refused with a brief tooltip (e.g. `timeline ≠ line`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again right away and drag.
 
 ![A curve's label dragged onto another graph](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/drag-label.png)
 
@@ -398,7 +398,7 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu, title
 ![A graph's menu, Behavior open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-graph.png)
 
 *Cut* is also in the *Behavior* submenu of a curve's or a timeline entity's type menu. Once something is cut, the ⠿ zone of every graph shows where it can go, instead of the ⠿ symbol and the padlock:
-- a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any line or bar graph for a curve, saved only when both graphs are);
+- a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any graph for an entity whose state is a number — shown the way that graph shows its entities —, a timeline only for one whose state isn't; saved only when both graphs are);
 - a graph: ↓ 📋 ↑ — ↓ inserts it below that graph, ↑ above it, as a drop below or above its midpoint; a swipe down or up on them does the same (on a touch screen, that swipe doesn't scroll the page); a block of linked graphs moves as a whole, and nothing is inserted inside another block.
 
 A choice that isn't possible is greyed and struck through in red; clicked, it says why, and the cut goes on. ✂ marks the graph it was cut from — clicked, the cut is cancelled. As for the labels, a click just beside a button counts as on it, and one about halfway between two does nothing (the cut goes on). A click clearly away from them, anywhere else on the card or the page, or Escape, cancels it too.
@@ -408,7 +408,7 @@ A choice that isn't possible is greyed and struck through in red; clicked, it sa
 Entities in timeline and arrowline graphs can also be reorganized interactively:
 - **Double-click** an entity label to extract it into its own graph, placed immediately below the original
 - **Long-press** (or right click) an entity label to open the [display type menu](#choosing-an-entitys-display-type)
-- Drag an entity label to move it to another graph of the same type
+- Drag an entity label to move it to another graph — of another type too, for an entity whose state is a number (see [Moving curves between graphs](#moving-curves-between-graphs))
 - Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again right away and drag)
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
 
@@ -616,7 +616,7 @@ graphs:
       showTimeLabels: false   # hide the time axis labels on this graph
 ```
 
-By default a timeline shows the states as Home Assistant names them for their device class (`Open`/`Closed` for a door, `Detected`/`Clear` for a motion sensor). The raw states (`on`/`off`) or no text at all can be chosen instead:
+By default a timeline shows the states as Home Assistant names them for their device class (`Open`/`Closed` for a door, `Detected`/`Clear` for a motion sensor). A state that is a number is shown in its unit (`19.5 °C`), in its row and in its tooltip. The raw states (`on`/`off`) or no text at all can be chosen instead:
 
 ```yaml
 type: custom:history-explorer-card

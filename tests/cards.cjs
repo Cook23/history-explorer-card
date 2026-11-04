@@ -258,5 +258,33 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A curve dropped onto a graph showing another type: shown the way that graph shows its
+    // entities; a state that isn't a number only ever on a timeline ──
+    t = await openCard(card([]), { height: 1200 });
+    {
+        const add = id => t.E(`el.instance.addCurves(['${id}'], 'default')`);
+        for( const id of ['sensor.power', 'binary_sensor.a', 'sensor.wind', 'sensor.power_kw'] ) { await add(id); await t.wait(300); }
+        await t.wait(800);
+        const at = async re => (await t.graphs()).findIndex(x => re.test(x));
+        const typeOf = id => t.E(`(()=>{ const e = el.instance.store.find('${id}'); return e ? e.type + '/' + e.lineMode : null; })()`);
+        await t.step('a row of states that aren\'t numbers dropped onto a graph of curves: refused, nothing moves', async () => {
+            const g0 = await t.graphs();
+            await t.drag(await t.E(`tlPt(${await at(/^t:a@/)},0)`), await t.E(`graphPtAt(${await at(/^l:power@/)},0.5)`)); await t.wait(800);
+            const g1 = await t.graphs();
+            return JSON.stringify(g1) === JSON.stringify(g0) ? true : g1.join(' | ');
+        });
+        await t.step('a curve dropped onto a timeline: a row of it, saved as a timeline', async () => {
+            await t.drag(await t.E(`legendPt(${await at(/^l:power@/)},0)`), await t.E(`graphPtAt(${await at(/^t:a@/)},0.5)`)); await t.wait(800);
+            const g = await t.graphs(), type = await typeOf('sensor.power');
+            return g.some(x => /^t:(a\+power|power\+a)@/.test(x)) && !g.some(x => /^l:power@/.test(x)) && /^timeline\//.test(type) ? true : g.join(' | ') + ' ' + type;
+        });
+        await t.step('an angle dropped from its arrowline onto a graph of curves: a curve, in its own default line mode', async () => {
+            await t.drag(await t.E(`tlPt(${await at(/^a:wind@/)},0)`), await t.E(`graphPtAt(${await at(/^l:power_kw@/)},0.5)`)); await t.wait(800);
+            const g = await t.graphs(), type = await typeOf('sensor.wind');
+            return g.some(x => /^l:(power_kw\+wind|wind\+power_kw)@/.test(x)) && !g.some(x => /^a:/.test(x)) && type === 'line/smart' ? true : g.join(' | ') + ' ' + type;
+        });
+    }
+    done(await t.close());
+
     return { passed, failed };
 };
