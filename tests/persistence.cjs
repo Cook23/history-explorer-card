@@ -141,6 +141,59 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Timelines added from the card, split then grouped again on one device: the other device,
+    // which last saw them split, shows them grouped — and keeps them so in Home Assistant ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs: [] }, { mock: { series: true }, height: 1200 });
+    await t.step('3 timelines split, grouped again by drags on one device: the other device, which saw them split, shows them grouped, Home Assistant too, and so does the first after a reload', async () => {
+        for( const id of ['binary_sensor.a', 'binary_sensor.b', 'climate.salon'] ) { await t.E(`el.instance.addCurves(['${id}'], 'default')`); await t.wait(300); }
+        await t.wait(1500);
+        const look = async () => (await t.graphs()).map(g => g.split('@')[0]).join(' | ');
+        const rowOf = async id => t.E(`(()=>{ const all=el.instance.graphsInDisplayOrder(); const gi=all.findIndex(g=>g.entities.some(e=>e.entity==='${id}'));
+            return tlPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
+        const ha = () => t.E(`__getUD('history-explorer_card_' + el.instance.id)`).then(v => (v?.entities ?? []).map(e => e.entity.split('.')[1] + '@' + e.groupId).join(' '));
+        const grouped = await look();
+        for( const id of ['binary_sensor.b', 'climate.salon'] ) { await t.dblclick(await rowOf(id)); await t.wait(1000); }
+        const split = await look();
+        // (the other device: it last saw them split)
+        const other = await t.E(`localStorage.getItem('history-explorer_card_' + el.instance.id)`);
+        for( const id of ['binary_sensor.b', 'climate.salon'] ) { const a = await rowOf(id), c = await rowOf('binary_sensor.a'); await t.drag(a, { x: c.x, y: c.y + 4 }); await t.wait(1000); }
+        const regrouped = await look(), haRegrouped = await ha();
+        await t.E(`localStorage.setItem('history-explorer_card_' + el.instance.id, ${JSON.stringify('X')}.replace('X', ${JSON.stringify(other)}))`);
+        await reload();
+        const onOther = await look(), haAfterOther = await ha();
+        await reload();
+        const back = await look();
+        const one = x => /^t:[a-z+]+$/.test(x) && x.split('+').length === 3;
+        return one(grouped) && split.split(' | ').length === 3 && one(regrouped) && one(onOther) && haAfterOther === haRegrouped && one(back) ? true
+            : JSON.stringify({ grouped, split, regrouped, haRegrouped, onOther, haAfterOther, back });
+    });
+    done(await t.close());
+
+    // ── A device that only loads the card writes nothing new to Home Assistant: the graphs'
+    // places saved as a load rebuilds them (renumberGraphs) ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true, graphs: [] }, { mock: { series: true }, height: 1200 });
+    await t.step('a curve split, a curve made a timeline, a graph moved on one device: the other device, loading the card, leaves Home Assistant as it was', async () => {
+        await t.E(`el.instance.addCurves(['sensor.power', 'sensor.power_kw', 'sensor.rain'], 'default')`); await t.wait(400);
+        await t.E(`el.instance.addCurves(['binary_sensor.a', 'binary_sensor.b'], 'default')`); await t.wait(1500);
+        const key = 'history-explorer_card_' + await t.E('el.instance.id');
+        const ha = async () => JSON.stringify((await t.E(`__getUD(${JSON.stringify(key)})`)).entities.map(e => [e.entity, e.groupId, e.graphIndex, e.type]));
+        const r = {};
+        for( const [name, act] of [
+            ['split', `I.splitCurve(G('sensor.power_kw'), G('sensor.power_kw').entities.findIndex(e => e.entity === 'sensor.power_kw'))`],
+            ['timeline', `I.setCurveType(G('sensor.rain'), G('sensor.rain').entities.findIndex(e => e.entity === 'sensor.rain'), 'timeline', null)`],
+            ['moved', `I.moveGraph(G('binary_sensor.a'), G('sensor.power'), true)`]] ) {
+            const other = await t.E(`localStorage.getItem(${JSON.stringify(key)})`);
+            await t.E(`(()=>{ const I = el.instance; const G = id => I.graphsInDisplayOrder().find(g => g.entities.some(e => e.entity === id)); ${act}; })()`); await t.wait(1500);
+            const before = await ha();
+            await t.E(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify('X')}.replace('X', ${JSON.stringify(other)}))`);
+            await reload();
+            const after = await ha();
+            if( after !== before ) r[name] = { before, after };
+        }
+        return Object.keys(r).length === 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── YAML entities, enable_multidevice_persistence ──
     t = await openCard(YAML({ enable_multidevice_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
     await t.step('enable_multidevice_persistence: another device gets every change — a curve hidden aside, kept on its device', async () => {
