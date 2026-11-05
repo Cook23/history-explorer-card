@@ -27,6 +27,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.2.59** — Time ranges up to 10 years, drawn from Home Assistant's daily statistics.
 - **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
 - **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
 - **v1.2.15** — Gesture settings for every card (long-press duration, pointer precision, for a mouse or a pen and for a finger); the options menu in submenus.
@@ -172,7 +173,7 @@ graphs:
 ## Time range
 
 ```yaml
-defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y
+defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
 defaultTimeOffset: 1D    # uppercase: snapped — here the current day, from midnight
 defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y the Y axis, xy both (default)
 ```
@@ -292,7 +293,7 @@ entityOptions:
 
 ![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/long-term-stats.png)
 
-The card loads what the screen can show — the hourly statistics, the 5-minute statistics or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
+The card loads what the screen can show — the daily, hourly or 5-minute statistics, or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
 
 ```yaml
 statistics:

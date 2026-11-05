@@ -115,13 +115,13 @@ function history(d){
   return r;
 }
 // The statistics as Home Assistant compiles them: for an entity with a state_class, a
-// period (an hour; 5 minutes, d.period '5minute') once it has ended (and a few minutes for
+// period (an hour; 5 minutes, d.period '5minute'; a day, 'day') once it has ended (and a few minutes for
 // the compiling, MOCK.statsLag, 10 min by default), from the mocked history — a
 // measurement its mean (weighted by time, the state in force at its start included), min
 // and max, a total its state at the period's end and its sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
 // long as the history (historyDays). MOCK.noStatistics: entities without any
 function statistics(d){
-  const P=d.period==='5minute'?300e3:3600e3;
+  const P={ '5minute':300e3, hour:3600e3, day:86400e3 }[d.period] ?? 3600e3;
   const kept=P<3600e3&&MOCK.historyDays ? Date.now()-MOCK.historyDays*86400e3 : -Infinity;
   const t0=Math.max(Date.parse(d.start_time), kept), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
   for(const e of d.statistic_ids){

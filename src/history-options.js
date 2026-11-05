@@ -430,6 +430,35 @@ export const BAR_INTERVALS = [
     { code: 4, yaml: null,      label: 'rawline' },
 ];
 export const RAW_INTERVAL = 4;
+// A year's hours (365 days), and the longest time range, in years
+export const YEAR_HOURS = 365 * 24;
+export const MAX_RANGE_YEARS = 10;
+
+// The time ranges, from the shortest: their hours, their label (ui.ranges.*, with its count
+// n), whether the range selector lists them (menu: false — still taken when the window is set
+// so) and whether the magnifier's zoom steps through them (step: false)
+export const TIME_RANGES = [
+    { hours: 0, label: 'l_hour', menu: false, step: false }, { hours: 1, label: 'hour' },
+    ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => ({ hours: n, label: 'n_hours', n, menu: [2, 6, 12].includes(n), step: [2, 6, 12].includes(n) })),
+    { hours: 24, label: 'day' },
+    ...[2, 3, 4, 5, 6].map(n => ({ hours: 24 * n, label: 'n_days', n, menu: n <= 3 })),
+    { hours: 168, label: 'week' },
+    ...[2, 3].map(n => ({ hours: 168 * n, label: 'n_weeks', n })),
+    { hours: 720, label: 'month' },
+    { hours: 2184, label: 'n_months', n: 3 }, { hours: 4368, label: 'n_months', n: 6 },
+    { hours: YEAR_HOURS, label: 'year' },
+    ...Array.from({ length: MAX_RANGE_YEARS - 1 }, (_, k) => k + 2).map(n => ({ hours: YEAR_HOURS * n, label: 'n_years', n, menu: [2, 5, MAX_RANGE_YEARS].includes(n) })),
+];
+
+// The statistics export's periods, in the order its menu shows them: Home Assistant's period
+// (its 5-minute statistics, short-term; the others, long-term), its label (ui.interval.*)
+export const STATS_EXPORT_PERIODS = [
+    { period: '5minute', label: '_5m' },
+    { period: 'hour',    label: 'hourly' },
+    { period: 'day',     label: 'daily' },
+    { period: 'week',    label: 'weekly' },
+    { period: 'month',   label: 'monthly' },
+];
 export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 
 // Looks: a set of default options given at once with `look:` — the card's own options

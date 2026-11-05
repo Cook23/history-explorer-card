@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -42,9 +42,9 @@ const _SECTIONS = { rep: 'ui.menu.type_representation', appearance: 'ui.menu.typ
                     behavior: 'ui.menu.type_behavior' };
 // The type menu's lines: the sections, and, last, the tests a user can run to report what
 // their browser or app gives the card (card-tests.js)
-const _TYPE_SUBMENUS = { ..._SECTIONS, tests: 'ui.menu.type_tests' };
-// The submenus only the card's menu has, not the info panel's
-const _CARD_ONLY_SUBMENUS = ['tests'];
+const _TYPE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', tests: 'ui.menu.type_tests' };
+// The submenus only the card's menu has, not the info panel's (Export: a graph's menu only)
+const _CARD_ONLY_SUBMENUS = ['export', 'tests'];
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
@@ -582,7 +582,17 @@ export class CardMenus
                 if( it.on !== undefined ) setSwitch(_line, it.on);
                 if( it.style ) _line.style.cssText += it.style;
                 if( it.marked ) { _line.style.fontWeight = 'bold'; _line.dataset.selected = _line.dataset.marked = '1'; }
-                _line.addEventListener('click', (e) => { e.preventDefault(); if( it.final ) this._choiceMade(_line, () => it.choose(_line)); else it.choose(_line); }, true);
+                _line.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // (a click on a line closes the submenus its menu's other lines opened —
+                    // a line with a submenu then opens its own)
+                    const _box = _line.parentNode, _root = _box?._root ?? _box;
+                    if( _root?._cascade ) this.closeCascade(_root, _root._cascade.indexOf(_box) + 1);
+                    // (a switch acts by a click on the switch itself — or the keyboard: a click
+                    // with no pointer, detail 0 —, never by one on its line's name)
+                    if( it.on !== undefined && e.detail !== 0 && !e.target.closest?.('[data-switch]') ) return;
+                    if( it.final ) this._choiceMade(_line, () => it.choose(_line)); else it.choose(_line);
+                }, true);
             }
             menuEl.appendChild(_line);
             return _line;
@@ -718,6 +728,7 @@ export class CardMenus
         const _lines = [this._typeTitle(i), ...this._sectionLines(m)];
         if( _full && _label )
             _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityTypeMenu(i); this.openEntityInfo(_e, g); } });
+        if( _full && _menu._menuForGraph ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_TYPE_SUBMENUS.export), ['export']));
         if( _full && !_menu._menuForGraph ) _lines.push(this._submenuLine(m, `et_${i}_tests`, i18n(_TYPE_SUBMENUS.tests), ['tests'], ';border-top:1px solid #444'));
         return _lines;
     }
@@ -736,9 +747,10 @@ export class CardMenus
                  label: _menu._menuForGraph ? ( g ? this._graphMenuTitle(g) : '' ) : Array.isArray(_id) ? '*' : _id };
     }
 
-    // A type submenu's lines (path: see _menuOf): a section's, or the tests
+    // A type submenu's lines (path: see _menuOf): a section's, the graph's exports, or the tests
     _typeSubmenuLines(i, path)
     {
+        if( path[0] === 'export' ) { const { g } = this._menuTargets(i); return this._exportLines(this._typeMenu(i), path[1] ?? null, g ? [g] : []); }
         if( path[0] !== 'tests' ) return this._sectionItems(this._typeMenu(i), path);
         return Object.keys(CARD_TESTS).map(k => ({ id: `et_${i}_test_${k}`, label: i18n(CARD_TESTS[k].label),
                                                    choose: () => { this.hideEntityTypeMenu(i); openCardTest(k, this); } }));
@@ -1128,7 +1140,7 @@ export class CardMenus
     }
 
     // An options submenu's lines (path: see _menuOf): a section's, for every curve of the
-    // card; the exports (the statistics with the long-term statistics on); the card's actions
+    // card; the exports (the statistics with the long-term statistics on — ▸ their periods); the card's actions
     // (▸: each confirmed first in a submenu over it — Confirm or Cancel, Cancel marked); the
     // info panel's switch and the gesture thresholds, as they are
     _optionsSubmenuLines(i, path)
@@ -1136,9 +1148,7 @@ export class CardMenus
         const [key, level = null] = path;
         const m = this._optionsMenu(i);
         if( _SECTIONS[key] ) return this._sectionItems(m, path);
-        if( key === 'export' )
-            return [{ id: `eo_${i}_csv`, label: i18n('ui.menu.export_csv'), choose: () => this.exportFile() },
-                    ...( this.statistics?.enabled ? [{ id: `eo_${i}_stats`, label: i18n('ui.menu.export_stats'), choose: () => this.exportStatistics() }] : [] )];
+        if( key === 'export' ) return this._exportLines(m, level, this.graphs);
         if( key === 'card' ) {
             if( level === null )
                 return Object.keys(_CARD_ACTIONS).map(k => this._submenuLine(m, `eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label), ['card', k]));
@@ -1150,6 +1160,19 @@ export class CardMenus
                   choose: () => { this.toggleInfoPanel(); this._menuChosen(m); } },
                 ...Object.keys(GESTURE_SETTINGS).map(k => ({ input: GESTURE_SETTINGS[k], id: `eo_${i}_g_${k}`, labelId: `eo_${i}_gl_${k}`,
                     label: i18n(GESTURE_SETTINGS[k].label), value: _v[k], change: v => { this.setGesture(k, v); return localGestures()[k]; } }))];
+    }
+
+    // The Export submenu of menu m — the options menu's (every graph), a graph's (graphs: that
+    // one) —, level null: its history and ▸ its statistics (with the long-term statistics on);
+    // level 'stats': their periods, the one the menu offers first in bold — each exported for
+    // the graphs' entities, over the window shown
+    _exportLines(m, level, graphs)
+    {
+        if( level === 'stats' )
+            return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: i18n(`ui.interval.${p.label}`), marked: p.period === this.exportStatsPeriod(),
+                                                    choose: () => { m.close(); this.exportStatistics(p.period, graphs); } }));
+        return [{ id: `${m.prefix}_csv`, label: i18n('ui.menu.export_csv'), choose: () => { m.close(); this.exportFile(graphs); } },
+                ...( this.statistics?.enabled ? [this._submenuLine(m, `${m.prefix}_stats`, i18n('ui.menu.export_stats'), ['export', 'stats'])] : [] )];
     }
 
     // The options menus open, as they are now (the info panel switched on another device)
@@ -1337,8 +1360,8 @@ export class CardMenus
     // A menu stays readable under its submenus (each opened over it, right-aligned on it,
     // level with its line, see openSubmenu): wider than each of them by its widest line's
     // text, so that its lines show beside the submenu open and another one can be picked —
-    // the last line's submenu aside, which hides no line below it: as wide as the menu at
-    // most. Set when the menu opens (with what it shows then), so it keeps its width. With
+    // the last line's submenu too; only with no room for that, as wide as the menu at most
+    // (it hides no line below it). Set when the menu opens (with what it shows then), so it keeps its width. With
     // no room for that (a small card or screen: menuEl.dataset.cramped), the menu takes
     // the room there is, opens with no submenu (its lines read first), and a submenu opened
     // leaves a strip of its lines (_menuStrip). A menu's lines open the submenus
@@ -1352,7 +1375,7 @@ export class CardMenus
         // (its widths with its border: never wider than the room, border included)
         menuEl.style.boxSizing = 'border-box';
         const _room = Math.min(this._menuRoom(), +menuEl.dataset.room || Infinity);
-        const _need = Math.max(+menuEl.dataset.minWidth, _hasSubs ? this._menuNeed(menuEl) : 0);
+        const _need = Math.max(+menuEl.dataset.minWidth, _hasSubs ? this._menuNeed(menuEl, _room) : 0);
         menuEl.style.maxWidth = Math.floor(_room) + 'px';
         menuEl.style.minWidth = Math.floor(Math.min(_need, _room)) + 'px';
         menuEl.dataset.cramped = _need > _room ? '1' : '';
@@ -1364,8 +1387,11 @@ export class CardMenus
         return Math.min(this.cardWidth() || Infinity, document.documentElement.clientWidth || Infinity);
     }
 
-    // The width menuEl needs to stay readable under its submenus (its own, without any)
-    _menuNeed(menuEl)
+    // The width menuEl needs to stay readable under its submenus (its own, without any): each
+    // submenu fitting within it beside its lines, the last line's too — only when there's no
+    // room for that (room: what the menu may take), the last line's submenu as wide as the
+    // menu (it hides no other line)
+    _menuNeed(menuEl, room = this._menuRoom())
     {
         return this._laidOut(menuEl, () => {
             const _lines = this._menuLines(menuEl);
@@ -1373,7 +1399,10 @@ export class CardMenus
             if( !_withSub.length ) return menuEl.offsetWidth;
             const _readable = Math.max(..._lines.map(a => this._lineTextWidth(a)));
             const _last = _lines[_lines.length - 1];
-            return Math.max(menuEl.offsetWidth, ..._withSub.map(a => this._menuNeed(this._submenuOf(a)) + ( a === _last ? 0 : _readable )));
+            return Math.max(menuEl.offsetWidth, ..._withSub.map(a => {
+                const _sub = this._menuNeed(this._submenuOf(a), room);
+                return a === _last && _sub + _readable > room ? _sub : _sub + _readable;
+            }));
         });
     }
 

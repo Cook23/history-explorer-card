@@ -8,6 +8,7 @@ import { i18n } from "./languages.js";
 import { stateLabel, OPTION_DEFAULTS } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
+import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -94,6 +95,8 @@ export class CardCharts
                 // ylock: the Y axis can't be moved nor zoomed by hand (the padlock still works)
                 yAxisPanEnabled: !config?.ylock,
                 zoomYEnabled: !config?.ylock,
+                // (the Y axes locked or released, their locked ranges: kept — keepYAxisLock)
+                yAxisLockChanged: ranges => this.keepYAxisLock(canvas, ranges),
                 customEvent: (info) => this.onGesture(info),
                 scales: {
                     xAxes: [this._chartTimeAxis(graphtype, config, _hasBars)],
@@ -139,7 +142,7 @@ export class CardCharts
                         // (the room around each label: as little as keeps them apart — the
                         // curves keep the rest)
                         padding: 6,
-                        fontSize: this._textSizes().text,
+                        fontSize: this.textSizes().text,
                         // (a label wider than the legend: shortened, its value kept)
                         hecShortNames: datasets => this.shortNameForms(datasets)
                     },
@@ -154,7 +157,7 @@ export class CardCharts
                         return this.getStateColor(datasets[index].domain, datasets[index].device_class, datasets[index].entity_id, data[2]);
                     },
                     showText: true,
-                    font: this._textSizes().timeline,
+                    font: this.textSizes().timeline,
                     textPadding: 4
                 },
                 responsive: true,
@@ -375,7 +378,7 @@ export class CardCharts
             },
             ticks: {
                 fontColor: config.showTimeLabels ? this.pconfig.graphLabelColor : 'rgba(0,0,0,0)',
-                fontSize: this._textSizes().text,
+                fontSize: this.textSizes().text,
                 major: {
                     enabled: true,
                     unit: 'day',
@@ -390,7 +393,7 @@ export class CardCharts
                 // (labels that don't fit side by side — a narrow plot — skipped,
                 // never drawn over each other)
                 autoSkip: true,
-                autoSkipPadding: 8
+                autoSkipPadding: TICK_LABEL_GAP_PX
             },
             gridLines: {
                 color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
@@ -544,7 +547,7 @@ export class CardCharts
 
     // The size of the graphs' text, as the card's width says: text (the legend, the time
     // labels, a timeline's names), timeline (its states, a canvas font), yLabels(inside)
-    _textSizes()
+    textSizes()
     {
         const _narrow = this.narrowCard();
         const _text = _narrow ? NARROW_FONT_PX : FONT_PX;
@@ -558,7 +561,7 @@ export class CardCharts
     // its color and opacity are Chart.js's) — or beside it
     _yLabelTicks(inside)
     {
-        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this._textSizes().yLabels(inside),
+        return { mirror: inside, padding: inside ? -6 : 0, labelOffset: inside ? -7 : 0, fontSize: this.textSizes().yLabels(inside),
                  hecBackdrop: inside };
     }
 
@@ -579,7 +582,7 @@ export class CardCharts
     // tooltipSize) — when the card crosses NARROW_CARD_PX or SMALL_CHART_PX
     fitToCardWidth()
     {
-        const _sizes = this._textSizes();
+        const _sizes = this.textSizes();
         for( const g of this.graphs ) {
             const o = g.chart.options;
             let _changed = false;
@@ -704,15 +707,15 @@ export class CardCharts
     }
 
     // A tooltip's title: where its first element comes from — the history, or the statistics
-    // and their period (5 min, 1 h) — and its time (_tooltipTime)
+    // and their period (5 min, 1 h, 1 d) — and its time (_tooltipTime)
     _tooltipTitle(p, xLabel)
     {
         const _time = this._tooltipTime(p, xLabel);
         // (a timeline's or arrowline's state, [start, end, state]: from the history)
         if( Array.isArray(p) ) p = { x: p[0] };
         if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return _time;
-        // (statistics: their period too — 5 min, 1 h)
-        const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : moment.duration(ms).humanize();
+        // (statistics: their period too — 5 min, 1 h, 1 d)
+        const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : `${Math.round(ms / 86400e3)} ${i18n('ui.label.day_unit')}`;
         const _source = p.statistics ? `${i18n('ui.label.source_statistics')}${p.statisticsPeriod ? ' ' + _period(p.statisticsPeriod) : ''}` : i18n('ui.label.source_history');
         return `${_source}${i18n('ui.label.source_separator')}${_time}`;
     }

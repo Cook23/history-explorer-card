@@ -98,7 +98,10 @@ export class HistoryCardState {
         this.state.loading       = false;
         this.state.zoomMode      = false;
         // (the magnifier's mode: what the elastic box zooms — 'x' the time, 'y' the Y axes, 'xy' both)
-        this.state.zoomBox       = 'xy';
+        this.state.zoomBox       = OPTION_DEFAULTS.defaultMagnifierMode;
+        // (the statistics export's period chosen in its menu — null: the YAML's; see
+        // exportStatsPeriod)
+        this.state.exportStatsPeriod = null;
         this.state.autoScroll    = false;
 
         this._drag = null;   // label or graph being dragged (_onDragStart)

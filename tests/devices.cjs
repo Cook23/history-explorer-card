@@ -13,7 +13,7 @@ const YAML = { type: 'custom:history-explorer-card', defaultTimeRange: '24', sta
 
 // An entity's fields kept on each device, never from another one (card-storage.js
 // ENTITY_FIELD_SCOPE 'local')
-const LOCAL = ['hidden', 'showPoints', 'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip'];
+const LOCAL = ['hidden', 'showPoints', 'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'yAxisLock'];
 
 // In the page: I the card, G(id) the graph showing id, X(g, id) its place in g
 const H = `const I = el.instance; const G = id => I.graphsInDisplayOrder().find(g => g.entities.some(e => e.entity === id)); const X = (g, id) => g.entities.findIndex(e => e.entity === id);`;

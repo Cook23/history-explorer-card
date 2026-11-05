@@ -30,9 +30,9 @@ module.exports = async function()
         const l = await lines(t); await closeMenu(t);
         return m.startsWith('Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸') && l === 'Color ▸ | Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' ? true : `${m} / ${l}`;
     });
-    await t.step('Points, clicked with the mouse (its line focused, then rebuilt): the curve\'s dots shown, the switch on, the menu still open 0.4 s later, then closed; again: hidden', async () => {
+    await t.step('Points, its switch clicked with the mouse (its line focused, then rebuilt): the curve\'s dots shown, the switch on, the menu still open 0.4 s later, then closed; again: hidden', async () => {
         await curveMenu(t, 0, 0);
-        const p = await t.E(`(()=>{ const r=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[1].getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
+        const p = await t.E(`(()=>{ const r=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[1].querySelector('[data-switch]').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(400);
         const r = { l: await lines(t), open: await menuOpen(t), dots: (await ds(t, 0, 0)).r };
         await t.wait(700); r.later = await menuOpen(t);

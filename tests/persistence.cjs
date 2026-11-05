@@ -413,5 +413,53 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The Y axes' padlock: locked from the graph's menu or by a gesture on a Y axis, kept on
+    // this device with its ranges, as a hidden curve — after a reload, when the graph is built
+    // again; not kept without enable_persistence (a YAML card's default) ──
+    const DYNAMIC = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true, graphs: [] };
+    // (graph 0's lock and its left Y axis' range)
+    const lock = () => t.E(`(()=>{ const c = graphAt(0).chart; return (c.hecYAxisLocked() ? 'locked ' : 'free ') + yRange(0).join(' '); })()`);
+    const menuLock = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(300); await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(300); await t.E(`el.querySelector('#et_0_ylock').click()`); await t.wait(900); };
+    t = await openCard(DYNAMIC, { mock: { series: true }, height: 1200 });
+    await t.E(`el.instance.addCurves(['sensor.power', 'sensor.power_kw'], 'default')`); await t.wait(1500);
+    await t.step('the padlock closed from the graph\'s menu: locked on the same range after a reload; opened: free after a reload', async () => {
+        await menuLock(); const a = await lock();
+        await reload(); const b = await lock();
+        await menuLock(); const c = await lock();
+        await reload(); const d = await lock();
+        return a.startsWith('locked') && b === a && c.startsWith('free') && d.startsWith('free') ? true : JSON.stringify({ a, b, c, d });
+    });
+    await t.step('a Y axis dragged (the lock engaged by the gesture): locked on the range dragged to, after a reload and when the graph is built again (its interpolation changed)', async () => {
+        const pt = await t.E('yaPt(0,0.5)');
+        await t.drag(pt, { x: pt.x, y: pt.y + 60 }); await t.wait(900);
+        const a = await lock();
+        await reload(); const b = await lock();
+        await t.E(`(()=>{ const g = graphAt(0); el.instance.setInterpolation(g, g.entities, 'makima'); })()`); await t.wait(900);
+        const c = await lock();
+        return a.startsWith('locked') && b === a && c === a ? true : JSON.stringify({ a, b, c });
+    });
+    done(await t.close());
+
+    t = await openCard(YAML(), { mock: { series: true }, height: 1200 });
+    await t.wait(1000);
+    await t.step('a YAML card without persistence: the padlock closed, free again after a reload — as a hidden curve', async () => {
+        await menuLock(); const a = await lock();
+        await reload(); const b = await lock();
+        return a.startsWith('locked') && b.startsWith('free') ? true : JSON.stringify({ a, b });
+    });
+    done(await t.close());
+
+    t = await openCard(YAML({ enable_persistence: 'entities' }), { mock: { series: true }, height: 1200 });
+    await t.wait(1000);
+    await t.step('a YAML card with enable_persistence: entities — the padlock kept on this device after a reload; a new device (nothing saved on it): free', async () => {
+        await menuLock(); const a = await lock();
+        await reload(); const b = await lock();
+        const key = 'history-explorer_card_' + await t.E('el.instance.id');
+        await t.E(`localStorage.removeItem(${JSON.stringify(key)})`); await reload();
+        const c = await lock();
+        return a.startsWith('locked') && b === a && c.startsWith('free') ? true : JSON.stringify({ a, b, c });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

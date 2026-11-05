@@ -5,12 +5,20 @@
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
 import { paintMagnifier } from "./card-menus.js";
-import { ZOOM_BOX_MODES, OPTION_DEFAULTS } from "./history-options.js";
+import { ZOOM_BOX_MODES, OPTION_DEFAULTS, TIME_RANGES, MAX_RANGE_YEARS, YEAR_HOURS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
-// Valid time ranges in hours
-const ranges = [1, 2, 6, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368, 8760];
+// The time ranges the magnifier's zoom steps through, in hours (TIME_RANGES)
+const ranges = TIME_RANGES.filter(r => r.step !== false).map(r => r.hours);
+// The time axis's steps, from the shortest — a step whose labels don't fit along the plot
+// gives way to the next (_fitTickStep) —, a unit's length (a month: 30 days), the room
+// Chart.js keeps between two labels (autoSkipPadding, card-charts.js)
+const TICK_STEPS = [[1, 'minute'], [2, 'minute'], [5, 'minute'], [10, 'minute'], [15, 'minute'], [20, 'minute'], [30, 'minute'],
+    [1, 'hour'], [2, 'hour'], [3, 'hour'], [4, 'hour'], [6, 'hour'], [8, 'hour'], [12, 'hour'],
+    [1, 'day'], [2, 'day'], [3, 'day'], [4, 'day'], [7, 'day'], [14, 'day'], [1, 'month'], [2, 'month'], [3, 'month'], [6, 'month'], [12, 'month'], [24, 'month'], [60, 'month']];
+const TICK_UNIT_MS = { minute: 60e3, hour: 3600e3, day: 86400e3, month: 30 * 86400e3 };
+export const TICK_LABEL_GAP_PX = 8;
 // A window ending this close to the present shows it (its end is set to the second)
 const PRESENT_MS = 1000;
 
@@ -174,7 +182,7 @@ export class CardTimeRange
     // restored (card-storage.js)
     setZoomBoxMode(mode, save = true)
     {
-        this.state.zoomBox = ZOOM_BOX_MODES.includes(mode) ? mode : 'xy';
+        this.state.zoomBox = ZOOM_BOX_MODES.includes(mode) ? mode : this.pconfig.defaultMagnifierMode;
         this._paintMagnifiers();
         for( const g of this.graphs ) if( g.chart ) g.chart.options.zoomBoxAxes = this.state.zoomBox;
         if( save ) this.writeLocalState();
@@ -267,10 +275,9 @@ export class CardTimeRange
             return _density(this.pconfig.timeTickOverride);
     }
 
-    setStepSize(update = false, tbw = null)
+    setStepSize(update = false)
     {
         const width = this.cardWidth();
-        const _tbw = tbw ?? (this._this.querySelector('#tb_0')?.clientWidth || width);
 
         const tdensity = this.computeTickDensity(width);
 
@@ -285,17 +292,16 @@ export class CardTimeRange
             stepSizes.push({ '1': '10m', '2': '20m', '3': '30m', '4': '1h', '5': '1h', '6': '1h', '7': '1h', '8': '1h', '9': '1h', '10': '2h', '11': '2h', '12': '2h', '24': '4h', '48': '8h', '72': '12h', '96': '1d', '120': '1d', '144': '1d', '168': '2d', '336': '3d', '504': '4d', '720': '7d', '2184': '1o', '4368': '1o', '8760': '1o' });
             stepSizes.push({ '1': '20m', '2': '30m', '3': '1h', '4': '2h', '5': '2h', '6': '2h', '7': '2h', '8': '2h', '9': '2h', '10': '4h', '11': '4h', '12': '4h', '24': '6h', '48': '12h', '72': '1d', '96': '2d', '120': '2d', '144': '2d', '168': '4d', '336': '7d', '504': '7d', '720': '14d', '2184': '1o', '4368': '1o', '8760': '1o' });
 
-            this.activeRange.tickStepSize = stepSizes[tdensity][range].slice(0, -1);
-            switch( stepSizes[tdensity][range].slice(-1)[0] ) {
+            // (beyond a year: a tick every few months — 1, 2, 3, 6 or 12 —, about as many per
+            // year as a year's own at this density, spread over the years)
+            const _perYear = [12, 12, 8, 6, 4][tdensity], _years = range / YEAR_HOURS;
+            const _step = stepSizes[tdensity][range] ?? ( [1, 2, 3, 6, 12].find(m => 12 / m * _years <= _perYear * 1.5) ?? 12 ) + 'o';
+            this.activeRange.tickStepSize = _step.slice(0, -1);
+            switch( _step.slice(-1)[0] ) {
                 case 'm': this.activeRange.tickStepUnit = 'minute'; break;
                 case 'h': this.activeRange.tickStepUnit = 'hour'; break;
                 case 'd': this.activeRange.tickStepUnit = 'day';  break;
                 case 'o': this.activeRange.tickStepUnit = 'month';  break;
-            }
-            // Compact: 1 year on narrow card → 2 months step
-            if( range === 8760 && _tbw < 300 ) {
-                this.activeRange.tickStepSize = 2;
-                this.activeRange.tickStepUnit = 'month';
             }
 
         } else if( this.activeRange.timeRangeMinutes ) {
@@ -316,21 +322,42 @@ export class CardTimeRange
 
         }
 
+        this._fitTickStep(width);
+
         if( update ) {
             for( let g of this.graphs ) this.applyTimeAxis(g);
         }
+    }
+
+    // The time labels side by side: while they don't fit along the plot (the widest graph's —
+    // else the card's less its Y labels), the next longer step (TICK_STEPS). A label's width:
+    // its format's characters at the time labels' size (minutes and hours: the time; days:
+    // the date; months: the month), and the room Chart.js keeps between two (autoSkipPadding)
+    _fitTickStep(width)
+    {
+        // (the range's length — the window may not be set to it yet)
+        const _span = ( this.activeRange.timeRangeHours || 0 ) * 3600e3 + ( this.activeRange.timeRangeMinutes || 0 ) * 60e3;
+        const _plot = Math.max(0, ...this.graphs.map(g => g.chart?.hecPlotWidth?.() ?? 0)) || Math.max(0, width - 100);
+        if( !_span || !_plot ) return;
+        const _px = this.textSizes().text;
+        const _format = { minute: this.i18n.styleTimeTicks, hour: this.i18n.styleTimeTicks, day: this.i18n.styleDateTicks, month: 'MMM' };
+        const _labelPx = unit => moment('2026-12-28T23:59:00').format(_format[unit] ?? 'MMM').length * _px * 0.6 + TICK_LABEL_GAP_PX;
+        let i = TICK_STEPS.findIndex(([n, unit]) => unit === this.activeRange.tickStepUnit && n >= this.activeRange.tickStepSize);
+        if( i < 0 ) return;
+        while( i < TICK_STEPS.length - 1 && _span / ( TICK_STEPS[i][0] * TICK_UNIT_MS[TICK_STEPS[i][1]] ) * _labelPx(TICK_STEPS[i][1]) > _plot ) i++;
+        [this.activeRange.tickStepSize, this.activeRange.tickStepUnit] = TICK_STEPS[i];
     }
 
     // --------------------------------------------------------------------------------------
     // Activate a given time range
     // --------------------------------------------------------------------------------------
 
-    validateRange(range, hidden = false)
+    // The range of `range` hours: itself under 12 hours (an hour, or one the selector holds
+    // unlisted), else the shortest of the ranges at least that long — the longest at most
+    validateRange(range)
     {
-        if( hidden && range < 12 && range > 0 ) return range;
-        let i = ranges.findIndex(e => e >= range);
-        if( i < ranges.length-1 && (i < 0 || ranges[i] != range) ) i++;
-        return ranges[i];
+        if( range > 0 && range < 12 ) return range;
+        return ranges.find(r => r >= range) ?? ranges[ranges.length - 1];
     }
 
     // The time range set — from the toolbar, a gesture, the saved state (card-storage.js),
@@ -359,7 +386,7 @@ export class CardTimeRange
         this.activeRange.timeRangeHours = hours;
         this.activeRange.timeRangeMinutes = minutes;
 
-        this.setStepSize(!update, this._this.querySelector('#tb_0')?.clientWidth || null);
+        this.setStepSize(!update);
 
         for( let i of this.ui.rangeSelector ) if( i ) i.value = selected;
 
@@ -406,20 +433,15 @@ export class CardTimeRange
     {
         const s = range.slice(0, -1);
 
-        let t = 0;
-        switch( range.slice(-1)[0] ) {
-            case 'm': t = s*1; break;
-            case 'h': t = s*60; break;
-            case 'd': t = ( s <= 7 ) ? s*24*60 : ( s <= 14 ) ? 14*24*60 : ( s <= 21 ) ? 21*24*60 : 30*24*60; break;
-            case 'w': t = ( s <= 3 ) ? s*7*24*60 : 30*24*60; break;
-            case 'o': t = ( s <= 1 ) ? 30*24*60 : ( s <= 3 ) ? 91*24*60 : ( s <= 6 ) ? 182*24*60 : 365*24*60; break;
-            case 'y': t = 365*24*60; break;
-        }
+        // (in minutes — a month 30 days, a year 365 —, at most the longest range; an hour or
+        // more: the shortest range at least that long — validateRange)
+        const _minutes = { m: 1, h: 60, d: 24*60, w: 7*24*60, o: 30*24*60, y: YEAR_HOURS*60 }[range.slice(-1)[0]] ?? 0;
+        const t = Math.min(Math.max(s*1, 0) * _minutes, MAX_RANGE_YEARS*YEAR_HOURS*60);
 
         const h = Math.floor(t / 60);
 
         if( h > 0 )
-            this.applyTimeRange(this.validateRange(h, true), update, t_center);
+            this.applyTimeRange(this.validateRange(h), update, t_center);
         else
             this.applyTimeRangeMinutes(t, update, t_center);
     }

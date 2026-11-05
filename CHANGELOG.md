@@ -4,6 +4,48 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.59] - 2026-11-05
+
+### Added — time ranges up to 10 years, from the daily statistics
+- The range selector lists 2, 5 and 10 years; the magnifiers − and + step a year at a time up to 10 years (as they step a day at a time from 1 to 6 days); `defaultTimeRange` takes days, weeks, months and years up to 10 years — the shortest range at least that long (`24o`, `400d`: 2 years). The cache reaches back to the window's start, however long
+- Where a column of pixels lasts a day or more, the card asks Home Assistant for its daily statistics (the hourly ones for the days not compiled yet) — the same rule as the hourly and 5-minute ones; the tooltip names them `Statistics 1 d`
+- One list of the time ranges (`TIME_RANGES`) for the selector and the magnifiers
+
+### Added — the statistics export's period, and the export of a graph
+- *Export ▸ Statistics ▸* opens the periods: 5 min (the short-term statistics), hour, day, week, month (the long-term ones); the one chosen in bold next time, kept on this device whatever the persistence options; `csv.statisticsPeriod` its default (5minute, hour, day, week or month), a change of it in the YAML winning
+- A graph's menu has *Export ▸* too — *History* and *Statistics ▸* — for its own entities
+
+### Changed — the time labels always fit
+- Whatever the range and the card's width, the time labels fit side by side along the axis: a step whose labels wouldn't gives way to the next longer one (`_fitTickStep`) — one rule for every range, instead of a step of 2 months for a year on a narrow card alone
+
+### Fixed — smart line mode where statistics and history meet
+- Two values of the history with statistics between them (a day of history next to days of statistics, the last minutes after the statistics) were taken for a silence: a plateau end holding the old value was put among the statistics — a vertical line, its lower point not shown. Statistics are never a silence now
+- A curve ending with statistics was given an ongoing silence from a value of the history, sometimes days old
+- A silence shorter than a column of pixels could draw a point back in time, or a sloping plateau
+
+### Fixed — the Y axes' padlock kept
+- The padlock closed — from it, its menu, or a gesture on a Y axis —, with its ranges, is kept on this device as a hidden curve is (`yAxisLock`, as the persistence options say), and when the graph is built again (it was lost then too)
+
+### Fixed — menus
+- A submenu opened from a menu's last line hid that line even with room beside it (*Export ▸ Statistics ▸*, *Global ▸*): the last line now stays readable beside its submenu, as the others; only without room is its submenu as wide as the menu
+- A click on a line closes the submenu another line of its menu opened (a line with a submenu then opens its own)
+- A switch is toggled by a click on the switch itself (or Enter on its line), not by one on its name
+
+### Fixed — CSV export
+- A value of 0 was written as an empty cell; a missing attribute as `undefined`; a cell holding the separator, a quote or a line break is quoted, its quotes doubled; the file name holds no `:`
+
+### Fixed — `defaultTimeRange` in hours
+- A number of hours took the range after the one that holds it (`36h`: 3 days); now the shortest range at least that long (`36h`: 2 days)
+
+### Changed — docs
+- README_Full: *What is kept, and where* — the persistence options' defaults, and what each value obeys, on this device and on every device; `enableMultidevicePersistence` is the sync across devices (a value never synced is kept on this device by `enablePersistence` only)
+
+### Tests
+- New suite `smart`: the smart line mode where the curve is drawn from statistics
+- `menus`: every submenu of every menu at 1000 and 400 px, hiding no line's name with room; a click on a line closing another's submenu; a switch toggled by its switch only
+- `persistence`: the padlock, kept with its ranges, after a reload and a rebuild, not without `enablePersistence`
+- `features`: the time ranges up to 10 years, the daily statistics, `defaultTimeRange` in every unit; the time labels fitting along the axis at 360 and 1000 px; *Export ▸ Statistics ▸* and its period; a graph's export; a 0 and a quoted cell in the files
+
 ## [v1.2.58] - 2026-11-05
 
 ### Fixed — barSpacing set on a graph or on an entity had no effect
