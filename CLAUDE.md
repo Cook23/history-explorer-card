@@ -24,6 +24,9 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
+- **After an interruption by the user** (a command stopped, a request interrupted): check
+  what was interrupted and clean it up, or finish it — a file written in part, a probe or
+  scratch file left in the repository, a process still running —, never leave it behind.
 - **What the user observes is a fact, not a hypothesis.** The user sees the card, the device,
   the browser; Claude doesn't. What the user says they saw weighs as much as a screenshot.
   Past sessions kept their own idea against the user's repeated observations, until a
