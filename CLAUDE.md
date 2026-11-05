@@ -1,10 +1,14 @@
 # history-explorer-card — notes for Claude sessions
 
-Two lines are maintained: `main` (stable 1.1.x) and `v1.2-dev` (1.2 beta, split into several
-`src/card-*.js` files). Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
-Work branches for pull requests: `claude/v1.1-port` (from `main`) and `claude/v1.2-dev-port`
-(from `v1.2-dev`) — always these two, never a new one, whatever name a session is given; each
-reset to its line after a merge.
+Two lines are maintained: `v1.2-dev` (1.2, the repository's default branch and the line
+released now — its history explorer part stable, its mini-graph-card part in beta —, split
+into several `src/card-*.js` files) and `v1.1-legacy` (1.1.x, the former `main`, renamed).
+Read `BRANCH.md` on the branch you work on first. Tests: `yarn test`.
+Work branches for pull requests: `claude/v1.1-legacy-port` (from `v1.1-legacy`) and
+`claude/v1.2-dev-port` (from `v1.2-dev`) — always these two, never a new one, whatever name a
+session is given; each reset to its line after a merge.
+The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1.1-legacy`
+(never a raw file's link), as long as no branch is named `main` again.
 
 ## How to work — set by the user, not negotiable
 
@@ -190,7 +194,7 @@ the CHANGELOG is the traceability:
 | Document | What it says |
 |---|---|
 | README.md, README_Full.md | How to use the card **as it is now**. Never what changed, when, or what it was before: no version number, no "(1.2.25)", "since 1.2.23", "now", "no longer", "was", "is ignored since". An option kept only for compatibility is described as it is today ("accepted, no effect"), without its history. |
-| "📋 Version highlights" (README.md, before the table of contents, formatted as lowpass_dt's — the only place in a README naming versions; README_Full links to it, it is never deleted) | **When each important feature appeared, usable.** One line per important feature, at the one version where it first worked and could be used — never a range of versions. Not the versions before it (not usable yet), not the ones after it (refinements, more options, bug fixes, polish: the feature didn't really change). A version of bug fixes and refinements only has no line at all. Only the versions of its own branch (1.1 on `main`, 1.2 on `v1.2-dev`, never mixed). |
+| "📋 Version highlights" (README.md, before the table of contents, formatted as lowpass_dt's — the only place in a README naming versions; README_Full links to it, it is never deleted) | **When each important feature appeared, usable.** One line per important feature, at the one version where it first worked and could be used — never a range of versions. Not the versions before it (not usable yet), not the ones after it (refinements, more options, bug fixes, polish: the feature didn't really change). A version of bug fixes and refinements only has no line at all. Only the versions of its own branch (1.1 on `v1.1-legacy`, 1.2 on `v1.2-dev`, never mixed). |
 | CHANGELOG.md (and the release notes) | **Everything, version by version**: every change, fix, refinement — the full traceability. |
 
 Before adding a version to the highlights, ask: does it bring an important feature that
