@@ -511,6 +511,9 @@ interval: "hourly"
 # By default, line graphs will interpolate curves over missing data. Enable this config option to show gaps for unavailable data 
 showUnavailable: False
 
+# By default, a curve of text states (stateMap) goes over a state its list doesn't hold. Enable this config option to show gaps there
+showMissingState: False
+
 # Whether to show the current value of data series in the key at the top of the graph
 showCurrentValues: True
 

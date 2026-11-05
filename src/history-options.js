@@ -161,6 +161,10 @@ function _yBound(v)
     return v !== '' && v !== true && v !== false && isFinite(n) ? n : undefined;
 }
 
+// A state a stateMap doesn't list, once mapped (see processOf): no value — a gap in the curve
+// with showMissingState, else the curve goes over it
+export const STATE_NOT_LISTED = '\u0000not listed';
+
 // The label of a state of a stateMap (mini-graph-card's state_map — see normalizeOptions):
 // a whole number, the one at that place in the list (the value drawn); else the one of that
 // state; undefined when there's none

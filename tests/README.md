@@ -21,6 +21,7 @@ The suites:
 | `scale` | `scale` without `unit` changes only the drawing (real value in the legend and tooltip), with `unit` it converts |
 | `options` | The options at every level (card, entityOptions, graph, entity) with their synonyms, `interpolation` and the Interpolation submenu (card and info panel, keyboard, mouse and touch, at the screen edges, inside a shadow root, kept after a reload), automatic refresh on by default and at most one request every 2 s |
 | `persistence` | Every option that can be changed from the card (interpolation, line mode, display type, hidden, bar interval, split, a drop onto another graph — saved only when both graphs are), and the time range: without persistence, with `enable_persistence`, with `enable_multidevice_persistence` on this device and on a new one; the last one to speak — the YAML, another device — winning; *Card ▸ Default graphs* and *Default display*, confirmed, on this device and another |
+| `devices` | Every change of what's shown (a curve split, grouped again by a drop or the chain, a type changed, a graph moved, a curve dropped onto a graph of another type, rows and curves reordered, an interpolation, a curve added or deleted, a graph removed, the time range, the magnifier's mode), on a card of entities added from it and on a YAML card with `enableMultidevicePersistence`: the same after a reload, on a new device and on a device that last saw the card before the change; a device that only loads the card writes nothing new to Home Assistant |
 | `pen` | A pen (Pointer Events of type `pen`): barrel button held, a drag moves a label at once and a tap opens the type menu; barrel button pressed twice with the tip down splits a curve; the tip taps as a finger; the tooltip opened by a tap, moved by hovering, closed when the pen moves away |
 | `colors` | A curve's or bar's color: a value, thresholds on its own value or on another entity's value or states (with `default`), an entity holding the color; the legend's swatch, the color kept or changed when a curve moves to another graph |
 | `graphmenu` | A graph's menu (long-press, right click, touch): its title, *Display* and *Interpolation* for all its curves, its submenus placed as everywhere, the Y axis locked and released, a graph added from the card deleted; cut and paste: a graph inserted above or below another (by a click, or a swipe up or down, mouse and touch), a curve pasted into a graph, the places refused struck through and saying why, cancelled by a click elsewhere, Escape or ✂, a click just beside a button counting as on it, halfway between two doing nothing |
@@ -43,7 +44,7 @@ iOS Safari especially, is still worth a try before a release).
 ```sh
 yarn build
 yarn test              # every suite
-yarn test touch        # one suite: lint, store, legend, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, pen, colors, yaxes, graphmenu, attributes, copies, values, realtime, points, settings or modes
+yarn test touch        # one suite: lint, store, legend, mouse, touch, cards, features, panel, typemenu, arrowline, scale, options, persistence, devices, pen, colors, yaxes, graphmenu, attributes, copies, values, realtime, points, settings or modes
 ```
 
 Chromium comes with Playwright (`npx playwright install chromium` once); set

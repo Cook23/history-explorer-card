@@ -435,5 +435,64 @@ module.exports = async function()
         return shown === s.text ? true : JSON.stringify({ s, shown });
     });
     const r3 = await t3.close();
-    return { passed: r.passed + r2.passed + r3.passed, failed: r.failed + r2.failed + r3.failed };
+
+    // ── Graphs moved by their ⠿ handle, linked blocks, the drag's feedback, the page scrolled at its
+    // edge; a YAML graph never joined by an entity added from the card ──
+    const t4 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true,
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
+                 { type: 'line', entities: [{ entity: 'sensor.rain' }, { entity: 'binary_sensor.a', type: 'timeline' }] },
+                 { type: 'line', entities: [{ entity: 'sensor.tank' }] }] }, { height: 1400, scrollRoom: 2500 });
+    const look = async () => (await t4.graphs()).map(g => g.split('@')[0]).join(' | ');
+    const m = t4.page.mouse;
+    await t4.step('a YAML graph never joined by an entity added from the card, even with combineSameUnits and its unit: a graph of its own', async () => {
+        await t4.E(`el.instance.addCurves(['sensor.power_kw'], 'default')`); await t4.wait(1500);
+        const g = await look();
+        return g === 'l:power | l:rain | t:a | l:tank | l:power_kw' ? true : g;
+    });
+    await t4.step('a graph dragged by its ⠿ handle onto another one: above it when released on its upper half, below it on its lower half', async () => {
+        await t4.drag(await t4.E('moPt(3)'), await t4.E('graphPtAt(0,0.25)'));
+        const up = await look();
+        await t4.drag(await t4.E('moPt(0)'), await t4.E('graphPtAt(1,0.85)'));
+        const down = await look();
+        return up === 'l:tank | l:power | l:rain | t:a | l:power_kw' && down === 'l:power | l:tank | l:rain | t:a | l:power_kw' ? true : JSON.stringify({ up, down });
+    });
+    await t4.step('a linked block (a YAML graph of a line and a timeline): a graph dropped between its graphs goes beside the block, never inside; one of its graphs dragged elsewhere moves the whole block', async () => {
+        await t4.drag(await t4.E('moPt(4)'), await t4.E('graphPtAt(3,0.2)'));
+        const between = await look();
+        await t4.drag(await t4.E('moPt(3)'), await t4.E('graphPtAt(0,0.2)'));
+        const block = await look();
+        const together = g => /l:rain \| t:a/.test(g);
+        return together(between) && together(block) && block.startsWith('l:rain | t:a') ? true : JSON.stringify({ between, block });
+    });
+    await t4.step('a drag shows a ghost following the pointer — a label\'s, a graph\'s by its handle — and, for a graph, the insertion marker where it goes; all gone once dropped', async () => {
+        const shown = id => t4.E(`(()=>{ const e = document.getElementById('${id}'); return !!e && e.isConnected && getComputedStyle(e).display !== 'none'; })()`);
+        // (dropped as any drag: the graph moved, the curve moved)
+        const during = async (a, c) => {
+            await m.move(a.x, a.y); await m.down();
+            for( let i = 1; i <= 10; i++ ) { await m.move(a.x + (c.x - a.x) * i / 10, a.y + (c.y - a.y) * i / 10); await t4.wait(25); }
+            await t4.wait(200);
+            const r = { ghost: await shown('_hec_ghost'), marker: await shown('_hec_insert') };
+            await m.up(); await t4.wait(800);
+            return r;
+        };
+        const last = async () => (await t4.graphs()).length - 1;
+        const graph = await during(await t4.E('moPt(0)'), await t4.E(`graphPtAt(${await last()},0.8)`));
+        const withLegend = await t4.E(`el.instance.graphsInDisplayOrder().findIndex(g => g.chart.legend.legendHitBoxes.length)`);
+        const label = await during(await t4.E(`legendPt(${withLegend},0)`), await t4.E(`graphPtAt(${await last()},0.5)`));
+        const after = { ghost: await shown('_hec_ghost'), marker: await shown('_hec_insert') };
+        return label.ghost && graph.ghost && graph.marker && !after.ghost && !after.marker ? true : JSON.stringify({ label, graph, after });
+    });
+    await t4.step('a drag held near the bottom edge of the screen scrolls the page down; near the top, back up', async () => {
+        const withLegend = await t4.E(`el.instance.graphsInDisplayOrder().findIndex(g => g.chart.legend.legendHitBoxes.length)`);
+        const y0 = await t4.E('document.scrollingElement.scrollTop'), a = await t4.E(`legendPt(${withLegend},0)`);
+        await m.move(a.x, a.y); await m.down(); await m.move(a.x, a.y + 30, { steps: 5 });
+        await m.move(a.x, 1385, { steps: 10 }); await t4.wait(800);
+        const down = await t4.E('document.scrollingElement.scrollTop');
+        await m.move(a.x, 15, { steps: 10 }); await t4.wait(800);
+        const up = await t4.E('document.scrollingElement.scrollTop');
+        await t4.page.keyboard.press('Escape'); await m.up(); await t4.wait(800);
+        return down > y0 + 50 && up < down - 50 ? true : JSON.stringify({ y0, down, up });
+    });
+    const r4 = await t4.close();
+    return { passed: r.passed + r2.passed + r3.passed + r4.passed, failed: r.failed + r2.failed + r3.failed + r4.failed };
 };

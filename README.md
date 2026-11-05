@@ -224,7 +224,7 @@ frontend:
 - `dashMode`: `solid`, `points`, `shortlines`, `longlines`, `pointline` or a pattern `[10, 4]`; `lineWidth`; `fill`.
 - `showMinMax: true`: a band between the minimum and the maximum around the curve.
 - Angles (unit `°`) are drawn without a jump at 0/360 (`circular`).
-- `showUnavailable: true`: gaps where the entity was unavailable.
+- `showUnavailable: true`: gaps where the entity was unavailable; `showMissingState: true`: gaps where a text state isn't in its `stateMap`.
 
 📖 [Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-appearance)
 
