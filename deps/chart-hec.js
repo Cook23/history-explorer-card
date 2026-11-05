@@ -1489,6 +1489,7 @@
       if (_dblYAxisZone && !me._hecYAxisLock) {
         me._hecYAxisLock = 2;
         me._hecUpdateYAxisState();
+        me._hecNotifyYAxisLock();
       }
     }
     var _yIdx = yAxisIndexAt(c, _hx, _hy);
@@ -2597,6 +2598,14 @@
       });
       if (!me._hecYAxisLock) me._hecYAxisLock = 2;
       me.update();
+      me._hecNotifyYAxisLock();
+    },
+
+    // The lock or the locked ranges changed: told to options.yAxisLockChanged — the ranges
+    // as _hecYRanges gives them, null when released
+    _hecNotifyYAxisLock: function () {
+      var cb = this.options.yAxisLockChanged;
+      if (typeof cb === 'function') cb(this._hecYAxisLock ? this._hecYRanges() : null);
     },
 
     // Gives every Y axis back its own range (its configured ymin / ymax, else the data's)
@@ -2610,6 +2619,7 @@
         _t.removeEdgeTicks = false;
       });
       me._hecYAxisLock = 0;
+      me._hecNotifyYAxisLock();
     },
 
     // Does this chart have a Y axis lock (the padlock)?
@@ -2659,9 +2669,16 @@
       return this._hecHasYAxisLock() ? !!this._hecYAxisLock : undefined;
     },
 
-    // Public (Chart Custom.js.md §1): locks or releases the Y axes, as a click on the padlock
-    hecSetYAxisLocked: function (locked) {
-      if (this._hecHasYAxisLock() && !!this._hecYAxisLock !== !!locked) this._hecToggleYAxisLock();
+    // Public (Chart Custom.js.md §1): locks or releases the Y axes, as a click on the padlock —
+    // locked on ranges (as yAxisLockChanged gave them) when given, else on the ranges shown
+    hecSetYAxisLocked: function (locked, ranges) {
+      if (!this._hecHasYAxisLock()) return;
+      if (locked && ranges) {
+        this._hecYAxisLock = 1;
+        this._hecUpdateYAxisState();
+        this._hecSetYRanges(ranges);
+      }
+      else if (!!this._hecYAxisLock !== !!locked) this._hecToggleYAxisLock();
     },
 
     // Toggles the Y-axis lock on/off: locked, each Y axis keeps the range it shows; released,

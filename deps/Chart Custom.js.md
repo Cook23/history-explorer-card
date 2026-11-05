@@ -67,6 +67,7 @@ or `maintainAspectRatio`.
 | `zoomYEnabled` | `boolean` | `true` | Y-axis zoom specifically (wheel Shift+wheel, or the Y-spread of a pinch) is inert, even if `zoomEnabled` is on. |
 | `yAxisPanEnabled` | `boolean` | `true` | Dragging directly on the Y-axis label zone (or Shift+drag anywhere on a `line`/`bar` graph) never pans the Y scale. Never applies to `timeline`/`arrowline` graphs regardless. |
 | `yAxisLockEnabled` | `boolean` | `true` | The Y-axis lock icon (padlock) is never drawn, never engages automatically, and the grouped lock+handle click/dblclick toggle (§5) does nothing. |
+| `yAxisLockChanged` | `function(ranges)` | none | Called each time the Y axes are locked or released, or their locked ranges change — by the padlock, `hecSetYAxisLocked`, a gesture on a Y axis (a drag, a zoom, a double tap there), a change of chart type: `ranges` one `[min, max]` per value Y axis (of a logarithmic one, the logarithm), `null` when released. The card keeps them, to lock the chart on them again (`hecSetYAxisLocked`). |
 | `legendClickEnabled` | `boolean` | `true` | A click/double-click on a legend label is not forwarded to the stock `legend.onClick`. The card sets it to `false`: it handles legend clicks like every other gesture, from `customEvent` (`click`/`dblclick` with `legendIndex`). |
 | `hover.activateOnContact` | `boolean` | `false` | A hover move only moves a tooltip that a click or a tap on the plot area opened (released without a drag, a pinch or a long press — never a press alone): near a curve (`_hecCurveAt`, the picking rule), that curve joins the tooltip mode — several can be in it (what each shows: `hecTooltip`); beside or between the curves, nothing changes; on a chart without curves, or on a bar, the element picked (`_hecElementAt`); leaving the plot area, or the canvas (a pen moving out of hover range), closes it, and the next hover opens nothing. The card sets it to `true`. |
 | `tooltips.hecFirstOnly` | `boolean` | `false` | A tooltip shows its first element alone — the one pointed at (`_hecHoverElements`) —, whatever each dataset's `hecTooltip`: no other dataset's element at its time joins it. Read each time the tooltip's elements are searched. The card sets it for its slim tooltips (`tooltip.size`). |
@@ -172,9 +173,11 @@ hand (`circularPeriod`).
 `chart.hecYAxisLocked()` — whether the chart's Y axes are locked (the padlock closed), or
 `undefined` on a chart without a lock: what a menu entry shows.
 
-`chart.hecSetYAxisLocked(locked)` locks (`true`) or releases (`false`) the chart's Y axes, as
-a click on the padlock does — for a menu entry that does the same. Nothing on a chart
-without a lock (`yAxisLockEnabled: false`, a timeline or arrowline).
+`chart.hecSetYAxisLocked(locked, ranges)` locks (`true`) or releases (`false`) the chart's Y
+axes, as a click on the padlock does — for a menu entry that does the same; locked on
+`ranges` when given (as `yAxisLockChanged` gave them: a chart built again locked as it was),
+else on the ranges it shows. Nothing on a chart without a lock (`yAxisLockEnabled: false`, a
+timeline or arrowline).
 
 `chart.hecEndTooltip()` closes the chart's tooltip at once (removed, not faded out) and ends
 its tooltip mode, the point it showed back to its normal look, no hover dot — the card calls

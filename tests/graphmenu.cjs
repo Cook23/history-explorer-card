@@ -40,8 +40,8 @@ module.exports = async function()
     await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, behavior (the tooltip, the Y axis lock — a switch —, cut)', async () => {
         await graphMenu('rain');
         const m = await menu(); await click('behavior'); const l = await menu();
-        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* || Tooltip ▸ | Y axis locked | Cut' ? true : `${m} / ${l}`;
+        return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
+            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis locked | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -49,7 +49,7 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
         await graphMenu('rain'); const late = await menu();
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
-        return /Behavior ▸\* \|\| Tooltip ▸ \| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
+        return /Behavior ▸\* \| Export ▸ \|\| Tooltip ▸ \| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
     await t.step('Y axis locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
         const sw = () => t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);

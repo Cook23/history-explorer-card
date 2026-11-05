@@ -85,6 +85,99 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Time ranges up to 10 years: the selector lists 2, 5 and 10 years, the magnifier's
+    // zoom steps year by year (as it does day by day, 1 to 6, where the selector lists 1 to
+    // 3); a window where a column of pixels lasts a day or more drawn from the daily
+    // statistics — the same rule as the hourly and the 5-minute ones ──
+    t = await openCard(card({ statistics: { enabled: true }, defaultTimeRange: '1y', graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.wait(2000);
+    const hours = () => t.E('el.instance.activeRange.timeRangeHours');
+    const dayAsked = () => t.E(`window.__ws.some(w => w.type === 'recorder/statistics_during_period' && w.period === 'day')`);
+    await t.step('the range selector: 1, 2, 5 and 10 years listed; 3, 4 and 6 to 9 years there, not listed', async () => {
+        const r = await t.E(`[...el.querySelector('#by_0').options].filter(o => +o.value >= 8760).map(o => (+o.value / 8760) + (o.hidden ? 'h' : '')).join(' ')`);
+        return r === '1 2 3h 4h 5 6h 7h 8h 9h 10' ? true : r;
+    });
+    await t.step('a year: from the hourly statistics, no daily ones asked', async () => {
+        const r = { source: await t.E('el.instance._sourceNeeded()'), day: await dayAsked() };
+        return r.source === 'stats' && !r.day ? true : JSON.stringify(r);
+    });
+    await t.step('the magnifier\'s zoom out (−): a year at a time, 2 to 10 years, then no further', async () => {
+        const r = [];
+        for( let i = 0; i < 10; i++ ) { await t.E('el.instance.decZoom()'); await t.wait(300); r.push(( await hours() ) / 8760); }
+        return r.join(' ') === '2 3 4 5 6 7 8 9 10 10' ? true : r.join(' ');
+    });
+    await t.step('10 years: the cache reaches back to the window\'s start; the daily statistics asked and drawn — the tooltip naming them: Statistics 1 d', async () => {
+        await t.wait(4000);
+        const r = await t.E(`(()=>{ const I = el.instance, d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null);
+            const p = d.find(p => p.statisticsPeriod >= 86400e3);
+            return { source: I._sourceNeeded(), c0: I.mapStartTimeToCacheSlot(I.startTime), n: d.length, first: d.length ? Math.round(( (typeof d[0].x === 'number' ? d[0].x : Date.parse(d[0].x)) - Date.parse(I.startTime) ) / 86400e3) : null,
+                     title: p ? I._tooltipTitle(p, '') : null }; })()`);
+        r.day = await dayAsked();
+        return r.source === 'day' && r.c0 >= 0 && r.n > 300 && Math.abs(r.first) <= 2 && r.day && /^Statistics 1 d: /.test(r.title ?? '') ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (the shortest range at least that long: 36 hours, 2 days; 13 hours, a day)
+    const Y = 8760;
+    for( const [range, want, says] of [['3y', 3 * Y, '3 years'], ['20y', 10 * Y, '10 years'], ['10y', 10 * Y, '10 years'], ['24o', 2 * Y, '2 years'], ['18o', 2 * Y, '2 years'],
+                                       ['52w', Y, 'a year'], ['400d', 2 * Y, '2 years'], ['36h', 48, '2 days'], ['36', 48, '2 days'], ['13h', 24, 'a day'], ['4h', 4, '4 hours']] ) {
+        t = await openCard(card({ statistics: { enabled: false }, defaultTimeRange: range, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), {});
+        await t.wait(1000);
+        await t.step(`defaultTimeRange: ${range} — ${says}`, async () => {
+            const h = await t.E('el.instance.activeRange.timeRangeHours');
+            return h === want ? true : h;
+        });
+        done(await t.close());
+    }
+
+    // ── The time labels side by side, whatever the range and the card's width: a step whose
+    // labels don't fit along the axis gives way to a longer one (none skipped by Chart.js) ──
+    for( const width of [360, 1000] ) {
+        t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), {});
+        await t.E(`(()=>{ document.body.style.width='${width}px'; document.getElementById('host').style.width='${width}px'; })()`); await t.wait(1500);
+        await t.step(`${width} px: 1 day, 1 week, 1 month, 1 year, 10 years — the time labels fit side by side along the axis`, async () => {
+            const bad = [];
+            for( const range of ['1d', '1w', '1o', '1y', '10y'] ) {
+                await t.E(`el.instance.setTimeRangeFromString('${range}', true)`); await t.wait(700);
+                const r = await t.E(`(()=>{ const c=graphAt(0).chart, s=c.scales['x-axis-0'], ctx=c.ctx;
+                    ctx.save(); ctx.font = s.options.ticks.fontSize + 'px ' + window.HXLocal_Chart.defaults.global.defaultFontFamily;
+                    const labels = (s.ticks || []).filter(l => l !== undefined && l !== null && l !== ''), w = Math.max(0, ...labels.map(l => ctx.measureText(String(l)).width)); ctx.restore();
+                    return { n: labels.length, w: Math.round(w), width: Math.round(s.width), step: el.instance.activeRange.tickStepSize + ' ' + el.instance.activeRange.tickStepUnit }; })()`);
+                if( r.n * ( r.w + 8 ) > r.width + 2 ) bad.push(`${range}: ${r.n} labels of ${r.w} px on ${r.width} px (${r.step})`);
+            }
+            return bad.length ? bad.join(' / ') : true;
+        });
+        done(await t.close());
+    }
+
+    // ── A graph's menu: Export ▸, its graph's entities only — its history, ▸ its statistics
+    // by the period chosen (as the options menu's) ──
+    t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    {
+        const at = sel => t.E(`(()=>{ const a=el.querySelector('${sel}'); const r=a.getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
+        const clickAt = async sel => { const p = await at(sel); await t.page.mouse.click(p.x, p.y); await t.wait(300); };
+        const graphMenu = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(400); };
+        await t.step('a graph\'s menu: Export ▸ History — the history of its own entities only', async () => {
+            await graphMenu(); await t.E('captureSave()'); await clickAt('#et_0_export'); await clickAt('#et_0_csv');
+            for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
+            const f = await t.E('__saved'), lines = (f?.text ?? '').split('\r\n');
+            return lines.includes('sensor.power') && !lines.includes('sensor.rain') && !(await t.E(`el.querySelector('#et_0').style.display !== 'none'`)) ? true : lines.slice(0, 3).join(' | ') || 'nothing saved';
+        });
+        await t.step('a graph\'s menu: Export ▸ Statistics ▸ Day — its own entities\' statistics by the day; the period then in bold in the options menu\'s too', async () => {
+            await t.page.mouse.click(5, 5); await t.wait(1200);
+            await graphMenu(); await t.E('captureSave()'); await clickAt('#et_0_export'); await clickAt('#et_0_stats');
+            const periods = await t.E(`[...el.querySelectorAll('#et_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+            await clickAt('#et_0_stats_day'); await t.wait(1200);
+            const w = await t.E(`window.__ws.filter(w=>w.type==='recorder/statistics_during_period' && w.period==='day').pop()`);
+            await clickAt('#bo_0'); await clickAt('#eo_0_export'); await clickAt('#eo_0_stats');
+            const options = await t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+            await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
+            return periods === '5 min | Hour* | Day | Week | Month' && w && w.ids.join() === 'sensor.power' && options === '5 min | Hour | Day* | Week | Month' ? true : JSON.stringify({ periods, w, options });
+        });
+    }
+    done(await t.close());
+
     // ── CSV export ──
     t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true } });
@@ -102,6 +195,78 @@ module.exports = async function()
         if( !f ) return 'nothing saved';
         const lines = f.text.split('\r\n');
         return lines[0] === 'Time stamp;State;Mean;Min;Max' && lines.includes('sensor.power') && lines.filter(l => l.split(';').length === 5).length > 20 ? true : lines.slice(0, 4).join(' | ');
+    });
+    done(await t.close());
+
+    // ── The statistics export's period: Export ▸ Statistics ▸ its periods, the one the menu
+    // offers first in bold — csv.statisticsPeriod, else the hour; the one chosen until the page
+    // is reloaded ──
+    const periodCard = o => card({ statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }], ...o });
+    // (the menu opened on Export ▸ Statistics: its lines, the bold one with *)
+    const periods = async t => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_stats').click()`); await t.wait(300);
+        return t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+    };
+    const lastPeriod = t => t.E(`window.__ws.filter(w=>w.type==='recorder/statistics_during_period').pop()?.period`);
+    t = await openCard(periodCard({}), { mock: { series: true } });
+    await t.wait(1000);
+    await t.step('Export ▸ Statistics ▸ its periods — 5 min, Hour, Day, Week, Month —, the hour in bold by default; Day chosen: the statistics asked by the day and saved, Day in bold next time and after a reload — a YAML card without persistence options: kept on this device, always', async () => {
+        const a = await periods(t);
+        await t.E('captureSave()'); await t.E(`el.querySelector('#eo_0_stats_day').click()`);
+        for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
+        const r = { a, period: await lastPeriod(t), saved: !!(await t.E('__saved')), b: await periods(t) };
+        await t.page.reload(); await t.wait(3000);
+        r.c = await periods(t);
+        return r.a === '5 min | Hour* | Day | Week | Month' && r.period === 'day' && r.saved && r.b === '5 min | Hour | Day* | Week | Month' && r.c === r.b ? true : JSON.stringify(r);
+    });
+    await t.step('csv.statisticsPeriod changed in the YAML since: the YAML\'s wins (the last one to speak); not changed again: the one chosen next is kept', async () => {
+        const name = await t.E('window.CFG.cardName');
+        await t.page.addInitScript(c => { window.CFG = c; }, periodCard({ csv: { statisticsPeriod: 'week' }, cardName: name }));
+        await t.page.reload(); await t.wait(3000);
+        const a = await periods(t);
+        await t.E(`el.querySelector('#eo_0_stats_month').click()`); await t.wait(800);
+        await t.page.reload(); await t.wait(3000);
+        const b = await periods(t);
+        return a === '5 min | Hour | Day | Week* | Month' && b === '5 min | Hour | Day | Week | Month*' ? true : JSON.stringify({ a, b });
+    });
+    done(await t.close());
+    t = await openCard(periodCard({ csv: { statisticsPeriod: '5minute' } }), { mock: { series: true } });
+    await t.wait(1000);
+    await t.step('csv.statisticsPeriod: 5minute — 5 min in bold, the 5-minute statistics asked by the export', async () => {
+        const a = await periods(t);
+        await t.E('captureSave()'); await t.E(`el.querySelector('#eo_0_stats_5minute').click()`); await t.wait(800);
+        const r = { a, period: await lastPeriod(t) };
+        return r.a === '5 min* | Hour | Day | Week | Month' && r.period === '5minute' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard(periodCard({ csv: { statisticsPeriod: 'fortnight' } }), { mock: { series: true } });
+    await t.wait(1000);
+    await t.step('csv.statisticsPeriod a period the menu doesn\'t offer: the hour', async () => {
+        const a = await periods(t);
+        return a === '5 min | Hour* | Day | Week | Month' ? true : a;
+    });
+    done(await t.close());
+
+    // ── The files' cells: a 0 written (not left empty), a value holding the separator or a
+    // quote quoted, its quotes doubled ──
+    t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.rain' }] }, { type: 'timeline', entities: [{ entity: 'sensor.power' }] }] }),
+        { mock: { rows: { 'sensor.rain': [[2 * 86400, '0'], [5 * 3600, '0']], 'sensor.power': [[2 * 86400, 'on;off "x"']] } } });
+    await t.wait(1500);
+    await t.step('the statistics of a value of 0: its mean, min and max written 0', async () => {
+        const f = await save('el.instance.exportStatistics()');
+        const rows = (f?.text ?? '').split('\r\n').filter(l => /^\d{4}-/.test(l));
+        return rows.length > 20 && rows.every(l => l.endsWith(';;0;0;0')) ? true : rows.slice(0, 3).join(' | ') || 'nothing saved';
+    });
+    await t.step('the history: a value of 0 written 0; a state holding the separator and quotes quoted, its quotes doubled', async () => {
+        const f = await save('el.instance.exportFile()');
+        const lines = (f?.text ?? '').split('\r\n');
+        // (an entity's lines: from its name to the next one's)
+        const section = id => { const i = lines.indexOf(id) + 1, j = lines.findIndex((l, k) => k >= i && !/^\d{4}-/.test(l)); return lines.slice(i, j < 0 ? undefined : j); };
+        const rain = section('sensor.rain'), power = section('sensor.power')[0];
+        return rain.length > 0 && rain.every(l => l.endsWith(';0')) && power?.endsWith(';"on;off ""x"""') ? true : JSON.stringify({ rain: rain.slice(0, 2), power });
     });
     done(await t.close());
 

@@ -10,6 +10,61 @@ session is given; each reset to its line after a merge.
 The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1.1-legacy`
 (never a raw file's link), as long as no branch is named `main` again.
 
+## STANDARD. EVERYTHING IS STANDARD. — set by the user, not negotiable
+
+**There is no special case in this code: that is the whole point of version 1.2.**
+
+- Every option, setting, menu, choice, persisted value, default and list works **the same way
+  as the others of its kind** — same storage, same persistence rules, same defaults, same
+  "last one to speak wins", same code path. "Like the others" means exactly that: never a
+  variant.
+- **An EXCEPTION must be agreed by the user, after being warned** that it is a special case,
+  not similar to everything else, and which rule it breaks. Warn first; never code a special
+  case and leave the user to find it later.
+- A special case found in the existing code: report it to the user as such, before anything
+  else.
+
+## Persistence — what is kept where, and why — set by the user, not negotiable
+
+Two kinds of values, by what they mean to the user:
+
+- **Comfort of viewing, on this device, at this moment: kept on this device, never synced.**
+  A pre-selection for an action done once and right away, or something that depends on the
+  device's screen. A curve hidden (`hidden`) is hidden because, on this device at this
+  moment, it hides what is behind it — not a configuration to sync: nobody adds a curve to
+  hide it. The statistics export's period serves once, for the export done right away; shown
+  in bold next time it reminds which one was just made — no use on another device. Same for
+  the points shown, the tooltip modes, the Y axes' padlock. Losing them on this device
+  because the page was refreshed (an internet connection problem) is unpleasant: they are
+  kept on this device.
+- **The configuration of what's shown** (the graphs, their curves and their organization,
+  the display types, the time range…): synced across devices as the persistence options say.
+
+**The exception, by default: YAML graphs.** By default the YAML is the source of truth. The
+user is tolerated — barely — rearranging a YAML card's curves to compare things more easily;
+at the first refresh the organization the YAML sets is back, unless the YAML allows these
+changes to persist (`enablePersistence` / `enableMultidevicePersistence`).
+
+**The two options never mean the same thing:**
+
+- **`enablePersistence`: kept on this device.**
+- **`enableMultidevicePersistence`: SYNCED across devices — nothing else.** Syncing a value
+  that isn't kept on this device makes no sense: for a value it syncs, it implies
+  `enablePersistence`. Reading "multidevice" as "on this device" is the absolute
+  misreading: a past session wrote it in README_Full, the next one built a test and a table
+  on it.
+- **A value never synced** (the comfort of viewing: `hidden`, `showPoints`, the tooltip
+  modes, `yAxisLock`) is kept on this device by `enablePersistence` only (the statistics
+  export's period: always).
+
+**A synced value is kept on this device too, even without `enablePersistence` for it.**
+
+**Never mention `enableMultidevicePersistence` about a value that isn't synced across devices**
+— not in a discussion with the user, a code comment, a doc, a test or its name. For such a
+value, only `enablePersistence` exists.
+
+README_Full's *What is kept, and where* tells the user what each value obeys.
+
 ## How to work — set by the user, not negotiable
 
 - **Code what is asked, exactly.** A problem detected, something to correct, a case the
@@ -358,15 +413,29 @@ and any one to come):
   submenu's line ▸ its own, at any depth — the selector's sub-attributes too. A submenu never replaces the content of the menu
   it comes from: it opens **over** it, right-aligned on it, level with its line — there is
   no room beside it.
+- **If possible, the submenu fits within the menu that calls it, hiding nothing** (that menu
+  widened so that its lines stay readable beside the submenu — the last line's too).
+  Otherwise, the rules below.
 - The cascade of calling menus always shows: a submenu is narrower than its calling menu,
   leaving 2 or 3 characters of each line visible — with the room there is: the line was
   read just before, its start is enough to recognize it and click it to change submenu. A
   menu fully hidden by its submenu is a dead end. (A guideline on how much shows, not a
   minimum to push.)
 - The only exception: a submenu opened from the **last** line of its menu may be as wide as
-  that menu — unfolding from that last line, it hides no other line. That's why a section
+  that menu **when it needs it** (no room otherwise) — unfolding from that last line, it hides
+  no other line. "May": never because it's the last line alone — a narrow submenu on a last
+  line leaves its line readable like any other (the code didn't apply this from 1.2.16 on —
+  `_menuNeed` never widened a menu for its last line —, seen when Export ▸ Statistics ▸
+  hid its line). That's why a section
   needing a wide submenu goes last: *Global* (the info panel's switch, the gesture
   thresholds) is the last section of the options menu (*Export*, *Card*, *Global*).
+- **A menu really without room**, every other option used up: its lines' labels may be
+  shortened (cut with '…').
+- **A click on a line of a menu closes the submenu another of its lines opened; a line with a
+  submenu then opens its own.** Not a special case: every line, every menu.
+- **A switch acts by a click on the switch itself** — never by a click on its line's name
+  (that click only closes the submenu another line opened: a switch it covered shows again).
+  The keyboard (Enter on the line) toggles it.
 - A menu follows what opened it (its line for a submenu; a label, a ⠿ zone, a field, a
   button for a menu) — the page, a dialog or its parent menu scrolled. Its display zone: the
   screen less what covers it (a sticky toolbar, Home Assistant's header) for a menu; for a

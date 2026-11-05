@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS, STATS_EXPORT_PERIODS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -157,7 +157,10 @@ export class CardConfig
         P.exportSeparator =        c.csv?.separator ?? D.csv.separator;
         P.exportTimeFormat =       c.csv?.timeFormat ?? D.csv.timeFormat;
         P.exportAttributes =       c.csv?.exportAttributes;
-        P.exportStatsPeriod =      c.csv?.statisticsPeriod ?? D.csv.statisticsPeriod;
+        // (the statistics export menu's period, unless chosen there — one it doesn't offer: the default)
+        P.exportStatsPeriod =      STATS_EXPORT_PERIODS.some(p => p.period === c.csv?.statisticsPeriod) ? c.csv.statisticsPeriod : D.csv.statisticsPeriod;
+        // (the YAML's own, when it sets one: what speaks against the one saved on this device)
+        P.yamlExportStatsPeriod =  c.csv?.statisticsPeriod !== undefined ? P.exportStatsPeriod : undefined;
         P.exportNumberLocale =     c.csv?.numberLocale;
 
         this.statistics.enabled =   c.statistics?.enabled ?? D.statistics.enabled;

@@ -16,11 +16,12 @@ module.exports = async function()
     // root: the card's elements ('el') or the info panel's ('inst()._this')
     const run = (t, root) => {
         const shown = sel => t.E(`(()=>{ const m=${root}.querySelector('${sel}'); return !!m && m.style.display!=='none'; })()`);
-        // A line clicked with the mouse: an id, or [box, text] — the line of box whose name is text
+        // A line clicked with the mouse: an id, or [box, text] — the line of box whose name is text;
+        // a line with a switch: on its switch (a click on its name doesn't act)
         const click = async target => {
             const q = typeof target === 'string' ? `${root}.querySelector('${target}')`
                 : `[...${root}.querySelectorAll('${target[0]} a')].find(a=>a.textContent.trim().replace(/ ▸$/,'')==='${target[1]}')`;
-            const p = await t.E(`(()=>{ const a=${q}; if( !a ) return null; const r=a.getBoundingClientRect(); return { x: r.left+Math.min(20, r.width/2), y: r.top+r.height/2 }; })()`);
+            const p = await t.E(`(()=>{ const a=${q}; if( !a ) return null; const sw=a.querySelector('[data-switch]'), r=(sw??a).getBoundingClientRect(); return sw ? { x: r.left+r.width/2, y: r.top+r.height/2 } : { x: r.left+Math.min(20, r.width/2), y: r.top+r.height/2 }; })()`);
             if( !p ) return false;
             await t.page.mouse.click(p.x, p.y); return true;
         };
@@ -79,6 +80,23 @@ module.exports = async function()
         () => choice('graph Y axis locked', graph, ['#et_0_behavior', '#et_0_ylock']),
         () => choice('graph Y axis unlocked', graph, ['#et_0_behavior', '#et_0_ylock']),
     ]));
+    await t.step('a click on a line closes the submenu another line of its menu opened: Behavior ▸ Tooltip ▸ open over Y axis locked\'s switch, a click on its name closes Tooltip, the lock unchanged; a click on the switch locks', async () => {
+        const options = async () => { await click('#bo_0'); };
+        // (the menu of the step before closed, its delay over)
+        await t.page.mouse.click(5, 880); await t.wait(1500);
+        await options(); await t.wait(300); await click('#eo_0_behavior'); await t.wait(300); await click('#eo_0_behavior_tooltip'); await t.wait(300);
+        // (the options menu's lock: every graph's that has one)
+        const lock = () => t.E('el.instance.graphs.some(g => g.chart.hecYAxisLocked())');
+        const a = { tooltip: await shown('#eo_0_behavior_tooltip_sub'), lock: await lock() };
+        const p = await t.E(`(()=>{ const r=el.querySelector('#eo_0_ylock').getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(800);
+        const b = { tooltip: await shown('#eo_0_behavior_tooltip_sub'), behavior: await shown('#eo_0_behavior_sub'), lock: await lock() };
+        await click('#eo_0_ylock'); await t.wait(300);
+        const c = { lock: await lock() };
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(1200);
+        if( c.lock ) { await options(); await t.wait(300); await click('#eo_0_behavior'); await t.wait(300); await click('#eo_0_ylock'); await t.wait(1500); }
+        return a.tooltip && !a.lock && !b.tooltip && b.behavior && !b.lock && c.lock ? true : JSON.stringify({ a, b, c });
+    });
     await t.step('the options menu: Enhanced native history — open half a second, then closed (twice: back as it was)', async () => {
         const options = async () => { await click('#bo_0'); };
         return all([
@@ -159,6 +177,62 @@ module.exports = async function()
         () => P.choice('panel Width 3 px', typeLink, ['#et_0_appearance', ['#et_0_appearance_sub', 'Width'], ['#et_0_appearance_width_sub', '3 px']]),
     ]));
     done(await t.close());
+
+    // ── Every menu, every submenu at any depth, opened in turn (CLAUDE.md, "Menus: a cascade,
+    // always visible"): a submenu fits within the menu calling it, hiding no line's text —
+    // the last line's too —, when there's room; without room, 2 or 3 characters of each
+    // line it covers still show (40 px), the last line's submenu aside (as wide as the menu
+    // when it needs it) ──
+    // (the lines of box opening a submenu, shown — `${line id}_sub`)
+    const subLines = (t, root, box) => t.E(`[...${root}.querySelectorAll('#${box} a')].filter(a=>a.parentNode.id==='${box}' && a.id && a.offsetParent && ${root}.querySelector('#'+a.id+'_sub')).map(a=>a.id)`);
+    // (with line's submenu open: the names of box's lines it covers, how much of box shows
+    // left of it, whether line is box's last, whether the submenu is as wide as box)
+    const covered = (t, root, box, line) => t.E(`(()=>{ const R=${root}, b=R.querySelector('#${box}'), s=R.querySelector('#${line}_sub'), l=R.querySelector('#${line}');
+        if( !s || s.style.display==='none' ) return { closed: true };
+        const sq=s.getBoundingClientRect(), bq=b.getBoundingClientRect();
+        const lines=[...b.querySelectorAll('a')].filter(a=>a.parentNode===b && a.offsetParent);
+        const right=a=>{ const n=document.createTreeWalker(a, NodeFilter.SHOW_TEXT).nextNode(); if( !n ) return 0; const r=document.createRange(); r.selectNodeContents(n); return r.getBoundingClientRect().right; };
+        return { hidden: lines.filter(a=>{ const q=a.getBoundingClientRect(); return q.bottom>sq.top+1 && q.top<sq.bottom-1 && right(a)>sq.left+1; }).map(a=>a.textContent.trim()),
+                 shows: Math.round(sq.left-bq.left), last: lines[lines.length-1]===l, full: sq.width>=bq.width-2 }; })()`);
+    // (menu box of root walked: each line opening a submenu clicked, the submenu checked, then
+    // walked; a fault: the path, what it hides)
+    const walk = async (t, R, root, box, path, narrow, faults) => {
+        for( const id of await subLines(t, root, box) ) {
+            const name = await t.E(`${root}.querySelector('#${id}').textContent.trim().replace(/ ▸$/,'')`);
+            await R.click(`#${id}`); await t.wait(300);
+            const c = await covered(t, root, box, id), where = [...path, name].join(' ▸ ');
+            if( c.closed ) { faults.push(where + ': not opened'); continue; }
+            const ok = !c.hidden.length || ( narrow && ( c.shows >= 40 || ( c.last && c.full ) ) );
+            if( !ok ) faults.push(`${where}: hides ${c.hidden.join(', ')} (${c.shows} px of its menu show)`);
+            await walk(t, R, root, `${id}_sub`, [...path, name], narrow, faults);
+        }
+    };
+    const close = async t => { for( let i = 0; i < 4; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(3, 3); await t.wait(300); };
+    const STATS = () => ({ ...card(), statistics: { enabled: true } });
+    for( const width of [1000, 400] ) {
+        const narrow = width < 600;
+        t = await openCard(STATS(), { height: 900 });
+        await t.E(`(()=>{ document.body.style.width='${width}px'; document.getElementById('host').style.width='${width}px'; })()`); await t.wait(1500);
+        const R = run(t, 'el');
+        await t.step(`${width} px: every submenu of the options menu, a curve's, a graph's and a timeline row's menu — ${narrow ? 'without room: 2 or 3 characters of each line it covers show, the last line\'s as wide as the menu when it needs it' : 'each within the menu calling it, hiding no line\'s text, the last line\'s too'}`, async () => {
+            const faults = [];
+            await R.click('#bo_0'); await t.wait(400); await walk(t, R, 'el', 'eo_0', ['Options'], narrow, faults); await close(t);
+            await t.longPress(await t.E('legendPt(0,0)')); await t.wait(400); await walk(t, R, 'el', 'et_0', ['curve'], narrow, faults); await close(t);
+            await t.longPress(await t.E('moPt(0)')); await t.wait(400); await walk(t, R, 'el', 'et_0', ['graph'], narrow, faults); await close(t);
+            await t.longPress(await t.E('tlPt(1,0)')); await t.wait(400); await walk(t, R, 'el', 'et_0', ['timeline row'], narrow, faults); await close(t);
+            return faults.length ? faults.join(' / ') : true;
+        });
+        done(await t.close());
+        t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
+        await t.E(`(()=>{ document.body.style.width='${width}px'; })()`); await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+        const Q = run(t, 'inst()._this');
+        await t.step(`${width} px: every submenu of the info panel's menu, as every menu's`, async () => {
+            const faults = [];
+            await Q.click('#tf_0'); await t.wait(400); await walk(t, Q, 'inst()._this', 'et_0', ['panel'], narrow, faults);
+            return faults.length ? faults.join(' / ') : true;
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

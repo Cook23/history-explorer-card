@@ -3,24 +3,11 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { BAR_INTERVALS } from "./history-options.js";
+import { BAR_INTERVALS, TIME_RANGES } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
-// The ranges of the range selector (#by_N): their hours, their label (ui.ranges.*, with its
-// count), and whether they're left out of the list (still taken when the window is set so)
-const RANGES = [
-    { hours: 0, label: 'l_hour', hidden: true }, { hours: 1, label: 'hour' },
-    ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => ({ hours: n, label: 'n_hours', n, hidden: ![2, 6, 12].includes(n) })),
-    { hours: 24, label: 'day' },
-    ...[2, 3, 4, 5, 6].map(n => ({ hours: 24 * n, label: 'n_days', n, hidden: n > 3 })),
-    { hours: 168, label: 'week' },
-    ...[2, 3].map(n => ({ hours: 168 * n, label: 'n_weeks', n })),
-    { hours: 720, label: 'month' },
-    { hours: 2184, label: 'n_months', n: 3 }, { hours: 4368, label: 'n_months', n: 6 },
-    { hours: 8760, label: 'year' },
-];
 
 const BUTTON_STYLE = 'margin:0px;border:0px solid black;color:inherit;background-color:#00000000';
 
@@ -49,7 +36,7 @@ export function rangeControlsHtml(i, optionStyle, invertZoom)
         `<button id="bz_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:4px;height:30px;padding:0;vertical-align:top">${magnifierSvg('xy', undefined, 20)}</button>${zoomMenuHtml(i)}` +
         `<button id="b${invertZoom ? 5 : 4}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-right:2px;height:30px;padding:0;vertical-align:top">${magnifierSvg('out', undefined, 20)}</button>` +
         `<select id="by_${i}" style="${BUTTON_STYLE};height:30px;max-width:83px;text-align:center;text-align-last:center">` +
-            RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.hidden ? ' hidden' : ''}></option>`).join('') +
+            TIME_RANGES.map(r => `<option value="${r.hours}" ${optionStyle}${r.menu === false ? ' hidden' : ''}></option>`).join('') +
         `</select>` +
         `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:5px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
 }
@@ -227,7 +214,7 @@ export class CardToolbar
         if( _in ) _in.placeholder = i18n(this.entityListReady() ? 'ui.label.type_to_search' : 'ui.label.loading');
         let by = this._this.querySelector(`#by_${i}`);
         if( by ) {
-            RANGES.forEach((r, k) => { by.children[k].innerHTML = i18n('ui.ranges.' + r.label, r.n); });
+            TIME_RANGES.forEach((r, k) => { by.children[k].innerHTML = i18n('ui.ranges.' + r.label, r.n); });
         }
     }
 
@@ -236,7 +223,6 @@ export class CardToolbar
         const w = this.cardWidth();
 
         if( Math.abs(this.lastWidth - w) > 2 ) {
-            const tickChanged = this.computeTickDensity(w) != this.computeTickDensity(this.lastWidth);
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
@@ -244,8 +230,8 @@ export class CardToolbar
             // (a card crossing SMALL_CHART_PX, a window SMALL_SCREEN_PX: its curves' tooltip as there)
             const _tf = Object.values(this.tooltipFields()).join();
             if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipModes(); }
-            const _tbEl = this._this.querySelector('#tb_0');
-            if( tickChanged ) this.setStepSize(true, _tbEl?.clientWidth || w);
+            // (the time labels' step: as the density and the plot's width allow — setStepSize)
+            this.setStepSize(true);
         }
 
         this.resizeSelector();
@@ -432,20 +418,32 @@ export class CardToolbar
     // Toolbar menu entries
     // --------------------------------------------------------------------------------------
 
-    exportFile()
+    // The history of graphs' entities exported (every graph's by default)
+    exportFile(graphs = this.graphs)
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
-        this.csvExporter.exportFile(this);
+        this.csvExporter.exportFile(this, graphs);
     }
 
-    exportStatistics()
+    // The statistics of graphs' entities (every graph's by default) exported for period
+    // (STATS_EXPORT_PERIODS — the menu's by default), the period kept as the menu's
+    // (setExportStatsPeriod)
+    exportStatistics(period = this.exportStatsPeriod(), graphs = this.graphs)
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
-        this.statsExporter.exportFile(this);
+        this.setExportStatsPeriod(period);
+        this.statsExporter.exportFile(this, graphs, period);
+    }
+
+    // The statistics export menu's period: the one chosen there, else the YAML's
+    // (csv.statisticsPeriod)
+    exportStatsPeriod()
+    {
+        return this.state.exportStatsPeriod ?? this.pconfig.exportStatsPeriod;
     }
 
 

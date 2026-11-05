@@ -211,7 +211,7 @@ function hxHookInfoPanel()
 
         let ro = new ResizeObserver(() => {
             for( let g of instance.graphs ) g.chart.resize(undefined, g.graphHeight);
-            instance.setStepSize(true, instance._this.querySelector('#tb_0')?.clientWidth || null);
+            instance.setStepSize(true);
             instance.resizeSelector();
         });
         ro.observe(this);

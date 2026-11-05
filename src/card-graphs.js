@@ -503,7 +503,7 @@ export class CardGraphs
 
         // Apply interval override if provided
         const _dynG = this.graphs.find(g => g.id === _dynGid);
-        if( _dynG ) { this.updateGraphHeader(_dynG); this._showPlot(_dynG); }
+        if( _dynG ) { this.updateGraphHeader(_dynG); this._showPlot(_dynG); this._restoreYAxisLock(_dynG); }
         if( _dynG && interval !== null && interval !== undefined ) {
             _dynG.interval = interval;
             const _bd = this._this.querySelector(`#bd-${_dynGid}`);
@@ -516,6 +516,17 @@ export class CardGraphs
         // Update mo/ca visibility based on graph count
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
+    }
+
+    // Graph g's Y axes locked again as its curves keep them (yAxisLock — see keepYAxisLock),
+    // when they all keep the same ranges (a curve come from another graph keeps that one's:
+    // then none); its curves given what it shows
+    _restoreYAxisLock(g)
+    {
+        const _v = g.entities.map(e => JSON.stringify(e.yAxisLock ?? null));
+        const _ranges = _v.every(v => v === _v[0]) ? g.entities[0]?.yAxisLock : undefined;
+        for( const e of g.entities ) e.yAxisLock = _ranges ?? undefined;
+        if( _ranges ) g.chart.hecSetYAxisLocked(true, _ranges);
     }
 
     // A new graph's element e put in the page: where the graph it was combined from was (its

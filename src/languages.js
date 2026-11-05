@@ -11,6 +11,7 @@ const lang_en =
             "loading" : "Loading…",
             "source_history" : "History",
             "source_statistics" : "Statistics",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Entities unavailable",
             "already_exists" : "Already in graph",
@@ -100,10 +101,12 @@ const lang_en =
             "n_weeks" : "%1 Weeks",
             "month" : "1 Month",
             "n_months" : "%1 Months",
-            "year" : "1 Year"
+            "year" : "1 Year",
+            "n_years" : "%1 Years"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Hour",
             "daily" : "Day",
             "weekly" : "Week",
@@ -126,6 +129,7 @@ const lang_fr =
             "loading" : "Chargement…",
             "source_history" : "Historique",
             "source_statistics" : "Statistique",
+            "day_unit" : "j",
             "source_separator" : " : ",
             "error_retreiving" : "Entités indisponibles",
             "already_exists" : "Déjà dans un graphique",
@@ -215,10 +219,12 @@ const lang_fr =
             "n_weeks" : "%1 Sem",
             "month" : "1 Mois",
             "n_months" : "%1 Mois",
-            "year" : "1 An"
+            "year" : "1 An",
+            "n_years" : "%1 Ans"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Heure",
             "daily" : "Jour",
             "weekly" : "Semaine",
@@ -241,6 +247,7 @@ const lang_de =
             "loading" : "Laden…",
             "source_history" : "Verlauf",
             "source_statistics" : "Statistik",
+            "day_unit" : "T",
             "source_separator" : ": ",
             "error_retreiving" : "Entitäten nicht verfügbar",
             "already_exists" : "Bereits im Diagramm",
@@ -330,10 +337,12 @@ const lang_de =
             "n_weeks" : "%1 Wo.",
             "month" : "1 Monat",
             "n_months" : "%1 Monate",
-            "year" : "1 Jahr"
+            "year" : "1 Jahr",
+            "n_years" : "%1 Jahre"
         },
         "interval" : {
             "_10m" : "10 Min.",
+            "_5m" : "5 Min.",
             "hourly" : "Stunde",
             "daily" : "Tag",
             "weekly" : "Woche",
@@ -356,6 +365,7 @@ const lang_es =
             "loading" : "Cargando…",
             "source_history" : "Historial",
             "source_statistics" : "Estadística",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Entidades no disponibles",
             "already_exists" : "Ya en un gráfico",
@@ -445,10 +455,12 @@ const lang_es =
             "n_weeks" : "%1 Sem.",
             "month" : "1 Mes",
             "n_months" : "%1 Meses",
-            "year" : "1 Año"
+            "year" : "1 Año",
+            "n_years" : "%1 Años"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Hora",
             "daily" : "Día",
             "weekly" : "Semana",
@@ -471,6 +483,7 @@ const lang_nl =
             "loading" : "Laden…",
             "source_history" : "Geschiedenis",
             "source_statistics" : "Statistiek",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Entiteiten niet beschikbaar",
             "already_exists" : "Al in een grafiek",
@@ -560,10 +573,12 @@ const lang_nl =
             "n_weeks" : "%1 Weken",
             "month" : "1 Maand",
             "n_months" : "%1 Maanden",
-            "year" : "1 Jaar"
+            "year" : "1 Jaar",
+            "n_years" : "%1 Jaar"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Uur",
             "daily" : "Dag",
             "weekly" : "Week",
@@ -586,6 +601,7 @@ const lang_pl =
             "loading" : "Ładowanie…",
             "source_history" : "Historia",
             "source_statistics" : "Statystyka",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Encje niedostępne",
             "already_exists" : "Już na wykresie",
@@ -675,10 +691,12 @@ const lang_pl =
             "n_weeks" : "%1 Tyg",
             "month" : "1 Miesiąc",
             "n_months" : "%1 Mies",
-            "year" : "1 Rok"
+            "year" : "1 Rok",
+            "n_years" : "%1 Lat"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Godzina",
             "daily" : "Dzień",
             "weekly" : "Tydzień",
@@ -701,6 +719,7 @@ const lang_sv =
             "loading": "Laddar…",
             "source_history" : "Historik",
             "source_statistics" : "Statistik",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving": "Enheter otillgängliga",
             "already_exists" : "Redan i ett diagram",
@@ -790,10 +809,12 @@ const lang_sv =
             "n_weeks": "%1 veckor",
             "month": "1 månad",
             "n_months": "%1 månader",
-            "year": "1 år"
+            "year": "1 år",
+            "n_years": "%1 år"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Timme",
             "daily" : "Dag",
             "weekly" : "Vecka",
@@ -816,6 +837,7 @@ const lang_da =
             "loading" : "Indlæser…",
             "source_history" : "Historik",
             "source_statistics" : "Statistik",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Entiteter utilgængelige",
             "already_exists" : "Allerede i et diagram",
@@ -905,10 +927,12 @@ const lang_da =
             "n_weeks" : "%1 uger",
             "month" : "1 måned",
             "n_months" : "%1 måneder",
-            "year" : "1 år"
+            "year" : "1 år",
+            "n_years" : "%1 år"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Time",
             "daily" : "Dag",
             "weekly" : "Uge",
@@ -931,6 +955,7 @@ const lang_sk =
             "loading" : "Načítava sa…",
             "source_history" : "História",
             "source_statistics" : "Štatistika",
+            "day_unit" : "d",
             "source_separator" : ": ",
             "error_retreiving" : "Entity nedostupné",
             "already_exists" : "Už v grafe",
@@ -1020,10 +1045,12 @@ const lang_sk =
             "n_weeks" : "%1 týždňov",
             "month" : "1 mesiac",
             "n_months" : "%1 mesiacov",
-            "year" : "1 rok"
+            "year" : "1 rok",
+            "n_years" : "%1 rokov"
         },
         "interval" : {
             "_10m" : "10 min",
+            "_5m" : "5 min",
             "hourly" : "Hodina",
             "daily" : "Deň",
             "weekly" : "Týždeň",
@@ -1046,6 +1073,7 @@ const lang_ru =
             "loading" : "Загрузка…",
             "source_history" : "История",
             "source_statistics" : "Статистика",
+            "day_unit" : "д",
             "source_separator" : ": ",
             "error_retreiving" : "Объекты недоступны",
             "already_exists" : "Уже в графике",
@@ -1135,10 +1163,12 @@ const lang_ru =
             "n_weeks" : "%1 Нед",
             "month" : "1 Месяц",
             "n_months" : "%1 Мес",
-            "year" : "1 Год"
+            "year" : "1 Год",
+            "n_years" : "%1 Лет"
         },
         "interval" : {
             "_10m" : "10 мин",
+            "_5m" : "5 мин",
             "hourly" : "Час",
             "daily" : "День",
             "weekly" : "Неделя",

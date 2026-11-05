@@ -4,7 +4,7 @@
 
 import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
-import { STATE_NOT_LISTED, OPTION_DEFAULTS } from "./history-options.js";
+import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period)
@@ -14,16 +14,25 @@ const periodMs = p => PERIOD_MS[p] ?? PERIOD_MS[OPTION_DEFAULTS.statistics.perio
 // Home Assistant's short-term statistics: every 5 minutes, kept as long as the history
 // (recorder purge_keep_days) — what it returns is taken, nothing assumed
 const FINE_PERIOD = '5minute';
+// Home Assistant's daily statistics, from its hourly ones: for a window where a column of
+// pixels lasts a day or more (the statistics of the period shorter than a day)
+const DAY_PERIOD = 'day';
 // A shown entity changed: its recent history refreshed at most once every 2 s, never sooner
 // than five times what drawing the graphs again last took (see scheduleAutoRefresh)
 const AUTO_REFRESH_MIN_MS = 2000, AUTO_REFRESH_BUILD_FACTOR = 5;
+// A year's days, and the cache's days at most: twice the longest time range, for the window
+// to be moved back a whole range
+const YEAR_DAYS = YEAR_HOURS / 24, CACHE_MAX_DAYS = 2 * MAX_RANGE_YEARS * YEAR_DAYS;
 // The start of the day n days after day d (a date or a slot's start), as a cache slot's
 // bounds are written: local time, "YYYY-MM-DDT00:00:00"
 const dayAfter = (d, n) => moment(d).add(n, "day").format("YYYY-MM-DD") + "T00:00:00";
 // Where each kind of request goes in a cache slot: the history of whole days, the history
-// after the statistics (tail), the 5-minute statistics, the statistics of the period
-const LAYER = { stats: 'stats', fine: 'fine', tail: 'tail', history: 'hist' };
-const LAYERS = ['hist', 'tail', 'fine', 'stats'];
+// after the statistics (tail), the 5-minute statistics, the statistics of the period, the
+// daily statistics — from the finest
+const LAYER = { day: 'day', stats: 'stats', fine: 'fine', tail: 'tail', history: 'hist' };
+const LAYERS = ['hist', 'tail', 'fine', 'stats', 'day'];
+// The period of a kind of statistics request (Home Assistant's)
+const periodOfKind = (kind, period) => kind === 'fine' ? FINE_PERIOD : kind === 'day' ? DAY_PERIOD : period;
 // History parts asked at once (Home Assistant answers two together a quarter sooner)
 const HISTORY_REQUESTS = 2;
 // How late Home Assistant may be with a period's statistics: it compiles them once the
@@ -63,7 +72,7 @@ export class CardHistory
 
     growCache(growSize)
     {
-        if( this.cacheSize >= 20 * 365 ) return;
+        if( this.cacheSize >= CACHE_MAX_DAYS ) return;
 
         let e = this.cache[0].start;
 
@@ -151,16 +160,18 @@ export class CardHistory
     }
 
     // The coarsest source that gives each column of pixels its min, mean and max as exactly
-    // as the history (to 1 px): 'stats' — the statistics of the period (hourly) — while a
-    // column lasts that long or more; else 'fine' — the 5-minute statistics — while it lasts
-    // 5 minutes or more; else 'history'. Always 'history', the statistics off; never,
-    // forced (statistics.force: 'fine' at most)
+    // as the history (to 1 px): 'day' — the daily statistics — while a column lasts a day
+    // or more (the statistics of the period shorter than a day); else 'stats' — the
+    // statistics of the period (hourly) — while it lasts that long or more; else 'fine' — the
+    // 5-minute statistics — while it lasts 5 minutes or more; else 'history'. Always
+    // 'history', the statistics off; never, forced (statistics.force: 'fine' at most)
     _sourceNeeded()
     {
         if( !this.statistics.enabled ) return 'history';
         const _px = Math.max(0, ...this.graphs.map(g => g.chart.hecPlotWidth()));
         const _column = moment(this.endTime).diff(moment(this.startTime)) / ( _px || 1000 );
         const _period = periodMs(this.statistics.period);
+        if( _column >= PERIOD_MS[DAY_PERIOD] && _period < PERIOD_MS[DAY_PERIOD] ) return 'day';
         if( _column >= _period ) return 'stats';
         if( _column >= PERIOD_MS[FINE_PERIOD] || this.statistics.force ) return _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats';
         return 'history';
@@ -276,7 +287,8 @@ export class CardHistory
         this._extendToNow();
 
         // Check if we need to grow the cache due to an overflow
-        if( moment(this.startTime) < this.cache[0].start_m ) this.growCache(365);
+        // (a year at a time, until it reaches the window's start — 10 years at most, see growCache)
+        while( moment(this.startTime) < this.cache[0].start_m && this.cacheSize < CACHE_MAX_DAYS ) this.growCache(YEAR_DAYS);
 
         const c0 = this.mapStartTimeToCacheSlot(this.startTime);
         const c1 = this.mapEndTimeToCacheSlot(this.endTime);
@@ -290,8 +302,14 @@ export class CardHistory
         // where the statistics of the period aren't compiled yet —, each in one request
         const _period = periodMs(this.statistics.period);
         const _finest = _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats', _finestMs = Math.min(_period, PERIOD_MS[FINE_PERIOD]);
-        const _wants = { stats: () => true, fine: i => _finest === 'fine' && ( _source === 'fine' || ( _source === 'stats' && this._lacksStatistics(i, _period) ) ) };
-        for( const kind of ['stats', 'fine'] ) this._askRows(kind, c0, c1, _statIds, _wants[kind]);
+        // (the daily statistics for a column of a day or more; the statistics of the period
+        // where they don't cover — the days not compiled yet —, the 5-minute ones where those
+        // don't, as ever)
+        const _dayMs = PERIOD_MS[DAY_PERIOD];
+        const _wants = { day: () => _source === 'day',
+                         stats: i => _source !== 'day' || this._lacksStatistics(i, _dayMs),
+                         fine: i => _finest === 'fine' && ( _source === 'fine' || ( ( _source === 'stats' || _source === 'day' ) && this._lacksStatistics(i, _period) ) ) };
+        for( const kind of ['day', 'stats', 'fine'] ) this._askRows(kind, c0, c1, _statIds, _wants[kind]);
 
         // The history after the finest statistics — what Home Assistant hasn't compiled yet —,
         // from their period and STATS_LAG ago to now, in one request
@@ -371,7 +389,7 @@ export class CardHistory
         return _end < Math.min(msOf(s.end), Date.now() - period - STATS_LAG);
     }
 
-    // A request to Home Assistant for slots c0 to c1 and entities ids — kind 'stats',
+    // A request to Home Assistant for slots c0 to c1 and entities ids — kind 'day' (daily statistics), 'stats',
     // 'fine' (5-minute statistics), 'history' or 'tail' (the history from a time, from: in
     // slot c0) —, kept under way until it's answered, or fails (even before it's sent); the
     // answer put in the cache, what's still missing asked, the graphs drawn again
@@ -380,7 +398,7 @@ export class CardHistory
         const q = { kind, c0, c1, ids, gen: this._loadGen, at: Date.now() };
         this._requests.push(q);
         const t0 = from !== null ? moment(Math.max(from, msOf(this.cache[c0].start))) : this.cache[c0].start, t1 = this.cache[c1].end, l = [...ids];
-        const _period = kind === 'fine' ? FINE_PERIOD : this.statistics.period;
+        const _period = periodOfKind(kind, this.statistics.period);
         let _p;
         try {
             _p = LAYER[kind] === 'hist' || kind === 'tail' ? this.historyCall(l, t0, t1) : this._askHA(this.statisticsRequest(l, t0, t1, _period));
@@ -407,7 +425,7 @@ export class CardHistory
             // again at the next update)
             if( !error ) for( const id of q.ids ) {
                 const a = result?.[id] ?? [];
-                const _period = periodMs(q.kind === 'fine' ? FINE_PERIOD : this.statistics.period);
+                const _period = periodMs(periodOfKind(q.kind, this.statistics.period));
                 const rows = q.kind === 'history' || q.kind === 'tail' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period));
                 let p = 0;
                 for( let i = q.c0; i <= q.c1; i++ ) {

@@ -11,8 +11,11 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
-import { typesCompatible, RAW_INTERVAL } from "./history-options.js";
+import { typesCompatible, RAW_INTERVAL, STATS_EXPORT_PERIODS } from "./history-options.js";
 import { fillValue } from "./history-default-colors.js";
+
+// The Y axes' locked ranges saved this long after they last changed (keepYAxisLock)
+const YAXIS_LOCK_SAVE_MS = 500;
 
 export class CardOperations
 {
@@ -446,6 +449,28 @@ export class CardOperations
         for( const e of _curves ) e[this.tooltipFieldOf(e, _f)] = mode;
         this.applyTooltipModes(g);
         this.writeLocalState();
+    }
+
+    // The statistics export menu's period set — chosen there (save: kept on this device, as a
+    // curve's tooltip mode) or restored (card-storage.js); null, or one it doesn't offer: the
+    // YAML's
+    setExportStatsPeriod(period, save = true)
+    {
+        this.state.exportStatsPeriod = STATS_EXPORT_PERIODS.some(p => p.period === period) ? period : null;
+        if( save ) this.writeLocalState();
+    }
+
+    // The Y axes of the graph on canvas locked on ranges (Chart.js yAxisLockChanged), or
+    // released (null): kept on its entities (yAxisLock — on this device, as a hidden curve),
+    // saved once they stop changing (a drag of a Y axis changes them at each move)
+    keepYAxisLock(canvas, ranges)
+    {
+        const g = this.graphs.find(x => x.canvas === canvas);
+        const v = ranges ?? undefined;
+        if( !g || g.entities.every(e => JSON.stringify(e.yAxisLock) === JSON.stringify(v)) ) return;
+        for( const e of g.entities ) e.yAxisLock = v;
+        clearTimeout(this._yAxisLockSaveTid);
+        this._yAxisLockSaveTid = setTimeout(() => this.writeLocalState(), YAXIS_LOCK_SAVE_MS);
     }
 
     // Entity idx of graph g shown or hidden, the other way round — saved so

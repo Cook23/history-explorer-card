@@ -88,9 +88,14 @@ export function takeInfoLook(entityId)
 //   'local'   — on this device only: a viewing comfort that suits one screen and clutters
 //               another (every point of a curve, a verbose curve hidden — fine on a large
 //               screen, unreadable or needed on a small one).
-// Whether a field is saved at all is set by the persistence options (enable_persistence,
-// enable_multidevice_persistence); this only says how far it goes once saved: a 'local'
-// field is never taken from another device, whatever enable_multidevice_persistence says.
+// Whether a field is saved at all is set by the persistence options; this only says how far
+// it goes once saved. The two options never mean the same thing:
+//   enable_persistence             — kept on this device (localStorage);
+//   enable_multidevice_persistence — SYNCED across devices, nothing else. Syncing a value not
+//               kept on this device makes no sense: for a 'devices' field it covers, it implies
+//               enable_persistence.
+// A 'local' field, never synced, is kept on this device by enable_persistence ONLY, never
+// taken from another device.
 // --------------------------------------------------------------------------------------
 const ENTITY_FIELD_SCOPE = {
     type          : 'devices',
@@ -116,6 +121,8 @@ const ENTITY_FIELD_SCOPE = {
     netBars       : 'devices',
     circular      : 'devices',
     groupId       : 'devices',
+    // (its graph's Y axes locked — the padlock, a gesture on a Y axis —: their ranges)
+    yAxisLock     : 'local',
 };
 const LOCAL_ONLY_FIELDS = Object.keys(ENTITY_FIELD_SCOPE).filter(f => ENTITY_FIELD_SCOPE[f] === 'local');
 
@@ -184,9 +191,13 @@ export class CardStorage
             timeRangeMinutes    : this.activeRange.timeRangeMinutes,
             // (the magnifier's mode: kept as the time range is — _resolveZoomBox)
             zoomBox             : this.state.zoomBox,
+            // (the statistics export's period: kept on this device only, always —
+            // _resolveExportStatsPeriod)
+            exportStatsPeriod   : this.state.exportStatsPeriod,
             // YAML mirrors (last YAML value seen — detect YAML change across restarts)
             yaml_defaultTimeRange  : this.pconfig.yamlDefaultTimeRange,
             yaml_defaultMagnifierMode : this.pconfig.yamlDefaultMagnifierMode,
+            yaml_exportStatsPeriod : this.pconfig.yamlExportStatsPeriod,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_gestures          : this.pconfig.gestures,
             yaml_entities          : this._pureYamlEntities ?? this.store.statics(),
@@ -290,6 +301,7 @@ export class CardStorage
         this._resolveEntities(_ls, _haCard, _yamlImage, _noStatics);
         this._resolveTimeRange(_ls, _haCard, _yamlImage, _noStatics);
         this._resolveZoomBox(_ls, _haCard, _yamlImage, _noStatics);
+        this._resolveExportStatsPeriod(_ls, _yamlImage);
         const _infoPanelChanged = this._resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage);
         this._resolveGestures(_ls, _haGestures, _yamlImage);
 
@@ -360,10 +372,9 @@ export class CardStorage
     // YAML source: static entities from pconfig (initialized from YAML before this call).
     //              Always wins for a given entity when changed — never blocked.
     // HA user source: compared to ha_entities mirror in localStorage — may come from
-    //              another device. Blocked per entity via disable_multidevice_persistence
-    //              (entity-level `disable_multidevice_persistence`, falling back to the
-    //              card-level option) — a device then never adopts another device's HA
-    //              value for that entity, though it still keeps writing its own local changes.
+    //              another device. Taken only for the fields enable_multidevice_persistence
+    //              syncs (the entity's own option, else the card's — see _persistedFieldSets);
+    //              never for a 'local' field (ENTITY_FIELD_SCOPE), never synced.
     // UI source: localStorage active value — wins if no YAML or (unblocked) HA front.
     _resolveEntities(_ls, _haCard, _yamlImage, _noStaticsDefaultAll)
     {
@@ -456,11 +467,12 @@ export class CardStorage
         // falling back to the card-level 'entities' switch, itself defaulting to 'all'
         // for a dynamic entity (no YAML to fall back to) or 'none' for a static one (see
         // _resolvePersistenceDefault) when the card-level option isn't configured at all.
-        // enable_multidevice_persistence additionally allows the HA/cross-device front to
-        // win for its fields; enable_persistence only allows this device's own local
-        // storage — multidevice always wins over local for whatever it covers, since a
-        // field enabled by either ends up in _enabledFields regardless, while only
-        // _multiFields fields can also be won by the HA front below.
+        // enable_multidevice_persistence means SYNCED across devices: it lets the HA front
+        // win for its fields (_multiFields) — and, since a synced field is kept on this
+        // device too, they're enabled here as well (_enabledFields: either option).
+        // enable_persistence keeps a field on this device only (_localFields). A 'local'
+        // field (ENTITY_FIELD_SCOPE), never synced, is never in _multiFields: it's kept on
+        // this device by enable_persistence only.
         const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
         const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
@@ -538,14 +550,14 @@ export class CardStorage
             } else {
                 // HA user wins (only reachable when enable_multidevice_persistence covers range)
                 if( _haCard.timeRangeHours > 0 )
-                    this.applyTimeRange(this.validateRange(_haCard.timeRangeHours, true));
+                    this.applyTimeRange(this.validateRange(_haCard.timeRangeHours));
                 else if( _haCard.timeRangeMinutes > 0 )
                     this.applyTimeRangeMinutes(_haCard.timeRangeMinutes);
             }
         } else {
             // Local restore — reachable since at least one of the two options is enabled
             if( _ls?.timeRangeHours > 0 )
-                this.applyTimeRange(this.validateRange(_ls.timeRangeHours, true));
+                this.applyTimeRange(this.validateRange(_ls.timeRangeHours));
             else if( _ls?.timeRangeMinutes > 0 )
                 this.applyTimeRangeMinutes(_ls.timeRangeMinutes);
         }
@@ -565,6 +577,17 @@ export class CardStorage
         const _mode = !_range.multi && !_range.local || _yamlChanged ? this.pconfig.defaultMagnifierMode
                     : _haChanged ? _haCard.zoomBox : _ls?.zoomBox;
         this.setZoomBoxMode(_mode ?? this.pconfig.defaultMagnifierMode, false);
+    }
+
+    // --- Last one to speak wins — the statistics export's period ---
+    // Kept on this device only, whatever the persistence options (as a curve's tooltip mode:
+    // nothing another device would use); its YAML being csv.statisticsPeriod: the YAML's when
+    // it changed, else this device's
+    _resolveExportStatsPeriod(_ls, _yamlImage)
+    {
+        const _yamlChanged = this.pconfig.yamlExportStatsPeriod !== undefined &&
+                             this.pconfig.yamlExportStatsPeriod !== _yamlImage?.yaml_exportStatsPeriod;
+        this.setExportStatsPeriod(_yamlChanged ? null : _ls?.exportStatsPeriod ?? null, false);
     }
 
     // --- Last one to speak wins — the info panel's switch ---
@@ -657,10 +680,12 @@ export class CardStorage
             }
         } catch(e) {}
     }
-    // The fields of an entity whose value is saved: { multi (on every device), local (on
-    // this device) } — the YAML entity's own enable_* options (staticEntry), else the card's
-    // 'entities' switch, which defaults to every field for an entity added from the card
-    // (no YAML value to fall back to) and to none for a YAML one
+    // The fields of an entity whose value is saved: { multi (synced across devices —
+    // enable_multidevice_persistence), local (kept on this device — enable_persistence) } —
+    // the YAML entity's own enable_* options (staticEntry), else the card's 'entities'
+    // switch, which defaults to every field for an entity added from the card (no YAML
+    // value to fall back to) and to none for a YAML one. A 'local' field (never synced) is
+    // never in multi: kept on this device by enable_persistence only
     _persistedFieldSets(staticEntry)
     {
         const _resolve = (_entityFields, _cardRaw) => {
@@ -668,8 +693,8 @@ export class CardStorage
             const _cardSet = this._resolvePersistenceDefault(_cardRaw, PERSISTENCE_CATEGORIES, !staticEntry);
             return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
         };
-        // (a field kept on this device only — see ENTITY_FIELD_SCOPE: never taken from
-        // another device, whatever the options)
+        // (a 'local' field — see ENTITY_FIELD_SCOPE: never synced, never in multi; kept on
+        // this device by enable_persistence only)
         const _multi = new Set(_resolve(staticEntry?.enableMultidevicePersistence, this.pconfig.enableMultidevicePersistence));
         for( const _f of LOCAL_ONLY_FIELDS ) _multi.delete(_f);
         return { multi: _multi, local: _resolve(staticEntry?.enablePersistence, this.pconfig.enablePersistence) };

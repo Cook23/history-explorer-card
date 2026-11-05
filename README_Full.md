@@ -10,7 +10,7 @@
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card)** (itself a fork of the original [alexarch21/history-explorer-card](https://github.com/alexarch21/history-explorer-card), archived March 2024), based on its version 1.0.54.
 > 📖 [README.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md) — the short version · [Version highlights](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README.md#-version-highlights) · What this fork adds: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION_FR.md) 🇫🇷
 
-A highly interactive way to view the history of your entities in Home Assistant: it loads only what the screen can show — the hourly statistics, the 5-minute statistics or the history — so that panning and zooming stay smooth.
+A highly interactive way to view the history of your entities in Home Assistant: it loads only what the screen can show — the daily, hourly or 5-minute statistics, or the history — so that panning and zooming stay smooth.
 
 ![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/hero.png)
 
@@ -77,6 +77,7 @@ A highly interactive way to view the history of your entities in Home Assistant:
   - [Replacing mini-graph-card](#replacing-mini-graph-card)
 - [Default view and time ranges](#default-view-and-time-ranges)
 - [Persistence](#persistence)
+  - [What is kept, and where](#what-is-kept-and-where)
   - [Enabling persistence (`enablePersistence` / `enableMultidevicePersistence`)](#enabling-persistence-enablepersistence--enablemultidevicepersistence)
   - [Persistence for specific entities](#persistence-for-specific-entities)
 - [Auto refresh](#auto-refresh)
@@ -136,7 +137,7 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 The card opens on the last 24 hours (see [Default view and time ranges](#default-view-and-time-ranges)).
 
 - **Pan** — drag a graph left or right to slide it through time. The card loads what comes into view as you move (see [Long term statistics](#long-term-statistics)): on a slow database (on an SD card, for example), parts of the window may stay empty for a moment, filled as the data comes in. Released, the Y axes readjust to the new data, and every graph of the card shows the same time.
-- **Zoom** — the time range selector (top right), the magnifiers − and + on each side of it, or the mouse wheel with Ctrl. Under the pointer — a mouse, a pen above the screen, a finger while it presses —, each magnifier is shown twice as large, to see which one is clicked.
+- **Zoom** — the time range selector (top right: up to 10 years), the magnifiers − and + on each side of it (each a step: an hour, a day — 1 to 6 —, a week, a month, a year — 1 to 10), or the mouse wheel with Ctrl. Under the pointer — a mouse, a pen above the screen, a finger while it presses —, each magnifier is shown twice as large, to see which one is clicked.
 - **Elastic box** — with a mouse, a drag mostly up or down on a graph draws a box (a drag mostly sideways pans; a finger's or a pen's vertical move scrolls the page). Released, the time zooms to it — the round duration that covers it, centred on it — and every Y axis of the graph to its values, the padlock closed. A box narrower or lower than the pointer's precision, or covering 90 % or more of the curves' area that way, leaves that axis as it is — a box the whole height zooms the time only. Escape cancels it. The magnifying glass turns green while it's drawn.
 - **The magnifying glass** — a click turns it on: any drag on a graph's curves then draws the same box, with a finger too (the page doesn't scroll from a graph meanwhile). It goes off at the end of the next gesture on a graph, a press outside the graphs, Escape, or a click on it again. A double click brings the range back to `defaultTimeRange`, in real time. A long press — or a right click, a pen's button — opens the menu of what the box zooms: the time (↔ — a band the curves' whole height), the Y axis (↕ — a band their whole width) or both (⤢); the glass shows its symbol, kept as the time range is. Its default: `defaultMagnifierMode` (see [Default view and time ranges](#default-view-and-time-ranges)).
 - **Date** — the `<` `>` buttons move a day back or forward. The date shown is the window's first day: a click opens your browser's calendar, the day you choose starts the window, the range kept (a day whose window reaches the present: real time). A double click brings you back to the present, the zoom kept.
@@ -202,13 +203,13 @@ A long-press — or a right click — opens a menu: on a curve's or a row's labe
 
 ![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-curve.png)
 
-Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A choice that changes what the menu shows — a display type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it (the new type in bold, the switch moved), then closes; another choice made meanwhile is applied too, and the half second starts again. An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color* (the picker takes over), a type for an entity being added (a second one would add it again) — closes the menu at once. A switch is a line with its name and, on its right, Home Assistant's switch: green and on the right when on, red and on the left when off. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page scrolls — or the dialog, the panel holding the card —, even under a sticky toolbar; a submenu follows its line when its menu scrolls (the entity list, a long list of attributes). Each shows in its zone: for a menu, the screen minus what covers it (a sticky toolbar, the page's header); for a submenu, its menu at the top and that same zone at the bottom. What goes past it, at the top or at the bottom, is masked; the menu closes once its own first line is wholly out of its zone — a submenu opened from a menu's first or last line isn't closed by the least scroll. A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked (the last line's submenu, which hides no line below it, may be as wide as the menu). On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
+Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A click on a line closes the submenu another line of its menu opened (a line with a submenu then opens its own). A choice that changes what the menu shows — a display type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it (the new type in bold, the switch moved), then closes; another choice made meanwhile is applied too, and the half second starts again. An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color* (the picker takes over), a type for an entity being added (a second one would add it again) — closes the menu at once. A switch is a line with its name and, on its right, Home Assistant's switch: green and on the right when on, red and on the left when off; it's toggled by a click on the switch itself, or Enter on its line — a click on its name doesn't toggle it. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page scrolls — or the dialog, the panel holding the card —, even under a sticky toolbar; a submenu follows its line when its menu scrolls (the entity list, a long list of attributes). Each shows in its zone: for a menu, the screen minus what covers it (a sticky toolbar, the page's header); for a submenu, its menu at the top and that same zone at the bottom. What goes past it, at the top or at the bottom, is masked; the menu closes once its own first line is wholly out of its zone — a submenu opened from a menu's first or last line isn't closed by the least scroll. A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked — the last line's too; only without room for that, the last line's submenu, which hides no line below it, may be as wide as the menu. On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
 #### The options menu
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
 - **Display ▸**, **Appearance ▸** (its color aside), **Interpolation ▸**, **Behavior ▸** (*Tooltip ▸*, *Y axis locked*) — as in a graph's menu, for every curve of the card at once: the value all of them share in bold, a switch on when all of them show it; a choice in the card's menu, a graph's or a curve's applies to every curve it concerns, the last one made winning;
-- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics* (their long-term statistics, with long-term statistics on), each as a CSV file;
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics ▸* (their statistics, with long-term statistics on, for the period chosen in its submenu: *5 min*, *Hour*, *Day*, *Week*, *Month* — see [Exporting data as CSV](#exporting-data-as-csv)), each as a CSV file;
 - **Card ▸** — *Default graphs ▸*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display ▸*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu over *Card ▸*, right-aligned on it (*Confirm* / *Cancel*, Cancel marked: Enter changes nothing; Cancel, ← or Escape close it). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
 - **Global ▸** — what applies to every card of every dashboard, on every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red) — see `defaultInfoPanel` —, and the [gesture settings](#gesture-settings), entered right in the submenu.
 
@@ -393,7 +394,8 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu, title
 - **Display ▸** — open with the menu (*Behavior* for a graph of timelines): the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
 - **Appearance ▸** — as in the type menu, its color aside, for all the graph's curves at once: a switch on when all of them show it, a value in bold when all of them have it;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
-- **Behavior ▸** — *Tooltip ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button).
+- **Behavior ▸** — *Tooltip ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button);
+- **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities.
 
 ![A graph's menu, Behavior open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-graph.png)
 
@@ -800,7 +802,7 @@ graphs:
 
 By default the min/max scales for the Y axis are adjusted automatically to the data you are currently viewing: the padlock is open, in green. Locked, it is closed, in red (the theme's own green and red).
 
-Pressing the axis lock icon — or the *Y axis locked* switch in the [graph menu](#the-graph-menu-cut-and-paste) — will temporarily disable autoscaling and lock the Y axis to the currently active range. Pressing it again will revert back to the defaults for the graph:
+Pressing the axis lock icon — or the *Y axis locked* switch in the [graph menu](#the-graph-menu-cut-and-paste) — disables autoscaling and locks the Y axis to the currently active range; a drag or a zoom of a Y axis locks it too, on the range it's moved to. The lock and its range are kept on this device, as the card's persistence options say — as a hidden curve (see [What is kept, and where](#what-is-kept-and-where)). Pressing it again will revert back to the defaults for the graph:
 
 ![The Y axis padlock](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/y-lock.png)
 
@@ -914,7 +916,7 @@ interpolation: makima
 
 Many sensors report irregularly: every few seconds while something happens, then nothing for minutes or hours. `curves` and `lines` then bridge each silence with a long spline or diagonal from the last value before it to the first one after it — suggesting a slow, gradual change that never happened. `stepped` avoids that, but loses the smooth shape of the curve while the sensor reports.
 
-`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way.
+`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way. Statistics are never a silence: where the curve is drawn from them (a long time range), the values of the history next to them — another day, the last minutes they don't cover yet — neither start nor end one.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1090,16 +1092,17 @@ The card loads what the screen can show, and no more. A graph can't draw anythin
 
 | A column of pixels lasts | Loaded |
 |---|---|
-| an hour or more | the hourly statistics of the whole window, in one request (the 5-minute statistics for the day whose last hour isn't compiled yet) |
+| a day or more | the daily statistics of the whole window, in one request (the hourly ones for the days not compiled yet, then as below) |
+| between an hour and a day | the hourly statistics of the whole window, in one request (the 5-minute statistics for the day whose last hour isn't compiled yet) |
 | between 5 minutes and an hour | the hourly statistics of the whole window, then its 5-minute statistics, in one request each (the hourly ones kept where Home Assistant no longer has 5-minute ones) |
 | less than 5 minutes | the history, a few days at a time, the most recent first, each day drawn as it comes (the hourly statistics only where there's no more history) |
 
-For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h). The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500. It's asked two parts at a time: each part is drawn as it comes, parts that arrive meanwhile together.
+For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h), five or ten years from the daily statistics (2 or 4 days). The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500. It's asked two parts at a time: each part is drawn as it comes, parts that arrive meanwhile together.
 
 - **The last minutes from the history.** Home Assistant compiles a period's statistics once it has ended: the hour not compiled yet comes from the 5-minute statistics, and the minutes after them from the history — one short request, from 20 minutes ago (the 5 minutes not compiled yet, and room for Home Assistant being slow), at the same time as the statistics. On a recent day whose 5-minute statistics stop earlier (Home Assistant late with them, or none for an entity), that day comes from the history. The automatic refresh asks these last minutes and today's statistics again, never the day's history.
 - **The same values from both.** A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics over the same time (see [Data decimation](#data-decimation)): nothing shows where the history meets the statistics.
-- **`statistics.period`** (below) is the table's first threshold — an hour by default, a day with `period: day`; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last minutes.
-- **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever: the card takes what it returns, however far back.
+- **`statistics.period`** (below) is the hourly threshold of the table — an hour by default; with `period: day`, the daily statistics replace the hourly ones; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last minutes.
+- **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever (the daily ones are computed from them): the card takes what it returns, however far back.
 - **Entities without statistics** — timelines, attributes, angles (`circular`: Home Assistant averages angles as plain numbers), entities without a state class — always come from the history: past the history retention limit, their graph is blank.
 
 ![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/long-term-stats.png)
@@ -1250,14 +1253,14 @@ Written differently in the card's syntax:
 
 ## Default view and time ranges
 
-When the dashboard is opened, the card will show the last 24 hours by default. You can select a different default time range in the YAML. Use m, h, d, and w to denote minutes, hours, days and weeks respectively. For longer time scale, o and y denote months and year. The maximum range is one year. If no postfix is given, hours are assumed.
+When the dashboard is opened, the card will show the last 24 hours by default. You can select a different default time range in the YAML. Use m, h, d, and w to denote minutes, hours, days and weeks respectively. For longer time scale, o and y denote months and years. The maximum range is ten years. If no postfix is given, hours are assumed.
 
 When the time range is persisted (see [Persistence](#persistence)), the card reopens at the range last chosen, and a change of `defaultTimeRange` in the YAML takes over — the last one to speak wins. Otherwise it always opens at `defaultTimeRange`.
 
 ```yaml
 type: custom:history-explorer-card
 defaultTimeRange: 4h     # show the last 4 hours when opening the card
-                         # or: 15m (15 minutes), 2d (2 days), 3w (3 weeks), 6o (6 months), 1y (1 year)
+                         # or: 15m (15 minutes), 2d (2 days), 3w (3 weeks), 6o (6 months), 1y (1 year), 5y (5 years)
 ```
 
 The magnifying glass's mode — what its box zooms — has its default the same way, kept or not as the time range is:
@@ -1281,6 +1284,29 @@ defaultTimeOffset: 1h       # Add 1 hour of empty space after the current time
 
 ## Persistence
 
+### What is kept, and where
+
+The default values of the two options, when the YAML doesn't set them (see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)):
+
+| Option | Default on a card with YAML graphs (`graphs:`) | Default on a card with only entities added from it |
+|---|---|---|
+| `enablePersistence` | `none` — but `entities` for the entities added from the card | `all` |
+| `enableMultidevicePersistence` | `none` — but `entities` for the entities added from the card | `all` |
+
+What each variable obeys, for its persistence on this device and on every device:
+
+| Variable | Kept on this device by | Kept on every device by |
+|---|---|---|
+| The time range | `range` (either option) | `enableMultidevicePersistence: range` |
+| The magnifier's mode | `range` (either option) | `enableMultidevicePersistence: range` |
+| The graphs' order, the linked graphs' too | `order` (either option) | `enableMultidevicePersistence: order` |
+| An entity's `type`, `color`, `fill`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
+| A curve hidden (`hidden`), its points (`showPoints`), its tooltip modes, its graph's Y axes locked with their ranges (`yAxisLock`: the padlock, or a gesture on a Y axis) | `enablePersistence: entities` — a YAML entity: its own `enablePersistence` first | Never |
+| The info panel's switch, the gesture thresholds | Always | Always |
+| The statistics export's period | Always | Never |
+
+`enableMultidevicePersistence` is the sync across devices: what it syncs is kept on this device too ("either option"). Not kept: what the YAML says, at each load. Kept: a change of the YAML still wins — the last one to speak wins.
+
 ### Enabling persistence (`enablePersistence` / `enableMultidevicePersistence`)
 
 By default, nothing about this card's state persists across reloads: the time range always reopens at `defaultTimeRange`, graphs always display in their YAML order, and every static (YAML-defined) entity always shows exactly what YAML says, regardless of any zoom, pan, reorder, or edit made through the UI on any device.
@@ -1303,7 +1329,7 @@ enableMultidevicePersistence: range     # this device's time range syncs across 
 
 - **`enablePersistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
 - **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. If YAML and another source both spoke, YAML wins. For an entity, a YAML edit replaces every UI customization of that entity (other entities are untouched); reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML doesn't set at all (e.g. no `defaultTimeRange`) never speaks. A device opening the card for the very first time (or after its browser storage was cleared) has no image of its own yet: with `enableMultidevicePersistence`, it compares the YAML with the image saved in your HA account, so it gets what your other devices saved — unless the YAML changed since, which then wins there too; with `enablePersistence` alone, it gets the YAML.
-- **`enableMultidevicePersistence`** — turns on persistence in both local storage *and* your Home Assistant user account, so this device's changes sync across all your other devices too. Where both options cover the same field, `enableMultidevicePersistence` always wins — that field syncs across devices, `enablePersistence` on the same field only matters for what `enableMultidevicePersistence` doesn't already cover.
+- **`enableMultidevicePersistence`** — syncs across devices: turns on persistence in both local storage *and* your Home Assistant user account, so this device's changes sync across all your other devices too. Where both options cover the same field, `enableMultidevicePersistence` always wins — that field syncs across devices, `enablePersistence` on the same field only matters for what `enableMultidevicePersistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
 Both accept `range`, `entities`, `order` (the display order of your graphs — card-level only, since a position only means something relative to every other graph, not a property of one entity), or `all` at the card level (top-level YAML key, alongside `defaultTimeRange`):
@@ -1348,7 +1374,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`. `hidden`, `showPoints` and the tooltip modes are never synced across devices: `enableMultidevicePersistence` keeps them on this device only, as `enablePersistence` does. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`, `yAxisLock` (its graph's Y axes locked, with their ranges). `hidden`, `showPoints`, the tooltip modes and `yAxisLock` are never synced across devices: only `enablePersistence` keeps them, on this device. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a purely dynamic card, see above).
 
@@ -1745,7 +1771,7 @@ A card narrower than 300 px (two cards side by side on a phone, a grid of small 
 - the toolbar: when even the short date and the range don't fit side by side, the date (‹ ›), the range (🔍 − + and its name) and the entity search each on a line, centered;
 - the Y labels inside the plot, each in a box of the card's background 80 % opaque (opaque while the pointer is near them), at mini-graph-card's size (10.5 px), a label whose box would touch another one skipped; dragged along them, an axis moves (a finger or a pen: a tap, then a second press right away) — a click, a long press or a hover there are the curves' (see [Y axis scaling](#y-axis-scaling));
 - the handle, the padlock, the chain icon and the close button each in a box like the Y labels', over the legend's labels or a timeline's rows, taking no room — on the box a gesture is theirs, beside it the label's;
-- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels that would overlap skipped;
+- the legend, the time labels and a timeline's text in 11 px (12 px, and 13 px for a timeline's states, otherwise); the legend's lines below the first taking the whole width; the time labels' step grown until they fit side by side;
 - the legend's names shortened, every curve of the graph at the same step: a qualifier many entities carry as its initials (`(Filtered)` → `(F)`), the start of the name — the device's name, or the words shared with another curve — abbreviated (`M-F V…`), the articles removed, that start removed where two curves don't then read the same, then '…' before the value;
 - the values over a graph (`showState`): the first curve's large, the others small in a column on its right, each cut ('…') rather than wrapped; the statistics a little smaller;
 - a menu takes the room there is, opening without a submenu (a submenu then leaves the start of its lines); a tooltip wider than the card stays within the screen.
@@ -1763,7 +1789,7 @@ hour24: true
 
 ### Changing the horizontal time tick density
 
-By default, time tick density is automatic and adjusts to the width of your screen. That's always a compromise between looking good (no clipping), being readable at all screen sizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
+By default, time tick density is automatic and adjusts to the width of your screen. Whatever the density, the time labels always fit side by side along the axis: when they wouldn't, the step between two grows (two hours instead of one, a week instead of a day, two months instead of one…) until they do. That's always a compromise between looking good (no clipping), being readable at all screen sizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
 
 The year of the window's left end is shown in bold, in the margin left of the plot, on the line of the time labels — on every graph that shows its time labels and has room for it there (none when its Y labels are inside the plot, as on a narrow card). When the axis already shows that year at its left end (a window ticked by month starting on 1 January), the margin shows none.
 
@@ -1811,7 +1837,9 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History* (*Export ▸ Statistics* for the long-term statistics). CSV export does not work in the HA Companion app.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History*, or *Export ▸ Statistics ▸* and a period for their statistics — a graph's own entities from the same *Export ▸* in its menu (a long-press on its ⠿ zone). CSV export does not work in the HA Companion app.
+
+Home Assistant's recorder keeps two kinds of statistics, for the entities with a state class: every 5 minutes (short-term, kept as long as the history — the recorder's `purge_keep_days`) and every hour (long-term, kept for ever). *5 min* exports the first, *Hour* the second; *Day*, *Week* and *Month* are computed by Home Assistant from the hourly ones. The period in bold is the one chosen last, kept on this device whatever the persistence options (see [What is kept, and where](#what-is-kept-and-where)) — else `csv.statisticsPeriod`; a change of `csv.statisticsPeriod` in the YAML wins (the last one to speak wins).
 
 ![The options menu, Export open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-export.png)
 
@@ -1821,10 +1849,12 @@ type: custom:history-explorer-card
 csv:
   separator: ';'            # Use a semicolon as a separator, the default is a comma
   timeFormat: 'DD/MM/YYYY'  # Customize the date/time format used in the CSV. The default is 'YYYY-MM-DD HH:mm:ss'.
-  statisticsPeriod: hour    # Period used for statistics export. Hour, day or month is supported. Default is hour.
+  statisticsPeriod: hour    # The default period of Export ▸ Statistics ▸: 5minute, hour, day, week or month. Default is hour.
   exportAttributes: true    # Export all entity attributes along with their state, in separate columns. Default is off (no attributes).
   numberLocale: 'en-US'     # Format numbers using the given locale. If this setting is not defined, the raw DB values will be written (no formatting).
 ```
+
+A value missing leaves its cell empty (a value of 0 is written 0); a cell holding the separator, a quote or a line break is quoted, its quotes doubled.
 
 ---
 

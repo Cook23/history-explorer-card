@@ -17,12 +17,14 @@ function localizeNumber(state, nf)
     return nf.format(+state);
 }
 
+// A cell of the file: nothing for no value (a value of 0 written); a list or an object (an
+// attribute's) as JSON; quoted when it holds the separator, a quote or a line break — its
+// quotes doubled
 function escapeSeperator(sep, state)
 {
-    if( state !== undefined && state !== null && String(state).indexOf(sep) >= 0 ) 
-        return `"${state}"`;
-    else 
-        return state;
+    if( state === undefined || state === null ) return '';
+    const v = typeof state === 'object' ? JSON.stringify(state) : String(state);
+    return v.includes(sep) || v.includes('"') || /[\r\n]/.test(v) ? `"${v.replaceAll('"', '""')}"` : v;
 }
 
 
@@ -41,16 +43,16 @@ class CSVExporter {
         this.timeFormat = undefined;
     }
 
-    exportFile(cardstate)
+    // The entities of graphs (an attribute's curve: its entity), over the window shown
+    exportFile(cardstate, graphs)
     {
         this.separator = cardstate.pconfig.exportSeparator;
         this.timeFormat = cardstate.pconfig.exportTimeFormat;
         this.numberLocale = cardstate.pconfig.exportNumberLocale;
 
-        const t0 = cardstate.startTime.replace('+', '%2b');
-        const t1 = cardstate.endTime.replace('+', '%2b');
+        const t0 = cardstate.startTime, t1 = cardstate.endTime;
         const l = [];
-        for( const g of cardstate.graphs )
+        for( const g of graphs )
             for( const e of g.entities ) {
                 const _id = seriesOf(e.entity).entity;
                 if( !l.includes(_id) ) l.push(_id);
@@ -73,7 +75,8 @@ class CSVExporter {
     {
         const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
         document.body.removeChild(this.overlay);
-        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH:mm:ss') + ".csv");
+        // (no ':' in the name: a file name can't hold one everywhere)
+        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH-mm-ss') + ".csv");
     }
 
     exportFailed(error)
@@ -91,11 +94,11 @@ class CSVExporter {
 
 export class HistoryCSVExporter extends CSVExporter {
 
-    exportFile(cardstate)
+    exportFile(cardstate, graphs)
     {
         this.saveAttributes = cardstate.pconfig.exportAttributes;
         this._hass = cardstate._hass;
-        super.exportFile(cardstate);
+        super.exportFile(cardstate, graphs);
     }
 
     _request(cardstate, l, t0, t1)
@@ -124,7 +127,7 @@ export class HistoryCSVExporter extends CSVExporter {
                     for( let a in this._hass.states[entity].attributes ) {
                         if( !HA_ATTRIBUTES.includes(a) ) {
                             attributes.push(a);
-                            v += `${this.separator}${a}`;
+                            v += this.separator + escapeSeperator(this.separator, a);
                         }
                     }
                 }
@@ -138,7 +141,7 @@ export class HistoryCSVExporter extends CSVExporter {
                 let v = t + this.separator + escapeSeperator(this.separator, state);
                 if( this.saveAttributes ) {
                     for( let a of attributes ) {
-                        state = e.a ? localizeNumber(e.a[a], nf) : '';
+                        state = localizeNumber(e.a?.[a], nf);
                         v += this.separator + escapeSeperator(this.separator, state);
                     }
                 }
@@ -159,9 +162,16 @@ export class HistoryCSVExporter extends CSVExporter {
 
 export class StatisticsCSVExporter extends CSVExporter {
 
+    // (period: the one chosen in the menu — STATS_EXPORT_PERIODS)
+    exportFile(cardstate, graphs, period)
+    {
+        this.period = period;
+        super.exportFile(cardstate, graphs);
+    }
+
     _request(cardstate, l, t0, t1)
     {
-        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, cardstate.pconfig.exportStatsPeriod));
+        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, this.period));
     }
 
     exportCallback(result)
@@ -176,7 +186,7 @@ export class StatisticsCSVExporter extends CSVExporter {
             data.push(entity + "\r\n");
             for( let e of r ) {
                 const t = moment(e.start).format(this.timeFormat);
-                const _cell = x => escapeSeperator(this.separator, x ? localizeNumber(x, nf) : '');
+                const _cell = x => escapeSeperator(this.separator, localizeNumber(x, nf));
                 data.push(t + this.separator + [e.state, e.mean, e.min, e.max].map(_cell).join(this.separator) + "\r\n");
             }
         }

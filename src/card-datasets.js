@@ -142,9 +142,11 @@ export class CardDatasets
         if( raw.length < 3 || s.length < 2 ) return s;
 
         const _dts = [];
+        // (an interval with statistics in it — raw[i].afterStats — is no interval of the source:
+        // neither a silence nor counted in its usual interval)
         for( let i = 1; i < raw.length; i++ ) {
             const dt = raw[i].t - raw[i - 1].t;
-            if( dt > 0 ) _dts.push(dt);
+            if( dt > 0 && !raw[i].afterStats ) _dts.push(dt);
         }
         if( _dts.length < 2 ) return s;
         _dts.sort((a, b) => a - b);
@@ -160,7 +162,7 @@ export class CardDatasets
         const gaps = [];
         for( let i = 1; i < raw.length; i++ ) {
             const dt = raw[i].t - raw[i - 1].t;
-            if( dt <= 0 ) continue;
+            if( dt <= 0 || raw[i].afterStats ) continue;
             const limit = _limit();
             let dtStat = dt;
             if( dt > limit ) {
@@ -186,8 +188,14 @@ export class CardDatasets
         for( const gap of gaps ) {
             while( k < out.length && tOf(out[k]) < gap.tb ) k++;
             if( k === 0 || k >= out.length ) continue;
+            // (the point drawn before the value ending the silence already past the plateau's
+            // end — a silence within a column of pixels —: nothing to show, and a point put
+            // there would go back in time)
+            if( tOf(out[k - 1]) >= gap.tb - gap.lead ) continue;
             k = ensureStart(k, gap.ta, gap.y);
-            out.splice(k, 0, { x: gap.tb - gap.lead, y: gap.y, hecPlateauEnd: true, hecVirtual: true });
+            // (flat: the value of the point before it — the value held, ensureStart; or, the
+            // silence beginning within a column of pixels, the value drawn for that column)
+            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, hecPlateauEnd: true, hecVirtual: true });
             k++;
         }
 
@@ -397,9 +405,19 @@ export class CardDatasets
 
         if( !_agg.explicit && (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
             // Silences are detected on every value recorded (not on the columns, nor on the
-            // statistics: an hour of them is no silence)
-            const _raw = _values.filter(v => !v.stat).map(v => ({ t: v.t, y: v.y }));
-            s = this._applySilencePlateaus(s, _raw, _extended);
+            // statistics: an hour of them is no silence) — never across statistics: two values
+            // of the history with statistics between them (a day of history next to days of
+            // statistics, the history after the statistics) are no silence, however far apart
+            const _raw = [];
+            let _afterStats = false;
+            for( const v of _values ) {
+                if( v.stat ) { _afterStats = true; continue; }
+                _raw.push({ t: v.t, y: v.y, afterStats: _afterStats });
+                _afterStats = false;
+            }
+            // (an ongoing silence only after a value of the history: statistics last until
+            // their end)
+            s = this._applySilencePlateaus(s, _raw, _extended && !_afterStats);
         }
 
         return this._withGaps(s, _values, _gaps, _until);
