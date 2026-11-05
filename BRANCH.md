@@ -1,8 +1,8 @@
 # Branch: v1.2-dev
 
-This branch contains the development version 1.2.
+This branch contains version 1.2 — the repository's default branch, the line released now.
 
-DO NOT assume that code or architecture from main still applies.
+DO NOT assume that code or architecture from v1.1-legacy (the 1.1 line) still applies.
 This branch is allowed to contain breaking architectural changes.
 How the code is organized, and the rules that keep its parts apart: see
 [ARCHITECTURE.md](ARCHITECTURE.md).
