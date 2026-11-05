@@ -23,7 +23,7 @@ import { CardGestures } from "./card-gestures.js";
 import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
-import { withLook } from "./history-options.js";
+import { withLook, OPTION_DEFAULTS, PERSISTENCE_CATEGORIES } from "./history-options.js";
 import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-settings.js";
 import { localGestures } from "./card-storage.js";
 import "./history-info-panel.js"
@@ -116,7 +116,7 @@ export class HistoryCardState {
         this.statistics.enabled = false;
         this.statistics.retention = undefined;
         this.statistics.mode = '';
-        this.statistics.period = 'hour';
+        this.statistics.period = undefined;
 
         this.id = "";
 
@@ -429,8 +429,8 @@ class HistoryExplorerCard extends HTMLElement
         // (the card's own: what's saved and how, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.yamlDefaultMagnifierMode = config.defaultMagnifierMode;
-        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, ['range', 'entities', 'order']);
-        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, ['range', 'entities', 'order']);
+        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, PERSISTENCE_CATEGORIES);
+        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, PERSISTENCE_CATEGORIES);
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
 
@@ -450,9 +450,10 @@ class HistoryExplorerCard extends HTMLElement
         const bgcol = buttonsColor(config.uiColors);
 
         const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };
-        const tools = bitmask[config.uiLayout?.toolbar] ?? 1;
-        const selector = bitmask[config.uiLayout?.selector] ?? 1;
-        this.instance.ui.stickyTools = bitmask[config.uiLayout?.sticky] ?? 0;
+        const _layout = k => bitmask[config.uiLayout?.[k]] ?? bitmask[OPTION_DEFAULTS.uiLayout[k]];
+        const tools = _layout('toolbar');
+        const selector = _layout('selector');
+        this.instance.ui.stickyTools = _layout('sticky');
         this.instance.ui.hideSelector = selector === 0;
 
         const invertZoom = config.uiLayout?.invertZoom === true;

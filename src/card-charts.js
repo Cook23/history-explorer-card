@@ -5,7 +5,7 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { stateLabel } from "./history-options.js";
+import { stateLabel, OPTION_DEFAULTS } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
 const Chart = window.HXLocal_Chart;
@@ -96,48 +96,7 @@ export class CardCharts
                 zoomYEnabled: !config?.ylock,
                 customEvent: (info) => this.onGesture(info),
                 scales: {
-                    xAxes: [{
-                        type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
-                        // (half a bar of margin at both ends only when there are bars to show)
-                        offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
-                        // (barSpacing — mini-graph-card's bar_spacing: the room between two
-                        // bars, in px; Chart.js hecBarSpacing)
-                        ...( graphtype == 'bar' && config?.barSpacing !== undefined ? { hecBarSpacing: config.barSpacing } : {} ),
-                        time: {
-                            // (the time window from the start: without it, the axis would
-                            // span the data first, ticked every few minutes — thousands of
-                            // labels over each other until the window is set)
-                            min: this.startTime,
-                            max: this.endTime,
-                            unit: this.activeRange.tickStepUnit,
-                            stepSize: this.activeRange.tickStepSize,
-                            displayFormats: { 'minute': this.i18n.styleTimeTicks, 'hour': this.i18n.styleTimeTicks, 'day': this.i18n.styleDateTicks, 'month': 'MMM' },
-                            tooltipFormat: this.i18n.styleDateTimeTooltip,
-                        },
-                        ticks: {
-                            fontColor: config.showTimeLabels ? this.pconfig.graphLabelColor : 'rgba(0,0,0,0)',
-                            fontSize: this._textSizes().text,
-                            major: {
-                                enabled: true,
-                                unit: 'day',
-                                fontStyle: 'bold',
-                                unitStepSize: 1,
-                                displayFormats: { 'day': this.i18n.styleDateTicks },
-                            },
-                            maxRotation: 0,
-                            // (the year of the window's left end, in the margin left of the
-                            // plot where there's room — Chart.js hecLeftLabel)
-                            ...( config.showTimeLabels ? { hecLeftLabel: t => moment(t).format('YYYY') } : {} ),
-                            // (labels that don't fit side by side — a narrow plot — skipped,
-                            // never drawn over each other)
-                            autoSkip: true,
-                            autoSkipPadding: 8
-                        },
-                        gridLines: {
-                            color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
-                        },
-                        stacked: config?.stacked
-                    }],
+                    xAxes: [this._chartTimeAxis(graphtype, config, _hasBars)],
                     yAxes: [_yAxis(LEFT_Y_AXIS), ...( datasets.some(d => d.yAxisID === RIGHT_Y_AXIS) ? [_yAxis(RIGHT_Y_AXIS)] : [] )],
                 },
                 topClipMargin : 4,
@@ -389,6 +348,54 @@ export class CardCharts
             borderJoinStyle: 'round',
             borderCapStyle: 'round',
             data: { }
+        };
+    }
+
+    // The time axis of a chart (graphtype, its graph's options config; _hasBars: bars to
+    // show)
+    _chartTimeAxis(graphtype, config, _hasBars)
+    {
+        return {
+            type: ( graphtype == 'line' || graphtype == 'bar' ) ? 'time' : ( graphtype == 'arrowline' ) ? 'arrowline' : 'timeline',
+            // (half a bar of margin at both ends only when there are bars to show)
+            offset: ( graphtype == 'bar' ) ? _hasBars : undefined,
+            // (barSpacing — mini-graph-card's bar_spacing: the room between two
+            // bars, in px; Chart.js hecBarSpacing)
+            ...( graphtype == 'bar' && config?.barSpacing !== undefined ? { hecBarSpacing: config.barSpacing } : {} ),
+            time: {
+                // (the time window from the start: without it, the axis would
+                // span the data first, ticked every few minutes — thousands of
+                // labels over each other until the window is set)
+                min: this.startTime,
+                max: this.endTime,
+                unit: this.activeRange.tickStepUnit,
+                stepSize: this.activeRange.tickStepSize,
+                displayFormats: { 'minute': this.i18n.styleTimeTicks, 'hour': this.i18n.styleTimeTicks, 'day': this.i18n.styleDateTicks, 'month': 'MMM' },
+                tooltipFormat: this.i18n.styleDateTimeTooltip,
+            },
+            ticks: {
+                fontColor: config.showTimeLabels ? this.pconfig.graphLabelColor : 'rgba(0,0,0,0)',
+                fontSize: this._textSizes().text,
+                major: {
+                    enabled: true,
+                    unit: 'day',
+                    fontStyle: 'bold',
+                    unitStepSize: 1,
+                    displayFormats: { 'day': this.i18n.styleDateTicks },
+                },
+                maxRotation: 0,
+                // (the year of the window's left end, in the margin left of the
+                // plot where there's room — Chart.js hecLeftLabel)
+                ...( config.showTimeLabels ? { hecLeftLabel: t => moment(t).format('YYYY') } : {} ),
+                // (labels that don't fit side by side — a narrow plot — skipped,
+                // never drawn over each other)
+                autoSkip: true,
+                autoSkipPadding: 8
+            },
+            gridLines: {
+                color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
+            },
+            stacked: config?.stacked
         };
     }
 
@@ -812,8 +819,8 @@ export class CardCharts
                 // (period of a circular entity in the units shown, before SI conversion)
                 "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : null,
                 // (an arrowline's values are angles: a full turn is the entity's circular
-                // period, 360 when it has none)
-                "arrowPeriod": ( _kind === 'arrowline' ) ? ( this.circularPeriodOf(d) ?? 360 ) : undefined,
+                // period, else the default one)
+                "arrowPeriod": ( _kind === 'arrowline' ) ? ( this.circularPeriodOf(d) ?? OPTION_DEFAULTS.arrowlinePeriod ) : undefined,
                 "unit": this.getUnitOfMeasure(d.entity, d.unit),
                 "rounding": this.roundingOf(d),
                 // (the factor between the entity's value and the value shown in the legend and

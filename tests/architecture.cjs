@@ -26,6 +26,27 @@ const DEFAULTED = [...code('src/history-options.js').match(/export const OPTION_
 // What a function of a source sets on its object, by name (P.x = — this.pconfig.x =)
 const setIn = (s, from, to, re) => { const b = s.slice(s.indexOf(from), s.indexOf(to, s.indexOf(from))); return new Set([...b.matchAll(re)].map(m => m[1])); };
 
+// The lists of names written in a source (arrays of strings, at least two): { index, key, names }
+const stringLists = (s, file) => {
+    const out = [];
+    walk(acorn.parse(s, { ecmaVersion: 2022, sourceType: 'module' }), n => {
+        if( n.type !== 'ArrayExpression' || n.elements.length < 2 ) return;
+        if( !n.elements.every(e => e?.type === 'Literal' && typeof e.value === 'string') ) return;
+        const names = n.elements.map(e => e.value);
+        out.push({ index: n.start, key: JSON.stringify(names), names });
+    });
+    return out;
+};
+// Every list of names of the card's sources, by its content: where it's written
+const LISTS = (() => {
+    const m = new Map();
+    for( const f of CARD ) for( const l of stringLists(code(f), f) ) m.set(l.key, [...( m.get(l.key) ?? [] ), f]);
+    return m;
+})();
+// The options' names (history-options.js: its lists of option names, OPTION_DEFAULTS)
+const OPTION_NAMES = new Set([...DEFAULTED,
+    ...[...code('src/history-options.js').matchAll(/const (?:\w*_KEYS|_GRAPH_OPTIONS) = \[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'(\w+)'/g)].map(x => x[1]))]);
+
 // Stock Chart.js API the card may use on a chart or on Chart (chartjs.org, 2.7)
 const STOCK = new Set(['data', 'options', 'config', 'update', 'resize', 'destroy', 'helpers', 'defaults']);
 
@@ -129,6 +150,12 @@ const RULES = [
     { id: 'inputs', why: "the gestures, the menus, the selector and the toolbar ask card-operations.js for a change of what's shown: they never change the entity list or the graphs themselves",
       files: ['src/card-gestures.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-toolbar.js'],
       re: /this\.store\.(add|remove|reset|removeAllDynamic|moveToGroup|setGraphOrder|syncGroupOrder|moveBefore|regroup|setGraphKey|newGroupId|normalizeGroupIds|setNextGroupId)\(|this\.(addGraph|detachGraph|rebuildGraph|detachAndRebuildRemaining|removeGraphs|placeGraphs|buildGraphsFromStore|clearGraphs|writeLocalState)\(/g },
+    // (a list written once, by name — ARCHITECTURE.md rule 3)
+    { id: 'lists-once', why: "a list of names is written once, as a named constant: never the same list written again",
+      files: CARD, check: (s, f) => stringLists(s, f).filter(l => LISTS.get(l.key).length > 1).map(l => ({ index: l.index, text: l.key + ' (also ' + LISTS.get(l.key).length + '×)' })) },
+    { id: 'option-lists', why: "a list of options is written in history-options.js, named, with the others: the rest of the card uses it, never writes its own",
+      files: CARD.filter(f => f !== 'src/history-options.js'),
+      check: (s, f) => stringLists(s, f).filter(l => l.names.length >= 3 && l.names.every(n => OPTION_NAMES.has(n))).map(l => ({ index: l.index, text: l.key })) },
 ];
 
 // Stock Chart.js options the card sets on a chart already made (chartjs.org, 2.7)

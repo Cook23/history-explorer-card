@@ -5,7 +5,7 @@
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
 import { paintMagnifier } from "./card-menus.js";
-import { ZOOM_BOX_MODES } from "./history-options.js";
+import { ZOOM_BOX_MODES, OPTION_DEFAULTS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -259,12 +259,12 @@ export class CardTimeRange
     computeTickDensity(width)
     {
         const densities = { 'low' : 4, 'medium' : 3, 'high' : 2, 'higher' : 1, 'highest' : 0 };
-        let densityLimit = densities[this.pconfig.timeTickDensity];
-        if( densityLimit === undefined ) densityLimit = 2;
+        // (a value it doesn't know: the default density)
+        const _density = k => densities[k] ?? densities[OPTION_DEFAULTS.timeTicks.density];
         if( this.pconfig.timeTickOverride === undefined )
-            return Math.max(( width < 650 ) ? 4 : ( width < 1100 ) ? 3 : ( width < 1300 ) ? 2 : ( width < 1900 ) ? 1 : 0, densityLimit);
+            return Math.max(( width < 650 ) ? 4 : ( width < 1100 ) ? 3 : ( width < 1300 ) ? 2 : ( width < 1900 ) ? 1 : 0, _density(this.pconfig.timeTickDensity));
         else
-            return densities[this.pconfig.timeTickOverride] ?? 2;
+            return _density(this.pconfig.timeTickOverride);
     }
 
     setStepSize(update = false, tbw = null)

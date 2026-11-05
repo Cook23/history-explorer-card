@@ -295,10 +295,7 @@ export class CardGraphs
     // customEvent in the zone 'linkMarker' and merges them (mergeGraphUp).
     _updateGroupLinkMarkers()
     {
-        // Sort by graphIndex — the stable, persisted display-order field — rather than
-        // relying on this.graphs' own array order to already match it.
-        const _sorted = [...this.graphs].sort((a, b) =>
-            (a.entities?.[0]?.graphIndex ?? 0) - (b.entities?.[0]?.graphIndex ?? 0));
+        const _sorted = this.graphsInDisplayOrder();
         for( let i = 0; i < _sorted.length; i++ ) {
             const g = _sorted[i];
             const _linked = i > 0 && _sorted[i - 1].groupId !== null &&
@@ -494,19 +491,7 @@ export class CardGraphs
 
         const e = this._graphElement(type, h, _graphIndex, _graphInterval);
 
-        let gl = this._this.querySelector('#graphlist');
-        const _tgtDiv = ( before && before.canvas?.parentNode ) ? this.graphDiv(before) : null;
-        if( _combineInsertBefore && (_combineGl ?? gl).contains(_combineInsertBefore) ) {
-            (_combineGl ?? gl).insertBefore(e, _combineInsertBefore);
-        } else if( _tgtDiv && _tgtDiv.parentNode ) {
-            // Insert right before `before` — "the graph this one belongs right before".
-            // `before` null (or no longer valid) falls through to the last-position
-            // fallback below, same as "nothing after it, insert last".
-            _tgtDiv.parentNode.insertBefore(e, _tgtDiv);
-        } else {
-            const _footer = this._footerAnchor(gl);
-            if( _footer ) gl.insertBefore(e, _footer); else gl.appendChild(e);
-        }
+        this._placeGraphElement(e, before, _combineGl, _combineInsertBefore);
 
         // For bar graphs, connect the interval selector dropdown listener
         if( type == 'bar' && !this.ui.hideInterval )
@@ -531,6 +516,25 @@ export class CardGraphs
         // Update mo/ca visibility based on graph count
         this._updateMoVisibility();
         this._updateGroupLinkMarkers();
+    }
+
+    // A new graph's element e put in the page: where the graph it was combined from was (its
+    // parent combineGl, before combineNext), else right before graph `before`, else last
+    _placeGraphElement(e, before, combineGl, combineNext)
+    {
+        const gl = this._this.querySelector('#graphlist');
+        const _tgtDiv = ( before && before.canvas?.parentNode ) ? this.graphDiv(before) : null;
+        if( combineNext && (combineGl ?? gl).contains(combineNext) ) {
+            (combineGl ?? gl).insertBefore(e, combineNext);
+        } else if( _tgtDiv && _tgtDiv.parentNode ) {
+            // Insert right before `before` — "the graph this one belongs right before".
+            // `before` null (or no longer valid) falls through to the last-position
+            // fallback below, same as "nothing after it, insert last".
+            _tgtDiv.parentNode.insertBefore(e, _tgtDiv);
+        } else {
+            const _footer = this._footerAnchor(gl);
+            if( _footer ) gl.insertBefore(e, _footer); else gl.appendChild(e);
+        }
     }
 
     // An entity's options in the graph of group groupId: from the lowest priority to the

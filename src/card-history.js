@@ -4,14 +4,19 @@
 
 import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
-import { STATE_NOT_LISTED } from "./history-options.js";
+import { STATE_NOT_LISTED, OPTION_DEFAULTS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
-// The period of the long-term statistics asked, in ms (statistics.period: 'hour' unless set)
+// The period of the long-term statistics asked, in ms (statistics.period)
 const PERIOD_MS = { '5minute': 300e3, hour: 3600e3, day: 86400e3, week: 7 * 86400e3, month: 30 * 86400e3 };
+// (a period it doesn't know: the default one's)
+const periodMs = p => PERIOD_MS[p] ?? PERIOD_MS[OPTION_DEFAULTS.statistics.period];
 // Home Assistant's short-term statistics: every 5 minutes, kept as long as the history
 // (recorder purge_keep_days) — what it returns is taken, nothing assumed
 const FINE_PERIOD = '5minute';
+// A shown entity changed: its recent history refreshed at most once every 2 s, never sooner
+// than five times what drawing the graphs again last took (see scheduleAutoRefresh)
+const AUTO_REFRESH_MIN_MS = 2000, AUTO_REFRESH_BUILD_FACTOR = 5;
 // The start of the day n days after day d (a date or a slot's start), as a cache slot's
 // bounds are written: local time, "YYYY-MM-DDT00:00:00"
 const dayAfter = (d, n) => moment(d).add(n, "day").format("YYYY-MM-DD") + "T00:00:00";
@@ -71,8 +76,6 @@ export class CardHistory
         this.cacheSize += growSize;
         // (the requests under way name their slots by index: moved with them)
         for( const q of this._requests ) { q.c0 += growSize; q.c1 += growSize; }
-
-        console.log(`Cache grown from ${this.cacheSize - growSize} to ${this.cacheSize} days`);
     }
 
     // Slots added for the days begun since the cache was made (a page left open past
@@ -157,7 +160,7 @@ export class CardHistory
         if( !this.statistics.enabled ) return 'history';
         const _px = Math.max(0, ...this.graphs.map(g => g.chart.hecPlotWidth()));
         const _column = moment(this.endTime).diff(moment(this.startTime)) / ( _px || 1000 );
-        const _period = PERIOD_MS[this.statistics.period] ?? PERIOD_MS.hour;
+        const _period = periodMs(this.statistics.period);
         if( _column >= _period ) return 'stats';
         if( _column >= PERIOD_MS[FINE_PERIOD] || this.statistics.force ) return _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats';
         return 'history';
@@ -285,7 +288,7 @@ export class CardHistory
 
         // The statistics of the window — and its 5-minute ones where they tell more, and
         // where the statistics of the period aren't compiled yet —, each in one request
-        const _period = PERIOD_MS[this.statistics.period] ?? PERIOD_MS.hour;
+        const _period = periodMs(this.statistics.period);
         const _finest = _period > PERIOD_MS[FINE_PERIOD] ? 'fine' : 'stats', _finestMs = Math.min(_period, PERIOD_MS[FINE_PERIOD]);
         const _wants = { stats: () => true, fine: i => _finest === 'fine' && ( _source === 'fine' || ( _source === 'stats' && this._lacksStatistics(i, _period) ) ) };
         for( const kind of ['stats', 'fine'] ) this._askRows(kind, c0, c1, _statIds, _wants[kind]);
@@ -377,7 +380,7 @@ export class CardHistory
         const q = { kind, c0, c1, ids, gen: this._loadGen, at: Date.now() };
         this._requests.push(q);
         const t0 = from !== null ? moment(Math.max(from, msOf(this.cache[c0].start))) : this.cache[c0].start, t1 = this.cache[c1].end, l = [...ids];
-        const _period = kind === 'fine' ? FINE_PERIOD : this.statistics.period ?? 'hour';
+        const _period = kind === 'fine' ? FINE_PERIOD : this.statistics.period;
         let _p;
         try {
             _p = LAYER[kind] === 'hist' || kind === 'tail' ? this.historyCall(l, t0, t1) : this._askHA(this.statisticsRequest(l, t0, t1, _period));
@@ -396,10 +399,7 @@ export class CardHistory
         try {
             // (an answer for a cache since cleared — reloadHistory —: ignored)
             if( q.gen !== this._loadGen ) return;
-            if( error ) {
-                console.log("Database request failure");
-                console.log(error);
-            }
+            if( error ) console.error('history-explorer-card: history request failed', error);
             const _t = performance.now();
             if( this.databaseCallback ) this.databaseCallback(!error);
             // (what each entity asked got, split by day: an entity absent from the answer has
@@ -407,7 +407,7 @@ export class CardHistory
             // again at the next update)
             if( !error ) for( const id of q.ids ) {
                 const a = result?.[id] ?? [];
-                const _period = PERIOD_MS[q.kind === 'fine' ? FINE_PERIOD : this.statistics.period] ?? PERIOD_MS.hour;
+                const _period = periodMs(q.kind === 'fine' ? FINE_PERIOD : this.statistics.period);
                 const rows = q.kind === 'history' || q.kind === 'tail' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period));
                 let p = 0;
                 for( let i = q.c0; i <= q.c1; i++ ) {
@@ -529,7 +529,7 @@ export class CardHistory
         this._autoRefreshTid = setTimeout(() => {
             this._autoRefreshTid = 0;
             this.refresh();
-        }, Math.max(2000, 5 * ( this._lastBuildMs ?? 0 )));
+        }, Math.max(AUTO_REFRESH_MIN_MS, AUTO_REFRESH_BUILD_FACTOR * ( this._lastBuildMs ?? 0 )));
     }
 
     updateHistoryAutoRefresh()

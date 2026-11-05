@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>history-explorer-card tests</title></head>
-<body style="width:1000px;margin:0"><style>ha-card{display:block}</style><div id=host></div>
+<body style="width:1000px;margin:0"><style>ha-card{display:block} /* a theme variable, as Home Assistant sets them before the cards (a color given as --name) */ :root{--hec-test-color:#123456}</style><div id=host></div>
 <!-- The card under test (the built history-explorer-card.js) against a mocked Home
      Assistant (mock-ha.js). The config comes from the test (window.CFG). -->
 <script src="mock-ha.js"></script>

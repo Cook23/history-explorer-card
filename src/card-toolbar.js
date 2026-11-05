@@ -250,6 +250,58 @@ export class CardToolbar
 
         this.resizeSelector();
     }
+    // The width of el on one line, unwrapped
+    _naturalWidth(el)
+    {
+        if( !el ) return 0;
+        const pWS = el.style.whiteSpace, pW = el.style.width;
+        el.style.whiteSpace = 'nowrap'; el.style.width = 'max-content';
+        const nw = el.offsetWidth;
+        el.style.whiteSpace = pWS; el.style.width = pW;
+        return nw;
+    }
+
+    // The start date of toolbar i shown in format fmt
+    _showStartDate(bxEl, i, fmt)
+    {
+        bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
+    }
+
+    // The form of toolbar i's date (dl) and range (dr) for its width tbw: the first that fits
+    // of the long date and the whole range, the short date and the whole range, the short date
+    // and the short range — each shortened only when needed. Back to a longer form only once
+    // it clearly fits (a hysteresis: no flicker at the edge). → the widths of the date and
+    // the range in the form chosen, and in the shortest one
+    _fitDateForm(i, tbw, dl, dr, bxEl, byEl)
+    {
+        const _mw = el => this._naturalWidth(el);
+        // (measured long — the range's maxWidth 83px —, then short — 50px)
+        if( bxEl && this.i18n._styleDateLong ) this._showStartDate(bxEl, i, this.i18n._styleDateLong);
+        if( byEl ) byEl.style.maxWidth = '83px';
+        const dlwLong = _mw(dl);
+        const drwLong = _mw(dr);
+        if( bxEl && this.i18n._styleDateShort ) this._showStartDate(bxEl, i, this.i18n._styleDateShort);
+        if( byEl ) byEl.style.maxWidth = '50px';
+        const dlwShort = _mw(dl);
+        const drwShort = _mw(dr);
+
+        const _forms = [{ need: dlwLong + drwLong, fmt: this.i18n._styleDateLong, range: '83px', dlw: dlwLong, drw: drwLong },
+                        { need: dlwShort + drwLong, fmt: this.i18n._styleDateShort, range: '83px', dlw: dlwShort, drw: drwLong },
+                        { need: dlwShort + drwShort, fmt: this.i18n._styleDateShort, range: '50px', dlw: dlwShort, drw: drwShort }];
+        this._toolbarForm ??= [];
+        const _prev = this._toolbarForm[i] ?? 0;
+        let _k = _forms.findIndex((f, k) => f.need <= tbw - ( k < _prev ? 20 : 10 ));
+        if( _k < 0 ) _k = _forms.length - 1;
+        this._toolbarForm[i] = _k;
+        const { fmt, dlw, drw, range } = _forms[_k];
+        if( bxEl && fmt ) {
+            this.ui.dateFormat = fmt;
+            this._showStartDate(bxEl, i, fmt);
+        }
+        if( byEl ) byEl.style.maxWidth = range;
+        return { dlwNow: dlw, drwNow: drw, dlwShort, drwShort };
+    }
+
 
     resizeSelector()
     {
@@ -262,54 +314,10 @@ export class CardToolbar
             const input = this._this.querySelector(`#b7_${i}`);
             const sl = this._this.querySelector(`#sl_${i}`);
 
-            // Common: measure tbw and apply date format before any layout decision
             const tbwNow = tb ? tb.clientWidth : w;
-            const _mw = (el) => {
-                if( !el ) return 0;
-                const pWS = el.style.whiteSpace, pW = el.style.width;
-                el.style.whiteSpace = 'nowrap'; el.style.width = 'max-content';
-                const nw = el.offsetWidth;
-                el.style.whiteSpace = pWS; el.style.width = pW;
-                return nw;
-            };
-
-            // Measure dl (LONG) and dr (NORMAL: maxWidth=83px)
             const bxEl = this._this.querySelector(`#bx_${i}`);
             const byEl = this._this.querySelector(`#by_${i}`);
-            if( bxEl && this.i18n._styleDateLong )
-                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(this.i18n._styleDateLong)}</a>`;
-            if( byEl ) byEl.style.maxWidth = '83px';
-            const dlwLong = _mw(dl);
-            const drwLong = _mw(dr);
-
-            // Measure dl (SHORT) and dr (COMPACT: maxWidth=50px)
-            if( bxEl && this.i18n._styleDateShort )
-                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(this.i18n._styleDateShort)}</a>`;
-            if( byEl ) byEl.style.maxWidth = '50px';
-            const dlwShort = _mw(dl);
-            const drwShort = _mw(dr);
-
-            // The forms tried in turn, the first that fits taken: the long date and the whole
-            // range, the short date and the whole range, the short date and the short range —
-            // each shortened only when needed. Back to a longer form only once it clearly fits
-            // (a hysteresis: no flicker at the edge)
-            const _forms = [{ need: dlwLong + drwLong, fmt: this.i18n._styleDateLong, range: '83px', dlw: dlwLong, drw: drwLong },
-                            { need: dlwShort + drwLong, fmt: this.i18n._styleDateShort, range: '83px', dlw: dlwShort, drw: drwLong },
-                            { need: dlwShort + drwShort, fmt: this.i18n._styleDateShort, range: '50px', dlw: dlwShort, drw: drwShort }];
-            this._toolbarForm ??= [];
-            const _prev = this._toolbarForm[i] ?? 0;
-            let _k = _forms.findIndex((f, k) => f.need <= tbwNow - ( k < _prev ? 20 : 10 ));
-            if( _k < 0 ) _k = _forms.length - 1;
-            this._toolbarForm[i] = _k;
-            const { fmt, dlw: dlwNow, drw: drwNow } = _forms[_k];
-
-            // Apply chosen format and range width
-            if( bxEl && fmt ) {
-                this.ui.dateFormat = fmt;
-                bxEl.innerHTML = `<a id="eh_${i}" href="#" style="display:block;text-decoration:none;color:inherit">${moment(this.startTime).format(fmt)}</a>`;
-            }
-            if( byEl ) byEl.style.maxWidth = _forms[_k].range;
-
+            const { dlwNow, drwNow, dlwShort, drwShort } = this._fitDateForm(i, tbwNow, dl, dr, bxEl, byEl);
 
             const totNow = dlwNow + drwNow || 1;
             const dlFrNow = Math.round(dlwNow / totNow * 100);
@@ -357,24 +365,15 @@ export class CardToolbar
                 sl.style.alignItems = 'center';
                 sl.style.justifyContent = 'center';
                 input.style.width = _inputW((tb ? tb.clientWidth : w) - 80) + 'px';
-                sl.style.display = 'flex';
-                sl.style.alignItems = 'center';
-                sl.style.justifyContent = 'center';
             }
-
-            // dl and dr already measured above as dlwNow/drwNow
-            const dlw = dlwNow;
-            const drw = drwNow;
 
             // sl buttons
             const bo = this._this.querySelector(`#bo_${i}`);
-            const bow=_mw(bo);
+            const bow = this._naturalWidth(bo);
             const slCSS = getComputedStyle(sl);
             const slPad = parseFloat(slCSS.paddingLeft||0)+parseFloat(slCSS.paddingRight||0);
             const slBtnsW = bow + slPad;
 
-            // Compute input width for layout A and check if total fits
-            const tbw = tbwNow;
             // Get actual margins of dl and dr
             const dlMargin = dl ? (parseFloat(getComputedStyle(dl).marginLeft||0)+parseFloat(getComputedStyle(dl).marginRight||0)) : 0;
             const drMargin = dr ? (parseFloat(getComputedStyle(dr).marginLeft||0)+parseFloat(getComputedStyle(dr).marginRight||0)) : 0;
@@ -383,7 +382,7 @@ export class CardToolbar
             const CORRECTION = 23; // inputExtra(~8) + flex gap(~5) + safety margin(10)
 
             // (the room between the date and the range, the toolbar's middle column centered)
-            const roomA = tbw - 2*(Math.max(dlw, drw) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION;
+            const roomA = tbwNow - 2*(Math.max(dlwNow, drwNow) + Math.max(dlMargin, drMargin)) - slBtnsW - CORRECTION;
 
             if( roomA >= _minW ) {
                 // Layout A : dl | sl | dr on one line

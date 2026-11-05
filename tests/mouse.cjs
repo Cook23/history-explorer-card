@@ -222,6 +222,16 @@ module.exports = async function()
         const w1 = await win(), y1 = await E(`yRange(${li})`), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
         return !box && w1[0] !== w0[0] && Math.abs(span(w1) - span(w0)) < 2000 && y1.join() === y0.join() && !locked ? true : JSON.stringify({ box, w0, w1, y0, y1, locked });
     });
+    await t.step('a pan released: every graph shows the same time, each Y axis fitted to the values now shown', async () => {
+        const li = await boxGraph(); await unlock(li);
+        const a = await E(`graphPtAt(${li},0.5)`);
+        await t.drag(a, { x: a.x + 300, y: a.y + 5 }); await t.wait(1500);
+        const r = await E(`(()=>{ const all = el.instance.graphsInDisplayOrder(), c = graphAt(${li}).chart, x = c.scales[c.options.scales.xAxes[0].id], s = c.scales['y-axis-0'];
+            const ys = c.data.datasets.filter(d => !d.hidden && ( d.yAxisID ?? 'y-axis-0' ) === 'y-axis-0').flatMap(d => d.data.filter(p => +new Date(p.x) >= x.min && +new Date(p.x) <= x.max).map(p => p.y)).filter(y => y !== null && isFinite(y));
+            return { axes: c.data.datasets.map(d => d.yAxisID + (d.hidden ? '(h)' : '')), mins: [...new Set(all.map(g => { const ch = g.chart; return ch.scales[ch.options.scales.xAxes[0].id].min; }))].length, ymin: s.min, ymax: s.max, dmin: Math.min(...ys), dmax: Math.max(...ys) }; })()`);
+        await E('el.instance.todayNoReset ? el.instance.todayNoReset() : null'); await t.wait(800);
+        return r.mins === 1 && r.ymin <= r.dmin && r.ymax >= r.dmax && ( r.dmax - r.dmin ) >= 0.5 * ( r.ymax - r.ymin ) ? true : JSON.stringify(r);
+    });
     await t.step('a tall, narrow box (narrower than the precision): the Y axis zoomed, the time as it was', async () => {
         const li = await boxGraph(); await unlock(li);
         const r0 = (await t.state()).range, y0 = await E(`yRange(${li})`), a = await E(`graphPtAt(${li},0.4)`);
