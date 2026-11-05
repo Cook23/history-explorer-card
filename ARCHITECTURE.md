@@ -91,7 +91,10 @@ show it, and the conductor starts the card and wires the parts together.
    change the store or the graphs themselves.
 3. **One implementation per thing.** A behavior needed in two places is a function both
    call (`moveCurve` for curves and rows, `rebuildGraph`, `Chart.hecUi` for every floating
-   element...), never two copies.
+   element...), never two copies. The same for a list of names: written once, as a named
+   constant — a list of options in `history-options.js`, with the others (`GRAPH_OPTION_KEYS`,
+   `CURVE_OPTION_KEYS`, `PERSISTENCE_CATEGORIES`...); never a list written by hand where it's
+   used, nor the same list written twice.
 4. **A new feature extends a contract, it doesn't reach across one.** A new gesture is a
    `gestureType` or a payload field; a new change of what's shown is an operation; a new
    entity rule is a store method.
@@ -130,16 +133,21 @@ show it, and the conductor starts the card and wires the parts together.
    `graphOption`, after the persistence's merge (what is saved stays as it was set,
    nothing when it never was). A host's own defaults (the info panel's) go through
    `applyConfig`'s `defaults`.
-9. **Every business default is written in one place** — or in two when they have to differ
-   before and after the persistence (what is read and saved, what is applied) —, never
-   again where the value is used. The options' are `history-options.js`
-   `OPTION_DEFAULTS` (rule 8); the gesture settings' are `gesture-settings.js`
-   `GESTURE_SETTINGS`; the default colors are `history-default-colors.js`. Chart.js (the
-   fork, `deps/chart-hec.js`) may keep its own default of a setting the card gives it
-   (`Chart.defaults.global.gestures`), so as to work without the card: it never serves,
-   the card always setting it, and the card's is the business default. Nowhere else a
-   value standing for a default: no `?? 400`, no `!== undefined ? … : 400` where the
-   value is read — the code reads the one place that holds it.
+9. **Every business default is written once, in the one place of its family** — or in two
+   when they have to differ before and after the persistence (what is read and saved, what
+   is applied): the options' in `history-options.js` `OPTION_DEFAULTS` (rule 8), the
+   gesture settings' in `gesture-settings.js` `GESTURE_SETTINGS`, the default colors in
+   `history-default-colors.js`. Nowhere else a value standing for a business default: no
+   `?? 65`, no `!== undefined ? … : 360` where the value is read or used — the code reads
+   the one place that holds it. Two exceptions:
+   - **a value computed from business circumstances** — the line mode taken from the type,
+     `circular` detected from the unit, `hour24` from the language, a curve's color from
+     the palette: no default, it is worked out where it's used (rule 8);
+   - **a module's fallback, in practice never used** — a value a module keeps so as to work
+     on its own, though the card always gives it the business one (Chart.js's
+     `Chart.defaults.global.gestures`, a parameter a function can take): it may stay in that
+     module, written once there, at the top or in its defaults (written again at each use
+     is untidy — but never a business default).
 
 ## Where a change goes
 

@@ -181,6 +181,8 @@ const _labelsShown = v => v === 'hover' ? v : v !== false;
 // The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
 // or all, whatever its case; anything else not set, with a warning
 const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
+// showStateFor / showStatsFor: the values over a graph for every curve, or for the first one
+const SHOWN_FOR = ['all', 'first'];
 const _tooltipMode = v => {
     const m = String(v).trim().toLowerCase();
     if( TOOLTIP_MODES.includes(m) ) return m;
@@ -245,8 +247,8 @@ const OPTION_VALUES = {
     // (the values over a graph: for every curve, or for the first one and those setting their
     // own showState / showStats — mini-graph-card's; in their curve's color, or the text's —
     // see card-values.js showValues)
-    showStateFor  : v => ['all', 'first'].includes(v) ? v : undefined,
-    showStatsFor  : v => ['all', 'first'].includes(v) ? v : undefined,
+    showStateFor  : v => SHOWN_FOR.includes(v) ? v : undefined,
+    showStatsFor  : v => SHOWN_FOR.includes(v) ? v : undefined,
     stateAdaptiveColor : v => v !== false,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
@@ -356,10 +358,38 @@ export const OPTION_DEFAULTS = {
     showIcon: false,
     // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
     interval: 1,
+    // (the card's — CardConfig.applyConfig; the info panel gives some its own, see
+    // history-info-panel.js)
+    labelAreaWidth: 65, labelsVisible: true, stateColorSeed: 137, stateTextMode: 'auto', interpolation: 'monotone', lineWidth: 2.0,
+    lineGraphHeight: 250, barGraphHeight: 150, timelineBarHeight: 24, timelineBarSpacing: 40,
+    showUnavailable: false, showMissingState: false, showCurrentValues: true, axisAddMarginMin: false, axisAddMarginMax: false, recordedEntitiesOnly: false,
+    defaultTimeRange: '24h', defaultMagnifierMode: 'xy',
+    cursor: { mode: 'auto', types: ['timeline'] },
+    tooltip: { showColorsLine: true, showColorsTimeline: true, size: 'auto', showDuration: false, showLabel: true },
+    timeTicks: { density: 'high' },
+    refresh: { automatic: true },
+    csv: { separator: ',', timeFormat: 'YYYY-MM-DD HH:mm:ss', statisticsPeriod: 'hour' },
+    statistics: { enabled: true, mode: 'mean', period: 'hour' },
+    // (the toolbar's and the selector's places — history-explorer-card.js setConfig)
+    uiLayout: { toolbar: 'top', selector: 'top', sticky: 'hide' },
+    // (an arrowline's full turn, when its entity has no circular period — card-charts.js)
+    arrowlinePeriod: 360,
 };
 // (the graph's ones, given to every graph under the card's own)
 const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight'];
 export const GRAPH_DEFAULTS = Object.fromEntries(_GRAPH_DEFAULT_KEYS.map(k => [k, OPTION_DEFAULTS[k]]));
+
+// An entity's own options (never a graph's): set on the entity, its entityOptions, or — for
+// those of CARD_ENTITY_KEYS — on the card
+export const ENTITY_OPTION_KEYS = ['color', 'hidden', 'name', 'scale', 'siConversionFactor', 'type', 'unit', 'process', 'circular', 'legendVisible', 'fixedValue'];
+// The options of every curve the card can set (CardConfig.resolveOption: the entity's, else
+// its graph's, else entityOptions', else the card's, else OPTION_DEFAULTS)
+export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor',
+    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip'];
+// An entity's options the card can set for every entity, as mini-graph-card does
+export const CARD_ENTITY_KEYS = ['color', 'fill', 'unit'];
+// The persistence options' categories (enablePersistence, enableMultidevicePersistence)
+export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
@@ -376,6 +406,11 @@ const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMod
 export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader',
     'nameAdaptiveColor', 'iconAdaptiveColor', 'showStateFor', 'showStatsFor'];
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show', 'tooltip'];
+// The graph options kept on the graph (CardConfig.pconfig.graphs) and on its entities: all
+// but those consumed while the graph is read — interval (its entities'), exclude (its
+// wildcards'), lineColor (its entities' colors) — and tooltipBehavior (folded into the
+// tooltips by normalizeOptions)
+export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclude', 'lineColor', 'tooltipBehavior'].includes(k));
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)

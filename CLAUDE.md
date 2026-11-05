@@ -24,6 +24,9 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
+- **After an interruption by the user** (a command stopped, a request interrupted): check
+  what was interrupted and clean it up, or finish it — a file written in part, a probe or
+  scratch file left in the repository, a process still running —, never leave it behind.
 - **What the user observes is a fact, not a hypothesis.** The user sees the card, the device,
   the browser; Claude doesn't. What the user says they saw weighs as much as a screenshot.
   Past sessions kept their own idea against the user's repeated observations, until a
@@ -134,10 +137,17 @@ it each time. So:
   user's explicit approval — ask, giving the reason;
 - a deviation the test can't see, found by reading: fix it, and add a rule that catches
   its kind;
-- split code only when it reads better split — never for its size.
-- a business default in one place (`ARCHITECTURE.md` rule 9) — two at most, when they
-  differ before and after the persistence; Chart.js's own default of a setting the card
-  gives it is accepted, never a third copy where the value is used.
+- factor code out: always when it's reused (one implementation, rule 3); to split a long
+  function, only when it reads better split — when groups of its own function can be
+  isolated, each with a name saying what it does. Never for its size alone: the one
+  question is "is it more readable factored out?".
+- a business default written once, in the one place of its family (`ARCHITECTURE.md` rule 9) —
+  `OPTION_DEFAULTS`, `GESTURE_SETTINGS`, the default colors; a value computed from business
+  circumstances is no default; a module's fallback, never used in practice, may stay in that
+  module, written once there.
+- a list of names written once, as a named constant (`ARCHITECTURE.md` rule 3) — a list of
+  options in `history-options.js`, with the others; never a list written by hand where it's
+  used, nor the same list written twice (checked: `lists-once`, `option-lists`).
 
 ## mini-graph-card — the product's direction, set by the user, not negotiable
 

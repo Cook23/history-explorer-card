@@ -5,6 +5,9 @@
 import { i18n } from "./languages.js";
 import { formatNumber } from "./history-units.js";
 import { seriesAttributes, isAttributeGroup, seriesId, attributeLabel } from "./history-series.js";
+
+// The domains never offered by the entity selector (nothing to draw)
+const UNLISTED_DOMAINS = ['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'];
 const moment = window.HXLocal_moment;
 
 // A line of the entity list: its padding on each side (px)
@@ -336,8 +339,7 @@ export class CardSelector
 
     entityCollectorFailed(error)
     {
-        console.log(error);
-
+        console.error('history-explorer-card: the recorded entities could not be listed (all entities offered instead)', error);
         this.entityCollectAll();
 
         for( let i of this.ui.inputField )
@@ -346,8 +348,7 @@ export class CardSelector
 
     entityCollectAll()
     {
-        const _hidden = ['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'];
-        this._fillEntitySelectors(Object.keys(this._hass.states).filter(e => !_hidden.includes(this.getDomainForEntity(e))));
+        this._fillEntitySelectors(Object.keys(this._hass.states).filter(e => !UNLISTED_DOMAINS.includes(this.getDomainForEntity(e))));
     }
 
     // Fills the entity selectors' dropdowns with the candidate entities the card's
@@ -577,7 +578,7 @@ export class CardSelector
             for( let e in this._hass.states ) {
                 if( !this.matchRegexList(regex, e) || this.matchExcludeRegexList(excludeRegex, e) ) continue;
                 const d = this.getDomainForEntity(e);
-                if( !['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'].includes(d) ) l.push(e);
+                if( !UNLISTED_DOMAINS.includes(d) ) l.push(e);
             }
 
             this._hass.callWS(this.historyRequest(l, t0)).then(this.entityCollectorCallback.bind(this), this.entityCollectorFailed.bind(this));

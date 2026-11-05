@@ -4,8 +4,9 @@
 // history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { keyOf, repairedGroupIds } from "./history-entity-store.js";
+import { keyOf, repairedGroupIds, PLACEMENT_FIELDS } from "./history-entity-store.js";
 import { GESTURE_SETTINGS, clampGesture, gestureSettings, applyGestures } from "./gesture-settings.js";
+import { PERSISTENCE_CATEGORIES } from "./history-options.js";
 
 // --------------------------------------------------------------------------------------
 // What is kept for the whole page — every card and the info panel, read before any card
@@ -350,7 +351,7 @@ export class CardStorage
     // defaultAll and the option isn't set (see _resolvePersistenceDefault)
     _cardPersists(category, defaultAll)
     {
-        const _on = raw => this._resolvePersistenceDefault(raw, ['range', 'entities', 'order'], defaultAll).has(category);
+        const _on = raw => this._resolvePersistenceDefault(raw, PERSISTENCE_CATEGORIES, defaultAll).has(category);
         return { multi: _on(this.pconfig.enableMultidevicePersistence), local: _on(this.pconfig.enablePersistence) };
     }
 
@@ -504,7 +505,7 @@ export class CardStorage
         const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
                         ( _enabledFields.has('groupId') ? _localE : null );
         if( _keySrc ) {
-            for( const _f of ['graphKey', 'graphIndex'] ) {
+            for( const _f of PLACEMENT_FIELDS.filter(f => f !== 'groupId') ) {
                 if( _keySrc[_f] !== undefined ) _result[_f] = _keySrc[_f];
                 else delete _result[_f];
             }
@@ -664,7 +665,7 @@ export class CardStorage
     {
         const _resolve = (_entityFields, _cardRaw) => {
             if( _entityFields !== undefined ) return _entityFields;
-            const _cardSet = this._resolvePersistenceDefault(_cardRaw, ['range', 'entities', 'order'], !staticEntry);
+            const _cardSet = this._resolvePersistenceDefault(_cardRaw, PERSISTENCE_CATEGORIES, !staticEntry);
             return _cardSet.has('entities') ? new Set(this._entityPersistenceFields()) : new Set();
         };
         // (a field kept on this device only — see ENTITY_FIELD_SCOPE: never taken from

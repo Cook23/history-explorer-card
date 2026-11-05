@@ -79,7 +79,7 @@ class CSVExporter {
     exportFailed(error)
     {
         document.body.removeChild(this.overlay);
-        console.log(error);
+        console.error('history-explorer-card: CSV export failed', error);
     }
 
 }

@@ -5,7 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS } from "./history-options.js";
+import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -58,6 +58,10 @@ function normalizeEntityOptions(eo)
     return Object.fromEntries(Object.entries(eo).map(([k, v]) => [k, normalizeOptions(v)]));
 }
 
+// A YAML entity's options (CardConfig._makeStaticEntityEntry) that are the graph's
+// (GRAPH_STORED_KEYS): its header aside, the graph's only, and lineWidth, kept as width
+const _ENTITY_GRAPH_KEYS = GRAPH_STORED_KEYS.filter(k => !GRAPH_HEADER_KEYS.includes(k) && k !== 'lineWidth');
+
 export class CardConfig
 {
     // --------------------------------------------------------------------------------------
@@ -72,27 +76,27 @@ export class CardConfig
         const P = this.pconfig;
         // (the options in their one form, whatever the user wrote — see normalizeOptions)
         const c = normalizeOptions(config);
-        const d = (k, v) => k in defaults ? defaults[k] : v;
+        const d = (k, v) => k in defaults ? defaults[k] : v, D = OPTION_DEFAULTS;
 
         P.customStateColors = {};
         for( let i in c.stateColors ?? {} ) P.customStateColors[i] = parseColor(c.stateColors[i]);
         P.entityOptions =          normalizeEntityOptions(c.entityOptions);
 
-        P.labelAreaWidth =         c.labelAreaWidth ?? 65;
-        P.labelsVisible =          c.labelsVisible ?? true;
+        P.labelAreaWidth =         c.labelAreaWidth ?? D.labelAreaWidth;
+        P.labelsVisible =          c.labelsVisible ?? D.labelsVisible;
         P.hideLegend =           ( c.legendVisible == false ) ? true : undefined;
         // (auto: a graph's legend only when it has several labels — see card-charts.js newGraph)
         P.legendAuto =             c.legendVisible === 'auto';
-        P.cursorMode =             c.cursor?.mode ?? d('cursorMode', 'auto');
-        P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', ['timeline']);
-        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? true;
-        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? true;
-        P.tooltipSize =            c.tooltip?.size ?? 'auto';
-        P.tooltipShowDuration =    c.tooltip?.showDuration ?? d('tooltipShowDuration', false);
-        P.tooltipShowLabel =       c.tooltip?.showLabel ?? true;
-        P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? 'auto';
-        P.colorSeed =              c.stateColorSeed ?? 137;
-        P.stateTextMode =          c.stateTextMode ?? 'auto';
+        P.cursorMode =             c.cursor?.mode ?? d('cursorMode', D.cursor.mode);
+        P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', D.cursor.types);
+        P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? D.tooltip.showColorsLine;
+        P.showTooltipColors[1] =   c.tooltip?.showColorsTimeline ?? D.tooltip.showColorsTimeline;
+        P.tooltipSize =            c.tooltip?.size ?? D.tooltip.size;
+        P.tooltipShowDuration =    c.tooltip?.showDuration ?? d('tooltipShowDuration', D.tooltip.showDuration);
+        P.tooltipShowLabel =       c.tooltip?.showLabel ?? D.tooltip.showLabel;
+        P.tooltipStateTextMode =   c.tooltip?.stateTextMode ?? c.stateTextMode ?? D.stateTextMode;
+        P.colorSeed =              c.stateColorSeed ?? D.stateColorSeed;
+        P.stateTextMode =          c.stateTextMode ?? D.stateTextMode;
         // (the theme: dark, light or Home Assistant's; the colors of the labels, grid and cursor
         // line — see applyTheme)
         P.uimode =                 c.uimode;
@@ -101,11 +105,11 @@ export class CardConfig
 
         // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
         P.defaultLineMode =        c.lineMode ?? d('defaultLineMode', undefined);
-        P.defaultInterpolation =   c.interpolation ?? 'monotone';
-        P.defaultLineWidth =       c.lineWidth ?? d('defaultLineWidth', 2.0);
+        P.defaultInterpolation =   c.interpolation ?? D.interpolation;
+        P.defaultLineWidth =       c.lineWidth ?? d('defaultLineWidth', D.lineWidth);
         P.defaultDashMode =        c.dashMode;
         P.defaultNetBars =         c.netBars;
-        P.defaultInterval =        c.interval ?? OPTION_DEFAULTS.interval;
+        P.defaultInterval =        c.interval ?? D.interval;
         P.defaultShowMinMax =      c.showMinMax;
         // (aggregation — see resolveAggregation)
         P.defaultPointsPerHour =   c.pointsPerHour;
@@ -118,48 +122,48 @@ export class CardConfig
         P.tapAction =              c.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries(['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor', 'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        P.cardOptions =            Object.fromEntries([...CURVE_OPTION_KEYS, ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
         P.hour24 =                 c.hour24;
         // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card;
         // a graph's options the card doesn't set, their defaults)
         P.cardGraphDefaults =      { ...GRAPH_DEFAULTS, ...Object.fromEntries(
-            ['color', 'fill', 'unit', ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]])) };
+            [...CARD_ENTITY_KEYS, ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]])) };
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
         // barGraphHeight set their own)
-        P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? 250 ) * 1;
-        P.barGraphHeight =       ( c.barGraphHeight ?? c.height ?? 150 ) * 1;
-        P.timelineBarHeight =    ( c.timelineBarHeight ?? 24 ) * 1;
-        P.timelineBarSpacing =   ( c.timelineBarSpacing ?? 40 ) * 1;
+        P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? D.lineGraphHeight ) * 1;
+        P.barGraphHeight =       ( c.barGraphHeight ?? c.height ?? D.barGraphHeight ) * 1;
+        P.timelineBarHeight =    ( c.timelineBarHeight ?? D.timelineBarHeight ) * 1;
+        P.timelineBarSpacing =   ( c.timelineBarSpacing ?? D.timelineBarSpacing ) * 1;
 
-        P.showUnavailable =        c.showUnavailable ?? false;
-        P.showMissingState =       c.showMissingState ?? false;
-        P.showCurrentValues =      c.showCurrentValues ?? true;
-        P.axisAddMarginMin =       c.axisAddMarginMin ?? false;
-        P.axisAddMarginMax =       c.axisAddMarginMax ?? false;
-        P.recordedEntitiesOnly =   c.recordedEntitiesOnly ?? false;
+        P.showUnavailable =        c.showUnavailable ?? D.showUnavailable;
+        P.showMissingState =       c.showMissingState ?? D.showMissingState;
+        P.showCurrentValues =      c.showCurrentValues ?? D.showCurrentValues;
+        P.axisAddMarginMin =       c.axisAddMarginMin ?? D.axisAddMarginMin;
+        P.axisAddMarginMax =       c.axisAddMarginMax ?? D.axisAddMarginMax;
+        P.recordedEntitiesOnly =   c.recordedEntitiesOnly ?? D.recordedEntitiesOnly;
         P.filterEntities =         c.filterEntities;
         P.excludeFilterEntities =  c.excludeFilterEntities;
         P.combineSameUnits =       c.combineSameUnits === true;
-        P.defaultTimeRange =       c.defaultTimeRange ?? '24h';
+        P.defaultTimeRange =       c.defaultTimeRange ?? D.defaultTimeRange;
         P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
-        P.defaultMagnifierMode =   c.defaultMagnifierMode ?? 'xy';
-        P.timeTickDensity =        c.timeTicks?.density ?? 'high';
+        P.defaultMagnifierMode =   c.defaultMagnifierMode ?? D.defaultMagnifierMode;
+        P.timeTickDensity =        c.timeTicks?.density ?? D.timeTicks.density;
         P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;
         P.timeTickShortDate =      c.timeTicks?.dateFormat === 'short';
         // (on by default since 1.1.49: `automatic: false` turns it off)
-        P.refreshEnabled =         c.refresh?.automatic ?? true;
+        P.refreshEnabled =         c.refresh?.automatic ?? D.refresh.automatic;
         P.refreshInterval =        c.refresh?.interval ?? undefined;
         // (the CSV export — see history-csv-exporter.js)
-        P.exportSeparator =        c.csv?.separator ?? ',';
-        P.exportTimeFormat =       c.csv?.timeFormat ?? 'YYYY-MM-DD HH:mm:ss';
+        P.exportSeparator =        c.csv?.separator ?? D.csv.separator;
+        P.exportTimeFormat =       c.csv?.timeFormat ?? D.csv.timeFormat;
         P.exportAttributes =       c.csv?.exportAttributes;
-        P.exportStatsPeriod =      c.csv?.statisticsPeriod ?? 'hour';
+        P.exportStatsPeriod =      c.csv?.statisticsPeriod ?? D.csv.statisticsPeriod;
         P.exportNumberLocale =     c.csv?.numberLocale;
 
-        this.statistics.enabled =   c.statistics?.enabled ?? true;
-        this.statistics.mode =      c.statistics?.mode ?? 'mean';
+        this.statistics.enabled =   c.statistics?.enabled ?? D.statistics.enabled;
+        this.statistics.mode =      c.statistics?.mode ?? D.statistics.mode;
         this.statistics.retention = c.statistics?.retention ?? undefined;
-        this.statistics.period =    c.statistics?.period ?? 'hour';
+        this.statistics.period =    c.statistics?.period ?? D.statistics.period;
         this.statistics.force =     c.statistics?.force ?? undefined;
 
         Object.assign(P, fixed);
@@ -299,8 +303,8 @@ export class CardConfig
     // column of pixels, their mean (see card-datasets.js _lineSamples)
     resolveAggregation(e)
     {
-        const _of = k => e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k]
-            ?? this.pconfig['default' + k.charAt(0).toUpperCase() + k.slice(1)];
+        const _card = { pointsPerHour: this.pconfig.defaultPointsPerHour, aggregateFunc: this.pconfig.defaultAggregateFunc, groupBy: this.pconfig.defaultGroupBy };
+        const _of = k => e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? _card[k];
         const r = { pointsPerHour: _of('pointsPerHour'), func: _of('aggregateFunc'), groupBy: _of('groupBy') };
         r.explicit = !!( r.pointsPerHour || r.func || ( r.groupBy && r.groupBy !== 'interval' ) );
         return r;
@@ -391,67 +395,16 @@ export class CardConfig
         return {
             entity            : entity,
             groupId           : groupId,
-            color             : ent.color,
-            colorSet          : ent.color !== undefined || undefined,
-            fill              : ent.fill,
-            hidden            : ent.hidden,
-            interval          : ent.interval ?? interval,
             isStatic          : true,
-            name              : ent.name,
-            scale             : ent.scale,
-            siConversionFactor: ent.siConversionFactor,
-            dashMode          : ent.dashMode,
-            lineMode          : ent.lineMode,
-            interpolation     : ent.interpolation,
+            // (its own options)
+            ...Object.fromEntries(ENTITY_OPTION_KEYS.map(k => [k, ent[k]])),
+            colorSet          : ent.color !== undefined || undefined,
+            // (the graph's options set on the entity — for its curve, or for the graph it's
+            // shown in, see addGraph —: its header aside, the graph's only; its line width
+            // kept as width; its interval, else the graph's)
+            ...Object.fromEntries(_ENTITY_GRAPH_KEYS.map(k => [k, ent[k]])),
             width             : ent.lineWidth,
-            type              : ent.type,
-            // Y axis bounds set on an entity: the axis is the graph's, so they apply to the
-            // graph the entity is shown in (see addGraph)
-            ymin              : ent.ymin,
-            ymax              : ent.ymax,
-            ystepSize         : ent.ystepSize,
-            // Other options of the graph the entity is shown in (same as the Y axis bounds)
-            ylock             : ent.ylock,
-            stacked           : ent.stacked,
-            height            : ent.height,
-            showTimeLabels    : ent.showTimeLabels,
-            showGrid          : ent.showGrid,
-            yLabels           : ent.yLabels,
-            showPoints        : ent.showPoints,
-            largeScreenTooltip: ent.largeScreenTooltip,
-            smallScreenTooltip: ent.smallScreenTooltip,
-            largeChartTooltip : ent.largeChartTooltip,
-            smallChartTooltip : ent.smallChartTooltip,
-            showMinMax        : ent.showMinMax,
-            showState         : ent.showState,
-            showStats         : ent.showStats,
-            unit              : ent.unit,
-            process           : ent.process,
-            netBars           : ent.netBars,
-            circular          : ent.circular,
-            yAxis             : ent.yAxis,
-            rounding          : ent.rounding,
-            tapAction         : ent.tapAction,
-            pointsPerHour     : ent.pointsPerHour,
-            aggregateFunc     : ent.aggregateFunc,
-            groupBy           : ent.groupBy,
-            yminRight         : ent.yminRight,
-            ymaxRight         : ent.ymaxRight,
-            yrange            : ent.yrange,
-            yrangeRight       : ent.yrangeRight,
-            logarithmic       : ent.logarithmic,
-            labelsLeft        : ent.labelsLeft,
-            labelsRight       : ent.labelsRight,
-            valueFactor       : ent.valueFactor,
-            stateMap          : ent.stateMap,
-            colorTransition   : ent.colorTransition,
-            showLine          : ent.showLine,
-            legendVisible     : ent.legendVisible,
-            showIndicator     : ent.showIndicator,
-            showGraph         : ent.showGraph,
-            fixedValue        : ent.fixedValue,
-            stateAdaptiveColor: ent.stateAdaptiveColor,
-            showCurrentValues : ent.showCurrentValues,
+            interval          : ent.interval ?? interval,
             enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enableMultidevicePersistence),
             enablePersistence: this.resolveEntityPersistenceFields(ent.enablePersistence),
         };
@@ -565,52 +518,7 @@ export class CardConfig
             this.pconfig.graphs[_groupId] = {
                 type           : graph.type,
                 title          : graph.title,
-                showTimeLabels : _opts.showTimeLabels,
-                showGrid       : _opts.showGrid,
-                yLabels        : _opts.yLabels,
-                height         : _opts.height,
-                stacked        : _opts.stacked,
-                ylock          : _opts.ylock,
-                ymin           : _opts.ymin,
-                ymax           : _opts.ymax,
-                ystepSize      : _opts.ystepSize,
-                fill           : _opts.fill,
-                showMinMax     : _opts.showMinMax,
-                showState      : _opts.showState,
-                showStats      : _opts.showStats,
-                dashMode       : _opts.dashMode,
-                lineMode       : _opts.lineMode,
-                interpolation  : _opts.interpolation,
-                lineWidth      : _opts.lineWidth,
-                showPoints     : _opts.showPoints,
-                largeScreenTooltip : _opts.largeScreenTooltip,
-                smallScreenTooltip : _opts.smallScreenTooltip,
-                largeChartTooltip  : _opts.largeChartTooltip,
-                smallChartTooltip  : _opts.smallChartTooltip,
-                netBars        : _opts.netBars,
-                yAxis          : _opts.yAxis,
-                rounding       : _opts.rounding,
-                tapAction      : _opts.tapAction,
-                pointsPerHour  : _opts.pointsPerHour,
-                aggregateFunc  : _opts.aggregateFunc,
-                groupBy        : _opts.groupBy,
-                yminRight      : _opts.yminRight,
-                ymaxRight      : _opts.ymaxRight,
-                yrange         : _opts.yrange,
-                yrangeRight    : _opts.yrangeRight,
-                logarithmic    : _opts.logarithmic,
-                labelsLeft     : _opts.labelsLeft,
-                labelsRight    : _opts.labelsRight,
-                valueFactor    : _opts.valueFactor,
-                stateMap       : _opts.stateMap,
-                colorTransition: _opts.colorTransition,
-                showLine       : _opts.showLine,
-                showIndicator  : _opts.showIndicator,
-                showGraph      : _opts.showGraph,
-                stateAdaptiveColor: _opts.stateAdaptiveColor,
-                showCurrentValues: _opts.showCurrentValues,
-                // (its header and its values: see graphOption)
-                ...Object.fromEntries(GRAPH_HEADER_KEYS.map(k => [k, _opts[k]])),
+                ...Object.fromEntries(GRAPH_STORED_KEYS.map(k => [k, _opts[k]])),
             };
         }
     }

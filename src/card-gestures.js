@@ -6,6 +6,9 @@
 
 import { keepInfoLook } from "./card-storage.js";
 
+// The gestures that act (a hover or a drag under way doesn't): they end a cut or the magnifier
+const ACTION_GESTURES = ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'];
+
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -26,7 +29,7 @@ export class CardGestures
         // buttons, nothing happens — aimed at one of them, the cut goes on; any other action
         // cancels it and goes on as usual — a hover doesn't)
         if( this._cut ) {
-            const _action = ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType);
+            const _action = ACTION_GESTURES.includes(info.gestureType);
             if( info.handleButton || info.handleButtonBetween ) {
                 if( info.gestureType === 'click' ) return info.handleButton && this._onCutButton(info, g, info.handleButton);
                 // (a swipe on the buttons, whichever: up inserts above, down below)
@@ -38,7 +41,7 @@ export class CardGestures
         // (the magnifier on: any gesture on a graph but the elastic box's drag ends it, and
         // goes on as usual — a drag on the plot area is the box's, ended at its dragend; a
         // pinch, at its end: onTimePan)
-        if( this.state.zoomMode && ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'].includes(info.gestureType) &&
+        if( this.state.zoomMode && ACTION_GESTURES.includes(info.gestureType) &&
             !( info.gestureType === 'dragstart' && info.zone === 'plot' ) )
             this.endZoomMode();
         switch( info.gestureType ) {

@@ -1,2 +1,2 @@
 // The card's version — shown in its header and the console, and in a test's report
-export const Version = '1.2.57';
+export const Version = '1.2.58';

@@ -38,6 +38,13 @@ module.exports = async function()
         const g = await t.E(`[inst().graphs[0].type, !!inst()._this.querySelector('#bd-' + inst().graphs[0].id)]`);
         return g[0] === 'bar' && g[1] ? true : JSON.stringify(g);
     });
+    await t.step('the type chosen in the panel isn\'t saved: the panel opened again shows the curve as before, the card\'s saved state untouched', async () => {
+        const saved = () => t.E(`JSON.stringify(Object.keys(localStorage).filter(k => /history-explorer_card_/.test(k)).map(k => localStorage.getItem(k)))`);
+        const s0 = await saved();
+        await t.E(`openPanel('sensor.power')`); await t.wait(2500);
+        const type = await t.E(`inst().graphs[0].type`), s1 = await saved();
+        return type === 'line' && s1 === s0 ? true : JSON.stringify({ type, s0, s1 });
+    });
     done(await t.close());
 
     // ── On a phone, Home Assistant's entity dialog is a bottom sheet following every touch

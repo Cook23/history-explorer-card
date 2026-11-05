@@ -4,6 +4,28 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.58] - 2026-11-05
+
+### Fixed — barSpacing set on a graph or on an entity had no effect
+- `barSpacing` (mini-graph-card's `bar_spacing`) worked set on the card only: set on a graph (directly or under its `options:`) or on an entity, it was read but not kept with the graph's options nor with the entity's. It is now, at all three places
+- Test (`documented`): the room between two bars, 10 px, set on the graph, under its `options:`, on an entity
+
+### Changed — the browser's console
+- The "Cache grown…" message, a debug trace, is no longer written
+- A failed history request, a list of the recorded entities that couldn't be read (every entity offered instead), a failed CSV export: written as errors, named `history-explorer-card:`
+
+### Changed — code cleanliness (nothing changes for the user)
+- The options a YAML graph and a YAML entity keep are taken from the one list of the graph's options (`GRAPH_STORED_KEYS`), never copied one by one; every list of names is written once, named — a list of options in `history-options.js` (`ENTITY_OPTION_KEYS`, `CURVE_OPTION_KEYS`, `CARD_ENTITY_KEYS`, `PERSISTENCE_CATEGORIES`)
+- Every business default written once, in `OPTION_DEFAULTS` (the card's sizes, tooltip, cursor, CSV, statistics, time ticks, automatic refresh, toolbar and selector places, an arrowline's full turn)
+- The graphs' display order taken from one place (`graphsInDisplayOrder`) everywhere
+- Long functions split where their parts read better on their own: the toolbar's date form (`_fitDateForm`), a chart's time axis (`_chartTimeAxis`), a new graph placed in the page (`_placeGraphElement`)
+- Architecture test: two more rules — the same list written twice (`lists-once`), a list of options written outside `history-options.js` (`option-lists`)
+
+### Tests
+- New suite `documented`: options documented in README_Full and not tested until now — `legendVisible` on an entity, `showCurrentValues`, `lineColor` as a list, `stateTextMode`, `stateColors` and their order, `entityOptions` as a dictionary and as a list (patterns), `axisAddMarginMin` / `Max`, `labelAreaWidth`, the graphs' heights, `uimode: dark`, `uiLayout.invertZoom`, `filterEntities` / `excludeFilterEntities`, `defaultTimeOffset`, an angle without a unit, the tooltip's options, an arrowline's tooltip, `barSpacing` at its three places, the time range's units, `tooltip.size`, `defaultInfoPanel` (YAML and switch, the last one to speak, another device), `statistics.period: day`
+- `mouse`: a pan released — every graph shows the same time, each Y axis fitted to the values now shown
+- `panel`: the type chosen in the info panel isn't saved
+
 ## [v1.2.57] - 2026-11-05
 
 ### Added — showMissingState

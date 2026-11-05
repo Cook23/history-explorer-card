@@ -25,6 +25,9 @@ export function entityIdOf(e)
 
 const isObj = e => typeof e === 'object' && e !== null;
 
+// An entry's placement among the graphs: its group, its graph in the group, the graph's place
+export const PLACEMENT_FIELDS = ['groupId', 'graphKey', 'graphIndex'];
+
 // The key of an entry's curve: its series id, then '#' and its copy number for a second
 // (third…) curve of that series — the series id alone for the first, as before copies
 // existed. Kept by the curve whichever graph it moves to.
@@ -80,8 +83,7 @@ export class EntityStore
     placementOf(entry)
     {
         const i = this.list.indexOf(entry);
-        return { groupId: entry.groupId, graphKey: entry.graphKey, graphIndex: entry.graphIndex,
-                 preceding: this.list.slice(0, i).map(keyOf) };
+        return { ...Object.fromEntries(PLACEMENT_FIELDS.map(k => [k, entry[k]])), preceding: this.list.slice(0, i).map(keyOf) };
     }
 
     // The list as it is saved: an entry moved where its placement isn't saved (its
@@ -93,7 +95,7 @@ export class EntityStore
         const out = this.list.filter(e => !e?.unsavedFrom);
         for( const e of this.list.filter(e => e?.unsavedFrom) ) {
             const { unsavedFrom: u, ...saved } = e;
-            for( const k of ['groupId', 'graphKey', 'graphIndex'] ) {
+            for( const k of PLACEMENT_FIELDS ) {
                 if( u[k] === undefined ) delete saved[k]; else saved[k] = u[k];
             }
             const inGroup = k => isObj(out[k]) && out[k].groupId === u.groupId;

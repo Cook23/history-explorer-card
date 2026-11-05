@@ -206,12 +206,12 @@ export class CardOperations
 
     // Why graph src can't go right before (before) or after graph tgt — null when it can:
     // never between two graphs of a group it isn't part of (a group always stays one solid
-    // block; reordering inside its own group is allowed). Groups are consecutive by
-    // graphIndex: only the neighbor on the insertion side, in graphIndex order, is checked
+    // block; reordering inside its own group is allowed): only the neighbor on the insertion
+    // side, in display order (graphsInDisplayOrder), is checked
     graphMoveRefusal(src, tgt, before)
     {
         if( tgt.groupId === null || tgt.groupId === undefined || src.groupId === tgt.groupId ) return null;
-        const _sorted = [...this.graphs].sort((a, b) => (a.entities?.[0]?.graphIndex ?? 0) - (b.entities?.[0]?.graphIndex ?? 0));
+        const _sorted = this.graphsInDisplayOrder();
         const _i = _sorted.indexOf(tgt);
         const _neighbor = before ? _sorted[_i - 1] : _sorted[_i + 1];
         return _neighbor && _neighbor !== src && _neighbor.groupId === tgt.groupId ? i18n('ui.menu.linked_graphs_split') : null;
