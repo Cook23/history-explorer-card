@@ -118,6 +118,19 @@ const ENTITY_FIELD_SCOPE = {
 };
 const LOCAL_ONLY_FIELDS = Object.keys(ENTITY_FIELD_SCOPE).filter(f => ENTITY_FIELD_SCOPE[f] === 'local');
 
+// Two saved entries of one entity the same — what they say, not how it's written: whatever
+// the order of their fields, a field undefined as one absent (as saved); from another device
+// (devices), the fields kept on each device (LOCAL_ONLY_FIELDS) left out — never taken from
+// there. A source changed only when it says something else (the last one to speak: an entry
+// written again in another order hasn't spoken)
+function sameEntry(a, b, devices)
+{
+    const _canon = e => e && typeof e === 'object'
+        ? JSON.stringify(Object.keys(e).filter(k => e[k] !== undefined && ( !devices || !LOCAL_ONLY_FIELDS.includes(k) )).sort().map(k => [k, e[k]]))
+        : JSON.stringify(e ?? null);
+    return _canon(a) === _canon(b);
+}
+
 export class CardStorage
 {
     // --------------------------------------------------------------------------------------
@@ -435,7 +448,7 @@ export class CardStorage
         // YAML front — per entity, always wins on change, unaffected by the enable flags
         // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
         // is also the pure YAML mirror saved by writeLocalState)
-        if( _yamlE && JSON.stringify(_yamlE) !== JSON.stringify(_yamlImageE ?? null) )
+        if( _yamlE && !sameEntry(_yamlE, _yamlImageE) )
             return { ..._yamlE };
 
         // Resolve which fields have persistence enabled at all — entity-level first,
@@ -450,7 +463,7 @@ export class CardStorage
         const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
         const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
-        const _haChanged = _haE && JSON.stringify(_haE) !== JSON.stringify(_haImageE ?? null);
+        const _haChanged = _haE && !sameEntry(_haE, _haImageE, true);
         const _localE = _lsE ?? _yamlE ?? _haE;
 
         // Base: the YAML value for every field — nothing persists unless explicitly

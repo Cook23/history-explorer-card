@@ -4,6 +4,24 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.57] - 2026-11-05
+
+### Added — showMissingState
+- `showMissingState: true` (card): a curve of text states (`stateMap`) shows a gap where its state isn't in the list; `false` by default, the curve going over it — as `showUnavailable` for an unavailable or unknown state
+- Test (`features`): both options false by default, the curve over the state without a value; true, a gap there, the value before held until it — each option for its own states
+
+### Fixed — showUnavailable had no effect on a curve
+- `showUnavailable: true` let an unavailable or unknown state through, but as a number it was none, and the curve went over it as without the option. It now shows a gap there: the value before held until it, nothing until the next value (`_withGaps`); a state a `stateMap` doesn't list has no value either (`STATE_NOT_LISTED`), a gap with `showMissingState`
+- README_Full: *Line graphs and unavailable data* and *Text states as a curve* — a state not listed has no value, the curve over it by default, a gap with `showMissingState`
+
+### Fixed — an entity saved again in another order taken for a change
+- A device loading the card took an entity of Home Assistant's (or of the YAML) for changed when its fields were only written in another order — the last one to speak heard where nobody spoke. Entries are compared by what they say: their fields in any order, an undefined one as absent, from another device without the fields kept on each device (`sameEntry`)
+
+### Tests
+- New suite `devices`: every change of what's shown — a curve split, grouped again by a drop or the chain, a type changed, a graph moved, a curve dropped onto a graph of another type, rows and curves reordered, an interpolation, a curve added or deleted, a graph removed, the time range, the magnifier's mode —, on a card of entities added from it and on a YAML card with `enableMultidevicePersistence`: the same after a reload, on a new device and on a device that last saw the card before the change; a device that only loads the card writes nothing new to Home Assistant
+- `features`: `process`, `stateMap`, `valueFactor`, `netBars` — features documented and not tested until now
+- `mouse`: a graph dragged by its ⠿ handle (above or below the target by its half), a linked block (nothing dropped inside it, moved as a whole), the drag's ghost and insertion marker, the page scrolled at the screen's edge during a drag, a YAML graph never joined by an entity added from the card
+
 ## [v1.2.56] - 2026-11-04
 
 ### Fixed — graphs grouped again on one device, split again by another one

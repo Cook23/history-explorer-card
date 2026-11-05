@@ -1158,5 +1158,66 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── The data shaped before it's drawn: process, stateMap, valueFactor, netBars (a known history
+    // for each: MOCK.rows, [seconds ago, state]) ──
+    {
+        const H = 3600;
+        const t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [
+            { type: 'timeline', entities: [{ entity: 'sensor.power', process: 'state > 300 ? "high" : "low"' }] },
+            { type: 'line', entities: [{ entity: 'climate.salon', stateMap: [{ value: 'off', label: 'Off' }, 'heat', 'cool'] }] },
+            { type: 'line', entities: [{ entity: 'sensor.power_kw', valueFactor: -3 }] },
+            { type: 'bar', entities: [{ entity: 'sensor.net_energy', netBars: true }, { entity: 'sensor.energy' }] }] }),
+            { height: 1400, mock: { rows: {
+                'sensor.power': [[10*H, '100'], [6*H, '400'], [2*H, '200']],
+                'sensor.power_kw': [[10*H, '400'], [2*H, '800']],
+                'climate.salon': [[10*H, 'off'], [8*H, 'heat'], [6*H, 'cool'], [2*H, 'off']],
+                'sensor.net_energy': [[10*H, '10'], [8*H, '12'], [6*H, '11'], [4*H, '15']],
+                'sensor.energy': [[10*H, '10'], [8*H, '12'], [6*H, '11'], [4*H, '15']] } } });
+        await t.wait(1500);
+        const ds = (gi, k) => `graphAt(${gi}).chart.data.datasets[${k}]`;
+        await t.step('process: each state as the expression gives it — a power shown as a timeline of "low" / "high"', async () => {
+            const r = await t.E(`${ds(0, 0)}.data.map(d => d[2])`);
+            return JSON.stringify(r) === JSON.stringify(['low', 'high', 'low']) ? true : JSON.stringify(r);
+        });
+        await t.step('stateMap: a text state drawn at its place in the list (off 0, heat 1, cool 2), its label in the tooltip', async () => {
+            const r = await t.E(`({ y: ${ds(1, 0)}.data.map(p => p.y), tip: [0, 1, 2].map(y => el.instance._tooltipValue('line', ${ds(1, 0)}, { index: 0, yLabel: y }).trim()) })`);
+            return JSON.stringify(r.y.filter((y, i) => y !== r.y[i - 1])) === '[0,1,2,0]' && JSON.stringify(r.tip) === '["Off","heat","cool"]' ? true : JSON.stringify(r);
+        });
+        await t.step('valueFactor -3: the values drawn and shown divided by 1000, the unit kept (400 → 0.4 kW)', async () => {
+            const r = await t.E(`({ y: [...new Set(${ds(2, 0)}.data.map(p => p.y))], tip: el.instance._tooltipValue('line', ${ds(2, 0)}, { index: 0, yLabel: 0.4 }) })`);
+            return JSON.stringify(r.y) === '[0.4,0.8]' && r.tip === '0.4 kW' ? true : JSON.stringify(r);
+        });
+        await t.step('netBars: a total that goes down drawn as a negative bar (10, 12, 11, 15 → +2, −1, +4); without it, a decrease is a reset — no negative bar', async () => {
+            const r = await t.E(`[0, 1].map(k => ${ds(3, 'k')}.data.map(p => Math.round((p.y ?? p) * 100) / 100).filter(v => v !== 0))`);
+            return JSON.stringify(r) === '[[2,-1,4],[2,4]]' ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── A state without a value on a curve — unavailable, or a text state its stateMap doesn't list:
+    // the curve goes over it by default; a gap there with showUnavailable, showMissingState ──
+    {
+        const H = 3600;
+        const rows = { 'sensor.power_kw': [[10*H, '400'], [6*H, 'unavailable'], [2*H, '800']],
+                       'climate.salon': [[10*H, 'off'], [6*H, 'dry'], [2*H, 'heat']] };
+        const graphs = [{ type: 'line', entities: [{ entity: 'sensor.power_kw', lineMode: 'stepped' }] },
+                        { type: 'line', entities: [{ entity: 'climate.salon', lineMode: 'stepped', stateMap: ['off', 'heat'] }] }];
+        // (each curve's points: hours ago, value — null: the curve broken there)
+        const points = t => t.E(`[0, 1].map(gi => graphAt(gi).chart.data.datasets[0].data.map(p => Math.round((Date.now() - p.x) / 36e5) + 'h:' + p.y).join(' '))`);
+        const open = opts => openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, ...opts, graphs }), { height: 900, mock: { rows } });
+        const gap = s => /6h:\S+ 6h:null/.test(s);
+        const over = s => !/null/.test(s);
+        const t = await open({});
+        await t.wait(1500);
+        await t.step('showUnavailable, showMissingState: false by default, the curve over the state without a value; true, a gap there — the value before held until it, each option for its own states', async () => {
+            const byDefault = await points(t), r = { byDefault };
+            for( const [k, opts] of [['unavailable', { showUnavailable: true }], ['missing', { showMissingState: true }]] ) {
+                const o = await open(opts); await o.wait(1500); r[k] = await points(o); await o.close();
+            }
+            return over(byDefault[0]) && over(byDefault[1]) && gap(r.unavailable[0]) && over(r.unavailable[1]) && over(r.missing[0]) && gap(r.missing[1]) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
     return { passed, failed };
 };

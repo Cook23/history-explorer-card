@@ -4,7 +4,7 @@
 
 import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
-import { barInterval, RAW_INTERVAL } from "./history-options.js";
+import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
 import { timeWeightedMean } from "./history-stats.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
@@ -205,10 +205,14 @@ export class CardDatasets
     // The graphs' datasets from the history (result: each entity's, in the graphs' order)
     buildChartData(result, colorHistory)
     {
-        // The time window drawn: now, its start and end, and which states are drawn
+        // The time window drawn: now, its start and end; a state without a value is a gap in a
+        // curve (isGap) — unavailable or unknown with showUnavailable, one a stateMap doesn't
+        // list with showMissingState —; else the curve goes over it
+        const _missing = state => ['unavailable', 'unknown'].includes(state);
         const w = {
             now: moment(), start: moment(this.startTime), end: moment(this.endTime),
-            isValid: state => this.pconfig.showUnavailable || !['unavailable', 'unknown'].includes(state)
+            isValid: state => !_missing(state) && state !== STATE_NOT_LISTED,
+            isGap: state => state === STATE_NOT_LISTED ? this.pconfig.showMissingState : this.pconfig.showUnavailable && _missing(state),
         };
 
         let id = 0;
@@ -301,11 +305,15 @@ export class CardDatasets
         const _num = v => { const x = this.process(v, process); return w.isValid(x) ? x * scale : NaN; };
 
         // (each valid value: its time, the time it lasts until, its value — statistics: its
-        // mean, min and max)
-        const _values = [];
+        // mean, min and max; the times of the gaps — w.isGap —, the first after a value only)
+        const _values = [], _gaps = [];
         for( let i = 0; i < n; i++ ) {
             const y = _num(data[i].state);
-            if( isNaN(y) ) continue;
+            if( isNaN(y) ) {
+                const _t = msOf(data[i].last_changed);
+                if( w.isGap(this.process(data[i].state, process)) && _values.length && !( _gaps.length && _gaps[_gaps.length - 1] > _values[_values.length - 1].t ) ) _gaps.push(_t);
+                continue;
+            }
             const st = data[i].statistics;
             const v = { t: msOf(data[i].last_changed), y, min: y, max: y, stat: !!st };
             if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); v.period = v.end - v.t; }
@@ -317,7 +325,9 @@ export class CardDatasets
             const _l = _values[_values.length - 1];
             _values.splice(0, _values.length, { t: w.start.valueOf(), y: _l.y, min: _l.y, max: _l.y, stat: false });
         }
-        _values.forEach((v, k) => { v.end ??= k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t); });
+        // (a value lasts until the next one, or a gap)
+        const _gapAfter = t => _gaps.find(g => g > t);
+        _values.forEach((v, k) => { v.end ??= Math.min(k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t), _gapAfter(v.t) ?? Infinity); });
 
         // (the groups the values are put in: each column of pixels — or, aggregated
         // (_groupsOf), the groups asked, never narrower than a column)
@@ -380,7 +390,7 @@ export class CardDatasets
         // The last value carried to the end of the window, or to now when the window
         // reaches it (aggregated: its groups go there)
         let _extended = false;
-        if( !_agg.explicit && s.length > 0 && s[s.length-1].x < _until && _values.length ) {
+        if( !_agg.explicit && s.length > 0 && s[s.length-1].x < _until && _values.length && _gapAfter(_values[_values.length - 1].t) === undefined ) {
             s.push({ x: _until, y: _values[_values.length - 1].y });
             _extended = true;
         }
@@ -392,6 +402,21 @@ export class CardDatasets
             s = this._applySilencePlateaus(s, _raw, _extended);
         }
 
+        return this._withGaps(s, _values, _gaps, _until);
+    }
+
+    // A curve's points s broken at each gap (its time, after a value — see _lineSamples): the
+    // value before it held until it, then nothing until the next value (a null point: Chart.js
+    // breaks the line there); no point drawn within it
+    _withGaps(s, values, gaps, until)
+    {
+        for( const g of gaps ) {
+            const _next = values.find(v => v.t > g)?.t ?? until;
+            const _prev = values.filter(v => v.t < g).pop();
+            s = s.filter(p => p.x <= g || p.x >= _next);
+            const i = s.findIndex(p => p.x > g);
+            s.splice(i < 0 ? s.length : i, 0, ...( _prev ? [{ x: g, y: _prev.y }] : [] ), { x: g, y: null });
+        }
         return s;
     }
 

@@ -132,6 +132,7 @@ export class CardConfig
         P.timelineBarSpacing =   ( c.timelineBarSpacing ?? 40 ) * 1;
 
         P.showUnavailable =        c.showUnavailable ?? false;
+        P.showMissingState =       c.showMissingState ?? false;
         P.showCurrentValues =      c.showCurrentValues ?? true;
         P.axisAddMarginMin =       c.axisAddMarginMin ?? false;
         P.axisAddMarginMax =       c.axisAddMarginMax ?? false;

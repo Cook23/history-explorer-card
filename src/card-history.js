@@ -4,6 +4,7 @@
 
 import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
+import { STATE_NOT_LISTED } from "./history-options.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period: 'hour' unless set)
@@ -490,7 +491,7 @@ export class CardHistory
 
     // How entity e's states become the values drawn: its process function, then its
     // stateMap (mini-graph-card's state_map) — a state listed, its place in the list (0, 1,
-    // 2…); any other, unavailable. null: as they are
+    // 2…); any other, STATE_NOT_LISTED (no value: see showMissingState). null: as they are
     processOf(e)
     {
         const _p = this.buildProcessFunction(e?.process);
@@ -499,7 +500,7 @@ export class CardHistory
         return v => {
             const x = _p ? _p(v) : v;
             const i = _map.findIndex(m => m.value === String(x));
-            return i >= 0 ? i : 'unavailable';
+            return i >= 0 ? i : STATE_NOT_LISTED;
         };
     }
 

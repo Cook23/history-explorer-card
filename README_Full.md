@@ -1056,7 +1056,7 @@ graphs:
 
 ### Text states as a curve
 
-An entity whose state is a text (a mode, a set of choices) is drawn as a curve with `stateMap`: each state at its place in the list — 0, 1, 2… —, its label in the legend, the tooltip, the values over the graph and on the Y axis; a state that isn't listed is a gap. A state is written as it is (`off`), or with a label (`{ value: off, label: Off }`).
+An entity whose state is a text (a mode, a set of choices) is drawn as a curve with `stateMap`: each state at its place in the list — 0, 1, 2… —, its label in the legend, the tooltip, the values over the graph and on the Y axis; a state that isn't listed has no value: the curve goes over it, or shows a gap there with `showMissingState: true` (see [Line graphs and unavailable data](#line-graphs-and-unavailable-data)). A state is written as it is (`off`), or with a label (`{ value: off, label: Off }`).
 
 ```yaml
 type: custom:history-explorer-card
@@ -1072,11 +1072,14 @@ graphs:
 
 ### Line graphs and unavailable data
 
-If your history data contains an unavailable state, for example if a sensor went offline for a while, then the card will interpolate over the missing data in line charts to avoid gaps by default. If you prefer to keep the unavailable state visible, so to easily see when and how often your sensors disconnected or became unavailable, then you can disable the interpolation using the YAML below. Timeline charts will always show unavailable or unknown states, regardless of how this parameter is set.
+If your history data contains an unavailable state, for example if a sensor went offline for a while, then the card will interpolate over the missing data in line charts to avoid gaps by default. If you prefer to keep the unavailable state visible, so to easily see when and how often your sensors disconnected or became unavailable, set `showUnavailable: true`: the curve shows a gap wherever the entity was unavailable or unknown. Timeline charts will always show unavailable or unknown states, regardless of how this parameter is set.
+
+A text state drawn as a curve (`stateMap`, see [Text states as a curve](#text-states-as-a-curve)) has no value when the list doesn't hold it: the curve goes over it the same way by default, and shows a gap there with `showMissingState: true`.
 
 ```yaml
 type: custom:history-explorer-card
-showUnavailable: true
+showUnavailable: true    # a gap where the entity was unavailable or unknown (default false: the curve goes over it)
+showMissingState: true   # a gap where its state isn't in its stateMap (default false: the curve goes over it)
 ```
 
 ---
