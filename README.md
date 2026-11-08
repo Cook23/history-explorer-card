@@ -581,7 +581,7 @@ Every option is spelled the same at every level where it's accepted, and its syn
 
 ![image](https://user-images.githubusercontent.com/60828821/203881276-1332c8bd-d83c-4ff6-9a9b-9b43cb4a6c44.png)
 
-Open the entity action menu and select **Export as CSV**. Not available in the HA Companion app.
+Open the entity action menu and select **Export as CSV**.
 
 ```yaml
 csv:
