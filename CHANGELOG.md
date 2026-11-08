@@ -4,6 +4,11 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.1.57] - 2026-11-08
+
+### Changed — the README: CSV export in the HA Companion app
+- The README and README_Full no longer say that the CSV export doesn't work in the HA Companion app: it works there
+
 ## [v1.1.56] - 2026-10-12
 
 ### Fixed — `rounding: 0` shows no decimals
