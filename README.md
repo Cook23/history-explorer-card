@@ -27,6 +27,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.2.60** — The automatic Y axis shows what is in the window and keeps its scale as the time moves (`yScaleSteadiness`); the graphs drawn at once from coarser statistics, then refined, the cache filled ahead: a year shown in 0.4 s instead of 20, six months in 0.3 s instead of 10, a pan back at once.
 - **v1.2.59** — Time ranges up to 10 years, drawn from Home Assistant's daily statistics.
 - **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
 - **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
@@ -391,6 +392,7 @@ graphs:
 | `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *7 |
 | `yminRight` / `ymaxRight` | `lower_bound_secondary` / `upper_bound_secondary` | | ✓ | ✓ | ✓ | The right Y axis' own bounds — see *7 |
 | `yrange` / `yrangeRight` | `min_bound_range` / `min_bound_range_secondary` | | ✓ | ✓ | ✓ | The smallest range the Y axis (the right one) shows — see *7 |
+| `yScaleSteadiness` / `yScaleSteadinessRight` | | | ✓ | ✓ | ✓ | The automatic Y axis' balance, 0 to 100 (default 50): 0, what is shown first; 100, a steady scale first — see *7 |
 | `logarithmic` | | | ✓ | ✓ | ✓ | A logarithmic Y axis (a line graph) — see *7 |
 | `labelsLeft` | `show_labels` | | ✓ | ✓ | ✓ | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see *7 |
 | `labelsRight` | `show_labels_secondary` | | ✓ | ✓ | ✓ | The right Y axis' labels, the same way — see *7 |
@@ -484,7 +486,7 @@ timeTicks:
 
 ## CSV export
 
-The options menu (▾), *Export ▸ History* or *Statistics*. Not available in the HA Companion app.
+The options menu (▾), *Export ▸ History* or *Statistics*.
 
 ```yaml
 csv:
