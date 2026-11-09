@@ -198,11 +198,11 @@ module.exports = async function()
     // ── statistics.period: day — the daily statistics asked ──
     {
         const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true, period: 'day' },
-            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { height: 600, mock: { series: true } });
-        await t.wait(2500);
-        await t.step('statistics.period: day — over a year, the statistics asked by the day', async () => {
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { height: 600, mock: { series: true, historyDays: 10 } });
+        await t.wait(4000);
+        await t.step('statistics.period: day — over a year, no hourly statistics: the daily ones where the 5-minute ones are no longer kept (10 days)', async () => {
             const r = await t.E(`[...new Set(__ws.filter(w => w.type === 'recorder/statistics_during_period').map(w => w.period))]`);
-            return r.includes('day') ? true : JSON.stringify(r);
+            return r.includes('day') && !r.includes('hour') ? true : JSON.stringify(r);
         });
         done(await t.close());
     }

@@ -220,6 +220,11 @@ graphs:
     yrange: null
     yrangeRight: null
 
+    # The automatic Y axis' balance, in % (the right one: yScaleSteadinessRight): 0, what is shown first;
+    # 100, a steady scale first — the values shown fill at least 100 - yScaleSteadiness % of its height
+    yScaleSteadiness: 50
+    yScaleSteadinessRight: null
+
     # A logarithmic Y axis (a line graph)
     logarithmic: False
 

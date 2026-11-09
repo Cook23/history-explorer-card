@@ -157,9 +157,10 @@ module.exports = async function()
         { mock: { series: true, historyStep: 600 }, height: 700 });
     await t.wait(3000);
     await t.step('group_by: date — a point a day, from midnight to midnight; aggregate_func max: the day\'s highest value, min: its lowest, none: its mean (time-weighted), between them', async () => {
-        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0];
+        // (the groups of the window — before it, the value carried from the day before)
+        const r = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], t0=Date.parse(el.instance.startTime);
             return g.chart.data.datasets.map((d,k)=>{ const raw=(g.valueSamples?.[k]??[]);
-                return d.data.map(p=>{ const v=raw.filter(x=>x.t>=p.columnFrom && x.t<p.columnTo).map(x=>x.v);
+                return d.data.filter(p=>p.columnTo>t0).map(p=>{ const v=raw.filter(x=>x.t>=p.columnFrom && x.t<p.columnTo).map(x=>x.v);
                     return { from: p.columnFrom, to: p.columnTo, y: p.y, lo: v.length?Math.min(...v):null, hi: v.length?Math.max(...v):null }; }); }); })()`);
         const [mx, mn, av] = r;
         const midnight = x => new Date(x).getHours() === 0 && new Date(x).getMinutes() === 0;

@@ -69,13 +69,14 @@ module.exports = async function()
     });
 
     await t.step('a silence shorter than a column of pixels, at every place in a column: nothing drawn back in time', async () => {
-        // (today: a value every minute, a 4-minute pause starting at every minute of the hour)
+        // (the last 24 hours — whatever the time of day: yesterday's part and today's —: a value
+        // every minute, a 4-minute pause starting at every minute of the hour)
         const r = await t.E(draw(`(day, now, H, S) => { const rows = [];
-            for( let t = day(0), k = 0; t < now; t += 60e3, k++ ) {
+            for( let t = now - 24 * 3600e3, k = 0; t < now; t += 60e3, k++ ) {
                 rows.push(H(t, 10 + ( k % 7 )));
                 if( k % 60 === 30 ) t += ( 3 + ( Math.floor(k / 60) % 10 ) ) * 60e3;
             }
-            return [{ layer: 'hist', slot: 0, rows }]; }`));
+            return [{ layer: 'hist', slot: 1, rows: rows.filter(r => r.last_changed < day(0)) }, { layer: 'hist', slot: 0, rows: rows.filter(r => r.last_changed >= day(0)) }]; }`));
         return r.n > 20 && r.back === -1 && r.wrong.length === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());

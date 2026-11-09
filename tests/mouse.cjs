@@ -240,15 +240,18 @@ module.exports = async function()
         await unlock(li);
         return r1.join() === r0.join() && span(y1) < span(y0) ? true : JSON.stringify({ r0, r1, y0, y1 });
     });
-    await t.step('a box the plot area\'s whole height: the time zoomed, the Y axis as it was, the padlock open (a box hardly smaller than the plot area that way leaves it)', async () => {
+    await t.step('a box the plot area\'s whole height: the time zoomed, the Y axis not zoomed by it — automatic, holding what is shown —, the padlock open (a box hardly smaller than the plot area that way leaves it)', async () => {
         const li = await boxGraph(); await unlock(li);
         const win = () => E('[+new Date(el.instance.startTime), +new Date(el.instance.endTime)]');
         const w0 = await win(), y0 = await E(`yRange(${li})`);
         const r = await E(`(()=>{ const c=graphAt(${li}).chart, a=c.chartArea, cr=c.canvas.getBoundingClientRect(); return { x: cr.left+(a.left+a.right)/2, top: cr.top+a.top+1, bottom: cr.top+a.bottom-1 }; })()`);
         await manualDrag({ x: r.x - 40, y: r.top }, { x: r.x + 40, y: r.bottom });
         const w1 = await win(), y1 = await E(`yRange(${li})`), locked = await E(`!!graphAt(${li}).chart._hecYAxisLock`);
+        // (what the left axis shows: its curves' points in the window)
+        const v = await E(`(()=>{ const I=el.instance, c=graphAt(${li}).chart, t0=+new Date(I.startTime), t1=+new Date(I.endTime);
+            const ys=c.data.datasets.filter(d=>( d.yAxisID ?? 'y-axis-0' ) === 'y-axis-0').flatMap(d=>d.data.filter(p=>p.y!==null && +new Date(p.x)>=t0 && +new Date(p.x)<=t1).map(p=>p.y)); return [Math.min(...ys), Math.max(...ys)]; })()`);
         await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
-        return span(w1) < span(w0) && y1.join() === y0.join() && !locked ? true : JSON.stringify({ w0, w1, y0, y1, locked });
+        return span(w1) < span(w0) && y1[0] <= v[0] && y1[1] >= v[1] && !locked ? true : JSON.stringify({ w0, w1, y0, y1, v, locked });
     });
     await t.step('Escape during the box: nothing applied, the box gone', async () => {
         const li = await boxGraph();

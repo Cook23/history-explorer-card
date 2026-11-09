@@ -194,6 +194,8 @@ const _tooltipBehavior = v => String(v).trim().toLowerCase() === 'auto' ? 'auto'
 
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
+// A percentage from 0 to 100 — a number, or a string with or without its '%' —, else not set
+const _percent = v => { const n = typeof v === 'string' && v.trim() !== '' ? Number(v.trim().replace(/%$/, '')) : typeof v === 'number' ? v : NaN; return n >= 0 && n <= 100 ? n : undefined; };
 
 // Each option's value in its one form, whatever the user wrote — the rest of the card only
 // ever sees that form
@@ -204,6 +206,10 @@ const OPTION_VALUES = {
     ymaxRight     : _yBound,
     yrange        : _positive,
     yrangeRight   : _positive,
+    // (the automatic Y axis' priority, in %: 0, what is shown first; 100, a steady scale
+    // first — see card-yscale.js)
+    yScaleSteadiness      : _percent,
+    yScaleSteadinessRight : _percent,
     // (an axis' labels: false hides them, hover shows them while the pointer is over the
     // graph — see card-charts.js _chartYAxis)
     labelsLeft    : _labelsShown,
@@ -353,7 +359,7 @@ export const OPTION_DEFAULTS = {
     largeScreenTooltip: 'mixed', smallScreenTooltip: 'selected', showPoints: 'hover', dashMode: 'solid', netBars: false,
     showLine: true, showGraph: true, fixedValue: false, stateAdaptiveColor: true, showIndicator: false, valueFactor: 0,
     // (a graph's — CardConfig.applyConfig, cardGraphDefaults)
-    showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true,
+    showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
     // (a graph's header — CardConfig.graphOption)
     showIcon: false,
     // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
@@ -376,7 +382,7 @@ export const OPTION_DEFAULTS = {
     arrowlinePeriod: 360,
 };
 // (the graph's ones, given to every graph under the card's own)
-const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight'];
+const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight', 'yScaleSteadiness'];
 export const GRAPH_DEFAULTS = Object.fromEntries(_GRAPH_DEFAULT_KEYS.map(k => [k, OPTION_DEFAULTS[k]]));
 
 // An entity's own options (never a graph's): set on the entity, its entityOptions, or — for
@@ -396,7 +402,7 @@ export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
     'showIndicator', 'showCurrentValues', 'showGraph', 'barSpacing', 'stateAdaptiveColor', 'showStateFor', 'showStatsFor',
     'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'tooltipBehavior'];
@@ -415,7 +421,7 @@ export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclu
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
-    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'barSpacing'];
+    'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'barSpacing'];
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its

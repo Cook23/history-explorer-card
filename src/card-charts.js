@@ -9,6 +9,8 @@ import { stateLabel, OPTION_DEFAULTS } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
 import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
+import { chooseYAxis, rangeIndex } from "./card-yscale.js";
+import { msOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -402,6 +404,108 @@ export class CardCharts
         };
     }
 
+    // A Y axis' automatic sides (freeLo, freeHi; me: the Chart.js scale, its id): what is
+    // shown first, a steady scale second, as steady says (yScaleSteadiness, in %) — see
+    // card-yscale.js —, from the points of its curves and bars shown (their band, the sums
+    // when stacked; on a logarithmic axis, in decades), the values the axis always reaches
+    // too (keep: its soft bounds; a side fixed). The axis chosen is kept for the chart: the
+    // next update starts from it; while a gesture moves the time window (state.drag), the
+    // axis only grows, it is tightened once the gesture ends
+    _autoYAxis(me, id, { freeLo, freeHi, steady, minSpan, log, step, keep })
+    {
+        const chart = me.chart, _v = y => log ? ( y > 0 ? Math.log10(y) : NaN ) : y;
+        const _stacked = !!me.options.stacked;
+        // (each curve's entries — stacked: one, the sums —, its values around added)
+        const _points = new Map(), curves = new Map(), _ok = e => !isNaN(e.lo) && !isNaN(e.hi);
+        chart.data.datasets.forEach((ds, i) => {
+            if( !chart.isDatasetVisible(i) || ( ds.yAxisID ?? LEFT_Y_AXIS ) !== id || !Array.isArray(ds.data) ) return;
+            const entries = [];
+            curves.set(i, entries);
+            for( const p of ds.data ) {
+                const x = typeof p?.x === 'number' ? p.x : +p?.x, y = Number(p?.y);
+                if( p?.y === null || p?.y === undefined || isNaN(x) || isNaN(y) ) continue;
+                if( _stacked ) {
+                    // (stacked: the sums above and below 0 at each time)
+                    const s = _points.get(x) ?? { pos: 0, neg: 0 };
+                    if( y < 0 ) s.neg += y; else s.pos += y;
+                    _points.set(x, s);
+                    continue;
+                }
+                const lo = _v(Math.min(y, p.yMin ?? y)), hi = _v(Math.max(y, p.yMax ?? y));
+                if( !isNaN(lo) && !isNaN(hi) ) entries.push({ x, lo, hi });
+            }
+        });
+        if( _stacked ) { curves.clear(); curves.set(0, [..._points].map(([x, s]) => ({ x, lo: _v(s.neg), hi: _v(s.pos) }))); }
+        // (and around them, the values the cache has of each curve — see _yScaleNeighbours)
+        else for( const [j, a] of this._yScaleNeighbours(chart, id, _v) ) curves.get(j)?.push(...a);
+        for( const a of curves.values() ) a.sort((p, q) => p.x - q.x);
+        // (what the axis always reaches: its soft bounds, a side fixed)
+        const _keep = [...keep, freeLo ? undefined : me.min, freeHi ? undefined : me.max].map(k => k === undefined ? NaN : _v(k)).filter(k => !isNaN(k));
+        const _index = rangeIndex([...curves.values()].map(a => a.filter(_ok)));
+        const rangeOf = (t0, t1) => {
+            const r = _index(t0, t1);
+            return r && _keep.length ? { lo: Math.min(r.lo, ..._keep), hi: Math.max(r.hi, ..._keep) } : r;
+        };
+        // (as many ticks as Chart.js puts on it: Chart.LinearScale's getTickLimit)
+        const _font = me.options.ticks.fontSize ?? FONT_PX;
+        const maxTicks = Math.min(me.options.ticks.maxTicksLimit ?? 11, Math.max(2, Math.ceil(( me.height || chart.height ) / ( 2 * _font ))));
+        // (the axes chosen, by chart: the card's own)
+        this._yAxesKept ??= new WeakMap();
+        if( !this._yAxesKept.has(chart) ) this._yAxesKept.set(chart, {});
+        const _kept = this._yAxesKept.get(chart);
+        const a = chooseYAxis(_kept[id], rangeOf, msOf(this.startTime), msOf(this.endTime),
+                              { maxTicks, steady: ( steady ?? OPTION_DEFAULTS.yScaleSteadiness ) / 100, moving: !!this.state.drag,
+                                minSpan: log ? undefined : minSpan, step: log ? 1 : step, zero: !log });
+        if( !a ) return;
+        _kept[id] = a;
+        if( freeLo ) me.min = log ? Math.pow(10, a.min) : a.min;
+        if( freeHi ) me.max = log ? Math.pow(10, a.max) : a.max;
+    }
+
+    // The values around the time window the automatic Y axis id of a chart looks at (see
+    // _autoYAxis), by curve (its index): entries { x, lo, hi } — v: a value as the axis counts it: from the cache
+    // over the slots around the window (yScaleSlots: the statistics asked for it, or anything
+    // loaded there), of each of its curves shown — not an angle (unwrapped around the window),
+    // not a fixed value —, outside the points drawn: its values as drawn (process, scale),
+    // its statistics' min and max with its band (showMinMax). Read again only when the slots
+    // or the cache change (cacheVersion)
+    _yScaleNeighbours(chart, id, v)
+    {
+        const g = this.graphs.find(g => g.chart === chart), [n0, n1] = this.yScaleSlots();
+        if( !g || n0 < 0 || n1 < 0 ) return new Map();
+        // (each curve of the axis, and the time its points drawn cover)
+        const _curves = [];
+        g.entities.forEach((e, j) => {
+            const ds = chart.data.datasets[j];
+            if( !ds || !Array.isArray(ds.data) || !chart.isDatasetVisible(j) || ( ds.yAxisID ?? LEFT_Y_AXIS ) !== id ) return;
+            if( this.entityKind(g, e) !== 'line' || this.circularPeriodOf(e) || this.resolveOption(e, 'fixedValue') ) return;
+            const _x = p => typeof p?.x === 'number' ? p.x : +p?.x;
+            const _first = ds.data.find(p => !isNaN(_x(p))), _last = ds.data.findLast(p => !isNaN(_x(p)));
+            _curves.push({ e, j, x0: _first ? _x(_first) : Infinity, x1: _last ? _x(_last) : -Infinity });
+        });
+        const key = [n0, n1, this.cacheVersion(), id, ..._curves.flatMap(c => [c.e.entity, c.x0, c.x1])].join();
+        this._yNeighbours ??= new WeakMap();
+        const _k = this._yNeighbours.get(chart)?.[id];
+        if( _k?.key === key ) return _k.entries;
+        const entries = new Map();
+        for( const { e, j, x0, x1 } of _curves ) {
+            const a = [];
+            entries.set(j, a);
+            const proc = this.processOf(e), scale = this.drawScaleOf(e) * ( e.siConversionFactor ?? 1 );
+            const _num = s => { const x = Number(this.process(s, proc)); return Number.isFinite(x) ? v(x * scale) : NaN; };
+            for( const row of this.cachedHistory(e.entity, n0, n1) ) {
+                const t = msOf(row.last_changed);
+                if( t >= x0 && t <= x1 ) continue;
+                let lo = _num(row.state), hi = lo;
+                if( e.showMinMax && row.statistics ) { lo = Math.min(lo, _num(row.statistics.min)); hi = Math.max(hi, _num(row.statistics.max)); }
+                if( !isNaN(lo) && !isNaN(hi) ) a.push({ x: t, lo: Math.min(lo, hi), hi: Math.max(lo, hi) });
+            }
+        }
+        if( !this._yNeighbours.has(chart) ) this._yNeighbours.set(chart, {});
+        this._yNeighbours.get(chart)[id] = { key, entries };
+        return entries;
+    }
+
     // A Y axis, left or right (the right one only for a line or bar graph with a second
     // group of units — see _assignYAxes): the same bounds and step (ymin, ymax, ystepSize)
     // for both, its own unit and circular labels; the grid is the left axis'.
@@ -429,6 +533,9 @@ export class CardCharts
         // range (yrange): the smallest the axis shows, widened on the sides not fixed
         const _own = k => _right ? ( config?.[k + 'Right'] ?? config?.[k] ) : config?.[k];
         const _lo = _own('ymin'), _hi = _own('ymax'), _range = _own('yrange');
+        // (its automatic bounds' priority, in %: what is shown first (0), a steady scale
+        // first (100) — see _autoYAxis)
+        const _steady = _own('yScaleSteadiness');
         const _fixedLo = typeof _lo === 'number' ? _lo : undefined, _fixedHi = typeof _hi === 'number' ? _hi : undefined;
         // (a state_map's curves only, all with the same one: its labels, at their places)
         const _map = _list.length && _list.every(d => d.stateMap?.length && JSON.stringify(d.stateMap) === JSON.stringify(_list[0].stateMap)) ? _list[0].stateMap : null;
@@ -451,6 +558,10 @@ export class CardCharts
             afterDataLimits: (me) => {
                 // (a side set by hand — the padlock, a drag, a pinch — or fixed: as it is)
                 const _freeLo = me.options.ticks.min == null, _freeHi = me.options.ticks.max == null;
+                // (the automatic sides: from what is shown, steady — a curve's or a bar's axis)
+                if( ( _freeLo || _freeHi ) && ( graphtype == 'line' || graphtype == 'bar' ) && !_map )
+                    this._autoYAxis(me, id, { freeLo: _freeLo, freeHi: _freeHi, steady: _steady, minSpan: _range, log: _log,
+                                              step: config?.ystepSize ?? undefined, keep: [_freeLo ? _lo?.soft : undefined, _freeHi ? _hi?.soft : undefined] });
                 if( _freeLo && _lo?.soft !== undefined ) me.min = Math.min(me.min, _lo.soft);
                 if( _freeHi && _hi?.soft !== undefined ) me.max = Math.max(me.max, _hi.soft);
                 const _short = ( _range ?? 0 ) - ( me.max - me.min );

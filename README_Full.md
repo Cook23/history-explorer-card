@@ -56,6 +56,7 @@ A highly interactive way to view the history of your entities in Home Assistant:
 - [Colors of curves and bars](#colors-of-curves-and-bars)
 - [Scaling values: scale, unit and valueFactor](#scaling-values-scale-unit-and-valuefactor)
 - [Y axis scaling](#y-axis-scaling)
+  - [The automatic scale](#the-automatic-scale)
   - [Bounds](#bounds)
   - [Two Y axes](#two-y-axes)
 - [Line appearance](#line-appearance)
@@ -818,7 +819,7 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
-By default, the Y axis of a line chart fits its curves exactly. A small margin can be added below and above them, to give some headroom (bar charts never get it):
+By default, the Y axis of a line chart fits its curves (see [The automatic scale](#the-automatic-scale)). A small margin can be added below and above them, to give some headroom (bar charts never get it):
 
 ```yaml
 type: custom:history-explorer-card
@@ -844,9 +845,30 @@ Setting `ylock: true` disables all interactive Y axis modifications for that gra
 
 See [Entity options](#entity-options) and the advanced example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs) for more examples.
 
+### The automatic scale
+
+The automatic Y axis of a line or bar graph shows the values in the time window — with the nearest one on each side, where a curve crosses the window's edges —, never those outside it: a spike earlier in the day doesn't stretch the axis while it isn't shown. It also avoids changing its scale at every move of the time: it is kept as long as the values shown fit in it and fill enough of its height; when it has to change, the new one is chosen to last through the moves most likely to come — a pan of one window either way, a zoom in or out by 2. While a drag or a pinch moves the time, the axis only grows — a value shown is never cut —, and it is tightened once the gesture ends. A logarithmic axis does the same, counted in decades.
+
+The values around the window come from what the card has loaded: as it loads a window, it also loads its statistics a step coarser over a window on each side, and more while the graphs are looked at (see [Long term statistics](#long-term-statistics)). A curve without statistics (no `state_class`), or with the statistics off, uses only what is loaded.
+
+`yScaleSteadiness` sets the balance between the two, in % — from 0 to 100, 50 by default: the values shown fill at least 100 − `yScaleSteadiness` % of the axis' height. At 0 the axis follows exactly what is shown, at every move, during a drag too; at 100 it only grows, holding what the next moves would show. `yScaleSteadinessRight` sets the right axis' own (else `yScaleSteadiness`). Both on the card, in `entityOptions`, on a graph or on an entity (for its graph):
+
+```yaml
+type: custom:history-explorer-card
+yScaleSteadiness: 25        # every graph: what is shown first
+graphs:
+  - type: line
+    options:
+      yScaleSteadiness: 75  # this graph: a steadier scale
+    entities:
+      - entity: sensor.outside_temperature
+```
+
+A side fixed (`ymin`, `ymax`), set by hand (the padlock, a drag, a pinch) or locked (`ylock`) stays as it is; soft bounds and `yrange` are reached as usual (see [Bounds](#bounds)). A `state_map`'s axis keeps its states' places.
+
 ### Bounds
 
-A bound written with a `~` is soft: the axis reaches it, and goes past it where the values do — `ymin: ~0` shows 0 at least, and a negative value below it. `yrange` is the smallest range the axis shows: a nearly constant sensor isn't drawn as if it varied a lot; the range is widened on the sides that aren't fixed (on both, evenly, when neither is). A side set by hand — the padlock, a drag, a pinch — is kept as it is.
+A bound written with a `~` is soft: the axis reaches it, and goes past it where the values do — `ymin: ~0` shows 0 at least, and a negative value below it. `yrange` is the smallest range the axis shows: a nearly constant sensor isn't drawn as if it varied a lot; the range is widened on the sides that aren't fixed (on both, evenly, when neither is), never across 0 when the values don't cross it — a sensor at 0 shown from 0. A side set by hand — the padlock, a drag, a pinch — is kept as it is.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1090,19 +1112,26 @@ showMissingState: true   # a gap where its state isn't in its stateMap (default 
 
 The card loads what the screen can show, and no more. A graph can't draw anything narrower than a column of pixels: what it loads depends on how long a column lasts — the window's duration divided by the width of the plot area, in CSS pixels (the widest graph's). Both sources are combined on the fly: you keep scrolling and zooming in or out of your data, as usual.
 
-| A column of pixels lasts | Loaded |
+| A column of pixels lasts | The window drawn from |
 |---|---|
-| a day or more | the daily statistics of the whole window, in one request (the hourly ones for the days not compiled yet, then as below) |
-| between an hour and a day | the hourly statistics of the whole window, in one request (the 5-minute statistics for the day whose last hour isn't compiled yet) |
-| between 5 minutes and an hour | the hourly statistics of the whole window, then its 5-minute statistics, in one request each (the hourly ones kept where Home Assistant no longer has 5-minute ones) |
-| less than 5 minutes | the history, a few days at a time, the most recent first, each day drawn as it comes (the hourly statistics only where there's no more history) |
+| a month (30 days) or more | the monthly statistics |
+| a week or more | the weekly statistics |
+| a day or more | the daily statistics |
+| an hour or more | the hourly statistics (`statistics.period`) |
+| 5 minutes or more | the 5-minute statistics |
+| less than 5 minutes | the history |
 
-For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h), five or ten years from the daily statistics (2 or 4 days). The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500. It's asked two parts at a time: each part is drawn as it comes, parts that arrive meanwhile together.
+For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h), five or ten years from the daily statistics (2 or 4 days) — ten years on 500 pixels from the weekly ones. The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500. It's asked a few days at a time, the most recent first, two parts at a time: each part is drawn as it comes, parts that arrive meanwhile together.
 
+- **Drawn at once, in two passes.** What the card has loaded is drawn at once, however coarse — the monthly statistics, the weekly ones, the daily ones, the hourly ones, the 5-minute ones —, each finer part replacing it as it comes. Where it has nothing yet, the first pass: the coarsest statistics, a step coarser than the window's own source at least, that still give the window ten values or more — the hourly ones for a day, the 5-minute ones for a few hours, the weekly ones for six months, the monthly ones for a year or more —, over the window and a window on each side: few values, quick to come, and a pan or a zoom out finds them there. Then the second pass: the window's own source, for the window. Where no coarser source gives the window ten values (less than 50 minutes drawn from the history), or for a curve without statistics, the window's own source is asked for the window first, then for a window on each side, both at once, as soon as the window has come.
+- **The history first.** Where a day's history is loaded, it is drawn, however sparse next to the statistics: the history is what was recorded.
+- **Whatever there is, drawn.** A day where a source comes back empty, or starts well after the day's beginning (past the recorder's retention), gets the next coarser statistics; a day whose statistics all come back empty or starting late (deleted, or begun that day, after a change of unit) gets its history.
+- **Ahead, while the graphs are looked at.** Two seconds after the last change of the window or answer, the card fills its cache further around the window, one step at a time: the window's own source a window on each side, then the coarse ones two, then four windows on each side — asked without showing the window as loading, one request at a time, only when nothing else is under way, a pause after each one of a second at least, and at least twice as long as it took, 30 seconds at most (Home Assistant busy for it a third of the time at most), and only while the cache stays under some 300 000 values: a chatty sensor's history isn't filled ahead, its statistics still are.
+- **A reasonable cache.** Past some 500 000 values (about 50 MB), the card drops the least useful ones until it's back under 300 000: the history of the days farthest from the window first, then their 5-minute statistics, the hourly, daily, weekly and monthly ones last — never the window nor a window on each side. A day dropped is drawn again at once from the statistics kept, and asked again when it's shown.
 - **The last minutes from the history.** Home Assistant compiles a period's statistics once it has ended: the hour not compiled yet comes from the 5-minute statistics, and the minutes after them from the history — one short request, from 20 minutes ago (the 5 minutes not compiled yet, and room for Home Assistant being slow), at the same time as the statistics. On a recent day whose 5-minute statistics stop earlier (Home Assistant late with them, or none for an entity), that day comes from the history. The automatic refresh asks these last minutes and today's statistics again, never the day's history.
 - **The same values from both.** A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics over the same time (see [Data decimation](#data-decimation)): nothing shows where the history meets the statistics.
 - **`statistics.period`** (below) is the hourly threshold of the table — an hour by default; with `period: day`, the daily statistics replace the hourly ones; with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last minutes.
-- **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever (the daily ones are computed from them): the card takes what it returns, however far back.
+- **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever (the daily, weekly and monthly ones are computed from them): the card takes what it returns, however far back.
 - **Entities without statistics** — timelines, attributes, angles (`circular`: Home Assistant averages angles as plain numbers), entities without a state class — always come from the history: past the history retention limit, their graph is blank.
 
 ![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/long-term-stats.png)
@@ -1470,6 +1499,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `ymax` | number or `~`number | `upper_bound` | | Set the initial Y axis maximum, the same way |
 | `yminRight`, `ymaxRight` | number or `~`number | `lower_bound_secondary`, `upper_bound_secondary` | | The right Y axis' own bounds (else `ymin` / `ymax`) — see [Two Y axes](#two-y-axes) |
 | `yrange`, `yrangeRight` | number | `min_bound_range`, `min_bound_range_secondary` | | The smallest range the Y axis (the right one) shows — see [Bounds](#bounds) |
+| `yScaleSteadiness`, `yScaleSteadinessRight` | 0 to 100 | | `50` | The automatic Y axis' (the right one's) balance: 0, what is shown first; 100, a steady scale first — see [The automatic scale](#the-automatic-scale) |
 | `logarithmic` | boolean | | | A logarithmic Y axis (a line graph) |
 | `labelsLeft` | boolean or `hover` | `show_labels` | | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see [Y axis scaling](#y-axis-scaling) |
 | `labelsRight` | boolean or `hover` | `show_labels_secondary` | | The right Y axis' labels, the same way |
@@ -1512,7 +1542,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 
 Every option above, except `type`, `name`, `hidden`, `legendVisible`, `scale`, `process` and `circular` (an entity's only), `color` and `unit` (an entity's or the card's — the card's: every entity's), and `lineColor` (a graph's or the card's), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**.
 
-The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
+The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
 An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 
@@ -1837,7 +1867,7 @@ cardName: history-card-5
 
 ## Exporting data as CSV
 
-The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History*, or *Export ▸ Statistics ▸* and a period for their statistics — a graph's own entities from the same *Export ▸* in its menu (a long-press on its ⠿ zone). CSV export does not work in the HA Companion app.
+The raw data for the currently displayed entities and time range can be exported as a CSV file by opening the options menu (▾ beside the entity selector) and selecting *Export ▸ History*, or *Export ▸ Statistics ▸* and a period for their statistics — a graph's own entities from the same *Export ▸* in its menu (a long-press on its ⠿ zone).
 
 Home Assistant's recorder keeps two kinds of statistics, for the entities with a state class: every 5 minutes (short-term, kept as long as the history — the recorder's `purge_keep_days`) and every hour (long-term, kept for ever). *5 min* exports the first, *Hour* the second; *Day*, *Week* and *Month* are computed by Home Assistant from the hourly ones. The period in bold is the one chosen last, kept on this device whatever the persistence options (see [What is kept, and where](#what-is-kept-and-where)) — else `csv.statisticsPeriod`; a change of `csv.statisticsPeriod` in the YAML wins (the last one to speak wins).
 

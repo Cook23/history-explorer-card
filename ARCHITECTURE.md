@@ -57,7 +57,7 @@ show it, and the conductor starts the card and wires the parts together.
 | `src/card-config.js` | The YAML options applied, what Home Assistant and the entity options say of an entity (domain, device class, unit, default type, line mode, interpolated), the graphs built from the YAML. |
 | `src/card-storage.js` | What is kept between sessions and devices, and the "last one to speak wins" merge of local state, HA user data and YAML — the only part reading or writing either. What the whole page shares, read before any card exists, too: the gesture settings (`localGestures`), the info panel's switch and config (`infoPanelEnabled`, `infoPanelData`, `fetchInfoPanelData`). |
 | **Data** | |
-| `src/card-history.js` | The history data: the cache of what Home Assistant returned (history, the history after the statistics, 5-minute and hourly statistics, by day), filled on demand for the time window shown — the statistics first, finer data where it tells more —, whatever is loading (the window asked is the window shown), refreshed; the graphs updated from it. |
+| `src/card-history.js` | The history data: the cache of what Home Assistant returned (history, the history after the statistics, 5-minute, hourly, daily, weekly and monthly statistics, by day), filled on demand for the time window shown — drawn at once from what it has, the coarsest statistics still giving the window ten values over it and around it first, the window's own source then, whatever there is drawn —, whatever is loading (the window asked is the window shown); filled further around the window while the graphs are looked at, one request at a time; kept under a number of rows, the least useful purged; refreshed; the graphs updated from it. |
 | `src/card-datasets.js` | From history data to what the graphs draw: one point per column of pixels (mean, min, max) and the min/max band, line modes, bars by interval, circular values, timelines, colors. |
 | `src/card-values.js` | The values over a graph: each curve's value now (`showState`), its minimum, average and maximum (`showStats`) — computed and formatted, given to the chart to show (`hecSetValues`). |
 | **Outputs** | |
@@ -68,6 +68,7 @@ show it, and the conductor starts the card and wires the parts together.
 | `src/history-series.js` | What a curve shows: an entity's state, or one of its attributes — its id, its state, its history. |
 | `src/history-stats.js` | How a run of values gives its mean, as Home Assistant compiles its statistics (each value weighted by how long it lasted): the one rule of the points drawn, their groups and the average over a graph. |
 | `src/history-units.js` | SI prefixes: which units share an axis, the prefix an axis is shown in. |
+| `src/card-yscale.js` | The automatic Y axis: what is shown first, a steady scale second (`yScaleSteadiness`) — the axis on Chart.js's round ticks, whether it still holds what is shown, the one chosen to last through the next gestures; from the values' ranges it is given. |
 | `src/legend-names.js` | The shorter forms of the curves' names, for a legend too narrow for them. |
 | `src/gesture-settings.js` | The gesture settings (long-press duration, precision, for a mouse or a pen and for a finger): their bounds, given to Chart.js (`Chart.defaults.global.gestures`). Saved by `card-storage.js`. |
 | `src/history-default-colors.js` | The default colors: the palette of the curves, the colors of the timeline states, the toolbar buttons'. |
@@ -160,6 +161,7 @@ show it, and the conductor starts the card and wires the parts together.
 | How entities are saved | `src/card-storage.js` |
 | How the graphs are built and placed | `src/card-graphs.js` |
 | What a graph is for Chart.js (options, axes, legend, datasets) | `src/card-charts.js` |
+| The automatic Y axis' bounds | `src/card-yscale.js` (the rule), `src/card-charts.js` (`_autoYAxis`: the values it is given, from the points drawn and the cache) |
 | What a curve's points are | `src/card-datasets.js` |
 | The values over a graph | `src/card-values.js` (what they are), `deps/chart-hec.js` (how they're shown, their gestures) |
 | The legend | `src/card-charts.js` (its parts), `src/legend-names.js` (shorter names), `deps/chart-hec.js` + `deps/Chart.js` (its layout) |

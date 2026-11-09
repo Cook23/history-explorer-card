@@ -14,8 +14,12 @@
 //   rows        an entity's history as given: { id: [[seconds before now, state], …] }
 //   statsLag    seconds after an hour's end before its statistics exist (600)
 //   noStatistics entities without long-term statistics (whatever their state_class)
+//   statsFrom   { id: days }: an entity's statistics only for its last days (a unit changed)
 //   json        the history and statistics answered as Home Assistant's websocket does: a
 //               JSON text parsed by the page
+//   cost        { base, history, statistics }: Home Assistant answering the history and the
+//               statistics one request at a time (its database), each in base ms plus, per
+//               value returned, history or statistics ms — instead of historyDelay
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
@@ -115,19 +119,21 @@ function history(d){
   return r;
 }
 // The statistics as Home Assistant compiles them: for an entity with a state_class, a
-// period (an hour; 5 minutes, d.period '5minute'; a day, 'day') once it has ended (and a few minutes for
+// period (an hour; 5 minutes, d.period '5minute'; a day, 'day'; a week; a month, 30 days) once it has ended (and a few minutes for
 // the compiling, MOCK.statsLag, 10 min by default), from the mocked history — a
 // measurement its mean (weighted by time, the state in force at its start included), min
 // and max, a total its state at the period's end and its sum; none for a period not ended. The hourly ones kept for ever, the 5-minute ones as
 // long as the history (historyDays). MOCK.noStatistics: entities without any
 function statistics(d){
-  const P={ '5minute':300e3, hour:3600e3, day:86400e3 }[d.period] ?? 3600e3;
+  const P={ '5minute':300e3, hour:3600e3, day:86400e3, week:7*86400e3, month:30*86400e3 }[d.period] ?? 3600e3;
   const kept=P<3600e3&&MOCK.historyDays ? Date.now()-MOCK.historyDays*86400e3 : -Infinity;
   const t0=Math.max(Date.parse(d.start_time), kept), t1=Math.min(Date.parse(d.end_time), Date.now()-(MOCK.statsLag??600)*1000), r={};
   for(const e of d.statistic_ids){
     const sc=STATES[e]?.attributes.state_class;
+    // (MOCK.statsFrom: an entity's statistics only for its last days — its unit just changed)
+    const from=MOCK.statsFrom?.[e]!==undefined ? Date.now()-MOCK.statsFrom[e]*86400e3 : -Infinity;
     if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
-    const pts=[]; for(let t=Math.ceil(t0/P)*P; t+P<=t1; t+=P){
+    const pts=[]; for(let t=Math.ceil(Math.max(t0, from)/P)*P; t+P<=t1; t+=P){
       if(sc==='measurement'){
         // (as Home Assistant compiles them — sensor/recorder.py: the history's states over
         // the period, the one in force at its start included; the mean weighted by how long
@@ -143,6 +149,8 @@ function statistics(d){
   }
   return r;
 }
+// (MOCK.cost: when Home Assistant is free again)
+let mockBusyUntil=0;
 function mkHass(){ return {
   states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
@@ -154,13 +162,19 @@ function mkHass(){ return {
   entities:{ 'sensor.power':{entity_id:'sensor.power',device_id:'d_ecowitt'}, 'sensor.power2':{entity_id:'sensor.power2',device_id:'d_mf'}, 'sensor.rain':{entity_id:'sensor.rain',device_id:'d_ecowitt'} },
   devices:{ d_ecowitt:{id:'d_ecowitt',name:'Ecowitt'}, d_mf:{id:'d_mf',name:'Météo-France Villeveyrac'} },
   callWS:(d)=>{
-    __ws.push({type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, period:d.period, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
+    __ws.push({at:Date.now(), type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, period:d.period, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
     // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
     const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();
     const wire=v=> MOCK.json ? JSON.parse(JSON.stringify(v)) : v;
-    if(d.type==='history/history_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(wire(history(d))));
-    if(d.type==='recorder/statistics_during_period') return later(MOCK.historyDelay, ()=>Promise.resolve(wire(statistics(d))));
+    // (MOCK.cost: one request at a time, as long as what it returns asks)
+    const costed=(per, v)=>{ const n=Object.values(v).reduce((k,a)=>k+a.length,0), ms=MOCK.cost.base+n*per;
+      const start=Math.max(Date.now(), mockBusyUntil); mockBusyUntil=start+ms; return new Promise(r=>setTimeout(()=>r(wire(v)), mockBusyUntil-Date.now())); };
+    // (and what working out the answer took the page — Home Assistant's server work, not the
+    // card's: window.__mockSpent, [when, ms])
+    const spent=f=>{ const t=performance.now(), v=f(); (window.__mockSpent=window.__mockSpent||[]).push([t, performance.now()-t]); return v; };
+    if(d.type==='history/history_during_period') return MOCK.cost ? costed(MOCK.cost.history, spent(()=>history(d))) : later(MOCK.historyDelay, ()=>Promise.resolve(wire(history(d))));
+    if(d.type==='recorder/statistics_during_period') return MOCK.cost ? costed(MOCK.cost.statistics, spent(()=>statistics(d))) : later(MOCK.historyDelay, ()=>Promise.resolve(wire(statistics(d))));
     if(d.type==='frontend/get_user_data') return later(MOCK.userDataDelay, ()=>window.__getUD(d.key).then(v=>({value:v})));
     if(d.type==='frontend/set_user_data'){ return window.__setUD(d.key, d.value===null?null:JSON.parse(JSON.stringify(d.value))).then(()=>({})); }
     return Promise.resolve({}); } }; }
