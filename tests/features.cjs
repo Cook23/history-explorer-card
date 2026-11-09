@@ -173,11 +173,12 @@ module.exports = async function()
         await t.step('a graph\'s menu: Export ▸ Statistics ▸ Day — its own entities\' statistics by the day; the period then in bold in the options menu\'s too', async () => {
             await t.page.mouse.click(5, 5); await t.wait(1200);
             await graphMenu(); await t.E('captureSave()'); await clickAt('#et_0_export'); await clickAt('#et_0_stats');
-            const periods = await t.E(`[...el.querySelectorAll('#et_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+            // (each period's name without its count, * the one chosen last — in italic)
+            const periods = await t.E(`[...el.querySelectorAll('#et_0_stats_sub a')].map(a=>a.textContent.trim().replace(/ \\(\\d+\\)$/, '')+(a.style.fontStyle==='italic'?'*':'')).join(' | ')`);
             await clickAt('#et_0_stats_day'); await t.wait(1200);
             const w = await t.E(`window.__ws.filter(w=>w.type==='recorder/statistics_during_period' && w.period==='day').pop()`);
             await clickAt('#bo_0'); await clickAt('#eo_0_export'); await clickAt('#eo_0_stats');
-            const options = await t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+            const options = await t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim().replace(/ \\(\\d+\\)$/, '')+(a.style.fontStyle==='italic'?'*':'')).join(' | ')`);
             await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
             return periods === '5 min | Hour* | Day | Week | Month' && w && w.ids.join() === 'sensor.power' && options === '5 min | Hour | Day* | Week | Month' ? true : JSON.stringify({ periods, w, options });
         });
@@ -213,10 +214,12 @@ module.exports = async function()
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_stats').click()`); await t.wait(300);
-        return t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+        // (each period's name without its count, * the one chosen last — in italic)
+        return t.E(`[...el.querySelectorAll('#eo_0_stats_sub a')].map(a=>a.textContent.trim().replace(/ \\(\\d+\\)$/, '')+(a.style.fontStyle==='italic'?'*':'')).join(' | ')`);
     };
-    // (the export's request: the window's own time — the cache's start on a day)
-    const lastPeriod = t => t.E(`window.__ws.filter(w=>w.type==='recorder/statistics_during_period' && Date.parse(w.start) === Date.parse(el.instance.startTime)).pop()?.period`);
+    // (the period exported: the one its file is named after — 'Statistics 1 d - …' —, from the
+    // cache or asked)
+    const lastPeriod = t => t.E(`(()=>{ const m = /^Statistics (\\d+ \\w+) - /.exec(window.__saved?.name ?? ''); return m ? ({ '5 min': '5minute', '1 h': 'hour', '1 d': 'day', '7 d': 'week', '30 d': 'month' })[m[1]] : undefined; })()`);
     t = await openCard(periodCard({}), { mock: { series: true } });
     await t.wait(1000);
     await t.step('Export ▸ Statistics ▸ its periods — 5 min, Hour, Day, Week, Month —, the hour in bold by default; Day chosen: the statistics asked by the day and saved, Day in bold next time and after a reload — a YAML card without persistence options: kept on this device, always', async () => {
@@ -243,7 +246,8 @@ module.exports = async function()
     await t.wait(1000);
     await t.step('csv.statisticsPeriod: 5minute — 5 min in bold, the 5-minute statistics asked by the export', async () => {
         const a = await periods(t);
-        await t.E('captureSave()'); await t.E(`el.querySelector('#eo_0_stats_5minute').click()`); await t.wait(800);
+        await t.E('captureSave()'); await t.E(`el.querySelector('#eo_0_stats_5minute').click()`);
+        for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
         const r = { a, period: await lastPeriod(t) };
         return r.a === '5 min* | Hour | Day | Week | Month' && r.period === '5minute' ? true : JSON.stringify(r);
     });
@@ -279,11 +283,53 @@ module.exports = async function()
 
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
     await t.step('CSV export failing: no error, the spinner goes away', async () => {
-        await t.E(`MOCK.fail=['history/history_during_period']`);
+        // (the cache emptied: the export asks Home Assistant, which fails)
+        await t.E(`MOCK.fail=['history/history_during_period']`); await t.E('el.instance.reloadHistory()'); await t.wait(300);
         await t.E('captureSave()'); await t.E('el.instance.exportFile()'); await t.wait(800);
         const spinner = await t.E(`!!(el.instance.ui.spinOverlay && el.instance.ui.spinOverlay.isConnected)`);
         await t.E(`MOCK.fail=[]`);
         return !spinner && !(await t.E('__saved')) ? true : 'spinner left: ' + spinner;
+    });
+    done(await t.close());
+
+    // ── The CSV export from the cache: the counts, the lines greyed, the periods in the cache in
+    // bold; a file named as the tooltip's first line ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true } });
+    await t.wait(3000);
+    const exportLines = async (sub) => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await t.E(`el.instance.showOptionsSubmenu(0, 'export')`); await t.wait(300);
+        if( sub ) { await t.E(`el.querySelector('#eo_0_stats').click()`); await t.wait(300); }
+        const r = await t.E(`[...el.querySelectorAll('${sub ? '#eo_0_stats_sub' : '#eo_0_export_sub'} a')].map(a => a.textContent.trim() + ( a.style.fontWeight === 'bold' ? '+' : '' ) + ( a.getAttribute('aria-disabled') ? '-' : '' )).join(' | ')`);
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
+        return r;
+    };
+    await t.step('Export ▸: History (2) — the curve and the timeline —, Statistics (1) — the curve alone has statistics', async () => {
+        const r = await exportLines(false);
+        return /^History \(2\) \| Statistics \(1\) ▸/.test(r) ? true : r;
+    });
+    await t.step('Export ▸ Statistics ▸: each period (1); the hourly ones, loaded over the whole window (the first pass), in bold', async () => {
+        const r = await exportLines(true);
+        return /Hour \(1\)\+/.test(r) && /5 min \(1\)/.test(r) && /Month \(1\)/.test(r) ? true : r;
+    });
+    await t.step('a graph of timelines: Export ▸ Statistics (0), greyed — nothing happens on a click', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, g = I.graphs.find(g => g.type === 'timeline'); return I.exportAvailability(g.entities.map(e => e.entity)); })()`);
+        return r.statistics === 0 && r.history === 1 ? true : JSON.stringify(r);
+    });
+    await t.step('Export ▸ History, the window in the cache: nothing asked, the file saved — named "History - start - end"', async () => {
+        const n0 = await t.E(`__ws.filter(w => w.type === 'history/history_during_period').length`);
+        await t.E('captureSave()'); await t.E('el.instance.exportFile()');
+        for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
+        const r = await t.E(`({ n: __ws.filter(w => w.type === 'history/history_during_period').length, name: __saved?.name, lines: __saved?.text.split('\\n').length })`);
+        return r.n === n0 && /^History - \d{4}-\d\d-\d\d \d\d-\d\d - (\d{4}-\d\d-\d\d )?\d\d-\d\d\.csv$/.test(r.name ?? '') && r.lines > 10 ? true : JSON.stringify({ n0, ...r });
+    });
+    await t.step('Export ▸ Statistics ▸ Hour, the cache emptied of them: the days asked, the file saved — named "Statistics 1 h - …"', async () => {
+        const n0 = await t.E(`__ws.filter(w => w.period === 'hour').length`);
+        await t.E(`(()=>{ for( const s of el.instance.cache ) s.stats.delete('sensor.power'); })()`);
+        await t.E('captureSave()'); await t.E(`el.instance.exportStatistics('hour')`);
+        for( let i = 0; i < 30 && !(await t.E('__saved')); i++ ) await t.wait(100);
+        const r = await t.E(`({ asked: __ws.filter(w => w.period === 'hour').length - ${n0}, name: __saved?.name, rows: __saved?.text.split('\\n').filter(l => /^\\d{4}-/.test(l)).length })`);
+        return r.asked >= 1 && /^Statistics 1 h - /.test(r.name ?? '') && r.rows >= 20 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -1253,7 +1299,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await t.E(`el.instance.showOptionsSubmenu(0, 'export')`); await t.wait(200);
         const txt = await t.E(`el.querySelector('#eo_0_csv')?.textContent`);
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300);
-        return txt === 'Historique' ? true : JSON.stringify(txt);
+        return /^Historique \(\d+\)$/.test(txt ?? '') ? true : JSON.stringify(txt);
     });
     done(await t.close());
 

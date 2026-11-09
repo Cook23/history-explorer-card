@@ -12,6 +12,7 @@ import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
+import { seriesOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the type menu (et_N_<index>)
@@ -543,11 +544,12 @@ export class CardMenus
         requestAnimationFrame(() => setTimeout(choose));
     }
 
-    // A menu's lines written in menuEl — { id, label, style, title, marked, on, final, input,
-    // choose(line) }: a title (a line of its own, not picked); an input (a number entered
+    // A menu's lines written in menuEl — { id, label, style, title, marked, markedItalic,
+    // strong, disabled, on, final, input, choose(line) }: a title (a line of its own, not picked); an input (a number entered
     // there: its GESTURE_SETTINGS bounds, value, labelId, change(value) → the value kept); a
-    // line — the marked one in bold and pre-selected (Enter takes it, the first arrow
-    // highlights it), one with on (true or false) a switch line showing it, a final one (a
+    // line — the marked one in bold (in italic: markedItalic) and pre-selected (Enter takes
+    // it, the first arrow highlights it), a strong one in bold, a disabled one greyed (nothing
+    // to do there: a click does nothing), one with on (true or false) a switch line showing it, a final one (a
     // choice, not a way to something else) shown chosen at once (_choiceMade). The focus on
     // one of its lines — the one just clicked — is kept in the box: a line taken away with
     // the focus on it would leave it nowhere, and the menu, seeing the focus gone, would
@@ -581,9 +583,12 @@ export class CardMenus
                 if( it.icon ) _line.title = it.label;
                 if( it.on !== undefined ) setSwitch(_line, it.on);
                 if( it.style ) _line.style.cssText += it.style;
-                if( it.marked ) { _line.style.fontWeight = 'bold'; _line.dataset.selected = _line.dataset.marked = '1'; }
+                if( it.marked ) { _line.style[it.markedItalic ? 'fontStyle' : 'fontWeight'] = it.markedItalic ? 'italic' : 'bold'; _line.dataset.selected = '1'; if( !it.markedItalic ) _line.dataset.marked = '1'; }
+                if( it.strong ) { _line.style.fontWeight = 'bold'; _line.dataset.marked = '1'; }
+                if( it.disabled ) { _line.style.opacity = '0.45'; _line.setAttribute('aria-disabled', 'true'); }
                 _line.addEventListener('click', (e) => {
                     e.preventDefault();
+                    if( it.disabled ) return;
                     // (a click on a line closes the submenus its menu's other lines opened —
                     // a line with a submenu then opens its own)
                     const _box = _line.parentNode, _root = _box?._root ?? _box;
@@ -1164,15 +1169,20 @@ export class CardMenus
 
     // The Export submenu of menu m — the options menu's (every graph), a graph's (graphs: that
     // one) —, level null: its history and ▸ its statistics (with the long-term statistics on);
-    // level 'stats': their periods, the one the menu offers first in bold — each exported for
-    // the graphs' entities, over the window shown
+    // level 'stats': their periods — each exported for the graphs' entities, over the window
+    // shown. Each line says how many of them have data there, at least in part (greyed, none:
+    // see exportAvailability); a period the cache holds over the whole window in bold, the
+    // one chosen last time in italic
     _exportLines(m, level, graphs)
     {
+        const ids = [...new Set(graphs.flatMap(g => g.entities.map(e => seriesOf(e.entity).entity)))];
+        const a = this.exportAvailability(ids), _n = (label, n) => `${label} (${n})`;
         if( level === 'stats' )
-            return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: i18n(`ui.interval.${p.label}`), marked: p.period === this.exportStatsPeriod(),
+            return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: _n(i18n(`ui.interval.${p.label}`), a.periods[p.period]),
+                                                    marked: p.period === this.exportStatsPeriod(), markedItalic: true, strong: a.cached[p.period], disabled: !a.periods[p.period],
                                                     choose: () => { m.close(); this.exportStatistics(p.period, graphs); } }));
-        return [{ id: `${m.prefix}_csv`, label: i18n('ui.menu.export_csv'), choose: () => { m.close(); this.exportFile(graphs); } },
-                ...( this.statistics?.enabled ? [this._submenuLine(m, `${m.prefix}_stats`, i18n('ui.menu.export_stats'), ['export', 'stats'])] : [] )];
+        return [{ id: `${m.prefix}_csv`, label: _n(i18n('ui.menu.export_csv'), a.history), disabled: !a.history, choose: () => { m.close(); this.exportFile(graphs); } },
+                ...( this.statistics?.enabled ? [{ ...this._submenuLine(m, `${m.prefix}_stats`, _n(i18n('ui.menu.export_stats'), a.statistics), ['export', 'stats']), disabled: !a.statistics }] : [] )];
     }
 
     // The options menus open, as they are now (the info panel switched on another device)
