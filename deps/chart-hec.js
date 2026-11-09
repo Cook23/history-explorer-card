@@ -632,7 +632,10 @@
   // other an area of its own), shaded in the dataset's line color at MINMAX_BAND_ALPHA, on
   // the dataset's own Y axis — the line's color as drawn: a color, or a gradient where it
   // varies (colorSteps along the time, hecValueGradient along the Y axis), each part of the
-  // band in the color of the line there
+  // band in the color of the line there. Its edges drawn as the line is (helpers.canvas.lineTo):
+  // straight, in steps, or curves of the line's interpolation (its tension,
+  // cubicInterpolationMode and hecInterpolation — their control points as the line
+  // controller's updateBezierControlPoints computes them), within the plot area
   // (any CSS color — a name, #rgb, #rrggbb(aa), rgb(a)(), hsl(a)() — with that alpha; black otherwise)
   // (the band's opacity: twice the light fill's — fill: true —, so it shows over it)
   var MINMAX_BAND_ALPHA = 0.3;
@@ -662,28 +665,67 @@
         var points = dataset.data;
         // (a dataset not filled yet holds {}, not a list)
         if (!yScale || !Array.isArray(points) || points.length < 2) return;
-        var _clampY = function (v) { return Math.max(_a.top, Math.min(_a.bottom, yScale.getPixelForValue(v))); };
+        var _line = chart.getDatasetMeta(di).dataset, _lm = _line && _line._model || {};
+        // (each edge's point as a point of the line: its segment straight, in steps or a curve
+        // — straight to a plateau's end, as the line's —; a B-spline's when the line's is)
+        var _point = function (pt, py) {
+          var flat = !!pt.hecPlateauEnd;
+          return { x: xScale.getPixelForValue(pt.x), y: py, skip: false,
+            tension: flat ? 0 : _lm.tension || 0, steppedLine: flat ? false : _lm.steppedLine || false,
+            hecBspline: !flat && dataset.hecInterpolation === 'bspline' && !!_lm.tension && !_lm.steppedLine };
+        };
+        // (their control points: the line controller's, see updateBezierControlPoints)
+        var _curve = function (e) {
+          if (!_lm.tension || _lm.steppedLine) return e;
+          var w = e.map(function (m) { return { _model: m }; }), algo = dataset.hecInterpolation;
+          if (_lm.cubicInterpolationMode === 'monotone') {
+            if (algo && algo !== 'monotone' && algo !== 'bspline') helpers.hecSplineCurve(w, algo);
+            else helpers.splineCurveMonotone(w);
+          } else {
+            e.forEach(function (m, i) {
+              var c = helpers.splineCurve(e[Math.max(0, i - 1)], m, e[Math.min(e.length - 1, i + 1)], _lm.tension);
+              m.controlPointPreviousX = c.previous.x; m.controlPointPreviousY = c.previous.y;
+              m.controlPointNextX = c.next.x; m.controlPointNextY = c.next.y;
+            });
+          }
+          if (chart.options.elements.line.capBezierPoints) e.forEach(function (m) {
+            m.controlPointPreviousX = Math.max(_a.left, Math.min(_a.right, m.controlPointPreviousX));
+            m.controlPointNextX = Math.max(_a.left, Math.min(_a.right, m.controlPointNextX));
+            m.controlPointPreviousY = Math.max(_a.top, Math.min(_a.bottom, m.controlPointPreviousY));
+            m.controlPointNextY = Math.max(_a.top, Math.min(_a.bottom, m.controlPointNextY));
+          });
+          return e;
+        };
         var runs = [], band = null;
         points.forEach(function (pt) {
           var px = pt && pt.yMin != null && pt.yMax != null ? xScale.getPixelForValue(pt.x) : null;
-          if (px === null || px < _a.left - 1 || px > _a.right + 1) { band = null; return; }
+          if (px === null) { band = null; return; }
           if (!band) runs.push(band = []);
-          band.push({ px: px, pyMin: _clampY(pt.yMin), pyMax: _clampY(pt.yMax) });
+          band.push(pt);
         });
         ctx.save();
-        var _line = chart.getDatasetMeta(di).dataset, _col = _line && _line._model && _line._model.borderColor || dataset.borderColor;
+        helpers.canvas.clipArea(ctx, _a);
+        var _col = _lm.borderColor || dataset.borderColor;
         ctx.globalAlpha = MINMAX_BAND_ALPHA;
         ctx.fillStyle = typeof _col === 'string' ? hecColorWithAlpha(_col, 1) : _col;
         runs.forEach(function (b) {
           if (b.length < 2) return;
+          var hi = _curve(b.map(function (pt) { return _point(pt, yScale.getPixelForValue(pt.yMax)); }));
+          var lo = _curve(b.map(function (pt) { return _point(pt, yScale.getPixelForValue(pt.yMin)); }));
+          var n = b.length, i;
           ctx.beginPath();
-          // (yMax from left to right, then yMin back: a closed polygon)
-          ctx.moveTo(b[0].px, b[0].pyMax);
-          for (var i = 1; i < b.length; i++) ctx.lineTo(b[i].px, b[i].pyMax);
-          for (var j = b.length - 1; j >= 0; j--) ctx.lineTo(b[j].px, b[j].pyMin);
+          ctx.hecBsplineMid = false;
+          // (yMax from left to right, then yMin back — drawn backwards, as a line's fill is)
+          ctx.moveTo(hi[0].x, hi[0].y);
+          for (i = 1; i < n; i++) helpers.canvas.lineTo(ctx, hi[i - 1], hi[i]);
+          helpers.canvas.hecLineEnd(ctx, hi[n - 1]);
+          ctx.lineTo(lo[n - 1].x, lo[n - 1].y);
+          for (i = n - 1; i > 0; i--) helpers.canvas.lineTo(ctx, lo[i], lo[i - 1], true);
+          helpers.canvas.hecLineEnd(ctx, lo[0]);
           ctx.closePath();
           ctx.fill();
         });
+        helpers.canvas.unclipArea(ctx);
         ctx.restore();
       });
     } });
