@@ -459,11 +459,11 @@ export const TIME_RANGES = [
 // The statistics export's periods, in the order its menu shows them: Home Assistant's period
 // (its 5-minute statistics, short-term; the others, long-term), its label (ui.interval.*)
 export const STATS_EXPORT_PERIODS = [
-    { period: '5minute', label: '_5m' },
-    { period: 'hour',    label: 'hourly' },
-    { period: 'day',     label: 'daily' },
-    { period: 'week',    label: 'weekly' },
-    { period: 'month',   label: 'monthly' },
+    { period: '5minute', label: '_5m',     ms: 300e3 },
+    { period: 'hour',    label: 'hourly',  ms: 3600e3 },
+    { period: 'day',     label: 'daily',   ms: 86400e3 },
+    { period: 'week',    label: 'weekly',  ms: 7 * 86400e3 },
+    { period: 'month',   label: 'monthly', ms: 30 * 86400e3 },
 ];
 export const barInterval = code => BAR_INTERVALS.find(i => i.code == code);
 

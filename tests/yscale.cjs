@@ -105,12 +105,12 @@ module.exports = async function()
             return r.asked >= 1 ? true : JSON.stringify(r);
         });
         if( range === '24h' ) await t.step('the user idle: the cache filled further — the hourly statistics 4 windows before, the history of the day before the window, quietly; one request at a time, a second at least between two', async () => {
-            const since = await t.E('Date.now()');
             await t.wait(20000);
             const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime);
                 const coarse = __ws.some(w => w.period === 'hour' && Date.parse(w.start) <= t0 - 3 * 86400e3);
                 const fine = __ws.some(w => w.type === 'history/history_during_period' && Date.parse(w.end) <= t0 + 86400e3 && Date.parse(w.start) < t0 - 3600e3);
-                const at = __ws.filter(w => w.at > ${since}).map(w => w.at), gaps = at.slice(1).map((a, k) => a - at[k]);
+                // (the background: what's asked after the first display's requests, a second at least after them)
+                const all = __ws.map(w => w.at), k0 = all.findIndex((a, k) => k && a - all[k - 1] >= 900), at = k0 < 0 ? [] : all.slice(k0), gaps = at.slice(1).map((a, k) => a - at[k]);
                 return { coarse, fine, loading: I.state.loading, n: at.length, minGap: gaps.length ? Math.min(...gaps) : null }; })()`);
             return r.coarse && r.fine && !r.loading && r.n >= 2 && r.minGap >= 950 ? true : JSON.stringify(r);
         });
@@ -160,10 +160,66 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The display is only the display: an entity with statistics shown as a timeline or an
+    // arrowline loaded as a curve is ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6o', statistics: { enabled: true },
+        graphs: [{ type: 'timeline', entities: [{ entity: 'sensor.power' }] }, { type: 'arrowline', entities: [{ entity: 'sensor.power2' }] }] }, { height: 900, mock: { series: true } });
+    await t.wait(3500);
+    await t.step('a timeline and an arrowline of entities with statistics: their statistics asked and drawn — no history but the last minutes —; their export counts them', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, st = __ws.filter(w => w.type === 'recorder/statistics_during_period');
+            const old = __ws.filter(w => w.type === 'history/history_during_period' && Date.parse(w.start) < Date.now() - 26 * 3600e3);
+            return { stats: ['sensor.power', 'sensor.power2'].every(id => st.some(w => w.ids.includes(id))), old: old.length,
+                     drawn: I.graphs.map(g => g.chart.data.datasets[0].data.length), exp: I.exportAvailability(['sensor.power', 'sensor.power2']).statistics }; })()`);
+        return r.stats && r.old === 0 && r.drawn.every(n => n > 0) && r.exp === 2 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The same mechanism for every entity: one giving a curve its color loaded as a curve
+    // is; an angle too, its history asked besides, the window's first, from the right ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6o', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', color: { entity: 'sensor.power2', 0: 'green', 400: 'red' } }] }] }, { height: 900, mock: { series: true } });
+    await t.wait(3500);
+    await t.step('an entity giving a curve its color, with statistics: its statistics asked — no history but the last minutes', async () => {
+        const r = await t.E(`(()=>{ const st = __ws.filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('sensor.power2'));
+            const old = __ws.filter(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.power2') && Date.parse(w.start) < Date.now() - 26 * 3600e3);
+            return { stats: st.length, old: old.length }; })()`);
+        return r.stats >= 1 && r.old === 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6o', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind' }, { entity: 'sensor.power' }] }] }, { height: 900, mock: { series: true } });
+    await t.wait(20000);
+    await t.step('an angle drawn from statistics: drawn in 2 passes as the rest, then its history over the window first of the background — from the right, one request at a time, a second at least between two —, the other curve\'s not; drawn as it comes', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
+            const st = __ws.filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('sensor.wind'));
+            const _old = w => w.type === 'history/history_during_period' && Date.parse(w.start) < Date.now() - 26 * 3600e3;
+            const h = __ws.filter(w => _old(w) && w.ids.includes('sensor.wind') && Date.parse(w.end) > t0 + 3600e3);
+            const other = __ws.filter(w => _old(w) && w.ids.includes('sensor.power'));
+            // (between the window's first part and its last, nothing else in the background)
+            const i0 = __ws.indexOf(h[0]), i1 = __ws.indexOf(h[h.length - 1]), between = __ws.slice(i0, i1 + 1).filter(w => !h.includes(w));
+            const at = h.map(w => w.at), gaps = at.slice(1).map((a, k) => a - at[k]);
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0 && x(p) <= t1);
+            return { stats: st.length, firstStats: __ws.indexOf(st[0]) < i0, hist: h.length, right: h.length ? ( Date.now() - Date.parse(h[0].end) ) / 86400e3 : null,
+                     fromRight: h.every((w, k) => !k || Date.parse(w.end) <= Date.parse(h[k - 1].start) + 1000),
+                     reach: h.length ? ( Math.min(...h.map(w => Date.parse(w.start))) - t0 ) / 86400e3 : null, other: other.length,
+                     between: between.map(w => w.type[0] + ' ' + ( w.period ?? '' ) + ' ' + w.start), minGap: gaps.length ? Math.min(...gaps) : null,
+                     drawn: d.length, fromStats: d.filter(p => p.statistics).length, source: I._sourceNeeded() }; })()`);
+        return r.source !== 'history' && r.stats >= 1 && r.firstStats && r.hist >= 2 && r.right < 2 && r.fromRight && r.reach <= 1 && r.other === 0
+            && !r.between.length && r.minGap >= 950 && r.drawn > 0 && r.fromStats === 0 ? true : JSON.stringify(r);
+    });
+    await t.step('the user idle: the angle\'s history beside the window asked too, in the background', async () => {
+        await t.wait(10000);
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime);
+            return { before: __ws.some(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.wind') && Date.parse(w.end) <= t0 + 86400e3 && Date.parse(w.start) < t0 - 86400e3), loading: I.state.loading }; })()`);
+        return r.before && !r.loading ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── No coarse pass (the statistics off): the window first, then its sides at once ──
     t = await openCard(card('24h', { statistics: { enabled: false } }), { height: 900, mock: { series: true, historyDelay: 300 } });
     await t.wait(2500);
-    await t.step('no coarse pass (the statistics off): the window\'s history first, then the day before it at once — not after the 2 s of the user idle', async () => {
+    await t.step('no coarse pass (the statistics off): the window\'s history first, then the day before it at once — not after the pause of the background', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, day0 = I.cache[I.mapStartTimeToCacheSlot(I.startTime)].start_m.valueOf();
             const h = __ws.filter(w => w.type === 'history/history_during_period');
             const win = h.filter(w => Date.parse(w.end) > day0), side = h.find(w => Date.parse(w.end) <= day0);

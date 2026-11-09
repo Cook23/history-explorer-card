@@ -826,9 +826,17 @@ export class CardCharts
         if( Array.isArray(p) ) p = { x: p[0] };
         if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return _time;
         // (statistics: their period too — 5 min, 1 h, 1 d)
-        const _period = ms => ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : `${Math.round(ms / 86400e3)} ${i18n('ui.label.day_unit')}`;
-        const _source = p.statistics ? `${i18n('ui.label.source_statistics')}${p.statisticsPeriod ? ' ' + _period(p.statisticsPeriod) : ''}` : i18n('ui.label.source_history');
+        const _ms = p.statisticsPeriod, _source = this.sourceLabel(p.statistics ? ( _ms > 0 ? _ms : 0 ) : null);
         return `${_source}${i18n('ui.label.source_separator')}${_time}`;
+    }
+
+    // Where values come from, as the tooltip says it: History, or Statistics and their period
+    // (ms: 5 min, 1 h, 1 d — 0: none said) — the tooltip's, an export file's name's
+    sourceLabel(periodMs)
+    {
+        if( periodMs === null || periodMs === undefined ) return i18n('ui.label.source_history');
+        const ms = periodMs, _p = ms < 3600e3 ? `${Math.round(ms / 60e3)} min` : ms < 86400e3 ? `${Math.round(ms / 3600e3)} h` : `${Math.round(ms / 86400e3)} ${i18n('ui.label.day_unit')}`;
+        return i18n('ui.label.source_statistics') + ( ms ? ' ' + _p : '' );
     }
 
     // An element's time in its tooltip: a value's own (xLabel); the time a column of values,

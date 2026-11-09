@@ -2,6 +2,7 @@
 import "../deps/moment.js";
 import "../deps/FileSaver.js";
 import { HA_ATTRIBUTES, seriesOf } from "./history-series.js";
+import { STATS_EXPORT_PERIODS } from "./history-options.js";
 
 var moment = window.HXLocal_moment;
 
@@ -47,10 +48,11 @@ class CSVExporter {
     exportFile(cardstate, graphs)
     {
         this.separator = cardstate.pconfig.exportSeparator;
+        this.window = [cardstate.startTime, cardstate.endTime];
+        this.source = this.sourceOf(cardstate);
         this.timeFormat = cardstate.pconfig.exportTimeFormat;
         this.numberLocale = cardstate.pconfig.exportNumberLocale;
 
-        const t0 = cardstate.startTime, t1 = cardstate.endTime;
         const l = [];
         for( const g of graphs )
             for( const e of g.entities ) {
@@ -61,7 +63,7 @@ class CSVExporter {
 
         this.overlay = cardstate.ui.spinOverlay;
         document.body.appendChild(this.overlay);
-        this._request(cardstate, l, t0, t1).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
+        this._request(cardstate, l).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
     }
 
     // The numbers' format (exportNumberLocale), or null: as they are
@@ -70,13 +72,17 @@ class CSVExporter {
         return this.numberLocale ? new Intl.NumberFormat(this.numberLocale, { maximumSignificantDigits: 20 }) : null;
     }
 
-    // The file saved, its lines data; the spinner removed
+    // The file saved, its lines data, named as the tooltip's first line: its source — History,
+    // Statistics and their period —, then the window: its start, its end (its time alone on
+    // the same day) — 'Statistics 1 h - 2026-11-01 00-00 - 2026-11-09 11-15.csv' (no ':' in a
+    // file name: it can't hold one everywhere); the spinner removed
     save(data)
     {
         const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
         document.body.removeChild(this.overlay);
-        // (no ':' in the name: a file name can't hold one everywhere)
-        saveAs(blob, "entities-" + moment().format('YYYY-MM-DD_HH-mm-ss') + ".csv");
+        const t0 = moment(this.window[0]), t1 = moment(this.window[1]);
+        const _end = t1.format(t0.isSame(t1, 'day') ? 'HH-mm' : 'YYYY-MM-DD HH-mm');
+        saveAs(blob, `${this.source} - ${t0.format('YYYY-MM-DD HH-mm')} - ${_end}.csv`);
     }
 
     exportFailed(error)
@@ -101,9 +107,16 @@ export class HistoryCSVExporter extends CSVExporter {
         super.exportFile(cardstate, graphs);
     }
 
-    _request(cardstate, l, t0, t1)
+    // (from the cache first, what it lacks asked to Home Assistant — with the attributes, all)
+    _request(cardstate, l)
     {
-        return cardstate._hass.callWS(cardstate.historyRequest(l, t0, t1, this.saveAttributes));
+        return cardstate.exportRows('history', l, this.saveAttributes);
+    }
+
+    // (the file's source: History)
+    sourceOf(cardstate)
+    {
+        return cardstate.sourceLabel(null);
     }
 
     exportCallback(result)
@@ -169,9 +182,16 @@ export class StatisticsCSVExporter extends CSVExporter {
         super.exportFile(cardstate, graphs);
     }
 
-    _request(cardstate, l, t0, t1)
+    // (from the cache first, what it lacks asked to Home Assistant)
+    _request(cardstate, l)
     {
-        return cardstate._hass.callWS(cardstate.statisticsRequest(l, t0, t1, this.period));
+        return cardstate.exportRows(this.period, l);
+    }
+
+    // (the file's source: Statistics and their period)
+    sourceOf(cardstate)
+    {
+        return cardstate.sourceLabel(STATS_EXPORT_PERIODS.find(p => p.period === this.period)?.ms ?? 0);
     }
 
     exportCallback(result)
