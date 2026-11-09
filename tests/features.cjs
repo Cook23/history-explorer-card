@@ -19,10 +19,11 @@ module.exports = async function()
     let t = await openCard(card({ statistics: { enabled: false }, graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }] },
         { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true } });
-    await t.step('history: one request for every entity, over the time window shown', async () => {
+    await t.step('history: each entity on its own, in blocks of a day at most, over the time window shown', async () => {
         const ws = await wsOf(t, 'history/history_during_period');
-        const span = ws.length ? (Date.parse(ws[0].end) - Date.parse(ws[0].start)) / HOUR : 0;
-        return ws.length >= 1 && ws[0].ids.includes('sensor.power') && ws[0].ids.includes('binary_sensor.a') && span >= 24 ? true : JSON.stringify(ws);
+        const t0 = await t.E('Date.parse(el.instance.startTime)');
+        const of = id => ws.filter(w => w.ids.length === 1 && w.ids[0] === id), ok = id => of(id).length >= 1 && Math.min(...of(id).map(w => Date.parse(w.start))) <= t0;
+        return ok('sensor.power') && ok('binary_sensor.a') && ws.every(w => w.ids.length === 1 && Date.parse(w.end) - Date.parse(w.start) <= 24 * HOUR) ? true : JSON.stringify(ws);
     });
     await t.step('history: the curve gets every point, the timeline its state changes', async () => {
         const c = (await t.E('datasets(0)'))[0]; const tl = await t.E('datasets(1)');
@@ -50,12 +51,13 @@ module.exports = async function()
     done(await t.close());
 
     t = await openCard(card({ defaultTimeRange: '2d', statistics: { enabled: true, period: 'hour', force: true },
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
-    await t.step('statistics forced: the statistics only — hourly and 5-minute ones (a column of pixels shorter than 5 minutes), the history only after the 5-minute ones (the last 20 minutes)', async () => {
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyStep: 60 } });
+    await t.step('statistics forced: the statistics only — hourly and 5-minute ones (a column of pixels shorter than 5 minutes), the history only for the last hours (the probe of the last 2, the minutes after the 5-minute ones)', async () => {
         const st = await ownWsOf(t, 'recorder/statistics_during_period'); const h = await wsOf(t, 'history/history_during_period');
         const d = (await t.E('datasets(0)'))[0];
-        const recent = h.every(w => Date.parse(w.start) >= Date.now() - 25 * 60e3);
-        return st.map(w => w.period).sort().join() === '5minute,hour' && h.length <= 1 && recent && d.n > 20 ? true : JSON.stringify({ st, h, d });
+        // (the history: the last hour asked first, and the minutes after the 5-minute statistics — from a whole hour)
+        const recent = h.every(w => Date.parse(w.start) >= Date.now() - 3.2 * HOUR);
+        return [...new Set(st.map(w => w.period))].sort().join() === '5minute,hour' && h.length <= 2 && recent && d.n > 20 ? true : JSON.stringify({ st, h, d });
     });
     await t.step('the tooltip of a point of the 5-minute statistics: "Statistics 5 min" and the time it covers', async () => {
         const r = await t.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], cb=c.options.tooltips.callbacks;
@@ -70,13 +72,14 @@ module.exports = async function()
     t = await openCard(card({ defaultTimeRange: '6o', statistics: { enabled: true },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true } });
     await t.wait(3000);
-    await t.step('6 months: the statistics asked for the curve only — the daily ones over the window first (the coarsest giving it 100 values), hourly over the window, 5-minute ones for the day the hourly ones don\'t cover yet; the timeline (no statistics) from the history, over the whole window; the curve\'s history only after the 5-minute statistics (the last 20 minutes)', async () => {
+    await t.step('6 months: the statistics asked for the curve only — the daily ones over the window first (the coarsest giving it 100 values), hourly over the window, 5-minute ones for the day the hourly ones don\'t cover yet; the timeline (no statistics) from the history, over the whole window; the curve\'s history only for the last hours (the probe of the last 2, the minutes after the statistics)', async () => {
         const st = await ownWsOf(t, 'recorder/statistics_during_period'), h = await wsOf(t, 'history/history_during_period');
         const hourly = st.filter(w => w.period === 'hour'), fine = st.filter(w => w.period === '5minute'), daily = st.filter(w => w.period === 'day');
         const old = h.filter(w => Date.parse(w.start) < Date.now() - 26 * HOUR), curve = h.filter(w => w.ids.includes('sensor.power'));
-        const ok = daily.length >= 1 && daily.every(w => w.ids.join() === 'sensor.power') && hourly.length === 1 && hourly[0].ids.join() === 'sensor.power' && fine.length === 1 && Date.parse(fine[0].start) >= Date.now() - 26 * HOUR
+        // (the 5-minute statistics only where relevant: a value every 10 minutes, none)
+        const ok = daily.length >= 1 && daily.every(w => w.ids.join() === 'sensor.power') && hourly.length === 1 && hourly[0].ids.join() === 'sensor.power' && fine.every(w => Date.parse(w.start) >= Date.now() - 26 * HOUR)
             && old.length >= 1 && old.every(w => !w.ids.includes('sensor.power') && w.ids.includes('binary_sensor.a'))
-            && curve.length >= 1 && curve.every(w => Date.parse(w.start) >= Date.now() - 25 * 60e3);
+            && curve.length >= 1 && curve.every(w => Date.parse(w.start) >= Date.now() - 3.2 * HOUR);
         return ok ? true : JSON.stringify({ st, h: h.map(w => [w.start, w.ids]) });
     });
     await t.step('the tooltip: "Statistics" and the time a point covers, from – to, min / mean / max with the unit; "History" on the recent points', async () => {
@@ -242,7 +245,7 @@ module.exports = async function()
         return a === '5 min | Hour | Day | Week* | Month' && b === '5 min | Hour | Day | Week | Month*' ? true : JSON.stringify({ a, b });
     });
     done(await t.close());
-    t = await openCard(periodCard({ csv: { statisticsPeriod: '5minute' } }), { mock: { series: true } });
+    t = await openCard(periodCard({ csv: { statisticsPeriod: '5minute' } }), { mock: { series: true, historyStep: 60 } });
     await t.wait(1000);
     await t.step('csv.statisticsPeriod: 5minute — 5 min in bold, the 5-minute statistics asked by the export', async () => {
         const a = await periods(t);
@@ -262,14 +265,16 @@ module.exports = async function()
 
     // ── The files' cells: a 0 written (not left empty), a value holding the separator or a
     // quote quoted, its quotes doubled ──
-    t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
+    // (a week: whole days in the window, for the daily statistics)
+    t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, csv: { separator: ';' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.rain' }] }, { type: 'timeline', entities: [{ entity: 'sensor.power' }] }] }),
         { mock: { rows: { 'sensor.rain': [[2 * 86400, '0'], [5 * 3600, '0']], 'sensor.power': [[2 * 86400, 'on;off "x"']] } } });
     await t.wait(1500);
+    // (its daily statistics: two values in two days, its hourly ones aren't relevant — never exported)
     await t.step('the statistics of a value of 0: its mean, min and max written 0', async () => {
-        const f = await save('el.instance.exportStatistics()');
+        const f = await save(`el.instance.exportStatistics('day')`);
         const rows = (f?.text ?? '').split('\r\n').filter(l => /^\d{4}-/.test(l));
-        return rows.length > 20 && rows.every(l => l.endsWith(';;0;0;0')) ? true : rows.slice(0, 3).join(' | ') || 'nothing saved';
+        return rows.length >= 1 && rows.every(l => l.endsWith(';;0;0;0')) ? true : rows.slice(0, 3).join(' | ') || 'nothing saved';
     });
     await t.step('the history: a value of 0 written 0; a state holding the separator and quotes quoted, its quotes doubled', async () => {
         const f = await save('el.instance.exportFile()');
@@ -295,7 +300,7 @@ module.exports = async function()
     // ── The CSV export from the cache: the counts, the lines greyed, the periods in the cache in
     // bold; a file named as the tooltip's first line ──
     t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true },
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true } });
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true, historyStep: 60 } });
     await t.wait(3000);
     const exportLines = async (sub) => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300); await t.E(`el.instance.showOptionsSubmenu(0, 'export')`); await t.wait(300);
@@ -325,7 +330,7 @@ module.exports = async function()
     });
     await t.step('Export ▸ Statistics ▸ Hour, the cache emptied of them: the days asked, the file saved — named "Statistics 1 h - …"', async () => {
         const n0 = await t.E(`__ws.filter(w => w.period === 'hour').length`);
-        await t.E(`(()=>{ for( const s of el.instance.cache ) s.stats.delete('sensor.power'); })()`);
+        await t.E(`(()=>{ for( const s of el.instance.cache ) { s.stats.delete('sensor.power'); s.cover.stats.delete('sensor.power'); } })()`);
         await t.E('captureSave()'); await t.E(`el.instance.exportStatistics('hour')`);
         for( let i = 0; i < 30 && !(await t.E('__saved')); i++ ) await t.wait(100);
         const r = await t.E(`({ asked: __ws.filter(w => w.period === 'hour').length - ${n0}, name: __saved?.name, rows: __saved?.text.split('\\n').filter(l => /^\\d{4}-/.test(l)).length })`);
@@ -911,12 +916,13 @@ module.exports = async function()
         const once = new Set(ws.map(w => w[0])).size === ws.length && ws.every((w, i) => !i || w[1] === ws[i - 1][0]);
         const covered = await t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data; return +new Date(d[0].x) <= +new Date(el.instance.startTime) + 86400e3; })()`);
         await t.close();
-        return seen.length >= 4 && seen.every((v, i) => !i || v < seen[i - 1]) && ws.length <= 8 && newestFirst && once && covered
-            ? true : JSON.stringify({ seen: seen.length, ws, newestFirst, once, covered });
+        const days = ws.every(w => Date.parse(w[1]) - Date.parse(w[0]) <= 24 * 3600e3);
+        return seen.length >= 4 && seen.every((v, i) => !i || v < seen[i - 1]) && days && newestFirst && once && covered
+            ? true : JSON.stringify({ seen: seen.length, ws, newestFirst, once, covered, days });
     };
     t = await openCard(card(), { mock: { series: true } });
     await t.step('a window of 7 days: the curve grows back in time as each day arrives; each day asked once, the most recent first; the whole window at the end', () => growing('7d', 16, 250));
-    await t.step('a window of 6 months: at most 8 requests, the most recent first, the curve growing back in time; the whole window at the end', () => growing('6o', 30, 300));
+    await t.step('a window of a month: blocks of a day at most, the most recent first, the curve growing back in time; the whole window at the end', () => growing('1o', 45, 300));
     await t.step('the parts of a long window all asked at once, from the right, one every 10 ms at least (see ha-requests.js); each answer drawn — those that came meanwhile drawn once', async () => {
         const p = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
             { mock: { series: true, historyDelay: 300 }, init: `document.addEventListener('DOMContentLoaded', ()=>setTimeout(()=>{ const I=el.instance; window.__trace=[];
@@ -930,7 +936,7 @@ module.exports = async function()
         await p.close();
         // (all asked before the first answer — 300 ms —; the answers that came together, drawn once)
         const answers = r.trace.split(' ').filter(x => x === 'answer').length, draws = r.trace.split(' ').filter(x => x === 'draw').length;
-        return r.asked > 2 && r.fromRight && r.gaps.every(g => g >= 9) && r.spread < 300 && answers === r.asked && draws >= 2 && draws <= answers + 1 && r.trace.endsWith('draw')
+        return r.asked > 2 && r.fromRight && r.gaps.every(g => g >= 9) && r.spread < 300 && answers === r.asked && draws >= 2 && draws <= answers + 2 && r.trace.endsWith('draw')
             ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -974,24 +980,26 @@ module.exports = async function()
         const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
         return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
     });
-    await t.step('a window of 30 days, 10 of history (a column of pixels of some 50 minutes): the hourly statistics first (the coarsest giving it 100 values), then its 5-minute ones, each in one request; the history only after them (the last 20 minutes); past the 10 days — where the 5-minute ones come back empty or start late — the hourly ones; the whole window, joined; nothing asked twice', async () => {
-        const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10 }, 12, 300);
+    await t.step('a window of 30 days, 10 of history (a column of pixels of some 50 minutes): the hourly statistics first (the coarsest giving it 100 values), then its 5-minute ones, each in one request; the history only for the last hours (the probe of the last 2, the minutes after them); past the 10 days — where the 5-minute ones come back empty or start late — the hourly ones; the whole window, joined; nothing asked twice', async () => {
+        const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10, historyStep: 60 }, 12, 300);
         const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
-        const recent = r.ws.filter(w => w[0] === 'h').every(w => Date.parse(w[1]) >= Date.now() - 25 * 60e3);
-        const order = /^r(fh|hf)$/.test(types), covered = last.first <= r.start + 86400e3;
+        const recent = r.ws.filter(w => w[0] === 'h').every(w => Date.parse(w[1]) >= Date.now() - 3.2 * HOUR);
+        // (the last hour's history first — the probe —, then the hourly statistics, the 5-minute ones and the last minutes' history)
+        const order = /^h?r(fh?|hf)$/.test(types), covered = last.first <= r.start + 86400e3;
         // (past 10 days, an hour a point at most — the hourly statistics; within them, finer)
         const old = r.pts.filter(p => p[0] < Date.now() - 11 * 86400e3), recentPts = r.pts.filter(p => p[0] > Date.now() - 9 * 86400e3 && p[0] < Date.now() - 86400e3);
         const gap = a => a.length > 1 ? ( a[a.length - 1][0] - a[0][0] ) / ( a.length - 1 ) : 0;
         const finer = gap(recentPts) < gap(old);
         return r.joined && r.once && r.fits && order && recent && covered && finer ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, types, recent, covered, gaps: [gap(old), gap(recentPts)] });
     });
-    await t.step('a window of 6 months: the daily statistics first (the coarsest giving it 100 values), then the hourly ones in one request, drawn at once; the 5-minute ones only for the day the hourly ones don\'t cover yet; the history only after them (the last 20 minutes)', async () => {
+    await t.step('a window of 6 months: the daily statistics first (the coarsest giving it 100 values), then the hourly ones in one request, drawn at once; the 5-minute ones only for the day the hourly ones don\'t cover yet; the history only for the last hours (the probe of the last 2, the minutes after them)', async () => {
         const r = await watch('6o', { statistics: { enabled: true } }, {}, 8, 300);
         const st = r.ws.filter(w => w[0] === 'r'), h = r.ws.filter(w => w[0] === 'h'), last = r.seen[r.seen.length - 1];
-        const recent = h.every(w => Date.parse(w[1]) >= Date.now() - 25 * 60e3), covered = last.first <= r.start + 86400e3;
+        const recent = h.every(w => Date.parse(w[1]) >= Date.now() - 3.2 * HOUR), covered = last.first <= r.start + 86400e3;
         const fine = r.ws.filter(w => w[0] === 'f').every(w => Date.parse(w[1]) >= Date.now() - 26 * HOUR);
-        const daily = r.ws.filter(w => w[0] === 'd'), first = r.ws[0]?.[0];
-        return daily.length >= 1 && first === 'd' && st.length === 1 && fine && h.length === 1 && recent && covered && r.joined ? true : JSON.stringify({ ws: r.ws, covered, joined: r.joined });
+        // (after the last hour's history, the probe)
+        const daily = r.ws.filter(w => w[0] === 'd'), first = r.ws.find(w => w[0] !== 'h')?.[0];
+        return daily.length >= 1 && first === 'd' && st.length === 1 && fine && h.length <= 2 && recent && covered && r.joined ? true : JSON.stringify({ ws: r.ws, covered, joined: r.joined });
     });
     await t.step('a lot of history (6 months): the parts joined, the Y scale widening as each older, lower part comes', async () => {
         const r = await watch('6o', { statistics: { enabled: false } }, {}, 30, 300);
@@ -1054,9 +1062,9 @@ module.exports = async function()
 
     // ── The history after the statistics: the last minutes only, asked again at each
     // refresh with today's statistics; the whole day's when Home Assistant is late ──
-    t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyStep: 60 } });
     await t.wait(3000);
-    await t.step('a week (the 5-minute statistics): the curve up to now, its last minutes from the history; a refresh asks again the history after the statistics and today\'s statistics, never the day\'s history', async () => {
+    await t.step('a week (the 5-minute statistics): the curve up to now, its last minutes from the history; a refresh asks again what came since — today\'s statistics, the history since —, never the day\'s history', async () => {
         const d0 = (await t.E('datasets(0)'))[0];
         await t.E('(()=>{ __ws.length=0; el.instance.refresh(); })()'); await t.wait(2500);
         const ws = await t.E('__ws'), d1 = (await t.E('datasets(0)'))[0];
@@ -1083,7 +1091,8 @@ module.exports = async function()
         { mock: { series: true, historyDelay: 1500 } });
     await t.wait(5000);
     await t.step('a refresh with Home Assistant slow: the curve stays drawn from the history all along — never from the statistics —, as many points', async () => {
-        const pts = () => t.E(`(()=>{ const d=el.instance.graphs[0].chart.data.datasets[0].data; return { n: d.length, stat: d.filter(p=>p.statistics).length }; })()`);
+        // (the points in the window: those of its day before it, off the screen, drawn again only with it)
+        const pts = () => t.E(`(()=>{ const t0=Date.parse(el.instance.startTime), x=p=>typeof p.x==='number'?p.x:Date.parse(p.x), d=el.instance.graphs[0].chart.data.datasets[0].data.filter(p=>x(p)>=t0); return { n: d.length, stat: d.filter(p=>p.statistics).length }; })()`);
         const before = await pts();
         await t.E('el.instance.refresh()');
         const during = [];
@@ -1101,7 +1110,8 @@ module.exports = async function()
         { mock: { series: true, historyDelay: 2000 } });
     await t.step('a day on 900 pixels (a column of 1.6 min), Home Assistant slow: once the history has come, no point of the statistics left', async () => {
         await t.wait(6000);
-        const r = await t.E(`(()=>{ const d=el.instance.graphs[0]?.chart.data.datasets[0]?.data ?? []; return [d.length, d.filter(p=>p.statistics).length]; })()`);
+        // (the points in the window: those of its day before it, off the screen, drawn again only with it)
+        const r = await t.E(`(()=>{ const t0=Date.parse(el.instance.startTime), x=p=>typeof p.x==='number'?p.x:Date.parse(p.x), d=( el.instance.graphs[0]?.chart.data.datasets[0]?.data ?? [] ).filter(p=>x(p)>=t0); return [d.length, d.filter(p=>p.statistics).length]; })()`);
         return r[1] === 0 && r[0] > 50 ? true : JSON.stringify(r);
     });
     done(await t.close());
@@ -1185,7 +1195,8 @@ module.exports = async function()
             const h=__ws.filter(w=>w.type==='history/history_during_period').map(w=>w.start);
             const evening=x.filter(v=>v>Date.parse('2026-10-18T23:41:00+02:00') && v<Date.parse('2026-10-19T00:00:00+02:00')).length;
             return { h, evening, live: I.state.autoScroll, slots: I.cache.length - 1 === I.cacheSize }; })()`);
-        const ok = r.h.includes('2026-10-18T00:00:00+02:00') && r.h.includes('2026-10-19T00:00:00+02:00') && r.evening >= 3 && r.live && r.slots;
+        // (the evening's end from when it was asked — not the whole day again —, and the new day)
+        const ok = r.h.some(h => h >= '2026-10-18T23:00' && h < '2026-10-19T00:00') && r.h.includes('2026-10-19T00:00:00+02:00') && r.evening >= 3 && r.live && r.slots;
         return ok ? true : JSON.stringify(r);
     });
     done(await t.close());

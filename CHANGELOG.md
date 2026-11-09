@@ -4,6 +4,31 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.62] - 2026-11-09
+
+### Fixed — only real data drawn
+- The very coarse statistics asked around the window for the automatic Y axis (the first pass) were drawn too: until the window's own came, its curves went from the value before it — a month's mean — to the value now, straight or as an arc across the whole window. They serve the automatic Y axis only: a curve is drawn from its coarse source or finer, never a coarser one, whatever the cache holds
+- Statistics of a period shorter than an entity's own made up values between its values — a value held, drawn as twelve the same, then a step. Each entity's statistics are now told at the start, once a session, by probing its history (kept): its last 2 hours — its 5-minute statistics valid where the mean time between its values there (2 hours divided by their count; none: infinite) is under 4 minutes; its hourly ones too with 6 values there at least —; else its last 8 hours — its hourly ones valid where that mean is under 48 minutes. The daily, weekly and monthly statistics always valid. Statistics not valid never used: neither drawn nor exported, not counted in *Export ▸ Statistics ▸*; the entity's own source the history where they would be, its coarse source the first valid one
+- Tests (`yscale`): the probe asked first, the 5-minute statistics used with a value a minute, never with a value every 10 minutes, those in the cache not drawn; a value every 2 hours: its last 8 hours probed, neither its 5-minute nor its hourly statistics drawn, counted or exported, the daily ones still; the very coarse statistics never drawn; the three passes' tests with a value a minute
+
+### Changed — entity by entity, the history in blocks
+- Each entity asked on its own — each curve drawn as soon as its own answer comes —, its coarse statistics over the whole window at once, its passes one after the other: the coarse pass no longer waits for the last entity (Home Assistant answered all of them in one request, at the pace of the heaviest — since 1.2.25). The requests sent by pass, then in the graphs' order
+- The history in blocks of whole hours, over the window and a window on each side (three times the width shown, as the statistics), an hour at least, a day at most, the most recent first: 10 minutes shown no longer ask the whole day, a day's history kept by the hours it covers. The automatic refresh asks only what came since a curve's last block was asked — it asked the whole day again for a curve drawn from its history
+- Every source kept the same way, by the time it covers — the statistics by whole days, the history by whole hours —: what's lacking is what isn't covered, a refresh cutting each one's cover at the time it was asked; the history after the statistics (the last minutes) a block of history as any, no longer a source of its own
+- An entity without statistics takes at most its share of Home Assistant (1 / the number of curves) while the others load, its blocks interleaved with their requests; all of it once alone. Its history a window on each side only while the cache stays under 300 000 values (a chatty sensor)
+- An entity's attributes shown as several curves asked together, one request for their entity's history with its attributes
+- A block of history outside the window draws nothing again — a hover, a tooltip left as they are —, even within the window's day
+- The regulator raises the number of requests in flight only when it was reached (a few answered quickly no longer let a flood go next)
+- Tests (`yscale`): an entity without statistics interleaved; the angles' history in blocks of a day; the sides of a window without statistics in pass 3; the tests' history with the hours it covers
+- Tests (`features`, `options`, `smart`, `attributes`, `colors`, `mouse`): the history asked entity by entity in blocks of a day at most; a refresh asking what came since; the requests counted those of the window or the refresh; the 5-minute statistics with a value a minute; the steps and points counted in the window; the padlock and the colors tested once the window and its sides have come
+
+### Added
+- `yScaleSteadinessLeft`: a synonym of `yScaleSteadiness`
+- Tests (`yscale`): `yScaleSteadinessLeft` on the card
+
+### Changed — docs
+- README_Full: *Drawn at once, in three passes* (what the cache holds, drawn), *Only valid statistics*, *Requests to Home Assistant*, *The last minutes from the history*, the CSV export's counts; the options' table: `yScaleSteadinessLeft`; ARCHITECTURE.md: the cache by the time each source covers, entity by entity, the probes
+
 ## [v1.2.61] - 2026-11-09
 
 ### Changed — what the cache lacks, in three passes

@@ -205,7 +205,7 @@ module.exports = async function()
     for( const showCurrentValues of [true, false] ) {
         t = await openCard(card({ showCurrentValues, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
         await t.wait(1500);
-        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period' && Date.parse(w.start) > Date.now() - 2 * 3600e3).length`);
         await t.step(`refresh (showCurrentValues ${showCurrentValues}): a value changing every 0.5 s → one request every 2 s`, async () => {
             const n0 = await n();
             for( let i = 0; i < 20; i++ ) { await t.E(`setState('sensor.power', ${400 + i})`); await t.wait(500); }
@@ -225,7 +225,7 @@ module.exports = async function()
     t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
     {
-        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period').length`);
+        const n = () => t.E(`__ws.filter(w=>w.type==='history/history_during_period' && Date.parse(w.start) > Date.now() - 2 * 3600e3).length`);
         await t.step('info panel refresh: a value changing every 0.5 s → one request every 2 s', async () => {
             const n0 = await n();
             for( let i = 0; i < 20; i++ ) { await t.E(`setState('sensor.power', ${400 + i})`); await t.wait(500); }

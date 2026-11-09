@@ -403,6 +403,8 @@ module.exports = async function()
     const t2 = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, refresh: { automatic: false },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.rain' }] }] }, { mock: { series: true } });
     const E2 = x => t2.E(x);
+    // (the window and its sides loaded — its blocks of history come one after the other: no answer drawn during the step)
+    for( let k = 0; k < 50 && await E2('el.instance._requests.some(q => !q.background)'); k++ ) await t2.wait(200);
     await t2.wait(800);
     await t2.step('padlock clicked: the Y scale shown is kept when the data changes (the time panned, a new value); released, it follows the data again', async () => {
         // (a value far above the others, as new data brought by a pan or a refresh)
