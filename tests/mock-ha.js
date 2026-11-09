@@ -17,9 +17,12 @@
 //   statsFrom   { id: days }: an entity's statistics only for its last days (a unit changed)
 //   json        the history and statistics answered as Home Assistant's websocket does: a
 //               JSON text parsed by the page
-//   cost        { base, history, statistics }: Home Assistant answering the history and the
-//               statistics one request at a time (its database), each in base ms plus, per
-//               value returned, history or statistics ms — instead of historyDelay
+//   cost        { base, history, statistics, workers }: Home Assistant answering the history and
+//               the statistics workers requests at a time (its database: 1 by default), in the
+//               order they come, each in base ms plus, per value returned, history or
+//               statistics ms — instead of historyDelay; window.__mockWaiting: the most
+//               requests seen waiting for a worker
+//   lose        that many requests of the history or the statistics never answered (lost)
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
@@ -149,8 +152,8 @@ function statistics(d){
   }
   return r;
 }
-// (MOCK.cost: when Home Assistant is free again)
-let mockBusyUntil=0;
+// (MOCK.cost: when each of Home Assistant's workers is free again)
+let mockBusyUntil=[], mockStarts=[];
 function mkHass(){ return {
   states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
@@ -164,12 +167,17 @@ function mkHass(){ return {
   callWS:(d)=>{
     __ws.push({at:Date.now(), type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, period:d.period, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
+    if(MOCK.lose>0 && /history_during|statistics_during/.test(d.type)){ MOCK.lose--; __ws[__ws.length-1].lost=true; return new Promise(()=>{}); }
     // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
     const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();
     const wire=v=> MOCK.json ? JSON.parse(JSON.stringify(v)) : v;
     // (MOCK.cost: one request at a time, as long as what it returns asks)
-    const costed=(per, v)=>{ const n=Object.values(v).reduce((k,a)=>k+a.length,0), ms=MOCK.cost.base+n*per;
-      const start=Math.max(Date.now(), mockBusyUntil); mockBusyUntil=start+ms; return new Promise(r=>setTimeout(()=>r(wire(v)), mockBusyUntil-Date.now())); };
+    const costed=(per, v)=>{ const n=Object.values(v).reduce((k,a)=>k+a.length,0), ms=MOCK.cost.base+n*per, now=Date.now();
+      while(mockBusyUntil.length<(MOCK.cost.workers||1)) mockBusyUntil.push(0);
+      const w=mockBusyUntil.indexOf(Math.min(...mockBusyUntil)), start=Math.max(now, mockBusyUntil[w]), end=mockBusyUntil[w]=start+ms;
+      // (the requests waiting for a worker: those starting later)
+      mockStarts=mockStarts.filter(t=>t>now).concat(start>now ? [start] : []); window.__mockWaiting=Math.max(window.__mockWaiting||0, mockStarts.length);
+      return new Promise(r=>setTimeout(()=>r(wire(v)), end-now)); };
     // (and what working out the answer took the page — Home Assistant's server work, not the
     // card's: window.__mockSpent, [when, ms])
     const spent=f=>{ const t=performance.now(), v=f(); (window.__mockSpent=window.__mockSpent||[]).push([t, performance.now()-t]); return v; };

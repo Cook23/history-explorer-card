@@ -6,6 +6,7 @@ import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
 import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
+import { haRequests } from "./ha-requests.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period)
@@ -37,11 +38,11 @@ const LAYER = { month: 'month', week: 'week', day: 'day', stats: 'stats', fine: 
 const LAYERS = ['hist', 'tail', 'fine', 'stats', 'day', 'week', 'month'];
 // The period of a kind of statistics request (Home Assistant's)
 const periodOfKind = (kind, period) => ( { fine: FINE_PERIOD, day: DAY_PERIOD, week: WEEK_PERIOD, month: MONTH_PERIOD } )[kind] ?? period;
-// History parts asked at once (Home Assistant answers two together a quarter sooner)
-const HISTORY_REQUESTS = 2;
-// The coarse source drawn at once while the window's own comes: the coarsest statistics, a
-// step coarser than it at least, still giving the window this many values
-const COARSE_POINTS = 10;
+// The first pass, drawn at once while the window's own source comes: over the window, the
+// coarsest statistics coarser than it still giving the window COARSE_POINTS values — else
+// the next coarser one, if it gives it COARSE_MIN_POINTS —; over a window on each side
+// (the automatic Y axis' only), the coarsest giving it SIDE_POINTS
+const COARSE_POINTS = 100, COARSE_MIN_POINTS = 10, SIDE_POINTS = 3;
 // Ahead of the gestures to come — the time panned, a zoom in or out —, the cache filled
 // around the window, in steps, in the background (AHEAD_GAP_MS after the last request
 // answered, or the window last changed — no gesture going on): the coarse source over
@@ -289,11 +290,16 @@ export class CardHistory
     // cache has, however coarse, then refined as the rest comes:
     // - the source a column of pixels needs (_sourceNeeded: the history, the 5-minute, the
     //   hourly or the daily statistics) for the window, the statistics in one request, the
-    //   history a few days at a time, the most recent first, two parts at once — two for the
-    //   window shown: those still under way for another one don't hold it back;
-    // - first, the coarsest statistics a step coarser at least (_coarseOf) still giving the
-    //   window COARSE_POINTS values — the quickest to come —, over the window and a window on each side
-    //   (the time a pan or a zoom out shows next), where the cache has nothing finer;
+    //   history a few days at a time, the most recent first — all asked at once, sent to Home
+    //   Assistant in that order as fast as it answers them (see ha-requests.js);
+    // - in three passes, each once the one before has come, each answer drawn as it comes:
+    //   1. the coarse statistics (_coarseOf) over the window, and the coarsest giving a window
+    //      SIDE_POINTS values (_sideOf) a window on each side — what the automatic Y axis looks
+    //      at —, where the cache has nothing finer: few rows, the quickest to come;
+    //   2. the window's own source over the window, for every entity — the history of those
+    //      without statistics too;
+    //   3. the coarse statistics a window on each side (the time a pan or a zoom out shows
+    //      next) — quietly: the window no longer loading;
     // - where a day of the window comes back empty, or starting late (the recorder no longer
     //   keeps it, or not all of it: past its retention), the next coarser statistics there;
     //   where all its statistics come back empty or starting late (deleted, or begun that day,
@@ -304,12 +310,11 @@ export class CardHistory
     //   whole day's history of an entity whose statistics stop earlier there (Home Assistant
     //   late with them, or none); and the history of the entities without statistics,
     //   everywhere;
-    // - for the curves without that first, coarse pass, the window's own source a window on
-    //   each side, at once, as soon as the window has come — quietly;
-    // - while the user looks at the graphs without moving them, the cache filled further
+    // - then, in the background (one request at a time, see _backgroundFree): the history of
+    //   the angles drawn from statistics over the window first; then the cache filled further
     //   around the window in steps (see _scheduleAhead): the window's own source a window on
-    //   each side, the coarse one up to AHEAD_COARSE windows — quietly: the window isn't
-    //   loading for them —, never past AHEAD_MAX_ROWS rows in the cache.
+    //   each side — the history of the entities without statistics too —, the coarse one up to
+    //   AHEAD_COARSE windows, never past AHEAD_MAX_ROWS rows in the cache.
     // Nothing is asked twice: what the cache has, or a request under way will bring. The
     // graphs are drawn at once, from what the cache has — the window asked is the window
     // shown, whatever is loading —; each answer draws them again
@@ -334,14 +339,21 @@ export class CardHistory
         return l;
     }
 
-    // The coarse source drawn first for a window r ms long whose own is source (an index in
-    // sources): the coarsest, a step coarser at least, still giving the window COARSE_POINTS
-    // values or more — the fewest rows, the quickest to come; the window's own when it is the
-    // coarsest (asked around the window too); else none (-1)
+    // The coarse source of the first pass for a window r ms long whose own is source (an
+    // index in sources): the coarsest coarser than it still giving the window COARSE_POINTS
+    // values or more — the fewest rows, the quickest to come —; else the next coarser one if
+    // it gives it COARSE_MIN_POINTS; else none (-1): the window's own source first
     _coarseOf(sources, source, r)
     {
-        if( source === sources.length - 1 ) return source;
         for( let k = sources.length - 1; k > source; k-- ) if( r / sources[k].ms >= COARSE_POINTS ) return k;
+        return source + 1 < sources.length && r / sources[source + 1].ms >= COARSE_MIN_POINTS ? source + 1 : -1;
+    }
+
+    // The statistics of the first pass a window r ms long on each side of it, for the
+    // automatic Y axis only: the coarsest still giving it SIDE_POINTS values; else none (-1)
+    _sideOf(sources, r)
+    {
+        for( let k = sources.length - 1; k >= 1; k-- ) if( r / sources[k].ms >= SIDE_POINTS ) return k;
         return -1;
     }
 
@@ -387,16 +399,13 @@ export class CardHistory
         let _anglesPending = false;
         for( let i = c0; i <= c1 && !_anglesPending; i++ ) for( const id of _angles ) if( this._missing(i, 'hist', id) && !_asked('history', i, id) ) _anglesPending = true;
 
-        // The coarse source first, over the window and around it, where nothing finer is there
-        if( ci >= 0 ) {
-            const [a0, a1] = this._slotsOf(t0 - AHEAD_COARSE[0] * r, t1 + AHEAD_COARSE[0] * r);
-            if( a0 >= 0 && a1 >= 0 ) this._askRuns(S[ci].kind, a0, a1, _statIds, (i, id) => !_hasFrom(i, id, ci), c0, c1);
-            // (further, ahead: in the background)
-            if( AHEAD_COARSE[_step] > AHEAD_COARSE[0] && !_anglesPending ) {
-                const [b0, b1] = this._slotsOf(t0 - AHEAD_COARSE[_step] * r, t1 + AHEAD_COARSE[_step] * r);
-                if( b0 >= 0 && b1 >= 0 ) this._askRuns(S[ci].kind, b0, b1, _statIds, (i, id) => ( i < a0 || i > a1 ) && !_hasFrom(i, id, ci), c0, c1, true);
-            }
-        }
+        // Pass 1: the coarse source over the window, the coarsest giving a window SIDE_POINTS
+        // values a window on each side, where nothing finer is there — the window's own source
+        // asked once all of it has come
+        const [a0, a1] = this._slotsOf(t0 - AHEAD_COARSE[0] * r, t1 + AHEAD_COARSE[0] * r), vi = this._sideOf(S, r);
+        if( ci >= 0 ) this._askRuns(S[ci].kind, c0, c1, _statIds, (i, id) => !_hasFrom(i, id, ci), c0, c1, false, { pass: 1 });
+        if( vi >= 0 && a0 >= 0 && a1 >= 0 ) this._askRuns(S[vi].kind, a0, a1, _statIds, (i, id) => ( i < c0 || i > c1 ) && !_hasFrom(i, id, vi), a0, a1, false, { pass: 1, light: true });
+        const _pass1 = this._requests.some(q => q.pass === 1 && q.key === _key);
 
         // The window's own statistics — where they aren't compiled yet, the finer ones there —
         // and, where a day comes back empty (past the recorder's retention), the next coarser
@@ -418,11 +427,11 @@ export class CardHistory
             // (empty, or starting late: the next coarser)
             for( let j = si; j + 1 < S.length && _empty(i, id, j); j++ ) _wanted.get(S[j + 1].kind).add(i + ' ' + id);
         }
-        for( const x of S.slice(1) ) this._askRuns(x.kind, c0, c1, _statIds, (i, id) => _wanted.get(x.kind).has(i + ' ' + id), c0, c1);
+        if( !_pass1 ) for( const x of S.slice(1) ) this._askRuns(x.kind, c0, c1, _statIds, (i, id) => _wanted.get(x.kind).has(i + ' ' + id), c0, c1, false, { pass: 2 });
 
         // The history after the finest statistics — what Home Assistant hasn't compiled yet —,
         // from their period and STATS_LAG ago to now, in one request
-        if( _source !== 'history' )
+        if( _source !== 'history' && !_pass1 )
             this._askRows('tail', c0, c1, _statIds, i => this._lacksStatistics(i, _finestMs), Date.now() - _finestMs - STATS_LAG);
 
         // The history each day needs: everything when it tells more; else the entities
@@ -447,19 +456,29 @@ export class CardHistory
         const _needs = i => _ids.filter(id => this._missing(i, 'hist', id) && _histWanted(i, id));
         // (a few days at a time — at most 8 parts for the window —, the most recent first)
         const _days = Math.max(1, Math.ceil(( c1 - c0 + 1 ) / 8));
-        const _underWay = () => this._requests.filter(q => q.kind === 'history' && q.c0 <= c1 && q.c1 >= c0).length;
-        let i = c1;
+        let i = _pass1 ? c0 - 1 : c1;
         while( i >= c0 ) {
             const _n = _needs(i).filter(id => !_asked('history', i, id));
             if( !_n.length ) { i--; continue; }
-            if( _underWay() >= HISTORY_REQUESTS ) break;
             // (the days before it needing exactly the same entities, up to a part's length: a
             // curve's recent days never asked with weeks of a timeline's)
             const _k = k => _needs(k).filter(id => !_asked('history', k, id)).join();
             let j = i;
             while( j - 1 >= c0 && i - ( j - 1 ) < _days && _k(j - 1) === _n.join() ) j--;
-            this._ask('history', j, i, new Set(_n));
+            this._ask('history', j, i, new Set(_n), null, false, false, { pass: 2 });
             i = j - 1;
+        }
+
+        const _windowDone = !_pass1 && !this._requests.some(q => !q.quiet && q.c0 <= c1 && q.c1 >= c0);
+
+        // Pass 3, once the window has come — passes 1 and 2, above —: the coarse source a window on
+        // each side, quietly; further, ahead, in the background
+        if( ci >= 0 && _windowDone ) {
+            if( a0 >= 0 && a1 >= 0 ) this._askRuns(S[ci].kind, a0, a1, _statIds, (i, id) => ( i < c0 || i > c1 ) && !_hasFrom(i, id, ci), c0, c1, false, { pass: 3 });
+            if( AHEAD_COARSE[_step] > AHEAD_COARSE[0] && !_anglesPending ) {
+                const [b0, b1] = this._slotsOf(t0 - AHEAD_COARSE[_step] * r, t1 + AHEAD_COARSE[_step] * r);
+                if( b0 >= 0 && b1 >= 0 ) this._askRuns(S[ci].kind, b0, b1, _statIds, (i, id) => ( i < a0 || i > a1 ) && !_hasFrom(i, id, ci), c0, c1, true);
+            }
         }
 
         // Angles drawn from statistics (the window's own source a statistics one): their history
@@ -467,7 +486,6 @@ export class CardHistory
         // part at a time, Home Assistant free (_backgroundFree) —, a few days at a time, the
         // most recent first, each drawn as it comes (the points worked out again from it:
         // their mean, min and max); then a window on each side, with the rest of the background
-        const _windowDone = !this._requests.some(q => !q.quiet && q.c0 <= c1 && q.c1 >= c0);
         if( _windowDone && _anglesPending ) {
             const _need = k => [..._angles].filter(id => this._missing(k, 'hist', id) && !_asked('history', k, id));
             let k = c1;
@@ -480,27 +498,16 @@ export class CardHistory
             }
         }
 
-        // The window's own source a window on each side — the statistics, or the history it is
-        // drawn from —, outside the window, quietly: at once, as soon as the window has come,
-        // for the curves without a first, coarse pass (the second pass: the window first, then
-        // its sides, both at once); else ahead, the user idle (see _scheduleAhead), one at a time
-        const _coarsePass = id => ci >= 0 && _hasStats.has(id);
-        const _sides = this._aheadFine && _windowDone && _ids.some(id => !_coarsePass(id)) && this._sidesFit(S[si].kind);
-        if( ( AHEAD_FINE[_step] && this._aheadFine ) || _sides ) {
-            const _w = Math.max(this._aheadFine ? AHEAD_FINE[_step] : 0, _sides ? 1 : 0);
-            const [b0, b1] = this._slotsOf(t0 - _w * r, t1 + _w * r);
+        // The window's own source a window on each side, ahead, in the background (see
+        // _scheduleAhead) — the statistics, or the history it is drawn from; the history of the
+        // entities without statistics, and of the angles drawn from statistics, too
+        if( AHEAD_FINE[_step] && this._aheadFine ) {
+            const [b0, b1] = this._slotsOf(t0 - AHEAD_FINE[_step] * r, t1 + AHEAD_FINE[_step] * r);
             if( b0 >= 0 && b1 >= 0 ) {
-                // (outside the window: its own days are asked above, two history parts at once;
-                // at once for the curves without a coarse pass, else in the background)
                 const _out = i => i < c0 || i > c1;
-                for( const now of [true, false] ) {
-                    if( now ? !_sides : !( AHEAD_FINE[_step] && this._aheadFine ) ) continue;
-                    const _which = id => now ? !_coarsePass(id) : true;
-                    if( si >= 1 ) this._askRuns(S[si].kind, b0, b1, _statIds, (i, id) => _out(i) && _which(id) && !_hasFrom(i, id, si), c0, c1, !now);
-                    // (the history too of the angles drawn from statistics, in the background — see above)
-                    const _histOf = id => !_hasStats.has(id) || _all || ( !now && _angles.has(id) );
-                    this._askRuns('history', b0, b1, _ids, (i, id) => _out(i) && _which(id) && _histOf(id) && !_hasFrom(i, id, 0), c0, c1, !now);
-                }
+                if( si >= 1 ) this._askRuns(S[si].kind, b0, b1, _statIds, (i, id) => _out(i) && !_hasFrom(i, id, si), c0, c1, true);
+                const _histOf = id => !_hasStats.has(id) || _all || _angles.has(id);
+                this._askRuns('history', b0, b1, _ids, (i, id) => _out(i) && _histOf(id) && !_hasFrom(i, id, 0), c0, c1, true);
             }
         }
 
@@ -565,18 +572,9 @@ export class CardHistory
     _backgroundFree()
     {
         const _wait = ( this._backgroundNext ?? 0 ) - Date.now();
-        if( !this._requests.length && !this.state.drag && _wait <= 0 ) return true;
+        if( !this._requests.length && !haRequests.busy() && !this.state.drag && _wait <= 0 ) return true;
         clearTimeout(this._backgroundTid);
         this._backgroundTid = setTimeout(() => { this._backgroundTid = 0; if( !this._requests.length ) this._askMissing(); }, Math.min(AHEAD_GAP_MAX_MS, Math.max(_wait, AHEAD_GAP_MS)));
-        return false;
-    }
-
-    // May the window's own source (kind) be asked a window on each side — the cache staying
-    // under AHEAD_MAX_ROWS with twice the window's rows of it more? If not, never for this window
-    _sidesFit(kind)
-    {
-        if( this.cacheRows() + 2 * this._windowRows([LAYER[kind]]) <= AHEAD_MAX_ROWS ) return true;
-        this._aheadFine = false;
         return false;
     }
 
@@ -722,14 +720,14 @@ export class CardHistory
     // The rows of a kind that slots c0 to c1 lack for entities ids — those wanted (wants(i,
     // id)), neither loaded nor under way —, a request for each run of days needing some; a run
     // outside the window (slots w0 to w1) asked quietly
-    _askRuns(kind, c0, c1, ids, wants, w0, w1, background = false)
+    _askRuns(kind, c0, c1, ids, wants, w0, w1, background = false, o = {})
     {
         // (in the background: one run at a time, when Home Assistant is free — _backgroundFree —,
         // the others at a later turn)
         if( background && !this._backgroundFree() ) return;
         let run = null, sent = false;
         const _flush = () => {
-            if( run && !( background && sent ) ) { this._ask(kind, run.c0, run.c1, run.ids, null, run.c1 < w0 || run.c0 > w1, background); sent = true; }
+            if( run && !( background && sent ) ) { this._ask(kind, run.c0, run.c1, run.ids, null, run.c1 < w0 || run.c0 > w1, background, o); sent = true; }
             run = null;
         };
         for( let i = c0; i <= c1; i++ ) {
@@ -811,15 +809,18 @@ export class CardHistory
     // 'fine' (5-minute statistics), 'history' or 'tail' (the history from a time, from: in
     // slot c0) —, kept under way until it's answered, or fails (even before it's sent); the
     // answer put in the cache, what's still missing asked, the graphs drawn again
-    _ask(kind, c0, c1, ids, from = null, quiet = false, background = false)
+    _ask(kind, c0, c1, ids, from = null, quiet = false, background = false, o = {})
     {
-        const q = { kind, c0, c1, ids, gen: this._loadGen, at: Date.now(), quiet: quiet || background, background };
+        // (o.pass: the pass of the window's loading it belongs to — key: that window's; o.light:
+        // a very coarse one, sent at once with the others — see ha-requests.js)
+        const q = { kind, c0, c1, ids, gen: this._loadGen, at: Date.now(), quiet: quiet || background, background, pass: o.pass ?? 0, key: this._aheadKey };
         this._requests.push(q);
         const t0 = from !== null ? moment(Math.max(from, msOf(this.cache[c0].start))) : this.cache[c0].start, t1 = this.cache[c1].end, l = [...ids];
         const _period = periodOfKind(kind, this.statistics.period);
         let _p;
         try {
-            _p = LAYER[kind] === 'hist' || kind === 'tail' ? this.historyCall(l, t0, t1) : this._askHA(this.statisticsRequest(l, t0, t1, _period));
+            const _o = { light: !!o.light, now: background, rows: this._rowsOf(kind, l.length, moment(t1).diff(t0) / 86400e3) };
+            _p = LAYER[kind] === 'hist' || kind === 'tail' ? this.historyCall(l, t0, t1, _o) : this._askHA(this.statisticsRequest(l, t0, t1, _period), _o);
         } catch( e ) {
             _p = Promise.reject(e);
         }
@@ -875,11 +876,23 @@ export class CardHistory
         }
     }
 
+    // How many rows a request of kind should give for n entities over days (the regulator's
+    // time-out, see ha-requests.js): the statistics' periods; the history's as the cache holds
+    // them, an entity's day — a value a minute, without any yet
+    _rowsOf(kind, n, days)
+    {
+        if( LAYER[kind] !== 'hist' && kind !== 'tail' ) return n * days * 86400e3 / periodMs(periodOfKind(kind, this.statistics.period));
+        let _rows = 0, _days = 0;
+        for( const s of this.cache ) for( const a of s.hist.values() ) if( a.length ) { _rows += a.length; _days++; }
+        return n * days * ( _days ? _rows / _days : 1440 );
+    }
+
     // A request of the history or the statistics to Home Assistant — timed, with how many
     // values it gave, while a performance test records (perf)
-    _askHA(request)
+    _askHA(request, o = {})
     {
-        const _p = this._hass.callWS(request);
+        // (through the page's regulator: see ha-requests.js)
+        const _p = haRequests.request(() => this._hass.callWS(request), { ...o, connected: () => this._hass?.connection?.connected !== false });
         if( !this.perf ) return _p;
         const _t = performance.now(), _perf = this.perf;
         return _p.then(r => {
@@ -1040,13 +1053,13 @@ export class CardHistory
     // compressed rows): the states asked as usual; the attributes from their entities'
     // history with its attributes, every change included (an attribute changing alone is
     // no significant change for Home Assistant)
-    historyCall(ids, t0, t1 = null)
+    historyCall(ids, t0, t1 = null, o = {})
     {
         const _states = ids.filter(id => !seriesOf(id).attribute);
         const _attrs = ids.filter(id => seriesOf(id).attribute);
         const _entities = [...new Set(_attrs.map(id => seriesOf(id).entity))];
         const _ask = (l, attributes) => l.length
-            ? this._askHA({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) })
+            ? this._askHA({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) }, o)
             : Promise.resolve({});
         return Promise.all([_ask(_states, false), _ask(_entities, true)])
             .then(([r, ra]) => ({ ...r, ...attributeHistories(_attrs, ra) }));

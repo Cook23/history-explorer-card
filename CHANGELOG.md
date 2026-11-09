@@ -4,6 +4,26 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.61] - 2026-11-09
+
+### Changed — what the cache lacks, in three passes
+- What the cache lacks, in three passes, each once the one before has come: 1. over the window, the coarsest statistics coarser than its own source still giving it 100 values (the 5-minute ones for a day, the hourly ones for a week or a month, the daily ones for six months or a year, the monthly ones for ten years), else the next coarser one if it gives 10 (the 5-minute ones for a few hours), else none; and a window on each side, the coarsest giving it 3 values, for the automatic Y axis only — the fewest rows, the quickest to come; 2. over the window, its own source, for every entity — the history of an entity without statistics too, which no longer comes with the first pass, holding it back; 3. a window on each side, the coarse statistics. Without statistics, the automatic Y axis looks at the window alone at first, at its sides once the cache has them, filled in the background. Whatever there is, drawn: a day of the window that comes back empty, or whose values start well after its beginning (past the recorder's retention), gets the next coarser statistics; a day whose statistics all come back empty or starting late (deleted, or begun that day, after a change of unit) gets its history
+- Ahead, while the graphs are looked at: the history of the entities without statistics a window on each side with the rest, in the background — it was asked at once after the window
+- Measured on the same mock of Home Assistant (a Raspberry Pi 5 with MariaDB, answering 4 requests at a time): the window shown (80 % of its width) after 0.65 s for 6 months (1.2.60: 0.32 s, 1.2.59: 10.5 s), 0.89 s for a year (0.39 s, 20.5 s), 2.05 s for 30 days (0.37 s, 2.03 s), 1.35 s for a day (0.45 s, 1.95 s) — the first pass's hundred values an entity, more detailed, longer to come; the window complete 3 to 10 % later than 1.2.59, 3.0 s instead of 1.95 for a day (the history asked once the first pass has come); a pan back after looking at the graphs complete in 0.03 to 0.09 s
+- Tests (`yscale`, `features`): the three passes for 3 hours, a day and a week, an entity without statistics in the second, the daily statistics first for six months or a year, the hourly ones for 30 days, the 5-minute ones in bold in *Export ▸ Statistics ▸* for a day; the window's sides in the background without statistics
+
+### Changed — the requests to Home Assistant regulated
+- One regulator for the page (`ha-requests.js`), every card's requests through it: the very coarse statistics all sent at once; the others in the order they're needed, one every 10 ms, up to 10 in flight at first, then as many as Home Assistant's answers show it takes without a flood (TCP Vegas, as Netflix's concurrency-limits does it: each answer's time against the quickest for its rows, one to three requests kept waiting at its database); the window's history no longer two parts at a time; the background only when nothing else is in flight
+- A request lost — no answer in its time (what it should take, waiting included, twice; 15 s at least) or the connection lost — asked again once the connection is back, twice at most; the next pass and the background no longer wait for it for ever
+- Tests (`yscale`, `features`): 6 months of history with Home Assistant answering 4 at a time (the parts from the right, paced, more than 4 in flight, never a flood), a request lost; a long window's parts all asked at once, from the right, paced, the curve growing back in time as Home Assistant answers them one at a time; the mock answers `workers` requests at a time and loses some when asked (`MOCK.lose`)
+
+### Fixed — the min/max band's edges follow the curve
+- The edges of the min/max band (`showMinMax`) were straight lines from one point to the next: they're drawn as the curve is — straight, in steps, or curves of the same interpolation (monotone, makima, Catmull-Rom, Steffen, B-spline) —, without a line of their own (`hecMinMaxBand`)
+- Tests (`features`): the band's edges in each line mode and interpolation
+
+### Changed — docs
+- README_Full: *Drawn at once, in three passes*, *Ahead*, *Requests to Home Assistant* (Long term statistics), the automatic scale's values around the window, the min/max band's edges; ARCHITECTURE.md: `ha-requests.js`, the cache's three passes; `deps/Chart Custom.js.md`: `showMinMax`'s edges
+
 ## [v1.2.60] - 2026-11-09
 
 ### Added — the automatic Y axis: what is shown first, a steady scale second ([#274](https://github.com/Cook23/history-explorer-card/issues/274))
