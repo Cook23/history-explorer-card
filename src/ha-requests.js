@@ -5,7 +5,8 @@
 //
 // - Light ones (the very coarse statistics: a few rows, the time of the network only) are
 //   sent at once, all together.
-// - Heavy ones are sent in the order asked — Home Assistant answers them in the order they
+// - Heavy ones are sent in the order asked — by their order (o.order: a pass, then the place
+//   of its entity in the graphs), then as asked; Home Assistant answers them in the order they
 //   come, its workers taking them one after the other —, one every PACE_MS, up to `limit` in
 //   flight: START_LIMIT at first, then as Home Assistant answers (TCP Vegas, as Netflix's
 //   concurrency-limits does it): each answer's time against the time it would take with
@@ -13,6 +14,9 @@
 //   perRow —, the requests waiting at Home Assistant worked out from it (in flight × (1 −
 //   quickest ÷ measured)): fewer than ALPHA, one more in flight; more than BETA, one less —
 //   its workers kept busy, a request or two waiting there, never a flood.
+// - A request shared (o.share: an entity without statistics, see card-history.js _shareOf)
+//   takes at most 1 / o.share.n of what Home Assistant does for its epoch (the window) while
+//   other requests wait or are in flight — all of it once alone (_next).
 // - The background (now) is sent at once: the card sends it one at a time, only when nothing
 //   heavy is in flight or waiting here (busy).
 // - A request lost — no answer after its time-out (as TCP's: the time it should take, from
@@ -44,16 +48,27 @@ class Regulator
         this.perRow = Infinity;
         this.srtt = null;
         this.rttvar = 0;
+        // (the heavy requests not shared in flight; what Home Assistant did, by epoch: its
+        // total and each shared key's, in ms)
+        this.othersInFlight = 0;
+        this.used = new Map();
     }
 
     // A request: send() → a promise of Home Assistant's answer; o: { light, now (the
-    // background), rows (how many it should give), connected() } → a promise of its answer
+    // background), rows (how many it should give), order (lower sent first), connected() } →
+    // a promise of its answer
     request(send, o = {})
     {
         return new Promise((resolve, reject) => {
-            const job = { send, resolve, reject, light: !!o.light, now: !!o.now, rows: Math.max(1, o.rows || 1), connected: o.connected ?? ( () => true ), tries: 0, done: false };
+            const job = { send, resolve, reject, light: !!o.light, now: !!o.now, rows: Math.max(1, o.rows || 1), connected: o.connected ?? ( () => true ), tries: 0, done: false, order: o.order ?? Infinity,
+                          share: o.share ?? null, epoch: o.epoch ?? null };
             if( job.light || job.now ) this._send(job);
-            else { this.queue.push(job); this._pump(); }
+            else {
+                // (after those of its order or a lower one: as asked within it)
+                const k = this.queue.findIndex(x => x.order > job.order);
+                this.queue.splice(k < 0 ? this.queue.length : k, 0, job);
+                this._pump();
+            }
         });
     }
 
@@ -70,24 +85,41 @@ class Regulator
         while( this.queue.length && this.inFlight < this.limit ) {
             const _wait = this.lastSent + PACE_MS - performance.now();
             if( _wait > 0 ) { this.pumpTid = setTimeout(() => { this.pumpTid = 0; this._pump(); }, _wait); return; }
-            this._send(this.queue.shift());
+            const k = this._next();
+            if( k < 0 ) return;
+            this._send(this.queue.splice(k, 1)[0]);
         }
+    }
+
+    // The next heavy request to send: the first waiting — but a shared one (o.share: { key,
+    // n, epoch }) past its share of what Home Assistant did for its epoch (1 / n of it), while
+    // others are waiting or in flight: left for later; -1, none for now
+    _next()
+    {
+        const _others = this.othersInFlight > 0 || this.queue.some(j => !j.share);
+        for( let k = 0; k < this.queue.length; k++ ) {
+            const j = this.queue[k];
+            if( !j.share || !_others ) return k;
+            const u = this.used.get(j.share.epoch);
+            if( !u || ( u.by.get(j.share.key) ?? 0 ) <= u.total / j.share.n ) return k;
+        }
+        return -1;
     }
 
     _send(job)
     {
         const _heavy = !job.light && !job.now, _at = performance.now();
-        if( _heavy ) { this.inFlight++; this.lastSent = _at; }
+        if( _heavy ) { this.inFlight++; this.lastSent = _at; if( !job.share ) this.othersInFlight++; }
         const _load = this.inFlight;
         let _over = false;
         // (no longer in flight: answered, failed, or past its time-out)
-        const _release = () => { if( _over ) return; _over = true; if( _heavy ) { this.inFlight--; this._pump(); } };
+        const _release = () => { if( _over ) return; _over = true; if( _heavy ) { this.inFlight--; if( !job.share ) this.othersInFlight--; this._pump(); } };
         const _tid = setTimeout(() => { _release(); this._again(job, new Error('Home Assistant did not answer')); }, this._timeout(job.rows));
         let _p;
         try { _p = Promise.resolve(job.send()); } catch( e ) { _p = Promise.reject(e); }
         _p.then(r => {
             clearTimeout(_tid);
-            if( !_over ) this._measure(performance.now() - _at, _rowsOf(r), _load, _heavy);
+            if( !_over ) { this._measure(performance.now() - _at, _rowsOf(r), _load, _heavy); this._account(job, performance.now() - _at); }
             _release();
             if( !job.done ) { job.done = true; job.resolve(r); }
         }, e => {
@@ -98,6 +130,20 @@ class Regulator
             if( _lost(e) ) this._again(job, e);
             else { job.done = true; job.reject(e); }
         });
+    }
+
+    // What Home Assistant did for a heavy request of an epoch (ms): its epoch's total, its key's
+    // when shared — the last few epochs kept
+    _account(job, ms)
+    {
+        if( job.light || job.now || job.epoch === null ) return;
+        if( !this.used.has(job.epoch) ) {
+            this.used.set(job.epoch, { total: 0, by: new Map() });
+            if( this.used.size > 4 ) this.used.delete(this.used.keys().next().value);
+        }
+        const u = this.used.get(job.epoch);
+        u.total += ms;
+        if( job.share ) u.by.set(job.share.key, ( u.by.get(job.share.key) ?? 0 ) + ms);
     }
 
     // A request lost sent again — after RETRY_MS, once the connection is back —, RETRIES times
@@ -128,7 +174,8 @@ class Regulator
         else { this.rttvar = 0.75 * this.rttvar + 0.25 * Math.abs(this.srtt - _row); this.srtt = 0.875 * this.srtt + 0.125 * _row; }
         if( !heavy || !Number.isFinite(this.perRow) ) return;
         const _queued = load * ( 1 - ( this.base + rows * this.perRow ) / ms );
-        if( _queued < ALPHA ) this.limit = Math.min(MAX_LIMIT, this.limit + 1);
+        // (one more only when the limit was reached: few requests answered quickly tell nothing of more)
+        if( _queued < ALPHA ) { if( load >= this.limit - 1 ) this.limit = Math.min(MAX_LIMIT, this.limit + 1); }
         else if( _queued > BETA ) this.limit = Math.max(MIN_LIMIT, this.limit - 1);
     }
 

@@ -18,11 +18,13 @@ const FAIL = ['history/history_during_period', 'recorder/statistics_during_perio
 // holding another value than the point before (wrong), the last point a plateau's end (endPlateau)
 const draw = f => `(()=>{
     const I = el.instance, id = 'sensor.rain', now = Date.now(), last = I.cache.length - 1;
-    for( const s of I.cache ) for( const l of ['hist', 'tail', 'fine', 'stats'] ) s[l].delete(id);
+    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats'] ) { s[l].delete(id); s.cover[l].delete(id); }
     const day = i => I.cache[last - i].start_m.valueOf();
     const H = (t, v) => ({ last_changed: t, state: String(v) });
     const S = (t, v) => ({ last_changed: t, state: v, statistics: { end: t + 300e3, min: v, mean: v, max: v } });
-    for( const { layer, slot, rows } of (${f})(day, now, H, S) ) I.cache[last - slot][layer].set(id, rows);
+    // (the history with the hours its rows cover)
+    for( const { layer, slot, rows } of (${f})(day, now, H, S) ) { const c = I.cache[last - slot]; c[layer].set(id, rows);
+        if( layer === 'hist' && rows.length ) c.cover.hist.set(id, [[rows[0].last_changed, Math.max(rows[rows.length - 1].last_changed + 1, layer === 'hist' && slot === 0 ? now : 0)]]); }
     I.generateGraphDataFromCache();
     const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && p.y !== undefined);
     const t = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
@@ -53,7 +55,7 @@ module.exports = async function()
                 { layer: 'fine', slot: 1, rows: every(day(1), day(0), 300e3, t => 33, S) },
                 { layer: 'fine', slot: 0, rows: every(day(0), now - 20 * 60e3, 300e3, t => 36, S) },
                 // (the last 15 minutes: the history after the statistics, 43 then 44)
-                { layer: 'tail', slot: 0, rows: every(now - 15 * 60e3, now, 300e3, t => t < now - 8 * 60e3 ? 43 : 44, H) },
+                { layer: 'hist', slot: 0, rows: every(now - 15 * 60e3, now, 300e3, t => t < now - 8 * 60e3 ? 43 : 44, H) },
             ]; }`));
         return r.source === 'fine' && r.n > 100 && r.back === -1 && r.wrong.length === 0 && r.plateaus === 0 ? true : JSON.stringify(r);
     });

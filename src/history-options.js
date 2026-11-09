@@ -77,6 +77,7 @@ const OPTION_SYNONYMS = {
     dashMode         : ['line_style'],
     yAxis            : ['y_axis'],
     ymin             : ['lower_bound'],
+    yScaleSteadiness : ['yScaleSteadinessLeft'],
     ymax             : ['upper_bound'],
     fill             : ['show_fill'],
     color            : ['color_thresholds'],

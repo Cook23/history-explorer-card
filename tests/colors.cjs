@@ -20,6 +20,8 @@ module.exports = async function()
         { type: 'line', entities: [{ entity: 'sensor.rain', color: { entity: 'sensor.clim_mode', hot: 'red', cold: 'blue', default: 'grey' } }] },
         { type: 'line', entities: [{ entity: 'sensor.wind', color: { entity: 'sensor.clim_mode', hot: 'red', cold: 'blue' } }] },
     ] }), { height: 2000, mock: { series: true } });
+    // (the window and its sides loaded — every entity's blocks of history come one after the other)
+    for( let k = 0; k < 50 && await t.E('el.instance._requests.some(q => !q.background)'); k++ ) await t.wait(200);
     await t.wait(800);
     // Graph gi's first dataset: its color steps, its points (time, value), its colors, its legend swatch
     const ds = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, d=c.data.datasets[0], l=c.legend.legendItems[0];
@@ -32,9 +34,12 @@ module.exports = async function()
         return ['input_text.curve_color', 'input_text.curve_thresholds', 'input_text.not_a_color'].every(i => ids.includes(i)) ? true : JSON.stringify(ids);
     });
     await t.step('color from an entity: the curve takes, at each point, the color the entity had then', async () => {
-        const d = await ds(0);
-        const onPoints = d.steps && d.steps.every(s => d.pts.some(p => p.x === s.x));
-        return d.steps && d.steps.length > 3 && colorsOf(d) === '#0000ff,red' && onPoints ? true : JSON.stringify({ steps: d.steps, n: d.pts.length });
+        // (the steps shown: from the window's start — before it, its day's points off the screen,
+        // the color entity's history there perhaps not come yet)
+        const d = await ds(0), t0 = await t.E('Date.parse(el.instance.startTime)');
+        const steps = d.steps && d.steps.filter(s => s.x >= t0), shown = { ...d, steps };
+        const onPoints = steps && steps.every(s => d.pts.some(p => p.x === s.x));
+        return steps && steps.length > 3 && colorsOf(shown) === '#0000ff,red' && onPoints ? true : JSON.stringify({ steps: d.steps, t0, n: d.pts.length });
     });
     await t.step('color from an entity: the legend shows the curve\'s color now', async () => {
         // (the mock's history goes on past now: the color now is that of the last point at or before now)
