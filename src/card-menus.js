@@ -40,11 +40,10 @@ const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;co
 // (_scopeOf)
 const _SECTIONS = { rep: 'ui.menu.type_representation', appearance: 'ui.menu.type_appearance', interp: 'ui.menu.type_interpolation',
                     behavior: 'ui.menu.type_behavior' };
-// The type menu's lines: the sections, and, last, the tests a user can run to report what
-// their browser or app gives the card (card-tests.js)
-const _TYPE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', tests: 'ui.menu.type_tests' };
+// The type menu's lines: the sections, and, a graph's, its exports
+const _TYPE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
 // The submenus only the card's menu has, not the info panel's (Export: a graph's menu only)
-const _CARD_ONLY_SUBMENUS = ['export', 'tests'];
+const _CARD_ONLY_SUBMENUS = ['export'];
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
@@ -75,8 +74,10 @@ const _APPEARANCE = {
 // every curve of the card; what the card exports, what concerns this card (the entities
 // added from it), and what concerns every card of the page and every device (the info
 // panel — a switch, ei_N —, the gesture thresholds — entered in the submenu itself, kept
-// within their bounds) — last, for its submenu to be as wide as it
-const _OPTIONS_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all' };
+// within their bounds) — last, for its submenu to be as wide as it —, then, set apart, the
+// tests a user can run to report what their browser or app gives the card (card-tests.js; the
+// card's menu only, not the info panel's)
+const _OPTIONS_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', card: 'ui.menu.options_card', all: 'ui.menu.options_all', tests: 'ui.menu.options_tests' };
 // The card submenu's actions, each confirmed first in the submenu itself (Confirm / Cancel —
 // Cancel marked, so that Enter changes nothing): the graphs added from the card removed
 // (defaultGraphs), everything back to the YAML (defaultDisplay)
@@ -695,7 +696,7 @@ export class CardMenus
     showGraphMenu(input_idx, graph, clientX, clientY)
     {
         // (the info panel's menu has no graph menu: its one graph is its entity's)
-        if( !this._this.querySelector(`#et_${input_idx}`) || !this._this.querySelector(`#et_${input_idx}_tests_sub`) ) return;
+        if( !this._this.querySelector(`#et_${input_idx}`) || !this._cardsTypeMenu(`et_${input_idx}`) ) return;
         this._openTypeMenu(input_idx, {
             entityId: null, graphId: graph.id, key: keyOf(graph.entities[0]),
             forGraph: true, from: 'graph', anchor: { clientX, clientY },
@@ -718,9 +719,16 @@ export class CardMenus
         this._openRememberedSubmenu(input_idx, sub);
     }
 
+    // Is the type menu id the card's — not the info panel's: its submenus the card's only
+    // (typeMenuHtml full: Export) there?
+    _cardsTypeMenu(id)
+    {
+        return !!this._this.querySelector(`#${id}_export_sub`);
+    }
+
     // The type menu's lines, as its entity — or its graph — is now: its title, then each
-    // section that applies (▸), Info (the card's menu, from a long-press on a label) before
-    // the tests, set apart
+    // section that applies (▸), Info (the card's menu, from a long-press on a label), a graph's
+    // exports
     _typeLines(i)
     {
         const m = this._typeMenu(i);
@@ -728,12 +736,11 @@ export class CardMenus
         const { g, entities } = this._menuTargets(i);
         const _e = entities[0];
         const _label = _menu._menuFrom === 'label' && !!_e;
-        const _full = !!this._this.querySelector(`#et_${i}_tests_sub`);
+        const _full = this._cardsTypeMenu(`et_${i}`);
         const _lines = [this._typeTitle(i), ...this._sectionLines(m)];
         if( _full && _label )
             _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityTypeMenu(i); this.openEntityInfo(_e, g); } });
         if( _full && _menu._menuForGraph ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_TYPE_SUBMENUS.export), ['export']));
-        if( _full && !_menu._menuForGraph ) _lines.push(this._submenuLine(m, `et_${i}_tests`, i18n(_TYPE_SUBMENUS.tests), ['tests'], ';border-top:1px solid #444'));
         return _lines;
     }
 
@@ -751,13 +758,11 @@ export class CardMenus
                  label: _menu._menuForGraph ? ( g ? this._graphMenuTitle(g) : '' ) : Array.isArray(_id) ? '*' : _id };
     }
 
-    // A type submenu's lines (path: see _menuOf): a section's, the graph's exports, or the tests
+    // A type submenu's lines (path: see _menuOf): a section's, or the graph's exports
     _typeSubmenuLines(i, path)
     {
         if( path[0] === 'export' ) { const { g } = this._menuTargets(i); return this._exportLines(this._typeMenu(i), path[1] ?? null, g ? [g] : []); }
-        if( path[0] !== 'tests' ) return this._sectionItems(this._typeMenu(i), path);
-        return Object.keys(CARD_TESTS).map(k => ({ id: `et_${i}_test_${k}`, label: i18n(CARD_TESTS[k].label),
-                                                   choose: () => { this.hideEntityTypeMenu(i); openCardTest(k, this); } }));
+        return this._sectionItems(this._typeMenu(i), path);
     }
 
     // --------------------------------------------------------------------------------------
@@ -853,7 +858,7 @@ export class CardMenus
                                                          choose: () => this._behaviorChosen(m, 'tooltip', v) }));
         }
         const _menu = m.el();
-        const _full = m.prefix.startsWith('eo_') || !!this._this.querySelector(`#${m.prefix}_tests_sub`);
+        const _full = m.prefix.startsWith('eo_') || this._cardsTypeMenu(m.prefix);
         const _g = pairs[0]?.g;
         const _locks = this._yLocks(m);
         const _shown = {
@@ -1136,7 +1141,8 @@ export class CardMenus
             kind: () => 'options',
             lines: () => {
                 const m = this._optionsMenu(i);
-                return [...this._sectionLines(m), ...['export', 'card', 'all'].map(k => this._submenuLine(m, `eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]), [k]))];
+                return [...this._sectionLines(m), ...['export', 'card', 'all'].map(k => this._submenuLine(m, `eo_${i}_${k}`, i18n(_OPTIONS_SUBMENUS[k]), [k])),
+                        ...( this.infoPanel ? [] : [this._submenuLine(m, `eo_${i}_tests`, i18n(_OPTIONS_SUBMENUS.tests), ['tests'], ';border-top:1px solid #444')] )];
             },
             sub: path => this._optionsSubmenuLines(i, path),
             close: () => this.menuSetVisibility(i, false),
@@ -1144,7 +1150,7 @@ export class CardMenus
     }
 
     // An options submenu's lines (path: see _menuOf): a section's, for every curve of the
-    // card; the exports (the statistics with the long-term statistics on — ▸ their periods); the card's actions
+    // card; the exports (the statistics with the long-term statistics on — ▸ their periods); the tests; the card's actions
     // (▸: each confirmed first in a submenu over it — Confirm or Cancel, Cancel marked); the
     // info panel's switch and the gesture thresholds, as they are
     _optionsSubmenuLines(i, path)
@@ -1153,6 +1159,8 @@ export class CardMenus
         const m = this._optionsMenu(i);
         if( _SECTIONS[key] ) return this._sectionItems(m, path);
         if( key === 'export' ) return this._exportLines(m, level, this.graphs);
+        if( key === 'tests' ) return Object.keys(CARD_TESTS).map(k => ({ id: `eo_${i}_test_${k}`, label: i18n(CARD_TESTS[k].label),
+                                                                         choose: () => { this.menuSetVisibility(i, false); openCardTest(k, this); } }));
         if( key === 'card' ) {
             if( level === null )
                 return Object.keys(_CARD_ACTIONS).map(k => this._submenuLine(m, `eo_${i}_${k}`, i18n(_CARD_ACTIONS[k].label), ['card', k]));

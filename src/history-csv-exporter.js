@@ -78,7 +78,8 @@ class CSVExporter {
     // file name: it can't hold one everywhere); the spinner removed
     save(data)
     {
-        const blob = new Blob(data, { type: "text/plain;charset=utf-8"});
+        // (a CSV: its type says so — an app naming the file by it, HA Companion, gives it .csv)
+        const blob = new Blob(data, { type: "text/csv;charset=utf-8" });
         document.body.removeChild(this.overlay);
         const t0 = moment(this.window[0]), t1 = moment(this.window[1]);
         const _end = t1.format(t0.isSame(t1, 'day') ? 'HH-mm' : 'YYYY-MM-DD HH-mm');

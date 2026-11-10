@@ -10,7 +10,11 @@ const CFG = { type: 'custom:history-explorer-card', defaultTimeRange: '24', stat
 
 module.exports = async function()
 {
-    const t = await openCard(CFG, { touch: true, height: 1300, scrollRoom: 2500 });
+    // (the curves: a value every 3 hours over 4 days, around their state — points a tap can land
+    // on, whatever the time, the window panned a day back too, whichever graph comes first)
+    const _rows = v => Array.from({ length: 32 }, (_, k) => [k * 3 * 3600 + 1800, String(v * ( 0.95 + ( k % 4 ) * 0.03 ))]);
+    const t = await openCard(CFG, { touch: true, height: 1300, scrollRoom: 2500,
+        mock: { rows: { 'sensor.power': _rows(400), 'sensor.watering_cycle': _rows(3), 'sensor.days_to_watering': _rows(2) } } });
     const E = x => t.E(x);
     const step = (name, fn) => t.step(name, async () => { await t.scrollTop(); return fn(); });
     const lineGraph = async () => (await t.graphs()).findIndex(x => x.startsWith('l:'));

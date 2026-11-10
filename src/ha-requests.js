@@ -10,8 +10,9 @@
 //   requests never behind a long queue there. A fixed count, nothing measured: requests of
 //   sizes that different (an hour of a sensor, ten years of several) tell nothing of Home
 //   Assistant's load by their time.
-// - A request of a window no longer shown (o.stale()) is sent only once none of a window
-//   shown waits.
+// - A request bringing nothing to the window shown now (o.stale(): asked for another window,
+//   its time outside this one — or in the background) is sent only once none bringing some of
+//   it waits; one asked for another window but bringing some of this one keeps its place.
 // - Never a request sent again: an answer always comes (Home Assistant's websocket, or its
 //   error when the connection is lost).
 // Data only: no DOM, no event.
@@ -29,7 +30,7 @@ class Regulator
     }
 
     // A request: send() → a promise of Home Assistant's answer; o: { order (lower sent first),
-    // stale() (its window no longer shown) } → a promise of its answer
+    // stale() (it brings nothing to the window shown now) } → a promise of its answer
     request(send, o = {})
     {
         return new Promise((resolve, reject) => {
@@ -47,8 +48,8 @@ class Regulator
         return this.inFlight > 0 || this.queue.length > 0;
     }
 
-    // The requests waiting sent while fewer than HA_WORKERS are in flight: the first of a
-    // window shown, else the first
+    // The requests waiting sent while fewer than HA_WORKERS are in flight: the first bringing
+    // some of the window shown, else the first
     _pump()
     {
         while( this.queue.length && this.inFlight < HA_WORKERS ) {

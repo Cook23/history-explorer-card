@@ -6,6 +6,7 @@ import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
 import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
+import { perf } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
 const moment = window.HXLocal_moment;
 
@@ -39,6 +40,8 @@ const LAYERS = ['hist', 'fine', 'stats', 'day', 'week', 'month'];
 const periodOfKind = (kind, period) => ( { fine: FINE_PERIOD, day: DAY_PERIOD, week: WEEK_PERIOD, month: MONTH_PERIOD } )[kind] ?? period;
 // Phase 1's source gives the window COARSE_POINTS values at least (see _planOf)
 const COARSE_POINTS = 100;
+// (the phase of phase 1's parts wholly outside the window shown: sent after phase 2's)
+const PHASE_SIDES = 3;
 // Statistics of a period shorter than an entity's own would make up values between its own
 // (a value held, drawn as twelve the same, then a step): told once a session, at the start, by
 // probing its history (_probeFine) — its last PROBE_MS (short: a sensor flooding its history
@@ -384,7 +387,7 @@ export class CardHistory
         // (how long the graphs took to be drawn again: the pace of the refreshes, see
         // scheduleAutoRefresh)
         this._lastBuildMs = performance.now() - _t;
-        this.perf?.add('redraw', this._lastBuildMs);
+        perf.add('redraw', this._lastBuildMs);
     }
 
     // The graphs drawn again from the cache as soon as the page is free — once for all the
@@ -511,14 +514,22 @@ export class CardHistory
     // it there? Not once all of it has come: no
     _emptyIn(x, id, a, b)
     {
+        const t = this._firstIn(x, id, a, b);
+        return t !== null && t > a + Math.max(x.ms, 60e3);
+    }
+
+    // When entity id's source x (a kind of _sources) begins from a to b (ms): the time of its
+    // first row there, b for none (until now); null while some of it hasn't come
+    _firstIn(x, id, a, b)
+    {
         const layer = LAYER[x.kind];
-        if( this._lacking(layer, id, a, b, false).length ) return false;
+        if( this._lacking(layer, id, a, b, false).length ) return null;
         b = Math.min(b, Date.now());
         for( let i = this._slotAt(a), i1 = this._slotAt(b - 1); i <= i1; i++ ) for( const row of this.cache[i][layer].get(id) ?? [] ) {
             const t = msOf(row.last_changed);
-            if( t >= a && t < b ) return t > a + Math.max(x.ms, 60e3);
+            if( t >= a && t < b ) return t;
         }
-        return true;
+        return b;
     }
 
     // (a request of a kind widened to whole days — the statistics of the hourly family: their
@@ -754,10 +765,12 @@ export class CardHistory
         const _side = Math.min(r, PERIOD_MS[MONTH_PERIOD]), _size = this._blockOf(r);
 
         // Phase 1: the coarse source over the window and a width on each side — where it isn't
-        // compiled yet, the finer ones of its family
+        // compiled yet, the finer ones of its family. A part it lacks wholly outside the window
+        // (a side, the window moved): after phase 2 (PHASE_SIDES) — the window shown first
         for( const { u, fam, p1 } of plans.values() ) {
             if( !p1 ) continue;
-            this._askSpan(p1.kind, u[0], t0 - _side, t1 + _side, { phase: 1 });
+            for( const [a, b] of this._lacking(LAYER[p1.kind], u[0], t0 - _side, t1 + _side) )
+                this._ask(p1.kind, ...this._span(p1.kind, a, b), [u[0]], { phase: this._inWindow(a, b) ? 1 : PHASE_SIDES });
             for( let k = fam.indexOf(p1); k > 0; k-- ) {
                 const _from = _now - fam[k].ms - STATS_LAG;
                 if( _from >= t1 + _side ) break;
@@ -766,10 +779,11 @@ export class CardHistory
         }
 
         // Phase 2: the fine source over the window, in blocks from the right — block by block,
-        // the entities of a source in groups (_requestGroups), a request each. Where the
-        // 5-minute statistics come back empty or starting late: without phase 1 (past the
-        // recorder's retention), the family's finest there; where those come back empty too
-        // (deleted, or begun later, after a change of unit), the history there — the same way
+        // the entities of a source in groups (_requestGroups), a request each. Where it comes
+        // back empty or starting late — the 5-minute statistics, or the history (past the
+        // recorder's retention) —: without phase 1, the family's finest there; where the
+        // 5-minute ones and those come back empty too (deleted, or begun later, after a change
+        // of unit), the history there — the same way
         const _bySource = new Map();
         for( const p of plans.values() ) if( p.p2 ) { if( !_bySource.has(p.p2.kind) ) _bySource.set(p.p2.kind, []); _bySource.get(p.p2.kind).push(p); }
         const _series = (kind, l) => l.flatMap(p => kind === 'history' ? p.u : [p.u[0]]);
@@ -778,14 +792,23 @@ export class CardHistory
                 this._askGroup(kind, _series(kind, g), a, b, { phase: 2, rank: k });
                 const _empty = new Map(), _add = (f, ids) => { if( !_empty.has(f) ) _empty.set(f, []); _empty.get(f).push(...ids); };
                 for( const p of g ) {
-                    if( p.p2.kind === 'history' || !this._emptyIn(p.p2, p.u[0], a, b) ) continue;
+                    if( !this._emptyIn(p.p2, p.u[0], a, b) ) continue;
                     const c = p.p1 ?? p.fam[0];
                     if( !p.p1 && c ) _add(c.kind, [p.u[0]]);
-                    if( !c || this._emptyIn(c, p.u[0], a, b) ) _add('history', p.u);
+                    if( p.p2.kind !== 'history' && ( !c || this._emptyIn(c, p.u[0], a, b) ) ) _add('history', p.u);
                 }
                 for( const [f, ids] of _empty ) this._askGroup(f, ids, a, b, { phase: 2, rank: k });
             }
         });
+
+        // Without phase 2: where phase 1's statistics begin late within the window (begun
+        // after its start — a state class given later, a change of unit), the history before
+        // them, in one request
+        for( const p of plans.values() ) {
+            if( p.p2 || !p.p1 ) continue;
+            const _first = this._firstIn(p.p1, p.u[0], t0, t1);
+            if( _first !== null && _first > t0 + p.p1.ms ) this._askGroup('history', p.u, t0, _first, { phase: 2 });
+        }
 
         // The history after the finest statistics drawn — phase 2's, else the family's finest —,
         // the entities from the same time together, in one request
@@ -1045,7 +1068,22 @@ export class CardHistory
     // Is the window loading — a request under way for it (not one for the values around it)?
     _loading()
     {
-        return this._requests.some(q => !q.quiet);
+        return this._requests.some(q => this._serves(q));
+    }
+
+    // Does a to b (ms) meet the window shown — the window shown now, whenever it's asked?
+    _inWindow(a, b)
+    {
+        return a < msOf(this.endTime) && b > msOf(this.startTime);
+    }
+
+    // Does request q bring some of the window shown now — not in the background, for the cache
+    // as it is (not one since cleared), its time in the window shown —, whatever window it was
+    // asked for: the window shown is loading while one does; one that doesn't is sent after
+    // those that do (see ha-requests.js stale)
+    _serves(q)
+    {
+        return !q.background && q.gen === this._loadGen && this._inWindow(q.b0, q.b1);
     }
 
     // The cache slots around the window the automatic Y axes look at (card-yscale.js): HORIZON
@@ -1085,8 +1123,6 @@ export class CardHistory
     _ask(kind, a, b, ids, o = {})
     {
         const q = { kind, ids: new Set(ids), b0: a, b1: b, gen: this._loadGen, at: Date.now(), background: !!o.background, phase: o.phase, key: this._aheadKey };
-        // (one for the time around the window only, or in the background: quiet — the window isn't loading)
-        q.quiet = q.background || b <= msOf(this.startTime) || a >= msOf(this.endTime);
         this._requests.push(q);
         // (what it will bring, by layer and entity: see _lacking)
         this._flying ??= new Map();
@@ -1094,7 +1130,8 @@ export class CardHistory
         let _p;
         try {
             const _at = Math.min(...ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 999 : k; }));
-            const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _at, stale: () => q.gen !== this._loadGen || q.key !== this._aheadKey };
+            const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _at, stale: () => !this._serves(q),
+                         info: { phase: o.phase ?? null, background: q.background } };
             _p = kind === 'history' ? this.historyCall(ids, moment(a), moment(b), _o)
                                     : this._askHA(this.statisticsRequest(ids, moment(a), moment(b), periodOfKind(kind, this.statistics.period)), _o);
         } catch( e ) {
@@ -1139,7 +1176,7 @@ export class CardHistory
                     p = k;
                 }
             }
-            this.perf?.add('part', performance.now() - _t);
+            perf.add('part', performance.now() - _t);
             this._cacheVersion = this.cacheVersion() + 1;
             if( !error ) this._purge();
             // (what's still lacking asked at once, before this answer is drawn: Home Assistant
@@ -1147,10 +1184,17 @@ export class CardHistory
             if( !error ) this._askMissing();
         } finally {
             this.state.loading = this._loading();
-            // (an answer for the time outside the window — asked quietly — changes nothing
-            // shown: not drawn again, a hover, a tooltip left as they are; the next drawing takes it)
-            if( !q.quiet || ( q.b0 < msOf(this.endTime) && q.b1 > msOf(this.startTime) ) ) this._drawSoon();
+            // (an answer for the time outside the window shown changes nothing shown: not drawn
+            // again, a hover, a tooltip left as they are; the next drawing takes it)
+            if( q.gen === this._loadGen && this._inWindow(q.b0, q.b1) ) this._drawSoon();
         }
+    }
+
+    // The performance test's recorder for the page — { add(kind, ms, info) }, null: none —,
+    // every card's steps reported to it (see card-perf.js)
+    setPerfRecorder(recorder)
+    {
+        perf.set(recorder);
     }
 
     // A request of the history or the statistics to Home Assistant, through the page's
@@ -1158,23 +1202,21 @@ export class CardHistory
     // performance test records (perf)
     _askHA(request, o = {})
     {
-        const _p = haRequests.request(() => this._hass.callWS(request), o);
-        if( !this.perf ) return _p;
-        const _t = performance.now(), _perf = this.perf;
-        return _p.then(r => {
+        if( !perf.on ) return haRequests.request(() => this._hass.callWS(request), o);
+        // (timed while the performance test records: how long it waited in the queue, how long
+        // Home Assistant took, what it asked and gave, whether it brought some of the window
+        // shown when sent — o.info: its phase, whether it's the background's)
+        const _t = performance.now();
+        let _sent = _t, _shown = null;
+        // (whether it brought some of the window shown when it was sent: see _serves)
+        return haRequests.request(() => { _sent = performance.now(); _shown = o.stale ? !o.stale() : null; return this._hass.callWS(request); }, o).then(r => {
             const _values = Object.values(r ?? {}).reduce((n, a) => n + ( Array.isArray(a) ? a.length : 0 ), 0);
-            _perf.add('request', performance.now() - _t, { type: request.type, entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, values: _values });
+            perf.add('request', performance.now() - _sent, { type: request.type, period: request.period ?? null, start: request.start_time, end: request.end_time ?? null,
+                entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, values: _values, waited: _sent - _t, shown: _shown, ...( o.info ?? {} ) });
             return r;
         });
     }
 
-    // What the card does, timed while a performance test records it (card-tests.js): the
-    // requests to Home Assistant, each answer put in the cache, the graphs drawn again and
-    // each chart's update — recorder: { add(kind, ms, info) }, null: nothing recorded
-    setPerfRecorder(recorder)
-    {
-        this.perf = recorder;
-    }
 
     // A row of the cache from an hour of Home Assistant's statistics: its mean — or, for a
     // total, its state —, with its end, min, mean and max (statistics)

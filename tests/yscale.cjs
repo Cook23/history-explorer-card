@@ -353,6 +353,93 @@ module.exports = async function()
         return r.asked && r.first !== null && r.first <= 24 ? true : JSON.stringify(r);
     });
     done(await t.close());
+    // ── The window moved while its requests are on their way (Home Assistant slow, a request at a
+    // time): what brings some of the window shown first, whatever window asked it — then what
+    // doesn't (the sides, the background) —; the window shown loading until it's whole ──
+    {
+        const ents = ['sensor.power', 'sensor.s1', 'sensor.s2', 'sensor.s3'];
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: true }, graphs: ents.map(entity => ({ type: 'line', entities: [{ entity }] })) },
+            { height: 900, mock: { series: true, historyStep: 60, historyDays: 90, fastStats: true, clones: 3, cost: { base: 300, history: 0.01, statistics: 0.03, workers: 1 } } });
+        await t.wait(4000);
+        // (a window of h hours 200 days back, loaded; then moved — move: a function of the card —; the
+        // requests sent after its last move, each bringing some of the window shown (v) or not (o);
+        // whether the window was ever not loading before it was whole)
+        const moved = (h, move) => t.E(`(async()=>{ const I = el.instance, D = 86400e3, m = window.HXLocal_moment, H = ${h} * 3600e3;
+            I.applyTimeRange(${h}, false); const end = Date.now() - 200 * D; I._setWindow(m(end - H), m(end)); I.updateHistory();
+            for( let k = 0; k < 200 && ( I.state.loading || I._requests.length ); k++ ) await new Promise(r => setTimeout(r, 200));
+            await (${move})(I, m, H);
+            const t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime), n1 = __ws.length;
+            const whole = () => I.graphs.every(g => { const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), xs = g.chart.data.datasets[0].data.filter(p => p.y !== null).map(x).sort((a, b) => a - b);
+                if( xs.length < 10 ) return false; let gap = 0; for( let i = 1; i < xs.length; i++ ) if( xs[i] > t0 && xs[i - 1] < t1 ) gap = Math.max(gap, Math.min(xs[i], t1) - Math.max(xs[i - 1], t0)); return gap < H / 20; });
+            let early = false, done = false;
+            for( let k = 0; k < 300 && !done; k++ ) { const w = whole(); if( !w && !I.state.loading ) early = true; done = w && !I._requests.length; await new Promise(r => setTimeout(r, 100)); }
+            // (the exports' probe — 5-minute statistics, in the background — left out)
+            const seq = __ws.slice(n1).filter(w => /during_period/.test(w.type) && w.period !== '5minute').map(w => Date.parse(w.start) < t1 && ( w.end ? Date.parse(w.end) : Date.now() ) > t0 ? 'v' : 'o').join('');
+            return { seq, early, whole: whole() }; })()`);
+        await t.step('3 months, \'<\' clicked 3 times in a row (a month back each time): what brings some of the window shown sent first — the month a click before asked for its side, now in the window, too —, the sides and the background after', async () => {
+            const r = await moved(2184, `async (I) => { for( let k = 0; k < 3; k++ ) { I.stepDay(-1); await new Promise(r => setTimeout(r, 250)); } }`);
+            return /^v*o*$/.test(r.seq) && r.seq.includes('v') && r.whole ? true : JSON.stringify(r);
+        });
+        await t.step('6 months, the window dragged back (8 moves of a tenth of it): never shown as loaded before it is whole; what brings some of it sent first', async () => {
+            const r = await moved(4368, `async (I, m, H) => { I.state.drag = true; for( let k = 0; k < 8; k++ ) { I.moveTimeWindow(m(Date.parse(I.startTime) - H / 10)); I.updateHistory(); await new Promise(r => setTimeout(r, 120)); } I.state.drag = false; I.updateHistory(); }`);
+            return !r.early && /^v*o*$/.test(r.seq) && r.whole ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── What there is, drawn: past the recorder's retention, a sensor whose 5-minute statistics
+    // aren't valid (a value every 20 minutes) — its history the fine source, empty there: its
+    // hourly statistics there, without phase 1 (2 days: too short for a hundred hourly values) ──
+    t = await openCard(card('2d', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 1200, historyDays: 10 } });
+    await t.wait(3000);
+    // (the window moved to [now − to − 2 days, now − to], loaded, then its points: how many, and how many before a time)
+    const moveTo = (to, before) => t.E(`(async()=>{ const I = el.instance, now = Date.now(), m = window.HXLocal_moment;
+        I._setWindow(m(now - ( ${to} + 2 ) * 86400e3), m(now - ${to} * 86400e3)); I.updateHistory();
+        await new Promise(r => setTimeout(r, 4000));
+        const t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime), x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+        const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0 && x(p) <= t1);
+        return { fine: I._relevant('sensor.power', 300e3), hour: I._relevant('sensor.power', 3600e3), n: d.length, before: d.filter(p => x(p) < now - ${before} * 86400e3).length,
+                 hourly: __ws.some(w => w.period === 'hour' && Date.parse(w.start) < t1 && Date.parse(w.end) > t0) }; })()`);
+    await t.step('5-minute statistics not valid, a 2-day window 20 days back — past the history\'s retention (10 days): its hourly statistics drawn', async () => {
+        const r = await moveTo(20, 0);
+        return !r.fine && r.hour && r.hourly && r.n >= 40 ? true : JSON.stringify(r);
+    });
+    await t.step('the same window across the retention\'s edge (11 to 9 days back): the day before the edge drawn from the hourly statistics, the one after from the history', async () => {
+        const r = await moveTo(9, 10);
+        return r.before >= 20 && r.n - r.before >= 20 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── What there is, drawn: without phase 2 (60 days: a column of an hour or more), statistics
+    // only for the last 20 days (a unit changed) — the history before them asked and drawn ──
+    t = await openCard(card('60d', { statistics: { enabled: true } }), { height: 900, mock: { series: true, statsFrom: { 'sensor.power': 20 } } });
+    await t.wait(5000);
+    await t.step('60 days, statistics only for the last 20 (a unit changed): the 40 days before drawn from the history', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime), G = I._geometry(), x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0);
+            return { column: G.column / 3600e3, asked: __ws.some(w => w.type === 'history/history_during_period' && Date.parse(w.start) <= t0 + 3600e3 && Date.parse(w.end ?? Date.now()) > Date.now() - 25 * 86400e3),
+                     first: d.length ? ( x(d[0]) - t0 ) / 86400e3 : null, before: d.filter(p => x(p) < Date.now() - 21 * 86400e3).length }; })()`);
+        return r.column >= 1 && r.asked && r.first !== null && r.first <= 1 && r.before >= 100 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The mean of an angle: lowpass_dt's rule (CLAUDE.md) — each value by its difference to
+    // the mean the shortest way round ──
+    t = await openCard(card('24h', {}, { entities: [{ entity: 'sensor.wind', lineMode: 'lines' }] }), { height: 900, mock: { series: true, fail: FAIL } });
+    await t.wait(1500);
+    await t.step('an angle, a column of pixels holding 0°, 170°, 340° and 350° a quarter of it each: its point the mean of lowpass_dt — 305°, each value by its difference to it the shortest way round (215° unwrapped one after the other)', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.wind', now = Date.now(), last = I.cache.length - 1;
+            for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) for( const x of I.cache ) x[l].delete(id);
+            const w = ( Date.parse(I.endTime) - Date.parse(I.startTime) ) / I.graphs[0].chart.hecPlotWidth(), g = Math.floor(( now - 6 * 3600e3 ) / w) * w;
+            const rows = [[g - 2 * 3600e3, 0], [g, 0], [g + w / 4, 170], [g + w / 2, 340], [g + 3 * w / 4, 350], [g + w, 350]].map(([t, v]) => ({ last_changed: t, state: String(v) }));
+            for( const k of [0, 1] ) { const s = I.cache[last - k]; s.hist.set(id, rows.filter(r => r.last_changed >= s.start_m.valueOf() && r.last_changed < s.end_m.valueOf())); s.cover.hist.set(id, [[s.start_m.valueOf(), s.end_m.valueOf()]]); }
+            I.generateGraphDataFromCache();
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), p = I.graphs[0].chart.data.datasets[0].data.find(q => q.y !== null && x(q) > g && x(q) < g + w);
+            return p ? { y: ( ( p.y % 360 ) + 360 ) % 360, lo: p.yMin ?? null } : null; })()`);
+        return r && Math.abs(r.y - 305) < 1e-6 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     t = await openCard(card('24h', { statistics: { enabled: true } }), { height: 900, mock: { series: true, fail: FAIL } });
     await t.wait(1500);
     await t.step('a day with its history (6 values) and its 5-minute statistics (288): the history drawn — the reality, however sparse', async () => {

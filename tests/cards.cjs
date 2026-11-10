@@ -41,13 +41,13 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Tests (beta) ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
     });
     await t.step('type menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis) — no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Behavior ▸ | Info | Tests (beta) ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Behavior ▸ | Info || open: rep || Timeline* || Cut | Delete' ? true : m;
     });
     done(await t.close());
 
@@ -82,7 +82,7 @@ module.exports = async function()
         await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_interp').click()`); await t.wait(200);
         await t.E(`el.querySelector('#et_0_algo_makima').click()`); await t.wait(500);
         await t.longPress(await t.E('legendPt(0,0)'));
-        const open = await t.E(`['rep','interp','behavior','tests'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; })`);
+        const open = await t.E(`['rep','interp','behavior'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; })`);
         await t.E(`el.querySelector('#et_0_algo_monotone').click()`); await t.wait(500);
         return open.join() === 'interp' ? true : JSON.stringify(open);
     });
@@ -94,13 +94,13 @@ module.exports = async function()
         await closeMenu();
         return r.free > 0 && r.right < 1 ? true : JSON.stringify(r);
     });
-    // ── Tests ▸: the pen events test, in a dialog over the page ──
+    // ── Tests ▸ (the card's menu, ▾): the pen events test, in a dialog over the page ──
     const dlg = `[...document.body.children].find(d => d.shadowRoot && d.shadowRoot.querySelector('.dlg'))`;
     await t.step('Tests ▸ Pen events: its dialog, a pen contact reported, closed by Escape, the menu closed', async () => {
-        await t.longPress(await t.E('legendPt(0,0)'));
-        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
-        const entries = await t.E(`[...el.querySelectorAll('#et_0_tests_sub a')].map(a=>a.textContent).join()`);
-        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        const entries = await t.E(`[...el.querySelectorAll('#eo_0_tests_sub a')].map(a=>a.textContent).join()`);
+        await t.E(`el.querySelector('#eo_0_test_pen').click()`); await t.wait(300);
         const title = await t.E(`${dlg}?.shadowRoot.getElementById('title').textContent`);
         await t.E(`${dlg}.shadowRoot.getElementById('padFree').dispatchEvent(new PointerEvent('pointerdown', { pointerId: 7, pointerType: 'pen', buttons: 1, button: 0, bubbles: true }))`);
         await t.E(`${dlg}.shadowRoot.getElementById('padFree').dispatchEvent(new PointerEvent('pointerup', { pointerId: 7, pointerType: 'pen', buttons: 0, button: 0, bubbles: true }))`);
@@ -113,9 +113,9 @@ module.exports = async function()
             ? true : JSON.stringify({ entries, title, check, log, menuOpen, gone });
     });
     await t.step('Tests ▸ Pen events: the time between two hover moves, each kind of event apart (pointermove, pointerrawupdate, mousemove)', async () => {
-        await t.longPress(await t.E('legendPt(0,0)'));
-        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
-        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_pen').click()`); await t.wait(300);
         // (3 hover moves, each a pointerrawupdate, a pointermove and a mousemove, 50 ms apart)
         for( let i = 0; i < 3; i++ ) {
             await t.E(`(()=>{ const p=${dlg}.shadowRoot.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
@@ -128,9 +128,9 @@ module.exports = async function()
         return ok ? true : gaps;
     });
     await t.step('Tests ▸ Pen events: hover gaps in two regimes (moving fast, nearly still): each one\'s share, mean and standard deviation; one regime: no split', async () => {
-        await t.longPress(await t.E('legendPt(0,0)'));
-        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
-        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_pen').click()`); await t.wait(300);
         // (pointermove: 30 moves 20 ms apart, then 10 moves 130 ms apart — the clock driven by hand)
         const r = await t.E(`(()=>{ const p=${dlg}.shadowRoot.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
             const _now=performance.now; let t=0; performance.now=()=>t;
@@ -146,9 +146,9 @@ module.exports = async function()
         return /two regimes — fast: 30 gaps \(77 %\): mean 20ms.*slow: 9 gaps \(23 %\): mean 1[23]\dms/.test(r.two) && !/two regimes/.test(r.one) ? true : JSON.stringify(r);
     });
     await t.step('Tests ▸ Pen events: "Copy the stats" copies the stats only; "Clear all, start again" clears everything, its clock back to 0', async () => {
-        await t.longPress(await t.E('legendPt(0,0)'));
-        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
-        await t.E(`el.querySelector('#et_0_test_pen').click()`); await t.wait(1200);
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_pen').click()`); await t.wait(1200);
         const r = await t.E(`(async()=>{ const d=${dlg}.shadowRoot, p=d.getElementById('padFree'), o={ pointerId: 7, pointerType: 'pen', buttons: 0, button: -1, bubbles: true };
             for( let i=0;i<3;i++ ){ p.dispatchEvent(new PointerEvent('pointermove', o)); await new Promise(r=>setTimeout(r,30)); }
             let copied=null; const _c=navigator.clipboard; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { copied=t; return Promise.resolve(); } } });
@@ -166,20 +166,38 @@ module.exports = async function()
             && r.cleared.gaps === '— no hover yet —' && r.cleared.log === '' && r.cleared.yes === 0 && r.first < 300;
         return ok ? true : JSON.stringify(r);
     });
-    await t.step('Tests ▸ Performance: the graphs drawn again, the window loaded again, the real time — each timed in its report, the page\'s freezes counted', async () => {
-        await t.longPress(await t.E('legendPt(0,0)'));
-        await t.E(`el.querySelector('#et_0_tests').click()`); await t.wait(200);
-        await t.E(`el.querySelector('#et_0_test_perf').click()`); await t.wait(300);
+    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), the window loaded again from nothing (each request: its phase, its source, its time, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the page\'s freezes counted', async () => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
         const title = await t.E(`${dlg}?.shadowRoot.getElementById('title').textContent`);
         await t.E(`${dlg}.shadowRoot.getElementById('start').click()`);
-        let out = '';
-        for( let k = 0; k < 90 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('step').textContent`)); k++ ) await t.wait(1000);
-        out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
-        const recording = await t.E('el.instance.perf');
+        for( let k = 0; k < 240 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('step').textContent`)); k++ ) await t.wait(1000);
+        const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
-        return title === 'Performance' && /Graphs: \d+, entities: \d+, points drawn: \d+/.test(out) && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms, Chart\.js \d+ ms/.test(out)
-            && /history\/history_during_period: \d+ entities, \d+ values, answered in/.test(out) && /parts put in the cache/.test(out) && /the graphs drawn again \d+ times/.test(out) && /s of real time\n.*refreshes asked/.test(out) && /freezes, /.test(out) && recording === null
-            ? true : JSON.stringify({ title, out, recording });
+        const ok = title === 'Performance' && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
+            && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms, Chart\.js \d+ ms — by graph: \d+ ms/.test(out)
+            && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities, \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
+            && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
+            && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out);
+        return ok ? true : JSON.stringify({ title, out });
+    });
+    await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: each card\'s steps until drawn, from the moment the page came back', async () => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
+        await t.E(`${dlg}.shadowRoot.getElementById('back').click()`);
+        // (the page hidden; the card made again; the page shown again)
+        await t.E(`(()=>{ window.__vis = 'hidden'; Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis }); document.dispatchEvent(new Event('visibilitychange')); })()`);
+        await t.wait(300);
+        await t.E(`(()=>{ const old = el, host = old.parentNode; old.remove(); const el2 = document.createElement('history-explorer-card'); el2.setConfig(window.CFG); host.appendChild(el2); el2.hass = mkHass(); window.el = el2; window.hassTargets = [el2];
+            window.__vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); })()`);
+        for( let k = 0; k < 30 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('backStep').textContent`)); k++ ) await t.wait(1000);
+        const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        await t.E(`delete document.visibilityState`);
+        const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out) && /card (\d+): made[\s\S]*card \1: graphs built \(\d+ ms\)[\s\S]*card \1: drawn \(\d+ ms\)/.test(out);
+        return ok ? true : out;
     });
     done(await t.close());
 

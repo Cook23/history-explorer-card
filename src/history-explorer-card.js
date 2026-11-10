@@ -28,6 +28,7 @@ import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-setting
 import { localGestures, versionIsNew } from "./card-storage.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
+import { perf } from "./card-perf.js";
 
 var Chart = window.HXLocal_Chart;
 var moment = window.HXLocal_moment;
@@ -107,7 +108,6 @@ export class HistoryCardState {
         this._drag = null;   // label or graph being dragged (_onDragStart)
         this._lastBuildMs = 0;   // what drawing the graphs again last took (scheduleAutoRefresh)
         this._drawTid = 0;       // the graphs to be drawn again from the cache (_drawSoon)
-        this.perf = null;        // the performance test's recorder (setPerfRecorder)
 
         this.activeRange = {};
         this.activeRange.timeRangeHours  = 24;
@@ -183,6 +183,11 @@ export class HistoryCardState {
         if( !this.contentValid ) {
 
             this.contentValid = true;
+            // (its steps timed while the performance test records, from when it was made: its
+            // width known, its toolbar, its saved state read, its graphs built, drawn)
+            let _t = this._madeAt ?? performance.now();
+            const _step = step => { const n = performance.now(); perf.add('card', n - _t, { step, card: this.cid }); _t = n; };
+            _step('width');
 
             for( let i = 0; i < 2; i++ )
                 this.insertUIHtmlText(i);
@@ -198,7 +203,9 @@ export class HistoryCardState {
             for( let i = 0; i < 2; i++ ) this.wireToolbar(i);
 
 
+            _step('toolbar');
             const _needsIntervalRedraw = await this.readLocalState();
+            _step('saved state');
             // (the info panel's switch as read: the options menu shows it)
             this.refreshOptionsMenus();
 
@@ -210,12 +217,14 @@ export class HistoryCardState {
             // Every graph (static and dynamic) built from the entity list
             if( this.store.list ) this.buildGraphsFromStore();
             else this.store.reset([]);
+            _step('graphs built');
 
             // (the entity selector's list built once the card is drawn: until then its field
             // reads "Loading…", sized as the list needed the last time — savedSelectorWidths)
             requestAnimationFrame(() => setTimeout(() => this.requestEntityCollection(), 0));
 
             this.today(false);
+            _step('drawn');
 
             // Now that startTime/endTime are initialized, apply interval restoration if needed
             if( _needsIntervalRedraw ) this.updateHistory();
@@ -382,11 +391,13 @@ class HistoryExplorerCard extends HTMLElement
     // back on it: its cache kept for a card made again meanwhile, see card-history.js)
     disconnectedCallback()
     {
+        perf.add('card', 0, { step: 'off the page', card: this.instance?.cid });
         this.instance?.leavePage();
     }
 
     connectedCallback()
     {
+        perf.add('card', 0, { step: 'on the page', card: this.instance?.cid });
         this.instance?.backOnPage();
     }
 
@@ -465,6 +476,8 @@ class HistoryExplorerCard extends HTMLElement
         // (what the card is: its name and its YAML — its cache on the page, see card-history.js initCache)
         this.instance.pageKey = this.instance.id + ' ' + JSON.stringify(config);
         this.instance.cid = gcid++;
+        this.instance._madeAt = performance.now();
+        perf.add('card', 0, { step: 'made', card: this.instance.cid });
 
         this.instance.contentValid = false;
         this.instance.entitiesPopulated = false;
