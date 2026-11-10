@@ -87,7 +87,8 @@ already has is used, unless phase 0 makes it invalid.
   - statistics Home Assistant made up (a sensor silent: its last value carried, min = mean
     = max): a run of 5-minute or hourly ones at the same value, one value held to the run's
     end — a silence of smart mode;
-  - a plateau of smart mode keeps the min/max band of the point it carries on.
+  - the min/max band of a point over the time its values cover only — from a point to the next
+    where their times meet, a point alone a bar —; a plateau of smart mode without one.
 
 ## Planned
 

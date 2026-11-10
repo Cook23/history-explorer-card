@@ -12,7 +12,6 @@ import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
-import { seriesOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the type menu (et_N_<index>)
@@ -1175,7 +1174,7 @@ export class CardMenus
     // one chosen last time in italic
     _exportLines(m, level, graphs)
     {
-        const ids = [...new Set(graphs.flatMap(g => g.entities.map(e => seriesOf(e.entity).entity)))];
+        const ids = [...new Set(graphs.flatMap(g => g.entities.map(e => e.entity)))];
         const a = this.exportAvailability(ids), _n = (label, n) => `${label} (${n})`;
         if( level === 'stats' )
             return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: _n(i18n(`ui.interval.${p.label}`), a.periods[p.period]),

@@ -1,38 +1,35 @@
 // --------------------------------------------------------------------------------------
-// The automatic Y axis: what is shown first, a steady scale second
+// The automatic Y axis: what is shown first, a steady scale second — an automatic gain, as
+// in audio, with a look ahead
 //
-// 1. What is shown is seen well: every value in the window (and the nearest one on each
-//    side, the segments crossing the window's edges) fits in the axis, and fills at least
-//    1 - steady of its height — the axis as drawn, its bounds on the ticks.
-// 2. A steady scale: the axis kept as long as 1 holds — while a gesture goes on, kept too
-//    when what is shown no longer fills it enough, tightened once the gesture ends (but at
-//    steady 0) —; when
-//    it no longer does, the axis chosen is the one that would still hold 1 after the
-//    gestures most likely to come — a pan of one window either way, a zoom out by 2, a zoom
-//    in by 2 (left, middle, right) —, the tightest of those that do best.
-// steady, from 0 to 1: 0, the axis follows what is shown, whatever the rescales; 1, the
-// axis only grows, holding what the gestures foreseen would show; STEADY by default, what
-// is shown filling at least half the height.
+// 1. Its envelope: the values shown, and those on each side of the window within a zone
+//    (ZONE windows at steady 1), each pulling the envelope towards it the more as it is
+//    nearer the window's edge — weight 1 at the edge, 0 at the zone's end —: what is coming
+//    with a pan is felt before it shows.
+// 2. Attack: the axis grows at once to hold the envelope — what is shown never goes out of
+//    it, a value coming makes it grow step by step before it shows; at rest (a zoom, another
+//    window), narrowed on its other side too where it would be filled too little.
+// 3. Release: the axis is kept while the envelope fills at least 1 - steady of its height;
+//    else, while a gesture moves the window, it narrows one step at a time (a round axis
+//    about half as high), a step at most each RELEASE window the window's edges travelled;
+//    at rest, at once to the tightest axis holding the envelope.
+// 4. Its steps: Chart.js' round axes (1, 2, 5 × 10ⁿ ticks): a change of scale is a jump
+//    that shows, never a slide.
+// steady, from 0 to 1: 0, the axis follows what is shown, at every frame; 1, the axis only
+// grows, its zone 2 windows on each side; STEADY by default, a zone of a window on each side,
+// the envelope filling at least half the height.
 // Pure: the values come from rangeOf(t0, t1) — { lo, hi } of the values from t0 to t1, the
 // nearest outside included, or null for none.
 // --------------------------------------------------------------------------------------
 
 export const STEADY = 0.5;
 
-// (the gestures foreseen, as windows from the current one [t0, t1] of length r, each with
-// its weight: a pan either way, a zoom out, a zoom in — its three places sharing one)
-const GESTURES = [
-    { w: 1,     at: (t0, t1, r) => [t0 - r, t1 - r] },
-    { w: 1,     at: (t0, t1, r) => [t0 + r, t1 + r] },
-    { w: 1,     at: (t0, t1, r) => [t0 - r / 2, t1 + r / 2] },
-    { w: 1 / 3, at: (t0, t1, r) => [t0, t0 + r / 2] },
-    { w: 1 / 3, at: (t0, t1, r) => [t0 + r / 4, t1 - r / 4] },
-    { w: 1 / 3, at: (t0, t1, r) => [t0 + r / 2, t1] },
-];
+// (the zone looked at on each side at steady 1, in windows, in BANDS bands — each its weight;
+// how far the window's edges travel, in windows, between two release steps)
+const ZONE = 2, BANDS = 12, RELEASE = 0.5;
 
-// (how far the pans are foreseen: HORIZON windows either way — the values the card looks
-// for around the window, see card-history.js yScaleSlots —, FRAMES frames a window)
-const FRAMES = 12;
+// (how far the cache's values are read around the window, in windows: the zone, and the
+// background's sides — see card-history.js)
 export const HORIZON = 4;
 
 // (Chart.js' nice number: helpers.niceNum)
@@ -73,84 +70,68 @@ export function shownRange(r, minSpan, zero = true)
     return { lo: r.lo - d, hi: r.hi + d };
 }
 
-// Whether the axis holds the range r: r in it (inside), filling at least fill of it
+// Whether the axis holds the range v
 function inside(axis, v)
 {
     const eps = ( axis.max - axis.min ) * 1e-9;
     return v.lo >= axis.min - eps && v.hi <= axis.max + eps;
 }
-export function holds(axis, r, minSpan, fill = 1 - STEADY, zero = true)
-{
-    if( !r ) return true;
-    const v = shownRange(r, minSpan, zero);
-    return inside(axis, v) && ( v.hi - v.lo ) >= fill * ( axis.max - axis.min ) * ( 1 - 1e-9 );
-}
 
-// Every axis on round ticks that holds the range v with the fill asked, at most wmax high:
-// for each tick step, its bounds on that step around v — those Chart.js draws as they are
-// (at most twice maxTicks steps: Chart.js would take a wider step)
-export function axesOver(v, maxTicks, fill, wmax = Infinity, fixedStep)
+// The envelope of the window [t0, t1] (see 1): the values shown (view), each band of the
+// zone L long on each side pulling it towards its values with the weight of its nearest
+// edge's distance
+function envelope(rangeOf, t0, t1, view, L)
 {
-    const a = v.hi - v.lo, out = [], seen = new Set();
-    wmax = Math.max(a, Math.min(wmax, fill > 0 ? a / fill : Infinity));
-    const steps = fixedStep ? [fixedStep] : [];
-    if( !fixedStep )
-        for( let e = Math.floor(Math.log10(a / maxTicks)) - 1; e <= Math.ceil(Math.log10(wmax)); e++ )
-            for( const m of [1, 2, 5] ) steps.push(m * Math.pow(10, e));
-    for( const step of steps ) {
-            if( !fixedStep && ( step * ( maxTicks - 1 ) * 1.0001 < a / 2 || step > wmax * 1.0001 ) ) continue;
-            const top = Math.floor(v.lo / step + 1e-9), bot = Math.ceil(v.hi / step - 1e-9);
-            const most = Math.min(Math.floor(wmax / step * ( 1 + 1e-9 )), fixedStep ? Infinity : 2 * maxTicks, 1000);
-            for( let i = top; bot - i <= most; i-- )
-                for( let j = bot; j - i <= most; j++ ) {
-                    const c = { min: i * step, max: j * step }, n = niceAxis(c.min, c.max, maxTicks, fixedStep);
-                    const key = n.min + ',' + n.max;
-                    if( Math.abs(n.min - c.min) < step * 1e-6 && Math.abs(n.max - c.max) < step * 1e-6 && !seen.has(key) ) { seen.add(key); out.push(n); }
-                }
+    let lo = view.lo, hi = view.hi;
+    for( let k = 0; L > 0 && k < BANDS; k++ ) {
+        const w = 1 - k / BANDS, a = k * L / BANDS, b = ( k + 1 ) * L / BANDS;
+        for( const r of [rangeOf(t0 - b, t0 - a), rangeOf(t1 + a, t1 + b)] ) {
+            if( !r ) continue;
+            lo = Math.min(lo, view.lo + ( r.lo - view.lo ) * w);
+            hi = Math.max(hi, view.hi + ( r.hi - view.hi ) * w);
+        }
     }
-    return out;
+    return { lo, hi };
 }
 
-// How long an axis holds through a pan from [t0, t1] by dir: the share of the frames it
-// holds, one after the other, over HORIZON windows
-function panLife(axis, rangeOf, t0, t1, dir, minSpan, fill, zero)
+// (a step down from a height: the round one below it — 10 → 5 → 2 → 1)
+function stepDown(h)
 {
-    const r = t1 - t0;
-    for( let k = 1; k <= HORIZON * FRAMES; k++ ) {
-        const d = dir * r * k / FRAMES;
-        if( !holds(axis, rangeOf(t0 + d, t1 + d), minSpan, fill, zero) ) return ( k - 1 ) / ( HORIZON * FRAMES );
-    }
-    return 1;
+    const e = Math.floor(Math.log10(h)), f = h / Math.pow(10, e);
+    return ( f > 5 + 1e-9 ? 5 : f > 2 + 1e-9 ? 2 : f > 1 + 1e-9 ? 1 : 0.5 ) * Math.pow(10, e);
 }
 
-// The axis for the window [t0, t1] (prev: the one drawn; moving: a gesture going on): prev
-// kept while it holds — while moving, while what is shown stays in it —; else, of the axes
-// holding what is shown, the one lasting best through the gestures foreseen — a pan of a
-// window either way held to its end counting most, then how far it holds, a zoom out, a
-// zoom in —, the tightest of the best. step: the axis' own tick step (ystepSize, a
-// state_map's 1), else Chart.js'; zero: a widening never takes the axis across 0 (false: a
-// logarithmic axis, its values in decades)
+// The axis for the window [t0, t1] (prev: the one drawn — its bounds, and the window it was
+// chosen for —; moving: a gesture going on), see above: { min, max, t0, t1 }. step: the axis'
+// own tick step (ystepSize, a state_map's 1), else Chart.js'; zero: an axis never taken
+// across 0 by a widening (false: a logarithmic axis, its values in decades)
 export function chooseYAxis(prev, rangeOf, t0, t1, { maxTicks = 9, minSpan, steady = STEADY, moving = false, step, zero = true } = {})
 {
     const view = rangeOf(t0, t1);
     if( !view ) return prev ?? null;
-    const fill = 1 - steady, v = shownRange(view, minSpan, zero);
-    const _holds = (a, r) => holds(a, r, minSpan, fill, zero);
-    // (steady 0: what is shown, at every frame — never kept while moving)
-    if( prev && ( _holds(prev, view) || ( moving && steady > 0 && inside(prev, v) ) ) ) return prev;
-    const r = t1 - t0, zooms = GESTURES.slice(2).map(g => ({ w: g.w, range: rangeOf(...g.at(t0, t1, r)) }));
-    // (no axis higher than all the gestures foreseen would show)
-    const far = rangeOf(t0 - HORIZON * r, t1 + HORIZON * r), farV = far ? shownRange(far, minSpan, zero) : v;
-    let best = null, bestScore = -1;
-    for( const a of axesOver(v, maxTicks, fill, ( farV.hi - farV.lo ) * 1.5, step) ) {
-        if( !_holds(a, view) ) continue;
-        let score = zooms.reduce((s, z) => s + ( _holds(a, z.range) ? z.w : 0 ), 0);
-        for( const dir of [-1, 1] ) { const l = panLife(a, rangeOf, t0, t1, dir, minSpan, fill, zero); score += ( l >= 1 / HORIZON ? 1 : 0 ) + l; }
-        if( score > bestScore + 1e-9 || ( Math.abs(score - bestScore) <= 1e-9 && a.max - a.min < best.max - best.min ) ) { best = a; bestScore = score; }
+    const r = t1 - t0, env = shownRange(envelope(rangeOf, t0, t1, view, ZONE * steady * r), minSpan, zero);
+    const _at = a => ({ min: a.min, max: a.max, t0, t1 }), fit = _at(niceAxis(env.lo, env.hi, maxTicks, step));
+    // (steady 0: what is shown, at every frame)
+    if( !prev || steady <= 0 ) return fit;
+    // (attack: grown at once, on the side it lacks — at rest, the tightest where what it would
+    // hold fills it too little: the other side narrowed too, as a release would)
+    if( !inside(prev, env) ) {
+        const g = niceAxis(Math.min(prev.min, env.lo), Math.max(prev.max, env.hi), maxTicks, step);
+        return !moving && env.hi - env.lo < ( 1 - steady ) * ( g.max - g.min ) * ( 1 - 1e-9 ) ? fit : _at(g);
     }
-    // (none fills enough — the ticks' rounding, steady 0: the tightest, what is shown first)
-    if( !best ) best = niceAxis(v.lo, v.hi, maxTicks, step);
-    return best;
+    const h = prev.max - prev.min;
+    if( env.hi - env.lo >= ( 1 - steady ) * h * ( 1 - 1e-9 ) ) return prev;
+    // (release: at rest, at once; while moving, a step each RELEASE window travelled)
+    if( !moving ) return fit;
+    if( Math.abs(t0 - ( prev.t0 ?? -Infinity )) + Math.abs(t1 - ( prev.t1 ?? -Infinity )) < RELEASE * r ) return prev;
+    const H = stepDown(h);
+    if( H <= fit.max - fit.min ) return fit;
+    // (as high as the step down: on the side it keeps — the other fixed bound, 0 for a rain —,
+    // else around the envelope)
+    const lo = prev.min === fit.min ? prev.min : prev.max === fit.max ? prev.max - H
+             : Math.max(env.hi - H, Math.min(env.lo, ( env.lo + env.hi - H ) / 2));
+    const a = niceAxis(zero && env.lo >= 0 ? Math.max(0, lo) : lo, ( zero && env.lo >= 0 ? Math.max(0, lo) : lo ) + H, maxTicks, step);
+    return inside(a, env) && a.max - a.min < h ? _at(a) : fit;
 }
 
 // rangeOf over curves: for each, its entries { x, lo, hi } in the order of x — { lo, hi } of
