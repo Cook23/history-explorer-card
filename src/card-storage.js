@@ -7,6 +7,7 @@ import { i18n } from "./languages.js";
 import { keyOf, repairedGroupIds, PLACEMENT_FIELDS } from "./history-entity-store.js";
 import { GESTURE_SETTINGS, clampGesture, gestureSettings, applyGestures } from "./gesture-settings.js";
 import { PERSISTENCE_CATEGORIES } from "./history-options.js";
+import { Version } from "./version.js";
 
 // --------------------------------------------------------------------------------------
 // What is kept for the whole page — every card and the info panel, read before any card
@@ -21,6 +22,39 @@ const INFO_PANEL_KEY = 'history-explorer-info-panel';
 const INFO_PANEL_SWITCH_KEY = 'history-explorer-infopanel-enabled';
 
 const _readLocal = key => { try { return JSON.parse(window.localStorage.getItem(key)); } catch(e) { return null; } };
+
+// --------------------------------------------------------------------------------------
+// What the card keeps on this device is of two kinds — every key of it in one of the two
+// lists (checked: tests/architecture.cjs stored-keys); a key ending with '_', one per card
+// (its id after it):
+// - KEPT_KEYS: the user's choices, and the card's version — never let go by the card;
+// - DERIVED_KEYS: what the card worked out and keeps so as not to work it out again — never
+//   a choice —, let go when the card's version changes: a rule, a font, a text may have
+//   changed what it would work out now (see versionIsNew)
+// --------------------------------------------------------------------------------------
+const CARD_KEY = 'history-explorer_card_', VERSION_KEY = 'history-explorer-version';
+// The statistics probes' verdicts kept on this device (see card-history.js SENSOR_GAPS), by
+// entity: { fine, hour, at } — a day: a page loaded again (the app sent to the background,
+// its page dropped) doesn't probe again what it probed less than PROBES_KEPT_MS ago
+const PROBES_KEY = 'history-explorer_probes', PROBES_KEPT_MS = 24 * 3600e3;
+// The automatic Y axes (see card-charts.js _autoYAxis), the entity selector's widths and its
+// lines' shorter forms on this device's screen, by card
+const AXES_KEY = 'history-explorer_yaxes_', SELECTOR_KEY = 'history-explorer_selector_', FORMS_KEY = 'history-explorer_selector_forms_';
+const KEPT_KEYS = [CARD_KEY, GESTURES_KEY, INFO_PANEL_KEY, INFO_PANEL_SWITCH_KEY, VERSION_KEY];
+const DERIVED_KEYS = [PROBES_KEY, AXES_KEY, SELECTOR_KEY, FORMS_KEY];
+
+// Whether this device runs this version of the card for the first time (or the card at all):
+// what another version worked out let go (DERIVED_KEYS), this version kept (VERSION_KEY) —
+// once a page, before any card is made; the card's title says so (see history-explorer-card.js)
+export const versionIsNew = (() => {
+    try {
+        if( window.localStorage.getItem(VERSION_KEY) === Version ) return false;
+        const _is = (k, l) => l.some(d => d.endsWith('_') ? k.startsWith(d) : k === d);
+        for( const k of Object.keys(window.localStorage) ) if( _is(k, DERIVED_KEYS) && !_is(k, KEPT_KEYS) ) window.localStorage.removeItem(k);
+        window.localStorage.setItem(VERSION_KEY, Version);
+        return true;
+    } catch(e) { return false; }
+})();
 
 // The gesture settings in force on this device: { name: value } for each of them
 export function localGestures()
@@ -139,10 +173,6 @@ function sameEntry(a, b, devices)
     return _canon(a) === _canon(b);
 }
 
-// The statistics probes' verdicts kept on this device (see card-history.js SENSOR_GAPS), by
-// entity: { fine, hour, at } — a day: a page loaded again (the app sent to the background,
-// its page dropped) doesn't probe again what it probed less than PROBES_KEPT_MS ago
-const PROBES_KEY = 'history-explorer_probes', PROBES_KEPT_MS = 24 * 3600e3;
 // The automatic Y axes kept on this device, by card (see card-charts.js _autoYAxis): at most
 // AXES_KEPT graphs' — the last ones drawn
 const AXES_KEPT = 50;
@@ -174,7 +204,7 @@ export class CardStorage
     // The automatic Y axes kept for this card → { graph's key: { axis id: axis } }
     keptYAxes()
     {
-        return _readLocal('history-explorer_yaxes_' + this.id) ?? {};
+        return _readLocal(AXES_KEY + this.id) ?? {};
     }
 
     // The automatic Y axes of this card kept (axes: as keptYAxes gives them, in the order
@@ -183,7 +213,7 @@ export class CardStorage
     {
         try {
             const _l = Object.entries(axes);
-            window.localStorage.setItem('history-explorer_yaxes_' + this.id, JSON.stringify(Object.fromEntries(_l.slice(Math.max(0, _l.length - AXES_KEPT)))));
+            window.localStorage.setItem(AXES_KEY + this.id, JSON.stringify(Object.fromEntries(_l.slice(Math.max(0, _l.length - AXES_KEPT)))));
         } catch(e) {}
     }
 
@@ -207,7 +237,7 @@ export class CardStorage
         // write never comes back as another device's change, and a newer change made here
         // meanwhile isn't undone by it. A write that failed leaves it as it was.
         try {
-            await this._hass.callWS({ type: 'frontend/set_user_data', key: 'history-explorer_card_' + this.id, value: data });
+            await this._hass.callWS({ type: 'frontend/set_user_data', key: CARD_KEY + this.id, value: data });
             this._lastHaEntities         = data.entities;
             this._lastHaTimeRangeHours   = data.timeRangeHours;
             this._lastHaTimeRangeMinutes = data.timeRangeMinutes;
@@ -222,7 +252,7 @@ export class CardStorage
     {
         const data = this._savedNow();
         window.localStorage.removeItem('history-explorer-card');
-        window.localStorage.setItem('history-explorer_card_' + this.id, JSON.stringify(data));
+        window.localStorage.setItem(CARD_KEY + this.id, JSON.stringify(data));
         return data;
     }
     // What this device saves (writeLocalState): its state as shown, and its images of the
@@ -363,12 +393,12 @@ export class CardStorage
     // before the list is built again. On this device only (its fonts)
     savedSelectorWidths()
     {
-        return _readLocal('history-explorer_selector_' + this.id);
+        return _readLocal(SELECTOR_KEY + this.id);
     }
 
     keepSelectorWidths(w)
     {
-        try { window.localStorage.setItem('history-explorer_selector_' + this.id, JSON.stringify({ most: w.most, all: w.all })); } catch(e) {}
+        try { window.localStorage.setItem(SELECTOR_KEY + this.id, JSON.stringify({ most: w.most, all: w.all })); } catch(e) {}
     }
 
     // The shorter forms of the entity selector's lines (shortNameForms), as computed the
@@ -376,19 +406,19 @@ export class CardStorage
     // before they're computed again. On this device only
     savedEntityForms()
     {
-        return _readLocal('history-explorer_selector_forms_' + this.id);
+        return _readLocal(FORMS_KEY + this.id);
     }
 
     keepEntityForms(forms)
     {
-        try { window.localStorage.setItem('history-explorer_selector_forms_' + this.id, JSON.stringify(forms)); } catch(e) {}
+        try { window.localStorage.setItem(FORMS_KEY + this.id, JSON.stringify(forms)); } catch(e) {}
     }
 
     // What was saved on this device (localStorage — the source of truth for change
     // detection, it holds all the mirrors), or null
     _readLocalSaved()
     {
-        const _lsRaw = window.localStorage.getItem('history-explorer_card_' + this.id);
+        const _lsRaw = window.localStorage.getItem(CARD_KEY + this.id);
         return _lsRaw ? JSON.parse(_lsRaw) : null;
     }
 
@@ -397,7 +427,7 @@ export class CardStorage
     async _readHaSaved()
     {
         const _get = key => this._hass.callWS({ type: 'frontend/get_user_data', key }).then(r => r?.value, () => undefined);
-        const [_card, _ipe, _g] = await Promise.all([_get('history-explorer_card_' + this.id), _get(INFO_PANEL_SWITCH_KEY), _get(GESTURES_KEY)]);
+        const [_card, _ipe, _g] = await Promise.all([_get(CARD_KEY + this.id), _get(INFO_PANEL_SWITCH_KEY), _get(GESTURES_KEY)]);
         return {
             haCard: _card || null,
             haInfoEnabled: _ipe?.enabled !== undefined ? !!_ipe.enabled : undefined,

@@ -25,7 +25,7 @@ import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
 import { withLook, OPTION_DEFAULTS, PERSISTENCE_CATEGORIES } from "./history-options.js";
 import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-settings.js";
-import { localGestures } from "./card-storage.js";
+import { localGestures, versionIsNew } from "./card-storage.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
 
@@ -258,6 +258,8 @@ export class HistoryCardState {
         let locale = this._hass.language ? this._hass.language : 'en-GB';
 
         setLanguage(locale);
+        // (the default title in the user's language: "(new)" translated)
+        if( this.ui.defaultTitle && versionIsNew ) this._this?.querySelector('#maincard')?.setAttribute('header', defaultTitle());
 
         this.ui.wideInterval = ['da', 'nl', 'sv', 'sk', 'ru'].includes(locale);
 
@@ -367,6 +369,10 @@ function getLocalizedDateString(locale, style)
 
 var gcid = 0;
 
+// The card's title, unless the YAML gives one: its version — "(new)" after it the first time
+// this device runs it (see card-storage.js versionIsNew), in the user's language once known
+const defaultTitle = () => `History explorer v${Version}` + ( versionIsNew ? ` (${i18n('ui.label.new_version')})` : '' );
+
 class HistoryExplorerCard extends HTMLElement
 {
     instance = null;
@@ -463,7 +469,8 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.contentValid = false;
         this.instance.entitiesPopulated = false;
 
-        const header = config.header || `History explorer v${Version}`;
+        const header = config.header || defaultTitle();
+        this.instance.ui.defaultTitle = !config.header;
         const bgcol = buttonsColor(config.uiColors);
 
         const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };

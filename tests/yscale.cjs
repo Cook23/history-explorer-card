@@ -166,25 +166,25 @@ module.exports = async function()
         done(await t.close());
     }
 
-    // ── Statistics relevant only where the mean time between the values is 60 % of their
-    // period at most: measured again each time the history comes ──
-    t = await openCard(card('7d', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 7200 } });
+    // ── A sensor sparser than the probe allows (a value every 3 hours): neither its 5-minute
+    // nor its hourly statistics used ──
+    t = await openCard(card('7d', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 10800 } });
     await t.wait(5000);
-    await t.step('a value every 2 hours: neither its 5-minute nor its hourly statistics drawn, counted in Export ▸ Statistics ▸ or exported — the daily ones still', async () => {
+    await t.step('a value every 3 hours: neither its 5-minute nor its hourly statistics drawn — its history drawn where kept —; its 5-minute ones never counted in Export ▸ Statistics ▸ nor exported, its hourly ones always (Home Assistant has them)', async () => {
         const r = await t.E(`(async()=>{ const I = el.instance, id = 'sensor.power', t0 = Date.parse(I.startTime);
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
             const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0);
             const a = I.exportAvailability([id]), rows = await I.exportRows('hour', [id]), fine = await I.exportRows('5minute', [id]);
             return { finer: d.filter(p => p.statistics && p.statisticsPeriod <= 3600e3).length, n: d.length, periods: a.periods, hour: Object.keys(rows).length, fine: Object.keys(fine).length }; })()`);
-        return r.n > 0 && r.finer === 0 && r.periods['5minute'] === 0 && r.periods.hour === 0 && r.periods.day === 1 && r.hour === 0 && r.fine === 0 ? true : JSON.stringify(r);
+        return r.n > 0 && r.finer === 0 && r.periods['5minute'] === 0 && r.periods.hour === 1 && r.periods.day === 1 && r.hour === 1 && r.fine === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
     // ── Few values in the last hour: its last 24 probed — its hourly statistics valid only
-    // with 5 intervals under 48 minutes there ──
-    t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 7200 } });
+    // with 5 intervals under 50 minutes there ──
+    t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 10800 } });
     await t.wait(6000);
-    await t.step('a value every 2 hours: its last hour, then its last 24, probed before any statistics; its hourly statistics never drawn nor counted — the daily ones still', async () => {
+    await t.step('a value every 3 hours: its last hour, then its last 24, probed before any statistics; its hourly statistics never drawn where its history is kept — counted in Export ▸ Statistics ▸ still', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', t0 = Date.parse(I.startTime);
             const k = __ws.findIndex(w => w.type === 'recorder/statistics_during_period');
             const long = __ws.findIndex(w => w.type === 'history/history_during_period' && Date.now() - Date.parse(w.start) >= 24 * 3600e3 && Date.now() - Date.parse(w.start) < 26 * 3600e3);
@@ -192,7 +192,21 @@ module.exports = async function()
             const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0);
             const a = I.exportAvailability([id]);
             return { long, k, hourly: d.filter(p => p.statistics && p.statisticsPeriod <= 3600e3).length, n: d.length, hour: a.periods.hour, day: a.periods.day }; })()`);
-        return r.long >= 0 && r.long < r.k && r.hourly === 0 && r.n > 0 && r.hour === 0 && r.day === 1 ? true : JSON.stringify(r);
+        return r.long >= 0 && r.long < r.k && r.hourly === 0 && r.n > 0 && r.hour === 1 && r.day === 1 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Hourly statistics not valid, past the history's retention: the hourly ones drawn there
+    // — their periods made up held —, never daily ones coarser than a column of pixels ──
+    t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 10800, historyDays: 30 } });
+    await t.wait(6000);
+    await t.step('a value every 3 hours, 30 days of history, 6 months (a column of some 5 hours): its history where kept; before, its hourly statistics (their runs at the same value held) — no daily ones', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), t0 = Date.parse(I.startTime);
+            const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && !p.hecVirtual && x(p) >= t0);
+            const old = d.filter(p => x(p) < Date.now() - 32 * 86400e3), recent = d.filter(p => x(p) > Date.now() - 28 * 86400e3 && x(p) < Date.now() - 86400e3);
+            return { valid: I._relevant('sensor.power', 3600e3), old: old.length, hourly: old.filter(p => p.statisticsPeriod === 3600e3).length, daily: d.filter(p => p.statisticsPeriod >= 86400e3).length,
+                     recentStats: recent.filter(p => p.statistics).length, recent: recent.length }; })()`);
+        return !r.valid && r.old > 100 && r.hourly === r.old && r.daily === 0 && r.recent > 50 && r.recentStats === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -208,7 +222,7 @@ module.exports = async function()
         t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '7d', statistics: { enabled: true }, graphs: [{ type: 'line', entities: Object.keys(D).map(entity => ( { entity } )) }] },
             { height: 900, mock: { series: true, fastStats: true, rows, states } });
         await t.wait(5000);
-        await t.step('a real month of history: 5 intervals under 4 min in its last hour, the 5-minute and hourly statistics valid (a power every minute, the wind); a mean under 15 min, the hourly ones (the sun, a power every 5 min); else its last 24 hours, 5 intervals under 48 min, the hourly ones — silent the last hour (the sun\'s irradiance at night, a pump stopped, a thermostat); never for a reading every hour, a setting, a rain', async () => {
+        await t.step('a real month of history: 5 intervals under 4 min in its last hour, the 5-minute and hourly statistics valid (a power every minute, the wind); a mean under 15 min, the hourly ones (the sun, a power every 5 min); else its last 24 hours, 5 intervals under 50 minutes, the hourly ones — silent the last hour (the sun\'s irradiance at night, a pump stopped, a thermostat); never for a reading every hour, a setting, a rain', async () => {
             const r = await t.E(`(()=>{ const I = el.instance; return Object.fromEntries(${JSON.stringify(Object.keys(D))}.map(id => [id, [I._relevant(id, 300e3) ? 1 : 0, I._relevant(id, 3600e3) ? 1 : 0]])); })()`);
             const bad = Object.keys(D).filter(id => r[id][0] !== D[id][0] || r[id][1] !== D[id][1]);
             return !bad.length ? true : JSON.stringify(bad.map(id => [id, r[id], D[id]]));
@@ -242,11 +256,11 @@ module.exports = async function()
     t = await openCard(card('3d', { statistics: { enabled: false }, lineMode: 'smart', showMinMax: true }),
         { height: 900, mock: { series: true, rows: { 'sensor.power': Array.from({ length: 3 * 24 * 60 }, (_, k) => [k * 60, ( Math.floor(k / 60) % 6 ) < 2 ? 0 : String(100 + ( k * 37 ) % 200)]).filter(([ago]) => Math.floor(ago / 3600) % 6 >= 2 || ago % 3600 === 0) } } });
     await t.wait(3000);
-    await t.step('smart mode, a sensor silent 2 hours in 6, showMinMax: every point of a plateau keeps the band (yMin, yMax) of the point it carries on — the band never broken by a plateau', async () => {
+    await t.step('smart mode, a sensor silent 2 hours in 6, showMinMax: every point of a plateau has the band of the value held — its min and max that value: the band never broken by a plateau, never widened along it by the column before', async () => {
         const r = await t.E(`(()=>{ const d = el.instance.graphs[0].chart.data.datasets[0].data;
             const plateaus = d.filter((p, k) => p.hecPlateauEnd && k > 0 && d[k - 1].yMin != null);
-            return { plateaus: plateaus.length, banded: plateaus.filter(p => p.yMin != null && p.yMax != null).length, band: d.filter(p => p.yMin != null).length }; })()`);
-        return r.plateaus >= 3 && r.banded === r.plateaus && r.band > 100 ? true : JSON.stringify(r);
+            return { plateaus: plateaus.length, held: plateaus.filter(p => p.yMin === p.y && p.yMax === p.y).length, wide: d.filter(p => p.yMin != null && p.yMax > p.yMin).length, band: d.filter(p => p.yMin != null).length }; })()`);
+        return r.plateaus >= 3 && r.held === r.plateaus && r.wide > 50 && r.band > 100 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

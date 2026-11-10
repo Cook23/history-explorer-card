@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.65] - 2026-11-10
+
+### Changed — the probe's last 24 hours
+- The hourly statistics valid once 5 intervals there are each under 50 minutes (48 before) — a reading every hour still not: its hourly statistics are drawn anyway where its history isn't kept, and exported (see below)
+- Tests (`yscale`): a value every 3 hours, its hourly statistics not valid
+
+### Changed — hourly statistics not valid: the history first, the hourly ones where it isn't kept
+- Hourly statistics not valid for an entity (the probe) were never used: past the history's retention, the curve came from the daily statistics, coarser than a column of pixels. They're now drawn where the history isn't kept — their periods made up held —, the history first wherever it is (as for an angle); the automatic Y axis follows. 5-minute statistics not valid are still never used: the history is kept as long
+- Hourly statistics always exported, valid or not: Home Assistant has them; only the 5-minute ones not valid left out of the export
+- Tests (`yscale`): a value every 3 hours, 30 days of history, 6 months: its history where kept, its hourly statistics before — no daily ones; its hourly statistics counted and exported
+
+### Fixed — the min/max band along a plateau, without a block
+- A plateau kept the min and max of the column before it: a peak just before a silence drew a block as high as it all along the silence (a car charging, then nothing). A plateau's band is now the value held — nothing varies in a silence —: the band never broken by a plateau, never widened along it
+- Tests (`yscale`): a plateau's band the value held, the band still there around it
+
+### Added — a new version: what the card worked out let go, "(new)" in the title
+- What the card keeps on this device to spare working it out again — never a user's choice: the statistics probes' verdicts, the automatic Y axes, the entity selector's widths and shorter lines — is let go when the card's version changes (a rule, a font, a text may have changed what it would work out). The card keeps its version on this device; the first time a new one runs, its title reads "(new)" after its version (in the user's language)
+- The user's choices kept on this device (the card's state, the gesture thresholds, the info panel) never let go
+- Tests (`architecture`): every key kept on this device a constant in one of the two lists — the user's choices (`KEPT_KEYS`), what the card worked out (`DERIVED_KEYS`)
+
+### Changed — docs
+- README_Full: *Only valid statistics*, *What is kept, and where* (what the card worked out); BRANCH.md: phase 0; CLAUDE.md: what the card works out, purged with a new version
+
 ## [v1.2.64] - 2026-11-10
 
 ### Fixed — the statistics probe: how often a sensor speaks when it speaks
