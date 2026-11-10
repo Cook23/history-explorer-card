@@ -30,11 +30,15 @@ already has is used, unless phase 0 makes it invalid.
 - **Phase 0 — probes,** once a session per entity with statistics, all of them in one request,
   nothing else asked meanwhile:
   - their history's last hour asked (short: a sensor flooding its history — 1000 values an
-    hour — costs little): the 5-minute statistics valid when the mean gap (1 h divided by the
-    count; no value: infinite, the only special case) is under 4 min, the hourly ones when
-    it is under 15 min;
-  - otherwise (a sparse sensor, never one flooding) its last 8 h asked, in one request for
-    them all: the hourly ones valid when the mean gap (8 h / count) is under 48 min;
+    hour — costs little): the 5-minute statistics valid — the hourly ones too — once 5
+    intervals there are each under 4 min (counting stops there: no sort, no list); the
+    hourly ones valid when the mean gap (1 h divided by the count; no value: infinite) is
+    under 15 min;
+  - otherwise (a sparse sensor, never one flooding) its last 24 h asked, in one request for
+    them all: the hourly ones valid once 5 intervals there are each under 48 min — how often
+    the sensor speaks when it speaks, whatever its silences;
+  - only the intervals between two numbers count (an unavailable state and the value after
+    it, a restart, tell nothing of the sensor);
   - the daily, weekly and monthly ones always valid;
   - the verdict holds for the session; statistics it makes invalid are never asked, drawn or
     exported.
@@ -73,6 +77,15 @@ already has is used, unless phase 0 makes it invalid.
   - then each side widened: phase 1's source in blocks 10 × phase 2's, phase 2's source in its
     own blocks — every entity alike, the entities of a source in one request;
   - the memory bounds kept (AHEAD_MAX_ROWS 300 000, purge past 500 000).
+- **Drawing** what the cache holds:
+  - the coarsest valid source whose period a column of pixels holds — no min, mean and max
+    worked out from many values for nothing —, a finer one only where it lacks (the last
+    minutes, not compiled yet), a coarser one where nothing finer is kept; an angle from its
+    history first (the statistics' mean is wrong for it);
+  - statistics Home Assistant made up (a sensor silent: its last value carried, min = mean
+    = max): a run of 5-minute or hourly ones at the same value, one value held to the run's
+    end — a silence of smart mode;
+  - a plateau of smart mode keeps the min/max band of the point it carries on.
 
 ## Planned
 

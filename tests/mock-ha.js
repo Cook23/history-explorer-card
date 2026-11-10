@@ -27,6 +27,7 @@
 //               in Python: every hour of the time asked, however few rows it returns
 //   clones      that many more sensors with statistics: sensor.s1, sensor.s2…
 //   fastStats   the statistics worked out at once (from the sine), not compiled from the history
+//   states      more entities: { id: { state, unit, state_class } } (a data set's: see dataset.cjs)
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
@@ -76,6 +77,8 @@ Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, app
     // (sub-attributes: a list of dictionaries)
     forecast: [{ datetime: '2026-10-20T12:00:00+00:00', condition: 'sunny', temperature: 23.5, templow: 14 }, { datetime: '2026-10-21T12:00:00+00:00', condition: 'rainy', temperature: 18, templow: 12 }] });
 for(let k=1;k<=(MOCK.clones||0);k++) STATES['sensor.s'+k]=ent('sensor.s'+k,'sensor '+k,'W',String(100+k),'measurement');
+// (MOCK.states: more entities, { id: { state, unit, state_class } } — a data set's, see dataset.cjs)
+for(const [id,a] of Object.entries(MOCK.states||{})) STATES[id]=ent(id,id,a.unit||null,String(a.state),a.state_class);
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];

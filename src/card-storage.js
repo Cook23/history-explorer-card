@@ -139,8 +139,55 @@ function sameEntry(a, b, devices)
     return _canon(a) === _canon(b);
 }
 
+// The statistics probes' verdicts kept on this device (see card-history.js SENSOR_GAPS), by
+// entity: { fine, hour, at } — a day: a page loaded again (the app sent to the background,
+// its page dropped) doesn't probe again what it probed less than PROBES_KEPT_MS ago
+const PROBES_KEY = 'history-explorer_probes', PROBES_KEPT_MS = 24 * 3600e3;
+// The automatic Y axes kept on this device, by card (see card-charts.js _autoYAxis): at most
+// AXES_KEPT graphs' — the last ones drawn
+const AXES_KEPT = 50;
+
 export class CardStorage
 {
+    // --------------------------------------------------------------------------------------
+    // What the card worked out, kept on this device: its probes' verdicts, its Y axes
+    // --------------------------------------------------------------------------------------
+
+    // The probes' verdicts kept, less than PROBES_KEPT_MS old → [[id, { fine, hour }]]
+    keptProbes()
+    {
+        const _kept = _readLocal(PROBES_KEY) ?? {}, _from = Date.now() - PROBES_KEPT_MS;
+        return Object.entries(_kept).filter(([, v]) => v?.at > _from).map(([id, v]) => [id, { fine: !!v.fine, hour: !!v.hour }]);
+    }
+
+    // Probes' verdicts (verdicts: [[id, { fine, hour }]]) kept, now — the older ones dropped
+    keepProbes(verdicts)
+    {
+        try {
+            const _from = Date.now() - PROBES_KEPT_MS;
+            const _kept = Object.fromEntries(Object.entries(_readLocal(PROBES_KEY) ?? {}).filter(([, v]) => v?.at > _from));
+            for( const [id, v] of verdicts ) _kept[id] = { fine: v.fine, hour: v.hour, at: Date.now() };
+            window.localStorage.setItem(PROBES_KEY, JSON.stringify(_kept));
+        } catch(e) {}
+    }
+
+    // The automatic Y axes kept for this card → { graph's key: { axis id: axis } }
+    keptYAxes()
+    {
+        return _readLocal('history-explorer_yaxes_' + this.id) ?? {};
+    }
+
+    // The automatic Y axes of this card kept (axes: as keptYAxes gives them, in the order
+    // they were last drawn — the AXES_KEPT last ones)
+    keepYAxes(axes)
+    {
+        try {
+            const _l = Object.entries(axes);
+            window.localStorage.setItem('history-explorer_yaxes_' + this.id, JSON.stringify(Object.fromEntries(_l.slice(Math.max(0, _l.length - AXES_KEPT)))));
+        } catch(e) {}
+    }
+
+
     // --------------------------------------------------------------------------------------
     // Dynamic data storage
     // --------------------------------------------------------------------------------------

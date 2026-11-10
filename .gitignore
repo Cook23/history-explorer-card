@@ -1,3 +1,5 @@
 /node_modules
 .DS_Store
 tools/docs-images/out/
+# a real data set, private: kept on the machine that runs the tests, never published (see tests/dataset.cjs)
+tests/data/

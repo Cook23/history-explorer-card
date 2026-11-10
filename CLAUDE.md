@@ -75,6 +75,9 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
   coding.
 - **The full suite:** only when the user says the modifications are finished, or asks for it —
   never during modifications, never on your own initiative. Meanwhile, targeted tests only.
+- **Each real failed test** (a fault of the code, not a test to adapt to a behavior the user
+  asked for): search the code for the similar cases — the same mistake elsewhere — and report
+  them, before or with the fix.
 - **Never without being asked:** a version bump, a commit, a push, a PR, a merge.
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —

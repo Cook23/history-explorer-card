@@ -4,6 +4,32 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.64] - 2026-11-10
+
+### Fixed — the statistics probe: how often a sensor speaks when it speaks
+- A sensor silent when the page opened — the sun's irradiance at night, a pump stopped, a sensor publishing only its changes — had its hourly statistics refused for the session (a mean over its last 8 hours): the history drawn where it's kept, the daily statistics before — a seam. The probe now looks at the intervals between its values, never at its silences: its last hour — the 5-minute statistics valid, and the hourly ones, once 5 intervals there are each under 4 minutes; the hourly ones where the mean there is under 15 minutes —; else its last 24 hours — the hourly ones valid once 5 intervals there are each under 48 minutes. No sort, no list: counting stops at 5. Only the intervals between two numbers count (a restart's unavailable state tells nothing of the sensor)
+
+### Changed — the source drawn: the coarsest a column holds
+- Where several sources are loaded, the card draws the coarsest valid one whose period a column of pixels holds — the hourly statistics for six months, even where the history is loaded too: the same values, without working them out again from thousands —, a finer one only where it lacks (the last minutes, not compiled yet), a coarser one where nothing finer is kept. It drew the finest (the history first, however sparse). An angle is still drawn from its history first: its statistics are wrong
+
+### Added — statistics made up, a value held
+- Home Assistant compiles statistics for a period even when the sensor sent nothing: its last value carried, min = mean = max. A run of 5-minute or hourly statistics like that, at the same value, is now drawn as one value held until the run's end — a silence in smart mode, a plateau —, never a point each period
+
+### Fixed — the min/max band along a plateau
+- In smart mode, a plateau broke the min/max band (`showMinMax`): its points had no min and max — on a long window, a curve drawn from the history, silent now and then, had no band at all. A plateau keeps the band of the point it carries on
+
+### Added — what the card worked out kept
+- A card made again on the same page — Home Assistant drawing the dashboard again, coming back to it, the app back from the background — takes back what its cache held, asking only what came since (today's): the curves drawn at once, no probe. It started again from nothing: every request, every probe. A cache found by the card's name and its YAML — two cards never share one —, let go 10 minutes after its card left the page, unless taken back
+- The page loaded again (the app's page dropped meanwhile): the probes' verdicts kept on this device for a day — no probe asked again —, and the automatic Y axes, by graph — its curves as they're drawn (scale, valueFactor, SI conversion, process, stateMap): a curve drawn otherwise gets its own —, the axes as they were (`card-storage.js` `keptProbes`, `keptYAxes`)
+- Tests (`features`): the card made again on the same page, nothing of the window asked but today's; another card of the same name, other curves, a cache of its own; the card off the page more than 10 minutes, its window asked again; the page loaded again, no probe, the Y axis as it was — its own for a curve drawn 100 times larger
+
+### Tests
+- `architecture`: `option-defaults` reports every local fallback and points to the exact rule (CLAUDE.md, ARCHITECTURE.md rule 9): a business default moved to its place, a module's fallback the rule allows listed as an exception
+- `yscale`: a real month of a Home Assistant's history (`dataset.cjs`, the mock's `states` — the data set private, never in the repository: on the machine running the tests only, the test skipped without it): each sensor's statistics told by the probe; statistics made up held, a plateau in smart mode; the band along a plateau; the hourly statistics drawn for six months where the history is loaded too; the probe's 24 hours
+
+### Changed — docs
+- README_Full: *Kept when the card is drawn again*, *Only valid statistics* (the probe), *The coarsest source a column holds, first*, *Statistics made up, a value held*, smart mode's plateaus (statistics made up, the band); BRANCH.md: phase 0, *Drawing*
+
 ## [v1.2.63] - 2026-11-10
 
 ### Changed — the window loaded in phases

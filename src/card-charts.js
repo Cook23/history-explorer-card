@@ -449,15 +449,26 @@ export class CardCharts
         // (as many ticks as Chart.js puts on it: Chart.LinearScale's getTickLimit)
         const _font = me.options.ticks.fontSize ?? FONT_PX;
         const maxTicks = Math.min(me.options.ticks.maxTicksLimit ?? 11, Math.max(2, Math.ceil(( me.height || chart.height ) / ( 2 * _font ))));
-        // (the axes chosen, by chart: the card's own)
-        this._yAxesKept ??= new WeakMap();
-        if( !this._yAxesKept.has(chart) ) this._yAxesKept.set(chart, {});
-        const _kept = this._yAxesKept.get(chart);
+        // (the axes chosen, by graph — its id and its curves, each with what changes its values
+        // drawn (scale, valueFactor, SI conversion, process, stateMap): the same graph built
+        // again, the page loaded again, keeps them; two graphs — of two cards of the same name —
+        // whose curves are drawn otherwise, each its own —, kept on this device: see
+        // card-storage.js keptYAxes)
+        this._yAxesKept ??= this.keptYAxes();
+        const _g = this.graphs.find(g => g.chart === chart);
+        const _key = _g ? _g.id + ':' + _g.entities.map(e => [e.entity, this.drawScaleOf(e), e.siConversionFactor ?? 1, e.process ?? '', JSON.stringify(this.resolveOption(e, 'stateMap'))].join('~')).join() : '';
+        const _kept = this._yAxesKept[_key] ?? {};
         const a = chooseYAxis(_kept[id], rangeOf, msOf(this.startTime), msOf(this.endTime),
                               { maxTicks, steady: ( steady ?? OPTION_DEFAULTS.yScaleSteadiness ) / 100, moving: !!this.state.drag,
                                 minSpan: log ? undefined : minSpan, step: log ? 1 : step, zero: !log });
         if( !a ) return;
-        _kept[id] = a;
+        // (written only when it changes, never while a gesture moves the window: its end writes it)
+        if( a !== _kept[id] && _key ) {
+            delete this._yAxesKept[_key];
+            this._yAxesKept[_key] = { ..._kept, [id]: a };
+            this._yAxesChanged = true;
+        }
+        if( this._yAxesChanged && !this.state.drag ) { this._yAxesChanged = false; this.keepYAxes(this._yAxesKept); }
         if( freeLo ) me.min = log ? Math.pow(10, a.min) : a.min;
         if( freeHi ) me.max = log ? Math.pow(10, a.max) : a.max;
     }

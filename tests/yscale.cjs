@@ -6,6 +6,7 @@
 // The curve's rows are put in the card's cache as Home Assistant would give them (its
 // requests made to fail, so that nothing replaces them), then drawn.
 const { openCard } = require('./lib.cjs');
+const dataset = require('./dataset.cjs');
 
 const FAIL = ['history/history_during_period', 'recorder/statistics_during_period'];
 const card = (range, more = {}, graph = {}) => ({ type: 'custom:history-explorer-card', defaultTimeRange: range, statistics: { enabled: false }, ...more,
@@ -179,19 +180,88 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── Few values in the last hour: its last 8 probed — its hourly statistics valid only
-    // with a value every 48 minutes at least there ──
+    // ── Few values in the last hour: its last 24 probed — its hourly statistics valid only
+    // with 5 intervals under 48 minutes there ──
     t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 7200 } });
     await t.wait(6000);
-    await t.step('a value every 2 hours: its last hour, then its last 8, probed before any statistics; its hourly statistics never drawn nor counted — the daily ones still', async () => {
+    await t.step('a value every 2 hours: its last hour, then its last 24, probed before any statistics; its hourly statistics never drawn nor counted — the daily ones still', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', t0 = Date.parse(I.startTime);
             const k = __ws.findIndex(w => w.type === 'recorder/statistics_during_period');
-            const long = __ws.findIndex(w => w.type === 'history/history_during_period' && Date.now() - Date.parse(w.start) >= 8 * 3600e3 && Date.now() - Date.parse(w.start) < 10 * 3600e3);
+            const long = __ws.findIndex(w => w.type === 'history/history_during_period' && Date.now() - Date.parse(w.start) >= 24 * 3600e3 && Date.now() - Date.parse(w.start) < 26 * 3600e3);
             const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
             const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && x(p) >= t0);
             const a = I.exportAvailability([id]);
             return { long, k, hourly: d.filter(p => p.statistics && p.statisticsPeriod <= 3600e3).length, n: d.length, hour: a.periods.hour, day: a.periods.day }; })()`);
         return r.long >= 0 && r.long < r.k && r.hourly === 0 && r.n > 0 && r.hour === 0 && r.day === 1 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── A real data set (dataset.cjs: a month of a Home Assistant's history — private, on the
+    // machine running the tests only: skipped without it): each sensor's statistics told by how
+    // often it speaks when it speaks, whatever its silences ──
+    if( !dataset.available() ) console.log('  - skipped: a real month of history — tests/data/history-month.csv is not on this machine (private, see dataset.cjs)');
+    else {
+        const D = { 'sensor.lp_puissance_1': [1, 1], 'sensor.lp_ecowitt_wind_direction': [1, 1], 'sensor.lp_puissance_prioritaires': [0, 1], 'sensor.sun_azimuth': [0, 1],
+                    'sensor.lp_ecowitt_solar_irradiance': [0, 1], 'sensor.lp_puissance_var_piscine': [0, 1], 'sensor.lp_mesure_thermostat_bureau_ma_lin': [0, 1],
+                    'sensor.lp_villeveyrac_temperature': [0, 0], 'sensor.consigne_thermostat_mezzanine': [0, 0], 'sensor.lp_ecowitt_rain_rate': [0, 0] };
+        const { rows, states } = dataset(Object.keys(D));
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '7d', statistics: { enabled: true }, graphs: [{ type: 'line', entities: Object.keys(D).map(entity => ( { entity } )) }] },
+            { height: 900, mock: { series: true, fastStats: true, rows, states } });
+        await t.wait(5000);
+        await t.step('a real month of history: 5 intervals under 4 min in its last hour, the 5-minute and hourly statistics valid (a power every minute, the wind); a mean under 15 min, the hourly ones (the sun, a power every 5 min); else its last 24 hours, 5 intervals under 48 min, the hourly ones — silent the last hour (the sun\'s irradiance at night, a pump stopped, a thermostat); never for a reading every hour, a setting, a rain', async () => {
+            const r = await t.E(`(()=>{ const I = el.instance; return Object.fromEntries(${JSON.stringify(Object.keys(D))}.map(id => [id, [I._relevant(id, 300e3) ? 1 : 0, I._relevant(id, 3600e3) ? 1 : 0]])); })()`);
+            const bad = Object.keys(D).filter(id => r[id][0] !== D[id][0] || r[id][1] !== D[id][1]);
+            return !bad.length ? true : JSON.stringify(bad.map(id => [id, r[id], D[id]]));
+        });
+        done(await t.close());
+    }
+
+    // ── Statistics Home Assistant made up — a sensor silent, its last value carried —: a run of
+    // them one value held, a silence of smart mode ──
+    t = await openCard(card('24h', { statistics: { enabled: true }, lineMode: 'smart' }), { height: 900, mock: { series: true, fail: FAIL } });
+    await t.wait(1500);
+    await t.step('six hours of hourly statistics all at the same value, min = mean = max (the sensor silent): one value held over them — a plateau to their end in smart mode, no point in it', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', a = Math.floor(( Date.now() - 20 * 3600e3 ) / 3600e3) * 3600e3;
+            for( const x of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) { x[l].delete(id); x.cover[l].delete(id); }
+            const st = (k, v, lo = v, hi = v) => ({ last_changed: a + k * 3600e3, state: v, statistics: { end: a + ( k + 1 ) * 3600e3, min: lo, mean: v, max: hi, raw: { mean: v, min: lo, max: hi } } });
+            const rows = [st(0, 300, 200, 400), st(1, 350, 300, 420)];
+            for( let k = 2; k < 8; k++ ) rows.push(st(k, 380));
+            for( let k = 8; k < 19; k++ ) rows.push(st(k, 300 + k, 250, 450));
+            for( const x of rows ) { const s = I.cache[I._slotAt(x.last_changed)]; if( !s.stats.has(id) ) { s.stats.set(id, []); s.cover.stats.set(id, [[s.start_m.valueOf(), s.end_m.valueOf()]]); } s.stats.get(id).push(x); }
+            const c = I.cachedHistory(id, I._slotAt(a), I.cache.length - 1), held = c.find(x => x.statistics?.held);
+            I.generateGraphDataFromCache();
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = I.graphs[0].chart.data.datasets[0].data;
+            const inRun = d.filter(p => !p.hecVirtual && x(p) > a + 3 * 3600e3 && x(p) < a + 8 * 3600e3).length;
+            const plateau = d.find(p => p.hecPlateauEnd && Math.abs(x(p) - ( a + 8 * 3600e3 )) < 1000);
+            return { rows: c.length, held: held ? [( held.last_changed - a ) / 3600e3, held.statistics.end - a] : null, inRun, plateau: !!plateau }; })()`);
+        return r.rows === 14 && r.held && r.held[0] === 2 && r.held[1] === 8 * 3600e3 && r.inRun === 0 && r.plateau ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The min/max band along a plateau of smart mode: never broken by it ──
+    t = await openCard(card('3d', { statistics: { enabled: false }, lineMode: 'smart', showMinMax: true }),
+        { height: 900, mock: { series: true, rows: { 'sensor.power': Array.from({ length: 3 * 24 * 60 }, (_, k) => [k * 60, ( Math.floor(k / 60) % 6 ) < 2 ? 0 : String(100 + ( k * 37 ) % 200)]).filter(([ago]) => Math.floor(ago / 3600) % 6 >= 2 || ago % 3600 === 0) } } });
+    await t.wait(3000);
+    await t.step('smart mode, a sensor silent 2 hours in 6, showMinMax: every point of a plateau keeps the band (yMin, yMax) of the point it carries on — the band never broken by a plateau', async () => {
+        const r = await t.E(`(()=>{ const d = el.instance.graphs[0].chart.data.datasets[0].data;
+            const plateaus = d.filter((p, k) => p.hecPlateauEnd && k > 0 && d[k - 1].yMin != null);
+            return { plateaus: plateaus.length, banded: plateaus.filter(p => p.yMin != null && p.yMax != null).length, band: d.filter(p => p.yMin != null).length }; })()`);
+        return r.plateaus >= 3 && r.banded === r.plateaus && r.band > 100 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The source drawn: the coarsest a column of pixels holds, the finer ones only where it
+    // lacks ──
+    t = await openCard(card('6o', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 60 } });
+    await t.wait(5000);
+    await t.step('6 months (a column of some 5 hours), the history of a week ago in the cache too: the hourly statistics drawn there — not the history, worked out again for nothing —; the last minutes, not compiled yet, from the history', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', k = I.cache.length - 8, s = I.cache[k], a = s.start_m.valueOf(), b = s.end_m.valueOf();
+            s.hist.set(id, Array.from({ length: 1440 }, (_, m) => ({ last_changed: a + m * 60e3, state: '999' }))); s.cover.hist.set(id, [[a, b]]);
+            I.generateGraphDataFromCache();
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null);
+            const day = d.filter(p => x(p) >= a && x(p) < b), last = d.filter(p => x(p) > Date.now() - 20 * 60e3 && !p.hecVirtual);
+            return { day: day.length, fromStats: day.filter(p => p.statistics).length, h999: day.filter(p => p.y === 999).length, last: last.map(p => !!p.statistics) }; })()`);
+        return r.day > 0 && r.fromStats === r.day && r.h999 === 0 && r.last.length >= 1 && r.last.some(s => !s) ? true : JSON.stringify(r);
     });
     done(await t.close());
 

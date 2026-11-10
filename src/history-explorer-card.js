@@ -372,6 +372,18 @@ class HistoryExplorerCard extends HTMLElement
     instance = null;
     configSet = false;
 
+    // (the card off the page — Home Assistant drawing the dashboard again, another view —, or
+    // back on it: its cache kept for a card made again meanwhile, see card-history.js)
+    disconnectedCallback()
+    {
+        this.instance?.leavePage();
+    }
+
+    connectedCallback()
+    {
+        this.instance?.backOnPage();
+    }
+
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
     set hass(hass)
     {
@@ -444,6 +456,8 @@ class HistoryExplorerCard extends HTMLElement
             .map(k => [k, clampGesture(k, config.gestures?.[k])]).filter(([k, v]) => v !== undefined));
 
         this.instance.id = config.cardName ?? "default";
+        // (what the card is: its name and its YAML — its cache on the page, see card-history.js initCache)
+        this.instance.pageKey = this.instance.id + ' ' + JSON.stringify(config);
         this.instance.cid = gcid++;
 
         this.instance.contentValid = false;
