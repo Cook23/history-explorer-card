@@ -331,9 +331,10 @@ module.exports = async function()
     t = await openCard(card('24h', { statistics: { enabled: false } }), { height: 900, mock: { series: true, historyDelay: 300 } });
     await t.wait(2500);
     await t.step('the statistics off: the window\'s history first; then the day before it, in the background — a second after the window was shown', async () => {
-        const r = await t.E(`(()=>{ const I = el.instance, day0 = I.cache[I.mapStartTimeToCacheSlot(I.startTime)].start_m.valueOf();
+        // (the block before the window: ending where the window starts, at its whole hour)
+        const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime);
             const h = __ws.filter(w => w.type === 'history/history_during_period');
-            const win = h.filter(w => Date.parse(w.end) > day0), side = h.find(w => Date.parse(w.end) <= day0);
+            const win = h.filter(w => Date.parse(w.end) > t0 + 3600e3), side = h.find(w => Date.parse(w.end) <= t0 + 3600e3);
             return { win: win.length, last: win.length ? Math.max(...win.map(w => w.at)) : null, side: side ? side.at : null }; })()`);
         return r.win >= 1 && r.side !== null && r.side > r.last ? true : JSON.stringify(r);
     });
