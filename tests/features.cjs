@@ -985,12 +985,12 @@ module.exports = async function()
         const ends = r.ws.length <= 8, recent = last.first >= Date.now() - 3 * 86400e3;
         return r.joined && r.once && r.fits && ends && recent ? true : JSON.stringify({ joined: r.joined, once: r.once, fits: r.fits, ws: r.ws, last, firstShown });
     });
-    await t.step('a window of 30 days, 10 of history (a column of pixels of some 50 minutes): the hourly statistics first, in one request (phase 1), then the 5-minute ones in blocks of 3 days from the right (phase 2); the history only for the last hours (the probe of the last one, the minutes after them); past the 10 days the hourly ones; the whole window, joined; nothing asked twice', async () => {
+    await t.step('a window of 30 days, 10 of history (a column of pixels of some 50 minutes): the hourly statistics first, in one request (phase 1), then the 5-minute ones in blocks of 3 days from the right (phase 2); the history only for the last hours (the probe of the last one — kept on this device, the page loaded again: not asked again —, the minutes after them); past the 10 days the hourly ones; the whole window, joined; nothing asked twice', async () => {
         const r = await watch('30d', { statistics: { enabled: true } }, { historyDays: 10, historyStep: 60 }, 12, 300);
         const types = r.ws.map(w => w[0]).join(''), last = r.seen[r.seen.length - 1];
         const recent = r.ws.filter(w => w[0] === 'h').every(w => Date.parse(w[1]) >= Date.now() - 3.2 * HOUR);
-        // (the last hour's history first — the probe —, then the hourly statistics, the 5-minute ones and the last minutes' history)
-        const order = /^hr[fh]+$/.test(types) && types.split('h').length - 1 <= 3 && types.split('f').length - 1 <= 11, covered = last.first <= r.start + 86400e3;
+        // (the last hour's history first — the probe, unless kept on this device: the page is loaded again —, then the hourly statistics, the 5-minute ones and the last minutes' history)
+        const order = /^h?r[fh]+$/.test(types) && types.split('h').length - 1 <= 3 && types.split('f').length - 1 <= 11, covered = last.first <= r.start + 86400e3;
         // (past 10 days, an hour a point at most — the hourly statistics; within them, finer)
         const old = r.pts.filter(p => p[0] < Date.now() - 11 * 86400e3), recentPts = r.pts.filter(p => p[0] > Date.now() - 9 * 86400e3 && p[0] < Date.now() - 86400e3);
         const gap = a => a.length > 1 ? ( a[a.length - 1][0] - a[0][0] ) / ( a.length - 1 ) : 0;
@@ -1480,6 +1480,60 @@ module.exports = async function()
         });
         done(await t.close());
     }
+
+    // ── What the card worked out kept: a card made again on the same page (Home Assistant
+    // drawing the dashboard again) takes its cache back; a page loaded again (the app sent to
+    // the background, its page dropped) keeps its probes and its Y axes ──
+    t = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyStep: 60 } });
+    await t.wait(4000);
+    await t.step('the card made again on the same page: its cache taken back — nothing of the window asked again but what came since (today\'s), no probe; the curve drawn at once', async () => {
+        const r = await t.E(`(async()=>{ const n0 = __ws.length, old = el; old.remove();
+            const el2 = document.createElement('history-explorer-card'); el2.setConfig(window.CFG); document.getElementById('host').appendChild(el2); el2.hass = mkHass();
+            window.el = el2; window.hassTargets = [el2];
+            await new Promise(r => setTimeout(r, 800));
+            const n = el2.instance.graphs[0]?.chart.data.datasets[0]?.data.length ?? 0;
+            await new Promise(r => setTimeout(r, 2500));
+            const day = el2.instance.cache[el2.instance.cache.length - 1].start_m.valueOf();
+            // (the window's — the background widening its sides aside)
+            const t0 = Date.parse(el2.instance.startTime), w = __ws.slice(n0).filter(w => /during_period/.test(w.type) && ( w.end ? Date.parse(w.end) : Date.now() ) > t0);
+            return { n, asked: w.map(x => [x.type[0], x.period, x.start]), old: w.filter(x => Date.parse(x.start) < day).length }; })()`);
+        return r.n > 100 && r.old === 0 ? true : JSON.stringify(r);
+    });
+    await t.step('the page loaded again: the probes\' verdicts kept on this device (a day) — no probe asked —, the Y axis as it was', async () => {
+        const before = await t.E(`({ y: yRange(0), name: window.CFG.cardName, kept: !!localStorage.getItem('history-explorer_probes') })`);
+        await t.page.addInitScript(c => { window.CFG = c; }, card({ defaultTimeRange: '7d', statistics: { enabled: true }, cardName: before.name, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }));
+        await t.page.reload(); await t.wait(4000);
+        const r = await t.E(`(()=>{ const w = __ws.filter(w => /during_period/.test(w.type)); return { first: w[0] ? [w[0].type[0], w[0].period] : null, y: yRange(0) }; })()`);
+        return before.kept && r.first && r.first[0] === 'r' && r.y.join() === before.y.join() ? true : JSON.stringify({ before, r });
+    });
+    await t.step('the page loaded again, the same card, its curve drawn 100 times larger (scale): its own axis — never the one kept for the curve as it was', async () => {
+        const name = await t.E('window.CFG.cardName'), before = await t.E('yRange(0)');
+        await t.page.addInitScript(c => { window.CFG = c; }, card({ defaultTimeRange: '7d', statistics: { enabled: true }, cardName: name, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', scale: 100 }] }] }));
+        await t.page.reload(); await t.wait(4000);
+        const y = await t.E('yRange(0)');
+        return y[1] >= 50 * before[1] ? true : JSON.stringify({ before, y });
+    });
+    done(await t.close());
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true }, clock: new Date().toISOString() });
+    await t.wait(3000);
+    // (a card of the same name made on the page, its config cfg)
+    const another = cfg => `(()=>{ const e = document.createElement('history-explorer-card'); e.setConfig(${cfg}); document.getElementById('host').appendChild(e); e.hass = mkHass(); return e; })()`;
+    await t.step('another card of the same name, other curves (its YAML): a cache of its own — never the first one\'s', async () => {
+        const r = await t.E(`(async()=>{ const e = ${another(`{ ...window.CFG, graphs: [{ type: 'line', entities: [{ entity: 'sensor.rain' }] }] }`)};
+            await new Promise(r => setTimeout(r, 1500));
+            const shared = e.instance.cache.some(s => s.hist.has('sensor.power')); e.remove(); return { shared }; })()`);
+        return !r.shared ? true : JSON.stringify(r);
+    });
+    await t.step('the card off the page more than 10 minutes: its cache let go — the card made again asks its window again', async () => {
+        await t.E(`el.remove()`);
+        await t.page.clock.fastForward('11:00'); await t.wait(300);
+        const r = await t.E(`(async()=>{ const n0 = __ws.length, e = ${another('window.CFG')}; window.el = e; window.hassTargets = [e];
+            await new Promise(r => setTimeout(r, 2500));
+            const t0 = Date.parse(e.instance.startTime);
+            return { whole: __ws.slice(n0).some(w => w.type === 'history/history_during_period' && Date.parse(w.start) <= t0) }; })()`);
+        return r.whole ? true : JSON.stringify(r);
+    });
+    done(await t.close());
 
     return { passed, failed };
 };

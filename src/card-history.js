@@ -42,20 +42,53 @@ const COARSE_POINTS = 100;
 // Statistics of a period shorter than an entity's own would make up values between its own
 // (a value held, drawn as twelve the same, then a step): told once a session, at the start, by
 // probing its history (_probeFine) — its last PROBE_MS (short: a sensor flooding its history
-// costs little): its 5-minute statistics valid where the mean time between its values there
-// (that time divided by their count; none: infinite) is under FINE_GAP_MS, its hourly ones
-// where it is under HOUR_GAP_SHORT_MS; else — a sparse sensor, never one flooding — its last
-// PROBE_LONG_MS: its hourly ones valid where that mean is under HOUR_GAP_MS — the daily,
-// weekly and monthly ones always. Statistics not valid never used, drawn or exported (see
+// costs little): its 5-minute statistics valid where PROBE_COUNT intervals between its values
+// there are each under FINE_GAP_MS (how often it speaks when it speaks, whatever its
+// silences), its hourly ones too, or where the mean time between its values (that time divided
+// by their count; none: infinite) is under HOUR_GAP_SHORT_MS; else — a sparse sensor, never one
+// flooding — its last PROBE_LONG_MS: its hourly ones valid where PROBE_COUNT intervals there
+// are each under HOUR_GAP_MS — the daily, weekly and monthly ones always. Only the intervals
+// between two numbers count (an unavailable state and the value after it, a restart, tell
+// nothing of the sensor). Statistics not valid never used, drawn or exported (see
 // _relevant). SENSOR_GAPS: by entity, { fine, hour } — whether they're valid; PROBES: by
 // entity, its probe under way (a promise)
-const PROBE_MS = 3600e3, FINE_GAP_MS = 4 * 60e3, HOUR_GAP_SHORT_MS = 15 * 60e3, PROBE_LONG_MS = 8 * 3600e3, HOUR_GAP_MS = 48 * 60e3;
+const PROBE_MS = 3600e3, PROBE_LONG_MS = 24 * 3600e3, PROBE_COUNT = 5, FINE_GAP_MS = 4 * 60e3, HOUR_GAP_SHORT_MS = 15 * 60e3, HOUR_GAP_MS = 48 * 60e3;
 const SENSOR_GAPS = new Map(), PROBES = new Map();
+// (the verdicts kept on this device read once a page: see card-storage.js keptProbes)
+let probesRead = false;
+// The caches of the page, by card (pageKey: its name and its YAML — two different cards never
+// share one) — { cache, tid }: a card made again on the same page — Home Assistant drawing the
+// dashboard again — takes back what its cache held, and asks only what came since (see
+// initCache); a card off the page, its cache let go PAGE_CACHE_KEPT_MS later, unless a card
+// took it back or it came back (leavePage, backOnPage)
+const PAGE_CACHES = new Map(), PAGE_CACHE_KEPT_MS = 10 * 60e3;
 const HOUR_MS = 3600e3, DAY_MS = 86400e3;
 // (time t, ms, at the start of its hour — days: of its day, at local midnight —, or at the
 // end: the next one, unless t is one)
 const alignDown = (t, days) => days ? moment(t).startOf('day').valueOf() : Math.floor(t / HOUR_MS) * HOUR_MS;
 const alignUp = (t, days) => { const f = alignDown(t, days); return f < t ? ( days ? moment(f).add(1, 'day').valueOf() : f + HOUR_MS ) : f; };
+// Statistics Home Assistant makes up: a period where the sensor sent nothing gets its last
+// value — its min, mean and max the same. A run of them, each following the one before, of the
+// same period and the same value, is the value held: one row, the first, lasting until the
+// run's end (statistics.held; statistics.period: the period of each). The 5-minute and hourly
+// statistics of a measurement only (a total's state is a level, not a value made up)
+function heldRuns(rows)
+{
+    const _flat = st => st?.raw && st.raw.mean !== undefined && st.raw.mean !== null && st.min === st.max && st.max === st.mean;
+    const out = [];
+    for( const x of rows ) {
+        const p = out[out.length - 1], st = x.statistics, ps = p?.statistics;
+        if( _flat(st) && _flat(ps) && st.mean === ps.mean ) {
+            const P = ( ps.period ?? msOf(ps.end) - msOf(p.last_changed) ), Q = msOf(st.end) - msOf(x.last_changed);
+            if( P === Q && P <= HOUR_MS && msOf(x.last_changed) === msOf(ps.end) ) {
+                out[out.length - 1] = { ...p, statistics: { ...ps, end: st.end, held: true, period: P } };
+                continue;
+            }
+        }
+        out.push(x);
+    }
+    return out;
+}
 // (two lists of rows in time order, merged in time order)
 function mergeRows(a, b)
 {
@@ -133,6 +166,18 @@ export class CardHistory
 
     initCache()
     {
+        // (a card made again: the page's cache of this card — a copy of its list of slots, the
+        // slots shared —, what came since it was asked to be asked again)
+        const _page = PAGE_CACHES.get(this.pageKey);
+        clearTimeout(_page?.tid);
+        if( _page?.cache.length ) {
+            this.cache.push(..._page.cache);
+            this.cacheSize = this.cache.length - 1;
+            PAGE_CACHES.set(this.pageKey, { cache: this.cache });
+            this._forgetToday();
+            return;
+        }
+        PAGE_CACHES.set(this.pageKey, { cache: this.cache });
         let d = dayAfter(moment(), -this.cacheSize);
 
         for( let i = 0; i < this.cacheSize+1; i++ ) {
@@ -140,6 +185,24 @@ export class CardHistory
             this.cache.push(this._slot(d, e));
             d = e;
         }
+    }
+
+    // The card off the page: its cache let go PAGE_CACHE_KEPT_MS later — unless a card made
+    // again took it back, or this one came back (backOnPage)
+    leavePage()
+    {
+        const _page = PAGE_CACHES.get(this.pageKey);
+        if( !_page || _page.cache !== this.cache ) return;
+        clearTimeout(_page.tid);
+        _page.tid = setTimeout(() => { if( PAGE_CACHES.get(this.pageKey) === _page ) PAGE_CACHES.delete(this.pageKey); }, PAGE_CACHE_KEPT_MS);
+    }
+
+    // The card back on the page: its cache kept again
+    backOnPage()
+    {
+        const _page = PAGE_CACHES.get(this.pageKey);
+        if( _page?.cache === this.cache ) clearTimeout(_page.tid);
+        else if( this.cache.length && !_page ) PAGE_CACHES.set(this.pageKey, { cache: this.cache });
     }
 
     growCache(growSize)
@@ -268,15 +331,17 @@ export class CardHistory
     cachedHistory(entity, c0, c1, layers = null)
     {
         const _end = x => msOf(x.statistics?.end ?? x.last_changed);
-        // (layers: those it may be drawn from — see _drawLayers —; else every one)
-        const _layers = layers ? LAYERS.filter(l => layers.has(l)) : LAYERS;
-        const _rows = s => _layers.reduceRight((coarser, layer) => {
+        // (layers: those it may be drawn from, the first preferred — see _drawLayers —; else
+        // every one, the finest first)
+        const _layers = layers ?? LAYERS;
+        const _rows = s => _layers.reduceRight((under, layer) => {
             const a = s[layer].get(entity);
-            if( !a || !coarser?.length ) return a ?? coarser;
-            // (the coarser ones where the finer doesn't cover, or before its first row there —
-            // the recorder no longer keeping it)
+            if( !a || !under?.length ) return a ?? under;
+            // (the ones after where it doesn't cover, before its first row there — the recorder
+            // no longer keeping it —, or after its last statistics — not compiled yet)
             const cov = s.cover[layer].get(entity) ?? [], _first = a.length ? msOf(a[0].last_changed) : Infinity;
-            const out = coarser.filter(x => _end(x) <= _first || !cov.some(([p, q]) => msOf(x.last_changed) < q && _end(x) > p));
+            const _last = a.length && a[a.length - 1].statistics ? _end(a[a.length - 1]) : Infinity;
+            const out = under.filter(x => _end(x) <= _first || msOf(x.last_changed) >= _last || !cov.some(([p, q]) => msOf(x.last_changed) < q && _end(x) > p));
             return out.length ? mergeRows(out, a) : a;
         }, undefined);
         let r = [];
@@ -294,7 +359,7 @@ export class CardHistory
                 break;
             }
         }
-        return r;
+        return heldRuns(r);
     }
 
     // The graphs' data for the time window shown, from the cache: one history per shown
@@ -505,40 +570,58 @@ export class CardHistory
         return ms <= PERIOD_MS[FINE_PERIOD] ? g.fine : g.hour;
     }
 
-    // Entity id's values in its history in the cache from t to now — the state at a block's
-    // start, given with it, left out
-    _valuesSince(id, t)
+    // Entity id's history in the cache from t to now — the state at a block's start, given
+    // with it, left out —: { n: how many numbers, short: how many intervals between two numbers
+    // following each other are under gap — counted up to PROBE_COUNT, no further }
+    _speaks(id, t, gap)
     {
         const _now = Date.now();
-        let n = 0;
-        for( let i = this._slotAt(t); i < this.cache.length; i++ ) for( const x of this.cache[i].hist.get(id) ?? [] ) { const v = msOf(x.last_changed); if( !x.b && v > t && v <= _now ) n++; }
-        return n;
+        let n = 0, short = 0, prev = null;
+        for( let i = this._slotAt(t); i < this.cache.length; i++ ) for( const x of this.cache[i].hist.get(id) ?? [] ) {
+            const v = msOf(x.last_changed);
+            if( x.b || v <= t || v > _now ) continue;
+            if( x.state === '' || x.state === null || isNaN(Number(x.state)) ) { prev = null; continue; }
+            n++;
+            if( prev !== null && short < PROBE_COUNT && v - prev < gap ) short++;
+            prev = v;
+        }
+        return { n, short };
     }
 
     // Phase 0: whether the statistics of entities ids are valid (SENSOR_GAPS), before any is
     // used — once a session, for the page (PROBES: an entity's under way) —, all of them in one
     // request: their history's last PROBE_MS, their 5-minute ones and their hourly ones told by
-    // it; the sparse ones (their hourly ones not valid there) then their last PROBE_LONG_MS
-    // (the hour already there not asked again), in one request, their hourly ones told by it.
+    // it; the others (their hourly ones not valid there) then their last PROBE_LONG_MS (the hour
+    // already there not asked again), in one request, their hourly ones told by it — see
+    // SENSOR_GAPS.
     // No answer: every statistics valid. The window's loading taken up again once they've come
     _probeFine(ids)
     {
         const _fresh = ids.filter(id => !PROBES.has(id));
         if( _fresh.length ) {
-            const _now = Date.now(), _gap = (id, ms) => { const n = this._valuesSince(id, _now - ms); return n ? ms / n : Infinity; };
+            const _now = Date.now();
             const _valid = l => l.forEach(id => SENSOR_GAPS.set(id, { fine: true, hour: true }));
+            // (kept on this device only when told by the history — Home Assistant failing: every
+            // statistics valid for this page only)
+            let _told = false;
             const p = this._askGroup('history', _fresh, _now - PROBE_MS, _now, { phase: 0 }).then(e => {
                 if( e ) return _valid(_fresh);
+                _told = true;
                 const _sparse = [];
                 for( const id of _fresh ) {
-                    const g = _gap(id, PROBE_MS);
-                    SENSOR_GAPS.set(id, { fine: g < FINE_GAP_MS, hour: g < HOUR_GAP_SHORT_MS });
-                    if( g >= HOUR_GAP_SHORT_MS ) _sparse.push(id);
+                    const s = this._speaks(id, _now - PROBE_MS, FINE_GAP_MS), fine = s.short >= PROBE_COUNT;
+                    // (the 5-minute statistics valid: the hourly ones too)
+                    SENSOR_GAPS.set(id, { fine, hour: fine || ( s.n > 0 && PROBE_MS / s.n < HOUR_GAP_SHORT_MS ) });
+                    if( !SENSOR_GAPS.get(id).hour ) _sparse.push(id);
                 }
                 if( _sparse.length ) return this._askGroup('history', _sparse, _now - PROBE_LONG_MS, _now, { phase: 0 }).then(e2 => {
-                    for( const id of _sparse ) SENSOR_GAPS.get(id).hour = e2 ? true : _gap(id, PROBE_LONG_MS) < HOUR_GAP_MS;
+                    _told = !e2;
+                    for( const id of _sparse ) SENSOR_GAPS.get(id).hour = e2 ? true : this._speaks(id, _now - PROBE_LONG_MS, HOUR_GAP_MS).short >= PROBE_COUNT;
                 });
-            }).catch(() => _valid(_fresh)).finally(() => _fresh.forEach(id => PROBES.delete(id)));
+            }).catch(() => { _told = false; _valid(_fresh); }).finally(() => {
+                _fresh.forEach(id => PROBES.delete(id));
+                if( _told ) this.keepProbes(_fresh.map(id => [id, SENSOR_GAPS.get(id)]));
+            });
             for( const id of _fresh ) PROBES.set(id, p);
         }
         // (each probe this card waits for, once)
@@ -550,18 +633,24 @@ export class CardHistory
     }
 
     // The layers of the cache an entity's curve is drawn from, the window shown (see
-    // _planOf): the history, phase 2's source, fam from its finest to phase 1's source (no
-    // phase 1: fam's finest, where phase 2's comes back empty) — never statistics not valid
-    // for it, nor coarser ones loaded for another window. An entity without statistics: every
-    // one (its history only)
+    // _planOf), in their order: first the coarsest whose period a column of pixels holds —
+    // what the screen can show, with the fewest values to work out a column from —, then the
+    // finer ones where it lacks (the last minutes, not compiled yet), from the coarsest, then
+    // the coarser ones (where the recorder keeps no finer one). Among the history, phase 2's
+    // source, fam from its finest to phase 1's source (no phase 1: fam's finest, where phase
+    // 2's comes back empty) — never statistics not valid for it, nor coarser ones loaded for
+    // another window. An angle: the finest first — its history asked to correct the
+    // statistics (Home Assistant averages angles as plain numbers, see _background). An entity
+    // without statistics: every one (its history only)
     _drawLayers(statIds)
     {
-        const G = this._geometry(), out = new Map();
+        const G = this._geometry(), out = new Map(), _angles = new Set(this._angleIds(statIds));
         for( const id of statIds ) {
-            const { fam, p1, p2 } = this._planOf(id, true, G), l = new Set(['hist']);
-            if( p2 ) l.add(LAYER[p2.kind]);
-            for( const x of fam.slice(0, p1 ? fam.indexOf(p1) + 1 : 1) ) l.add(LAYER[x.kind]);
-            out.set(id, l);
+            const { fam, p1, p2 } = this._planOf(id, true, G);
+            const V = [{ kind: 'history', ms: 0 }, ...( p2 && p2.kind !== 'history' ? [p2] : [] ), ...fam.slice(0, p1 ? fam.indexOf(p1) + 1 : 1)]
+                .filter((x, k, a) => a.findIndex(y => y.kind === x.kind) === k).sort((x, y) => x.ms - y.ms);
+            const k = _angles.has(id) ? 0 : V.findLastIndex(x => x.ms <= G.column);
+            out.set(id, [...V.slice(0, k + 1).reverse(), ...V.slice(k + 1)].map(x => LAYER[x.kind]));
         }
         return out;
     }
@@ -648,6 +737,7 @@ export class CardHistory
         // Phase 0: the entities with statistics not probed yet (none needed without the
         // 5-minute ones among the sources) — nothing else asked meanwhile: the phases in their
         // order, the probe one short request
+        if( !probesRead ) { probesRead = true; for( const [id, v] of this.keptProbes() ) if( !SENSOR_GAPS.has(id) ) SENSOR_GAPS.set(id, v); }
         const _probing = new Set(this._sources().some(x => x.kind === 'fine') ? _statIds.filter(id => !SENSOR_GAPS.has(id)) : []);
         this._probeFine([..._probing]);
         if( _probing.size ) { this.state.loading = this._loading(); return; }

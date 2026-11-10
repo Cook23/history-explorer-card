@@ -176,11 +176,16 @@ export class CardDatasets
         const tOf = p => msOf(p.x);
         const out = s.slice();
 
+        // (a plateau's points — drawing only, no value of their own — keep the band (yMin,
+        // yMax) of the point they carry on, as they keep its value: the band goes along the
+        // plateau, never broken by it)
+        const _band = p => p && p.yMin != null ? { yMin: p.yMin, yMax: p.yMax } : {};
+
         // Inserts the plateau start point (the last value before the silence) right before
         // index k, unless it's already there — decimation may have dropped it
         const ensureStart = (k, ta, y) => {
             if( k > 0 && tOf(out[k - 1]) >= ta ) return k;
-            out.splice(k, 0, { x: ta, y });
+            out.splice(k, 0, { x: ta, y, ..._band(out[k - 1]) });
             return k + 1;
         };
 
@@ -195,7 +200,7 @@ export class CardDatasets
             k = ensureStart(k, gap.ta, gap.y);
             // (flat: the value of the point before it — the value held, ensureStart; or, the
             // silence beginning within a column of pixels, the value drawn for that column)
-            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, hecPlateauEnd: true, hecVirtual: true });
+            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, ..._band(out[k - 1]), hecPlateauEnd: true, hecVirtual: true });
             k++;
         }
 
@@ -205,6 +210,7 @@ export class CardDatasets
         if( extended && tOf(end) - last.t > _limit() ) {
             const kEnd = ensureStart(out.length - 1, last.t, last.y);
             out[kEnd].hecPlateauEnd = true;
+            Object.assign(out[kEnd], _band(out[kEnd - 1]));
         }
 
         return out;
@@ -324,7 +330,8 @@ export class CardDatasets
             }
             const st = data[i].statistics;
             const v = { t: msOf(data[i].last_changed), y, min: y, max: y, stat: !!st };
-            if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); v.period = v.end - v.t; }
+            // (a run of periods made up by Home Assistant, held: see card-history.js heldRuns)
+            if( st ) { v.min = Math.min(_num(st.min), y); v.max = Math.max(_num(st.max), y); v.end = msOf(st.end); v.period = st.period ?? v.end - v.t; v.held = !!st.held; }
             _values.push(v);
         }
         // (fixedValue — mini-graph-card's fixed_value: its last value, flat over the whole
@@ -350,8 +357,9 @@ export class CardDatasets
             const _own = group.filter(v => !v.carried);
             if( !_agg.explicit && _own.length === 1 && !_own[0].stat ) { s.push({ x: _own[0].t, y: _own[0].y }); return; }
             // (a value of the history counts until the group's end at most; an hour of
-            // statistics, whole — it belongs to the group where it starts)
-            const _end = v => v.stat || !_width ? v.end : Math.min(v.end, ge);
+            // statistics, whole — it belongs to the group where it starts —, a run of them held,
+            // its first period: the rest is a silence, drawn as such — see _heldPlateaus)
+            const _end = v => v.held ? v.t + v.period : v.stat || !_width ? v.end : Math.min(v.end, ge);
             let min = Infinity, max = -Infinity, stat = false, period = 0;
             for( const v of group ) {
                 min = Math.min(min, v.min); max = Math.max(max, v.max); stat ||= v.stat;
@@ -418,9 +426,29 @@ export class CardDatasets
             // (an ongoing silence only after a value of the history: statistics last until
             // their end)
             s = this._applySilencePlateaus(s, _raw, _extended && !_afterStats);
+            s = this._heldPlateaus(s, _values);
         }
 
         return this._withGaps(s, _values, _gaps, _until);
+    }
+
+    // The statistics Home Assistant made up — a run of periods where the sensor sent nothing,
+    // held (see card-history.js heldRuns) — a silence too in smart mode: a plateau from the
+    // point drawn for it to the run's end, its value and its band kept (drawing only: no point
+    // of its own, hecVirtual) — unless the next point drawn is already past it (a run within a
+    // column of pixels)
+    _heldPlateaus(s, values)
+    {
+        const out = s.slice();
+        for( const v of values ) {
+            if( !v.stat || !v.held ) continue;
+            const j = out.findIndex(p => msOf(p.x) >= v.end);
+            if( j <= 0 ) continue;
+            const p = out[j - 1];
+            if( p.hecVirtual || ( p.columnTo ?? msOf(p.x) ) < v.t ) continue;
+            out.splice(j, 0, { x: v.end, y: p.y, ...( p.yMin != null ? { yMin: p.yMin, yMax: p.yMax } : {} ), hecPlateauEnd: true, hecVirtual: true });
+        }
+        return out;
     }
 
     // A curve's points s broken at each gap (its time, after a value — see _lineSamples): the

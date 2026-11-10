@@ -134,7 +134,7 @@ const RULES = [
       files: CARD.filter(f => !['src/card-config.js', 'src/history-options.js', 'src/history-default-colors.js'].includes(f)),
       re: /\bnormalize(Options|Color|LineMode|Interpolation|YAxis|Stats)\b|\bparseIntervalConfig\b/g },
     // (an option's default applied where it's read, never where it's used — ARCHITECTURE.md rule 8)
-    { id: 'option-defaults', why: "an option's fixed default is applied where the options are read (card-config.js, from history-options.js OPTION_DEFAULTS): where it's used, the option is never given a value of its own nor compared with one its default stands for",
+    { id: 'option-defaults', why: "an option's fixed default is applied where the options are read (card-config.js, from history-options.js OPTION_DEFAULTS): where it's used, the option is never given a value of its own nor compared with one its default stands for — every local fallback is reported: check it against the exact rule (CLAUDE.md: a business default written once, in the one place of its family; ARCHITECTURE.md rule 9 and its two exceptions) — a business default: moved there; a module's fallback the rule allows: listed in the exceptions below, with why it's right there",
       files: CARD.filter(f => !['src/card-config.js', 'src/history-options.js'].includes(f)),
       re: new RegExp('\\b(?:resolveOption|graphOption)\\([^()]*\\)\\s*(?:\\?\\?|[!=]==\\s*(?:true|false)\\b)'
           + '|\\.(?:' + DEFAULTED.join('|') + ')\\s*(?:\\?\\?\\s*(?:true|false|-?\\d|[\'"`])|[!=]==\\s*(?:true|false)\\b)'
