@@ -4,6 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.66] - 2026-11-10
+
+### Changed — the automatic Y axis, an automatic gain
+- The axis tightened in one jump as soon as what is shown filled less than half its height: a peak leaving the screen took the scale from 0.10 to 0.01 at once. It now works like an automatic gain with a look ahead: the values on each side of the window count too, the more as they are near its edge (a window on each side by default); it grows at once — a curve never goes out of it —, and grows in steps as a spike comes near, before it shows; while a drag or a pinch moves the time, it narrows one step at a time, a step at most each quarter of a window moved — a small pan to and fro keeps it —, at once to the tightest once the gesture ends. Its scale changes by steps, on round values: a jump that shows, never a slide
+- `yScaleSteadiness`: what the axis holds fills at least 100 − `yScaleSteadiness` % of it, looking `yScaleSteadiness` / 50 windows on each side (0: what is shown, at every frame; 100: it only grows)
+- An angle: only its points in the window count (with the nearest on each side) — outside it, unwrapped from the window, they are in other turns than a pan would show them in
+- The axis no longer chosen by trying the gestures foreseen (a pan of a window, a zoom by 2): that code removed
+- Tests (`yscale`, `yaxes`): a pan towards a spike — the axis grows in round steps before it shows, what is shown always in it —; away from it — a step down at most at once —; to and fro — the same axis
+
+### Fixed — the min/max band stretched between points far apart
+- The band went from one point to the next whatever their distance: a column with a min and a max far apart next to a long run of made-up statistics drew triangles and humps over weeks, changing with a small pan (a rain). The band of a point now covers only the time its values cover: it goes from one point to the next only where their times meet; a point alone is a bar over its time. A generic Chart.js option: a point's span, `xMin` / `xMax`
+- A plateau of smart mode no longer has a band (the value held, before): nothing varies in a silence
+- Tests (`features`, `yscale`): a band per run of points whose spans meet, a point alone a bar; a plateau without band, nothing stretched over it
+
+### Fixed — the export of an attribute
+- A curve of an attribute (a weather's wind bearing) counted its entity in the Export menu — not in the cache: "History (0)", greyed, though its curve was drawn —, and its file held its entity's state. The export now holds the values the curves show: an attribute's own values; with `exportAttributes`, an entity shown by its state with all its attributes, an attribute shown still its own values. An attribute has no statistics: never in their export
+- Tests (`attributes`): a graph of attributes — its history counted, its file their values, with the attributes asked too
+
+### Changed — docs
+- README_Full: *The automatic scale*, the min/max band, smart mode's plateaus, the export of an attribute; ARCHITECTURE.md: `card-yscale.js`; BRANCH.md: the min/max band; `deps/Chart Custom.js.md`: `showMinMax`'s spans
+
 ## [v1.2.65] - 2026-11-10
 
 ### Changed — the probe's last 24 hours

@@ -907,12 +907,22 @@ export class CardHistory
     // → a promise of { id: rows }
     exportRows(source, ids, withAttributes = false)
     {
-        // (5-minute statistics not valid for an entity — see _exportable —: none of them, they would make up values)
-        if( source !== 'history' ) ids = ids.filter(id => this._exportable(id, source));
+        // (an attribute: no statistics, Home Assistant keeps none; 5-minute statistics not valid
+        // for an entity — see _exportable —: none of them, they would make up values)
+        if( source !== 'history' ) ids = ids.filter(id => !seriesOf(id).attribute && this._exportable(id, source));
         const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _src = this._exportSource(source);
         if( !ids.length ) return Promise.resolve({});
-        if( !this.cache.length || withAttributes || !_src )
-            return this._askHA(source === 'history' ? this.historyRequest(ids, moment(t0), moment(t1), withAttributes) : this.statisticsRequest(ids, moment(t0), moment(t1), source));
+        // (in the order asked: the graphs')
+        const _ordered = r => Object.fromEntries(ids.filter(id => r[id]).map(id => [id, r[id]]));
+        // (with the attributes: an entity's state asked with all of them; an attribute shown, its
+        // own values — as its curve draws them)
+        if( source === 'history' && withAttributes ) {
+            const _states = ids.filter(id => !seriesOf(id).attribute), _attrs = ids.filter(id => seriesOf(id).attribute);
+            return Promise.all([_states.length ? this._askHA(this.historyRequest(_states, moment(t0), moment(t1), true)) : {}, this.exportRows('history', _attrs)])
+                          .then(([a, b]) => _ordered({ ...a, ...b }));
+        }
+        if( !this.cache.length || !_src )
+            return ( source === 'history' ? this.historyCall(ids, moment(t0), moment(t1)) : this._askHA(this.statisticsRequest(ids, moment(t0), moment(t1), source)) ).then(_ordered);
         const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
         // (what each entity lacks over the window asked — see _askSpan —, what's under way waited for)
         const _waits = ( _src.kind === 'history' ? this._histUnits(ids) : ids.map(id => [id]) ).map(u => this._askSpan(_src.kind, _src.kind === 'history' ? u : u[0], t0, t1));
@@ -940,7 +950,8 @@ export class CardHistory
         });
     }
 
-    // What the window has, at least in part, for each export (ids: the entities exported):
+    // What the window has, at least in part, for each export (ids: the series exported — an
+    // entity's state, an attribute):
     // { history: n, periods: { period: n }, statistics: n — the entities with data —, cached:
     // { period: true when the cache holds it over the whole window for every one of them } }.
     // From what the cache knows, and Home Assistant's recorder: its hourly, daily, weekly and

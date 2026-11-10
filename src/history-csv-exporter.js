@@ -1,7 +1,7 @@
 
 import "../deps/moment.js";
 import "../deps/FileSaver.js";
-import { HA_ATTRIBUTES, seriesOf } from "./history-series.js";
+import { HA_ATTRIBUTES } from "./history-series.js";
 import { STATS_EXPORT_PERIODS } from "./history-options.js";
 
 var moment = window.HXLocal_moment;
@@ -30,7 +30,7 @@ function escapeSeperator(sep, state)
 
 
 // --------------------------------------------------------------------------------------
-// What both exports share: the entities shown (an attribute's curve: its entity), the
+// What both exports share: the series shown (an attribute's curve: that attribute), the
 // spinner while Home Assistant answers, the file saved — each export its own request
 // (_request) and its own lines (exportCallback)
 // --------------------------------------------------------------------------------------
@@ -44,7 +44,8 @@ class CSVExporter {
         this.timeFormat = undefined;
     }
 
-    // The entities of graphs (an attribute's curve: its entity), over the window shown
+    // The series of graphs — the values their curves show: an entity's state, an attribute —,
+    // over the window shown
     exportFile(cardstate, graphs)
     {
         this.separator = cardstate.pconfig.exportSeparator;
@@ -56,8 +57,7 @@ class CSVExporter {
         const l = [];
         for( const g of graphs )
             for( const e of g.entities ) {
-                const _id = seriesOf(e.entity).entity;
-                if( !l.includes(_id) ) l.push(_id);
+                if( !l.includes(e.entity) ) l.push(e.entity);
             }
         if( !l.length ) return;
 

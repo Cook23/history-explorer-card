@@ -29,6 +29,17 @@ module.exports = async function()
             return Object.values(by).map(l=>l.sort().join(' ; ')); })()`);
         return r.length && r.every(x => x === 'climate.salon:false:false ; climate.salon:true:true') ? true : JSON.stringify(r);
     });
+    // (the values a curve shows exported: an attribute's own — never its entity's state —, with
+    // or without the entities' attributes)
+    await t.step('Export of a graph of attributes: its history counted (the attributes with values in the window, as their curves have them), the file their own values — with the attributes asked too, the attributes shown still their own values', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0], file = async () => { captureSave(); I.exportFile([g]); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100)); return window.__saved?.text.split('\\r\\n') ?? []; };
+            const _num = l => l.filter(x => /^\\d{4}-/.test(x) && !isNaN(Number(x.split(/[,;\\t]/).pop()))).length;
+            const a = I.exportAvailability(g.entities.map(e => e.entity)).history, f = await file();
+            I.pconfig.exportAttributes = true; const fa = await file(); I.pconfig.exportAttributes = false;
+            return { a, heads: f.filter(x => /^climate/.test(x)), num: _num(f), headsA: fa.filter(x => /^climate/.test(x)), numA: _num(fa) }; })()`);
+        return r.a === 1 && r.heads.join() === 'climate.salon.current_temperature' && r.num > 10
+            && r.headsA.join() === 'climate.salon.current_temperature' && r.numA > 10 ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     // ── A sub-attribute (mini-graph-card's attribute: forecast.0.temperature) ──

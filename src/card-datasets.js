@@ -176,17 +176,11 @@ export class CardDatasets
         const tOf = p => msOf(p.x);
         const out = s.slice();
 
-        // (a plateau's points — drawing only, no value of their own — have the band of the
-        // value held: its min and max that value — nothing varies in a silence —, the band going
-        // along the plateau, never broken by it, never widened by the column before it; a curve
-        // with a band only — see _bandWanted)
-        const _banded = s.some(p => p.yMin != null), _band = y => _banded ? { yMin: y, yMax: y } : {};
-
         // Inserts the plateau start point (the last value before the silence) right before
         // index k, unless it's already there — decimation may have dropped it
         const ensureStart = (k, ta, y) => {
             if( k > 0 && tOf(out[k - 1]) >= ta ) return k;
-            out.splice(k, 0, { x: ta, y, ..._band(y) });
+            out.splice(k, 0, { x: ta, y });
             return k + 1;
         };
 
@@ -201,7 +195,7 @@ export class CardDatasets
             k = ensureStart(k, gap.ta, gap.y);
             // (flat: the value of the point before it — the value held, ensureStart; or, the
             // silence beginning within a column of pixels, the value drawn for that column)
-            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, ..._band(out[k - 1].y), hecPlateauEnd: true, hecVirtual: true });
+            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, hecPlateauEnd: true, hecVirtual: true });
             k++;
         }
 
@@ -211,7 +205,6 @@ export class CardDatasets
         if( extended && tOf(end) - last.t > _limit() ) {
             const kEnd = ensureStart(out.length - 1, last.t, last.y);
             out[kEnd].hecPlateauEnd = true;
-            Object.assign(out[kEnd], _band(out[kEnd].y));
         }
 
         return out;
@@ -371,7 +364,9 @@ export class CardDatasets
             const p = { x: ( _from + _to ) / 2, y: this._aggregate(_agg.func, group, _end, min, max), columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
             // (the statistics' period: 5 minutes, an hour — the coarsest in the column)
             if( period ) p.statisticsPeriod = period;
-            if( this._bandWanted(e, stat, _agg.explicit ? 2 : group.length) ) { p.yMin = min; p.yMax = max; }
+            // (its band over its time only: Chart.js links it to the next point's only where
+            // their times meet — see showMinMax)
+            if( this._bandWanted(e, stat, _agg.explicit ? 2 : group.length) ) Object.assign(p, { yMin: min, yMax: max, xMin: _from, xMax: _to });
             s.push(p);
         };
         // (aggregated, a group without values of its own: the value in force (_carried) — or,
@@ -435,8 +430,8 @@ export class CardDatasets
 
     // The statistics Home Assistant made up — a run of periods where the sensor sent nothing,
     // held (see card-history.js heldRuns) — a silence too in smart mode: a plateau from the
-    // point drawn for it to the run's end, its value kept, its band the value held (drawing
-    // only: no point of its own, hecVirtual) — unless the next point drawn is already past it
+    // point drawn for it to the run's end, its value kept, without a band — nothing varies in
+    // a silence — (drawing only: no point of its own, hecVirtual) — unless the next point drawn is already past it
     // (a run within a column of pixels)
     _heldPlateaus(s, values)
     {
@@ -447,7 +442,7 @@ export class CardDatasets
             if( j <= 0 ) continue;
             const p = out[j - 1];
             if( p.hecVirtual || ( p.columnTo ?? msOf(p.x) ) < v.t ) continue;
-            out.splice(j, 0, { x: v.end, y: p.y, ...( p.yMin != null ? { yMin: p.y, yMax: p.y } : {} ), hecPlateauEnd: true, hecVirtual: true });
+            out.splice(j, 0, { x: v.end, y: p.y, hecPlateauEnd: true, hecVirtual: true });
         }
         return out;
     }

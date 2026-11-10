@@ -835,6 +835,17 @@ module.exports = async function()
             && r.bspline.quadraticCurveTo >= 0.6 * n && r.bspline.bezierCurveTo === 0
             && r.stepped.bezierCurveTo === 0 && r.stepped.lineTo >= 1.5 * n ? true : JSON.stringify(r);
     });
+    // (points of the band's own: three whose spans meet, a hole, two whose spans meet, a hole, one alone)
+    await tb.step('showMinMax: a band per run of points whose spans (xMin to xMax) meet — none across a hole between them; a point alone, a bar over its span', async () => {
+        const r = await tb.E(`(()=>{ const c=graphAt(0).chart, ds=c.data.datasets[0], ctx=c.ctx, a=c.scales['x-axis-0'].min, h=( c.scales['x-axis-0'].max - a ) / 20;
+            const P=(k, w=1)=>({ x: a + ( k + w / 2 ) * h, y: 10, yMin: 5, yMax: 15, xMin: a + k * h, xMax: a + ( k + w ) * h });
+            const save=ds.data; Object.assign(ds, { lineTension: 0, steppedLine: false }); ds.data=[P(1), P(2), P(3), P(8), P(9), P(14)]; c.update(0);
+            const rec=()=>{ const n={ fill: 0, fillRect: 0 }, o={}; for( const k in n ) { o[k]=ctx[k]; ctx[k]=function(){ n[k]++; return o[k].apply(this,arguments); }; }
+                c.draw(); for( const k in n ) ctx[k]=o[k]; return n; };
+            const on=rec(); ds.showMinMax=false; const off=rec(); ds.showMinMax=true; ds.data=save; c.update(0);
+            return { runs: on.fill - off.fill, bars: on.fillRect - off.fillRect }; })()`);
+        return r.runs === 2 && r.bars === 1 ? true : JSON.stringify(r);
+    });
     done(await tb.close());
     tb = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: true, colorTransition: 'smooth',
         color: { '0': '#0000ff', '1000': '#ff0000' } }] }] }), { mock: { series: true, historyStep: 60 } });

@@ -629,7 +629,8 @@
   // ---------------------------------------------------------------------------
   // Min/max band — the dataset option showMinMax: between the yMin and yMax of its
   // points (those that have them, within the plot area — each run of them following each
-  // other an area of its own), shaded in the dataset's line color at MINMAX_BAND_ALPHA, on
+  // other an area of its own, broken where a point's span, xMin to xMax, doesn't reach the
+  // next one's; a point alone, a bar over its span), shaded in the dataset's line color at MINMAX_BAND_ALPHA, on
   // the dataset's own Y axis — the line's color as drawn: a color, or a gradient where it
   // varies (colorSteps along the time, hecValueGradient along the Y axis), each part of the
   // band in the color of the line there. Its edges drawn as the line is (helpers.canvas.lineTo):
@@ -666,6 +667,7 @@
         // (a dataset not filled yet holds {}, not a list)
         if (!yScale || !Array.isArray(points) || points.length < 2) return;
         var _line = chart.getDatasetMeta(di).dataset, _lm = _line && _line._model || {};
+        var _ms = function (v) { return typeof v === 'number' ? v : +(v && v.valueOf ? v.valueOf() : new Date(v)); };
         // (each edge's point as a point of the line: its segment straight, in steps or a curve
         // — straight to a plateau's end, as the line's —; a B-spline's when the line's is)
         var _point = function (pt, py) {
@@ -696,10 +698,13 @@
           });
           return e;
         };
+        // (a run broken where a point's span — xMin to xMax, when it has one — doesn't reach
+        // the next one's: nothing known of the min and max between them)
         var runs = [], band = null;
         points.forEach(function (pt) {
-          var px = pt && pt.yMin != null && pt.yMax != null ? xScale.getPixelForValue(pt.x) : null;
-          if (px === null) { band = null; return; }
+          if (!pt || pt.yMin == null || pt.yMax == null) { band = null; return; }
+          var prev = band && band[band.length - 1];
+          if (prev && prev.xMax != null && pt.xMin != null && _ms(pt.xMin) > _ms(prev.xMax)) band = null;
           if (!band) runs.push(band = []);
           band.push(pt);
         });
@@ -709,7 +714,15 @@
         ctx.globalAlpha = MINMAX_BAND_ALPHA;
         ctx.fillStyle = typeof _col === 'string' ? hecColorWithAlpha(_col, 1) : _col;
         runs.forEach(function (b) {
-          if (b.length < 2) return;
+          // (a point alone: a bar over its span, a pixel wide at least; none without a span)
+          if (b.length < 2) {
+            var p = b[0];
+            if (p.xMin == null || p.xMax == null) return;
+            var x0 = xScale.getPixelForValue(p.xMin), x1 = Math.max(xScale.getPixelForValue(p.xMax), x0 + 1);
+            var y0 = yScale.getPixelForValue(p.yMax), y1 = yScale.getPixelForValue(p.yMin);
+            ctx.fillRect(x0, Math.min(y0, y1), x1 - x0, Math.max(Math.abs(y1 - y0), 1));
+            return;
+          }
           var hi = _curve(b.map(function (pt) { return _point(pt, yScale.getPixelForValue(pt.yMax)); }));
           var lo = _curve(b.map(function (pt) { return _point(pt, yScale.getPixelForValue(pt.yMin)); }));
           var n = b.length, i;

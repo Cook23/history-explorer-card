@@ -407,10 +407,10 @@ export class CardCharts
     // A Y axis' automatic sides (freeLo, freeHi; me: the Chart.js scale, its id): what is
     // shown first, a steady scale second, as steady says (yScaleSteadiness, in %) — see
     // card-yscale.js —, from the points of its curves and bars shown (their band, the sums
-    // when stacked; on a logarithmic axis, in decades), the values the axis always reaches
-    // too (keep: its soft bounds; a side fixed). The axis chosen is kept for the chart: the
-    // next update starts from it; while a gesture moves the time window (state.drag), the
-    // axis only grows, it is tightened once the gesture ends
+    // when stacked; on a logarithmic axis, in decades) and the values around them, the values
+    // the axis always reaches too (keep: its soft bounds; a side fixed). The axis chosen is
+    // kept for the chart: the next update starts from it; while a gesture moves the time
+    // window (state.drag), it narrows a step at a time
     _autoYAxis(me, id, { freeLo, freeHi, steady, minSpan, log, step, keep })
     {
         const chart = me.chart, _v = y => log ? ( y > 0 ? Math.log10(y) : NaN ) : y;
@@ -433,6 +433,13 @@ export class CardCharts
                 }
                 const lo = _v(Math.min(y, p.yMin ?? y)), hi = _v(Math.max(y, p.yMax ?? y));
                 if( !isNaN(lo) && !isNaN(hi) ) entries.push({ x, lo, hi });
+            }
+            // (an angle: its points in the window only, with the nearest on each side — outside,
+            // unwrapped from the window, they're in other turns than they'd be shown in)
+            if( ds.circularPeriod ) {
+                const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _in = entries.filter(e => e.x >= t0 && e.x <= t1);
+                const _before = entries.filter(e => e.x < t0).pop(), _after = entries.find(e => e.x > t1);
+                entries.splice(0, entries.length, ...( _before ? [_before] : [] ), ..._in, ...( _after ? [_after] : [] ));
             }
         });
         if( _stacked ) { curves.clear(); curves.set(0, [..._points].map(([x, s]) => ({ x, lo: _v(s.neg), hi: _v(s.pos) }))); }

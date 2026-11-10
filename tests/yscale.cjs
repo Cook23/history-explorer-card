@@ -1,8 +1,8 @@
-// The automatic Y axis (card-yscale.js, card-charts.js _autoYAxis): what is shown first —
-// a value outside the time window never stretches the axis, what is shown fills at least
-// half its height —, a steady scale second — a small pan keeps it, while a gesture moves
-// the window it only grows, tightened at the gesture's end —; yScaleSteadiness at the
-// card's and at a graph's level; a rain at 0 shown from 0.
+// The automatic Y axis (card-yscale.js, card-charts.js _autoYAxis), an automatic gain: what
+// is shown first — always in the axis, filling at least half its height at rest —, a steady
+// scale second — a small pan keeps it; a pan towards a value grows it in round steps before it
+// shows, a pan away narrows it a step at a time —; yScaleSteadiness at the card's and at a
+// graph's level; a rain at 0 shown from 0.
 // The curve's rows are put in the card's cache as Home Assistant would give them (its
 // requests made to fail, so that nothing replaces them), then drawn.
 const { openCard } = require('./lib.cjs');
@@ -53,14 +53,14 @@ module.exports = async function()
         const b = await t.E(`(()=>{ const I = el.instance; I.moveTimeWindow(window.HXLocal_moment(I.startTime).subtract(10, 'minute')); I.generateGraphDataFromCache(); return axis(); })()`);
         return a.min === b.min && a.max === b.max ? true : JSON.stringify({ a, b });
     });
-    await t.step('while a gesture moves the window, the axis is kept as long as what is shown stays in it; tightened at its end', async () => {
+    await t.step('while a gesture moves the window far, the axis narrows a step at a time — still holding what is shown —; at its end, at once to the tightest', async () => {
         // (a big swing until 12 hours ago, small values since: the window moved from one to the other)
         const a = await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, t < now - 12 * 3600e3 ? ( Math.floor(t / 300e3) % 2 ? 1000 : 0 ) : 500 + ( Math.floor(t / 300e3) % 2 ) * 20)); return r; }`)
             .replace('I.generateGraphDataFromCache();', `I.state.drag = false; I._setWindow(window.HXLocal_moment(now).subtract(16, 'hour'), window.HXLocal_moment(now).subtract(13, 'hour')); I.generateGraphDataFromCache();`));
         const b = await t.E(`(()=>{ const I = el.instance, now = Date.now(); I.state.drag = true; I._setWindow(window.HXLocal_moment(now).subtract(4, 'hour'), window.HXLocal_moment(now).subtract(1, 'hour')); I.generateGraphDataFromCache(); return axis(); })()`);
         const c = await t.E(`(()=>{ const I = el.instance; I.state.drag = false; I.generateGraphDataFromCache(); return axis(); })()`);
-        return a.max >= 1000 && a.min <= 0 && b.min === a.min && b.max === a.max && c.max - c.min < 100 && fills(c) >= 0.5 && c.min <= 500 && c.max >= 520
-            ? true : JSON.stringify({ a, b, c });
+        return a.max >= 1000 && a.min <= 0 && b.max - b.min < a.max - a.min && b.max - b.min >= ( a.max - a.min ) / 2.5 - 1e-9 && b.min <= 500 && b.max >= 520
+            && c.max - c.min < 100 && fills(c) >= 0.5 && c.min <= 500 && c.max >= 520 ? true : JSON.stringify({ a, b, c });
     });
     await t.step('a rain at 0: the axis from 0, not from -1', async () => {
         const a = await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, 0)); return r; }`));
@@ -68,11 +68,38 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The automatic gain (yScaleSteadiness 50): a pan towards a spike, past it, and to and fro ──
+    // (a pump: 0 to 0.01 every 5 minutes, a spike of 0.1 twelve hours ago)
+    t = await openCard(card('3h'), { height: 900, mock: { series: true, fail: FAIL }, init: AXIS });
+    await t.wait(1500);
+    // (the window panned back by 10 minutes a frame, a gesture going on: each frame's axis, and what it shows)
+    const PAN = (from, frames, dir = 1) => `(()=>{ const I = el.instance, now = Date.now(), out = []; I.state.drag = true;
+        for( let k = 0; k <= ${frames}; k++ ) { const e = now - ( ${from} + ${dir} * 10 * k ) * 60e3; I._setWindow(window.HXLocal_moment(e - 3 * 3600e3), window.HXLocal_moment(e)); I.generateGraphDataFromCache(); out.push(axis()); }
+        I.state.drag = false; return out; })()`;
+    const steps = l => l.map(a => a.max).filter((m, k, all) => !k || m !== all[k - 1]);
+    await t.step('a pan towards a spike: the axis grows before it shows, in round steps — never a slide —, what is shown always in it', async () => {
+        await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, Math.abs(t - ( now - 12 * 3600e3 )) < 600e3 ? 0.1 : ( Math.floor(t / 300e3) % 3 ) * 0.005)); return r; }`));
+        const l = await t.E(PAN(0, 54)), m = steps(l), ahead = l.filter((a, k) => k < 48 && a.hi < 0.05);
+        const round = x => [1, 2, 5, 10].some(f => Math.abs(x / Math.pow(10, Math.floor(Math.log10(x))) - f) < 1e-6) || [1.2, 1.4, 1.5, 1.6, 2.5, 3, 4, 6, 7, 8].some(f => Math.abs(x / Math.pow(10, Math.floor(Math.log10(x))) - f) < 1e-6);
+        return m.length >= 3 && m.every((x, k) => !k || x > m[k - 1]) && l.every(a => a.max >= a.hi && a.min <= a.lo) && ahead.some(a => a.max > 2 * a.hi) && m.every(round) ? true : JSON.stringify(m);
+    });
+    await t.step('a pan away from it: the axis narrows a step at a time — never more than a step down at once, never back up —; to and fro a little: the same axis', async () => {
+        const l = await t.E(PAN(9 * 60, 54, -1)), m = steps(l);
+        const back = await t.E(`(()=>{ const I = el.instance, now = Date.now(), out = []; I.state.drag = true;
+            for( let k = 0; k < 12; k++ ) { const e = now - ( 2 * 60 + ( k % 2 ) * 10 ) * 60e3; I._setWindow(window.HXLocal_moment(e - 3 * 3600e3), window.HXLocal_moment(e)); I.generateGraphDataFromCache(); out.push(axis().max); }
+            I.state.drag = false; return out; })()`);
+        return m.length >= 3 && m.every((x, k) => !k || ( x < m[k - 1] && x >= m[k - 1] / 2.5 - 1e-9 )) && l.every(a => a.max >= a.hi) && new Set(back).size === 1 ? true : JSON.stringify({ m, back });
+    });
+    done(await t.close());
+
     t = await openCard(card('3h', { yScaleSteadinessLeft: 100 }), { height: 900, mock: { series: true, fail: FAIL }, init: AXIS });
     await t.wait(1500);
-    await t.step('yScaleSteadiness: 100 on the card (as yScaleSteadinessLeft, its synonym) — a steady scale first: the spike six hours ago, which a pan would show, held in the axis', async () => {
+    await t.step('yScaleSteadiness: 100 on the card (as yScaleSteadinessLeft, its synonym) — a steady scale first: the axis grown towards the spike six hours ago before it shows; once shown, kept after it — never narrowed', async () => {
         const a = await t.E(draw(SPIKE));
-        return a.max >= 10843 && a.min <= a.lo ? true : JSON.stringify(a);
+        const b = await t.E(`(()=>{ const I = el.instance, now = Date.now(); I._setWindow(window.HXLocal_moment(now).subtract(7, 'hour'), window.HXLocal_moment(now).subtract(4, 'hour')); I.generateGraphDataFromCache();
+            const s = axis(); I.state.drag = true; for( let k = 1; k <= 24; k++ ) { I._setWindow(window.HXLocal_moment(now).subtract(7 * 60 - 10 * k, 'minute'), window.HXLocal_moment(now).subtract(4 * 60 - 10 * k, 'minute')); I.generateGraphDataFromCache(); }
+            I.state.drag = false; I.generateGraphDataFromCache(); return { s, e: axis() }; })()`);
+        return a.max > a.hi && a.min <= a.lo && b.s.max >= 10843 && b.e.max === b.s.max ? true : JSON.stringify({ a, b });
     });
     done(await t.close());
 
@@ -252,15 +279,19 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The min/max band along a plateau of smart mode: never broken by it ──
+    // ── The min/max band of a point over its own time only: none along a plateau of smart mode ──
     t = await openCard(card('3d', { statistics: { enabled: false }, lineMode: 'smart', showMinMax: true }),
         { height: 900, mock: { series: true, rows: { 'sensor.power': Array.from({ length: 3 * 24 * 60 }, (_, k) => [k * 60, ( Math.floor(k / 60) % 6 ) < 2 ? 0 : String(100 + ( k * 37 ) % 200)]).filter(([ago]) => Math.floor(ago / 3600) % 6 >= 2 || ago % 3600 === 0) } } });
     await t.wait(3000);
-    await t.step('smart mode, a sensor silent 2 hours in 6, showMinMax: every point of a plateau has the band of the value held — its min and max that value: the band never broken by a plateau, never widened along it by the column before', async () => {
+    await t.step('smart mode, a sensor silent 2 hours in 6, showMinMax: a point of a plateau has no band (nothing varies in a silence); a point with a band, its span — its time —, the spans of the points before and after a plateau not meeting: no band stretched over it', async () => {
         const r = await t.E(`(()=>{ const d = el.instance.graphs[0].chart.data.datasets[0].data;
-            const plateaus = d.filter((p, k) => p.hecPlateauEnd && k > 0 && d[k - 1].yMin != null);
-            return { plateaus: plateaus.length, held: plateaus.filter(p => p.yMin === p.y && p.yMax === p.y).length, wide: d.filter(p => p.yMin != null && p.yMax > p.yMin).length, band: d.filter(p => p.yMin != null).length }; })()`);
-        return r.plateaus >= 3 && r.held === r.plateaus && r.wide > 50 && r.band > 100 ? true : JSON.stringify(r);
+            const x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), b = d.filter(p => p.yMin != null);
+            const plateaus = d.filter(p => p.hecPlateauEnd), spans = b.filter(p => p.xMin <= x(p) && x(p) <= p.xMax).length;
+            // (the points with a band on each side of a plateau's end past the column before it —
+            // a silence ending within a column: that column's span holds it —: their spans don't meet)
+            const across = plateaus.filter(p => { const k = d.indexOf(p), u = d.slice(0, k).reverse().find(q => q.yMin != null), v = d.slice(k + 1).find(q => q.yMin != null); return u && v && x(p) > u.xMax && v.xMin <= u.xMax; }).length;
+            return { plateaus: plateaus.length, banded: plateaus.filter(p => p.yMin != null).length, band: b.length, spans, across }; })()`);
+        return r.plateaus >= 3 && r.banded === 0 && r.band > 100 && r.spans === r.band && r.across === 0 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
