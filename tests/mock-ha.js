@@ -22,7 +22,11 @@
 //               order they come, each in base ms plus, per value returned, history or
 //               statistics ms — instead of historyDelay; window.__mockWaiting: the most
 //               requests seen waiting for a worker
-//   lose        that many requests of the history or the statistics never answered (lost)
+//               cost.read: ms more per hourly row the database reads — Home Assistant reads
+//               the hourly rows for the daily, weekly and monthly statistics and reduces them
+//               in Python: every hour of the time asked, however few rows it returns
+//   clones      that many more sensors with statistics: sensor.s1, sensor.s2…
+//   fastStats   the statistics worked out at once (from the sine), not compiled from the history
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
@@ -71,6 +75,7 @@ Object.assign(STATES['weather.villeveyrac'].attributes, { temperature: 21.7, app
     wind_bearing: 130, wind_gust_speed: 0, wind_speed: 14.4, wind_speed_unit: 'km/h', visibility_unit: 'km', precipitation_unit: 'mm', attribution: 'Data provided by Météo-France', supported_features: 3,
     // (sub-attributes: a list of dictionaries)
     forecast: [{ datetime: '2026-10-20T12:00:00+00:00', condition: 'sunny', temperature: 23.5, templow: 14 }, { datetime: '2026-10-21T12:00:00+00:00', condition: 'rainy', temperature: 18, templow: 12 }] });
+for(let k=1;k<=(MOCK.clones||0);k++) STATES['sensor.s'+k]=ent('sensor.s'+k,'sensor '+k,'W',String(100+k),'measurement');
 STATES['sensor.clim_mode'].attributes.values=['hot','cold','off'];
 STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
@@ -137,6 +142,7 @@ function statistics(d){
     const from=MOCK.statsFrom?.[e]!==undefined ? Date.now()-MOCK.statsFrom[e]*86400e3 : -Infinity;
     if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
     const pts=[]; for(let t=Math.ceil(Math.max(t0, from)/P)*P; t+P<=t1; t+=P){
+      if(sc==='measurement' && MOCK.fastStats){ const m=base(e)*(1+0.5*Math.sin((t+P/2)/3600e3)); pts.push({start:t,end:t+P,mean:m,min:m*0.9,max:m*1.1}); continue; }
       if(sc==='measurement'){
         // (as Home Assistant compiles them — sensor/recorder.py: the history's states over
         // the period, the one in force at its start included; the mean weighted by how long
@@ -167,12 +173,13 @@ function mkHass(){ return {
   callWS:(d)=>{
     __ws.push({at:Date.now(), type:d.type, start:d.start_time, end:d.end_time, ids:d.entity_ids||d.statistic_ids, period:d.period, attributes:d.no_attributes===false, allChanges:d.significant_changes_only===false});
     if((MOCK.fail||[]).includes(d.type)) return Promise.reject(new Error('mock failure: '+d.type));
-    if(MOCK.lose>0 && /history_during|statistics_during/.test(d.type)){ MOCK.lose--; __ws[__ws.length-1].lost=true; return new Promise(()=>{}); }
     // (MOCK.historyDelay, MOCK.userDataDelay: ms Home Assistant takes to answer — a real one isn't instant)
     const later=(ms, f)=> ms ? new Promise(r=>setTimeout(r, ms)).then(f) : f();
     const wire=v=> MOCK.json ? JSON.parse(JSON.stringify(v)) : v;
     // (MOCK.cost: one request at a time, as long as what it returns asks)
-    const costed=(per, v)=>{ const n=Object.values(v).reduce((k,a)=>k+a.length,0), ms=MOCK.cost.base+n*per, now=Date.now();
+    // (the hourly rows the database reads for statistics of a day, a week or a month: every hour asked, until now)
+    const hours=['day','week','month'].includes(d.period) ? (d.statistic_ids||[]).length*Math.max(0,(Math.min(Date.parse(d.end_time),Date.now())-Date.parse(d.start_time))/3600e3) : null;
+    const costed=(per, v)=>{ const n=Object.values(v).reduce((k,a)=>k+a.length,0), ms=MOCK.cost.base+n*per+(d.statistic_ids ? (hours??n)*(MOCK.cost.read||0) : 0), now=Date.now();
       while(mockBusyUntil.length<(MOCK.cost.workers||1)) mockBusyUntil.push(0);
       const w=mockBusyUntil.indexOf(Math.min(...mockBusyUntil)), start=Math.max(now, mockBusyUntil[w]), end=mockBusyUntil[w]=start+ms;
       // (the requests waiting for a worker: those starting later)
