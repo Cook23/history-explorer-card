@@ -28,18 +28,14 @@ module.exports = async function()
         return v === ORDER ? true : v;
     });
     // The menu's items in bold: the one whose submenu is open
-    const boldItems = () => t.E(`['rep','interp','behavior','tests'].filter(k=>el.querySelector('#et_0_'+k)?.style.fontWeight==='bold').join(',')`);
-    await t.step('the item whose submenu is open is in bold, and only it', async () => {
+    const boldItems = () => t.E(`['rep','appearance','interp','behavior'].filter(k=>el.querySelector('#et_0_'+k)?.style.fontWeight==='bold').join(',')`);
+    await t.step('the item whose submenu is open is in bold, and only it — for an entity being added, Display alone (its only item); closed, none', async () => {
         await select('sensor.power');
-        const r = { opened: await boldItems() };
-        // (another item shown in this menu — Interpolation and Behavior aren't, for an entity being added)
-        const other = await t.E(`['interp','behavior','tests'].find(k=>{ const a=el.querySelector('#et_0_'+k); return a && a.style.display!=='none'; })`);
-        await t.E(`el.querySelector('#et_0_${other}').click()`); await t.wait(200);
-        r.other = await boldItems(); r.want = other;
+        const r = { opened: await boldItems(), items: await t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none' && !/_title$/.test(a.id)).map(a=>a.id).join()`) };
         await t.page.keyboard.press('Escape'); await t.wait(200);
         r.back = await boldItems();
         await close();
-        return r.opened === 'rep' && r.other === r.want && r.back === '' ? true : JSON.stringify(r);
+        return r.opened === 'rep' && r.items === 'et_0_rep' && r.back === '' ? true : JSON.stringify(r);
     });
     const PRESELECT = [
         ['sensor.power', 'et_0_6', 'a measurement: a line, smart'],

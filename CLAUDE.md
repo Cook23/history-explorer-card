@@ -476,10 +476,20 @@ and any one to come):
   anchors of GitHub's rendering (`gh api repos/…/contents/README.md?ref=<branch>` with
   `Accept: application/vnd.github.html`).
 
+## The user's Home Assistant — facts, said by the user
+
+- Its recorder keeps **90 days of history** (and the 5-minute statistics as long): past that,
+  the hourly, daily, weekly and monthly statistics only. Simulate with `historyDays: 90`.
+- Home Assistant 2026.11, MariaDB (the recorder's 4 workers).
+- Observed (open): back on the page after the app was in the background (HA Companion, Android),
+  the page stays blank for a moment — the whole page in the app, the card's graphs only in
+  Chrome (Home Assistant's frame and the card's title shown) —, then appears all at once; the
+  data isn't downloaded again (the cache kept).
+
 ## Shared logic with lowpass_dt
 
 [Cook23/lowpass_dt](https://github.com/Cook23/lowpass_dt) (a Home Assistant integration,
-Python) is a different project by the same author. The card applies three of its rules
+Python) is a different project by the same author. The card applies four of its rules
 (below), and the documentation of both projects says they are the same — the card's
 README_Full gives the silences as "the rules of the lowpass_dt integration" and `circular`
 as "the same values as the `circular` option of lowpass_dt". A rule changed on one side
@@ -558,3 +568,18 @@ Decided by the user about the silence detection:
 - lowpass_dt also derives a device class and a state class for its attribute sources; the
   card doesn't need them.
 
+### 4. The mean of a circular value — lowpass_dt is the reference, set by the user
+
+| card 1.2 | lowpass_dt |
+|---|---|
+| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`) — the one rule in `history-stats.js` | `filter.py` `update_from_source` (lines 64-70: the mean; 101-103: its σ) |
+
+lowpass_dt's algorithm is the one to use — never another one (no sin/cos vector mean, no
+mean of unwrapped values): each value counts by its shortest-path difference to the mean,
+`wrap(d) = ((d + P/2) mod P) − P/2`, weighted by how long it was in force (the value
+before counts for the interval since it: zero-order hold), the result in `[0, P)`.
+lowpass_dt runs it online, as its EMA: `y ← (y + α · wrap(x_prev − y)) mod P`. Over a group
+of values (a column, a window) its batch form: the mean m such that `Σ w · wrap(x − m) = 0`
+— from a first estimate (the mean of the values unwrapped), corrected by
+`m ← m + Σ w · wrap(x − m) / Σ w` until it no longer moves (1 or 2 passes); the min and the
+max are m plus the extreme `wrap(x − m)`, the σ from the same differences (as lowpass_dt's).

@@ -105,9 +105,9 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 ![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-curve.png)
 
-- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Tests (beta) ▸*.
+- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete).
 - **A graph's menu** — a long press on its ⠿ zone: the same for all its curves, and *Cut* / *Delete the graph*.
-- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings).
+- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
 
 A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
 

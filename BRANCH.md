@@ -56,6 +56,9 @@ already has is used, unless phase 0 makes it invalid.
   the only phase):
   - the history or the 5-minute statistics, by the column's width; the history when the
     5-minute ones are invalid;
+  - without phase 1, where it comes back empty or starting late (past the recorder's
+    retention): the hourly statistics there; where they're empty too after the 5-minute ones,
+    the history;
   - the Y axis worked out here when there was no phase 1;
   - in blocks from the right, all the same size for a width: up to a day, one block of the
     width (whole hours, an hour at least); 1 to 10 days, blocks of a day; beyond, a tenth of
@@ -63,11 +66,17 @@ already has is used, unless phase 0 makes it invalid.
   - block by block, the entities of a source in 4 groups (Home Assistant's workers), in the
     graphs' order: a request per group — few requests (each costs Home Assistant a fixed time),
     every worker busy, still drawn as they come.
+- **Without phase 2,** where phase 1's statistics begin after the window's start (a state
+  class given later, a change of unit): the history before them, in one request.
 - **The history after the statistics** (what Home Assistant hasn't compiled yet): the entities
   from the same time together, in one request.
 - **Sending:**
   - one queue: by phase, then phase 2's block, then the graphs' order — phase 2 queued right
-    behind phase 1, without waiting for its answers; a window no longer shown's after;
+    behind phase 1, without waiting for its answers; phase 1's parts wholly outside the window
+    shown (its sides, the window moved) after phase 2; a request bringing nothing to the window
+    shown now after — one asked for a window before, bringing some of this one, keeps its
+    place (the window moved: arrows, a drag, a zoom);
+  - the window shown loading as long as a request bringing some of it is under way;
   - no delay between requests, never a request sent again (no time-out, no retry);
   - 4 in flight at most (Home Assistant's workers): a fixed count, nothing measured — requests
     of sizes that different tell nothing of its load by their time.
@@ -93,6 +102,7 @@ already has is used, unless phase 0 makes it invalid.
 ## Planned
 
 1.2-only features, to do when the time comes (each one a reason for a 1.2 release).
+
 None at the moment.
 
 ## Planned, once the 1.1 line is dropped

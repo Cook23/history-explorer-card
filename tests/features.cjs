@@ -943,7 +943,7 @@ module.exports = async function()
         const p = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
             { mock: { series: true, historyDelay: 300 }, init: `document.addEventListener('DOMContentLoaded', ()=>setTimeout(()=>{ const I=el.instance; window.__trace=[];
                 const a=I._answered, d=I.generateGraphDataFromCache;
-                I._answered=function(q){ const r=a.apply(this, arguments); if( !q.quiet ) __trace.push('answer'); return r; };
+                I._answered=function(q){ const r=a.apply(this, arguments); if( !q.background && I._inWindow(q.b0, q.b1) ) __trace.push('answer'); return r; };
                 I.generateGraphDataFromCache=function(){ __trace.push('draw'); return d.apply(this, arguments); }; }, 0));` });
         await p.E('__ws.length = 0; __trace.length = 0; el.instance.reloadHistory()'); await p.wait(4500);
         const r = await p.E(`(()=>{ const h = __ws.filter(w=>w.type==='history/history_during_period').filter(${OWN});

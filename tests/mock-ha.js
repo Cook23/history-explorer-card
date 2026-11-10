@@ -164,7 +164,7 @@ function statistics(d){
 // (MOCK.cost: when each of Home Assistant's workers is free again)
 let mockBusyUntil=[], mockStarts=[];
 function mkHass(){ return {
-  states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.7.4', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
   user:{id:'u1',name:'u'}, localize:()=>'',

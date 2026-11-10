@@ -5,7 +5,10 @@
 import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
-import { timeWeightedMean } from "./history-stats.js";
+import { timeWeightedMean, circularMean } from "./history-stats.js";
+
+// (the functions of a group other than its mean — see _aggregate)
+const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -309,6 +312,8 @@ export class CardDatasets
         const n = data.length;
         let s = [];
         const _width = columns > 0 ? ( w.end.valueOf() - w.start.valueOf() ) / columns : 0;
+        // (an angle: its period in the curve's units — its mean by lowpass_dt's rule, see _flush)
+        const _P = ( this.circularPeriodOf(e) ?? 0 ) * Math.abs(scale);
         const _until = ( w.now > w.end ? w.end : w.now ).valueOf();
         const _num = v => { const x = this.process(v, process); return w.isValid(x) ? x * scale : NaN; };
 
@@ -361,7 +366,14 @@ export class CardDatasets
             }
             const _from = _agg.explicit ? gs : group[0].t;
             const _to = _agg.explicit ? Math.min(ge, Math.max(_until, gs)) : Math.max(_from, _end(group[group.length - 1]));
-            const p = { x: ( _from + _to ) / 2, y: this._aggregate(_agg.func, group, _end, min, max), columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
+            let y = this._aggregate(_agg.func, group, _end, min, max);
+            // (an angle's mean, and its min and max around it: lowpass_dt's rule — the
+            // differences by the shortest way round —, in the turn of the values unwrapped)
+            if( _P > 0 && !AGGREGATES_NOT_MEAN.has(_agg.func) ) {
+                const c = circularMean(group, v => v.y, v => v.t, _end, _P, y, v => v.min, v => v.max);
+                if( c ) ({ mean: y, lo: min, hi: max } = c);
+            }
+            const p = { x: ( _from + _to ) / 2, y, columnMin: min, columnMax: max, columnFrom: _from, columnTo: _to, statistics: stat };
             // (the statistics' period: 5 minutes, an hour — the coarsest in the column)
             if( period ) p.statisticsPeriod = period;
             // (its band over its time only: Chart.js links it to the next point's only where

@@ -4,6 +4,38 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.67] - 2026-11-10
+
+### Fixed — a curve not drawn where Home Assistant has its statistics
+- A sensor whose 5-minute statistics aren't valid (a value every 20 minutes…), on a window of less than about 4 days past the recorder's retention: its history came back empty and nothing else was asked — a blank graph, or the part of the window before the retention's edge blank. Where the history comes back empty or starting late without phase 1, the hourly statistics are now asked there, as for the 5-minute statistics
+- A window drawn from the statistics only (a column of an hour or more), the statistics beginning after its start (a state class given later, a change of unit): the history before them was never asked — blank there. It is now asked and drawn
+- Tests (`yscale`): 5-minute statistics not valid, a 2-day window 20 days back and across the retention's edge — the hourly statistics drawn; 60 days, statistics for the last 20 only — the history before them drawn
+
+### Fixed — the window moved while its requests were on their way
+- A request asked for the window before (its side) but bringing some of the window shown was sent after every request of the new one: clicking '<' in a row on 3 months, the oldest month shown came after the month before it, off screen. A request is now put after the others only when it brings nothing to the window shown; one bringing some of it keeps its place — the arrows, a drag, a zoom, either way
+- Phase 1's parts wholly outside the window shown (its sides, once the window has moved) are sent after phase 2: what is shown first
+- The window showed as loaded while a request bringing some of it was still on its way (asked for the window before, for its side): it now shows as loading as long as one is
+- Tests (`yscale`): 3 months, '<' clicked 3 times in a row; 6 months, the window dragged back — what brings some of the window shown sent first, never shown as loaded before it's whole
+
+### Changed — Tests (beta) ▸ Performance: a real performance test; the Tests submenu in the card's menu
+- The performance test measured three totals. It now reports, with this device's entities and its Home Assistant: the card as it is (its graphs and points, which statistics the probe found valid); its graphs drawn again, graph by graph (the card's work and Chart.js's apart); the window loaded again from nothing, each request on its line (its phase or the background, its source, the time it asks from the window's start, its entities and values, how long it waited in the queue and Home Assistant took) until the window is whole; the window moved ('<' and '>' three times each, a drag back), each until whole with the requests sent; the real time; the page's freezes for each. A button measures a return to the page after another app: Home Assistant's connection lost and back, each card taken off the page and made again, each of its steps (its width, its toolbar, its saved state, its graphs built, drawn) and the freezes, timed from the moment the page came back. Every card of the page reports to it, a card made again by Home Assistant too (`card-perf.js`)
+- *Tests (beta) ▸* moved from a curve's menu to the card's options menu (▾), last, set apart
+- Tests (`cards`): the performance test's report; a return to the page, the card made again meanwhile; the tests opened from the options menu
+
+### Changed — tests
+- `touch`: the curves tapped have values within the window whatever the time the tests run at (their constant state gave two points only, outside it, at some hours)
+
+### Fixed — the mean of an angle: lowpass_dt's
+- A column of pixels of an angle averaged its values unwrapped one after the other (wrong across a turn, at a jump of a curve going round more than a turn), and the average over a graph (`showStats`) the same. Every mean of an angle is now lowpass_dt's: each value counts, for as long as it lasted, by its difference to the mean the shortest way round; a column's min and max are the mean plus the largest differences each way
+- Tests (`yscale`): a column holding 0°, 170°, 340° and 350° — its point 305°
+
+### Changed — the CSV files' type
+- The exported files are declared `text/csv` (`text/plain` before): HA Companion, which names a downloaded file by its type, gives them `.csv` instead of `.txt` (their name stays its own: the app doesn't take the card's)
+- Tests (`attributes`): the file's type
+
+### Changed — docs
+- README_Full: the fine source empty without phase 1, the history before the statistics without phase 2, the mean of an angle, the order of the requests; BRANCH.md: phase 2's fallbacks, the history before the statistics, the order of the requests; ARCHITECTURE.md: `history-stats.js`, `ha-requests.js`, `card-perf.js`, the tests' menu; README, README_Full: the tests in the options menu, the performance test; CLAUDE.md: the mean of an angle, lowpass_dt the reference, the user's Home Assistant (90 days of history)
+
 ## [v1.2.66] - 2026-11-10
 
 ### Changed — the automatic Y axis, an automatic gain

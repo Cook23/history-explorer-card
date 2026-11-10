@@ -5,6 +5,7 @@
 
 import { RIGHT_Y_AXIS } from "./card-charts.js";
 import { paintMagnifier } from "./card-menus.js";
+import { perf } from "./card-perf.js";
 import { ZOOM_BOX_MODES, OPTION_DEFAULTS, TIME_RANGES, MAX_RANGE_YEARS, YEAR_HOURS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
@@ -419,7 +420,7 @@ export class CardTimeRange
         _time.max = this.endTime;
         const _t = performance.now();
         g.chart.update();
-        this.perf?.add('chart', performance.now() - _t);
+        perf.add('chart', performance.now() - _t, { graph: this.graphs.indexOf(g) });
     }
 
     applyTimeAxes()

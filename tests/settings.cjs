@@ -32,7 +32,7 @@ module.exports = async function()
 
     t = await openCard(YAML(), { mock: { series: true } });
     await t.wait(800);
-    await t.step('the options menu: the sections for every curve of the card (Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸), Export ▸, Card ▸, Global ▸; Global: the info panel, the four thresholds and the reading time of a word, as they are', async () => {
+    await t.step('the options menu: the sections for every curve of the card (Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸), Export ▸, Card ▸, Global ▸, Tests (beta) ▸; Global: the info panel, the four thresholds and the reading time of a word, as they are', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         const m = await items('#eo_0');
         await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
@@ -40,7 +40,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸' && r.ex === 'History (2)' && r.exportClosed
+        return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸ | Tests (beta) ▸' && r.ex === 'History (2)' && r.exportClosed
             && /Enhanced native history/.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all) && /Reading time per word/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12, readingTimePerWord: 400 }) ? true : JSON.stringify(r);
     });
