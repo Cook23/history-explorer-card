@@ -108,6 +108,13 @@ const RULES = [
       re: /\bdocument\b|getComputedStyle|querySelector|addEventListener|\.style\b|innerHTML|getBoundingClientRect|\bChart\b/g },
     { id: 'persistence', why: 'what is kept between sessions is read and written by card-storage.js only',
       files: CARD.filter(f => f !== 'src/card-storage.js'), re: /localStorage|frontend\/(set|get)_user_data/g },
+    { id: 'stored-keys', why: "what is kept on this device is a user's choice (KEPT_KEYS: never let go) or what the card worked out to spare working it out again (DERIVED_KEYS: let go when the card's version changes — card-storage.js versionIsNew): every key a constant, in one of the two lists — never a key written where it's used",
+      files: ['src/card-storage.js'],
+      check: s => {
+          const _listed = ['KEPT_KEYS', 'DERIVED_KEYS'].flatMap(n => ( new RegExp('const ' + n + '\\s*=\\s*\\[([^\\]]*)\\]').exec(s)?.[1] ?? '' ).split(',').map(x => x.trim()));
+          return [...[...s.matchAll(/(\w+_KEY)\s*=\s*'history-explorer[^']*'/g)].filter(m => !_listed.includes(m[1])).map(m => ( { index: m.index, text: m[1] + ' in neither list' } )),
+                  ...[...s.matchAll(/(?:setItem|getItem|removeItem|_readLocal)\(\s*'[^']*'/g)].map(m => ( { index: m.index, text: m[0] } ))];
+      } },
     { id: 'store', why: 'the entity list changes only through the store',
       files: CARD.filter(f => f !== 'src/history-entity-store.js'), re: /pconfig\.entities\s*(=(?!=)|\.(push|splice|unshift|pop|shift|sort|reverse)\()/g },
     { id: 'graph-gestures', why: "a gesture on a graph is Chart.js's: the card listens only to its own toolbars, menus and dialogs",
@@ -164,6 +171,7 @@ const STOCK_OPTIONS = new Set(['scales', 'layout', 'legend', 'tooltips', 'elemen
 // The exceptions: [rule, file, the text matched, why it's right there]
 const EXCEPTIONS = [
     ['store', 'src/history-explorer-card.js', 'pconfig.entities             =', 'the card creates the list the store then manages'],
+    ['stored-keys', 'src/card-storage.js', "removeItem('history-explorer-card')", "an old version's key (one for every card): let go, never written"],
     ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'a mode (the cut, the magnifier): a press anywhere on the page or Escape ends it — the page, not a graph (listenOutsideGraphs)'],
     ['datasets', 'src/card-values.js', 'chart.data.datasets', "the values read a curve's own data there (its unit, its scale, its period, its color, hidden), never change it"],
     ['rendering', 'src/card-toolbar.js', 'getComputedStyle', "the toolbar's own layout"],

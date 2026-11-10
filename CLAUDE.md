@@ -63,6 +63,14 @@ changes to persist (`enablePersistence` / `enableMultidevicePersistence`).
 — not in a discussion with the user, a code comment, a doc, a test or its name. For such a
 value, only `enablePersistence` exists.
 
+**What the card works out and keeps on this device so as not to work it out again — never a
+user's choice** (the probes' verdicts, the automatic Y axes, the entity selector's widths and
+shorter forms): purged when the card's version changes. The card keeps its version on this
+device; a new one found, every such value is let go (`card-storage.js` `DERIVED_KEYS`,
+`versionIsNew`) and the card's title reads "(new)" after its version, that first time only.
+A user's choice is never purged (`KEPT_KEYS`). Every new key kept on this device goes in one of
+the two lists (checked: `tests/architecture.cjs` `stored-keys`).
+
 README_Full's *What is kept, and where* tells the user what each value obeys.
 
 ## How to work — set by the user, not negotiable

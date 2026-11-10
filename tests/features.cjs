@@ -1506,6 +1506,24 @@ module.exports = async function()
         const r = await t.E(`(()=>{ const w = __ws.filter(w => /during_period/.test(w.type)); return { first: w[0] ? [w[0].type[0], w[0].period] : null, y: yRange(0) }; })()`);
         return before.kept && r.first && r.first[0] === 'r' && r.y.join() === before.y.join() ? true : JSON.stringify({ before, r });
     });
+    await t.step('a new version of the card: what it worked out let go (the probes\' verdicts, the Y axes), the user\'s choices kept; its title "(new)" after its version, that first load only', async () => {
+        const name = await t.E('window.CFG.cardName'), cfg = card({ defaultTimeRange: '7d', statistics: { enabled: true }, cardName: name, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] });
+        const header = () => t.E(`el.querySelector('ha-card').getAttribute('header')`);
+        const first = await header();
+        // (what an older version worked out: a verdict, a card's axes — marked; and a choice)
+        await t.E(`(()=>{ localStorage.setItem('history-explorer-version', '1.0.0'); localStorage.setItem('history-explorer-gestures', JSON.stringify({ kept: 1 }));
+            localStorage.setItem('history-explorer_probes', JSON.stringify({ 'sensor.zzz': { fine: true, hour: true, at: Date.now() } })); localStorage.setItem('history-explorer_yaxes_zzz', '{}'); })()`);
+        await t.page.addInitScript(c => { window.CFG = c; }, cfg);
+        await t.page.reload(); await t.wait(300);
+        const after = await t.E(`({ probes: /zzz/.test(localStorage.getItem('history-explorer_probes') ?? ''), axes: localStorage.getItem('history-explorer_yaxes_zzz'),
+            gestures: localStorage.getItem('history-explorer-gestures'), card: Object.keys(localStorage).some(k => k.startsWith('history-explorer_card_')), version: localStorage.getItem('history-explorer-version') })`);
+        const updated = await header();
+        await t.page.reload(); await t.wait(1500);
+        const next = await header();
+        const ok = !/new/.test(first ?? '') && !after.probes && after.axes === null && after.gestures && after.card && after.version !== '1.0.0'
+            && / \(new\)$/.test(updated ?? '') && !/new/.test(next ?? '');
+        return ok ? true : JSON.stringify({ first, after, updated, next });
+    });
     await t.step('the page loaded again, the same card, its curve drawn 100 times larger (scale): its own axis — never the one kept for the curve as it was', async () => {
         const name = await t.E('window.CFG.cardName'), before = await t.E('yRange(0)');
         await t.page.addInitScript(c => { window.CFG = c; }, card({ defaultTimeRange: '7d', statistics: { enabled: true }, cardName: name, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', scale: 100 }] }] }));

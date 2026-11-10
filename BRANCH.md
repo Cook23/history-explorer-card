@@ -35,13 +35,15 @@ already has is used, unless phase 0 makes it invalid.
     hourly ones valid when the mean gap (1 h divided by the count; no value: infinite) is
     under 15 min;
   - otherwise (a sparse sensor, never one flooding) its last 24 h asked, in one request for
-    them all: the hourly ones valid once 5 intervals there are each under 48 min — how often
+    them all: the hourly ones valid once 5 intervals there are each under 50 min — how often
     the sensor speaks when it speaks, whatever its silences;
   - only the intervals between two numbers count (an unavailable state and the value after
     it, a restart, tell nothing of the sensor);
   - the daily, weekly and monthly ones always valid;
-  - the verdict holds for the session; statistics it makes invalid are never asked, drawn or
-    exported.
+  - the verdict holds for the session (a day on this device, a new version of the card
+    purging it); 5-minute statistics it makes invalid are never asked, drawn or exported;
+    hourly ones it makes invalid are drawn only where the history isn't kept (past the
+    recorder's retention), the history first wherever it is — always exported.
 - **Phase 1 — the coarse source,** one request per entity — the heavy ones (Home Assistant reads
   every hourly row, whatever the period): each drawn as it comes, Home Assistant's workers all
   busy (may not exist):

@@ -52,7 +52,7 @@ const COARSE_POINTS = 100;
 // nothing of the sensor). Statistics not valid never used, drawn or exported (see
 // _relevant). SENSOR_GAPS: by entity, { fine, hour } — whether they're valid; PROBES: by
 // entity, its probe under way (a promise)
-const PROBE_MS = 3600e3, PROBE_LONG_MS = 24 * 3600e3, PROBE_COUNT = 5, FINE_GAP_MS = 4 * 60e3, HOUR_GAP_SHORT_MS = 15 * 60e3, HOUR_GAP_MS = 48 * 60e3;
+const PROBE_MS = 3600e3, PROBE_LONG_MS = 24 * 3600e3, PROBE_COUNT = 5, FINE_GAP_MS = 4 * 60e3, HOUR_GAP_SHORT_MS = 15 * 60e3, HOUR_GAP_MS = 50 * 60e3;
 const SENSOR_GAPS = new Map(), PROBES = new Map();
 // (the verdicts kept on this device read once a page: see card-storage.js keptProbes)
 let probesRead = false;
@@ -436,24 +436,27 @@ export class CardHistory
     }
 
     // How an entity's window is loaded (BRANCH.md) — hasStats: it has statistics —: { fam:
-    // its statistics of the hourly family valid for it (_relevant: the hourly ones, the daily,
-    // weekly and monthly), from the finest; p1: phase 1's source — the coarsest of fam a
-    // column of pixels holds whole (never finer than a column shows), else fam's finest —,
-    // when it gives the window COARSE_POINTS values (a column's count at most); p2: phase 2's
-    // — the 5-minute statistics where a column holds them whole and they're valid (forced:
-    // statistics.force, the statistics wherever valid), else the history —, when a column
-    // lasts less than fam's finest (an hour; without statistics: always) } — null: none
+    // its statistics of the hourly family (the hourly ones, the daily, weekly and monthly),
+    // from the finest — the hourly ones even when not valid for it (_relevant): drawn only
+    // where its history isn't kept then (see _drawLayers), better than daily ones coarser than
+    // a column —; p1: phase 1's source — the coarsest of fam a column of pixels holds whole
+    // (never finer than a column shows), else fam's finest —, when it gives the window
+    // COARSE_POINTS values (a column's count at most); p2: phase 2's — the 5-minute statistics
+    // where a column holds them whole and they're valid (forced: statistics.force, the
+    // statistics wherever valid), else the history —, when a column lasts less than the finest
+    // of fam valid for it (an hour; the hourly ones not valid, a day; without statistics:
+    // always) } — null: none
     _planOf(id, hasStats, { r, px, column })
     {
-        const fam = hasStats ? this._sources().filter(x => x.ms >= HOUR_MS && this._relevant(id, x.ms)) : [];
+        const fam = hasStats ? this._sources().filter(x => x.ms >= HOUR_MS) : [], valid = fam.filter(x => this._relevant(id, x.ms));
         let p1 = null, p2 = null;
         if( fam.length ) {
             const k = Math.max(0, fam.findLastIndex(x => x.ms <= column));
             if( r / fam[k].ms >= Math.min(COARSE_POINTS, px) ) p1 = fam[k];
         }
-        if( column < ( fam[0]?.ms ?? Infinity ) ) {
+        if( column < ( valid[0]?.ms ?? Infinity ) ) {
             const fine = hasStats ? this._sources().find(x => x.ms === PERIOD_MS[FINE_PERIOD] && this._relevant(id, x.ms)) : null;
-            p2 = fine && ( this.statistics.force || column >= fine.ms ) ? fine : this.statistics.force && fam[0] ? fam[0] : { kind: 'history', ms: 0 };
+            p2 = fine && ( this.statistics.force || column >= fine.ms ) ? fine : this.statistics.force && valid[0] ? valid[0] : { kind: 'history', ms: 0 };
         }
         return { fam, p1, p2 };
     }
@@ -640,7 +643,9 @@ export class CardHistory
     // source, fam from its finest to phase 1's source (no phase 1: fam's finest, where phase
     // 2's comes back empty) — never statistics not valid for it, nor coarser ones loaded for
     // another window. An angle: the finest first — its history asked to correct the
-    // statistics (Home Assistant averages angles as plain numbers, see _background). An entity
+    // statistics (Home Assistant averages angles as plain numbers, see _background); hourly
+    // statistics not valid for it too: its history first, the hourly ones where it isn't kept
+    // (past the recorder's retention) — their periods made up held (heldRuns). An entity
     // without statistics: every one (its history only)
     _drawLayers(statIds)
     {
@@ -649,7 +654,8 @@ export class CardHistory
             const { fam, p1, p2 } = this._planOf(id, true, G);
             const V = [{ kind: 'history', ms: 0 }, ...( p2 && p2.kind !== 'history' ? [p2] : [] ), ...fam.slice(0, p1 ? fam.indexOf(p1) + 1 : 1)]
                 .filter((x, k, a) => a.findIndex(y => y.kind === x.kind) === k).sort((x, y) => x.ms - y.ms);
-            const k = _angles.has(id) ? 0 : V.findLastIndex(x => x.ms <= G.column);
+            // (an angle, or hourly statistics not valid for it: its history first, where it's kept)
+            const k = _angles.has(id) || !this._relevant(id, HOUR_MS) ? 0 : V.findLastIndex(x => x.ms <= G.column);
             out.set(id, [...V.slice(0, k + 1).reverse(), ...V.slice(k + 1)].map(x => LAYER[x.kind]));
         }
         return out;
@@ -876,6 +882,14 @@ export class CardHistory
     // The CSV export: from the cache first, what it lacks asked to Home Assistant
     // --------------------------------------------------------------------------------------
 
+    // Whether entity id's statistics of a period are exported: the 5-minute ones only where
+    // valid for it (_relevant: never valid, they'd make up values between its own, which its
+    // history holds as long); the others wherever Home Assistant has them
+    _exportable(id, period)
+    {
+        return period !== FINE_PERIOD || this._relevant(id, PERIOD_MS[FINE_PERIOD]);
+    }
+
     // The cache layer and the kind of request of an export's source — 'history', or a
     // statistics period (STATS_EXPORT_PERIODS) —, none when the cache doesn't keep it (the
     // hourly statistics, statistics.period being a day)
@@ -893,8 +907,8 @@ export class CardHistory
     // → a promise of { id: rows }
     exportRows(source, ids, withAttributes = false)
     {
-        // (statistics not relevant for an entity — see _relevant —: none of it, they would make up values)
-        if( source !== 'history' ) ids = ids.filter(id => this._relevant(id, PERIOD_MS[source] ?? 0));
+        // (5-minute statistics not valid for an entity — see _exportable —: none of them, they would make up values)
+        if( source !== 'history' ) ids = ids.filter(id => this._exportable(id, source));
         const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _src = this._exportSource(source);
         if( !ids.length ) return Promise.resolve({});
         if( !this.cache.length || withAttributes || !_src )
@@ -944,14 +958,14 @@ export class CardHistory
         for( const id of ids ) {
             const a = this._availability(id, c0, c1, _stats.has(id));
             if( a.short ) out.history++;
-            // (a period counted only where relevant for it: see _relevant)
-            const _fine = a.short && _stats.has(id) && this._relevant(id, PERIOD_MS['5minute']), _long = ['hour', 'day', 'week', 'month'].filter(p => a.long && this._relevant(id, PERIOD_MS[p]));
+            // (a period counted only where exported for it: see _exportable)
+            const _fine = a.short && _stats.has(id) && this._exportable(id, '5minute'), _long = ['hour', 'day', 'week', 'month'].filter(p => a.long && this._exportable(id, p));
             if( _fine ) out.periods['5minute']++;
             for( const p of _long ) out.periods[p]++;
             if( _fine || _long.length ) out.statistics++;
         }
         for( const p of STATS_EXPORT_PERIODS.map(x => x.period) ) {
-            const _src = this._exportSource(p), _with = ids.filter(id => _stats.has(id) && this._relevant(id, PERIOD_MS[p] ?? 0));
+            const _src = this._exportSource(p), _with = ids.filter(id => _stats.has(id) && this._exportable(id, p));
             out.cached[p] = !!_src && out.periods[p] > 0 && _with.every(id => { for( let i = c0; i <= c1; i++ ) if( this._missing(i, _src.layer, id) ) return false; return true; });
         }
         return out;

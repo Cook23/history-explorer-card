@@ -17,6 +17,7 @@ const lang_en =
             "already_exists" : "Already in graph",
             "add" : "Add",
             "infopanel_conflict" : "YAML parameter infoPanelActive conflict:",
+            "new_version" : "new",
         }, 
         "menu" : {  
             "export_csv" : "History",
@@ -135,6 +136,7 @@ const lang_fr =
             "already_exists" : "Déjà dans un graphique",
             "add" : "Ajouter",
             "infopanel_conflict" : "Conflit du paramètre YAML infoPanelActive :",
+            "new_version" : "nouveau",
         }, 
         "menu" : {  
             "export_csv" : "Historique",
@@ -253,6 +255,7 @@ const lang_de =
             "already_exists" : "Bereits im Diagramm",
             "add" : "Hinzufügen",
             "infopanel_conflict" : "Konflikt beim YAML-Parameter infoPanelActive:",
+            "new_version" : "neu",
         }, 
         "menu" : {  
             "export_csv" : "Verlauf",
@@ -371,6 +374,7 @@ const lang_es =
             "already_exists" : "Ya en un gráfico",
             "add" : "Añadir",
             "infopanel_conflict" : "Conflicto del parámetro YAML infoPanelActive:",
+            "new_version" : "nuevo",
         }, 
         "menu" : {  
             "export_csv" : "Historial",
@@ -489,6 +493,7 @@ const lang_nl =
             "already_exists" : "Al in een grafiek",
             "add" : "Toevoegen",
             "infopanel_conflict" : "Conflict met de YAML-parameter infoPanelActive:",
+            "new_version" : "nieuw",
         }, 
         "menu" : {  
             "export_csv" : "Historie",
@@ -607,6 +612,7 @@ const lang_pl =
             "already_exists" : "Już na wykresie",
             "add" : "Dodaj",
             "infopanel_conflict" : "Konflikt parametru YAML infoPanelActive:",
+            "new_version" : "nowa",
         }, 
         "menu" : {  
             "export_csv" : "Historia",
@@ -725,6 +731,7 @@ const lang_sv =
             "already_exists" : "Redan i ett diagram",
             "add" : "Lägg till",
             "infopanel_conflict" : "YAML-parameter infoPanelActive konflikt:",
+            "new_version" : "ny",
         },
         "menu": {
             "export_csv": "Historik",
@@ -843,6 +850,7 @@ const lang_da =
             "already_exists" : "Allerede i et diagram",
             "add" : "Tilføj",
             "infopanel_conflict" : "YAML parameter infoPanelActive konflikt:",
+            "new_version" : "ny",
         }, 
         "menu" : {  
             "export_csv" : "Historik",
@@ -961,6 +969,7 @@ const lang_sk =
             "already_exists" : "Už v grafe",
             "add" : "Pridať",
             "infopanel_conflict" : "Konflikt parametra YAML infoPanelActive:",
+            "new_version" : "nová",
         }, 
         "menu" : {  
             "export_csv" : "História",
@@ -1079,6 +1088,7 @@ const lang_ru =
             "already_exists" : "Уже в графике",
             "add" : "Добавить",
             "infopanel_conflict" : "Конфликт параметра YAML infoPanelActive:",
+            "new_version" : "новая",
         }, 
         "menu" : {  
             "export_csv" : "История",
