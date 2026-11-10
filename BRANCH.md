@@ -21,6 +21,59 @@ and fixes alike, must keep it so:
 - dead code removed, comments saying why rather than history, tests for every behavior.
 A change that would break this is redesigned, not merged.
 
+## Loading the window — set by the user
+
+What the window shown needs is asked to Home Assistant in phases (`card-history.js`), through
+the page's regulator (`ha-requests.js`). Each answer is drawn as soon as it comes. What the cache
+already has is used, unless phase 0 makes it invalid.
+
+- **Phase 0 — probes,** once a session per entity with statistics, all of them in one request,
+  nothing else asked meanwhile:
+  - their history's last hour asked (short: a sensor flooding its history — 1000 values an
+    hour — costs little): the 5-minute statistics valid when the mean gap (1 h divided by the
+    count; no value: infinite, the only special case) is under 4 min, the hourly ones when
+    it is under 15 min;
+  - otherwise (a sparse sensor, never one flooding) its last 8 h asked, in one request for
+    them all: the hourly ones valid when the mean gap (8 h / count) is under 48 min;
+  - the daily, weekly and monthly ones always valid;
+  - the verdict holds for the session; statistics it makes invalid are never asked, drawn or
+    exported.
+- **Phase 1 — the coarse source,** one request per entity — the heavy ones (Home Assistant reads
+  every hourly row, whatever the period): each drawn as it comes, Home Assistant's workers all
+  busy (may not exist):
+  - the most precise valid statistics of the hourly family (hour, day, week, month) giving at
+    least 100 points over the width shown — never finer than a column of pixels shows;
+  - over min(3 widths, width + 2 months): a width (a month at most) on each free side — in
+    real time, the left side only (nothing carried over to the right);
+  - the automatic Y axis is worked out from it.
+- **Phase 2 — the fine source,** only when a column of pixels lasts less than an hour (may be
+  the only phase):
+  - the history or the 5-minute statistics, by the column's width; the history when the
+    5-minute ones are invalid;
+  - the Y axis worked out here when there was no phase 1;
+  - in blocks from the right, all the same size for a width: up to a day, one block of the
+    width (whole hours, an hour at least); 1 to 10 days, blocks of a day; beyond, a tenth of
+    the width in whole days, a calendar month at most (10 years: 120 blocks, plus the probes);
+  - block by block, the entities of a source in 4 groups (Home Assistant's workers), in the
+    graphs' order: a request per group — few requests (each costs Home Assistant a fixed time),
+    every worker busy, still drawn as they come.
+- **The history after the statistics** (what Home Assistant hasn't compiled yet): the entities
+  from the same time together, in one request.
+- **Sending:**
+  - one queue: by phase, then phase 2's block, then the graphs' order — phase 2 queued right
+    behind phase 1, without waiting for its answers; a window no longer shown's after;
+  - no delay between requests, never a request sent again (no time-out, no retry);
+  - 4 in flight at most (Home Assistant's workers): a fixed count, nothing measured — requests
+    of sizes that different tell nothing of its load by their time.
+- **Background,** once phase 2 is over, with the anti-flood pacing (one request at a time, only
+  when nothing else is under way, 1 s after the last change, then a pause of twice what the
+  last one took, 1 s to 30 s):
+  - first, the history of the circular axes over the window shown, where they're drawn from
+    statistics (Home Assistant averages angles as plain numbers);
+  - then each side widened: phase 1's source in blocks 10 × phase 2's, phase 2's source in its
+    own blocks — every entity alike, the entities of a source in one request;
+  - the memory bounds kept (AHEAD_MAX_ROWS 300 000, purge past 500 000).
+
 ## Planned
 
 1.2-only features, to do when the time comes (each one a reason for a 1.2 release).
