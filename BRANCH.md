@@ -24,8 +24,12 @@ A change that would break this is redesigned, not merged.
 ## Loading the window — set by the user
 
 What the window shown needs is asked to Home Assistant in phases (`card-history.js`), through
-the page's regulator (`ha-requests.js`). Each answer is drawn as soon as it comes. What the cache
-already has is used, unless phase 0 makes it invalid.
+the page's regulator (`ha-requests.js`). Each answer is drawn as soon as it comes — only the
+graphs of the entities it brought something to; answers coming close together (within twice
+what a drawing takes, 100 ms at least) drawn once. What the cache already has is used, unless
+phase 0 makes it invalid. The history is never asked before where Home Assistant was seen to
+keep none for an entity (an answer empty, or beginning well after its start: the recorder's
+retention, the entity created later).
 
 - **Phase 0 — probes,** once a session per entity with statistics, all of them in one request,
   nothing else asked meanwhile:
@@ -46,7 +50,8 @@ already has is used, unless phase 0 makes it invalid.
     recorder's retention), the history first wherever it is — always exported.
 - **Phase 1 — the coarse source,** one request per entity — the heavy ones (Home Assistant reads
   every hourly row, whatever the period): each drawn as it comes, Home Assistant's workers all
-  busy (may not exist):
+  busy (may not exist); a short part (200 periods at most: a day, a side, the hours not
+  compiled yet) the same for several entities, one request for them all:
   - the most precise valid statistics of the hourly family (hour, day, week, month) giving at
     least 100 points over the width shown — never finer than a column of pixels shows;
   - over min(3 widths, width + 2 months): a width (a month at most) on each free side — in

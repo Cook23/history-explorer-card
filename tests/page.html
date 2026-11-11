@@ -6,7 +6,7 @@
 <script src="mock-ha.js"></script>
 <script src="../history-explorer-card.js"></script>
 <script>
-const el=document.createElement('history-explorer-card');
+var el=document.createElement('history-explorer-card');
 el.setConfig(window.CFG);
 document.getElementById('host').appendChild(el);
 el.hass=mkHass();

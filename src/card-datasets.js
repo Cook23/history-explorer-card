@@ -213,8 +213,9 @@ export class CardDatasets
         return out;
     }
 
-    // The graphs' datasets from the history (result: each entity's, in the graphs' order)
-    buildChartData(result, colorHistory)
+    // The graphs' datasets from the history (result: each entity's, in the graphs' order) —
+    // graphs: only those (the others as they are), none: every one
+    buildChartData(result, colorHistory, graphs = null)
     {
         // The time window drawn: now, its start and end; a state without a value is a gap in a
         // curve (isGap) — unavailable or unknown with showUnavailable, one a stateMap doesn't
@@ -229,6 +230,8 @@ export class CardDatasets
         let id = 0;
 
         for( let g of this.graphs ) {
+
+            if( graphs && !graphs.includes(g) ) { id += g.entities.length; continue; }
 
             let updated = false;
 
@@ -641,18 +644,15 @@ export class CardDatasets
             let t0 = data[i].last_changed;
             let t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;
 
-            // Not currently merging small blocks ?
-            if( !merged ) {
+            // State of the current block (a merge under way keeps its first one); where it begins
+            if( !merged ) state = this.processRaw(data[i].state, process);
+            const i0 = i;
 
-                // State of the current block
-                state = this.processRaw(data[i].state, process);
-
-                // Skip noop state changes (can happen at cache slot boundaries)
-                while( i < n-1 && this.processRaw(data[i].state, process) == this.processRaw(data[i+1].state, process) ) {
-                    ++i;
-                    t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;
-                }
-
+            // Skip noop state changes (the state in force repeated at a cache slot's start,
+            // local midnight): a block judged by its whole length, merging or not
+            while( i < n-1 && this.processRaw(data[i].state, process) == this.processRaw(data[i+1].state, process) ) {
+                ++i;
+                t1 = ( i < n-1 ) ? data[i+1].last_changed : m_max;
             }
 
             if( msOf(t1) - msOf(t0) >= _merge || i == n-1 ) {
@@ -661,7 +661,7 @@ export class CardDatasets
                 if( merged > 0 ) {
                     t0 = mt0;
                     t1 = mt1;
-                    i--;
+                    i = i0 - 1;
                 }
             } else {
                 // Too narrow, start merge (keep the first state for possible single block merges) or extend current one
@@ -684,7 +684,23 @@ export class CardDatasets
 
         }
 
-        return s;
+        return g.type == 'arrowline' ? this._arrowColumns(s, _start, _end, g.chart.hecPlotWidth()) : s;
+    }
+
+    // An arrowline's rows (see _timelineRows) a block at most per pixel column of a plot w px
+    // wide over _start to _end (ms): a block kept only where a column's middle falls in it —
+    // the one the arrow there shows —, from where the one kept before it ends (the first, from
+    // the first row's start: no gap)
+    _arrowColumns(s, _start, _end, w)
+    {
+        // (_mid(t): how many columns' middles come before t)
+        const cw = ( _end - _start ) / Math.max(1, w), _mid = t => Math.ceil(( msOf(t) - _start ) / cw - 0.5);
+        const out = [];
+        for( const r of s ) {
+            if( _mid(r[0]) === _mid(r[1]) ) continue;
+            out.push([out.length ? out[out.length - 1][1] : s[0][0], r[1], r[2]]);
+        }
+        return out;
     }
 
     // --------------------------------------------------------------------------------------

@@ -42,6 +42,20 @@ module.exports = async function()
             && r.headsA.join() === 'climate.salon.current_temperature' && r.numA > 10 ? true : JSON.stringify(r);
     });
     done(await t.close());
+    // (an attribute without a value in the window — a constant, its value recorded before it —
+    // never counted, whatever the window's start in its day: right after midnight too)
+    for( const [h, m] of [[0, 55], [12, 30]] ) {
+        const d = new Date(); d.setUTCHours(h, m, 0, 0);
+        t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'climate.salon', attribute: 'current_temperature', unit: '°C' }, { entity: 'climate.salon.temperature' }] }] }),
+            { mock: { series: true }, height: 900, clock: d.toISOString() });
+        await t.wait(2500);
+        await t.step(`Export at ${String(h).padStart(2, '0')}:${m}, the window starting then: only the attributes with values within its time counted and exported — never one whose value comes before it, the same day`, async () => {
+            const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0]; captureSave(); I.exportFile([g]); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100));
+                return { a: I.exportAvailability(g.entities.map(e => e.entity)).history, heads: ( window.__saved?.text.split('\\r\\n') ?? [] ).filter(x => /^climate/.test(x)) }; })()`);
+            return r.a === 1 && r.heads.join() === 'climate.salon.current_temperature' ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
 
     // ── A sub-attribute (mini-graph-card's attribute: forecast.0.temperature) ──
     t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'weather.villeveyrac', attribute: 'forecast.0.temperature' }, { entity: 'weather.villeveyrac.forecast.1.templow' }] }] }),

@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.68] - 2026-11-11
+
+### Changed — a load lighter for the page and for Home Assistant
+- Each answer drew every graph of the card again (up to half a second each on a year, the page frozen in a row of them). An answer now draws again only the graphs of the entities it brought something to, and answers coming close together (within twice what a drawing takes, 100 ms at least) are drawn once
+- Phase 1 asked each entity on its own, even a short part: moving the window or a refresh sent as many small requests as entities. A short part (200 periods at most: a day, a side, the hours not compiled yet) the same for several entities is now asked in one request for them all; the large ones stay one per entity
+- An entity's history was asked again and again before the recorder's retention (empty answers, ahead of the sides in the queue). Where it comes back empty or beginning well after the time asked, the card remembers it and never asks the history there again
+- An arrowline drew every state of its history (33 000 on a year): it now keeps a state per column of pixels at most — the one in force at the column's middle, the one its arrow shows
+- A card made again by Home Assistant (the app back from the background, the dashboard drawn again) built and drew all its graphs again, after waiting for its width. It now takes back the card it replaces as it was — its graphs already drawn, shown at once — and asks only what came since
+- Tests (`features`): an answer for some entities draws only their graphs, two close together once; '<' — the side's hourly statistics in one request for the three entities; history kept 2 days — nothing asked before it; the card made again takes back the one it replaces, never one still on the page; (`cards`) the performance test's return to the page — the card taken back. (`arrowline`): a week of a value a minute, a block per column at most, each column's middle the value in force there
+
+### Fixed
+- Each refresh asked again today's statistics of every entity, though no new period had been compiled since (a row of 28 requests every few seconds in real time, looping during a load). They are now asked again only once a new period of theirs has been compiled
+- A 24-hour window dragged: the history of a part asked next to one already loaded was taken for one starting late (its state at the start, the one in force before, not kept), and the hourly statistics were asked there for nothing
+- A timeline: a short state followed by one lasting past midnight, less than 2 pixels of it before midnight, was merged into a *multiple* block up to midnight — the state in force, repeated at the start of each day in the cache, cut the state there while short ones were being merged. A state is now judged by its whole length, midnight or not
+- The CSV export counted, and exported, a series without a value within the window when it had one earlier the same day (the days the window touches were looked at, not its time): an attribute that never changes, its section in the file without values, depending on the hour. Only the series with values within the window's time are now counted and exported
+- A curve over more than a day: a point at each midnight that was never recorded — the state in force, repeated by Home Assistant at the start of each day's request, drawn as a value: in the tooltip, with the points shown, the line held flat until midnight then sloping. In smart mode, it cut a silence across midnight in two, and counted in the source's usual interval — not the rule shared with lowpass_dt (the intervals between the source's values). The CSV export of the history had a row there too. That state is now left out wherever the row before it gives the same: never drawn, exported or counted as a value
+- The CSV export of the history began with the state in force at the window's start only when it had been recorded the same day: it is now looked for in the days before too, as far as they're loaded
+- The export's count of a period of statistics: a period beginning within the window, as its file holds (one overlapping the window from before was counted, its file without it)
+- Tests (`features`): the timeline of a week at 23:47; 3 days and 24 hours at 00:30 and 12:00, a value every 3 hours — no point nor exported row at midnight, the export beginning with the state at the window's start. (`attributes`): the export of attributes at 00:55 and 12:30 — the same series. (`smart`): a silence from 22:00 to 02:00 — one plateau, no point at midnight
+- Unused code removed (`_windowRows`)
+- Tests (`features`): a refresh with no new hour compiled — no hourly statistics asked; a part asked next to one already there — not starting late. The test page's card can be replaced by a card made again (`page.html`)
+
+
 ## [v1.2.67] - 2026-11-10
 
 ### Fixed — a curve not drawn where Home Assistant has its statistics

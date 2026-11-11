@@ -378,6 +378,11 @@ function getLocalizedDateString(locale, style)
 
 var gcid = 0;
 
+// The cards off the page, drawn, by what they are (pageKey: name and YAML) — [{ el, tid }]: a
+// card made again on the page takes back the content of one (see _takeBack), until
+// PAGE_CARD_KEPT_MS after it left
+const PAGE_CARDS = new Map(), PAGE_CARD_KEPT_MS = 10 * 60e3;
+
 // The card's title, unless the YAML gives one: its version — "(new)" after it the first time
 // this device runs it (see card-storage.js versionIsNew), in the user's language once known
 const defaultTitle = () => `History explorer v${Version}` + ( versionIsNew ? ` (${i18n('ui.label.new_version')})` : '' );
@@ -393,12 +398,42 @@ class HistoryExplorerCard extends HTMLElement
     {
         perf.add('card', 0, { step: 'off the page', card: this.instance?.cid });
         this.instance?.leavePage();
+        // (drawn: kept for a card made again on the page with the same name and YAML — it
+        // takes this one's content as it is, see InitWithConfig —, let go PAGE_CARD_KEPT_MS later)
+        if( !this.instance?.contentValid ) return;
+        const k = this.instance.pageKey, l = PAGE_CARDS.get(k) ?? [];
+        if( l.some(x => x.el === this) ) return;
+        const x = { el: this, tid: setTimeout(() => { const m = PAGE_CARDS.get(k)?.filter(y => y !== x); if( m?.length ) PAGE_CARDS.set(k, m); else PAGE_CARDS.delete(k); }, PAGE_CARD_KEPT_MS) };
+        PAGE_CARDS.set(k, [...l, x]);
     }
 
     connectedCallback()
     {
         perf.add('card', 0, { step: 'on the page', card: this.instance?.cid });
         this.instance?.backOnPage();
+        // (back itself: no longer for a card made again)
+        const k = this.instance?.pageKey, l = PAGE_CARDS.get(k);
+        const x = l?.find(y => y.el === this);
+        if( x ) { clearTimeout(x.tid); if( l.length > 1 ) PAGE_CARDS.set(k, l.filter(y => y !== x)); else PAGE_CARDS.delete(k); }
+    }
+
+    // A card of the same name and YAML (key) off the page, drawn (see disconnectedCallback):
+    // its content moved into this one — its graphs as they are, drawn, its cache, its state —,
+    // nothing built or drawn again, its width not waited for → whether one was taken
+    _takeBack(key)
+    {
+        const l = PAGE_CARDS.get(key), x = l?.find(y => !y.el.isConnected && y.el.instance?.contentValid);
+        if( !x ) return false;
+        clearTimeout(x.tid);
+        if( l.length > 1 ) PAGE_CARDS.set(key, l.filter(y => y !== x)); else PAGE_CARDS.delete(key);
+        this.instance = x.el.instance;
+        x.el.instance = null;
+        this.replaceChildren(...x.el.childNodes);
+        this.instance._this = this;
+        this.instance.backOnPage();
+        perf.add('card', 0, { step: 'taken back', card: this.instance.cid });
+        this._tookBack = true;
+        return true;
     }
 
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
@@ -413,6 +448,8 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance._this = this;
         this.instance._hass = hass;
+        // (a card taken back: what came while it was off the page asked, as a refresh does)
+        if( this._tookBack ) { this._tookBack = false; this.instance.refresh(); }
 
         this.instance.version = hass.config.version.split('.').map(Number);
 
@@ -442,6 +479,10 @@ class HistoryExplorerCard extends HTMLElement
     InitWithConfig(hass)
     {
         const config = this.config;
+
+        // (a card made again — Home Assistant drawing the dashboard again —: the one it
+        // replaces taken back, if it was drawn)
+        if( !this.instance && this._takeBack(( config.cardName ?? 'default' ) + ' ' + JSON.stringify(config)) ) return;
 
         if( !this.instance )
             this.instance = new HistoryCardState();
