@@ -182,7 +182,7 @@ module.exports = async function()
             && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out);
         return ok ? true : JSON.stringify({ title, out });
     });
-    await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: each card\'s steps until drawn, from the moment the page came back', async () => {
+    await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: the card it replaces taken back, its steps from the moment the page came back', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
         await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
@@ -196,7 +196,7 @@ module.exports = async function()
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
         await t.E(`delete document.visibilityState`);
-        const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out) && /card (\d+): made[\s\S]*card \1: graphs built \(\d+ ms\)[\s\S]*card \1: drawn \(\d+ ms\)/.test(out);
+        const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out) && /card (\d+): off the page[\s\S]*card \1: taken back/.test(out);
         return ok ? true : out;
     });
     done(await t.close());

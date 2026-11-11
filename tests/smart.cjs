@@ -95,5 +95,20 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── A silence across midnight: the state in force at the day's start (Home Assistant's
+    // answer to a request beginning there) no value of the source ──
+    const _noon = () => { const d = new Date(); d.setUTCHours(12, 0, 0, 0); return d.toISOString(); };
+    t = await openCard(card('24h'), { height: 900, mock: { series: true, fail: FAIL }, clock: _noon() });
+    await t.wait(1500);
+    await t.step('a source silent from 22:00 to 02:00, the state in force repeated at midnight: one silence — a plateau holding its last value —, no point at midnight', async () => {
+        const r = await t.E(draw(`(day, now, H, S) => { const every = ${every}, m = day(0);
+            const yesterday = every(m - 10 * 3600e3, m - 2 * 3600e3, 60e3, t => 20 + ( t / 60e3 ) % 5, H), _last = yesterday[yesterday.length - 1];
+            return [{ layer: 'hist', slot: 1, rows: yesterday },
+                    { layer: 'hist', slot: 0, rows: [{ ...H(m, _last.state), b: true }, ...every(m + 2 * 3600e3, now, 60e3, t => 30 + ( t / 60e3 ) % 5, H)] }]; }`)
+            .replace('return { source', 'const _m = day(0); return { midnight: d.filter(p => t(p) === _m && !p.hecVirtual).length, source'));
+        return r.back === -1 && r.wrong.length === 0 && r.plateaus >= 1 && r.midnight === 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

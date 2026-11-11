@@ -561,13 +561,16 @@ module.exports = async function()
     await t.step('past 500 000 rows: purged back under 300 000 — the farthest days\' history first, then their 5-minute statistics; the hourly ones kept; the window and a day on each side untouched', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power', c0 = I.mapStartTimeToCacheSlot(I.startTime);
             const rows = (n, t) => Array.from({ length: n }, (_, k) => ({ last_changed: t + k, state: '1' }));
-            const win = I._windowRows(['hist', 'fine', 'stats', 'day']);
+            // (the rows of the window's slots, in those layers)
+            const _win = layers => { const c1 = I.mapEndTimeToCacheSlot(I.endTime); let n = 0;
+                for( let i = Math.max(0, c0); i <= c1; i++ ) for( const l of layers ) for( const a of I.cache[i][l].values() ) n += a.length; return n; };
+            const win = _win(['hist', 'fine', 'stats', 'day']);
             // (40 days before the window: 13 000 rows of history each, 288 of 5-minute statistics, 24 hourly)
             for( let d = 3; d < 43; d++ ) { const s = I.cache[c0 - d], t = s.start_m.valueOf();
                 s.hist.set(id, rows(13000, t)); s.fine.set(id, rows(288, t)); s.stats.set(id, rows(24, t)); }
             const before = I.cacheRows(); I._purge(); const after = I.cacheRows();
             const kept = d => ['hist', 'fine', 'stats'].map(l => I.cache[c0 - d][l].has(id) ? 1 : 0).join('');
-            return { before, after, win: I._windowRows(['hist', 'fine', 'stats', 'day']) === win, near: kept(3), far: kept(42), hourlyFar: I.cache[c0 - 42].stats.has(id) }; })()`);
+            return { before, after, win: _win(['hist', 'fine', 'stats', 'day']) === win, near: kept(3), far: kept(42), hourlyFar: I.cache[c0 - 42].stats.has(id) }; })()`);
         return r.before > 500000 && r.after <= 300000 && r.win && r.near === '111' && r.far[0] === '0' && r.hourlyFar ? true : JSON.stringify(r);
     });
     done(await t.close());

@@ -862,9 +862,9 @@ module.exports = async function()
         [5 * D, 'on'], [5 * D - 40 * 60, 'off'],                                          // 40 min: some 4 px
         ...Array.from({ length: 6 }, (_, k) => [3 * D - k * 30, k % 2 ? 'off' : 'on']),   // 30 s each, in a row
         [2 * D, 'off'], [D, 'on'], [D - 30, 'off']];                                         // 30 s alone
-    const timeline = async dec => {
+    const timeline = async (dec, clock) => {
         const t = await openCard(card({ defaultTimeRange: '7d', ...( dec === undefined ? {} : { decimation: dec } ), statistics: { enabled: false },
-            graphs: [{ type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true, rows: { 'binary_sensor.a': rows } } });
+            graphs: [{ type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }] }), { mock: { series: true, rows: { 'binary_sensor.a': rows } }, ...( clock ? { clock } : {} ) });
         await t.wait(1500);
         const r = await t.E(`graphAt(0).chart.data.datasets[0].data.map(b=>b[2]).join()`);
         await t.close();
@@ -873,6 +873,11 @@ module.exports = async function()
     await t.step('a timeline over a week: a state some 4 px wide drawn; states of 30 s in a row merged (multiple); a short one alone keeps its state; decimation: false, the same (ignored)', async () => {
         const auto = await timeline(), off = await timeline(false);
         return auto === 'off,on,off,multiple,off,on,off' && off === auto ? true : JSON.stringify({ auto, off });
+    });
+    await t.step('the same at 23:47, the states after the short ones lasting past midnight (the state in force repeated at the day\'s start): each judged by its whole length — the short one alone keeps its state, the merged run its own width', async () => {
+        const d = new Date(); d.setUTCHours(23, 47, 0, 0);
+        const r = await timeline(undefined, d.toISOString());
+        return r === 'off,on,off,multiple,off,on,off' ? true : r;
     });
     done(await t.close());
 
@@ -1080,14 +1085,14 @@ module.exports = async function()
     // refresh with today's statistics; the whole day's when Home Assistant is late ──
     t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyStep: 60 } });
     await t.wait(3000);
-    await t.step('a week (the 5-minute statistics): the curve up to now, its last minutes from the history; a refresh asks again what came since — today\'s statistics, the history since —, never the day\'s history', async () => {
+    await t.step('a week (the 5-minute statistics): the curve up to now, its last minutes from the history; a refresh asks again what came since — the history since, today\'s statistics only once a new period is compiled —, never the day\'s history', async () => {
         const d0 = (await t.E('datasets(0)'))[0];
         await t.E('(()=>{ __ws.length=0; el.instance.refresh(); })()'); await t.wait(2500);
         const ws = await t.E(`__ws.filter(${OWN})`), d1 = (await t.E('datasets(0)'))[0];
         const h = ws.filter(w => w.type === 'history/history_during_period'), st = ws.filter(w => w.type === 'recorder/statistics_during_period');
         const today = Date.parse(await t.E('el.instance.cache[el.instance.cache.length-1].start'));
         const ok = d0.x1 >= Date.now() - 5 * 60e3 && d1.x1 >= Date.now() - 5 * 60e3 && h.length >= 1 && h.every(w => Date.parse(w.start) >= Date.now() - 25 * 60e3)
-            && st.length >= 1 && st.every(w => Date.parse(w.start) >= today);
+            && st.every(w => Date.parse(w.start) >= today);
         return ok ? true : JSON.stringify({ d0, d1, ws });
     });
     done(await t.close());
@@ -1563,6 +1568,91 @@ module.exports = async function()
         return r.whole ? true : JSON.stringify(r);
     });
     done(await t.close());
+
+    // ── What a load costs: only the graphs whose entities got something drawn again, the
+    // answers close together drawn once; the statistics not asked again before a new period
+    // is compiled; a short part asked for all the entities at once; the history never asked
+    // where Home Assistant keeps none; the history of a drag not taken for one starting late;
+    // a card made again taking the one it replaces ──
+    const _at1030 = () => { const d = new Date(); d.setUTCHours(10, 30, 0, 0); return d.toISOString(); };
+    t = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', entities: [{ entity: 'sensor.rain' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }), { mock: { series: true }, clock: _at1030() });
+    await t.wait(5000);
+    await t.step('an answer for some entities: only their graphs drawn again — two close together, drawn once', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, d = () => I.graphs.map(g => g.chart.data.datasets[0].data), before = d();
+            let draws = 0; const f = I.generateGraphDataFromCache; I.generateGraphDataFromCache = function(){ draws++; return f.apply(this, arguments); };
+            await new Promise(r => setTimeout(r, 300)); draws = 0;
+            I._drawSoon(new Set(['sensor.power'])); I._drawSoon(new Set(['sensor.rain']));
+            await new Promise(r => setTimeout(r, 500)); I.generateGraphDataFromCache = f;
+            const after = d(); return { draws, changed: after.map((a, k) => a !== before[k]) }; })()`);
+        return r.draws === 1 && r.changed.join() === 'true,true,false' ? true : JSON.stringify(r);
+    });
+    await t.step('a refresh with no new hour compiled since: the hourly statistics not asked again', async () => {
+        // (the window's and its sides' — the background widening them farther aside)
+        const r = await t.E(`(async()=>{ const n0 = __ws.length; el.instance.refresh(); await new Promise(r => setTimeout(r, 1500)); el.instance.refresh(); await new Promise(r => setTimeout(r, 1500));
+            const from = Date.parse(el.instance.startTime) - 7 * 86400e3;
+            return __ws.slice(n0).filter(w => w.period === 'hour' && Date.parse(w.end) > from).map(w => [w.start, w.end]); })()`);
+        return r.length === 0 ? true : JSON.stringify(r);
+    });
+    await t.step('the window moved back (<): the hourly statistics of the side — a short part, the same for all — in one request for the three entities', async () => {
+        const n0 = await t.E('__ws.length');
+        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        const r = await t.E(`__ws.slice(${n0}).filter(w => w.period === 'hour').map(w => [w.start, w.end, w.ids.length])`);
+        return r.length >= 1 && r.every(w => w[2] === 3) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    t = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyDays: 2 } });
+    await t.wait(4000);
+    await t.step('history kept 2 days: where it begins remembered — the window moved back (<), nothing of its history asked before it', async () => {
+        const from = await t.E(`el.instance._histFrom?.get('sensor.power') ?? null`), n0 = await t.E('__ws.length');
+        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        const r = await t.E(`__ws.slice(${n0}).filter(w => w.type === 'history/history_during_period').map(w => Date.parse(w.start))`);
+        const kept = Date.now() - 2 * 86400e3;
+        return from !== null && Math.abs(from - kept) < 3600e3 && r.every(a => a >= from - 1000) ? true : JSON.stringify({ from, kept, r });
+    });
+    done(await t.close());
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyStep: 3600 }, clock: _at1030() });
+    await t.wait(3000);
+    await t.step('the history of a part asked next to one already there (a drag): not taken for one starting late — its state there, the one in force before', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, t0 = Date.parse(I.startTime), x = { kind: 'history', ms: 0 };
+            await I._ask('history', t0 - 4 * 3600e3, t0 - 2 * 3600e3, ['sensor.power'], { phase: 2 });
+            await I._ask('history', t0 - 2 * 3600e3, t0, ['sensor.power'], { phase: 2 });
+            return { late: I._emptyIn(x, 'sensor.power', t0 - 2 * 3600e3, t0), first: I._firstIn(x, 'sensor.power', t0 - 2 * 3600e3, t0) - ( t0 - 2 * 3600e3 ) }; })()`);
+        return r.late === false && r.first === 0 ? true : JSON.stringify(r);
+    });
+    await t.step('the card made again on the page (its YAML the same): the one it replaces taken back — its graphs as they were, drawn at once, nothing built again', async () => {
+        const r = await t.E(`(()=>{ const old = el, I = old.instance, canvas = old.querySelector('canvas'); old.remove();
+            const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); document.getElementById('host').appendChild(e); e.hass = mkHass();
+            window.el = e; window.hassTargets = [e];
+            return { same: e.instance === I, oldLet: old.instance === null, canvas: e.querySelector('canvas') === canvas, points: e.instance.graphs[0].chart.data.datasets[0].data.length }; })()`);
+        return r.same && r.oldLet && r.canvas && r.points > 10 ? true : JSON.stringify(r);
+    });
+    await t.step('a card of the same YAML made while the first is still on the page: a card of its own — the first one left as it is', async () => {
+        const r = await t.E(`(()=>{ const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); document.getElementById('host').appendChild(e); e.hass = mkHass();
+            const own = e.instance !== el.instance && !!el.querySelector('canvas'); e.remove(); return { own }; })()`);
+        return r.own ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The state in force at a request's start (Home Assistant's answer, at local midnight for
+    // the blocks of a day) no value of the sensor: never drawn nor exported as one; the export
+    // of the history beginning with the state in force at the window's start ──
+    // (in the window: before it, the value in force carried at the start of its first day — the curve begun at its edge)
+    const _rows3h = Array.from({ length: 30 }, (_, k) => [5400 + 3 * 3600 * k, String(100 + 10 * k)]);   // a value every 3 h, at :30
+    for( const [range, h, m] of [['3d', 12, 0], ['24h', 0, 30], ['24h', 12, 0]] ) {
+        const d = new Date(); d.setUTCHours(h, m, 0, 0);
+        t = await openCard(card({ defaultTimeRange: range, statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }),
+            { mock: { series: true, rows: { 'sensor.power': _rows3h } }, clock: d.toISOString() });
+        await t.wait(3000);
+        await t.step(`${range} at ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}, a value every 3 hours (none at midnight): no point at midnight, no row of the export there; the export beginning with the state in force at the window's start`, async () => {
+            const r = await t.E(`(async()=>{ const I = el.instance, t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime), mid = x => x % 86400e3 === 0 && x > t0 && x < t1;
+                const pts = I.graphs[0].chart.data.datasets[0].data.map(p => +new Date(p.x)).filter(mid).length;
+                const rows = ( await I.exportRows('history', ['sensor.power']) )['sensor.power'] ?? [];
+                return { pts, rows: rows.filter(x => mid(x.lu * 1000)).length, first: rows.length ? rows[0].lu * 1000 - t0 : null, n: rows.length }; })()`);
+            return r.pts === 0 && r.rows === 0 && r.first === 0 && r.n > 3 ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };
