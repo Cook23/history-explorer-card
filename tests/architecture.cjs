@@ -84,8 +84,10 @@ const PARTS = (() => {
 })();
 
 const RULES = [
+    // (a WebGL context of its own, never a chart's: only to read the device's graphics — the
+    // performance test's report, card-tests.js)
     { id: 'chart-internals', why: 'the card never reads or sets what Chart.js keeps for itself (its layout, its meta, what it drew, anything _hec)',
-      files: CARD, re: /getDatasetMeta|chartArea|legendHitBoxes|\.scales\[|\b_hec|\._view\b|chart\??\.ctx\b|measureText|getContext\(/g },
+      files: CARD, re: /getDatasetMeta|chartArea|legendHitBoxes|\.scales\[|\b_hec|\._view\b|chart\??\.ctx\b|measureText|getContext\((?!'webgl'\))/g },
     { id: 'chart-contract', why: "the card uses only Chart.js's stock API and what deps/Chart Custom.js.md documents",
       files: CARD, check: src => {
           const out = [];

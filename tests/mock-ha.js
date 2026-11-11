@@ -28,6 +28,8 @@
 //   clones      that many more sensors with statistics: sensor.s1, sensor.s2…
 //   fastStats   the statistics worked out at once (from the sine), not compiled from the history
 //   states      more entities: { id: { state, unit, state_class } } (a data set's: see dataset.cjs)
+//   system      Home Assistant tells what it runs on (system health, hardware), as to an
+//               administrator: a Raspberry Pi 5, Home Assistant OS, MariaDB — else nothing
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
@@ -163,7 +165,16 @@ function statistics(d){
 }
 // (MOCK.cost: when each of Home Assistant's workers is free again)
 let mockBusyUntil=[], mockStarts=[];
+// (MOCK.system: what Home Assistant tells of the hardware it runs on — its system health, its
+// hardware integration —, as to an administrator)
+const mockConnection={ subscribeMessage:(cb,msg)=>{
+  if(MOCK.system && msg.type==='system_health/info') setTimeout(()=>{ cb({type:'initial', data:{ homeassistant:{info:{installation_type:'Home Assistant OS', arch:'aarch64', os_name:'Linux', os_version:'6.12'}},
+    hassio:{info:{host_os:'Home Assistant OS 16.3', board:'rpi5-64', disk_total:'228.5', disk_used:'21.0'}}, recorder:{info:{database_engine:'mysql', database_version:'11.4.5', estimated_db_size:{type:'pending'}}} }});
+    cb({type:'update', domain:'recorder', key:'estimated_db_size', success:true, data:'3412.50 MiB'}); cb({type:'finish'}); }, 10);
+  else if(MOCK.system && msg.type==='hardware/subscribe_system_status') setTimeout(()=>cb({cpu_percent:12, memory_used_percent:40, memory_used_mb:3276.8, memory_free_mb:4915.2, timestamp:''}), 10);
+  return Promise.resolve(()=>{}); } };
 function mkHass(){ return {
+  connection: mockConnection,
   states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
@@ -193,6 +204,7 @@ function mkHass(){ return {
     const spent=f=>{ const t=performance.now(), v=f(); (window.__mockSpent=window.__mockSpent||[]).push([t, performance.now()-t]); return v; };
     if(d.type==='history/history_during_period') return MOCK.cost ? costed(MOCK.cost.history, spent(()=>history(d))) : later(MOCK.historyDelay, ()=>Promise.resolve(wire(history(d))));
     if(d.type==='recorder/statistics_during_period') return MOCK.cost ? costed(MOCK.cost.statistics, spent(()=>statistics(d))) : later(MOCK.historyDelay, ()=>Promise.resolve(wire(statistics(d))));
+    if(d.type==='hardware/info') return MOCK.system ? Promise.resolve({hardware:[{name:'Raspberry Pi 5', board:{hassio_board_id:'rpi5-64', model:'5'}}]}) : Promise.reject(new Error('unknown command'));
     if(d.type==='frontend/get_user_data') return later(MOCK.userDataDelay, ()=>window.__getUD(d.key).then(v=>({value:v})));
     if(d.type==='frontend/set_user_data'){ return window.__setUD(d.key, d.value===null?null:JSON.parse(JSON.stringify(d.value))).then(()=>({})); }
     return Promise.resolve({}); } }; }

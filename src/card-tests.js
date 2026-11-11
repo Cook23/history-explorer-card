@@ -463,13 +463,68 @@ function buildPerformanceTest(body, card)
         return _idle >= PERF_IDLE_MS ? performance.now() - t0 - _idle : null;
     };
 
+    // The systems the test runs on — first in the report: Home Assistant (its version, its
+    // installation, the hardware it runs on, its database: its system health and hardware
+    // integration — an administrator's; else unknown) and this device (its browser, its
+    // processor, memory, graphics, screen)
+    const _answer = p => Promise.race([p, wait(4000).then(() => { throw new Error('no answer'); })]);
+    const _health = () => new Promise(res => {
+        const info = {}, _c = card._hass?.connection;
+        if( !_c?.subscribeMessage ) return res(info);
+        let _un = null, _done = false;
+        const _end = () => { if( _done ) return; _done = true; Promise.resolve(_un).then(u => u?.()).catch(() => {}); res(info); };
+        setTimeout(_end, 4000);
+        const _v = x => x === null || typeof x !== 'object' ? x : undefined;
+        try { _un = _c.subscribeMessage(m => {
+            if( m?.type === 'initial' ) for( const [d, x] of Object.entries(m.data ?? {}) ) for( const [k, v] of Object.entries(x?.info ?? {}) ) { if( _v(v) !== undefined ) ( info[d] ??= {} )[k] = v; }
+            else if( m?.type === 'update' && m.success && _v(m.data) !== undefined ) ( info[m.domain] ??= {} )[m.key] = m.data;
+            else if( m?.type === 'finish' ) _end();
+        }, { type: 'system_health/info' }); } catch( e ) { _end(); }
+        Promise.resolve(_un).catch(_end);
+    });
+    const _status = () => new Promise(res => {
+        const _c = card._hass?.connection;
+        if( !_c?.subscribeMessage ) return res(null);
+        let _un = null, _done = false;
+        const _end = x => { if( _done ) return; _done = true; Promise.resolve(_un).then(u => u?.()).catch(() => {}); res(x); };
+        setTimeout(() => _end(null), 4000);
+        try { _un = _c.subscribeMessage(m => _end(m), { type: 'hardware/subscribe_system_status' }); } catch( e ) { _end(null); }
+        Promise.resolve(_un).catch(() => _end(null));
+    });
+    const systems = async () => {
+        step('Asking Home Assistant what it runs on…');
+        const [h, hw, st] = await Promise.all([_health(), _answer(Promise.resolve().then(() => card._hass.callWS({ type: 'hardware/info' }))).catch(() => null), _status()]);
+        const ha = h.homeassistant ?? {}, sv = h.hassio ?? {}, rec = h.recorder ?? {};
+        const _board = ( hw?.hardware ?? [] ).map(x => x.name ?? x.board?.model).filter(Boolean).join(', ') || sv.board;
+        const _mem = st && Number.isFinite(st.memory_used_mb) && Number.isFinite(st.memory_free_mb) ? `${( ( st.memory_used_mb + st.memory_free_mb ) / 1024 ).toFixed(1)} GB memory (${Math.round(st.memory_used_percent ?? 0)} % used)` : null;
+        // (Home Assistant names MariaDB and MySQL alike, 'mysql': MariaDB's versions are 10 and over)
+        const _engine = e => e === 'mysql' ? ( parseInt(rec.database_version) >= 10 ? 'MariaDB' : 'MySQL' ) : ( { sqlite: 'SQLite', postgresql: 'PostgreSQL' } )[e] ?? e;
+        const _db = rec.database_engine ? `database ${_engine(rec.database_engine)}${rec.database_version ? ' ' + rec.database_version : ''}${rec.estimated_db_size ? ' (' + rec.estimated_db_size + ')' : ''}` : null;
+        const _os = ha.os_name ? `${ha.installation_type ?? ''} on ${sv.host_os ?? ha.os_name + ' ' + ( ha.os_version ?? '' )}`.trim() : ha.installation_type;
+        const _disk = sv.disk_total ? `disk ${sv.disk_used ?? '?'} / ${sv.disk_total} GB` : null;
+        const _ha = [_os, ha.arch, _board, _mem, _disk, _db].filter(Boolean);
+        out(`Home Assistant ${card._hass?.config?.version ?? '?'}${_ha.length ? ': ' + _ha.join(', ') : ' (what it runs on unknown: an administrator\'s account tells it)'}`);
+        // (this device: the browser's hints — model, platform —, its graphics, its screen)
+        let _ua = null;
+        try { _ua = await _answer(navigator.userAgentData?.getHighEntropyValues?.(['model', 'platform', 'platformVersion', 'architecture']) ?? Promise.resolve(null)); } catch( e ) { _ua = null; }
+        let _gpu = null;
+        try {
+            const gl = document.createElement('canvas').getContext('webgl'), x = gl?.getExtension('WEBGL_debug_renderer_info');
+            _gpu = x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER) ?? null;
+            gl?.getExtension('WEBGL_lose_context')?.loseContext();
+        } catch( e ) { _gpu = null; }
+        const _dev = [_ua?.model, _ua?.platform ? `${_ua.platform} ${_ua.platformVersion ?? ''}`.trim() : null, _ua?.architecture,
+                      `${navigator.hardwareConcurrency ?? '?'} cores`, navigator.deviceMemory ? `${navigator.deviceMemory} GB memory or more` : null, _gpu ? `graphics ${_gpu}` : null,
+                      `screen ${screen.width}×${screen.height} px, window ${window.innerWidth}×${window.innerHeight} px, pixel ratio ${window.devicePixelRatio}`].filter(Boolean);
+        out(`This device: ${_dev.join(', ')}\n`);
+    };
+
     const setup = () => {
         const P = card.pconfig, g = card.graphs, ids = card.historyEntityIds(), stats = new Set(card._statisticsIds());
         const points = x => card.pointsShown(x);
         const G = card._geometry();
         out(`Window: ${card.startTime} → ${card.endTime} (${( G.r / 864e5 ).toFixed(1)} days), a column of pixels: ${( G.column / 60e3 ).toFixed(1)} min`);
         out(`Options: refresh ${P.refreshEnabled ? 'automatic' : 'off'}, statistics ${card.statistics?.enabled ? `on (their period: ${card.statistics.period})` : 'off'}`);
-        out(`Device: ${navigator.hardwareConcurrency ?? '?'} cores, ${window.innerWidth}×${window.innerHeight} px, pixel ratio ${window.devicePixelRatio}`);
         out(`Graphs: ${g.length}, entities: ${ids.length} (${stats.size} with statistics), points drawn: ${g.reduce((a, x) => a + points(x), 0)}`);
         for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points`);
         // (the statistics probe's verdicts: see card-history.js SENSOR_GAPS)
@@ -485,8 +540,8 @@ function buildPerformanceTest(body, card)
             record();
             card.generateGraphDataFromCache();
             const r = stop();
-            const _all = sum(of(r, 'redraw')), _charts = of(r, 'chart');
-            out(`  ${ms(_all)}: the card ${ms(_all - sum(_charts))}, Chart.js ${ms(sum(_charts))} — by graph: ${_charts.map(c => ms(c.ms)).join(', ')}`);
+            const _all = sum(of(r, 'redraw')), _charts = of(r, 'chart'), _card = _all - sum(_charts), _rows = sum(of(r, 'from cache')), _pts = sum(of(r, 'points'));
+            out(`  ${ms(_all)}: the card ${ms(_card)} (the rows read from the cache ${ms(_rows)}, the points worked out ${ms(_pts)}, the rest ${ms(Math.max(0, _card - _rows - _pts))}), Chart.js ${ms(sum(_charts))} — by graph: ${_charts.map(c => ms(c.ms)).join(', ')}`);
         }
     };
 
@@ -551,7 +606,7 @@ function buildPerformanceTest(body, card)
     // Back on the page: armed; the page hidden, then shown again — watched PERF_BACK_WATCH_S
     // from then: Home Assistant's connection, each card's steps, the freezes
     let _onVis = null, _conn = null, _onConn = null;
-    const back = () => {
+    const back = head => {
         $('back').disabled = true;
         $('backStep').textContent = 'Waiting: switch to another app, then come back.';
         const _hass = card._hass, _c = _hass?.connection;
@@ -576,6 +631,7 @@ function buildPerformanceTest(body, card)
             if( _conn ) for( const k in _onConn.fns ) _conn.removeEventListener(k, _onConn.fns[k]);
             _conn = null;
             if( !r ) return;
+            await head;
             out(`\n== Back on the page, after ${sec(_shown - _hidden)} away`);
             const _all = [...r.events.filter(e => e.kind === 'card').map(e => ({ at: e.at, what: `card ${e.info.card}: ${e.info.step}${e.ms ? ` (${ms(e.ms)})` : ''}` })),
                           ..._events, ...r.freezes.map(f => ({ at: f.at, what: `the page froze ${ms(f.ms)}` })),
@@ -589,11 +645,13 @@ function buildPerformanceTest(body, card)
         };
         document.addEventListener('visibilitychange', _onVis);
     };
-    $('back').addEventListener('click', () => { if( lines.length === 0 || lines[0].startsWith('—') ) setup(); back(); });
+    // (armed at once — the page may be left right away —, the report's first lines written meanwhile)
+    $('back').addEventListener('click', () => { back(lines.length === 0 || lines[0].startsWith('—') ? ( lines.length = 0, systems().then(setup) ) : null); });
 
     $('start').addEventListener('click', async () => {
         $('start').disabled = true;
         lines.length = 0;
+        await systems();
         setup();
         await redraws();
         if( !stopped ) await load();

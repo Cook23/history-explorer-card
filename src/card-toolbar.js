@@ -5,6 +5,7 @@
 import { i18n } from "./languages.js";
 import { BAR_INTERVALS, TIME_RANGES } from "./history-options.js";
 import { typeMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
+import { perf } from "./card-perf.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -223,6 +224,7 @@ export class CardToolbar
         const w = this.cardWidth();
 
         if( Math.abs(this.lastWidth - w) > 2 ) {
+            const _t = performance.now();
             this.lastWidth = w;
             for( let g of this.graphs ) g.chart.resize(undefined, g.graphHeight);
             // (a card crossing NARROW_CARD_PX: its Y labels inside or beside the plot, its text sized)
@@ -232,6 +234,8 @@ export class CardToolbar
             if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipModes(); }
             // (the time labels' step: as the density and the plot's width allow — setStepSize)
             this.setStepSize(true);
+            // (timed while the performance test records)
+            perf.add('card', performance.now() - _t, { step: `resized to ${Math.round(w)} px`, card: this.cid });
         }
 
         this.resizeSelector();

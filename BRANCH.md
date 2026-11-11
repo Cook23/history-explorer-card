@@ -51,7 +51,9 @@ retention, the entity created later).
 - **Phase 1 — the coarse source,** one request per entity — the heavy ones (Home Assistant reads
   every hourly row, whatever the period): each drawn as it comes, Home Assistant's workers all
   busy (may not exist); a short part (200 periods at most: a day, a side, the hours not
-  compiled yet) the same for several entities, one request for them all:
+  compiled yet) the same for several entities, one request for them all; a larger one once
+  the window has moved (the entity has some of it already), in 4 groups of entities (Home
+  Assistant's workers), a request each — a first load, a request per entity:
   - the most precise valid statistics of the hourly family (hour, day, week, month) giving at
     least 100 points over the width shown — never finer than a column of pixels shows;
   - over min(3 widths, width + 2 months): a width (a month at most) on each free side — in
