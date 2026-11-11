@@ -459,8 +459,9 @@ class HistoryExplorerCard extends HTMLElement
 
         this.instance._this = this;
         this.instance._hass = hass;
-        // (a card taken back: what came while it was off the page asked, as a refresh does)
-        if( this._tookBack ) { this._tookBack = false; this.instance.refresh(); }
+        // (a card taken back: what came while it was off the page asked, as a refresh does —
+        // the same one as for the states changed meanwhile, see scheduleAutoRefresh: one refresh)
+        if( this._tookBack ) { this._tookBack = false; this.instance.scheduleAutoRefresh(); }
 
         this.instance.version = hass.config.version.split('.').map(Number);
 

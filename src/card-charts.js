@@ -14,6 +14,9 @@ import { msOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
+// (an axis' own tick step — its option, ystepSize — while Chart.js makes its ticks with the
+// automatic axis' step: see _autoYAxis)
+const AUTO_STEPS = new WeakMap();
 // The Y axes of a line or bar graph: on the left (Chart.js's own first Y axis), and on the
 // right for a second group of units (see _assignYAxes)
 const LEFT_Y_AXIS = 'y-axis-0';
@@ -478,6 +481,10 @@ export class CardCharts
         if( this._yAxesChanged && !this.state.drag ) { this._yAxesChanged = false; this.keepYAxes(this._yAxesKept); }
         if( freeLo ) me.min = log ? Math.pow(10, a.min) : a.min;
         if( freeHi ) me.max = log ? Math.pow(10, a.max) : a.max;
+        // (its step given with its bounds — Chart.js' own worked out again from these bounds
+        // would widen them: see niceAxis —, for this drawing only: the axis' own option (ystepSize)
+        // put back once its ticks are made: the axis' afterBuildTicks)
+        if( !log && freeLo && freeHi && a.step > 0 ) { if( !AUTO_STEPS.has(me) ) AUTO_STEPS.set(me, me.options.ticks.stepSize); me.options.ticks.stepSize = a.step; }
     }
 
     // The values around the time window the automatic Y axis id of a chart looks at (see
@@ -573,6 +580,9 @@ export class CardCharts
             afterFit: (scaleInstance) => {
                 scaleInstance.width = ( scaleInstance.options.ticks.mirror || _shown === false ) ? 0 : this.pconfig.labelAreaWidth;
             },
+            // (the axis' own step put back once Chart.js made its ticks with the automatic one —
+            // see _autoYAxis)
+            afterBuildTicks: (me) => { if( AUTO_STEPS.has(me) ) { me.options.ticks.stepSize = AUTO_STEPS.get(me); AUTO_STEPS.delete(me); } },
             afterDataLimits: (me) => {
                 // (a side set by hand — the padlock, a drag, a pinch — or fixed: as it is)
                 const _freeLo = me.options.ticks.min == null, _freeHi = me.options.ticks.max == null;
@@ -1007,6 +1017,26 @@ export class CardCharts
         const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
 
         this.graphs.push(g);
+        this._watchShown(g);
+    }
+
+    // Whether graph g is on the screen, or near it (a screen's height above or below), watched
+    // (IntersectionObserver): one that isn't, drawn after those that are — marked to be drawn
+    // (_staleGraphs), one at a time when the page is free (card-history.js _drawStaleSoon) —,
+    // at once if it comes near the screen first. Not told yet: on the screen
+    _watchShown(g)
+    {
+        if( typeof IntersectionObserver === 'undefined' ) return;
+        this._shownObserver ??= new IntersectionObserver(entries => {
+            for( const en of entries ) {
+                const x = this.graphs.find(y => y.canvas === en.target);
+                if( !x ) continue;
+                if( !en.isIntersecting ) { ( this._offscreen ??= new Set() ).add(x); continue; }
+                this._offscreen?.delete(x);
+                if( this._staleGraphs?.delete(x) ) this.generateGraphDataFromCache(new Set(x.entities.map(e => e.entity)));
+            }
+        }, { rootMargin: '100% 0px' });
+        this._shownObserver.observe(g.canvas);
     }
 
     getStateColor(domain, device_class, entity_id, value)

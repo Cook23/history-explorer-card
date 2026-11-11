@@ -5,6 +5,7 @@
 // issue.
 
 import { Version } from "./version.js";
+import { PROBE_INFO } from "./card-history.js";
 const Chart = window.HXLocal_Chart;
 
 const ISSUE_URL = 'https://github.com/Cook23/history-explorer-card/issues/new';
@@ -409,6 +410,22 @@ const PERF_BACK_WATCH_S = 15;      // back on the page: watched that long
 const PERF_TICK_MS = 50;           // the page's pulse: a pulse late by more than
 const PERF_FREEZE_MS = 250;        // this is a freeze
 
+// The browser of a user agent: the Home Assistant app (its version, the web view it runs in),
+// Firefox, Edge, Opera, Samsung Internet, Chrome, Safari — its name and version
+export function browserOf(ua)
+{
+    const v = re => ua.match(re)?.[1];
+    const _chrome = v(/Chrome\/(\d+)/);
+    if( v(/Home Assistant\/([\d.]+)/) ) return `Home Assistant app ${v(/Home Assistant\/([\d.]+)/)}` + ( _chrome ? ` (web view: Chrome ${_chrome})` : / Safari\//.test(ua) || /AppleWebKit/.test(ua) ? ' (web view: WebKit)' : '' );
+    if( v(/Firefox\/(\d+)/) ) return `Firefox ${v(/Firefox\/(\d+)/)}`;
+    if( v(/Edg\w*\/(\d+)/) ) return `Edge ${v(/Edg\w*\/(\d+)/)}`;
+    if( v(/OPR\/(\d+)/) ) return `Opera ${v(/OPR\/(\d+)/)}`;
+    if( v(/SamsungBrowser\/([\d.]+)/) ) return `Samsung Internet ${v(/SamsungBrowser\/([\d.]+)/)}`;
+    if( _chrome ) return `Chrome ${_chrome}`;
+    if( v(/Version\/([\d.]+).*Safari/) ) return `Safari ${v(/Version\/([\d.]+).*Safari/)}`;
+    return 'unknown';
+}
+
 function buildPerformanceTest(body, card)
 {
     body.insertAdjacentHTML('beforeend', `
@@ -487,7 +504,8 @@ function buildPerformanceTest(body, card)
         if( !_c?.subscribeMessage ) return res(null);
         let _un = null, _done = false;
         const _end = x => { if( _done ) return; _done = true; Promise.resolve(_un).then(u => u?.()).catch(() => {}); res(x); };
-        setTimeout(() => _end(null), 4000);
+        // (Home Assistant sends it every few seconds: waited for longer)
+        setTimeout(() => _end(null), 8000);
         try { _un = _c.subscribeMessage(m => _end(m), { type: 'hardware/subscribe_system_status' }); } catch( e ) { _end(null); }
         Promise.resolve(_un).catch(() => _end(null));
     });
@@ -501,7 +519,9 @@ function buildPerformanceTest(body, card)
         const _engine = e => e === 'mysql' ? ( parseInt(rec.database_version) >= 10 ? 'MariaDB' : 'MySQL' ) : ( { sqlite: 'SQLite', postgresql: 'PostgreSQL' } )[e] ?? e;
         const _db = rec.database_engine ? `database ${_engine(rec.database_engine)}${rec.database_version ? ' ' + rec.database_version : ''}${rec.estimated_db_size ? ' (' + rec.estimated_db_size + ')' : ''}` : null;
         const _os = ha.os_name ? `${ha.installation_type ?? ''} on ${sv.host_os ?? ha.os_name + ' ' + ( ha.os_version ?? '' )}`.trim() : ha.installation_type;
-        const _disk = sv.disk_total ? `disk ${sv.disk_used ?? '?'} / ${sv.disk_total} GB` : null;
+        // (Home Assistant's sizes with their unit, or bare: then GB)
+        const _gb = v => /[a-z]/i.test(String(v)) ? String(v) : `${v} GB`;
+        const _disk = sv.disk_total ? `disk ${_gb(sv.disk_used ?? '?')} / ${_gb(sv.disk_total)}` : null;
         const _ha = [_os, ha.arch, _board, _mem, _disk, _db].filter(Boolean);
         out(`Home Assistant ${card._hass?.config?.version ?? '?'}${_ha.length ? ': ' + _ha.join(', ') : ' (what it runs on unknown: an administrator\'s account tells it)'}`);
         // (this device: the browser's hints — model, platform —, its graphics, its screen)
@@ -516,7 +536,8 @@ function buildPerformanceTest(body, card)
         const _dev = [_ua?.model, _ua?.platform ? `${_ua.platform} ${_ua.platformVersion ?? ''}`.trim() : null, _ua?.architecture,
                       `${navigator.hardwareConcurrency ?? '?'} cores`, navigator.deviceMemory ? `${navigator.deviceMemory} GB memory or more` : null, _gpu ? `graphics ${_gpu}` : null,
                       `screen ${screen.width}×${screen.height} px, window ${window.innerWidth}×${window.innerHeight} px, pixel ratio ${window.devicePixelRatio}`].filter(Boolean);
-        out(`This device: ${_dev.join(', ')}\n`);
+        out(`This device: ${_dev.join(', ')}`);
+        out(`Browser: ${browserOf(navigator.userAgent)}\n`);
     };
 
     const setup = () => {
@@ -528,7 +549,16 @@ function buildPerformanceTest(body, card)
         out(`Graphs: ${g.length}, entities: ${ids.length} (${stats.size} with statistics), points drawn: ${g.reduce((a, x) => a + points(x), 0)}`);
         for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points`);
         // (the statistics probe's verdicts: see card-history.js SENSOR_GAPS)
-        const _v = ids.filter(id => stats.has(id)).map(id => `${id}: 5 min ${card._relevant(id, 300e3) ? 'valid' : 'not valid'}, hourly ${card._relevant(id, 3600e3) ? 'valid' : 'not valid'}`);
+        // (and what each found: when, its values and its short intervals — see card-history.js _speaks)
+        const _hm = t => window.HXLocal_moment(t).format('HH:mm');
+        const _found = id => {
+            const i = PROBE_INFO.get(id);
+            if( !i ) return 'not probed';
+            if( i.kept ) return `kept on this device since ${_hm(i.at)}`;
+            const _long = i.long ? `; last 24 h: ${i.long.n} values, ${i.long.short}${i.long.short >= 5 ? '+' : ''} intervals under 50 min` : '';
+            return `probed at ${_hm(i.at)}: last hour ${i.n} values, ${i.short}${i.short >= 5 ? '+' : ''} intervals under 4 min, the shortest ${i.shortest === null ? '—' : Math.round(i.shortest / 1000) + ' s'}${_long}`;
+        };
+        const _v = ids.filter(id => stats.has(id)).map(id => `${id}: 5 min ${card._relevant(id, 300e3) ? 'valid' : 'not valid'}, hourly ${card._relevant(id, 3600e3) ? 'valid' : 'not valid'} (${_found(id)})`);
         if( _v.length ) { out('Statistics valid (the probe):'); for( const x of _v ) out('  ' + x); }
     };
 

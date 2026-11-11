@@ -48,6 +48,10 @@ const PHASE_SIDES = 3;
 const GROUP_MAX_ROWS = 200;
 // (the answers drawn: no sooner than this after the last drawing — see _drawSoon)
 const DRAW_GAP_MIN_MS = 100;
+// The graphs far from the screen drawn after those on it (see _drawStaleSoon): each when the
+// page is free, at most STALE_IDLE_WAIT_MS later; a gesture going on, looked at again every
+// STALE_GESTURE_WAIT_MS
+const STALE_IDLE_WAIT_MS = 500, STALE_GESTURE_WAIT_MS = 200;
 // Statistics of a period shorter than an entity's own would make up values between its own
 // (a value held, drawn as twelve the same, then a step): told once a session, at the start, by
 // probing its history (_probeFine) — its last PROBE_MS (short: a sensor flooding its history
@@ -63,6 +67,10 @@ const DRAW_GAP_MIN_MS = 100;
 // entity, its probe under way (a promise)
 const PROBE_MS = 3600e3, PROBE_LONG_MS = 24 * 3600e3, PROBE_COUNT = 5, FINE_GAP_MS = 4 * 60e3, HOUR_GAP_SHORT_MS = 15 * 60e3, HOUR_GAP_MS = 50 * 60e3;
 const SENSOR_GAPS = new Map(), PROBES = new Map();
+// What each probe found (the performance test's report): by entity, { at (when), n, short,
+// shortest (its last hour, see _speaks), long (its last day, when asked) } — or { at, kept: true }
+// for a verdict read from this device
+export const PROBE_INFO = new Map();
 // (the verdicts kept on this device read once a page: see card-storage.js keptProbes)
 let probesRead = false;
 // The caches of the page, by card (pageKey: its name and its YAML — two different cards never
@@ -380,8 +388,9 @@ export class CardHistory
     // entity, in the graphs' order (an empty one when the cache has none, so that the
     // indices stay in step with buildChartData), and the color entities' by entity_id.
     // only: the series whose data changed (an answer's) — only the graphs showing one of
-    // them, or colored by one, worked out and drawn again; none: every graph
-    generateGraphDataFromCache(only = null)
+    // them, or colored by one, worked out and drawn again; none: every graph. Never a graph far
+    // from the screen: drawn when it comes near it (_watchShown)
+    generateGraphDataFromCache(only = null, offscreenToo = false)
     {
         const _t = performance.now();
         let c0 = this.mapStartTimeToCacheSlot(this.startTime);
@@ -389,7 +398,15 @@ export class CardHistory
         // (what waited to be drawn again — see _drawSoon —: drawn now)
         if( !only || only === this._dirty ) this._dirty = undefined;
         this._lastDrawAt = performance.now();
-        const _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || only.has(colorEntityOf(e)))) : null;
+        let _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || only.has(colorEntityOf(e)))) : null;
+        // (a graph far from the screen: drawn after those on it — see _drawStaleSoon —, or when
+        // it comes near it, see _watchShown)
+        const _all = _graphs ?? this.graphs, _near = offscreenToo ? _all : _all.filter(g => !this._offscreen?.has(g));
+        if( _near.length < _all.length ) {
+            for( const g of _all ) if( this._offscreen.has(g) ) ( this._staleGraphs ??= new Set() ).add(g);
+            _graphs = _near;
+            this._drawStaleSoon();
+        }
         if( _graphs && !_graphs.length ) return;
 
         if( c0 >= 0 && c1 >= 0 ) {
@@ -410,6 +427,25 @@ export class CardHistory
         // scheduleAutoRefresh)
         this._lastBuildMs = performance.now() - _t;
         perf.add('redraw', this._lastBuildMs);
+    }
+
+    // The graphs far from the screen left to draw (_staleGraphs), drawn after those on it: one
+    // at a time, each when the page is free (requestIdleCallback) — a gesture or a touch never
+    // held up longer than a graph takes —, never while a gesture moves the window (after it)
+    _drawStaleSoon()
+    {
+        if( this._staleTid || !this._staleGraphs?.size ) return;
+        const _next = () => {
+            this._staleTid = 0;
+            if( !this._staleGraphs?.size ) return;
+            // (a gesture going on: after it)
+            if( this.state.drag ) return void ( this._staleTid = setTimeout(_next, STALE_GESTURE_WAIT_MS) );
+            const g = this._staleGraphs.values().next().value;
+            this._staleGraphs.delete(g);
+            if( this.graphs.includes(g) ) this.generateGraphDataFromCache(new Set(g.entities.map(e => e.entity)), true);
+            this._drawStaleSoon();
+        };
+        this._staleTid = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(_next, { timeout: STALE_IDLE_WAIT_MS }) : setTimeout(_next, 16);
     }
 
     // The graphs drawn again from the cache as soon as the page is free — once for all the
@@ -622,22 +658,30 @@ export class CardHistory
         return ms <= PERIOD_MS[FINE_PERIOD] ? g.fine : g.hour;
     }
 
-    // Entity id's history in the cache from t to now — the state at a block's start, given
-    // with it, left out —: { n: how many numbers, short: how many intervals between two numbers
-    // following each other are under gap — counted up to PROBE_COUNT, no further }
-    _speaks(id, t, gap)
+    // An entity's history as Home Assistant answered the probe (rows: its compressed rows, see
+    // historyCall) from t to now — its state at t, given with it, left out —: { n: how many
+    // numbers, short: how many intervals between two numbers following each other are under
+    // gap — counted up to PROBE_COUNT, no further —, shortest: the shortest of them (ms, null
+    // for none) }. From the answer itself, never from the cache: what the cache holds then
+    // isn't the probe's to know (a load started again meanwhile empties it, another request
+    // may bring the same hours later)
+    _speaks(rows, t, gap)
     {
         const _now = Date.now();
-        let n = 0, short = 0, prev = null;
-        for( let i = this._slotAt(t); i < this.cache.length; i++ ) for( const x of this.cache[i].hist.get(id) ?? [] ) {
-            const v = msOf(x.last_changed);
-            if( x.b || v <= t || v > _now ) continue;
-            if( x.state === '' || x.state === null || isNaN(Number(x.state)) ) { prev = null; continue; }
+        let n = 0, short = 0, shortest = null, prev = null;
+        for( const x of rows ?? [] ) {
+            const v = x.lu * 1000;
+            if( !( v > t ) || v > _now ) continue;
+            if( x.s === '' || x.s === null || isNaN(Number(x.s)) ) { prev = null; continue; }
             n++;
-            if( prev !== null && short < PROBE_COUNT && v - prev < gap ) short++;
+            if( prev !== null ) {
+                const d = v - prev;
+                if( shortest === null || d < shortest ) shortest = d;
+                if( short < PROBE_COUNT && d < gap ) short++;
+            }
             prev = v;
         }
-        return { n, short };
+        return { n, short, shortest };
     }
 
     // Phase 0: whether the statistics of entities ids are valid (SENSOR_GAPS), before any is
@@ -656,20 +700,25 @@ export class CardHistory
             // (kept on this device only when told by the history — Home Assistant failing: every
             // statistics valid for this page only)
             let _told = false;
-            const p = this._askGroup('history', _fresh, _now - PROBE_MS, _now, { phase: 0 }).then(e => {
-                if( e ) return _valid(_fresh);
+            // (asked as any request — put in the cache too —, judged from its own answer, see _speaks)
+            const _ask = (ids, from) => this._ask('history', ...this._span('history', from, _now), ids, { phase: 0, raw: true }).then(x => { if( x.error ) throw x.error; return x.result; });
+            const p = _ask(_fresh, _now - PROBE_MS).then(r => {
                 _told = true;
                 const _sparse = [];
                 for( const id of _fresh ) {
-                    const s = this._speaks(id, _now - PROBE_MS, FINE_GAP_MS), fine = s.short >= PROBE_COUNT;
+                    const s = this._speaks(r?.[id], _now - PROBE_MS, FINE_GAP_MS), fine = s.short >= PROBE_COUNT;
                     // (the 5-minute statistics valid: the hourly ones too)
                     SENSOR_GAPS.set(id, { fine, hour: fine || ( s.n > 0 && PROBE_MS / s.n < HOUR_GAP_SHORT_MS ) });
+                    PROBE_INFO.set(id, { at: _now, n: s.n, short: s.short, shortest: s.shortest, hours: 1 });
                     if( !SENSOR_GAPS.get(id).hour ) _sparse.push(id);
                 }
-                if( _sparse.length ) return this._askGroup('history', _sparse, _now - PROBE_LONG_MS, _now, { phase: 0 }).then(e2 => {
-                    _told = !e2;
-                    for( const id of _sparse ) SENSOR_GAPS.get(id).hour = e2 ? true : this._speaks(id, _now - PROBE_LONG_MS, HOUR_GAP_MS).short >= PROBE_COUNT;
-                });
+                if( _sparse.length ) return _ask(_sparse, _now - PROBE_LONG_MS).then(r2 => {
+                    for( const id of _sparse ) {
+                        const s = this._speaks(r2?.[id], _now - PROBE_LONG_MS, HOUR_GAP_MS);
+                        SENSOR_GAPS.get(id).hour = s.short >= PROBE_COUNT;
+                        PROBE_INFO.set(id, { ...PROBE_INFO.get(id), long: { n: s.n, short: s.short, shortest: s.shortest } });
+                    }
+                }, () => { _told = false; for( const id of _sparse ) SENSOR_GAPS.get(id).hour = true; });
             }).catch(() => { _told = false; _valid(_fresh); }).finally(() => {
                 _fresh.forEach(id => PROBES.delete(id));
                 if( _told ) this.keepProbes(_fresh.map(id => [id, SENSOR_GAPS.get(id)]));
@@ -792,7 +841,7 @@ export class CardHistory
         // Phase 0: the entities with statistics not probed yet (none needed without the
         // 5-minute ones among the sources) — nothing else asked meanwhile: the phases in their
         // order, the probe one short request
-        if( !probesRead ) { probesRead = true; for( const [id, v] of this.keptProbes() ) if( !SENSOR_GAPS.has(id) ) SENSOR_GAPS.set(id, v); }
+        if( !probesRead ) { probesRead = true; for( const [id, v] of this.keptProbes() ) if( !SENSOR_GAPS.has(id) ) { SENSOR_GAPS.set(id, { fine: v.fine, hour: v.hour }); PROBE_INFO.set(id, { at: v.at, kept: true }); } }
         const _probing = new Set(this._sources().some(x => x.kind === 'fine') ? _statIds.filter(id => !SENSOR_GAPS.has(id)) : []);
         this._probeFine([..._probing]);
         if( _probing.size ) { this.state.loading = this._loading(); return; }
@@ -983,9 +1032,9 @@ export class CardHistory
     // The rows of a source over the window shown (see _exportSource), by entity, as Home
     // Assistant gives them — the history { lu, s(, a) }, the statistics { start, end, state,
     // mean, min, max, sum } —: what the cache has, the days it lacks asked to Home Assistant
-    // (and kept there); with the attributes, or a source the cache doesn't keep, all asked
-    // → a promise of { id: rows }
-    exportRows(source, ids, withAttributes = false)
+    // (and kept there); with the attributes, or a source the cache doesn't keep, all asked;
+    // the history loaded again meanwhile, asked again once (retried) → a promise of { id: rows }
+    exportRows(source, ids, withAttributes = false, retried = false)
     {
         // (an attribute: no statistics, Home Assistant keeps none; 5-minute statistics not valid
         // for an entity — see _exportable —: none of them, they would make up values)
@@ -1003,13 +1052,20 @@ export class CardHistory
         }
         if( !this.cache.length || !_src )
             return ( source === 'history' ? this.historyCall(ids, moment(t0), moment(t1)) : this._askHA(this.statisticsRequest(ids, moment(t0), moment(t1), source)) ).then(_ordered);
-        const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
+        const _gen = this._loadGen;
         // (what each entity lacks over the window asked — see _askSpan —, what's under way waited for)
         const _waits = ( _src.kind === 'history' ? this._histUnits(ids) : ids.map(id => [id]) ).map(u => this._askSpan(_src.kind, _src.kind === 'history' ? u : u[0], t0, t1));
         const _under = () => ids.some(id => ( this._flying?.get(_src.layer + ' ' + id) ?? [] ).some(([a, b]) => a < t1 && b > t0));
         const _wait = () => new Promise(r => { const _k = () => _under() ? setTimeout(_k, 50) : r(); _k(); });
         // (a request of it failing: the export fails — no file of what came)
         return Promise.all(_waits).then(errors => { const e = errors.find(Boolean); if( e ) throw e; }).then(_wait).then(() => {
+            // (the history loaded again meanwhile — the cache emptied, the answers waited for
+            // dropped: asked again, from the cache as it now is; once)
+            if( this._loadGen !== _gen ) {
+                if( retried ) throw new Error('the history was loaded again during the export');
+                return this.exportRows(source, ids, withAttributes, true);
+            }
+            const c0 = this.mapStartTimeToCacheSlot(this.startTime), c1 = this.mapEndTimeToCacheSlot(this.endTime);
             const out = {};
             for( const id of ids ) {
                 let rows = [];
@@ -1185,7 +1241,8 @@ export class CardHistory
     // A request to Home Assistant for entities ids from a to b (ms) — kind 'history', 'fine'
     // (5-minute statistics), 'stats' (those of the period), 'day', 'week' or 'month' —, kept
     // under way until it's answered, or fails (even before it's sent); o: { phase (0 to 2:
-    // see _askMissing; none: an export's), rank (phase 2's block, from the right), background }.
+    // see _askMissing; none: an export's), rank (phase 2's block, from the right), background,
+    // raw (the promise gives { error, result }: the answer itself — the probe's) }.
     // Sent by phase, then by rank, then in the graphs' order — a window no longer shown's
     // after (see ha-requests.js). The answer put in the
     // cache, what's still lacking asked, the graphs drawn again → a promise of its error,
@@ -1207,6 +1264,8 @@ export class CardHistory
         } catch( e ) {
             _p = Promise.reject(e);
         }
+        // (o.raw: { error, result } — Home Assistant's answer itself, whatever the cache made of it)
+        if( o.raw ) return _p.then(r => { this._answered(q, r); return { error: null, result: r }; }, e => { this._answered(q, null, e); return { error: e ?? new Error('request failed'), result: null }; });
         return _p.then(r => { this._answered(q, r); return null; }, e => { this._answered(q, null, e); return e ?? new Error('request failed'); });
     }
 
@@ -1236,8 +1295,10 @@ export class CardHistory
                 // (an entity's history — its state at the start included, see historyRequest —
                 // empty, or beginning well after the start: Home Assistant keeps none before —
                 // the recorder's retention, the entity created later —, never asked there again)
-                if( q.kind === 'history' && !seriesOf(id).attribute ) {
-                    const _from = a.length ? a[0].lu * 1000 : Math.min(q.b1, q.at);
+                // (an attribute: where its entity's history begins — historyCall's entityFirst)
+                const _attr = seriesOf(id).attribute, _lu = _attr ? result?.entityFirst?.[id] : a[0]?.lu;
+                if( q.kind === 'history' && ( !_attr || result?.entityFirst && id in result.entityFirst ) ) {
+                    const _from = _lu != null ? _lu * 1000 : Math.min(q.b1, q.at);
                     if( _from > q.b0 + 60e3 && _from > ( this._histFrom?.get(id) ?? -Infinity ) ) ( this._histFrom ??= new Map() ).set(id, _from);
                 }
                 const _period = periodMs(periodOfKind(q.kind, this.statistics.period));
@@ -1462,8 +1523,12 @@ export class CardHistory
         const _ask = (l, attributes) => l.length
             ? this._askHA({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) }, o)
             : Promise.resolve({});
+        // (an attribute's own rows say nothing of where its entity's history begins — an
+        // attribute may be missing where the entity's state is there —: that told for each
+        // attribute by its entity's first row, its time (s), null for none — see _answered)
         return Promise.all([_ask(_states, false), _ask(_entities, true)])
-            .then(([r, ra]) => ({ ...r, ...attributeHistories(_attrs, ra) }));
+            .then(([r, ra]) => Object.defineProperty({ ...r, ...attributeHistories(_attrs, ra) }, 'entityFirst',
+                { value: Object.fromEntries(_attrs.map(id => [id, ra?.[seriesOf(id).entity]?.[0]?.lu ?? null])) }));
     }
 
     // The request for the long-term statistics of ids from t0 to t1, by period

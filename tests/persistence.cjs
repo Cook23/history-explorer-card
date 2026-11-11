@@ -461,5 +461,22 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The probe judged from its own answer: Home Assistant's settings, changed on another
+    // device, coming while it's under way — the card shown again, its history loaded again,
+    // the cache emptied — change nothing to its verdict ──
+    t = await openCard({ type: 'custom:history-explorer-card', cardName: 'probe-test', defaultTimeRange: '7d', enable_multidevice_persistence: 'all', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true, historyStep: 60, historyDelay: 2000, userDataDelay: 800 }, height: 900 });
+    await t.wait(6000);
+    await t.step('the range changed on another device, Home Assistant\'s settings coming during the probe (the history loaded again): its verdict the same — a value a minute, the 5-minute statistics valid', async () => {
+        const first = await t.E(`el.instance._relevant('sensor.power', 300e3)`);
+        const key = await t.E(`'history-explorer_card_' + el.instance.id`);
+        await t.E(`(async()=>{ const hs=el.instance._hass, v=(await hs.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value;
+            v.timeRangeHours=48; v.timeRangeMinutes=0; await hs.callWS({ type: 'frontend/set_user_data', key: '${key}', value: v }); localStorage.removeItem('history-explorer_probes'); })()`);
+        await t.page.reload(); await t.wait(8000);
+        const r = await t.E(`({ fine: el.instance._relevant('sensor.power', 300e3), range: el.instance.activeRange.timeRangeHours, kept: JSON.parse(localStorage.getItem('history-explorer_probes') ?? '{}')['sensor.power']?.fine })`);
+        return first && r.fine && r.range === 48 && r.kept === true ? true : JSON.stringify({ first, r });
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

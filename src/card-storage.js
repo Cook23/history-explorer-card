@@ -183,11 +183,11 @@ export class CardStorage
     // What the card worked out, kept on this device: its probes' verdicts, its Y axes
     // --------------------------------------------------------------------------------------
 
-    // The probes' verdicts kept, less than PROBES_KEPT_MS old → [[id, { fine, hour }]]
+    // The probes' verdicts kept, less than PROBES_KEPT_MS old → [[id, { fine, hour, at }]]
     keptProbes()
     {
         const _kept = _readLocal(PROBES_KEY) ?? {}, _from = Date.now() - PROBES_KEPT_MS;
-        return Object.entries(_kept).filter(([, v]) => v?.at > _from).map(([id, v]) => [id, { fine: !!v.fine, hour: !!v.hour }]);
+        return Object.entries(_kept).filter(([, v]) => v?.at > _from).map(([id, v]) => [id, { fine: !!v.fine, hour: !!v.hour, at: v.at }]);
     }
 
     // Probes' verdicts (verdicts: [[id, { fine, hour }]]) kept, now — the older ones dropped

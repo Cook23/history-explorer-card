@@ -1636,6 +1636,15 @@ module.exports = async function()
             return { before, same: e.instance === I, oldLet: old.instance === null, points: e.instance.graphs[0].chart.data.datasets[0].data.length }; })()`);
         return !r.before && r.same && r.oldLet && r.points > 10 ? true : JSON.stringify(r);
     });
+    await t.step('back on the page (the card taken back), states changed meanwhile: one refresh — not one for the take-back and another for the states', async () => {
+        const r = await t.E(`(async()=>{ const old = el, host = old.parentNode;
+            const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); e.hass = mkHass();
+            old.remove(); host.appendChild(e); window.el = e; window.hassTargets = [e];
+            const I = e.instance, f = I.refresh; let n = 0; I.refresh = function(){ n++; return f.apply(this, arguments); };
+            setState('sensor.power', 777);
+            await new Promise(r => setTimeout(r, 4000)); I.refresh = f; return n; })()`);
+        return r === 1 ? true : String(r);
+    });
     await t.step('a card of the same YAML made while the first is still on the page: a card of its own — the first one left as it is', async () => {
         const r = await t.E(`(()=>{ const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); document.getElementById('host').appendChild(e); e.hass = mkHass();
             const own = e.instance !== el.instance && !!el.querySelector('canvas'); e.remove(); return { own }; })()`);
@@ -1661,6 +1670,40 @@ module.exports = async function()
             const n0 = __ws.length; el.instance.reloadHistory(); await new Promise(r => setTimeout(r, 3000)); e.remove();
             return __ws.slice(n0).filter(w => w.period === 'hour').length; })()`);
         return r >= 8 ? true : String(r);
+    });
+    done(await t.close());
+
+    // ── An attribute's history past the recorder's retention: never asked there again —
+    // told by its entity's history ──
+    t = await openCard(card({ defaultTimeRange: '7d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'climate.salon', attribute: 'current_temperature', unit: '°C' }] }] }),
+        { mock: { series: true, historyDays: 2 } });
+    await t.wait(4000);
+    await t.step('an attribute, history kept 2 days: where it begins remembered from its entity\'s history — the window moved back (<), nothing of it asked before', async () => {
+        const id = 'climate.salon.current_temperature';
+        const from = await t.E(`el.instance._histFrom?.get('${id}') ?? null`), n0 = await t.E('__ws.length');
+        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        const r = await t.E(`__ws.slice(${n0}).filter(w => w.type === 'history/history_during_period').map(w => Date.parse(w.start))`);
+        const kept = Date.now() - 2 * 86400e3;
+        return from !== null && Math.abs(from - kept) < 3600e3 && r.every(a => a >= from - 1000) ? true : JSON.stringify({ from, kept, r });
+    });
+    done(await t.close());
+
+    // ── The graphs far from the screen: not drawn again, until they come near it ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: Array.from({ length: 8 }, () => ({ type: 'line', entities: [{ entity: 'sensor.power' }] })).map((g, k) => ({ ...g, entities: [{ entity: k % 2 ? 'sensor.rain' : 'sensor.power' }] })) }),
+        { mock: { series: true }, height: 500 });
+    await t.wait(3000);
+    await t.step('8 graphs, a 500 px screen: drawn again, those near it first — the others right after, one at a time when the page is free, without a scroll; never while a gesture moves the window', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, gs = I.graphsInDisplayOrder(), last = gs[gs.length - 1], d = () => gs.map(g => g.chart.data.datasets[0].data), before = d();
+            I.generateGraphDataFromCache(); const after = d();
+            await new Promise(r => setTimeout(r, 1500)); const later = d();
+            // (a gesture going on: the others waited for, drawn once it's over)
+            I.state.drag = true; I.generateGraphDataFromCache(); const g0 = d();
+            await new Promise(r => setTimeout(r, 1000)); const g1 = d();
+            I.state.drag = false; await new Promise(r => setTimeout(r, 1500)); const g2 = d();
+            const n = gs.length - 1;
+            return { first: after[0] !== before[0], lastAtOnce: after[n] !== before[n], lastLater: later[n] !== after[n], scrolled: window.scrollY,
+                     duringGesture: g1[n] !== g0[n], afterGesture: g2[n] !== g1[n], points: last.chart.data.datasets[0].data.length }; })()`);
+        return r.first && !r.lastAtOnce && r.lastLater && r.scrolled === 0 && !r.duringGesture && r.afterGesture && r.points > 10 ? true : JSON.stringify(r);
     });
     done(await t.close());
 
