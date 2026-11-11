@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.69] - 2026-11-11
+
+### Fixed — the card made again by Home Assistant
+- Home Assistant makes the new card and gives it its states before it takes the one it replaces off the page. The card decided then, the one it replaces still shown: it took back none — a second card built beside it, its own cache — or one taken off the page earlier, older. It now decides once it's put on the page, the one it replaces off it by then: it takes that one back, and there's never a second card
+- Loaded again from nothing (the performance test's load), the card took back the cache another card of the same name and YAML had left on the page: its window wasn't asked again. It now starts from nothing
+- Tests (`features`): Home Assistant's order — the one replaced taken back, one card only; another card of the same YAML on the page, then this one loaded again — its window asked again
+
+### Changed — the window moved, in fewer requests
+- A part of phase 1 the same for several entities, larger than 200 periods (a month of hourly statistics…), once the window has moved: in 4 groups of entities — Home Assistant's workers all busy, a request each — instead of a request for each entity (dragged back a year: 20 requests instead of 140). A first load stays a request per entity
+- Tests (`features`): 30 days, 8 entities — a request each at the first load, the month the window moved back in 4 requests of 2
+
+### Changed — a click next to the plot area
+- Under the legend and beside the Y axis' labels, a click, a tap or a hover goes to what's nearest by the one picking rule, a curve or a label — on the same pixel, the smaller target. A value drawn on the plot area's top edge (the axis' top) opened nothing: the legend took the click. The floating icons (the handle, the padlock, the chain, ×) are over everything, as before; a drag keeps its zones (a drop on a Y axis stays one)
+- Tests (`pen`): at 06:20 the value tapped on the top edge — its tooltip, also 3 px above it; 4 px left of the plot area by the curve, the curve; far in the labels' column, the Y axis
+
+### Changed — Tests (beta) ▸ Performance
+- The report begins with what Home Assistant runs on (its version, its installation, its board, memory, disk, and its database: MariaDB, MySQL, SQLite or PostgreSQL, its version and size — MariaDB told from MySQL by its version, Home Assistant naming both alike —; its system health and hardware integration, an administrator's account) and this device (its model, system, processor, memory, graphics, screen)
+- The graphs drawn again: the card's part split — the rows read from the cache, the points worked out, the rest
+- Back on the page: the card taken back timed — its graphs moved, the first frame after it —, and every resize of the card; the measurement armed at once (the report's first lines written meanwhile)
+- Tests (`cards`): the report's first lines and the card's part split (`mock-ha.js`: `system`, Home Assistant telling what it runs on); a return — the card taken back, its first frame
+- Tests (`architecture`): a WebGL context of the card's own, to read the device's graphics, allowed — never a chart's
+
+
 ## [v1.2.68] - 2026-11-11
 
 ### Changed — a load lighter for the page and for Home Assistant

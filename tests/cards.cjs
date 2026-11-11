@@ -52,7 +52,7 @@ module.exports = async function()
     done(await t.close());
 
     // ── The Behavior submenu: separate, merge back, delete — the same as the gestures ──
-    t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900 });
+    t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900, mock: { system: true } });
     const org = `[...el.querySelectorAll('#et_0_behavior_sub a')].filter(a=>a.style.display!=='none').map(a=>a.id.replace('et_0_','')).join(',')`;
     const arrange = async (gi, li, action) => {
         await t.longPress(await t.E(`legendPt(${gi},${li})`));
@@ -176,7 +176,9 @@ module.exports = async function()
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
         const ok = title === 'Performance' && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
-            && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms, Chart\.js \d+ ms — by graph: \d+ ms/.test(out)
+            // (first, what Home Assistant runs on and this device: see mock-ha.js system)
+            && /^Home Assistant [\d.]+: Home Assistant OS on Home Assistant OS 16\.3, aarch64, Raspberry Pi 5, 8\.0 GB memory \(40 % used\), disk 21\.0 \/ 228\.5 GB, database MariaDB 11\.4\.5 \(3412\.50 MiB\)\nThis device: .*\d+ cores.*screen \d+×\d+ px, window \d+×\d+ px, pixel ratio [\d.]+\n/.test(out)
+            && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms \(the rows read from the cache \d+ ms, the points worked out \d+ ms, the rest \d+ ms\), Chart\.js \d+ ms — by graph: \d+ ms/.test(out)
             && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities, \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
             && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out);
@@ -196,7 +198,8 @@ module.exports = async function()
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
         await t.E(`delete document.visibilityState`);
-        const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out) && /card (\d+): off the page[\s\S]*card \1: taken back/.test(out);
+        const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out)
+            && /card (\d+): off the page[\s\S]*card \1: taken back( \(\d+ ms\))?[\s\S]*card \1: first frame after it/.test(out);
         return ok ? true : out;
     });
     done(await t.close());

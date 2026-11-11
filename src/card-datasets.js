@@ -6,6 +6,7 @@ import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, 
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
 import { timeWeightedMean, circularMean } from "./history-stats.js";
+import { perf } from "./card-perf.js";
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -243,6 +244,7 @@ export class CardDatasets
                 const _dataset = g.chart.data.datasets[j];
                 let s = [];
                 let bcol = [];
+                const _tp = performance.now();
 
                 if( result && result.length > id ) {
 
@@ -274,6 +276,8 @@ export class CardDatasets
                 }
 
                 _dataset.data = s;
+                // (timed while the performance test records: the points worked out from the rows)
+                perf.add('points', performance.now() - _tp);
 
                 if( bcol.length > 0 ) {
                     _dataset.backgroundColor = bcol;

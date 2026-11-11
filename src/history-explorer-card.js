@@ -409,6 +409,8 @@ class HistoryExplorerCard extends HTMLElement
 
     connectedCallback()
     {
+        // (made off the page: built now — or the card it replaces, off the page by now, taken back)
+        if( this._pendingHass ) { const h = this._pendingHass; this._pendingHass = null; this.hass = h; }
         perf.add('card', 0, { step: 'on the page', card: this.instance?.cid });
         this.instance?.backOnPage();
         // (back itself: no longer for a card made again)
@@ -426,12 +428,17 @@ class HistoryExplorerCard extends HTMLElement
         if( !x ) return false;
         clearTimeout(x.tid);
         if( l.length > 1 ) PAGE_CARDS.set(key, l.filter(y => y !== x)); else PAGE_CARDS.delete(key);
+        const _t = performance.now();
         this.instance = x.el.instance;
         x.el.instance = null;
         this.replaceChildren(...x.el.childNodes);
         this.instance._this = this;
         this.instance.backOnPage();
-        perf.add('card', 0, { step: 'taken back', card: this.instance.cid });
+        // (timed while the performance test records: its graphs moved here, then shown — the
+        // page's first frame after it)
+        const _cid = this.instance.cid;
+        perf.add('card', performance.now() - _t, { step: 'taken back', card: _cid });
+        if( perf.on ) requestAnimationFrame(() => perf.add('card', performance.now() - _t, { step: 'first frame after it', card: _cid }));
         this._tookBack = true;
         return true;
     }
@@ -439,6 +446,10 @@ class HistoryExplorerCard extends HTMLElement
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
     set hass(hass)
     {
+        // (a card made, not on the page yet — Home Assistant makes the new one before it takes
+        // the one it replaces off the page —: nothing built until it's put on the page, where
+        // it takes the one it replaces back, see connectedCallback)
+        if( this.configSet && !this.instance && !this.isConnected ) { this._pendingHass = hass; return; }
         if( this.configSet ) {
             this.configSet = false;
             this.InitWithConfig(hass);

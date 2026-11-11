@@ -2336,6 +2336,52 @@
       return 'other';
     },
 
+    // The zone of a contact or a hover at a canvas-relative point (a click, a double click,
+    // a long press, the tooltip's): as _hecZoneAt, except next to the plot area — in the
+    // legend's band, in a Y axis' label column — where what's drawn on the plot area (a
+    // curve, a bar, a segment) and the labels there (the legend's, a timeline's rows) are
+    // picked by the one picking rule (_hecPickNearest): the one under the point, else the
+    // nearest one if near enough and clearly nearer than the next; on the same pixel, the
+    // smaller target (what's drawn, before a label); about halfway between them, 'between'
+    // (nothing). → { zone, label: the legend's or row's index picked, -1 for none }. The
+    // floating icons, drawn over everything, keep their zone (_hecTopTargetAt).
+    _hecContactAt: function (x, y) {
+      var me = this, zone = me._hecZoneAt(x, y);
+      var _label = zone === 'legend' ? me._hecLegendIndexAt(x, y) : zone === 'yAxis' ? me._hecYAxisIndexAt(x, y) : -1;
+      if (zone !== 'legend' && zone !== 'yAxis') return { zone: zone, label: _label };
+      // (what's drawn nearest the point: each line's place, each other element's box — only
+      // what's drawn on the plot area: looked for from the point brought onto its edge, the
+      // way there added — never a line's part clipped out, under the labels)
+      var A = me.chartArea;
+      if (!A) return { zone: zone, label: _label };
+      var _ex = Math.max(A.left, Math.min(x, A.right)), _ey = Math.max(A.top, Math.min(y, A.bottom)), _off = Math.sqrt((_ex - x) * (_ex - x) + (_ey - y) * (_ey - y));
+      var _drawn = me._hecCurveCands(_ex, _ey).filter(Boolean);
+      (me.data.datasets || []).forEach(function (ds, i) {
+        var meta = me.getDatasetMeta(i);
+        if (meta.dataset || !me.isDatasetVisible(i)) return;
+        me._hecOnlyDrawnElements(meta.data || []).forEach(function (el) { _drawn.push(_hecBoxNearest(el._view, _ex, _ey)); });
+      });
+      var _near = _drawn.reduce(function (a, c) { return !a || c.d < a.d ? c : a; }, null);
+      if (_near) _near = { d: _near.d + _off, x: _near.x, y: _near.y, size: _near.size };
+      if (!_near) return { zone: zone, label: _label };
+      // (the labels' rectangles there — a row's spans its whole column)
+      var _rects = [];
+      if (zone === 'legend' && me.legend && me.legend.legendHitBoxes)
+        _rects = me.legend.legendHitBoxes.map(function (b) { return { x: b.left, y: b.top, width: b.width, height: b.height }; });
+      else if (zone === 'yAxis' && me.scales && me.scales['y-axis-0'] && me.data.labels && me.chartArea && me._hecYAxisSideAt(x, y) === 'left') {
+        var _ys = me.scales['y-axis-0'], _n = me.data.labels.length;
+        for (var li = 0; li < _n; li++) { var _py = _ys.getPixelForValue(null, li, li); _rects.push({ x: 0, y: _py - _ys.height / _n / 2, width: me.chartArea.left, height: _ys.height / _n }); }
+      }
+      var _lab = _rects.map(function (r) {
+        var cx = Math.max(r.x, Math.min(x, r.x + r.width)), cy = Math.max(r.y, Math.min(y, r.y + r.height));
+        return { d: Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y)), x: cx, y: cy };
+      }).reduce(function (a, c) { return !a || c.d < a.d ? c : a; }, null);
+      var _k = _hecPickNearest([_near, _lab]);
+      if (_k === 0) return { zone: 'plot', label: -1 };
+      if (_k === PICK_BETWEEN) return { zone: 'between', label: -1 };
+      return { zone: zone, label: _label };
+    },
+
     // Where a canvas-relative x is along the time axis: 0 at the plot area's left edge,
     // 1 at its right edge (outside: below 0 or above 1), or undefined before layout
     _hecPlotFactor: function (x) {
@@ -2379,9 +2425,15 @@
     // PICK_BETWEEN about halfway between two. Two curves drawn on top of each other there:
     // the one drawn over (the first). only(i): the curves taken into account, all by default
     _hecCurveAt: function (px, py, only) {
+      return _hecPickNearest(this._hecCurveCands(px, py, only));
+    },
+
+    // Each shown line's place nearest (px, py) along its drawn path — { d, x, y, size: the
+    // line's half width } —, null for a dataset that isn't a shown line (see _hecCurveAt)
+    _hecCurveCands: function (px, py, only) {
       var me = this;
       var _m = _hecPickMargin();
-      var _cands = (me.data.datasets || []).map(function (ds, i) {
+      return (me.data.datasets || []).map(function (ds, i) {
         var meta = me.getDatasetMeta(i);
         if (!meta.dataset || !me.isDatasetVisible(i) || (only && !only(i))) return null;
         var pts = (meta.data || []).filter(function (p) { return p._view && !p._view.skip; })
@@ -2401,7 +2453,6 @@
         }
         return best;
       });
-      return _hecPickNearest(_cands);
     },
 
     // The element at (px, py) a tooltip shows first — a curve's point (a value drawn, never a
@@ -2568,6 +2619,15 @@
         event: native };
       var _hb = this._hecHandleButtonFields(x, y);
       for (var hk in _hb) payload[hk] = _hb[hk];
+      // (a contact next to the plot area: what's drawn there or a label, by the picking rule —
+      // see _hecContactAt —, the label's index only when it's picked)
+      if ((gestureType === 'click' || gestureType === 'dblclick' || gestureType === 'longpress') && (payload.zone === 'legend' || payload.zone === 'yAxis')) {
+        var _c = this._hecContactAt(x, y);
+        if (_c.zone !== payload.zone) {
+          payload.zone = _c.zone === 'between' ? 'other' : _c.zone;
+          payload.legendIndex = -1; payload.legendPart = null; payload.yAxisIndex = -1; payload.labelRect = null;
+        }
+      }
       // (a contact on the plot area: the curve it's on, by the picking rule)
       if (payload.zone === 'plot' && (gestureType === 'click' || gestureType === 'dblclick' || gestureType === 'longpress')) {
         var _ci = this._hecCurveAt(x, y);
@@ -3395,7 +3455,10 @@
       var _at = e.x !== null && e.y !== null;
       me._hecTapped = true;
       if (ho.activateOnContact === true) {
-        if (!_at || me._hecZoneAt(e.x, e.y) !== 'plot') {
+        var _cz = _at ? me._hecContactAt(e.x, e.y).zone : null;
+        // (about halfway between a label and what's drawn: nothing changes)
+        if (_cz === 'between') return;
+        if (!_at || _cz !== 'plot') {
           me._hecEndTooltipMode();
           me.active = [];
           return;
@@ -3447,7 +3510,7 @@
       var me = this;
       var _sel = me._hecTooltipMode ? (me._hecTooltipCurves || []) : [];
       var _mode = function (i) { return me.data.datasets[i].hecTooltip || 'selected'; };
-      var _at = e && e.x !== null && e.y !== null && me._hecZoneAt(e.x, e.y) === 'plot';
+      var _at = e && e.x !== null && e.y !== null && me._hecContactAt(e.x, e.y).zone === 'plot';
       var _first = _at ? me._hecPointAt(e.x, e.y, function (i) { return _mode(i) !== 'selected' || _sel.indexOf(i) >= 0; }) : null;
       if (!_first) return [];
       if (me.options.tooltips && me.options.tooltips.hecFirstOnly) return [_first];

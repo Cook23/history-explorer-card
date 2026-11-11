@@ -480,7 +480,15 @@ and any one to come):
 
 - Its recorder keeps **90 days of history** (and the 5-minute statistics as long): past that,
   the hourly, daily, weekly and monthly statistics only. Simulate with `historyDays: 90`.
-- Home Assistant 2026.11, MariaDB (the recorder's 4 workers).
+- Home Assistant 2026.11, MariaDB (the recorder's 4 workers), on a Raspberry Pi 5 with an
+  SSD; the screen a Samsung tablet (SM-X716B, Android 16, HA Companion).
+- **One** history-explorer-card on its dashboard (view *Historique*, `custom:grid-layout`),
+  never two: `cardName: historycard-51933822`, `refresh.automatic`, `decimation: false`,
+  `combineSameUnits`, `recordedEntitiesOnly`, `showCurrentValues`, `showMinMax`,
+  `statistics: { enabled: true, mode: mean }`, `uiLayout.sticky: top`, `entityOptions`
+  (`sensor.consigne_*` stepped, `sensor.*_daily_precipitation` bars of 10 min,
+  `sensor.sun_azimuth` an arrowline). Two instances in a report are the same card made again
+  by Home Assistant — never ask whether there are two cards.
 - Observed (open): back on the page after the app was in the background (HA Companion, Android),
   the page stays blank for a moment — the whole page in the app, the card's graphs only in
   Chrome (Home Assistant's frame and the card's title shown) —, then appears all at once; the

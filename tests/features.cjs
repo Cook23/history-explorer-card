@@ -1627,10 +1627,40 @@ module.exports = async function()
             return { same: e.instance === I, oldLet: old.instance === null, canvas: e.querySelector('canvas') === canvas, points: e.instance.graphs[0].chart.data.datasets[0].data.length }; })()`);
         return r.same && r.oldLet && r.canvas && r.points > 10 ? true : JSON.stringify(r);
     });
+    await t.step('Home Assistant\'s order — the new card made and given its states before the one it replaces is taken off the page, then put on the page —: the one it replaces taken back, never another one; one card only', async () => {
+        const r = await t.E(`(()=>{ const old = el, I = old.instance, host = old.parentNode;
+            const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); e.hass = mkHass();
+            const before = !!e.instance;
+            old.remove(); host.appendChild(e);
+            window.el = e; window.hassTargets = [e];
+            return { before, same: e.instance === I, oldLet: old.instance === null, points: e.instance.graphs[0].chart.data.datasets[0].data.length }; })()`);
+        return !r.before && r.same && r.oldLet && r.points > 10 ? true : JSON.stringify(r);
+    });
     await t.step('a card of the same YAML made while the first is still on the page: a card of its own — the first one left as it is', async () => {
         const r = await t.E(`(()=>{ const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); document.getElementById('host').appendChild(e); e.hass = mkHass();
             const own = e.instance !== el.instance && !!el.querySelector('canvas'); e.remove(); return { own }; })()`);
         return r.own ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── Loaded again from nothing: never from another card's cache; the window moved: its
+    // large parts in Home Assistant's workers' groups ──
+    t = await openCard(card({ defaultTimeRange: '30d', statistics: { enabled: true }, graphs: [{ type: 'line', entities: Array.from({ length: 8 }, (_, k) => ({ entity: 'sensor.s' + ( k + 1 ) })) }] }),
+        { mock: { series: true, clones: 8 } });
+    await t.wait(5000);
+    await t.step('30 days, 8 entities: the first load, a request of hourly statistics for each entity; the window moved back (<), its month — the same for all — in 4 requests of 2 entities (Home Assistant\'s 4 workers)', async () => {
+        const first = await t.E(`__ws.filter(w => w.period === 'hour' && ( Date.parse(w.end) - Date.parse(w.start) ) > 200 * 3600e3).map(w => w.ids.length)`);
+        const n0 = await t.E('__ws.length');
+        await t.E(`el.querySelector('#b1_0').click()`); await t.wait(3000);
+        const moved = await t.E(`__ws.slice(${n0}).filter(w => w.period === 'hour' && ( Date.parse(w.end) - Date.parse(w.start) ) > 200 * 3600e3).map(w => w.ids.length)`);
+        return first.length >= 8 && first.every(n => n === 1) && moved.length >= 4 && moved.every(n => n === 2) ? true : JSON.stringify({ first, moved });
+    });
+    await t.step('another card of the same YAML on the page, then this one loaded again from nothing: its window asked again — never the other card\'s cache taken', async () => {
+        const r = await t.E(`(async()=>{ const e = document.createElement('history-explorer-card'); e.setConfig(window.CFG); document.getElementById('host').appendChild(e); e.hass = mkHass();
+            await new Promise(r => setTimeout(r, 3000));
+            const n0 = __ws.length; el.instance.reloadHistory(); await new Promise(r => setTimeout(r, 3000)); e.remove();
+            return __ws.slice(n0).filter(w => w.period === 'hour').length; })()`);
+        return r >= 8 ? true : String(r);
     });
     done(await t.close());
 

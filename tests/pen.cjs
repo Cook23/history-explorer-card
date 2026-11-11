@@ -273,5 +273,37 @@ module.exports = async function()
         await closeMenu();
         return n === 1 && open ? true : JSON.stringify({ n, open });
     });
-    return t.close();
+    const r1 = await t.close();
+
+    // ── Next to the plot area — the legend's band, the Y axis' labels —: a curve and a label
+    // picked by the one picking rule (the smaller target on the same pixel). At 06:20 the
+    // power's value tapped is the axis' top: drawn on the plot area's top edge, the legend's
+    // band's last row ──
+    const t2 = await openCard({ ...CFG, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] },
+        { height: 1300, mock: { series: true }, clock: '2026-11-11T06:20:00Z' });
+    await t2.wait(2500);
+    const E2 = x => t2.E(x);
+    const _rel = p => E2(`(()=>{ const c=graphAt(0).chart, r=c.canvas.getBoundingClientRect(); return { x: ${p.x} - r.left, y: ${p.y} - r.top, top: c.chartArea.top }; })()`);
+    const _close = async p => { await t2.pen('pointerout', p, 0); await t2.pen('pointerleave', p, 0); await t2.wait(1300); };
+    await t2.step('a value drawn on the plot area\'s top edge (the legend\'s band\'s last row): a tap on it opens its tooltip', async () => {
+        const p = await E2('pointPt(0,0.3)'), r = await _rel(p);
+        await t2.penTap(p); await t2.wait(400);
+        const tip = await E2(TIP(0));
+        await _close(p);
+        return r.y === r.top && tip ? true : JSON.stringify({ r, tip });
+    });
+    await t2.step('a tap 3 px above it, in the legend\'s band, no label nearer: its tooltip too', async () => {
+        const p = await E2('pointPt(0,0.3)');
+        await t2.penTap({ x: p.x, y: p.y - 3 }); await t2.wait(400);
+        const tip = await E2(TIP(0));
+        await _close(p);
+        return tip ? true : String(tip);
+    });
+    await t2.step('beside the Y axis: a contact 4 px left of the plot area, by the curve, is on the curve; far in the labels\' column, the Y axis', async () => {
+        const r = await E2(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, p=c.getDatasetMeta(0).data.find(p=>!p._view.skip && p._view.x>=A.left)._view;
+            return { near: c._hecContactAt(A.left - 4, p.y).zone, far: c._hecContactAt(3, A.top + ( A.bottom - A.top ) / 2).zone }; })()`);
+        return r.near === 'plot' && r.far === 'yAxis' ? true : JSON.stringify(r);
+    });
+    const r2 = await t2.close();
+    return { passed: r1.passed + r2.passed, failed: r1.failed + r2.failed };
 };

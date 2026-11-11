@@ -42,8 +42,9 @@ const periodOfKind = (kind, period) => ( { fine: FINE_PERIOD, day: DAY_PERIOD, w
 const COARSE_POINTS = 100;
 // (the phase of phase 1's parts wholly outside the window shown: sent after phase 2's)
 const PHASE_SIDES = 3;
-// The most rows (periods of its source) a part of phase 1 asked for several entities together
-// may hold — larger, a request for each entity (see _askMissing)
+// The most rows (periods of its source) a part of phase 1 asked for several entities in a single
+// request may hold — larger, in HA_WORKERS groups once the window has moved, a request for each
+// entity at a first load (see _askMissing)
 const GROUP_MAX_ROWS = 200;
 // (the answers drawn: no sooner than this after the last drawing — see _drawSoon)
 const DRAW_GAP_MIN_MS = 100;
@@ -395,10 +396,13 @@ export class CardHistory
             const result = [];
             // (each from the layers its ladder allows: see _drawLayers — a graph not drawn
             // again: nothing worked out, its place kept)
+            const _tc = performance.now();
             const _layers = this._drawLayers(this._statisticsIds());
             for( const g of this.graphs ) for( const e of g.entities ) result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, c0, c1, _layers.get(e.entity)) : null);
             const colorHistory = {};
             for( const id of this.colorEntityIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1, _layers.get(id));
+            // (timed while the performance test records: the rows read from the cache)
+            perf.add('from cache', performance.now() - _tc);
             this.buildChartData(result, colorHistory, _graphs);
         } else
             this.buildChartData(null);
@@ -801,28 +805,35 @@ export class CardHistory
         // Phase 1: the coarse source over the window and a width on each side — where it isn't
         // compiled yet, the finer ones of its family. A part it lacks wholly outside the window
         // (a side, the window moved): after phase 2 (PHASE_SIDES) — the window shown first
-        // A short part (GROUP_MAX_ROWS rows at most: a day, a side, the hours since the last
-        // compiling) the same for several entities: a single request for them all — a large
-        // one, a request for each entity
-        const _short = new Map(), _part = (kind, A, B, id, phase) => {
-            const [a, b] = this._span(kind, A, B);
-            if( ( b - a ) / periodMs(periodOfKind(kind, this.statistics.period)) > GROUP_MAX_ROWS ) return void this._ask(kind, a, b, [id], { phase });
-            const k = [kind, a, b, phase].join(' ');
-            if( !_short.has(k) ) _short.set(k, { kind, a, b, phase, ids: [] });
-            _short.get(k).ids.push(id);
+        // A part the same for several entities: a short one (GROUP_MAX_ROWS rows at most: a day,
+        // a side, the hours since the last compiling), a single request for them all; a large
+        // one, the window moved (the entity has some of it already), in HA_WORKERS groups —
+        // every worker busy, a request each (_requestGroups); a large one of a first load, a
+        // request for each entity
+        const _short = new Map(), _large = new Map(), _part = (kind, A, B, id, phase, first) => {
+            const [a, b] = this._span(kind, A, B), k = [kind, a, b, phase].join(' ');
+            const _big = ( b - a ) / periodMs(periodOfKind(kind, this.statistics.period)) > GROUP_MAX_ROWS;
+            if( _big && first ) return void this._ask(kind, a, b, [id], { phase });
+            const m = _big ? _large : _short;
+            if( !m.has(k) ) m.set(k, { kind, a, b, phase, ids: [] });
+            m.get(k).ids.push(id);
         };
         for( const { u, fam, p1 } of plans.values() ) {
             if( !p1 ) continue;
-            for( const [a, b] of this._lacking(LAYER[p1.kind], u[0], t0 - _side, t1 + _side) )
-                _part(p1.kind, a, b, u[0], this._inWindow(a, b) ? 1 : PHASE_SIDES);
+            const _lack = this._lacking(LAYER[p1.kind], u[0], t0 - _side, t1 + _side);
+            // (a first load: nothing of it there, nor asked)
+            const _first = _lack.length === 1 && _lack[0][0] <= Math.max(t0 - _side, this.cache[0].a) && _lack[0][1] >= Math.min(t1 + _side, _now);
+            for( const [a, b] of _lack )
+                _part(p1.kind, a, b, u[0], this._inWindow(a, b) ? 1 : PHASE_SIDES, _first);
             for( let k = fam.indexOf(p1); k > 0; k-- ) {
                 const _from = _now - fam[k].ms - STATS_LAG;
                 if( _from >= t1 + _side ) break;
                 for( const [a, b] of this._lacking(LAYER[fam[k - 1].kind], u[0], Math.max(_from, t0 - _side), t1 + _side) )
-                    _part(fam[k - 1].kind, a, b, u[0], 1);
+                    _part(fam[k - 1].kind, a, b, u[0], 1, _first);
             }
         }
         for( const x of _short.values() ) this._ask(x.kind, x.a, x.b, x.ids, { phase: x.phase });
+        for( const x of _large.values() ) for( const ids of this._requestGroups(x.ids.map(id => [id])) ) this._ask(x.kind, x.a, x.b, ids, { phase: x.phase });
 
         // Phase 2: the fine source over the window, in blocks from the right — block by block,
         // the entities of a source in groups (_requestGroups), a request each. Where it comes
@@ -1379,8 +1390,8 @@ export class CardHistory
         }
     }
 
-    // The history loaded again, now, whatever is loading: a load in progress is superseded —
-    // its answer, when it comes, ignored (_loadGen)
+    // The history loaded again from nothing, now, whatever is loading: a load in progress is
+    // superseded — its answer, when it comes, ignored (_loadGen)
     reloadHistory()
     {
         this._loadGen = ( this._loadGen ?? 0 ) + 1;
@@ -1389,6 +1400,9 @@ export class CardHistory
         this._histFrom = new Map();
         this.state.loading = false;
         this.cache.length = 0;
+        // (from nothing: the page's cache of this card is this one, emptied — never one another
+        // card of the same name and YAML put there, see initCache)
+        if( this.pageKey ) { clearTimeout(PAGE_CACHES.get(this.pageKey)?.tid); PAGE_CACHES.set(this.pageKey, { cache: this.cache }); }
         this.updateHistory();
     }
 
