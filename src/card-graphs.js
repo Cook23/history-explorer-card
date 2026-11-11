@@ -248,6 +248,9 @@ export class CardGraphs
         // `before` (insertBefore semantics) for whatever gets rebuilt in its place.
         this.graphDiv(g).remove();
         this.graphs.splice(this.graphs.indexOf(g), 1);
+        // (no longer watched — see _watchShown)
+        this._shownObserver?.unobserve(g.canvas);
+        this._offscreen?.delete(g); this._staleGraphs?.delete(g);
     }
 
     // Removes g.entities[idx] and detaches g. If any entities remain, rebuilds g's

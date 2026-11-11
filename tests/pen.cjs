@@ -175,12 +175,17 @@ module.exports = async function()
     });
     await t.step('a graph: an entry with no move (the page scrolled under a pointer gone): no hover dot, no hover; a move: its dot', async () => {
         const p = await E(`pointPt(${gi},0.5)`);
+        // (a record, shown only if it fails: each move the chart processed — where (canvas px),
+        // the curve picked there, the dot after it —, the point aimed at, the time)
+        await E(`(()=>{ const c=graphAt(${gi}).chart, f=c._hecUpdateHoverDot, r=c.canvas.getBoundingClientRect(); window.__dotLog=[]; window.__dotAim=[${p.x}-r.left, ${p.y}-r.top];
+            c._hecUpdateHoverDot=function(e){ const x=f.apply(this, arguments); __dotLog.push(e ? [Math.round(e.x), Math.round(e.y), this._hecCurveAt(e.x, e.y), !!this._hecHoverDot, Math.round(performance.now())] : ['none', Math.round(performance.now())]); return x; }; })()`);
         const st = () => E(`(()=>{ const c=graphAt(${gi}).chart; return { dot: !!c._hecHoverDot, over: !!c._hecPointerOver }; })()`);
         await t.pen('pointerover', p, 0, -1, 'mouse', 1); await t.pen('pointerenter', p, 0, -1, 'mouse', 1); await t.wait(300);
         const entered = await st();
         await t.penHover({ x: p.x - 20, y: p.y }, p, 4); await t.wait(200); const moved = await st();
+        const record = await E(`(()=>{ const c=graphAt(${gi}).chart; delete c._hecUpdateHoverDot; return { aim: __dotAim.map(Math.round), moves: __dotLog, at: Math.round(performance.now()), clock: new Date().toISOString() }; })()`);
         await t.pen('pointerout', p, 0, -1, 'mouse', 1); await t.pen('pointerleave', p, 0, -1, 'mouse', 1); await t.wait(300);
-        return !entered.dot && !entered.over && moved.dot && moved.over ? true : JSON.stringify({ entered, moved });
+        return !entered.dot && !entered.over && moved.dot && moved.over ? true : JSON.stringify({ entered, moved, record });
     });
     await t.step('the entity selector: an entry the list brings under a pointer with no move previews nothing; a move over it: its preview, once', async () => {
         await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('power'); await t.wait(500);

@@ -177,7 +177,7 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.wait(200);
         const ok = title === 'Performance' && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
             // (first, what Home Assistant runs on and this device: see mock-ha.js system)
-            && /^Home Assistant [\d.]+: Home Assistant OS on Home Assistant OS 16\.3, aarch64, Raspberry Pi 5, 8\.0 GB memory \(40 % used\), disk 21\.0 \/ 228\.5 GB, database MariaDB 11\.4\.5 \(3412\.50 MiB\)\nThis device: .*\d+ cores.*screen \d+×\d+ px, window \d+×\d+ px, pixel ratio [\d.]+\n/.test(out)
+            && /^Home Assistant [\d.]+: Home Assistant OS on Home Assistant OS 16\.3, aarch64, Raspberry Pi 5, 8\.0 GB memory \(40 % used\), disk 21\.0 GB \/ 228\.5 GB, database MariaDB 11\.4\.5 \(3412\.50 MiB\)\nThis device: .*\d+ cores.*screen \d+×\d+ px, window \d+×\d+ px, pixel ratio [\d.]+\nBrowser: Chrome \d+\n/.test(out)
             && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms \(the rows read from the cache \d+ ms, the points worked out \d+ ms, the rest \d+ ms\), Chart\.js \d+ ms — by graph: \d+ ms/.test(out)
             && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities, \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
@@ -201,6 +201,23 @@ module.exports = async function()
         const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out)
             && /card (\d+): off the page[\s\S]*card \1: taken back( \(\d+ ms\))?[\s\S]*card \1: first frame after it/.test(out);
         return ok ? true : out;
+    });
+    done(await t.close());
+
+    // ── Tests ▸ Performance with statistics: each probe's verdict told with what it found ──
+    t = await openCard({ ...card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }]), defaultTimeRange: '7d', statistics: { enabled: true } },
+        { height: 900, mock: { series: true, historyStep: 60 } });
+    await t.wait(4000);
+    await t.step('Tests ▸ Performance: each probe\'s verdict with what it found — when, its last hour\'s values, its intervals under 4 min, the shortest', async () => {
+        await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
+        await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
+        await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
+        await t.E(`${dlg}.shadowRoot.getElementById('start').click()`);
+        for( let k = 0; k < 20 && !/Statistics valid/.test(await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`)); k++ ) await t.wait(500);
+        const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
+        await t.page.keyboard.press('Escape'); await t.wait(200);
+        const ok = /  sensor\.power: 5 min valid, hourly valid \(probed at \d\d:\d\d: last hour \d+ values, 5\+ intervals under 4 min, the shortest 60 s\)/.test(out);
+        return ok ? true : out.split('\n').filter(l => /sensor\./.test(l)).join(' | ');
     });
     done(await t.close());
 

@@ -4,6 +4,31 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.70] - 2026-11-11
+
+### Fixed — the statistics probe
+- The probe judged the entities from the cache, once its request was answered, as if its answer were there. Home Assistant's settings of the card changed on another device (another range, other entities) and coming while it was under way, the card was shown again and its history loaded again: the cache emptied, the probe's answer dropped. Every entity then had no value in its last hour: the 5-minute statistics not valid for all — kept a day on the device, the history drawn instead (on 30 days: 265 000 values instead of 50 000, the page frozen twice as long). The probe now judges from Home Assistant's answer itself
+- The CSV export, the history loaded again while it waited for what it lacked, read the cache emptied: it now asks again, from the cache as it then is
+- Tests (`persistence`): the range changed on another device, Home Assistant's settings coming during the probe — its verdict the same
+
+### Fixed — the automatic Y axis too wide
+- The axis was rounded again from bounds already rounded, each time with a larger step: temperatures from -3 to 40.4 (a side's value) made -20 to 60 instead of -10 to 50, a power from 0 to 3 200 -1 000 to 4 000. The axis is now the tightest round one holding the values (its step 1, 2 or 5 × 10ⁿ, within the ticks the graph's height allows), given to Chart.js with its step — drawn as is
+- Tests (`yscale`): -10 to 40 grown for 40.4 — -10 to 50; a year from -3 to 37.6, 42.4 in the zone on its right — -10 to 50; small values without float leftovers
+
+### Changed — the window, the screen
+- When an answer comes, the window moves or the real time goes on, the graphs on the screen (and a screen's height around) are drawn first, the others right after, one at a time when the page is free — after a gesture that moves the window, never during it: a drag no longer draws the 24 graphs at each move
+- An attribute's history past the recorder's retention is no longer asked: where it begins is told by its entity's history
+- Back on the page, the card taken back and the states changed meanwhile: one refresh instead of two
+- Tests (`features`): 8 graphs on a 500 px screen — those near it drawn first, the last one right after without a scroll, never during a gesture; an attribute, history kept 2 days — nothing asked before; back on the page with a state changed — one refresh
+
+### Changed — Tests (beta) ▸ Performance
+- The browser in the report's first lines: the Home Assistant app (its version, the web view it runs in), Firefox, Edge, Opera, Samsung Internet, Chrome or Safari, and its version
+- Each statistics probe's verdict told with what it found: when, its last hour's values, its intervals under 4 minutes, the shortest (and its last 24 hours, when asked) — or kept on this device since when
+- The disk's sizes with Home Assistant's own unit (no "GB GB"); the memory waited for longer (Home Assistant sends it every few seconds)
+- Tests (`cards`): the browser's line, the probe's findings
+- Tests (`pen`): "an entry with no move" failing now and then in the full suite (never alone, before this version too): a record of the moves the graph processed shown when it fails
+
+
 ## [v1.2.69] - 2026-11-11
 
 ### Fixed — the card made again by Home Assistant

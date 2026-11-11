@@ -42,6 +42,26 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
 
+    // ── The round axis: the tightest one for the values (card-yscale.js niceAxis), its step
+    // given to Chart.js — never its bounds rounded again into a wider axis ──
+    {
+        const { niceAxis, chooseYAxis } = await import('../src/card-yscale.js');
+        const step = (name, ok) => { if( ok === true ) { passed++; console.log('  ✓ ' + name); } else { failed++; console.log('  ✗ ' + name + '  -> ' + ok); } };
+        const _a = a => `${a.min}..${a.max} step ${a.step}`;
+        // (7 ticks: the temperatures of a year -3 to 37.6, a side's 42.4 within the zone)
+        const r = [7, 8, 9, 11].map(m => _a(niceAxis(-10, 40.4, m)));
+        step('the axis -10 to 40 grown for 40.4: -10 to 50 (step 10) with 7 to 11 ticks — never -20 to 60', r.every(x => x === '-10..50 step 10') ? true : r.join(' | '));
+        const t = [5, 7, 9].map(m => niceAxis(-2, 42, m)), tight = t.every((a, k) => ( a.max - a.min ) / a.step <= [5, 7, 9][k] - 1 && a.min <= -2 && a.max >= 42 && a.min > -2 - a.step && a.max < 42 + a.step);
+        step('-2 to 42: the bounds the steps nearest the values, within the ticks allowed', tight ? true : t.map(_a).join(' | '));
+        const f = niceAxis(0.02, 0.031, 7);
+        step('small values: bounds without float leftovers (0.02, not 0.020000000000000004)', String(f.min) === '0.02' && String(f.max) === '0.032' ? true : _a(f));
+        // (the user's pan: the year's values, the side's 42.4 weighted 0.58 at 5.8 months)
+        const Y = 365 * 864e5, t0 = 0, t1 = Y, side = t1 + 5.8 / 12 * Y;
+        const rangeOf = (a, b) => { const v = []; if( a < t1 && b > t0 ) v.push(-3, 37.6); if( a <= side && side < b ) v.push(42.4); return v.length ? { lo: Math.min(...v), hi: Math.max(...v) } : null; };
+        const ax = chooseYAxis({ min: -10, max: 40, step: 10, t0, t1 }, rangeOf, t0, t1, { maxTicks: 7 });
+        step('the year shown -3 to 37.6, 42.4 in the zone on its right: the axis -10 to 50', ax.min === -10 && ax.max === 50 ? true : _a(ax));
+    }
+
     let t = await openCard(card('3h'), { height: 900, mock: { series: true, fail: FAIL }, init: AXIS });
     await t.wait(1500);
     await t.step('a spike six hours ago, outside the 3 h window: the axis follows what is shown, which fills at least half its height', async () => {

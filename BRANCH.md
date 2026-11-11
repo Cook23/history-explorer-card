@@ -26,14 +26,17 @@ A change that would break this is redesigned, not merged.
 What the window shown needs is asked to Home Assistant in phases (`card-history.js`), through
 the page's regulator (`ha-requests.js`). Each answer is drawn as soon as it comes — only the
 graphs of the entities it brought something to; answers coming close together (within twice
-what a drawing takes, 100 ms at least) drawn once. What the cache already has is used, unless
+what a drawing takes, 100 ms at least) drawn once; the graphs on the screen (and a screen's height
+around) first, the others right after, one at a time when the page is free — after a gesture,
+never during it. What the cache already has is used, unless
 phase 0 makes it invalid. The history is never asked before where Home Assistant was seen to
 keep none for an entity (an answer empty, or beginning well after its start: the recorder's
-retention, the entity created later).
+retention, the entity created later) — an attribute, told by its entity's history.
 
 - **Phase 0 — probes,** once a session per entity with statistics, all of them in one request,
   nothing else asked meanwhile:
-  - their history's last hour asked (short: a sensor flooding its history — 1000 values an
+  - their history's last hour asked — the verdict from Home Assistant's answer itself, never from
+    the cache (a load started again meanwhile empties it) (short: a sensor flooding its history — 1000 values an
     hour — costs little): the 5-minute statistics valid — the hourly ones too — once 5
     intervals there are each under 4 min (counting stops there: no sort, no list); the
     hourly ones valid when the mean gap (1 h divided by the count; no value: infinite) is

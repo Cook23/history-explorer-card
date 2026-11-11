@@ -13,8 +13,8 @@
 //    else, while a gesture moves the window, it narrows one step at a time (a round axis
 //    about half as high), a step at most each RELEASE window the window's edges travelled;
 //    at rest, at once to the tightest axis holding the envelope.
-// 4. Its steps: Chart.js' round axes (1, 2, 5 × 10ⁿ ticks): a change of scale is a jump
-//    that shows, never a slide.
+// 4. Its steps: round axes (1, 2, 5 × 10ⁿ ticks), the tightest holding the envelope (niceAxis):
+//    a change of scale is a jump that shows, never a slide.
 // steady, from 0 to 1: 0, the axis follows what is shown, at every frame; 1, the axis only
 // grows, its zone 2 windows on each side; STEADY by default, a zone of a window on each side,
 // the envelope filling at least half the height.
@@ -41,18 +41,21 @@ function niceNum(range, round)
     return n * Math.pow(10, e);
 }
 
-// The axis Chart.js draws for the bounds lo, hi with at most maxTicks ticks: its bounds on
-// its ticks (Ticks.generators.linear), taken again until they no longer move — the axis
-// given back to Chart.js is drawn as is
+// The axis for the values lo to hi with at most maxTicks ticks: the tightest round one — the
+// smallest round step (1, 2, 5 × 10ⁿ) its bounds on that step around them take no more than
+// maxTicks ticks with — → { min, max, step }, given to Chart.js with its step (ticks.stepSize,
+// see card-charts.js _autoYAxis): drawn as is. Never Chart.js' own rule (the span rounded up
+// first — 51 made 100 —, then its step: -10 to 41 made -20 to 60), nor a step worked out again
+// from bounds so widened
 export function niceAxis(lo, hi, maxTicks, fixedStep)
 {
-    for( let i = 0; i < 4; i++ ) {
-        const step = fixedStep ?? niceNum(niceNum(hi - lo, false) / ( maxTicks - 1 ), true);
-        const a = Math.floor(lo / step + 1e-9) * step, b = Math.ceil(hi / step - 1e-9) * step;
-        if( Math.abs(a - lo) < step * 1e-6 && Math.abs(b - hi) < step * 1e-6 ) return { min: a, max: b };
-        lo = a; hi = b;
+    const _r = x => +x.toPrecision(12), _on = s => ({ min: _r(Math.floor(lo / s + 1e-9) * s), max: _r(Math.ceil(hi / s - 1e-9) * s), step: _r(s) });
+    if( fixedStep ) return _on(fixedStep);
+    const span = Math.max(hi - lo, Math.abs(hi) * 1e-9, 1e-12), n = Math.max(1, maxTicks - 1);
+    for( let e = Math.floor(Math.log10(span / n)) - 1; ; e++ ) for( const f of [1, 2, 5] ) {
+        const a = _on(f * Math.pow(10, e));
+        if( Math.round(( a.max - a.min ) / a.step) <= n ) return a;
     }
-    return { min: lo, max: hi };
 }
 
 // The values' range as the axis must show it: at least minSpan high (yrange), else, a
@@ -102,7 +105,7 @@ function stepDown(h)
 }
 
 // The axis for the window [t0, t1] (prev: the one drawn — its bounds, and the window it was
-// chosen for —; moving: a gesture going on), see above: { min, max, t0, t1 }. step: the axis'
+// chosen for —; moving: a gesture going on), see above: { min, max, step, t0, t1 }. step: the axis'
 // own tick step (ystepSize, a state_map's 1), else Chart.js'; zero: an axis never taken
 // across 0 by a widening (false: a logarithmic axis, its values in decades)
 export function chooseYAxis(prev, rangeOf, t0, t1, { maxTicks = 9, minSpan, steady = STEADY, moving = false, step, zero = true } = {})
@@ -110,7 +113,7 @@ export function chooseYAxis(prev, rangeOf, t0, t1, { maxTicks = 9, minSpan, stea
     const view = rangeOf(t0, t1);
     if( !view ) return prev ?? null;
     const r = t1 - t0, env = shownRange(envelope(rangeOf, t0, t1, view, ZONE * steady * r), minSpan, zero);
-    const _at = a => ({ min: a.min, max: a.max, t0, t1 }), fit = _at(niceAxis(env.lo, env.hi, maxTicks, step));
+    const _at = a => ({ min: a.min, max: a.max, step: a.step, t0, t1 }), fit = _at(niceAxis(env.lo, env.hi, maxTicks, step));
     // (steady 0: what is shown, at every frame)
     if( !prev || steady <= 0 ) return fit;
     // (attack: grown at once, on the side it lacks — at rest, the tightest where what it would
