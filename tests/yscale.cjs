@@ -31,7 +31,7 @@ const AXIS = `window.axis = () => {
     const I = el.instance, c = I.graphs[0].chart, sc = c.scales['y-axis-0'];
     const t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
     const v = c.data.datasets[0].data.filter(p => p.y !== null && p.x >= t0 && p.x <= t1).map(p => p.y);
-    return { min: sc.min, max: sc.max, lo: Math.min(...v), hi: Math.max(...v) };
+    return { min: sc.min, max: sc.max, step: sc._hecStep, lo: Math.min(...v), hi: Math.max(...v) };
 };`;
 // (a value every 5 minutes over the last two days, v(t); a spike of 10843 six hours ago)
 const SPIKE = `(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, Math.abs(t - ( now - 6 * 3600e3 )) < 600e3 ? 10843 : 26.8 + ( Math.floor(t / 300e3) % 7 ) * 932)); return r; }`;
@@ -42,24 +42,213 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
 
-    // ── The round axis: the tightest one for the values (card-yscale.js niceAxis), its step
-    // given to Chart.js — never its bounds rounded again into a wider axis ──
+    // ── The bounds the card gives: values, never rounded — the ticks (round bounds, their step)
+    // are Chart.js' (card-yscale.js chooseYAxis, card-charts.js _autoYAxis) ──
     {
-        const { niceAxis, chooseYAxis } = await import('../src/card-yscale.js');
+        const { chooseYAxis } = await import('../src/card-yscale.js');
         const step = (name, ok) => { if( ok === true ) { passed++; console.log('  ✓ ' + name); } else { failed++; console.log('  ✗ ' + name + '  -> ' + ok); } };
-        const _a = a => `${a.min}..${a.max} step ${a.step}`;
-        // (7 ticks: the temperatures of a year -3 to 37.6, a side's 42.4 within the zone)
-        const r = [7, 8, 9, 11].map(m => _a(niceAxis(-10, 40.4, m)));
-        step('the axis -10 to 40 grown for 40.4: -10 to 50 (step 10) with 7 to 11 ticks — never -20 to 60', r.every(x => x === '-10..50 step 10') ? true : r.join(' | '));
-        const t = [5, 7, 9].map(m => niceAxis(-2, 42, m)), tight = t.every((a, k) => ( a.max - a.min ) / a.step <= [5, 7, 9][k] - 1 && a.min <= -2 && a.max >= 42 && a.min > -2 - a.step && a.max < 42 + a.step);
-        step('-2 to 42: the bounds the steps nearest the values, within the ticks allowed', tight ? true : t.map(_a).join(' | '));
-        const f = niceAxis(0.02, 0.031, 7);
-        step('small values: bounds without float leftovers (0.02, not 0.020000000000000004)', String(f.min) === '0.02' && String(f.max) === '0.032' ? true : _a(f));
-        // (the user's pan: the year's values, the side's 42.4 weighted 0.58 at 5.8 months)
+        const _a = a => `${a.min}..${a.max}`;
+        // (a year -3 to 37.6, a value of 42.4 at 5.8 months after its end, in the zone on its right)
         const Y = 365 * 864e5, t0 = 0, t1 = Y, side = t1 + 5.8 / 12 * Y;
         const rangeOf = (a, b) => { const v = []; if( a < t1 && b > t0 ) v.push(-3, 37.6); if( a <= side && side < b ) v.push(42.4); return v.length ? { lo: Math.min(...v), hi: Math.max(...v) } : null; };
-        const ax = chooseYAxis({ min: -10, max: 40, step: 10, t0, t1 }, rangeOf, t0, t1, { maxTicks: 7 });
-        step('the year shown -3 to 37.6, 42.4 in the zone on its right: the axis -10 to 50', ax.min === -10 && ax.max === 50 ? true : _a(ax));
+        const f = chooseYAxis(null, rangeOf, t0, t1, { steady: 0 });
+        step('steady 0: the bounds are the values shown, as they are (-3 to 37.6), never rounded', f.min === -3 && f.max === 37.6 ? true : _a(f));
+        const g = chooseYAxis({ min: -3, max: 37.6, t0, t1 }, rangeOf, t0, t1);
+        step('the year -3 to 37.6, 42.4 in the zone on its right: the bounds grown towards it, by its weight — values, not a round axis', g.min === -3 && g.max > 37.6 && g.max < 42.4 && !Number.isInteger(g.max) ? true : _a(g));
+    }
+
+    // ── Chart.js' ticks of an axis given neither a step nor a bound (deps/chart-hec.js
+    // Chart.hecNiceTicks): the tightest round axis holding the values, within the ticks its
+    // height allows — whatever the values ──
+    {
+        let t = await openCard(card('3h'), { height: 900, mock: { series: true, fail: FAIL } });
+        await t.step('any values — every size from 1e-12 to 1e15 and 1e±300, either sign, equal, a span a billionth of them — and 2 to 11 ticks: ticks of one step of 1, 2, 5 × 10ⁿ, its exact multiples, holding the values, within a step of them, as many as allowed (3 across 0), the next step down needing more', async () => {
+            const r = await t.E(`(()=>{
+                const T = window.HXLocal_Chart.hecNiceTicks, bad = [];
+                let seed = 7; const rnd = () => ( seed = ( seed * 1103515245 + 12345 ) % 2147483648 ) / 2147483648;
+                const cases = [[-3, 42.4], [0, 2900], [0, 0], [5, 5], [-5, -5], [0.1, 0.3], [-1e-300, 1e-300], [1e300, 1.5e300]];
+                for( const m of [1e-12, 1e-6, 0.02, 0.5, 1, 7, 42.4, 100, 12345, 1e9, 1e15] ) for( const sp of [1e-9, 1e-4, 0.1, 1, 1.5, 3, 1e3] ) for( const sg of [-1, 0, 1] ) cases.push([sg * m, sg * m + sp * m]);
+                for( let k = 0; k < 20000; k++ ) { const e = Math.floor(rnd() * 30) - 14, a = ( rnd() * 2 - 1 ) * Math.pow(10, e); cases.push([a, a + rnd() * Math.pow(10, e + Math.floor(rnd() * 4) - 2)]); }
+                const down = s => { const e = Math.floor(Math.log10(s) + 1e-12), f = Math.round(s / Math.pow(10, e)); return f === 5 ? 2 * s / 5 : s / 2; };
+                for( const [lo, hi] of cases ) for( let mt = 2; mt <= 11; mt++ ) {
+                    const tk = T(lo, hi, mt), fail = why => { if( bad.length < 5 ) bad.push({ lo, hi, mt, tk, why }); };
+                    if( lo === hi ) continue;
+                    const most = Math.max(mt, lo < 0 && hi > 0 ? 3 : 2);
+                    if( !tk || tk.length < 2 || tk.length > most ) { fail('count'); continue; }
+                    const s0 = ( tk[tk.length - 1] - tk[0] ) / ( tk.length - 1 ), e0 = Math.floor(Math.log10(s0) + 1e-12);
+                    const s = [1, 2, 5, 10].reduce((b, f) => Math.abs(f - s0 / Math.pow(10, e0)) < Math.abs(b - s0 / Math.pow(10, e0)) ? f : b) * Math.pow(10, e0);
+                    if( Math.abs(s0 - s) > s * 1e-3 || tk.some((x, i) => i && Math.abs(x - tk[i - 1] - s) > s * 1e-3) ) { fail('step'); continue; }
+                    if( tk.some(x => Math.abs(x / s - Math.round(x / s)) > 1e-3 || x !== parseFloat(x.toPrecision(15))) ) { fail('multiples'); continue; }
+                    const tol = Math.max(Math.abs(lo), Math.abs(hi)) * 1e-12;
+                    if( tk[0] > lo + tol || tk[tk.length - 1] < hi - tol || ( hi > lo && ( tk[0] <= lo - s + tol || tk[tk.length - 1] >= hi + s - tol ) ) ) { fail('bounds'); continue; }
+                    const s2 = down(s);
+                    if( hi > lo && Math.ceil(hi / s2 - 1e-9) - Math.floor(lo / s2 + 1e-9) + 1 <= most ) { fail('not the tightest'); continue; }
+                }
+                return { n: cases.length * 10, bad }; })()`);
+            return r.n > 200000 && !r.bad.length ? true : JSON.stringify(r.bad);
+        });
+        await t.step('any parameters — dataMin / dataMax, min / max, both (a soft bound), a smallest range (hecMinRange), margins (hecMarginMin / Max), a stepSize or not, 2 to 11 ticks —: each side the lowest of dataMin and min (the highest of dataMax and max), imposed as it is where it is min (max), else rounded out to a multiple of the step; never two labels nearer than the axis over maxTicks - 1; stepSize kept unless its labels overlap; else the tightest step of 1, 2, 5 × 10ⁿ', async () => {
+            const r = await t.E(`(()=>{
+                const A = window.HXLocal_Chart.hecAxisTicks, bad = [], def = v => typeof v === 'number' && isFinite(v);
+                let seed = 11; const rnd = () => ( seed = ( seed * 1103515245 + 12345 ) % 2147483648 ) / 2147483648, pick = a => a[Math.floor(rnd() * a.length)];
+                const isNat = s => { const e = Math.floor(Math.log10(s) + 1e-12), f = s / Math.pow(10, e); return [1, 2, 5, 10].some(x => Math.abs(f - x) < 1e-6); };
+                const down = s => { const e = Math.floor(Math.log10(s) + 1e-12), f = Math.round(s / Math.pow(10, e)); return f === 5 ? 2 * s / 5 : s / 2; };
+                let n = 0;
+                for( let c = 0; c < 30000; c++ ) {
+                    const m = Math.pow(10, Math.floor(rnd() * 12) - 5), v1 = ( rnd() * 2 - 1 ) * 10 * m, v2 = v1 + rnd() * 10 * m * pick([0.01, 0.3, 1, 3]), o = {}, mode = pick(['auto', 'fixed', 'soft', 'mixed']);
+                    if( mode !== 'fixed' ) { o.dataMin = v1; o.dataMax = v2; }
+                    if( mode === 'fixed' || mode === 'soft' ) { o.min = v1 + ( rnd() - 0.5 ) * 4 * m; o.max = v2 + ( rnd() - 0.5 ) * 4 * m; if( o.max <= o.min ) o.max = o.min + m; }
+                    if( mode === 'mixed' ) { if( rnd() < 0.5 ) o.min = v1 + ( rnd() - 0.5 ) * 4 * m; else o.max = v2 + ( rnd() - 0.5 ) * 4 * m; }
+                    if( rnd() < 0.4 ) o.stepSize = pick([1, 2, 5, 3, 0.7, 2.5, 25]) * m * pick([0.1, 1, 10]);
+                    if( rnd() < 0.3 ) o.minRange = rnd() * 40 * m;
+                    if( rnd() < 0.3 ) o.marginMin = true;
+                    if( rnd() < 0.3 ) o.marginMax = true;
+                    let lo, fixLo, hi, fixHi;
+                    if( def(o.dataMin) && def(o.min) ) { lo = Math.min(o.dataMin, o.min); fixLo = o.dataMin > o.min; } else if( def(o.min) ) { lo = o.min; fixLo = true; } else { lo = o.dataMin; fixLo = false; }
+                    if( def(o.dataMax) && def(o.max) ) { hi = Math.max(o.dataMax, o.max); fixHi = o.dataMax < o.max; } else if( def(o.max) ) { hi = o.max; fixHi = true; } else { hi = o.dataMax; fixHi = false; }
+                    if( hi <= lo ) continue;
+                    // (the smallest range, minRange: reached by the free sides, unless 0 stops it — never across it)
+                    const sd = window.HXLocal_Chart.hecAxisSides(o), w0 = lo, w1 = hi;
+                    ({ lo, hi, fixLo, fixHi } = sd);
+                    if( o.minRange > 0 && !( fixLo && fixHi ) ) {
+                        const zeroStop = ( w0 >= 0 && !fixLo && lo === 0 ) || ( w1 <= 0 && !fixHi && hi === 0 );
+                        if( ( hi - lo < o.minRange * ( 1 - 1e-9 ) && !zeroStop ) || ( w0 >= 0 && lo < 0 ) || ( w1 <= 0 && hi > 0 ) ) { if( bad.length < 4 ) bad.push({ o, sd, why: 'minRange' }); continue; }
+                    }
+                    for( let mt = 2; mt <= 11; mt++ ) {
+                        n++;
+                        const tk = A(o, mt), fail = why => { if( bad.length < 4 ) bad.push({ o, mt, tk, why }); };
+                        if( !tk ) { fail('none'); continue; }
+                        const s = tk.step, a = tk[0], b = tk[tk.length - 1], tol = ( Math.abs(lo) + Math.abs(hi) ) * 1e-12 + s * 1e-9, mult = x => Math.abs(x / s - Math.round(x / s)) < 1e-6;
+                        if( fixLo ? a !== lo : !( a <= lo + tol && a > lo - s * ( o.marginMin ? 1.5 : 1 ) - tol && mult(a) ) ) { fail('bottom'); continue; }
+                        if( fixHi ? b !== hi : !( b >= hi - tol && b < hi + s * ( o.marginMax ? 1.5 : 1 ) + tol && mult(b) ) ) { fail('top'); continue; }
+                        if( ( o.marginMin && !fixLo && lo - a < s / 2 - tol ) || ( o.marginMax && !fixHi && b - hi < s / 2 - tol ) ) { fail('margin'); continue; }
+                        const most = Math.max(mt, ( !fixLo || !fixHi ) && lo < 0 && hi > 0 ? 3 : 2), gap = ( b - a ) / ( most - 1 );
+                        if( tk.some((x, i) => i && x - tk[i - 1] < gap * ( 1 - 1e-6 ) - tol) ) { fail('labels overlap'); continue; }
+                        if( tk.slice(1, -1).some(x => !mult(x) || x !== parseFloat(x.toPrecision(15))) ) { fail('not multiples'); continue; }
+                        if( o.stepSize > 0 && s === o.stepSize ) continue;
+                        if( !isNat(s) ) { fail('step'); continue; }
+                        if( o.marginMin || o.marginMax ) continue;
+                        const fits = s2 => { const a2 = fixLo ? lo : Math.floor(lo / s2 + 1e-9) * s2, b2 = fixHi ? hi : Math.ceil(hi / s2 - 1e-9) * s2; return s2 >= ( b2 - a2 ) / ( most - 1 ) * ( 1 + 1e-6 ); };
+                        if( o.stepSize > 0 && fits(o.stepSize) ) { fail('stepSize refused though its labels have room'); continue; }
+                        if( fits(down(s)) ) { fail('not the tightest'); continue; }
+                    }
+                }
+                return { n, bad }; })()`);
+            return r.n > 200000 && !r.bad.length ? true : JSON.stringify(r.bad);
+        });
+        await t.step('Chart.js charts 40 to 500 px high given these parameters: each axis drawn with the ticks of the rule for the length it is drawn over — never the half height it is laid out at first, nor its box before the half labels above and below are taken off —, the step applied told (ticks.hecTicksApplied)', async () => {
+            const r = await t.E(`(()=>{
+                const Chart = window.HXLocal_Chart, bad = [];
+                let seed = 5; const rnd = () => ( seed = ( seed * 1103515245 + 12345 ) % 2147483648 ) / 2147483648, pick = a => a[Math.floor(rnd() * a.length)];
+                let n = 0;
+                for( const h of [40, 50, 65, 80, 100, 120, 150, 200, 260, 320, 500] ) for( let c = 0; c < 25; c++ ) {
+                    const box = document.createElement('div'); box.style.cssText = 'width:600px;height:' + h + 'px'; document.body.appendChild(box);
+                    const cv = document.createElement('canvas'); box.appendChild(cv);
+                    const m = Math.pow(10, Math.floor(rnd() * 8) - 3), v1 = ( rnd() * 2 - 1 ) * 10 * m, v2 = v1 + rnd() * 10 * m, o = {}, mode = pick(['auto', 'fixed', 'soft', 'data']);
+                    if( mode === 'auto' || mode === 'soft' ) { o.dataMin = v1; o.dataMax = v2; }
+                    if( mode === 'fixed' || mode === 'soft' ) { o.min = v1 + ( rnd() - 0.5 ) * 4 * m; o.max = Math.max(o.min + m, v2 + ( rnd() - 0.5 ) * 4 * m); }
+                    if( rnd() < 0.4 ) o.stepSize = pick([1, 2, 5, 3, 0.7]) * m;
+                    let told;
+                    const chart = new Chart(cv, { type: 'line', data: { datasets: [{ data: [{ x: 0, y: v1 }, { x: 1, y: v2 }] }] },
+                        options: { responsive: true, maintainAspectRatio: false, animation: false, legend: { display: false },
+                            scales: { xAxes: [{ type: 'linear', display: false }], yAxes: [{ id: 'y', ticks: Object.assign({ hecTicksApplied: x => { told = x.step; } }, o) }] } } });
+                    const sc = chart.scales.y, tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
+                    // (no parameter on a side: the data's)
+                    const want = Chart.hecAxisTicks(Object.assign({ dataMin: mode === 'data' ? Math.min(v1, v2) : undefined, dataMax: mode === 'data' ? Math.max(v1, v2) : undefined }, o), lim);
+                    n++;
+                    if( JSON.stringify(tk) !== JSON.stringify(want.slice()) || told !== want.step ) bad.push({ h: sc.height, o, tk, want: want.slice(), told, step: want.step });
+                    chart.destroy(); box.remove();
+                }
+                return { n, bad: bad.slice(0, 4) }; })()`);
+            return r.n === 275 && !r.bad.length ? true : JSON.stringify(r.bad);
+        });
+        await t.step('Chart.js\' other parameters: a Y axis\' width (hecWidth: 65, 0); the room of a right axis kept (hecRightAxisRoom); the Y lock its own state — the range imposed as it is, the parameters never changed, the axis back to them once released; a time axis\' step kept unless its labels, measured, don\'t fit side by side — then a longer one, told (time.hecTicksApplied)', async () => {
+            const r = await t.E(`(()=>{
+                const Chart = window.HXLocal_Chart, out = {};
+                const mk = (h, w, opts) => { const box = document.createElement('div'); box.style.cssText = 'width:' + w + 'px;height:' + h + 'px'; document.body.appendChild(box); const cv = document.createElement('canvas'); box.appendChild(cv); const c = new Chart(cv, opts); c.hecBox = box; return c; };
+                const done = c => { c.destroy(); c.hecBox.remove(); };
+                const base = (y, extra) => ({ type: 'line', data: { datasets: [{ data: [{ x: 0, y: 3 }, { x: 1, y: 42 }] }] }, options: Object.assign({ responsive: true, maintainAspectRatio: false, animation: false, legend: { display: false },
+                    scales: { xAxes: [{ type: 'linear', display: false }], yAxes: [Object.assign({ id: 'y' }, y)] } }, extra || {}) });
+                let c = mk(200, 600, base({ hecWidth: 65 })); out.w65 = c.scales.y.width; const r0 = c.chartArea.right; done(c);
+                c = mk(200, 600, base({ hecWidth: 0 })); out.w0 = c.scales.y.width; done(c);
+                c = mk(200, 600, base({ hecWidth: 65 }, { hecRightAxisRoom: true })); out.room = r0 - c.chartArea.right; done(c);
+                c = mk(200, 600, base({ hecWidth: 65, ticks: { dataMin: 3, dataMax: 42 } }));
+                const before = [c.scales.y.min, c.scales.y.max], t = c.options.scales.yAxes[0].ticks;
+                c.hecSetYAxisLocked(true, [[12.37, 31.5]]);
+                out.lock = [c.scales.y.min, c.scales.y.max, t.min, t.max, t.dataMin, t.dataMax];
+                c.hecSetYAxisLocked(false); c.update();
+                out.released = [before, [c.scales.y.min, c.scales.y.max]]; done(c);
+                out.time = [];
+                for( const w of [300, 500, 800, 1200] ) for( const [hours, n, unit] of [[24, 30, 'minute'], [168, 6, 'hour'], [720, 1, 'day'], [8760, 1, 'month']] ) {
+                    let told; const t1 = Date.parse('2026-11-11T00:00:00'), t0 = t1 - hours * 3600e3;
+                    c = mk(150, w, { type: 'line', data: { datasets: [{ data: [{ x: t0, y: 1 }, { x: t1, y: 2 }] }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, legend: { display: false },
+                        scales: { xAxes: [{ id: 'x', type: 'time', time: { min: t0, max: t1, unit, stepSize: n, displayFormats: { minute: 'HH:mm', hour: 'HH:mm', day: 'D MMM', month: 'MMM' }, hecTicksApplied: x => { told = x; } },
+                            ticks: { autoSkipPadding: 8, maxRotation: 0, major: { enabled: true, unit: 'day', fontStyle: 'bold' } } }], yAxes: [{ hecWidth: 65 }] } } });
+                    const sc = c.scales.x, ctx = c.ctx, steps = Chart.hecTimeSteps.map(s => s.join(' ')), i = steps.indexOf(n + ' ' + unit), j = told ? steps.indexOf(told.stepSize + ' ' + told.unit) : -1;
+                    let tight = true;
+                    for( let k = 1; k < sc._ticks.length; k++ ) {
+                        ctx.font = sc._ticks[k].major ? 'bold 12px sans-serif' : '12px sans-serif';
+                        if( sc.getPixelForTick(k) - sc.getPixelForTick(k - 1) < ctx.measureText(String(sc.ticks[k])).width ) tight = false;
+                    }
+                    out.time.push({ w, hours, asked: i, applied: j, tight });
+                    done(c);
+                }
+                return out; })()`);
+            const ok = r.w65 === 65 && r.w0 === 0 && r.room === 65 && r.lock.join() === '12.37,31.5,,,3,42' && r.released[0].join() === r.released[1].join()
+                && r.time.every(x => x.applied >= x.asked && x.tight) && r.time.some(x => x.applied > x.asked) && r.time.some(x => x.applied === x.asked);
+            return ok ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+        // (graphs 60 to 600 px high: Chart.js lays an axis out in passes — half its height first
+        // —, the ticks made once more at each, from the values given: the last one's, for its
+        // final height)
+        const H = [60, 90, 130, 180, 250, 400, 600];
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '3h', statistics: { enabled: false }, yScaleSteadiness: 0,
+            graphs: H.map(h => ({ type: 'line', height: h, entities: [{ entity: 'sensor.power' }] })) }, { height: 3000, mock: { series: true, fail: FAIL } });
+        await t.wait(1500);
+        await t.step('graphs 60 to 600 px high, values from -3 to 42.4, 0 to 2900, 1e6 to 1e6 + 3, a single one…: each axis drawn with the ticks of the values given for its final height — never those of the half height Chart.js lays it out at first —, holding them, within the ticks it allows', async () => {
+            const r = await t.E(`(()=>{
+                const I = el.instance, id = 'sensor.power', now = Date.now(), last = I.cache.length - 1, bad = [];
+                for( const [lo, hi] of [[-3, 42.4], [0, 2900], [0.02, 0.031], [-1500, -1450], [1e6, 1e6 + 3], [-0.004, 0.0021], [17, 17], [-7e9, 3e10]] ) {
+                    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
+                    const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi, ( lo + hi ) / 2][k % 3]) });
+                    for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
+                    I.generateGraphDataFromCache(null, true);
+                    for( const g of I.graphs ) {
+                        const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
+                        const t = sc.options.ticks, want = window.HXLocal_Chart.hecAxisTicks({ dataMin: t.dataMin, dataMax: t.dataMax, min: t.min, max: t.max, minRange: t.hecMinRange }, lim, sc._hecDataLimits.min, sc._hecDataLimits.max);
+                        if( JSON.stringify(tk) !== JSON.stringify(want) || tk[0] > Math.min(lo, hi) || tk[tk.length - 1] < Math.max(lo, hi) ) bad.push({ lo, hi, h: sc.height, tk, want });
+                    }
+                }
+                return bad; })()`);
+            return !r.length ? true : JSON.stringify(r.slice(0, 4));
+        });
+        done(await t.close());
+        // (ystepSize 5 on graphs 60 to 600 px high)
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '3h', statistics: { enabled: false }, yScaleSteadiness: 0,
+            graphs: H.map(h => ({ type: 'line', title: 'g' + h, height: h, ystepSize: 5, entities: [{ entity: 'sensor.power' }] })) },
+            { height: 3000, mock: { series: true, fail: FAIL }, init: 'window.__warns = []; { const w = console.warn; console.warn = (...a) => { __warns.push(a.join(" ")); w(...a); }; }' });
+        await t.wait(1500);
+        await t.step('ystepSize 5: obeyed where its labels have room at the graph\'s height; where they would overlap, the axis\' automatic ticks — and the card warns once for that graph, never again at the next drawings', async () => {
+            const r = await t.E(`(()=>{
+                const I = el.instance, id = 'sensor.power', now = Date.now(), last = I.cache.length - 1, bad = [], ignored = new Set();
+                for( const [lo, hi] of [[-3, 42.4], [0, 12], [0, 2900], [-3, 42.4]] ) {
+                    for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
+                    const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi][k % 2]) });
+                    for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
+                    I.generateGraphDataFromCache(null, true);
+                    for( const g of I.graphs ) {
+                        const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
+                        const d = { min: sc.options.ticks.dataMin ?? sc._hecDataLimits.min, max: sc.options.ticks.dataMax ?? sc._hecDataLimits.max }, fits = Math.ceil(d.max / 5 - 1e-9) - Math.floor(d.min / 5 + 1e-9) + 1 <= lim;
+                        if( fits ? sc._hecStep !== 5 || tk.some(x => x % 5) : JSON.stringify(tk) !== JSON.stringify(window.HXLocal_Chart.hecNiceTicks(d.min, d.max, lim)) ) bad.push({ lo, hi, h: sc.height, tk, fits });
+                        if( !fits ) ignored.add(I.graphs.indexOf(g));
+                    }
+                }
+                return { bad, ignored: ignored.size, warns: __warns.filter(w => /ystepSize 5 ignored/.test(w)) }; })()`);
+            const once = new Set(r.warns).size === r.warns.length;
+            return !r.bad.length && r.ignored > 0 && r.warns.length === r.ignored && once ? true : JSON.stringify(r);
+        });
+        done(await t.close());
     }
 
     let t = await openCard(card('3h'), { height: 900, mock: { series: true, fail: FAIL }, init: AXIS });
@@ -86,6 +275,14 @@ module.exports = async function()
         const a = await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, 0)); return r; }`));
         return a.min === 0 && a.max > 0 ? true : JSON.stringify(a);
     });
+    await t.step('values -3 to 42.4: the card gives them as they are; Chart.js makes the ticks — round bounds holding them, one step from 1, 2, 5 × 10ⁿ between all of them, the bounds within a step of the values', async () => {
+        const a = await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, [-3, 20, 42.4][Math.floor(t / 300e3) % 3])); return r; }`));
+        const r = await t.E(`(()=>{ const I = el.instance, sc = I.graphs[0].chart.scales['y-axis-0'], v = sc.ticksAsNumbers.slice().sort((x, y) => x - y);
+            const kept = Object.values(I._yAxesKept)[0]['y-axis-0'];
+            return { kept: [kept.min, kept.max], steps: [...new Set(v.slice(1).map((x, k) => +( x - v[k] ).toPrecision(12)))] }; })()`);
+        const s = r.steps[0], e = s && Math.floor(Math.log10(s)), round = r.steps.length === 1 && [1, 2, 5].includes(+( s / Math.pow(10, e) ).toPrecision(12));
+        return r.kept[0] === -3 && r.kept[1] === 42.4 && round && a.min <= -3 && a.max >= 42.4 && a.min > -3 - s && a.max < 42.4 + s ? true : JSON.stringify({ a, r });
+    });
     done(await t.close());
 
     // ── The automatic gain (yScaleSteadiness 50): a pan towards a spike, past it, and to and fro ──
@@ -97,11 +294,11 @@ module.exports = async function()
         for( let k = 0; k <= ${frames}; k++ ) { const e = now - ( ${from} + ${dir} * 10 * k ) * 60e3; I._setWindow(window.HXLocal_moment(e - 3 * 3600e3), window.HXLocal_moment(e)); I.generateGraphDataFromCache(); out.push(axis()); }
         I.state.drag = false; return out; })()`;
     const steps = l => l.map(a => a.max).filter((m, k, all) => !k || m !== all[k - 1]);
-    await t.step('a pan towards a spike: the axis grows before it shows, in round steps — never a slide —, what is shown always in it', async () => {
+    await t.step('a pan towards a spike: the axis grows before it shows — never back down —, what is shown always in it, its ends on its ticks (multiples of its step: Chart.js\' graduation)', async () => {
         await t.E(draw(`(now, H) => { const r = []; for( let t = now - 47 * 3600e3; t < now; t += 300e3 ) r.push(H(t, Math.abs(t - ( now - 12 * 3600e3 )) < 600e3 ? 0.1 : ( Math.floor(t / 300e3) % 3 ) * 0.005)); return r; }`));
         const l = await t.E(PAN(0, 54)), m = steps(l), ahead = l.filter((a, k) => k < 48 && a.hi < 0.05);
-        const round = x => [1, 2, 5, 10].some(f => Math.abs(x / Math.pow(10, Math.floor(Math.log10(x))) - f) < 1e-6) || [1.2, 1.4, 1.5, 1.6, 2.5, 3, 4, 6, 7, 8].some(f => Math.abs(x / Math.pow(10, Math.floor(Math.log10(x))) - f) < 1e-6);
-        return m.length >= 3 && m.every((x, k) => !k || x > m[k - 1]) && l.every(a => a.max >= a.hi && a.min <= a.lo) && ahead.some(a => a.max > 2 * a.hi) && m.every(round) ? true : JSON.stringify(m);
+        const onTicks = a => [a.min, a.max].every(x => Math.abs(x / a.step - Math.round(x / a.step)) < 1e-6);
+        return m.length >= 3 && m.every((x, k) => !k || x > m[k - 1]) && l.every(a => a.max >= a.hi && a.min <= a.lo) && ahead.some(a => a.max > 2 * a.hi) && l.every(onTicks) ? true : JSON.stringify(m);
     });
     await t.step('a pan away from it: the axis narrows a step at a time — never more than a step down at once, never back up —; to and fro a little: the same axis', async () => {
         const l = await t.E(PAN(9 * 60, 54, -1)), m = steps(l);
@@ -240,6 +437,21 @@ module.exports = async function()
             const a = I.exportAvailability([id]);
             return { long, k, hourly: d.filter(p => p.statistics && p.statisticsPeriod <= 3600e3).length, n: d.length, hour: a.periods.hour, day: a.periods.day }; })()`);
         return r.long >= 0 && r.long < r.k && r.hourly === 0 && r.n > 0 && r.hour === 1 && r.day === 1 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── The history's retention learned while requests wait (Home Assistant answers a few at a
+    // time): a request planned before it was known asks no more than Home Assistant keeps ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.tank' }] }] },
+        { height: 900, mock: { series: true, historyStep: 10800, historyDays: 30, cost: { base: 300, history: 0.001, statistics: 0.001, workers: 4 } } });
+    await t.wait(1500);
+    await t.step('a year loaded again, 30 days of history kept, its blocks of history waiting their turn: once an answer tells where the history begins, the blocks before it are never sent — only those sent before (4 workers: a few)', async () => {
+        await t.E('window.__ws.length = 0; el.instance.reloadHistory()');
+        for( let k = 0; k < 60 && await t.E('el.instance._requests.length > 0 || window.__ws.length === 0'); k++ ) await t.wait(500);
+        const r = await t.E(`(()=>{ const edge = Date.now() - 30 * 86400e3 - 3600e3, h = window.__ws.filter(q => q.type === 'history/history_during_period');
+            return { history: h.length, before: h.filter(q => q.end && Date.parse(q.end) < edge).length }; })()`);
+        return r.history > 0 && r.before <= 4 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

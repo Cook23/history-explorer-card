@@ -12,13 +12,7 @@ const Chart = window.HXLocal_Chart;
 
 // The time ranges the magnifier's zoom steps through, in hours (TIME_RANGES)
 const ranges = TIME_RANGES.filter(r => r.step !== false).map(r => r.hours);
-// The time axis's steps, from the shortest — a step whose labels don't fit along the plot
-// gives way to the next (_fitTickStep) —, a unit's length (a month: 30 days), the room
-// Chart.js keeps between two labels (autoSkipPadding, card-charts.js)
-const TICK_STEPS = [[1, 'minute'], [2, 'minute'], [5, 'minute'], [10, 'minute'], [15, 'minute'], [20, 'minute'], [30, 'minute'],
-    [1, 'hour'], [2, 'hour'], [3, 'hour'], [4, 'hour'], [6, 'hour'], [8, 'hour'], [12, 'hour'],
-    [1, 'day'], [2, 'day'], [3, 'day'], [4, 'day'], [7, 'day'], [14, 'day'], [1, 'month'], [2, 'month'], [3, 'month'], [6, 'month'], [12, 'month'], [24, 'month'], [60, 'month']];
-const TICK_UNIT_MS = { minute: 60e3, hour: 3600e3, day: 86400e3, month: 30 * 86400e3 };
+// The room Chart.js keeps between two time labels (autoSkipPadding, card-charts.js)
 export const TICK_LABEL_GAP_PX = 8;
 // A window ending this close to the present shows it (its end is set to the second)
 const PRESENT_MS = 1000;
@@ -35,7 +29,7 @@ export class CardTimeRange
             this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
 
         this.setPresentWindow();
-        this.updateHistory();
+        this.updateHistory(!resetRange);
     }
 
     // The present, as the window shows it: now, moved by defaultTimeOffset (an empty space
@@ -127,7 +121,7 @@ export class CardTimeRange
         const t1 = moment(t0).add(this.activeRange.timeRangeHours, "hour");
         this._setWindow(t0.startOf('day'), t1.startOf('day'));
 
-        this.updateHistory();
+        this.updateHistory(true);
     }
 
     // The magnifier — the elastic box's mode: turned on by a click on it, or by a mouse's drag
@@ -323,30 +317,18 @@ export class CardTimeRange
 
         }
 
-        this._fitTickStep(width);
-
         if( update ) {
             for( let g of this.graphs ) this.applyTimeAxis(g);
         }
     }
 
-    // The time labels side by side: while they don't fit along the plot (the widest graph's —
-    // else the card's less its Y labels), the next longer step (TICK_STEPS). A label's width:
-    // its format's characters at the time labels' size (minutes and hours: the time; days:
-    // the date; months: the month), and the room Chart.js keeps between two (autoSkipPadding)
-    _fitTickStep(width)
+    // The time labels' step drawn: Chart.js' — the one asked (setStepSize), unless its labels
+    // don't fit side by side along the plot: a longer one (time.hecTicksApplied) —, else the
+    // one asked → [stepSize, unit]
+    timeTickStep()
     {
-        // (the range's length — the window may not be set to it yet)
-        const _span = ( this.activeRange.timeRangeHours || 0 ) * 3600e3 + ( this.activeRange.timeRangeMinutes || 0 ) * 60e3;
-        const _plot = Math.max(0, ...this.graphs.map(g => g.chart?.hecPlotWidth?.() ?? 0)) || Math.max(0, width - 100);
-        if( !_span || !_plot ) return;
-        const _px = this.textSizes().text;
-        const _format = { minute: this.i18n.styleTimeTicks, hour: this.i18n.styleTimeTicks, day: this.i18n.styleDateTicks, month: 'MMM' };
-        const _labelPx = unit => moment('2026-12-28T23:59:00').format(_format[unit] ?? 'MMM').length * _px * 0.6 + TICK_LABEL_GAP_PX;
-        let i = TICK_STEPS.findIndex(([n, unit]) => unit === this.activeRange.tickStepUnit && n >= this.activeRange.tickStepSize);
-        if( i < 0 ) return;
-        while( i < TICK_STEPS.length - 1 && _span / ( TICK_STEPS[i][0] * TICK_UNIT_MS[TICK_STEPS[i][1]] ) * _labelPx(TICK_STEPS[i][1]) > _plot ) i++;
-        [this.activeRange.tickStepSize, this.activeRange.tickStepUnit] = TICK_STEPS[i];
+        const a = this._timeTickApplied;
+        return a ? [a.stepSize, a.unit] : [+this.activeRange.tickStepSize, this.activeRange.tickStepUnit];
     }
 
     // --------------------------------------------------------------------------------------
@@ -409,17 +391,16 @@ export class CardTimeRange
     applyTimeAxis(g)
     {
         // (linked graphs keep their time aligned: when one of them has a right Y axis, the
-        // others keep the same room on the right)
+        // others keep the room of one — Chart.js hecRightAxisRoom)
         const _hasRight = x => x.chart.options.scales.yAxes.some(a => a.id === RIGHT_Y_AXIS);
-        const _room = !_hasRight(g) && g.groupId != null && this.graphs.some(x => x.groupId === g.groupId && _hasRight(x));
-        g.chart.options.layout.padding.right = _room ? this.pconfig.labelAreaWidth : 0;
+        g.chart.options.hecRightAxisRoom = g.groupId != null && this.graphs.some(x => x !== g && x.groupId === g.groupId && _hasRight(x));
         const _time = g.chart.options.scales.xAxes[0].time;
         _time.unit = this.activeRange.tickStepUnit;
         _time.stepSize = this.activeRange.tickStepSize;
         _time.min = this.startTime;
         _time.max = this.endTime;
         const _t = performance.now();
-        g.chart.update();
+        this.redrawChart(g);
         perf.add('chart', performance.now() - _t, { graph: this.graphs.indexOf(g) });
     }
 
@@ -452,7 +433,7 @@ export class CardTimeRange
     moveTimeWindow(t0)
     {
         this._setWindow(t0, moment(t0).add(this.activeRange.timeRangeHours, "hour").add(this.activeRange.timeRangeMinutes, "minute"));
-        this.updateHistory();
+        this.updateHistory(true);
     }
 
     // Length of the time window, in seconds

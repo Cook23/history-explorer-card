@@ -211,14 +211,14 @@ module.exports = async function()
     // ── The Y axis: soft bounds, a smallest range, the right axis' own, logarithmic ──
     // (graph i's Y axis k: its range drawn, its options)
     const axis = (t, k = 0, i = 0) => t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[${i}].chart, o=c.options.scales.yAxes[${k}], s=c.scales[o.id];
-        return { min: s.min, max: s.max, type: o.type ?? 'linear', display: o.display !== false && o.ticks.display !== false, tmin: o.ticks.min, tmax: o.ticks.max }; })()`);
+        return { min: s.min, max: s.max, type: o.type ?? 'linear', display: o.display !== false && o.ticks.display !== false, tmin: o.ticks.min, tmax: o.ticks.max, dmax: o.ticks.dataMax }; })()`);
     t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24,
         lower_bound: '~0', upper_bound: '~10', lower_bound_secondary: 0, upper_bound_secondary: 50, show: { labels_secondary: false },
         entities: ['sensor.power', { entity: 'sensor.rain', y_axis: 'secondary' }] }, { mock: { series: true }, height: 700 });
     await t.wait(1500);
-    await t.step('soft bounds (~0, ~10): the axis reaches 0, and goes past 10 to the values above it', async () => {
+    await t.step('soft bounds (~0, ~10): the axis reaches 0, and goes past 10 to the values above it — given to Chart.js as bounds (ticks.min, ticks.max) with the values (ticks.dataMin, ticks.dataMax): Chart.js goes past them', async () => {
         const a = await axis(t);
-        return a.min <= 0 && a.max >= 400 && a.tmin === undefined && a.tmax === undefined ? true : JSON.stringify(a);
+        return a.min <= 0 && a.max >= 400 && a.tmin === 0 && a.tmax === 10 && a.dmax >= 400 ? true : JSON.stringify(a);
     });
     await t.step('lower_bound_secondary / upper_bound_secondary: the right axis\' own bounds; show: labels_secondary: false — its labels hidden', async () => {
         const a = await axis(t, 1);

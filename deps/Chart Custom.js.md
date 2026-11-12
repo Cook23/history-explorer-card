@@ -23,14 +23,23 @@ only:
 
 | Direction | Channel | What goes through it |
 |---|---|---|
-| Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `zoomSelectMode`, …) |
+| Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration — its parameters: a Y axis' values (`ticks.dataMin` / `dataMax`), bounds, smallest range, margins, step, width; a time axis' unit and step; the magnifier's mode (`zoomSelectMode`, `zoomBoxAxes`) —, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `handleButtons`) |
 | Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
 | Both | `Chart.hecCircular` (§1) | Values that wrap around (angles): one rule placing them, for the card's samples and Chart.js's view |
 
-Rules that keep it that way:
+Rules that keep it that way (checked by the `architecture` test):
+
+- The card gives parameters; Chart.js lays out and draws with them. The card never writes
+  what a chart or a scale holds (its `min`, its `width`, its ticks), never steps into its
+  layout (a `before…` / `after…` callback): what it gives is worked out before it asks a
+  drawing (`update()`), and during a gesture it writes only its answers. The
+  graduation of an axis — its round bounds, its step, whether its labels fit — is
+  Chart.js' alone; the card never rounds a value to it.
+- Chart.js never writes its parameters: what it changes itself — the Y lock's range, a
+  gesture's — is its own state (`_hecLockRanges`), over the parameters while it holds.
 
 - The card never listens to a pointer, mouse, touch or wheel event on a graph
   canvas, never reads a chart's layout (`chartArea`, `legend`, hit boxes, scale
@@ -112,6 +121,13 @@ standard 2.7.1 options this fork reads/writes but didn't introduce.
 | Option | Type | Default | Effect |
 |---|---|---|---|
 | `scales.yAxes[].ticks.period` | `number` | none | An axis of values that wrap around (angles): each label shows its value brought into [0, period), formatted by Chart.js's own formatter; the top label, at a whole turn, shows the period itself (`0 … 360`, or `300 … 350, 0, 10 … 360`). The card sets it when every curve of a graph is circular with the same period. |
+| `scales.yAxes[].ticks.dataMin` / `ticks.dataMax` | `number` | none | The values a linear axis must hold, rounded out to its ticks. With `ticks.min` / `ticks.max` the axis' parameters for each side — §8, *Linear scale, `buildTicks`*: `dataMin` alone, automatic; `min` alone, imposed; both, a soft bound. A side given neither: its data's, as Chart.js reads them. The card gives them as numbers, before each drawing it asks (its `redrawChart`): worked out from what the chart shows; a drawing of Chart.js' own (a resize) keeps the last ones. |
+| `scales.yAxes[].ticks.hecTicksApplied` | `function({ axis, step })` | none | Called once the layout is done, at each update, with the step the linear axis was drawn with: its `ticks.stepSize` (the card's `ystepSize`), unless its labels would overlap at the axis' height — then the automatic one (§8, *Linear scale, `buildTicks`*). The card compares it with its `ystepSize` and warns when they differ. |
+| `scales.yAxes[].ticks.hecMinRange` | `number` | none | The smallest range a linear axis shows (the card's `yrange`): its free sides — not imposed, see `ticks.dataMin` — widened to it, both evenly, a single one when the other is imposed, never across 0 when the values don't cross it. |
+| `scales.yAxes[].ticks.hecMarginMin` / `ticks.hecMarginMax` | `boolean` | `false` | A free side's margin (the card's `axisAddMarginMin` / `axisAddMarginMax`): a step more where its value is within half a step of the axis' end. An imposed side: none. |
+| `scales.yAxes[].hecWidth` | `number` (px) | none | A vertical axis' width — its labels' column, the plots of the card's charts aligned —, whatever its labels' own (0: none, its labels inside the plot or not shown). |
+| `hecRightAxisRoom` | `boolean` | `false` | A chart with no right Y axis keeps the room of one on its right: its first Y axis' `hecWidth` — linked charts, one of which has a right axis, keep their plots aligned. |
+| `scales.xAxes[].time.hecTicksApplied` | `function({ axis, unit, stepSize })` | none | Called once the layout is done, at each update, with the step a time axis was drawn with: its `time.unit` / `time.stepSize`, unless its labels don't fit side by side — then a longer one (§8, *Time scale, `buildTicks`*). |
 
 ### Plugin options (`options.plugins`)
 
@@ -335,7 +351,8 @@ value needs to come back from the card:
 
 - **Y-axis pan** (dragging an axis' label zone — left, or right on a chart with
   a right axis — or Shift+drag anywhere on a `line`/`bar` chart) — moves the
-  `ticks.min/max` of that axis, or of every Y axis with Shift, directly
+  range of that axis, or of every Y axis with Shift, directly — the chart's own state
+  (`_hecLockRanges`), over the axis' parameters, never written in them
   (`_hecValueYAxes` / `_hecSetYRanges`). With Shift, the time moves too: the
   drag also goes to `panX` (start, move, end), as a plain drag would.
 - **Samples shown** (Alt, or Option, held while the pointer moves over the chart) —
@@ -541,8 +558,15 @@ pointing to `deps/chart-hec.js` or to this file:
 | Platform (DOM) | Canvas `touch-action: pan-y` (§3) — `none` with `zoomSelectMode` (`_hecUpdateDragTouchOverlays`); pointer and wheel listeners not passive (§5) |
 | Legend | `legend.leftMargin` / `legend.rightMargin` (§1); a line count that only grows while the labels stay the same (no legend jumping between one and two lines); a dataset whose colors are given per element (arrays: bars colored one by one) shows the last element's in its swatch — on a time axis, the most recent; a point style's dot 0.9 × the font size across, centred on the capitals' middle, ringed 2 px in the line's color, filled as the dataset is (`Chart.hecLegendFill`: `showMinMax` — the line's color at 30 % —, else its fill color — `hecFillColor` with `hecFillFade`, else its `backgroundColor`) |
 | Linear scale | `ticks.period` labels (§1) |
+| Linear scale, `buildTicks` | The ticks are `Chart.hecAxisTicks(parameters, maxTicks)` (`deps/chart-hec.js`), from the axis' parameters (§1). Each side: the lowest of `ticks.dataMin` and `ticks.min` (the highest of `ticks.dataMax` and `ticks.max`); imposed as it is — even off the grid of the step — where `dataMin` is not given or is above `min` (`dataMax` not given or below `max`); else rounded out to a multiple of the step. A side given neither: the data's (`dataMin`). The step: `ticks.stepSize` (the card's `ystepSize`), unless its labels would overlap; else the smallest of 1, 2, 5 × 10ⁿ whose labels don't — two labels never nearer than the axis' length over `maxTicks - 1`: a multiple of the step that near an imposed side is left out; two intervals at least when a free side is across 0 (a tick on the grid). Each tick the exact decimal of its multiple. The stock rule — the span rounded up, then the step rounded to the nearest — went past `maxTicks` or widened the axis. The step applied (`_hecStep`) is told once the layout is done (`ticks.hecTicksApplied`, §1) |
+| Linear scale, `getTickLimit` (vertical) | `maxTicks` from the length the axis is drawn over: its height less the half label the layout keeps above and below it (its `fit`'s `paddingTop` / `paddingBottom`, past the boxes there), which it takes off once the ticks are made — its height over twice the font size, 11 at most |
+| Time scale, `buildTicks` | An axis given a unit and a step (`time.unit`, `time.stepSize` — the card's, from its range and `timeTicks.density`): its ticks are `Chart.hecTimeTicks` (`deps/chart-hec.js`) — that step, the first of `Chart.hecTimeSteps` at least as long, unless its labels, each measured in its font (a day's, major, in the major one), with the room between two (`ticks.autoSkipPadding`), are wider than a step along the axis; then the next longer one, the longest at last. The step applied (`_hecTimeStep`) is told once the layout is done (`time.hecTicksApplied`, §1) |
+| Scale, `fit` | A vertical axis given `hecWidth` (§1) takes that width |
+| Layout, `update` | `hecRightAxisRoom` (§1): the room of a right Y axis added to the right padding of a chart that has none displayed |
+| Linear and logarithmic scales, the tick parameters | Read through the scale's `_hecTickOptions()` (`deps/chart-hec.js`): its own `options.ticks`, the Y lock's range over them — a range set by the padlock, a drag or a pinch (`_hecSetYRanges`) is the chart's own state (`_hecLockRanges`), both sides imposed, never written in the axis' parameters; released, the parameters again. Its first and last labels removed when off the grid while it holds (`_hecLockedRange`) |
+| Scale, `update` | The data's limits worked out once per layout (`_dataLimitsCached`, cleared by the layout for each box — a timeline's or an arrowline's kept while its size is the same), and given back as they were (`_hecDataLimits`) at each of the layout's passes: making the ticks changes `min` and `max`, so each pass — the first at half the chart's height, the last at the axis' own — makes its ticks from the data's, for its own size, never from the ticks of the pass before |
 | Time scale, `generate` | Ticks in hours (`time.unit: 'hour'`, with major ticks): stepped by the clock, day by day — 00:00, then every `stepSize` hours of that day —, not by their length from the first one: a day of 23 or 25 hours (a change of daylight saving time) keeps every midnight ticked, its day labelled; an hour that doesn't exist that day skipped |
-| Scale, `update` | `ticks.removeEdgeTicks` (set by the Y lock, `_hecSetYRanges`): the first and the last labels removed only when off the grid — not a multiple of the step between the labels inside (a logarithmic axis: both removed) |
+| Scale, `update` | The Y lock's range holding (`_hecLockedRange`): the first and the last labels removed only when off the grid — not a multiple of the step between the labels inside (a logarithmic axis: both removed) |
 | Line controller, `updateBezierControlPoints` | `hecInterpolation` (§1): another algorithm than `'monotone'` goes to `helpers.hecSplineCurve` |
 | Header, `HEC_CHART_VERSION` | The card's version, logged once at load |
 

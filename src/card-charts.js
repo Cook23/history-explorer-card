@@ -14,9 +14,6 @@ import { msOf } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
-// (an axis' own tick step — its option, ystepSize — while Chart.js makes its ticks with the
-// automatic axis' step: see _autoYAxis)
-const AUTO_STEPS = new WeakMap();
 // The Y axes of a line or bar graph: on the left (Chart.js's own first Y axis), and on the
 // right for a second group of units (see _assignYAxes)
 const LEFT_Y_AXIS = 'y-axis-0';
@@ -69,7 +66,9 @@ export class CardCharts
         const _hasCurves = ( graphtype == 'line' ) || ( graphtype == 'bar' && datasets.some(d => d.kind === 'line') );
         const _hasBars   = graphtype == 'bar' && datasets.some(d => d.kind === 'bar');
 
-        const _yAxis = id => this._chartYAxis(id, graphtype, datasets, config, _hasCurves && !_hasBars);
+        // (each Y axis, and how its automatic sides are worked out — redrawChart)
+        const _auto = new Map();
+        const _yAxis = id => this._chartYAxis(id, graphtype, datasets, config, _hasCurves && !_hasBars, _auto);
 
         var chart = new Chart(canvas, {
 
@@ -181,7 +180,18 @@ export class CardCharts
 
         });
 
+        ( this._yAxesAuto ??= new WeakMap() ).set(chart, _auto);
         return chart;
+    }
+
+    // Graph g drawn again (Chart.js' update, duration: its own), its Y axes' automatic sides
+    // given first — the values they hold, ticks.dataMin / dataMax (_autoYAxis), worked out from
+    // what it shows: every drawing the card asks goes through here
+    redrawChart(g, duration)
+    {
+        const _auto = this._yAxesAuto?.get(g.chart);
+        if( _auto ) for( const ax of g.chart.options.scales?.yAxes ?? [] ) { const a = _auto.get(ax.id); if( a ) this._autoYAxis(g.chart, ax, a); }
+        g.chart.update(duration);
     }
 
     // The datasets of a chart: a line or bar graph's curves and bars (each drawn on its Y
@@ -246,7 +256,7 @@ export class CardCharts
     {
         const _ds = g.chart.data.datasets[idx];
         _ds.hidden = !_ds.hidden;
-        g.chart.update();
+        this.redrawChart(g);
         return _ds.hidden;
     }
 
@@ -260,7 +270,7 @@ export class CardCharts
             const d = g.chart.data.datasets[i];
             if( d ) Object.assign(d, this._legendParts(d));
         }
-        g.chart.update();
+        this.redrawChart(g);
         this.showValues(g);
     }
 
@@ -279,7 +289,7 @@ export class CardCharts
             if( _ds ) Object.assign(_ds, this._lineModeStyle(lineMode));
             if( g.entities[i] ) g.entities[i].lineMode = lineMode;
         }
-        g.chart.update();
+        this.redrawChart(g);
     }
 
     // Entities of graph g drawn with the interpolation algorithm algo
@@ -289,7 +299,7 @@ export class CardCharts
             const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
             if( _ds ) _ds.hecInterpolation = algo;
         }
-        g.chart.update();
+        this.redrawChart(g);
     }
 
     // The samples' dots of entities (curves) of graph g shown (show) or hidden
@@ -299,7 +309,7 @@ export class CardCharts
             const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
             if( _ds ) Object.assign(_ds, this._pointRadii(show, undefined, _ds.borderWidth));
         }
-        g.chart.update();
+        this.redrawChart(g);
     }
 
     _curveDataset(d, graphtype, config)
@@ -378,6 +388,9 @@ export class CardCharts
                 max: this.endTime,
                 unit: this.activeRange.tickStepUnit,
                 stepSize: this.activeRange.tickStepSize,
+                // (the step Chart.js drew it with: the one asked, else a longer one its labels
+                // fit with — see timeTickStep)
+                hecTicksApplied: ({ unit, stepSize }) => { this._timeTickApplied = { unit, stepSize }; },
                 displayFormats: { 'minute': this.i18n.styleTimeTicks, 'hour': this.i18n.styleTimeTicks, 'day': this.i18n.styleDateTicks, 'month': 'MMM' },
                 tooltipFormat: this.i18n.styleDateTimeTooltip,
             },
@@ -407,17 +420,19 @@ export class CardCharts
         };
     }
 
-    // A Y axis' automatic sides (freeLo, freeHi; me: the Chart.js scale, its id): what is
+    // A Y axis' automatic sides (freeLo, freeHi; ax: its options, of chart — id): what is
     // shown first, a steady scale second, as steady says (yScaleSteadiness, in %) — see
     // card-yscale.js —, from the points of its curves and bars shown (their band, the sums
-    // when stacked; on a logarithmic axis, in decades) and the values around them, the values
-    // the axis always reaches too (keep: its soft bounds; a side fixed). The axis chosen is
-    // kept for the chart: the next update starts from it; while a gesture moves the time
-    // window (state.drag), it narrows a step at a time
-    _autoYAxis(me, id, { freeLo, freeHi, steady, minSpan, log, step, keep })
+    // when stacked; on a logarithmic axis, in decades) and the values around them, a fixed
+    // side's bound reached too (fixedLo, fixedHi). The values they hold only — never
+    // rounded, its ticks are Chart.js' —: its parameters ticks.dataMin, ticks.dataMax (its soft
+    // bounds, its smallest range, its margins: Chart.js', Chart Custom.js.md §1). The values
+    // chosen are kept for the chart: the next update starts from them; while a gesture moves
+    // the time window (state.drag), they narrow a step at a time
+    _autoYAxis(chart, ax, { id, freeLo, freeHi, fixedLo, fixedHi, steady, log })
     {
-        const chart = me.chart, _v = y => log ? ( y > 0 ? Math.log10(y) : NaN ) : y;
-        const _stacked = !!me.options.stacked;
+        const _v = y => log ? ( y > 0 ? Math.log10(y) : NaN ) : y;
+        const _stacked = !!ax.stacked;
         // (each curve's entries — stacked: one, the sums —, its values around added)
         const _points = new Map(), curves = new Map(), _ok = e => !isNaN(e.lo) && !isNaN(e.hi);
         chart.data.datasets.forEach((ds, i) => {
@@ -449,16 +464,13 @@ export class CardCharts
         // (and around them, the values the cache has of each curve — see _yScaleNeighbours)
         else for( const [j, a] of this._yScaleNeighbours(chart, id, _v) ) curves.get(j)?.push(...a);
         for( const a of curves.values() ) a.sort((p, q) => p.x - q.x);
-        // (what the axis always reaches: its soft bounds, a side fixed)
-        const _keep = [...keep, freeLo ? undefined : me.min, freeHi ? undefined : me.max].map(k => k === undefined ? NaN : _v(k)).filter(k => !isNaN(k));
+        // (what the axis always reaches: a side fixed)
+        const _keep = [freeLo ? undefined : fixedLo, freeHi ? undefined : fixedHi].map(k => k === undefined ? NaN : _v(k)).filter(k => !isNaN(k));
         const _index = rangeIndex([...curves.values()].map(a => a.filter(_ok)));
         const rangeOf = (t0, t1) => {
             const r = _index(t0, t1);
             return r && _keep.length ? { lo: Math.min(r.lo, ..._keep), hi: Math.max(r.hi, ..._keep) } : r;
         };
-        // (as many ticks as Chart.js puts on it: Chart.LinearScale's getTickLimit)
-        const _font = me.options.ticks.fontSize ?? FONT_PX;
-        const maxTicks = Math.min(me.options.ticks.maxTicksLimit ?? 11, Math.max(2, Math.ceil(( me.height || chart.height ) / ( 2 * _font ))));
         // (the axes chosen, by graph — its id and its curves, each with what changes its values
         // drawn (scale, valueFactor, SI conversion, process, stateMap): the same graph built
         // again, the page loaded again, keeps them; two graphs — of two cards of the same name —
@@ -469,8 +481,7 @@ export class CardCharts
         const _key = _g ? _g.id + ':' + _g.entities.map(e => [e.entity, this.drawScaleOf(e), e.siConversionFactor ?? 1, e.process ?? '', JSON.stringify(this.resolveOption(e, 'stateMap'))].join('~')).join() : '';
         const _kept = this._yAxesKept[_key] ?? {};
         const a = chooseYAxis(_kept[id], rangeOf, msOf(this.startTime), msOf(this.endTime),
-                              { maxTicks, steady: ( steady ?? OPTION_DEFAULTS.yScaleSteadiness ) / 100, moving: !!this.state.drag,
-                                minSpan: log ? undefined : minSpan, step: log ? 1 : step, zero: !log });
+                              { steady: ( steady ?? OPTION_DEFAULTS.yScaleSteadiness ) / 100, moving: !!this.state.drag, zero: !log });
         if( !a ) return;
         // (written only when it changes, never while a gesture moves the window: its end writes it)
         if( a !== _kept[id] && _key ) {
@@ -479,12 +490,9 @@ export class CardCharts
             this._yAxesChanged = true;
         }
         if( this._yAxesChanged && !this.state.drag ) { this._yAxesChanged = false; this.keepYAxes(this._yAxesKept); }
-        if( freeLo ) me.min = log ? Math.pow(10, a.min) : a.min;
-        if( freeHi ) me.max = log ? Math.pow(10, a.max) : a.max;
-        // (its step given with its bounds — Chart.js' own worked out again from these bounds
-        // would widen them: see niceAxis —, for this drawing only: the axis' own option (ystepSize)
-        // put back once its ticks are made: the axis' afterBuildTicks)
-        if( !log && freeLo && freeHi && a.step > 0 ) { if( !AUTO_STEPS.has(me) ) AUTO_STEPS.set(me, me.options.ticks.stepSize); me.options.ticks.stepSize = a.step; }
+        const t = ax.ticks;
+        t.dataMin = freeLo ? ( log ? Math.pow(10, a.min) : a.min ) : undefined;
+        t.dataMax = freeHi ? ( log ? Math.pow(10, a.max) : a.max ) : undefined;
     }
 
     // The values around the time window the automatic Y axis id of a chart looks at (see
@@ -535,7 +543,7 @@ export class CardCharts
     // group of units — see _assignYAxes): the same bounds and step (ymin, ymax, ystepSize)
     // for both, its own unit and circular labels; the grid is the left axis'.
     // curvesOnly: a margin may be added below and above (axisAddMarginMin / Max)
-    _chartYAxis(id, graphtype, datasets, config, curvesOnly)
+    _chartYAxis(id, graphtype, datasets, config, curvesOnly, auto)
     {
         // The curves of the axis (see _assignYAxes)
         const _list = datasets.filter(d => ( d.yAxisID ?? LEFT_Y_AXIS ) === id);
@@ -570,6 +578,10 @@ export class CardCharts
         // false, none, the plot taking their room; hover, shown while the pointer is over the
         // graph — Chart.js ticks.hecShowOnHover)
         const _shown = ( graphtype == 'line' || graphtype == 'bar' ) ? config?.[_right ? 'labelsRight' : 'labelsLeft'] : true;
+        // (the values its automatic sides hold — those without a fixed bound —: ticks.dataMin,
+        // ticks.dataMax, given before each drawing — a curve's or a bar's axis: redrawChart)
+        if( ( _fixedLo === undefined || _fixedHi === undefined ) && ( graphtype == 'line' || graphtype == 'bar' ) && !_map )
+            auto?.set(id, { id, freeLo: _fixedLo === undefined, freeHi: _fixedHi === undefined, fixedLo: _fixedLo, fixedHi: _fixedHi, steady: _steady, log: _log });
         return {
             id,
             ...( _log ? { type: 'logarithmic' } : {} ),
@@ -577,38 +589,23 @@ export class CardCharts
             yLabelsMode: config?.yLabels,
             labelUnit: _unit,
             labelsShown: _shown,
-            afterFit: (scaleInstance) => {
-                scaleInstance.width = ( scaleInstance.options.ticks.mirror || _shown === false ) ? 0 : this.pconfig.labelAreaWidth;
-            },
-            // (the axis' own step put back once Chart.js made its ticks with the automatic one —
-            // see _autoYAxis)
-            afterBuildTicks: (me) => { if( AUTO_STEPS.has(me) ) { me.options.ticks.stepSize = AUTO_STEPS.get(me); AUTO_STEPS.delete(me); } },
-            afterDataLimits: (me) => {
-                // (a side set by hand — the padlock, a drag, a pinch — or fixed: as it is)
-                const _freeLo = me.options.ticks.min == null, _freeHi = me.options.ticks.max == null;
-                // (the automatic sides: from what is shown, steady — a curve's or a bar's axis)
-                if( ( _freeLo || _freeHi ) && ( graphtype == 'line' || graphtype == 'bar' ) && !_map )
-                    this._autoYAxis(me, id, { freeLo: _freeLo, freeHi: _freeHi, steady: _steady, minSpan: _range, log: _log,
-                                              step: config?.ystepSize ?? undefined, keep: [_freeLo ? _lo?.soft : undefined, _freeHi ? _hi?.soft : undefined] });
-                if( _freeLo && _lo?.soft !== undefined ) me.min = Math.min(me.min, _lo.soft);
-                if( _freeHi && _hi?.soft !== undefined ) me.max = Math.max(me.max, _hi.soft);
-                const _short = ( _range ?? 0 ) - ( me.max - me.min );
-                if( _short > 0 && ( _freeLo || _freeHi ) ) {
-                    if( _freeLo && _freeHi ) { me.min -= _short / 2; me.max += _short / 2; }
-                    else if( _freeLo ) me.min -= _short;
-                    else me.max += _short;
-                }
-                const epsilon = 0.0001;
-                if( _freeLo && this.pconfig.axisAddMarginMin && curvesOnly ) me.min -= epsilon;
-                if( _freeHi && this.pconfig.axisAddMarginMax && curvesOnly ) me.max += epsilon;
-            },
+            // (its labels' column: labelAreaWidth, none when they're inside or not shown)
+            hecWidth: this._yAxisWidth(_inside, _shown),
+            // Its parameters (Chart Custom.js.md §1): a fixed bound, ticks.min / max; a soft one,
+            // ticks.min / max with the values (dataMin / dataMax) — Chart.js goes past it where
+            // they do —; its smallest range (yrange); a step more where a value is near the end
+            // (axisAddMarginMin / Max, curves only); its step (ystepSize)
             ticks: {
                 fontColor: this.pconfig.graphLabelColor,
-                min: _fixedLo,
-                max: _fixedHi,
-                forceMin: _fixedLo,
-                forceMax: _fixedHi,
+                min: _fixedLo ?? _lo?.soft,
+                max: _fixedHi ?? _hi?.soft,
+                hecMinRange: _range,
+                hecMarginMin: !!( this.pconfig.axisAddMarginMin && curvesOnly ),
+                hecMarginMax: !!( this.pconfig.axisAddMarginMax && curvesOnly ),
                 stepSize: _map ? 1 : config?.ystepSize ?? undefined,
+                // (the step Chart.js drew the axis with: ystepSize unless its labels overlap — a
+                // state_map's 1 is its own)
+                ...( _map ? {} : { hecTicksApplied: ({ step }) => this._stepApplied(config, step) } ),
                 period: _period,
                 // (a state_map's labels, at their places; nothing between them)
                 ...( _map ? { callback: v => Number.isInteger(v) ? ( _map[v]?.label ?? '' ) : '' } : {} ),
@@ -628,6 +625,21 @@ export class CardCharts
             barThickness: this.pconfig.timelineBarHeight - 4,
             stacked: config?.stacked
         };
+    }
+
+    // The step Chart.js drew a Y axis with (ticks.hecTicksApplied): not the graph's ystepSize —
+    // its labels would overlap at the graph's height, Chart.js' own taken —, a warning, once
+    // for the graph and that value
+    _stepApplied(config, step)
+    {
+        const want = config?.ystepSize;
+        if( !( want > 0 ) || Math.abs(step - want) <= want * 1e-9 ) return;
+        this._stepWarned ??= new WeakMap();
+        const _done = this._stepWarned.get(config) ?? new Set();
+        if( _done.has(want) ) return;
+        _done.add(want);
+        this._stepWarned.set(config, _done);
+        console.warn(`history-explorer-card: ystepSize ${want} ignored on graph '${config.title ?? config.type ?? '?'}' — its labels would overlap (step applied: ${step})`);
     }
 
     // Whether a graph's Y labels are drawn inside its plot: yLabels: inside; on a card
@@ -695,6 +707,13 @@ export class CardCharts
                  yLabels: inside => inside ? INSIDE_Y_LABEL_FONT_PX : _text };
     }
 
+    // A Y axis' width, its labels' column (Chart.js hecWidth): labelAreaWidth — the graphs'
+    // plots aligned —, none when its labels are inside the plot or not shown
+    _yAxisWidth(inside, shown)
+    {
+        return inside || shown === false ? 0 : this.pconfig.labelAreaWidth;
+    }
+
     // The Y labels' ticks options, inside the plot — just above their grid line, so that the
     // lowest one keeps clear of the time labels, each in a box (Chart.js ticks.hecBackdrop:
     // its color and opacity are Chart.js's) — or beside it
@@ -733,6 +752,7 @@ export class CardCharts
             for( const ax of o.scales?.yAxes ?? [] ) {
                 const _inside = this._yLabelsInside(ax.yLabelsMode, g.chart.config.type);
                 _set(ax.ticks, this._yLabelTicks(_inside));
+                _set(ax, { hecWidth: this._yAxisWidth(_inside, ax.labelsShown) });
                 _set(ax.scaleLabel, { display: !_inside && ax.labelsShown !== false && ax.labelUnit !== undefined && ax.labelUnit !== '' });
             }
             for( const ax of o.scales?.xAxes ?? [] ) _set(ax.ticks, { fontSize: _sizes.text });
@@ -740,7 +760,7 @@ export class CardCharts
             _set(o.tooltips, { hecFirstOnly: this.tooltipSize() === 'slim' });
             _set(o.legend?.labels, { fontSize: _sizes.text });
             _set(o.elements, { font: _sizes.timeline });
-            if( _changed ) g.chart.update(0);
+            if( _changed ) this.redrawChart(g, 0);
             // (the values over it laid out for that width too — see showValues)
             if( _changed && g.valueSamples ) this.showValues(g);
         }
@@ -803,7 +823,7 @@ export class CardCharts
     _tooltipDated()
     {
         const _oneDay = moment(this.startTime).isSame(moment(this.endTime).subtract(1, 'ms'), 'day');
-        return !_oneDay && !['minute', 'hour'].includes(this.activeRange.tickStepUnit);
+        return !_oneDay && !['minute', 'hour'].includes(this.timeTickStep()[1]);
     }
 
     // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
@@ -896,7 +916,7 @@ export class CardCharts
     setTopControl(g, el)
     {
         g.chart.options.hecTopControl = el ?? null;
-        g.chart.update();
+        this.redrawChart(g);
     }
 
     // How many points graph g draws, all its datasets together (the performance test)

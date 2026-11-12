@@ -512,6 +512,175 @@
     } });
 
   // ---------------------------------------------------------------------------
+  // The ticks of a linear axis (Chart Custom.js.md §1, §8), from its parameters o: dataMin /
+  // dataMax (the values to hold), min / max (bounds), minRange (its smallest range),
+  // marginMin / marginMax (a step more near a free side's value), stepSize (a step) — each side: its
+  // lowest of dataMin and min (its highest of dataMax and max), imposed as it is where it is
+  // min (max) — dataMin not given, or above it —, else rounded out to a multiple of the step.
+  // The step: stepSize, unless its labels would overlap; else the smallest of 1, 2, 5 × 10ⁿ
+  // whose labels don't. Overlapping: two labels nearer than the axis' length over maxTicks - 1
+  // (getTickLimit: its height over twice the font size, 11 at most) — a multiple of the step
+  // that near an imposed side left out. → the ticks, ascending, their step (.step); null
+  // without values (the stock rule)
+  var _def = function(v) { return typeof v === 'number' && isFinite(v); };
+
+  // A scale's range set by the Y lock or a gesture on it (_hecSetYRanges): its chart's
+  // state, never its parameters — [min, max], or null
+  Chart.Scale.prototype._hecLockedRange = function() {
+    var r = this.chart && this.chart._hecLockRanges;
+    return r && r[this.id] || null;
+  };
+
+  // A scale's tick parameters as its ticks are made: its own (options.ticks), the range of
+  // the Y lock over them — both sides imposed (min, max), no values to hold (dataMin,
+  // dataMax) —; the parameters themselves never changed
+  Chart.Scale.prototype._hecTickOptions = function() {
+    var t = this.options.ticks, r = this._hecLockedRange();
+    if( !r ) return t;
+    var v = Object.create(t);
+    v.min = r[0]; v.max = r[1]; v.dataMin = undefined; v.dataMax = undefined; v.suggestedMin = undefined; v.suggestedMax = undefined;
+    return v;
+  };
+  // An axis' sides from its parameters o (above; dataLo / dataHi: its data's, for a side
+  // given neither dataMin nor min): { lo, hi, fixLo, fixHi } — fixLo, the low side imposed —,
+  // its smallest range (o.minRange: hecMinRange) reached by its free sides — on both evenly,
+  // never across 0 when the values don't cross it —; null without values
+  Chart.hecAxisSides = function(o, dataLo, dataHi) {
+    var lo, hi, fixLo, fixHi, dMin = _def(o.dataMin) ? o.dataMin : _def(o.min) ? undefined : dataLo, dMax = _def(o.dataMax) ? o.dataMax : _def(o.max) ? undefined : dataHi;
+    if( _def(dMin) && _def(o.min) ) { lo = Math.min(dMin, o.min); fixLo = dMin > o.min; }
+    else if( _def(o.min) ) { lo = o.min; fixLo = true; }
+    else if( _def(dMin) ) { lo = dMin; fixLo = false; }
+    else return null;
+    if( _def(dMax) && _def(o.max) ) { hi = Math.max(dMax, o.max); fixHi = dMax < o.max; }
+    else if( _def(o.max) ) { hi = o.max; fixHi = true; }
+    else if( _def(dMax) ) { hi = dMax; fixHi = false; }
+    else return null;
+    if( hi < lo ) { var _t = lo; lo = hi; hi = _t; _t = fixLo; fixLo = fixHi; fixHi = _t; }
+    var need = o.minRange, d = need - ( hi - lo );
+    if( d > 0 && !( fixLo && fixHi ) ) {
+      if( !fixLo && !fixHi ) {
+        if( lo >= 0 && lo - d / 2 < 0 ) { lo = 0; hi = Math.max(hi, need); }
+        else if( hi <= 0 && hi + d / 2 > 0 ) { hi = 0; lo = Math.min(lo, -need); }
+        else { lo -= d / 2; hi += d / 2; }
+      }
+      else if( !fixLo ) lo = lo >= 0 ? Math.max(0, lo - d) : lo - d;
+      else hi = hi <= 0 ? Math.min(0, hi + d) : hi + d;
+    }
+    return { lo: lo, hi: hi, fixLo: fixLo, fixHi: fixHi };
+  };
+
+  Chart.hecAxisTicks = function(o, maxTicks, dataLo, dataHi) {
+    var _s = Chart.hecAxisSides(o, dataLo, dataHi);
+    if( !_s ) return null;
+    var lo = _s.lo, hi = _s.hi, fixLo = _s.fixLo, fixHi = _s.fixHi;
+    // (a single value: 1 on each free side — Chart.js' own)
+    if( hi === lo ) { if( !fixLo ) lo -= 1; if( !fixHi || fixLo ) hi += 1; }
+    // (an axis with a free side across 0 — a tick on the grid of its step — has two intervals
+    // at least)
+    var mt = Math.max(( !fixLo || !fixHi ) && lo < 0 && hi > 0 ? 3 : 2, Math.floor(maxTicks));
+    // The ticks with the step s, its k-th multiple mk(k): null where its labels overlap
+    var ticksOf = function(s, mk) {
+      var tol = function(v) { return Math.abs(v) * 1e-12; };
+      var below = function(v) { var k = Math.round(v / s); if( mk(k) > v + tol(v) ) k--; return k; };
+      var above = function(v) { var k = Math.round(v / s); if( mk(k) < v - tol(v) ) k++; return k; };
+      var ka = fixLo ? null : below(lo), kb = fixHi ? null : above(hi);
+      // (a free side given a margin, hecMarginMin / Max: a step more where its value is
+      // within half a step of it)
+      if( !fixLo && o.marginMin && lo - mk(ka) < s / 2 - tol(lo) ) ka--;
+      if( !fixHi && o.marginMax && mk(kb) - hi < s / 2 - tol(hi) ) kb++;
+      var a = fixLo ? lo : mk(ka), b = fixHi ? hi : mk(kb);
+      if( !isFinite(a) || !isFinite(b) ) return null;
+      if( b <= a ) b = fixHi ? b : mk(++kb);
+      var gap = ( b - a ) / ( mt - 1 ), eps = Math.max(gap * 1e-9, ( Math.abs(a) + Math.abs(b) ) * 1e-12);
+      if( s < gap - eps ) return null;
+      var ticks = [a || 0];
+      for( var k = fixLo ? above(a) : ka + 1, m; ( m = mk(k) ) < b - Math.max(tol(b), eps); k++ ) {
+        if( m <= a + Math.max(tol(a), eps) ) continue;
+        if( ( fixLo && m - a < gap - eps ) || ( fixHi && b - m < gap - eps ) ) continue;
+        ticks.push(m || 0);
+        if( ticks.length > 1000 ) return null;
+      }
+      ticks.push(b || 0);
+      ticks.step = s;
+      return ticks.every(isFinite) ? ticks : null;
+    };
+    // (the step given, its multiples read as decimals)
+    if( o.stepSize > 0 ) {
+      var _r = ticksOf(o.stepSize, function(k) { return k * o.stepSize === 0 ? 0 : parseFloat(( k * o.stepSize ).toPrecision(15)); });
+      if( _r ) return _r;
+    }
+    // (else the smallest round one: k × f × 10^e, the double nearest that decimal)
+    var at = function(f, e) { return function(k) { var m = k * f; return Math.abs(m) < 1e21 ? Number(m + 'e' + e) : m * Math.pow(10, e); }; };
+    for( var e = Math.floor(Math.log10(( hi - lo ) / ( mt - 1 ))) - 1; e < 400; e++ )
+      for( var i = 0; i < 3; i++ ) {
+        var f = [1, 2, 5][i], _s = at(f, e)(1);
+        if( !( _s > 0 ) || !isFinite(_s) ) continue;
+        var _t2 = ticksOf(_s, at(f, e));
+        if( _t2 ) return _t2;
+      }
+    return null;
+  };
+
+  // The tightest round axis holding lo to hi within maxTicks (hecAxisTicks, free on both sides)
+  Chart.hecNiceTicks = function(lo, hi, maxTicks) {
+    return Chart.hecAxisTicks({ dataMin: lo, dataMax: hi }, maxTicks);
+  };
+
+  // The steps of a time axis, from the shortest: a unit's number (Chart Custom.js.md §8, Time
+  // scale) — and a unit's length, to tell a step's width along the axis (a month: 30 days)
+  Chart.hecTimeSteps = [[1, 'minute'], [2, 'minute'], [5, 'minute'], [10, 'minute'], [15, 'minute'], [20, 'minute'], [30, 'minute'],
+    [1, 'hour'], [2, 'hour'], [3, 'hour'], [4, 'hour'], [6, 'hour'], [8, 'hour'], [12, 'hour'],
+    [1, 'day'], [2, 'day'], [3, 'day'], [4, 'day'], [7, 'day'], [14, 'day'], [1, 'month'], [2, 'month'], [3, 'month'], [6, 'month'], [12, 'month'], [24, 'month'], [60, 'month']];
+  var TIME_UNIT_MS = { minute: 60e3, hour: 3600e3, day: 86400e3, month: 30 * 86400e3 };
+
+  // The ticks of a time axis given a unit and a step (time.unit, time.stepSize — the first of
+  // hecTimeSteps at least as long): that step, unless its labels — each measured in its font,
+  // the major ones (a day's) in theirs — and the room between two (ticks.autoSkipPadding)
+  // are wider than a step along the axis; then the next longer one, the longest at last.
+  // generate, majorOf: the time scale's own (deps/Chart.js). → { timestamps, unit, stepSize },
+  // or null (no unit or step given: the stock rule)
+  Chart.hecTimeTicks = function(scale, min, max, generate, majorOf) {
+    var o = scale.options, t = o.time, steps = Chart.hecTimeSteps, moment = window.HXLocal_moment;
+    if( !t.unit || !( +t.stepSize > 0 ) || !( max > min ) ) return null;
+    var i = 0;
+    while( i < steps.length && !( steps[i][1] === t.unit && steps[i][0] >= +t.stepSize ) ) i++;
+    if( i === steps.length ) return null;
+    var g = Chart.defaults.global, _v = helpers.valueOrDefault;
+    var _font = function(f) { return helpers.fontString(_v(f.fontSize, g.defaultFontSize), _v(f.fontStyle, g.defaultFontStyle), _v(f.fontFamily, g.defaultFontFamily)); };
+    var minorFont = _font(o.ticks.minor || o.ticks), majorFont = _font(o.ticks.major || o.ticks), gap = _v(o.ticks.autoSkipPadding, 0);
+    var _unit = scale._unit, _major = scale._majorUnit, ctx = scale.ctx, out = null;
+    for( ; i < steps.length && !out; i++ ) {
+      var n = steps[i][0], u = steps[i][1], view = Object.create(o);
+      view.time = Object.create(t); view.time.unit = u; view.time.stepSize = n;
+      var ts = generate(min, max, 0, view).filter(function(x) { return x >= min && x <= max; });
+      var room = ( scale.width || 0 ) * n * TIME_UNIT_MS[u] / ( max - min ), wide = 0;
+      scale._unit = u; scale._majorUnit = majorOf(u);
+      var ticks = ts.map(function(x) { return { value: x, major: !!scale._majorUnit && x === +moment(x).startOf(scale._majorUnit) }; });
+      for( var k = 0; k < ticks.length && ctx; k++ ) {
+        ctx.font = ticks[k].major && o.ticks.major && o.ticks.major.enabled ? majorFont : minorFont;
+        wide = Math.max(wide, ctx.measureText(String(scale.tickFormatFunction(moment(ticks[k].value), k, ticks))).width);
+      }
+      if( wide + gap <= room || i === steps.length - 1 ) out = { timestamps: ts, unit: u, stepSize: n };
+    }
+    scale._unit = _unit; scale._majorUnit = _major;
+    return out;
+  };
+
+  // The step an axis was drawn with, once the layout is done — its last pass, the axis' own
+  // size: a linear axis' (its ticks.hecTicksApplied({ axis, step })), a time axis' (its
+  // time.hecTicksApplied({ axis, unit, stepSize })) — Chart Custom.js.md §1
+  Chart.plugins.register({
+    afterLayout: function(chart) {
+      helpers.each(chart.scales, function(scale) {
+        var o = scale.options || {};
+        var _f = o.ticks && o.ticks.hecTicksApplied;
+        if( typeof _f === 'function' && scale._hecStep !== undefined ) _f({ axis: scale.id, step: scale._hecStep });
+        var _t = o.time && o.time.hecTicksApplied;
+        if( typeof _t === 'function' && scale._hecTimeStep ) _t({ axis: scale.id, unit: scale._hecTimeStep.unit, stepSize: scale._hecTimeStep.stepSize });
+      });
+    } });
+
+  // ---------------------------------------------------------------------------
   // Values that wrap around (an angle: period Q, 360) — the one rule placing them, for the
   // card (its samples, before they're grouped by column: a mean across 0 needs them
   // continuous) and for the plugin hecCircularView below (Chart Custom.js.md §1)
@@ -598,8 +767,9 @@
           p.hecJump0 = !!p.hecCircularJump; p.hecPlateau0 = !!p.hecPlateauEnd && !p.hecCircularJump;
         });
         var o = axes.filter(function (a) { return a.id === ds.yAxisID; })[0] || axes[0];
-        var t = o && o.ticks;
-        var set = chart._hecYAxisLock && t && typeof t.min === 'number' && typeof t.max === 'number';
+        // (the range the Y lock holds — the chart's own state, _hecLockRanges)
+        var t = o && chart._hecLockRanges && chart._hecLockRanges[o.id];
+        var set = chart._hecYAxisLock && t;
         // (each point: the card's value moved, its band with it; its jump as said)
         var put = function (p, y, jump) {
           var d = y - p.hecY0;
@@ -620,7 +790,7 @@
           if (x <= _t0) first = i;
           if (x > _t1) { last = i; break; }
         }
-        var r = Chart.hecCircular.place(ok.map(function (p) { return p.hecY0; }), Q, first, last, (t.min + t.max) / 2);
+        var r = Chart.hecCircular.place(ok.map(function (p) { return p.hecY0; }), Q, first, last, (t[0] + t[1]) / 2);
         ok.forEach(function (p, i) { put(p, r.values[i], r.band && i > 0 && Chart.hecCircular.jumps(r.values[i - 1], r.values[i], Q)); });
       });
     }
@@ -1329,7 +1499,10 @@
           me._hecHideZoomSelection();
         };
         document.addEventListener('keydown', p.boxEscape, true);
-        // (the box started — customEvent 'zoombox': the card lights its magnifier up)
+        // (the box started — customEvent 'zoombox': the card lights its magnifier up —, the
+        // tooltip ended and kept closed while it's drawn: _hecBoxing)
+        me._hecBoxing = true;
+        me.hecEndTooltip();
         fire(c, 'zoombox', p.x0, p.y0);
         this.onMove(c, p, e);
         return true;
@@ -1792,6 +1965,7 @@
       _sw.swipe = Math.abs(_dy) > cfg.dragSlop ? (_dy < 0 ? 'up' : 'down') : null;
       fire(c, 'dragend', undefined, undefined, _sw);
     } else if (_hName === 'zoomBox') {
+      me._hecBoxing = false;
       me._hecHideZoomSelection();
       document.removeEventListener('keydown', p.boxEscape, true);
       // (each way the box zooms: the Y axes here, as a pinch does, the time by the card,
@@ -2707,9 +2881,8 @@
       me._hecValueYAxes().forEach(function (a, i) {
         if (!ranges[i]) return;
         var _log = a.opts.type === 'logarithmic';
-        a.opts.ticks.min = _log ? Math.pow(10, ranges[i][0]) : ranges[i][0];
-        a.opts.ticks.max = _log ? Math.pow(10, ranges[i][1]) : ranges[i][1];
-        a.opts.ticks.removeEdgeTicks = true;
+        me._hecLockRanges = me._hecLockRanges || {};
+        me._hecLockRanges[a.scale.id] = _log ? [Math.pow(10, ranges[i][0]), Math.pow(10, ranges[i][1])] : [ranges[i][0], ranges[i][1]];
       });
       if (!me._hecYAxisLock) me._hecYAxisLock = 2;
       me.update();
@@ -2723,16 +2896,11 @@
       if (typeof cb === 'function') cb(this._hecYAxisLock ? this._hecYRanges() : null);
     },
 
-    // Gives every Y axis back its own range (its configured ymin / ymax, else the data's)
+    // Gives every Y axis back its own range (its parameters: ymin / ymax, else the data's)
     // and releases the lock
     _hecReleaseYAxes: function () {
       var me = this;
-      (me.options.scales && me.options.scales.yAxes || []).forEach(function (o) {
-        var _t = o.ticks || {};
-        _t.min = _t.forceMin;
-        _t.max = _t.forceMax;
-        _t.removeEdgeTicks = false;
-      });
+      me._hecLockRanges = null;
       me._hecYAxisLock = 0;
       me._hecNotifyYAxisLock();
     },
@@ -2994,11 +3162,12 @@
     },
 
     // Whether the padlock is shown: the Y axis lock on, no handleButtons in its place, and
-    // not a range forced by the card (forceMin and forceMax) while unlocked
+    // not an axis whose two sides are imposed (ticks.min and ticks.max without dataMin and
+    // dataMax: nothing to lock) while unlocked
     _hecLockIconShown: function () {
       if (!this._hecHasYAxisLock() || this._hecHandleButtons()) return false;
-      var _t = this.options.scales.yAxes[0].ticks || {};
-      return !(_t.forceMin !== undefined && _t.forceMax !== undefined && !this._hecYAxisLock);
+      var _t = this.options.scales.yAxes[0].ticks || {}, _n = function (v) { return typeof v === 'number'; };
+      return !(_n(_t.min) && !_n(_t.dataMin) && _n(_t.max) && !_n(_t.dataMax) && !this._hecYAxisLock);
     },
 
     _hecLockAndHandleWidth: function () {
@@ -4136,7 +4305,8 @@
       var _justMoved = !!(_vm && _vm.hecJustMoved);
       if (_vm) _vm.hecJustMoved = false;
 
-      if (!this._options.enabled || !_vm || _vm.tooltipActive !== true) {
+      // (none while the elastic box is drawn: _hecBoxing)
+      if (!this._options.enabled || this._chart._hecBoxing || !_vm || _vm.tooltipActive !== true) {
         this._hecCloseTooltip();
         return;
       }

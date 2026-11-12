@@ -212,11 +212,10 @@ export class CardGestures
     }
 
     // The elastic box starts (Chart.js's, a drag mostly vertical or any drag with the
-    // magnifier on): the magnifier lit up while it's drawn, the tooltips off
+    // magnifier on): the magnifier lit up while it's drawn (its tooltip: Chart.js' own)
     _onZoomBox(info, g)
     {
         this.startZoomMode();
-        g.chart.options.tooltips.enabled = false;
     }
 
     // The drag ends: the drop (info.drop, resolved by Chart.js) or the elastic box — its
@@ -225,7 +224,6 @@ export class CardGestures
     {
         const d = this._drag;
         if( !d ) {
-            g.chart.options.tooltips.enabled = true;
             if( info.zoomSelectFactor0 !== undefined && info.zoomSelectFactor1 !== undefined )
                 this.zoomToSelection(info.zoomSelectFactor0, info.zoomSelectFactor1);
             if( info.zoomBox ) this.endZoomMode();
@@ -377,7 +375,7 @@ export class CardGestures
         this._cut = { g, idx };
         for( const _g of this.graphs ) {
             _g.chart.options.handleButtons = this._cutButtons(_g);
-            _g.chart.update();
+            this.redrawChart(_g);
         }
         this._cutStop = this.listenOutsideGraphs(() => this._endCut());
     }
@@ -437,7 +435,7 @@ export class CardGestures
         for( const _g of this.graphs ) {
             if( !_g.chart.options.handleButtons ) continue;
             _g.chart.options.handleButtons = null;
-            _g.chart.update();
+            this.redrawChart(_g);
         }
     }
 

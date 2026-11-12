@@ -282,7 +282,7 @@ export class CardGraphs
         for( let g of this.graphs ) {
             if( g.chart ) {
                 g.chart.options.moveHandleVisible = !_single;
-                g.chart.update();
+                this.redrawChart(g);
             }
         }
     }
@@ -308,7 +308,7 @@ export class CardGraphs
             if( !!_opt.linkMarkerVisible === _linked ) continue;
             _opt.linkMarkerVisible = _linked;
             _opt.linkMarkerTitle = `${i18n('ui.menu.linked_graphs')} — ${i18n('ui.menu.linked_graphs_merge')}`;
-            g.chart.update();
+            this.redrawChart(g);
         }
     }
 

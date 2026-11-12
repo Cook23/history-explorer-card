@@ -819,7 +819,7 @@ The Y axis can also be interactively modified. Pressing and holding the `SHIFT` 
 
 **On a touch screen**, the same Y axis zone is a touch target: tap it, then press it again right away (within the long-press duration) and drag (a swipe on it scrolls the page). Two fingers on a graph zoom and pan: spread or pinch them vertically to zoom the Y axis around them — what is under the fingers stays there —, horizontally to zoom the time (by the same steps as the zoom buttons), and move them together to pan the time and the Y axis.
 
-By default, the Y axis of a line chart fits its curves (see [The automatic scale](#the-automatic-scale)). A small margin can be added below and above them, to give some headroom (bar charts never get it):
+By default, the Y axis of a line chart fits its curves (see [The automatic scale](#the-automatic-scale)). A margin can be added below and above them, to give some headroom: where a curve comes within half a step of the axis' end, the axis takes one step more (bar charts never get it):
 
 ```yaml
 type: custom:history-explorer-card
@@ -839,6 +839,8 @@ graphs:
       ylock: true   # Disable all interactive Y axis modifications (pan and zoom)
 ```
 
+`ystepSize` sets the step between the Y axis' labels — unless, at the graph's height, they would overlap: the axis then takes its automatic step, and a warning in the browser's console says so (`ystepSize 5 ignored on graph '…'`). Without `ystepSize`, the axis takes the tightest round step (1, 2, 5, 10, 20…) its labels have room for.
+
 `ymin` and `ymax` set the initial Y axis range and the range restored when the padlock is unlocked. They do not prevent the user from modifying the axis interactively. Use `ylock: true` to fully disable interactive Y axis changes.
 
 Setting `ylock: true` disables all interactive Y axis modifications for that graph — including Y axis drag, two-finger pinch zoom and SHIFT-drag — on all platforms (desktop, mobile, tablet, stylus). The axis lock icon is not affected. This is useful for graphs where the Y range is meaningful and should not be accidentally altered by the user.
@@ -847,7 +849,7 @@ See [Entity options](#entity-options) and the advanced example of [YAML configur
 
 ### The automatic scale
 
-The automatic Y axis of a line or bar graph works like an automatic gain in audio. It always shows every value in the time window — with the nearest one on each side, where a curve crosses the window's edges. Around it, it looks at the values on each side of the window, each counting the more as it is near the window's edge — fully at the edge, not at all a window away (by default): a pan towards a spike makes the axis grow before the spike shows. It grows at once whenever it must, so that a curve never goes out of it; it narrows only when what it holds fills less than half its height (by default), and, while a drag or a pinch moves the time, one step at a time, a step at most each quarter of a window the time moved — a small pan to and fro keeps it as it is. Once the gesture ends, it narrows at once as far as it has to. Its scale changes by steps, on round values (1, 2, 5 × 10ⁿ), the tightest holding the values: a jump that shows, never a slide. A logarithmic axis does the same, counted in decades.
+The automatic Y axis of a line or bar graph works like an automatic gain in audio. It always shows every value in the time window — with the nearest one on each side, where a curve crosses the window's edges. Around it, it looks at the values on each side of the window, each counting the more as it is near the window's edge — fully at the edge, not at all a window away (by default): a pan towards a spike makes the axis grow before the spike shows. It grows at once whenever it must, so that a curve never goes out of it; it narrows only when what it holds fills less than half its height (by default), and, while a drag or a pinch moves the time, one step at a time, a step at most each quarter of a window the time moved — a small pan to and fro keeps it as it is. Once the gesture ends, it narrows at once as far as it has to. Its ends and its labels fall on round values: the tightest step of 1, 2, 5 × 10ⁿ whose labels fit at the graph's height — the axis moves from one tick to the next, never between them. A logarithmic axis does the same, counted in decades.
 
 The values around the window come from what the card has loaded: as it loads a window, its coarse statistics over a window on each side of it (a month at most), and more while the graphs are looked at (see [Long term statistics](#long-term-statistics)). A curve without statistics (no `state_class`), or with the statistics off, uses only what is loaded: the window alone at first, its sides once they're loaded.
 
@@ -1513,7 +1515,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `logarithmic` | boolean | | | A logarithmic Y axis (a line graph) |
 | `labelsLeft` | boolean or `hover` | `show_labels` | | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see [Y axis scaling](#y-axis-scaling) |
 | `labelsRight` | boolean or `hover` | `show_labels_secondary` | | The right Y axis' labels, the same way |
-| `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size |
+| `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size — unless its labels would overlap at the graph's height (then the automatic step, with a warning in the console) |
 | `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | | | Graph height in pixels (overrides global height settings) |
 | `decimation` | | | | Accepted, without effect: see [Data decimation](#data-decimation) |
