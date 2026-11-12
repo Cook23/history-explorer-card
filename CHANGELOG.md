@@ -4,6 +4,26 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.72] - 2026-11-12
+
+### Fixed — a silence in smart mode, statistics on
+- A sensor silent for weeks, drawn from its statistics: its dashed plateau was cut where the history's blocks join (the state in force repeated at each request's start) and where a run of statistics Home Assistant made up for the silence started again at the same value — the plateau broken into short curves. A row repeating the value held is no longer a value of its own: one plateau over the whole silence, its end where the sensor speaks again
+- Tests (`yscale`): 6 months, a sensor silent from 120 to 60 days ago — one dashed plateau, no point in it
+
+### Fixed — a time nothing is loaded of yet
+- The cache emptied in part (the window moved far back, then back to the present) and asked again: until the answers came, the curve joined the two loaded zones by a straight line over the months not loaded. Where nothing is loaded yet — no source the curve may be drawn from —, the curve now stops; whatever is loaded, however coarse (the daily, the hourly statistics), is still drawn at once; a zone loaded and empty stays a dashed plateau in smart mode
+- Tests (`yscale`): a year, the cache purged of its last 6 months, Home Assistant slow to answer — no line over the months asked again; drawn once they come
+
+### Changed — the graphs on the screen first
+- Within each phase of a load, the requests of the graphs on the screen or near it are sent first, in groups of their own — never mixed with the other graphs' nor held up by them
+- Tests (`yscale`): 8 graphs, scrolled to the last ones, the window moved back 3 months — their requests sent first, in their own groups
+
+### Added — the performance test
+- Each graph told on the screen or not; each request, how many of its entities are on the screen
+- Each drawing of the graphs again, what had it drawn: answers from Home Assistant, the window moved, the window or its settings changed, a graph come near the screen — counted by cause for the load, the moves and the real time, told for each one back on the page
+- Its drag drew every graph again at each move, where a finger's drag only moves the window (drawn whole at the end): it now does as a finger's drag
+- Tests (`cards`): the graphs on the screen, the entities on the screen of each request, the drawings counted by cause
+
 ## [v1.2.71] - 2026-11-11
 
 ### Fixed — the automatic Y axis (-20 to 60 instead of -10 to 50)

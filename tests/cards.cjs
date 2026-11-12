@@ -166,7 +166,7 @@ module.exports = async function()
             && r.cleared.gaps === '— no hover yet —' && r.cleared.log === '' && r.cleared.yes === 0 && r.first < 300;
         return ok ? true : JSON.stringify(r);
     });
-    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), the window loaded again from nothing (each request: its phase, its source, its time, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the page\'s freezes counted', async () => {
+    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), those on the screen told, the window loaded again from nothing (each request: its phase, its source, its time, its entities on the screen, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the graphs drawn again counted by cause, the page\'s freezes counted', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
         await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
@@ -175,13 +175,18 @@ module.exports = async function()
         for( let k = 0; k < 240 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('step').textContent`)); k++ ) await t.wait(1000);
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
+        // (each graph told on the screen or not; each request, how many of its entities are)
         const ok = title === 'Performance' && /Graphs: \d+, entities: \d+ \(\d+ with statistics\), points drawn: \d+/.test(out)
+            && /\n  line — \d+ entities, \d+ points, on the screen\n/.test(out)
             // (first, what Home Assistant runs on and this device: see mock-ha.js system)
             && /^Home Assistant [\d.]+: Home Assistant OS on Home Assistant OS 16\.3, aarch64, Raspberry Pi 5, 8\.0 GB memory \(40 % used\), disk 21\.0 GB \/ 228\.5 GB, database MariaDB 11\.4\.5 \(3412\.50 MiB\)\nThis device: .*\d+ cores.*screen \d+×\d+ px, window \d+×\d+ px, pixel ratio [\d.]+\nBrowser: Chrome \d+\n/.test(out)
             && /== The graphs drawn again[\s\S]*\d+ ms: the card \d+ ms \(the rows read from the cache \d+ ms, the points worked out \d+ ms, the rest \d+ ms\), Chart\.js \d+ ms — by graph: \d+ ms/.test(out)
-            && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities, \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
+            && /== The window loaded again from nothing\n(  (phase \d|background|export) +(history|5minute|hour|day|week|month|stats) +[-+]?[\d.]+ d → ([-+][\d.]+ d|now)  \d+ entities \(\d+ on the screen\), \d+ values — waited [\d.]+ s, took [\d.]+ s.*\n)+  whole after [\d.]+ s: \d+ requests/.test(out)
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
-            && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out);
+            && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out)
+            // (the graphs drawn again: each cause, how many times — the window moved, by '<' and '>')
+            && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come near the screen) \d+/.test(out)
+            && /== '<' clicked 3 times[^=]*the graphs drawn again \d+ times: [^\n]*the window moved \d+/.test(out);
         return ok ? true : JSON.stringify({ title, out });
     });
     await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: the card it replaces taken back, its steps from the moment the page came back', async () => {

@@ -6,7 +6,7 @@ import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
 import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
-import { perf } from "./card-perf.js";
+import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
 const moment = window.HXLocal_moment;
 
@@ -87,12 +87,18 @@ const alignUp = (t, days) => { const f = alignDown(t, days); return f < t ? ( da
 // The state in force a request of the history began at (b: see _mergeLayer) — no change of
 // the sensor — left out where the row before it gives the same: never drawn, exported or
 // counted as a value (a point at midnight that was never recorded, a silence cut in two); kept
-// where it tells what nothing before it does (nothing loaded before it, another state)
-const withoutRepeats = rows => rows.filter((x, k) => !x.b || !k || rows[k - 1].statistics || String(rows[k - 1].state) !== String(x.state));
+// where it tells what nothing before it does (nothing loaded before it, another state, a
+// period of statistics whose values varied — its mean isn't the state then). The row before:
+// a state, or statistics of a single value (min = mean = max: the value held — Home Assistant's
+// made up for a silence, see heldRuns), the same value
+const _sameValue = (a, b) => { const x = Number(a), y = Number(b); return a !== '' && b !== '' && !isNaN(x) && !isNaN(y) ? x === y : String(a) === String(b); };
+const _repeats = (p, x) => _sameValue(p.state, x.state) && ( !p.statistics || p.statistics.min === p.statistics.max );
+const withoutRepeats = rows => rows.filter((x, k) => !x.b || !k || !_repeats(rows[k - 1], x));
 // Statistics Home Assistant makes up: a period where the sensor sent nothing gets its last
 // value — its min, mean and max the same. A run of them, each following the one before, of the
 // same period and the same value, is the value held: one row, the first, lasting until the
-// run's end (statistics.held; statistics.period: the period of each). The 5-minute and hourly
+// run's end (statistics.held; statistics.period: the period of each) — none where it holds
+// the value of the row before it. The 5-minute and hourly
 // statistics of a measurement only (a total's state is a level, not a value made up)
 function heldRuns(rows)
 {
@@ -109,7 +115,10 @@ function heldRuns(rows)
         }
         out.push(x);
     }
-    return out;
+    // (a run held at the value of the row before it — the silence going on, through a time
+    // where nothing was made up: the history kept there, its blocks' joins —: no value of its
+    // own, the one before lasting over it)
+    return out.filter((x, k) => !( x.statistics?.held && k && _sameValue(out[k - 1].state, x.state) ));
 }
 // (two lists of rows in time order, merged in time order)
 function mergeRows(a, b)
@@ -349,7 +358,8 @@ export class CardHistory
     // issue at the start of a curve, no state disappearing at the start of a timeline).
     // Empty when the cache has none. What the cache has is drawn at once, however coarse —
     // the daily statistics, the hourly ones, the 5-minute ones —, a finer layer replacing it
-    // as it comes
+    // as it comes. The times of slots c0 to c1 the cache has nothing of yet — no source it may
+    // be drawn from loaded there, until now —: their spans [a, b] (notLoaded), never drawn over
     cachedHistory(entity, c0, c1, layers = null)
     {
         const _end = x => msOf(x.statistics?.end ?? x.last_changed);
@@ -381,16 +391,25 @@ export class CardHistory
                 break;
             }
         }
-        return heldRuns(withoutRepeats(r));
+        const out = heldRuns(withoutRepeats(r)), _now = Date.now(), _spans = [];
+        for( let i = c0; i <= c1; i++ ) {
+            const s = this.cache[i];
+            if( s.a >= _now || _layers.some(l => s.cover[l].get(entity)?.length) ) continue;
+            const _last = _spans[_spans.length - 1], b = Math.min(s.b, _now);
+            if( _last && _last[1] === s.a ) _last[1] = b; else _spans.push([s.a, b]);
+        }
+        out.notLoaded = _spans;
+        return out;
     }
 
     // The graphs' data for the time window shown, from the cache: one history per shown
     // entity, in the graphs' order (an empty one when the cache has none, so that the
     // indices stay in step with buildChartData), and the color entities' by entity_id.
+    // cause: what has them drawn again (REDRAW_CAUSES), told to the performance test.
     // only: the series whose data changed (an answer's) — only the graphs showing one of
     // them, or colored by one, worked out and drawn again; none: every graph. Never a graph far
     // from the screen: drawn when it comes near it (_watchShown)
-    generateGraphDataFromCache(only = null, offscreenToo = false)
+    generateGraphDataFromCache(cause, only = null, offscreenToo = false)
     {
         const _t = performance.now();
         let c0 = this.mapStartTimeToCacheSlot(this.startTime);
@@ -428,7 +447,7 @@ export class CardHistory
         // (how long the graphs took to be drawn again: the pace of the refreshes, see
         // scheduleAutoRefresh)
         this._lastBuildMs = performance.now() - _t;
-        perf.add('redraw', this._lastBuildMs);
+        perf.add('redraw', this._lastBuildMs, { cause });
     }
 
     // The graphs far from the screen left to draw (_staleGraphs), drawn after those on it: one
@@ -444,7 +463,7 @@ export class CardHistory
             if( this.state.drag ) return void ( this._staleTid = setTimeout(_next, STALE_GESTURE_WAIT_MS) );
             const g = this._staleGraphs.values().next().value;
             this._staleGraphs.delete(g);
-            if( this.graphs.includes(g) ) this.generateGraphDataFromCache(new Set(g.entities.map(e => e.entity)), true);
+            if( this.graphs.includes(g) ) this.generateGraphDataFromCache(REDRAW_CAUSES.near, new Set(g.entities.map(e => e.entity)), true);
             this._drawStaleSoon();
         };
         this._staleTid = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(_next, { timeout: STALE_IDLE_WAIT_MS }) : setTimeout(_next, 16);
@@ -467,7 +486,7 @@ export class CardHistory
             this._drawTid = 0;
             // (drawn whole meanwhile: nothing left)
             if( this._dirty === undefined ) return;
-            this.generateGraphDataFromCache(this._dirty);
+            this.generateGraphDataFromCache(REDRAW_CAUSES.answers, this._dirty);
         }, Math.max(0, ( this._lastDrawAt ?? -Infinity ) + _gap - performance.now()));
     }
 
@@ -485,7 +504,7 @@ export class CardHistory
         this.showDate();
         this._askMissing();
         if( moved && this._withinAColumn() ) return;
-        this.generateGraphDataFromCache();
+        this.generateGraphDataFromCache(moved ? REDRAW_CAUSES.moved : REDRAW_CAUSES.window);
     }
 
     // Whether the window is still, to a column of pixels, the one the graphs were last drawn
@@ -656,13 +675,15 @@ export class CardHistory
         return this._ask(kind, ...this._span(kind, a, b), _need, o);
     }
 
-    // Units (see _histUnits) in at most HA_WORKERS groups, in their order — Home Assistant's
-    // workers all busy, a request each, and as few requests as that
+    // Units (see _histUnits — of series ids, or of plans, see _planOf) in at most HA_WORKERS
+    // groups, in their order — Home Assistant's workers all busy, a request each, and as few
+    // requests as that —: those of the graphs on the screen or near it (shownSeries) first, in
+    // groups of their own — never held up by the others —, then the others'
     _requestGroups(units)
     {
-        const n = Math.ceil(units.length / HA_WORKERS), out = [];
-        for( let k = 0; k < units.length; k += n ) out.push(units.slice(k, k + n).flat());
-        return out;
+        const _s = this.shownSeries(), _on = u => u.some(x => _s.has(typeof x === 'string' ? x : x.u[0]));
+        const _groups = l => { const n = Math.ceil(l.length / HA_WORKERS), out = []; for( let k = 0; k < l.length; k += n ) out.push(l.slice(k, k + n).flat()); return out; };
+        return [..._groups(units.filter(_on)), ..._groups(units.filter(u => !_on(u)))];
     }
 
     // Whether statistics of a period ms long are valid for entity id (see SENSOR_GAPS): not
@@ -1261,7 +1282,7 @@ export class CardHistory
     // under way until it's answered, or fails (even before it's sent); o: { phase (0 to 2:
     // see _askMissing; none: an export's), rank (phase 2's block, from the right), background,
     // raw (the promise gives { error, result }: the answer itself — the probe's) }.
-    // Sent by phase, then by rank, then in the graphs' order — a window no longer shown's
+    // Sent by phase, then by rank, then those of the graphs on the screen first, in the graphs' order — a window no longer shown's
     // after (see ha-requests.js). The answer put in the
     // cache, what's still lacking asked, the graphs drawn again → a promise of its error,
     // null for none (an export waits for it)
@@ -1274,8 +1295,11 @@ export class CardHistory
         for( const id of ids ) { const k = LAYER[kind] + ' ' + id; if( !this._flying.has(k) ) this._flying.set(k, []); this._flying.get(k).push([a, b]); }
         let _p;
         try {
-            const _at = Math.min(...ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 999 : k; }));
-            const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _at, stale: () => !this._serves(q),
+            // (within a phase and a block: those of the graphs on the screen or near it first —
+            // see shownSeries —, then in the graphs' order)
+            const _at = Math.min(...ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
+            const _s = this.shownSeries(), _off = ids.some(id => _s.has(id)) ? 0 : 500;
+            const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
                          info: { phase: o.phase ?? null, background: q.background } };
             _p = kind === 'history' ? this.historyCall(ids, moment(a), moment(b), _o)
                                     : this._askHA(this.statisticsRequest(ids, moment(a), moment(b), periodOfKind(kind, this.statistics.period)), _o);
@@ -1365,13 +1389,19 @@ export class CardHistory
         // Home Assistant took, what it asked and gave, whether it brought some of the window
         // shown when sent — o.info: its phase, whether it's the background's)
         const _t = performance.now();
-        let _sent = _t, _shown = null;
+        let _sent = _t, _shown = null, _onScreen;
         // (whether it brought some of the window shown when it was sent: see _serves)
-        return haRequests.request(() => { _sent = performance.now(); _shown = o.stale ? !o.stale() : null; request = _make(); return request ? this._hass.callWS(request) : {}; }, o).then(r => {
+        // (and how many of its entities are in a graph on the screen or near it when it's sent —
+        // see shownSeries)
+        return haRequests.request(() => {
+            _sent = performance.now(); _shown = o.stale ? !o.stale() : null; request = _make();
+            if( request ) { const _s = this.shownSeries(); _onScreen = ( request.entity_ids ?? request.statistic_ids ?? [] ).filter(id => _s.has(id)).length; }
+            return request ? this._hass.callWS(request) : {};
+        }, o).then(r => {
             if( !request ) return r;
             const _values = Object.values(r ?? {}).reduce((n, a) => n + ( Array.isArray(a) ? a.length : 0 ), 0);
             perf.add('request', performance.now() - _sent, { type: request.type, period: request.period ?? null, start: request.start_time, end: request.end_time ?? null,
-                entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, values: _values, waited: _sent - _t, shown: _shown, ...( o.info ?? {} ) });
+                entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, onScreen: _onScreen, values: _values, waited: _sent - _t, shown: _shown, ...( o.info ?? {} ) });
             return r;
         });
     }

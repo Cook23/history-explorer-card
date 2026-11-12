@@ -108,7 +108,7 @@ module.exports = async function()
             const I = el.instance, o = I.generateGraphDataFromCache, out = {}, wait = ms => new Promise(r => setTimeout(r, ms));
             const watch = async (name, f) => {
                 const log = [];
-                I.generateGraphDataFromCache = function(only, off) { log.push(only ? 'some' : 'all'); return o.call(this, only, off); };
+                I.generateGraphDataFromCache = function(cause, only) { log.push(only ? 'some' : 'all'); return o.apply(this, arguments); };
                 await f();
                 I.generateGraphDataFromCache = o;
                 out[name] = log;
