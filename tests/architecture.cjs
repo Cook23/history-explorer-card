@@ -103,6 +103,19 @@ const RULES = [
               if( !documented(m[0]) ) out.push({ index: m.index, text: m[0] });
           return out;
       } },
+    // (the boundary with Chart.js: the card gives parameters, Chart.js draws — neither writes in
+    // what is the other's)
+    { id: 'chart-callbacks', why: "the card never steps into Chart.js' layout (a scale's or a chart's before… / after… callbacks): it gives its parameters, Chart.js lays out and draws with them",
+      files: CARD, re: /\b(?:before|after)(?:Update|SetDimensions|DataLimits|BuildTicks|TickToLabelConversion|CalculateTickRotation|Fit|Layout|Draw|DatasetsDraw|Render)\s*:/g },
+    { id: 'chart-state', why: "the card never writes what a chart or a scale of Chart.js holds (its min, its width, its ticks…): only its parameters, the options",
+      files: CARD, re: /\b(?:me|scale|scaleInstance|sc|chart)\??\.(?!options\b|data\b)\w+(?:\.\w+)*\s*(?:[-+*\/]?=)(?!=)/g },
+    { id: 'chart-redraw', why: "the card has a chart drawn again only through redrawChart (card-charts.js): its parameters given first — a Y axis' values (ticks.dataMin / dataMax) —, never a drawing with stale ones",
+      files: CARD, re: /\.chart\??\.update\(/g },
+    { id: 'gesture-answers', why: "during a gesture of Chart.js, the card writes only the answers the contract asks of it (dropAllowed, insertionForbidden, handleButtons — deps/Chart Custom.js.md §0): how the gesture looks (its tooltip…) is Chart.js'",
+      files: ['src/card-gestures.js'], check: s => [...s.matchAll(/chart\??\.options\.(\w+)(?:\.\w+)*\s*=(?!=)/g)]
+          .filter(m => !GESTURE_ANSWERS.includes(m[1])).map(m => ({ index: m.index, text: m[0] })) },
+    { id: 'chart-own-parameters', why: "Chart.js never writes its parameters (options): what it changes itself — the Y lock's range, a gesture's — is its own state",
+      files: ['deps/chart-hec.js'], re: /\b(?:options|opts|_t|tickOpts)\.\w+(?:\.\w+)*\s*=(?!=)/g },
     { id: 'no-business-in-chart', why: "Chart.js never knows what an entity, Home Assistant, the store or the card's texts are",
       files: ['deps/chart-hec.js', 'deps/timeline.js'], re: /\b(entity|entities|entity_id|hass|pconfig|store|i18n|statistics?)\b/gi },
     { id: 'pure-data', why: 'these parts are data only: no DOM, no style, no event',
@@ -167,12 +180,16 @@ const RULES = [
       check: (s, f) => stringLists(s, f).filter(l => l.names.length >= 3 && l.names.every(n => OPTION_NAMES.has(n))).map(l => ({ index: l.index, text: l.key })) },
 ];
 
+// The answers the card gives during a gesture of Chart.js (deps/Chart Custom.js.md §0)
+const GESTURE_ANSWERS = ['dropAllowed', 'insertionForbidden', 'handleButtons'];
+
 // Stock Chart.js options the card sets on a chart already made (chartjs.org, 2.7)
 const STOCK_OPTIONS = new Set(['scales', 'layout', 'legend', 'tooltips', 'elements']);
 
 // The exceptions: [rule, file, the text matched, why it's right there]
 const EXCEPTIONS = [
     ['store', 'src/history-explorer-card.js', 'pconfig.entities             =', 'the card creates the list the store then manages'],
+    ['chart-redraw', 'src/card-charts.js', 'g.chart.update(duration)', "redrawChart itself: the one place a chart is drawn again"],
     ['stored-keys', 'src/card-storage.js', "removeItem('history-explorer-card')", "an old version's key (one for every card): let go, never written"],
     ['graph-gestures', 'src/card-gestures.js', 'addEventListener(', 'a mode (the cut, the magnifier): a press anywhere on the page or Escape ends it — the page, not a graph (listenOutsideGraphs)'],
     ['datasets', 'src/card-values.js', 'chart.data.datasets', "the values read a curve's own data there (its unit, its scale, its period, its color, hidden), never change it"],

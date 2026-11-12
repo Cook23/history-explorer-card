@@ -379,13 +379,16 @@ module.exports = async function()
 
     // ── A tooltip shows points — real values, never a curve's path between them. Values an
     // hour apart: power at 50, 40, 30, 20 and 10 min ago, rain at 50, 35 and 20 min ago ──
-    const sparse = (mode, o = {}) => openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: mode,
-        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain', scale: 100 }] }] },
+    // (graph: its own options — room above the values, for a tooltip beside them: ymax: '~1000')
+    const sparse = (mode, o = {}, graph = {}) => openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1', statistics: { enabled: false }, largeScreenTooltip: mode,
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain', scale: 100 }], ...graph }] },
         { mock: { series: true, rows: { 'sensor.power': [[3000, '100'], [2400, '900'], [1800, '100'], [1200, '900'], [600, '100']],
                                         'sensor.rain': [[3000, '2'], [2100, '6'], [1200, '2']] } }, clock: CLOCK, ...o });
-    // (curve d's values: their points; the middle of its path between its values j and j + 1)
+    // (curve d's values: their points — in: 1 or -1, towards the plot's middle: a value on the
+    // plot's edge, its top or bottom, is reached from within the plot —; the middle of its
+    // path between its values j and j + 1)
     const vals = d => t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea, r=c.canvas.getBoundingClientRect();
-        return c.getDatasetMeta(${d}).data.filter(p=>!p._view.skip&&!p._view.hecVirtual&&p._view.x>=A.left&&p._view.x<=A.right).map(p=>({ x: r.left+p._view.x, y: r.top+p._view.y, i: p._index })); })()`);
+        return c.getDatasetMeta(${d}).data.filter(p=>!p._view.skip&&!p._view.hecVirtual&&p._view.x>=A.left&&p._view.x<=A.right).map(p=>({ x: r.left+p._view.x, y: r.top+p._view.y, i: p._index, in: p._view.y < (A.top+A.bottom)/2 ? 1 : -1 })); })()`);
     const mid = (a, b, f = 0.5) => ({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
     const activeAt = () => t.E('graphAt(0).chart.active.map(a=>[a._datasetIndex, a._index])');
     const fade = async () => { for( let i = 0; i < 60 && await tip(0) !== null; i++ ) await t.wait(250); return tip(0); };
@@ -419,7 +422,7 @@ module.exports = async function()
     });
     await t.step('nearest: a tooltip on a value (no dot on it), then the pointer far from every value: the tooltip stays on it, then fades out after its reading time; the dot on the value nearest the pointer', async () => {
         const v = await vals(0);
-        await t.page.mouse.move(v[1].x + 1, v[1].y - 1, { steps: 5 }); await t.wait(400);
+        await t.page.mouse.move(v[1].x + 1, v[1].y + v[1].in, { steps: 5 }); await t.wait(400);
         const on = await activeAt(), open = await tip(0);
         const onDot = await hoverDot(0);
         const p = mid(v[1], v[2], 0.7); await t.page.mouse.move(p.x, p.y, { steps: 6 }); await t.wait(300);
@@ -512,27 +515,27 @@ module.exports = async function()
     // ── The tooltip's side beside its point: behind the pointer's move, decided when it shows a
     // new point (the gesture engine's direction); a finger: the half of the plot it's in ──
     const side = () => t.E('graphAt(0).chart.tooltip._view.xAlign');
-    t = await sparse('nearest');
+    t = await sparse('nearest', {}, { ymax: '~1000' });
     await t.wait(800);
     await t.step('a hover reaching a value moving rightward: the tooltip on its left; a move back while on it changes nothing; the next value reached moving leftward: the tooltip on its right', async () => {
         const v = await vals(0);
-        await t.page.mouse.move(v[1].x - 120, v[1].y - 60); await t.page.mouse.move(v[1].x, v[1].y - 1, { steps: 12 }); await t.wait(400);
+        await t.page.mouse.move(v[1].x - 120, v[1].y + 60 * v[1].in); await t.page.mouse.move(v[1].x, v[1].y + v[1].in, { steps: 12 }); await t.wait(400);
         const right = await side(), on = await activeAt();
-        await t.page.mouse.move(v[1].x - 5, v[1].y - 1, { steps: 3 }); await t.wait(300);
+        await t.page.mouse.move(v[1].x - 5, v[1].y + v[1].in, { steps: 3 }); await t.wait(300);
         const back = await side();
-        await t.page.mouse.move(v[2].x + 120, v[2].y - 60, { steps: 12 }); await t.page.mouse.move(v[2].x, v[2].y - 1, { steps: 12 }); await t.wait(400);
+        await t.page.mouse.move(v[2].x + 120, v[2].y + 60 * v[2].in, { steps: 12 }); await t.page.mouse.move(v[2].x, v[2].y + v[2].in, { steps: 12 }); await t.wait(400);
         const left = await side(), on2 = await activeAt();
         // (xAlign 'right': the box's right edge at the point — the tooltip on the point's left)
         return right === 'right' && on[0][1] === v[1].i && back === 'right' && left === 'left' && on2[0][1] === v[2].i ? true : JSON.stringify({ right, back, left, on, on2 });
     });
     done(await t.close());
-    t = await sparse('selected', { touch: true });
+    t = await sparse('selected', { touch: true }, { ymax: '~1000' });
     await t.wait(800);
     await t.step('a finger (no hover, no direction): the tooltip beside its point as the half of the plot it\'s in says', async () => {
         const v = await vals(0);
         const r = [];
         for( const p of [v[0], v[v.length - 1]] ) {
-            await t.tap(p); await t.wait(500);
+            await t.tap({ x: p.x, y: p.y + p.in }); await t.wait(500);
             r.push({ side: await side(), left: await t.E(`(()=>{ const c=graphAt(0).chart, A=c.chartArea; return ${p.x} - c.canvas.getBoundingClientRect().left <= (A.left + A.right) / 2; })()`) });
         }
         // (the left half: the tooltip on the point's right — xAlign 'left')
@@ -543,7 +546,7 @@ module.exports = async function()
     await t.wait(800);
     await t.step('all: on a value, the other curve\'s value at the same time joins it; one a few minutes away (beyond the picking margin along the time axis) doesn\'t', async () => {
         const v = await vals(0), w = await vals(1);
-        const at = async p => { await t.page.mouse.move(p.x + 1, p.y - 1, { steps: 5 }); await t.wait(400); const r = await activeAt(); await t.page.mouse.move(p.x + 1, p.y - 120, { steps: 3 }); await fade(); return r; };
+        const at = async p => { await t.page.mouse.move(p.x + 1, p.y + p.in, { steps: 5 }); await t.wait(400); const r = await activeAt(); await t.page.mouse.move(p.x + 1, p.y - 120, { steps: 3 }); await fade(); return r; };
         // (power 50 min ago: rain then too; power 40 min ago: rain 35 min ago, 5 min away)
         const same = await at(v[0]), apart = await at(v[1]);
         const r = { same, apart, dx: Math.round(Math.abs(w[1].x - v[1].x)) };

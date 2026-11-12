@@ -4,6 +4,31 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.71] - 2026-11-11
+
+### Fixed — the automatic Y axis (-20 to 60 instead of -10 to 50)
+- The card chose the axis' round bounds itself, for the height Chart.js gives an axis on the first pass of its layout — half its own: too few ticks allowed, too wide a step (a year of temperatures from -3 to 42.4: -20 to 60). Chart.js then drew those bounds with a step of its own, worked out again for the real height. The graduation — the round bounds, the step, whether the labels fit — is now Chart.js' alone, made once for the length the axis is drawn over: the tightest step of 1, 2, 5 × 10ⁿ whose labels have room. The card gives it only the values to hold
+- `ystepSize` is kept unless its labels would overlap at the graph's height: then the automatic step, and a warning in the browser's console (`ystepSize 5 ignored on graph '…'`)
+- The soft bounds (`ymin: ~0`), `yrange` and `axisAddMarginMin` / `Max` worked out by Chart.js from the values the card gives: a soft bound reached as it is, the axis rounded past it where the values go; `axisAddMargin` a step more where a curve comes within half a step of the axis' end (it only did when a value fell exactly on a tick)
+- The time labels' step chosen by Chart.js from the labels it measures, no longer by the card from an estimate of their width
+- The tightest axis: a curve whose highest or lowest value is a round one touches the plot's top or bottom — its value reached by a hover from within the plot; a tooltip with no room beside it, near the top or the bottom of the graph, shown below or above it
+- Tests (`points`): the values reached from within the plot; the tooltip's side checked with room above the values (`ymax: ~1000`)
+- Tests (`yscale`): the rule over 300 000 sets of values, bounds, soft bounds, smallest ranges, margins and steps, 2 to 11 ticks; Chart.js charts 40 to 500 px high given them; a time axis' step at 4 widths and 4 ranges; the Y lock's range; `ystepSize` at 7 heights — kept, or the automatic step and one warning
+
+### Changed — the boundary between the card and Chart.js
+- The card gives Chart.js parameters only (`deps/Chart Custom.js.md` §0, §1): a Y axis' values (`ticks.dataMin` / `dataMax`), bounds, smallest range, margins, step and width, worked out before each drawing it asks (`redrawChart`) — it no longer writes in Chart.js' scales (their `min`, `max`, `width`) nor steps into its layout
+- The padlock's and the Y gestures' range is Chart.js' own state: its parameters are never changed by it, the axis back to them once released
+- During the magnifier's box, Chart.js hides its own tooltip
+- Tests (`architecture`): the card never writes what a chart or a scale holds, never uses a layout callback, has a chart drawn only through `redrawChart`, writes only the contract's answers during a gesture; Chart.js never writes its parameters
+
+### Fixed — requests and drawings for nothing
+- A window loaded again: its blocks of history, planned at once and waiting their turn (Home Assistant answers 4 at a time), were sent as planned even once an answer had told where the history begins — on a year with 90 days kept, some fifty requests answered empty. Each request is now made when it's sent, from what the card knows then
+- The automatic refresh drew every graph again at once, before any answer — on a year, the page frozen some 350 ms every few seconds. A refresh now only asks; each answer draws its own graphs again
+- The window moved less than a column of pixels since the graphs were drawn whole (the real time on a long window): nothing drawn again — nothing would change by a pixel
+- The statistics probe over: only the graphs of the entities it probed drawn again
+- Tests (`yscale`): a year loaded again, 30 days of history kept — the blocks before them never sent once known; (`realtime`): a refresh — on a window in the past nothing drawn again, on a year at the present only its answers' graphs, on an hour past a column every graph
+
+
 ## [v1.2.70] - 2026-11-11
 
 ### Fixed — the statistics probe

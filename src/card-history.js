@@ -398,6 +398,8 @@ export class CardHistory
         // (what waited to be drawn again — see _drawSoon —: drawn now)
         if( !only || only === this._dirty ) this._dirty = undefined;
         this._lastDrawAt = performance.now();
+        // (the window the graphs are drawn whole for — see _withinAColumn)
+        if( !only ) { const { r, px } = this._geometry(); this._drawnWhole = { s: msOf(this.startTime), r, px, graphs: [...this.graphs] }; }
         let _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || only.has(colorEntityOf(e)))) : null;
         // (a graph far from the screen: drawn after those on it — see _drawStaleSoon —, or when
         // it comes near it, see _watchShown)
@@ -475,12 +477,26 @@ export class CardHistory
 
     // What the window shown needs from Home Assistant, asked (see _askMissing); the graphs
     // drawn at once from what the cache has — the window asked is the window shown, whatever
-    // is loading —, each answer drawing them again
-    updateHistory()
+    // is loading —, each answer drawing them again. moved: only the window moved — not drawn
+    // again while it moved less than a column of pixels since the graphs were drawn whole
+    // (_withinAColumn): nothing shown would change by a pixel
+    updateHistory(moved = false)
     {
         this.showDate();
         this._askMissing();
+        if( moved && this._withinAColumn() ) return;
         this.generateGraphDataFromCache();
+    }
+
+    // Whether the window is still, to a column of pixels, the one the graphs were last drawn
+    // whole for (_drawnWhole): the same length, the same graphs as wide, its start moved less
+    // than a column since — its answers drawing their own graphs meanwhile
+    _withinAColumn()
+    {
+        const d = this._drawnWhole;
+        if( !d ) return false;
+        const { r, px, column } = this._geometry(), s = msOf(this.startTime);
+        return d.px === px && Math.abs(r - d.r) < 1 && Math.abs(s - d.s) < column && d.graphs.length === this.graphs.length && d.graphs.every((g, k) => g === this.graphs[k]);
     }
 
     // The sources of a curve with statistics, from the finest: the history, the 5-minute
@@ -725,11 +741,13 @@ export class CardHistory
             });
             for( const id of _fresh ) PROBES.set(id, p);
         }
-        // (each probe this card waits for, once)
+        // (each probe this card waits for, once — its verdicts change the sources of its own
+        // entities only: their graphs drawn again)
         this._probeWaits ??= new Set();
         for( const p of new Set(ids.map(id => PROBES.get(id))) ) if( p && !this._probeWaits.has(p) ) {
             this._probeWaits.add(p);
-            p.finally(() => { this._probeWaits.delete(p); this._askMissing(); this._drawSoon(); });
+            const _probed = ids.filter(id => PROBES.get(id) === p);
+            p.finally(() => { this._probeWaits.delete(p); this._askMissing(); this._drawSoon(_probed); });
         }
     }
 
@@ -1336,18 +1354,21 @@ export class CardHistory
     }
 
     // A request of the history or the statistics to Home Assistant, through the page's
-    // regulator (o: see ha-requests.js) — timed, with how many values it gave, while a
-    // performance test records (perf)
+    // regulator (o: see ha-requests.js) — request: the request, or a function making it when
+    // it's sent (null: nothing left to ask, answered empty without Home Assistant) —, timed,
+    // with how many values it gave, while a performance test records (perf)
     _askHA(request, o = {})
     {
-        if( !perf.on ) return haRequests.request(() => this._hass.callWS(request), o);
+        const _make = typeof request === 'function' ? request : () => request;
+        if( !perf.on ) return haRequests.request(() => { const r = _make(); return r ? this._hass.callWS(r) : {}; }, o);
         // (timed while the performance test records: how long it waited in the queue, how long
         // Home Assistant took, what it asked and gave, whether it brought some of the window
         // shown when sent — o.info: its phase, whether it's the background's)
         const _t = performance.now();
         let _sent = _t, _shown = null;
         // (whether it brought some of the window shown when it was sent: see _serves)
-        return haRequests.request(() => { _sent = performance.now(); _shown = o.stale ? !o.stale() : null; return this._hass.callWS(request); }, o).then(r => {
+        return haRequests.request(() => { _sent = performance.now(); _shown = o.stale ? !o.stale() : null; request = _make(); return request ? this._hass.callWS(request) : {}; }, o).then(r => {
+            if( !request ) return r;
             const _values = Object.values(r ?? {}).reduce((n, a) => n + ( Array.isArray(a) ? a.length : 0 ), 0);
             perf.add('request', performance.now() - _sent, { type: request.type, period: request.period ?? null, start: request.start_time, end: request.end_time ?? null,
                 entities: ( request.entity_ids ?? request.statistic_ids ?? [] ).length, values: _values, waited: _sent - _t, shown: _shown, ...( o.info ?? {} ) });
@@ -1444,10 +1465,13 @@ export class CardHistory
 
         // If auto scroll is allowed (scrolled at or past the previous last event) then adjust the x position
         // if the new event is past the visible graph area.
+        // (the window moved to now: drawn again whole, its time axis moved; else nothing shown
+        // changes until an answer comes: only asked — each answer draws its own graphs again,
+        // see _answered)
         if( this.state.autoScroll && last < now ) {
             this.today();
         } else {
-            this.updateHistory();
+            this._askMissing();
         }
     }
 
@@ -1520,13 +1544,20 @@ export class CardHistory
         const _states = ids.filter(id => !seriesOf(id).attribute);
         const _attrs = ids.filter(id => seriesOf(id).attribute);
         const _entities = [...new Set(_attrs.map(id => seriesOf(id).entity))];
-        const _ask = (l, attributes) => l.length
-            ? this._askHA({ ...this.historyRequest(l, t0, t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) }, o)
+        // (each request made when it's sent: from where Home Assistant keeps the history of
+        // its series by then — _histFrom, learned from the answers before it —, none when it
+        // keeps none of t0 to t1: a request planned before it was known asks no more than that)
+        const _ask = (l, series, attributes) => l.length
+            ? this._askHA(() => {
+                const _from = Math.max(msOf(t0), Math.min(...series.map(id => this._histFrom?.get(id) ?? -Infinity)));
+                if( t1 !== null && _from >= msOf(t1) ) return null;
+                return { ...this.historyRequest(l, moment(_from), t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) };
+            }, o)
             : Promise.resolve({});
         // (an attribute's own rows say nothing of where its entity's history begins — an
         // attribute may be missing where the entity's state is there —: that told for each
         // attribute by its entity's first row, its time (s), null for none — see _answered)
-        return Promise.all([_ask(_states, false), _ask(_entities, true)])
+        return Promise.all([_ask(_states, _states, false), _ask(_entities, _attrs, true)])
             .then(([r, ra]) => Object.defineProperty({ ...r, ...attributeHistories(_attrs, ra) }, 'entityFirst',
                 { value: Object.fromEntries(_attrs.map(id => [id, ra?.[seriesOf(id).entity]?.[0]?.lu ?? null])) }));
     }

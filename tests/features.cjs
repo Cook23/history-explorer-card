@@ -152,7 +152,7 @@ module.exports = async function()
                 const r = await t.E(`(()=>{ const c=graphAt(0).chart, s=c.scales['x-axis-0'], ctx=c.ctx;
                     ctx.save(); ctx.font = s.options.ticks.fontSize + 'px ' + window.HXLocal_Chart.defaults.global.defaultFontFamily;
                     const labels = (s.ticks || []).filter(l => l !== undefined && l !== null && l !== ''), w = Math.max(0, ...labels.map(l => ctx.measureText(String(l)).width)); ctx.restore();
-                    return { n: labels.length, w: Math.round(w), width: Math.round(s.width), step: el.instance.activeRange.tickStepSize + ' ' + el.instance.activeRange.tickStepUnit }; })()`);
+                    return { n: labels.length, w: Math.round(w), width: Math.round(s.width), step: el.instance.timeTickStep().join(' ') }; })()`);
                 if( r.n * ( r.w + 8 ) > r.width + 2 ) bad.push(`${range}: ${r.n} labels of ${r.w} px on ${r.width} px (${r.step})`);
             }
             return bad.length ? bad.join(' / ') : true;
@@ -1233,9 +1233,9 @@ module.exports = async function()
                 const ticks=sc._ticks.map(k=>({ v:k.value, major:k.major, at:at(k.value) }));
                 const nights=[], d=new Date(I.startTime); d.setHours(0,0,0,0);
                 for( d.setDate(d.getDate()+1); +d<+new Date(I.endTime); d.setDate(d.getDate()+1) ) nights.push(+d);
-                return { step: I.activeRange.tickStepSize + I.activeRange.tickStepUnit, at: ticks.map(k=>k.at),
+                return { step: I.timeTickStep().join(''), at: ticks.map(k=>k.at),
                          missing: nights.filter(n=>!ticks.some(k=>k.v===n && k.major)).map(at),
-                         offClock: ticks.filter(k=>new Date(k.v).getHours() % +I.activeRange.tickStepSize || new Date(k.v).getMinutes()).map(k=>k.at) }; })()`);
+                         offClock: ticks.filter(k=>new Date(k.v).getHours() % +I.timeTickStep()[0] || new Date(k.v).getMinutes()).map(k=>k.at) }; })()`);
             return r.missing.length === 0 && r.offClock.length === 0 && /h|hour/.test(r.step) ? true : JSON.stringify(r);
         });
         done(await t.close());

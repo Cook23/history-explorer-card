@@ -407,9 +407,10 @@ module.exports = async function()
     for( let k = 0; k < 50 && await E2('el.instance._requests.some(q => !q.background)'); k++ ) await t2.wait(200);
     await t2.wait(800);
     await t2.step('padlock clicked: the Y scale shown is kept when the data changes (the time panned, a new value); released, it follows the data again', async () => {
-        // (a value far above the others, as new data brought by a pan or a refresh)
-        const spike = () => E2(`(()=>{ const c=graphAt(0).chart, d=c.data.datasets[0].data; d.push({ x: d[d.length-1].x, y: 5000 }); c.update(); })()`);
-        const unspike = () => E2(`(()=>{ const c=graphAt(0).chart; c.data.datasets[0].data.pop(); c.update(); })()`);
+        // (a value far above the others, as new data brought by a pan or a refresh — the graph
+        // drawn again as the card does it: redrawChart, its Y axes' values given first)
+        const spike = () => E2(`(()=>{ const g=graphAt(0), d=g.chart.data.datasets[0].data; d.push({ x: d[d.length-1].x, y: 5000 }); el.instance.redrawChart(g); })()`);
+        const unspike = () => E2(`(()=>{ const g=graphAt(0); g.chart.data.datasets[0].data.pop(); el.instance.redrawChart(g); })()`);
         const lk = await E2('lockPt(0)');
         const free0 = await E2('yRange(0)'); await spike(); const free1 = await E2('yRange(0)'); await unspike();
         await t2.page.mouse.click(lk.x, lk.y); await t2.wait(600);

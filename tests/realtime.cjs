@@ -99,5 +99,30 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── The automatic refresh: the graphs drawn again by what it brings, never for nothing — a
+    // move of the window of less than a column of pixels draws nothing again ──
+    t = await openCard(card({ defaultTimeRange: '1y', statistics: { enabled: true } }), { mock: { series: true, historyDelay: 300 } });
+    await t.wait(5000);
+    await t.step('a refresh: the window in the past, nothing drawn again (nothing it shows changed); a year at the present (a column of some 11 hours): the window moved a few seconds — less than a column —, only the graphs its answers bring something to; an hour at the present (a column of some 5 s), 8 s later: the window moved past a column, every graph drawn again', async () => {
+        const r = await t.E(`(async()=>{
+            const I = el.instance, o = I.generateGraphDataFromCache, out = {}, wait = ms => new Promise(r => setTimeout(r, ms));
+            const watch = async (name, f) => {
+                const log = [];
+                I.generateGraphDataFromCache = function(only, off) { log.push(only ? 'some' : 'all'); return o.call(this, only, off); };
+                await f();
+                I.generateGraphDataFromCache = o;
+                out[name] = log;
+            };
+            I.moveTimeWindow(window.HXLocal_moment().subtract(500, 'day')); await wait(3000);
+            await watch('past', async () => { I.refresh(); await wait(3000); });
+            I.today(); await wait(3000);
+            await watch('year', async () => { I.refresh(); await wait(3000); });
+            I.setTimeRangeFromString('1h', true); I.today(); await wait(3000);
+            await watch('hour', async () => { await wait(8000); I.refresh(); await wait(3000); });
+            return out; })()`);
+        return r.past.length === 0 && r.year.length > 0 && r.year.every(x => x === 'some') && r.hour[0] === 'all' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

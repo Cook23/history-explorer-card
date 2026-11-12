@@ -6492,7 +6492,13 @@
             var layoutOptions = chart.options.layout || {};
             var padding = helpers.options.toPadding(layoutOptions.padding);
             var leftPadding = padding.left;
-            var rightPadding = padding.right;
+            // (fork) hecRightAxisRoom: the room of a right Y axis kept on the right of a chart
+            // that has none — its first Y axis' width (hecWidth): the plot of linked charts
+            // aligned (Chart Custom.js.md §1)
+            var _yAxes = chart.options.scales && chart.options.scales.yAxes || [];
+            var _room = chart.options.hecRightAxisRoom && !_yAxes.some(function (a) { return a.position === 'right' && a.display !== false; })
+              ? ( _yAxes[0] && typeof _yAxes[0].hecWidth === 'number' ? _yAxes[0].hecWidth : 0 ) : 0;
+            var rightPadding = padding.right + _room;
             var topPadding = padding.top;
             var bottomPadding = padding.bottom;
 
@@ -7408,12 +7414,18 @@
             me.setDimensions();
             me.afterSetDimensions();
 
-            // Data min/max
+            // Data min/max — (fork) worked out once per layout (see the layout's update), then
+            // given back as they were at each of its passes: making the ticks changes them
+            // (buildTicks), the next pass makes its own from the data's, for its own size
             if( !me._dataLimitsCached ) {
                 me.beforeDataLimits();
                 me.determineDataLimits();
                 me.afterDataLimits();
                 me._dataLimitsCached = true;
+                me._hecDataLimits = { min: me.min, max: me.max };
+            } else if( me._hecDataLimits ) {
+                me.min = me._hecDataLimits.min;
+                me.max = me._hecDataLimits.max;
             }
 
             // Ticks - `this.ticks` is now DEPRECATED!
@@ -7441,10 +7453,10 @@
             me.afterTickToLabelConversion();
 
             // Optionally remove first and last label (Alex) — (fork) only those off the grid:
-            // an axis' range set by hand (the Y lock) ends where it ends, its labels there any
+            // an axis' range set by hand (the Y lock, _hecLockedRange) ends where it ends, its labels there any
             // value ('12.37'); a bound on the grid, a multiple of the step between the labels
             // inside, keeps its label (a logarithmic axis, whose step varies: both removed)
-            if( me.options.ticks.removeEdgeTicks ) {
+            if( me._hecLockedRange() ) {
                 var _v = me.ticksAsNumbers || [];
                 var _step = me.options.type !== 'logarithmic' && _v.length > 2 ? Math.abs(_v[2] - _v[1]) : 0;
                 var _offGrid = function (v) { var q = v / _step; return !_step || typeof v !== 'number' || Math.abs(q - Math.round(q)) > 1e-6; };
@@ -7709,6 +7721,10 @@
             }
 
             me.handleMargins();
+
+            // (fork) a vertical axis given its width (hecWidth, px — its labels' column): that
+            // width, whatever its labels' (Chart Custom.js.md §1)
+            if( !me.isHorizontal() && typeof opts.hecWidth === 'number' ) minSize.width = opts.hecWidth;
 
             me.width = minSize.width;
             me.height = minSize.height;
@@ -12976,7 +12992,12 @@
             } else {
               // The factor of 2 used to scale the font size has been experimentally determined.
               var tickFontSize = helpers.valueOrDefault(tickOpts.fontSize, defaults.global.defaultFontSize);
-              maxTicks = Math.min(tickOpts.maxTicksLimit ? tickOpts.maxTicksLimit : 11, Math.ceil(me.height / (2 * tickFontSize)));
+              // (fork) the length the axis is drawn over: its height less the half label the
+              // layout keeps above and below it (fit's paddingTop / paddingBottom, past the
+              // boxes there — handleMargins), taken off once its ticks are made
+              var _pad = tickOpts.display && me.options.display ? tickFontSize / 2 : 0, _m = me.margins || {};
+              var _len = me.height - Math.max(_pad - ( _m.top || 0 ), 0) - Math.max(_pad - ( _m.bottom || 0 ), 0);
+              maxTicks = Math.min(tickOpts.maxTicksLimit ? tickOpts.maxTicksLimit : 11, Math.ceil(_len / (2 * tickFontSize)));
             }
 
             return maxTicks;
@@ -13046,7 +13067,7 @@
           handleTickRangeOptions: function () {
             var me = this;
             var opts = me.options;
-            var tickOpts = opts.ticks;
+            var tickOpts = me._hecTickOptions(); // (fork) its parameters, the Y lock's range over them
 
             // If we are forcing it to begin at 0, but 0 will already be rendered on the chart,
             // do nothing since that would make the chart weird. If the user really wants a weird chart
@@ -13115,7 +13136,7 @@
           buildTicks: function () {
             var me = this;
             var opts = me.options;
-            var tickOpts = opts.ticks;
+            var tickOpts = me._hecTickOptions(); // (fork) its parameters, the Y lock's range over them
 
             // Figure out what the max number of ticks we can support it is based on the size of
             // the axis area. For now, we say that the minimum tick spacing in pixels must be 50
@@ -13130,7 +13151,15 @@
               max: tickOpts.max,
               stepSize: helpers.valueOrDefault(tickOpts.fixedStepSize, tickOpts.stepSize) };
 
-            var ticks = me.ticks = Ticks.generators.linear(numericGeneratorOptions, me);
+            // (fork) the ticks chosen by Chart.hecAxisTicks (chart-hec.js) from the axis'
+            // parameters — dataMin / dataMax, min / max, stepSize —, a side given neither its
+            // data's. The step applied kept (_hecStep), told once the layout is done
+            // (ticks.hecTicksApplied)
+            var _hec = Chart.hecAxisTicks ? Chart.hecAxisTicks({ dataMin: tickOpts.dataMin, dataMax: tickOpts.dataMax, min: tickOpts.min, max: tickOpts.max,
+              minRange: tickOpts.hecMinRange, marginMin: tickOpts.hecMarginMin, marginMax: tickOpts.hecMarginMax, stepSize: numericGeneratorOptions.stepSize }, maxTicks, me.min, me.max) : null;
+            var ticks = me.ticks = _hec || Ticks.generators.linear(numericGeneratorOptions, me);
+            me._hecStep = _hec ? _hec.step : numericGeneratorOptions.stepSize > 0 ? numericGeneratorOptions.stepSize
+              : ticks.length > 2 ? +( ticks[ticks.length - 2] - ticks[ticks.length - 3] ).toPrecision(12) : undefined;
 
             me.handleDirectionalChanges();
 
@@ -13196,7 +13225,7 @@
           determineDataLimits: function () {
             var me = this;
             var opts = me.options;
-            var tickOpts = opts.ticks;
+            var tickOpts = me._hecTickOptions(); // (fork) its parameters, the Y lock's range over them
             var chart = me.chart;
             var data = chart.data;
             var datasets = data.datasets;
@@ -13315,11 +13344,16 @@
           buildTicks: function () {
             var me = this;
             var opts = me.options;
-            var tickOpts = opts.ticks;
+            var tickOpts = me._hecTickOptions(); // (fork) its parameters, the Y lock's range over them
 
+            // (fork) its sides from its parameters (Chart.hecAxisSides, chart-hec.js: dataMin /
+            // dataMax, min / max — a soft bound —), the data's for a side given neither; a side
+            // imposed as it is, a free one to its decade
+            var _s = Chart.hecAxisSides ? Chart.hecAxisSides({ dataMin: tickOpts.dataMin, dataMax: tickOpts.dataMax, min: tickOpts.min, max: tickOpts.max }, me.min, me.max) : null;
+            if( _s && _s.lo > 0 && _s.hi > _s.lo ) { me.min = _s.lo; me.max = _s.hi; }
             var generationOptions = {
-              min: tickOpts.min,
-              max: tickOpts.max };
+              min: _s ? ( _s.fixLo ? _s.lo : undefined ) : tickOpts.min,
+              max: _s ? ( _s.fixHi ? _s.hi : undefined ) : tickOpts.max };
 
             var ticks = me.ticks = Ticks.generators.logarithmic(generationOptions, me);
 
@@ -14573,6 +14607,7 @@
             var ticks = [];
             var i, ilen, timestamp;
 
+            me._hecTimeStep = undefined;
             switch (options.ticks.source) {
               case 'data':
                 timestamps = me._timestamps.data;
@@ -14582,7 +14617,12 @@
                 break;
               case 'auto':
               default:
-                timestamps = generate(min, max, me.getLabelCapacity(min), options);}
+                // (fork) a unit and a step given (time.unit, time.stepSize): that step, unless
+                // its labels — measured — don't fit side by side, then the next longer one
+                // (Chart.hecTimeTicks, chart-hec.js); the step applied kept (_hecTimeStep)
+                var _fit = Chart.hecTimeTicks ? Chart.hecTimeTicks(me, min, max, generate, determineMajorUnit) : null;
+                me._hecTimeStep = _fit ? { unit: _fit.unit, stepSize: _fit.stepSize } : undefined;
+                timestamps = _fit ? _fit.timestamps : generate(min, max, me.getLabelCapacity(min), options);}
 
 
             if (options.bounds === 'ticks' && timestamps.length) {
@@ -14606,7 +14646,7 @@
             me.max = max;
 
             // PRIVATE
-            me._unit = timeOpts.unit || determineUnitForFormatting(ticks, timeOpts.minUnit, me.min, me.max);
+            me._unit = me._hecTimeStep ? me._hecTimeStep.unit : timeOpts.unit || determineUnitForFormatting(ticks, timeOpts.minUnit, me.min, me.max);
             me._majorUnit = determineMajorUnit(me._unit);
             me._table = buildLookupTable(me._timestamps.data, min, max, options.distribution);
             me._offsets = computeOffsets(me._table, ticks, min, max, options);
