@@ -6,6 +6,15 @@
 
 let recorder = null;
 
+// What has a card's graphs drawn again (generateGraphDataFromCache), as the report says it
+export const REDRAW_CAUSES = {
+    answers: 'answers from Home Assistant',
+    moved: 'the window moved',
+    window: 'the window or its settings changed',
+    near: 'a graph come near the screen',
+    test: 'the test',
+};
+
 export const perf = {
     // (recorder: { add(kind, ms, info) } — null: nothing recorded)
     set(r) { recorder = r; },

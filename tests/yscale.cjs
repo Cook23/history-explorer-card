@@ -213,7 +213,7 @@ module.exports = async function()
                     for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
                     const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi, ( lo + hi ) / 2][k % 3]) });
                     for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
-                    I.generateGraphDataFromCache(null, true);
+                    I.generateGraphDataFromCache('the test', null, true);
                     for( const g of I.graphs ) {
                         const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
                         const t = sc.options.ticks, want = window.HXLocal_Chart.hecAxisTicks({ dataMin: t.dataMin, dataMax: t.dataMax, min: t.min, max: t.max, minRange: t.hecMinRange }, lim, sc._hecDataLimits.min, sc._hecDataLimits.max);
@@ -236,7 +236,7 @@ module.exports = async function()
                     for( const s of I.cache ) for( const l of ['hist', 'fine', 'stats', 'day'] ) s[l].delete(id);
                     const rows = []; for( let t = now - 47 * 3600e3, k = 0; t < now; t += 300e3, k++ ) rows.push({ last_changed: t, state: String([lo, hi][k % 2]) });
                     for( const k of [0, 1] ) { const s = I.cache[last - k], a = s.start_m.valueOf(), b = s.end_m.valueOf(); s.hist.set(id, rows.filter(r => r.last_changed >= a && r.last_changed < b)); s.cover.hist.set(id, [[a, b]]); }
-                    I.generateGraphDataFromCache(null, true);
+                    I.generateGraphDataFromCache('the test', null, true);
                     for( const g of I.graphs ) {
                         const sc = g.chart.scales['y-axis-0'], tk = sc.ticksAsNumbers.slice().sort((x, y) => x - y), lim = Math.max(2, Math.min(11, Math.ceil(sc.height / 24)));
                         const d = { min: sc.options.ticks.dataMin ?? sc._hecDataLimits.min, max: sc.options.ticks.dataMax ?? sc._hecDataLimits.max }, fits = Math.ceil(d.max / 5 - 1e-9) - Math.floor(d.min / 5 + 1e-9) + 1 <= lim;
@@ -510,6 +510,60 @@ module.exports = async function()
         return r.rows === 14 && r.held && r.held[0] === 2 && r.held[1] === 8 * 3600e3 && r.inRun === 0 && r.plateau ? true : JSON.stringify(r);
     });
     done(await t.close());
+
+    // ── The requests of the graphs on the screen first: within a phase, those of the graphs
+    // on it or near it in groups of their own, sent before the others' ──
+    {
+        const E = ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.power_kw', 'sensor.wind', 'sensor.watering_cycle', 'sensor.days_to_watering'];
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true }, graphs: E.map(e => ({ type: 'line', entities: [{ entity: e }] })) },
+            { height: 500, mock: { series: true, fastStats: true, cost: { base: 300, history: 0.001, statistics: 0.001, workers: 4 } } });
+        await t.wait(12000);
+        await t.step('8 graphs on a 500 px screen, scrolled to the last ones, the window moved back 3 months: phase 1\'s requests of the graphs on the screen sent first, in groups of their own — never mixed with the others\', nor after them', async () => {
+            const r = await t.E(`(async()=>{ const I = el.instance, w = ms => new Promise(r => setTimeout(r, ms)), g = I.graphs;
+                g[g.length - 1].canvas.scrollIntoView(); await w(1500);
+                const s = new Set(I.graphs.filter(x => I.graphShown(x)).map(x => x.entities[0].entity));
+                window.__ws.length = 0; I.moveTimeWindow(window.HXLocal_moment(I.startTime).subtract(3, 'month')); await w(8000);
+                return { shown: [...s], order: window.__ws.filter(q => /history|statistics/.test(q.type)).map(q => ( q.ids || [] ).map(id => s.has(id) ? 'S' : 'h').join('')) }; })()`);
+            const first = r.order.slice(0, r.order.findIndex(x => /h/.test(x)));
+            return r.shown.length > 0 && r.shown.length < 8 && first.length > 0 && first.every(x => /^S+$/.test(x)) && r.order.every(x => /^S+$|^h+$/.test(x)) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── A time the cache has nothing of yet (purged, asked again): a gap — the curve never drawn
+    // over it, filled as its answers come ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.tank' }] }] },
+        { height: 900, mock: { series: true, fastStats: true, historyDays: 90 } });
+    await t.wait(6000);
+    await t.step('a year: the window 30 months back, the cache purged (its last 6 months gone), back to the present, Home Assistant slow to answer: the curve stops where nothing is loaded yet — no line over the months asked again —; their answers come: drawn', async () => {
+        const look = `(()=>{ const c = el.instance.graphs[0].chart, now = Date.now(), x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = c.data.datasets[0].data;
+            return { last5: d.filter(p => p.y !== null && x(p) > now - 150 * 864e5).length, before: d.filter(p => p.y !== null && x(p) < now - 190 * 864e5).length, gaps: d.filter(p => p.y === null).length }; })()`;
+        await t.E(`(async()=>{ const I = el.instance, w = ms => new Promise(r => setTimeout(r, ms)); I.moveTimeWindow(window.HXLocal_moment().subtract(30, 'month')); await w(3000);
+            const o = I.cacheRows; I.cacheRows = () => 600000; I._purge(); I.cacheRows = o; window.MOCK.historyDelay = 4000; I.today(); })()`);
+        await t.wait(800);
+        const a = await t.E(look);
+        await t.wait(12000);
+        const b = await t.E(look);
+        return a.last5 === 0 && a.before > 0 && a.gaps > 0 && b.last5 > 0 && b.gaps === 0 ? true : JSON.stringify({ a, b });
+    });
+    done(await t.close());
+
+    // ── A silence of 60 days, statistics on, smart mode: one plateau — never cut where the
+    // history's blocks join (the state in force at a request's start), nor where a run of
+    // statistics Home Assistant made up starts again at the same value ──
+    {
+        const rows = []; for( let h = 180 * 24; h > 0; h-- ) { const d = h / 24; if( d < 120 && d > 60 ) continue; rows.push([h * 3600, String(100 + ( h % 7 ) * 50)]); }
+        t = await openCard(card('6o', { statistics: { enabled: true }, lineMode: 'smart' }), { height: 900, mock: { series: true, rows: { 'sensor.power': rows } } });
+        await t.wait(8000);
+        await t.step('6 months, a sensor silent from 120 to 60 days ago, statistics on, smart mode: one dashed plateau over the silence — no point in it, its end where the sensor speaks again', async () => {
+            const r = await t.E(`(()=>{ const c = el.instance.graphs[0].chart, now = Date.now(), x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
+                const d = c.data.datasets[0].data, inside = d.filter(p => p.y !== null && x(p) > now - 118 * 864e5 && x(p) < now - 62 * 864e5);
+                return { inside: inside.length, ends: d.filter(p => p.hecPlateauEnd && x(p) > now - 125 * 864e5 && x(p) < now - 55 * 864e5).map(p => Math.round(( now - x(p) ) / 864e5)) }; })()`);
+            return r.inside === 0 && r.ends.length === 1 && r.ends[0] === 60 ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
 
     // ── The min/max band of a point over its own time only: none along a plateau of smart mode ──
     t = await openCard(card('3d', { statistics: { enabled: false }, lineMode: 'smart', showMinMax: true }),

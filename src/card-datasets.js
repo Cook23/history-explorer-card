@@ -346,6 +346,10 @@ export class CardDatasets
             const _l = _values[_values.length - 1];
             _values.splice(0, _values.length, { t: w.start.valueOf(), y: _l.y, min: _l.y, max: _l.y, stat: false });
         }
+        // (a time the cache has nothing of yet — not loaded, see card-history.js cachedHistory
+        // notLoaded —: a gap, the curve never drawn over it; filled as its answers come)
+        for( const [a] of data.notLoaded ?? [] ) if( _values.some(v => v.t < a) && !_gaps.includes(a) ) _gaps.push(a);
+        _gaps.sort((p, q) => p - q);
         // (a value lasts until the next one, or a gap)
         const _gapAfter = t => _gaps.find(g => g > t);
         _values.forEach((v, k) => { v.end ??= Math.min(k + 1 < _values.length ? _values[k + 1].t : Math.max(_until, v.t), _gapAfter(v.t) ?? Infinity); });

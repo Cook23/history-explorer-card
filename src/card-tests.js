@@ -6,6 +6,7 @@
 
 import { Version } from "./version.js";
 import { PROBE_INFO } from "./card-history.js";
+import { REDRAW_CAUSES } from "./card-perf.js";
 const Chart = window.HXLocal_Chart;
 
 const ISSUE_URL = 'https://github.com/Cook23/history-explorer-card/issues/new';
@@ -456,6 +457,12 @@ function buildPerformanceTest(body, card)
     const sum = l => l.reduce((a, e) => a + ( e.ms ?? e ), 0);
     const max = l => l.reduce((a, e) => Math.max(a, e.ms ?? e), 0);
     const freezes = r => `${r.freezes.length} freezes, ${sec(sum(r.freezes))} in all (${Math.round(100 * sum(r.freezes) / Math.max(1, r.ms))} % of the time), the longest ${ms(max(r.freezes))}`;
+    // (the graphs drawn again in record r: how many times, how long, and what had them drawn — each cause, how many times)
+    const drawn = r => {
+        const d = of(r, 'redraw'), n = new Map();
+        for( const e of d ) n.set(e.info?.cause, ( n.get(e.info?.cause) ?? 0 ) + 1);
+        return `the graphs drawn again ${d.length} times${d.length ? `: ${ms(sum(d))} in all, the longest ${ms(max(d))} (${[...n].map(([c, k]) => `${c} ${k}`).join(', ')})` : ''}`;
+    };
     const wait = t => new Promise(res => setTimeout(res, t));
     const step = text => { $('step').textContent = text; };
     // (a time of Home Assistant's, in days from the window's start)
@@ -466,7 +473,7 @@ function buildPerformanceTest(body, card)
         for( const q of _req ) {
             const i = q.info, src = i.type.startsWith('history') ? 'history' : String(i.period);
             const who = i.background ? 'background' : i.phase === null || i.phase === undefined ? 'export' : 'phase ' + i.phase;
-            out(`  ${who.padEnd(10)} ${src.padEnd(7)} ${day(i.start, t0)} → ${day(i.end, t0)}  ${i.entities} entities, ${i.values} values — waited ${sec(i.waited)}, took ${sec(q.ms)}${i.shown === false ? '  (not for the window shown)' : ''}`);
+            out(`  ${who.padEnd(10)} ${src.padEnd(7)} ${day(i.start, t0)} → ${day(i.end, t0)}  ${i.entities} entities${i.onScreen !== undefined ? ` (${i.onScreen} on the screen)` : ''}, ${i.values} values — waited ${sec(i.waited)}, took ${sec(q.ms)}${i.shown === false ? '  (not for the window shown)' : ''}`);
         }
         return _req;
     };
@@ -547,7 +554,8 @@ function buildPerformanceTest(body, card)
         out(`Window: ${card.startTime} → ${card.endTime} (${( G.r / 864e5 ).toFixed(1)} days), a column of pixels: ${( G.column / 60e3 ).toFixed(1)} min`);
         out(`Options: refresh ${P.refreshEnabled ? 'automatic' : 'off'}, statistics ${card.statistics?.enabled ? `on (their period: ${card.statistics.period})` : 'off'}`);
         out(`Graphs: ${g.length}, entities: ${ids.length} (${stats.size} with statistics), points drawn: ${g.reduce((a, x) => a + points(x), 0)}`);
-        for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points`);
+        // (on the screen: on it or within a screen's height — drawn first, see card-charts.js graphShown)
+        for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points${card.graphShown(x) ? ', on the screen' : ''}`);
         // (the statistics probe's verdicts: see card-history.js SENSOR_GAPS)
         // (and what each found: when, its values and its short intervals — see card-history.js _speaks)
         const _hm = t => window.HXLocal_moment(t).format('HH:mm');
@@ -568,7 +576,7 @@ function buildPerformanceTest(body, card)
             step(`Drawing again (${k + 1}/${PERF_REDRAWS})…`);
             await wait(300);
             record();
-            card.generateGraphDataFromCache();
+            card.generateGraphDataFromCache(REDRAW_CAUSES.test);
             const r = stop();
             const _all = sum(of(r, 'redraw')), _charts = of(r, 'chart'), _card = _all - sum(_charts), _rows = sum(of(r, 'from cache')), _pts = sum(of(r, 'points'));
             out(`  ${ms(_all)}: the card ${ms(_card)} (the rows read from the cache ${ms(_rows)}, the points worked out ${ms(_pts)}, the rest ${ms(Math.max(0, _card - _rows - _pts))}), Chart.js ${ms(sum(_charts))} — by graph: ${_charts.map(c => ms(c.ms)).join(', ')}`);
@@ -587,8 +595,8 @@ function buildPerformanceTest(body, card)
         if( !r ) return;
         const _req = requests(r, t0);
         out(`  ${_whole === null ? `not whole after ${PERF_LOAD_MAX_S} s` : `whole after ${sec(_whole)}`}: ${_req.length} requests, ${_req.reduce((n, q) => n + q.info.values, 0)} values`);
-        const _parts = of(r, 'part'), _draws = of(r, 'redraw');
-        out(`  ${_parts.length} answers put in the cache: ${ms(sum(_parts))} in all; the graphs drawn again ${_draws.length} times: ${ms(sum(_draws))} in all, the longest ${ms(max(_draws))} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
+        const _parts = of(r, 'part');
+        out(`  ${_parts.length} answers put in the cache: ${ms(sum(_parts))} in all; ${drawn(r)} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
         out(`  ${freezes(r)}`);
     };
 
@@ -605,6 +613,7 @@ function buildPerformanceTest(body, card)
         out(`\n== ${label}: ${_whole === null ? `not whole after ${PERF_LOAD_MAX_S} s` : `whole after ${sec(_whole)}`}`);
         out(`  window: ${card.startTime} → ${card.endTime}`);
         requests(r, Date.parse(card.startTime));
+        out(`  ${drawn(r)}`);
         out(`  ${freezes(r)}`);
     };
     const moves = async () => {
@@ -613,8 +622,9 @@ function buildPerformanceTest(body, card)
         await moved("'>' clicked 3 times", _clicks(1));
         await moved('dragged back (8 moves of a tenth of the window)', async () => {
             const m = window.HXLocal_moment, r = Date.parse(card.endTime) - Date.parse(card.startTime);
+            // (as a finger's drag does — see card-gestures.js —: each move only moves the window, the end draws it whole)
             card.state.drag = true;
-            for( let k = 0; k < 8; k++ ) { card.moveTimeWindow(m(Date.parse(card.startTime) - r / 10)); card.updateHistory(); await wait(120); }
+            for( let k = 0; k < 8; k++ ) { card.moveTimeWindow(m(Date.parse(card.startTime) - r / 10)); await wait(120); }
             card.state.drag = false;
             card.updateHistory();
         });
@@ -628,8 +638,7 @@ function buildPerformanceTest(body, card)
         for( let k = 0; k < PERF_REALTIME_S && !stopped; k++ ) await wait(1000);
         const r = stop();
         if( !r ) return;
-        const _d = of(r, 'redraw');
-        out(`  ${of(r, 'request').length} requests, the graphs drawn again ${_d.length} times: ${ms(sum(_d))} in all, the longest ${ms(max(_d))}`);
+        out(`  ${of(r, 'request').length} requests, ${drawn(r)}`);
         out(`  ${freezes(r)}`);
     };
 
@@ -665,7 +674,7 @@ function buildPerformanceTest(body, card)
             out(`\n== Back on the page, after ${sec(_shown - _hidden)} away`);
             const _all = [...r.events.filter(e => e.kind === 'card').map(e => ({ at: e.at, what: `card ${e.info.card}: ${e.info.step}${e.ms ? ` (${ms(e.ms)})` : ''}` })),
                           ..._events, ...r.freezes.map(f => ({ at: f.at, what: `the page froze ${ms(f.ms)}` })),
-                          ...of(r, 'redraw').map(e => ({ at: e.at, what: `graphs drawn again (${ms(e.ms)})` })),
+                          ...of(r, 'redraw').map(e => ({ at: e.at, what: `graphs drawn again (${ms(e.ms)}): ${e.info?.cause}` })),
                           ...of(r, 'request').map(e => ({ at: e.at, what: `answer: ${e.info.type.startsWith('history') ? 'history' : e.info.period} (${e.info.values} values, ${sec(e.ms)})` }))]
                 .filter(e => e.at >= _hidden).sort((a, b) => a.at - b.at);
             for( const e of _all ) out(`  ${( e.at < _shown ? '-' : '+' ) + sec(Math.abs(e.at - _shown))}  ${e.what}`);
