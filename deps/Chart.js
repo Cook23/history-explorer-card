@@ -7695,13 +7695,26 @@
 
                 // Ensure that our ticks are always inside the canvas. When rotated, ticks are right aligned
                 // which means that the right padding is dominated by the font height
-                if (me.labelRotation !== 0) {
-                  me.paddingLeft = opts.position === 'bottom' ? cosRotation * firstLabelWidth + 3 : cosRotation * lineSpace + 3; // add 3 px to move away from canvas edges
-                  me.paddingRight = opts.position === 'bottom' ? cosRotation * lineSpace + 3 : cosRotation * lastLabelWidth + 3;
-                } else {
-                  me.paddingLeft = firstLabelWidth / 2 + 3; // add 3 px to move away from canvas edges
-                  me.paddingRight = lastLabelWidth / 2 + 3;
+                // (fork) the room kept at each end: for the widest label, worked out once per
+                // labels' format (font, time unit and step, rotation) — the same while the axis
+                // pans: the text of the labels at the ends never changes the layout; a label that
+                // doesn't fit there centred is drawn aligned on the edge, or not at all (draw)
+                var _room = me.chart._hecEdgeRoom = me.chart._hecEdgeRoom || {};
+                var _key = [tickFont.font, me._unit, me._hecTimeStep && me._hecTimeStep.stepSize, me.labelRotation].join('|');
+                var _r = _room[me.id];
+                if (!_r || _r.key !== _key) {
+                  firstLabelWidth = lastLabelWidth = largestTextWidth;
+                  _r = _room[me.id] = { key: _key, left: 0, right: 0 };
+                  if (me.labelRotation !== 0) {
+                    _r.left = opts.position === 'bottom' ? cosRotation * firstLabelWidth + 3 : cosRotation * lineSpace + 3; // add 3 px to move away from canvas edges
+                    _r.right = opts.position === 'bottom' ? cosRotation * lineSpace + 3 : cosRotation * lastLabelWidth + 3;
+                  } else {
+                    _r.left = firstLabelWidth / 2 + 3; // add 3 px to move away from canvas edges
+                    _r.right = lastLabelWidth / 2 + 3;
+                  }
                 }
+                me.paddingLeft = _r.left;
+                me.paddingRight = _r.right;
               } else {
                 // A vertical axis is more constrained by the width. Labels are the
                 // dominant factor here, so get that length first and account for padding
@@ -8002,6 +8015,15 @@
                 xLineValue += helpers.aliasPixel(lineWidth);
 
                 labelX = me.getPixelForTick(index) + optionTicks.labelOffset; // x values for optionTicks (need to consider offsetLabel option)
+                // (fork) a label centred on its tick that would go past the chart's edge (3 px
+                // from it): aligned on that edge, moved inwards half its font's size at most —
+                // further, not drawn (the room at the ends is fixed: see fit)
+                if (!isRotated && textAlign === 'center' && label !== null && label !== undefined && label !== '') {
+                  context.font = ( tick.major ? majorTickFont : tickFont ).font;
+                  var _w = computeTextSize(context, label, context.font), _lo = 3, _hi = me.chart.width - 3, _tol = tickFont.size / 2;
+                  if (labelX - _w / 2 < _lo) { if (_lo - ( labelX - _w / 2 ) > _tol) label = ''; else { labelX = _lo; textAlign = 'left'; } }
+                  else if (labelX + _w / 2 > _hi) { if (labelX + _w / 2 - _hi > _tol) label = ''; else { labelX = _hi; textAlign = 'right'; } }
+                }
 
                 tx1 = tx2 = x1 = x2 = xLineValue;
                 ty1 = yTickStart;

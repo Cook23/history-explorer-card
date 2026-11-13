@@ -4,6 +4,61 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.73] - 2026-11-13
+
+### Fixed — a dense curve stopped the drawing
+- A curve with more than some 120 000 values in the cache around the window (a value every 2 s, 3 days): its values were passed to a single call as its arguments, which a browser limits — "Maximum call stack size exceeded", the graphs no longer drawn. No list is spread into a call any more (`history-arrays.js`); a rule of the `architecture` test forbids it
+- Tests (`yscale`): a value every 2 s over 3 days, the background filling around it — drawn, the Y axis worked out
+
+### Fixed — the elastic box's time range
+- The time range a box zoomed to came from a list written by hand, with holes: a box of 10 days gave a week, shorter than the box; 300 days gave 6 months. It's now the first of the time ranges covering the box (10 days: 2 weeks; 300 days: a year), under an hour its minutes
+- Tests (`mouse`): boxes of 40 min to 6 years — each covered, the range one of the time ranges
+
+### Fixed — the last one to speak, at every level of the YAML
+- With persistence, a parameter changed on the card, a graph or in `entityOptions` (`lineWidth`, a line mode…) was ignored for the curves already saved: only a change on the curve's own line counted as the YAML speaking. A change at any level now does, as it reaches each curve; a choice made on the card since still wins, until the YAML speaks again
+- Every source compared option by option — the YAML and Home Assistant's user data (another device's changes) as this device's own choices were: an option one of them changed replaced every option of the curve with its own, those it hadn't changed too. Only the options a source changed now replace what the others said
+- A curve's options all taken from the levels when it's added, and kept as its own: some were (its width, its line mode, its color…), others were read again at each drawing (its interpolation, its tooltip's modes, `tapAction`, `rounding`, `valueFactor`, `stateMap`…) — a curve moved to another graph took that graph's, a curve added from the card followed a later change of the card's in the YAML. Every one is now the curve's own: moved, it keeps them, as its color
+- Updating to this version, with persistence: what the card keeps of the YAML to compare it with now holds every option of the YAML's curves; at the first load, the options it didn't hold count once as the YAML speaking — a choice made on the card for one of them on a curve of the YAML (its width, its line mode, its interpolation…) is lost once
+- Tests (`persistence`): `lineWidth` on the card, then on its graph, a line mode in `entityOptions`, a line mode chosen on the card, then `entityOptions` again; a choice made on the card kept when the YAML or another device changes another option
+
+### Fixed — `statistics.period: 5minute`
+- With the 5-minute statistics as the card's period, the probe of the statistics wasn't made: 5-minute statistics not valid for a sensor were asked and drawn. The probe is made whenever statistics shorter than a day can be used, whatever the period
+- `5minute` and `week` documented as values of `statistics.period`
+- Tests (`yscale`): `period: 5minute`, a value every hour — never asked nor drawn; every minute — asked and drawn
+
+### Fixed — one mean for an angle
+- The turn an angle's curve is shown in was chosen from a mean of its own in Chart.js (a vector mean, each value counting the same), beside lowpass_dt's rule used for every other mean of an angle. The card now gives Chart.js the circular mean by that rule, each value weighted by how long it's in force; Chart.js works out none
+- Tests (`yscale`): 350° for 23 h, then 20° for an hour — the curve around 350° (20° drawn as 380°), no longer -10° and 20°
+
+### Fixed — parameters' defaults in their tables
+- The defaults of `uiColors`' close button, labels and grid lines, of `tapAction` and of `yAxis` were written where they're read: they're in the tables of their families (`UI_COLOR_DEFAULTS`, `OPTION_DEFAULTS`); a rule of the `architecture` test (`defaults-in-family`) finds any written elsewhere
+- One resolution of `entityOptions` for the card and the info panel; variables never read removed, and found by the `lint` test from now on
+- Lists of names written once: the line styles (`DASH_MODES`), the interpolations, the tooltip's modes, the header's alignments; the `lists-once` rule sees a list written as an object's keys or as a menu's values too
+- One search of the cache's day for a time
+
+### Fixed — the cache's bound on a long window
+- The purge never touches the window and a side as wide as the window: on 5 years, 15 years were kept — the cache past its bound for good. Its sides are now the ones the coarse source asks (a width, a month at most); the documentation says that a window of years may keep the cache past 500 000 values
+- Tests (`yscale`): a window of 60 days — 45 days before it purged, 20 days kept
+
+### Fixed — the plot's width moved with the time labels
+- Chart.js kept at each end of the time axis the room of the label there, by its text: as the window moved (the real time, a pan), a label "Dec" becoming "2025" changed the plot's width by a few pixels — and the card, its columns of pixels changed, drew every graph again. The room kept is now the widest label's, worked out once per labels' format (their time unit, their step) and kept while the window moves; a label at an end that doesn't fit centred is aligned on the edge — moved inwards half its font's size at most —, else not drawn
+- A change of the plot's width of less than 1 % ignored before drawing the window again whole
+- Tests (`features`): a year panned a week at a time — the plot's width the same at every step, every label within the chart; (`realtime`): a refresh on a year draws only its answers' graphs
+
+### Added — a curve's export
+- *Export ▸* in a curve's menu (a long-press on its label) and in the info panel's: its own entity's history and statistics, as a graph's and the options menu's — the exports take the series they export, whatever menu asks
+- Tests (`features`, `panel`): a curve's history exported from its menu — its own entity only; the info panel's
+- The type menu named for what it is, the curve menu: its display, its appearance, its interpolation, its behavior, its export — in the info panel, its link *Curve ▾* (it read *Type*); the `typemenu` test suite `curvemenu`
+
+### Changed — the performance test
+- What follows each answer — the cache's size kept, what's still lacking asked — timed, for the load, the moves and the real time
+- The graphs off the screen, drawn after those on it, told as such (they were told as come near the screen)
+- Back on the page: the time the app was left told as away from the app, never as a freeze
+- Tests (`cards`): what follows the answers timed; the time away told as such
+
+### Documentation
+- ARCHITECTURE.md, BRANCH.md, README_Full: the sparse sensors probed over 24 hours; the background's order (the angles, the exports' probes, the sides); phase 3 — phase 1's sides, after phase 2; the purge's zone; a `defaultTimeRange` not in the selector rounded up to the next range; the list of test suites
+
 ## [v1.2.72] - 2026-11-12
 
 ### Fixed — a silence in smart mode, statistics on

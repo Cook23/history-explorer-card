@@ -4,16 +4,15 @@
 import { normalizeColor } from "./history-default-colors.js";
 
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
-// line modes) — the first one is the default; see hecSplineTangents in deps/chart-hec.js,
-// and helpers.canvas.lineTo in deps/Chart.js for bspline
-export const INTERPOLATIONS = ['monotone', 'steffen', 'makima', 'catmullrom', 'bspline'];
+// line modes), each as the Interpolation submenu names it (not translated) — the first one is
+// the default; see hecSplineTangents in deps/chart-hec.js, and helpers.canvas.lineTo in
+// deps/Chart.js for bspline
+export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom', bspline: 'B-spline' };
+export const INTERPOLATIONS = Object.keys(INTERPOLATION_LABELS);
 
 // The magnifier's modes (what the elastic box zooms — Chart.js zoomBoxAxes): the time (x),
 // the Y axes (y), both (xy)
 export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
-
-// How each algorithm is named in the Interpolation submenu (names, not translated)
-export const INTERPOLATION_LABELS = { monotone: 'Monotone', steffen: 'Steffen', makima: 'Makima', catmullrom: 'Catmull-Rom', bspline: 'B-spline' };
 
 // (each unknown value is reported once: it's resolved again at each redraw)
 const _reportedInterpolations = new Set();
@@ -146,6 +145,10 @@ const GROUP_BY = ['interval', 'hour', 'date'];
 // The statistics a curve can show over its graph (showStats), in the order they're shown
 const STATS = ['min', 'average', 'max'];
 
+// The line styles a dashMode names, in the order the Appearance menu shows them: their dashes
+// and gaps (px; solid: none)
+export const DASH_MODES = { solid: undefined, points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
+
 // A dashMode written as CSS writes dashes and gaps ('10,10', '10 5'): as a list
 const _dashList = v => ( typeof v === 'string' && /^[\d.\s,]+$/.test(v) && /\d/.test(v) ) ? v.trim().split(/[\s,]+/).map(Number) : v;
 
@@ -179,9 +182,13 @@ export function stateLabel(map, v)
 // An axis' labels: shown (true), hidden (false) or shown on a hover ('hover')
 const _labelsShown = v => v === 'hover' ? v : v !== false;
 
+// A graph's header's alignments (alignHeader): how its content is spread (CSS
+// justify-content — see card-graphs.js updateGraphHeader)
+export const HEADER_ALIGNS = { default: 'space-between', left: 'flex-start', right: 'flex-end', center: 'center' };
+
 // The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
 // or all, whatever its case; anything else not set, with a warning
-const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
+export const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
 // showStateFor / showStatsFor: the values over a graph for every curve, or for the first one
 const SHOWN_FOR = ['all', 'first'];
 const _tooltipMode = v => {
@@ -234,7 +241,7 @@ const OPTION_VALUES = {
     // updateGraphHeader, card-values.js showValues)
     showName      : v => v !== false,
     showIcon      : v => v !== false,
-    alignHeader   : v => ['default', 'left', 'right', 'center'].includes(v) ? v : undefined,
+    alignHeader   : v => v in HEADER_ALIGNS ? v : undefined,
     alignIcon     : v => ['left', 'right', 'state'].includes(v) ? v : undefined,
     alignState    : v => ['left', 'right', 'center'].includes(v) ? v : undefined,
     fontSize      : _positive,
@@ -381,6 +388,9 @@ export const OPTION_DEFAULTS = {
     uiLayout: { toolbar: 'top', selector: 'top', sticky: 'hide' },
     // (an arrowline's full turn, when its entity has no circular period — card-charts.js)
     arrowlinePeriod: 360,
+    // (a curve's Y axis side — CardConfig.resolveYAxis —, what a click on its value does —
+    // CardConfig.tapActionOf)
+    yAxis: 'auto', tapAction: { action: 'more-info' },
 };
 // (the graph's ones, given to every graph under the card's own)
 const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight', 'yScaleSteadiness'];

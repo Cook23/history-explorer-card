@@ -7,9 +7,9 @@ import "../deps/md5.js"
 import "../deps/FileSaver.js"
 
 import { HistoryCSVExporter, StatisticsCSVExporter } from "./history-csv-exporter.js";
-import { stateColors, stateColorsDark, defaultColors, parseColor, buttonsColor } from "./history-default-colors.js";
+import { stateColors, stateColorsDark, parseColor, buttonsColor, UI_COLOR_DEFAULTS } from "./history-default-colors.js";
 import { setLanguage, i18n } from "./languages.js";
-import { EntityStore, entityIdOf } from "./history-entity-store.js";
+import { EntityStore } from "./history-entity-store.js";
 import { CardConfig } from "./card-config.js";
 import { CardTimeRange } from "./card-timerange.js";
 import { CardHistory } from "./card-history.js";
@@ -29,10 +29,6 @@ import { localGestures, versionIsNew } from "./card-storage.js";
 import "./history-info-panel.js"
 import { Version } from "./version.js";
 import { perf } from "./card-perf.js";
-
-var Chart = window.HXLocal_Chart;
-var moment = window.HXLocal_moment;
-
 
 // --------------------------------------------------------------------------------------
 // Internal card representation and instance state
@@ -59,7 +55,6 @@ export class HistoryCardState {
         this.ui.zoomButton    = [];
         this.ui.inputField    = [];
         this.ui.darkMode      = false;
-        this.ui.spinOverlay   = null;
         this.ui.optionStyle   = '';
         this.ui.hideHeader    = false;
         this.ui.hideInterval  = false;
@@ -164,8 +159,9 @@ export class HistoryCardState {
         if( P.uimode === 'dark' ) this.ui.darkMode = true; else
         if( P.uimode === 'light' ) this.ui.darkMode = false;
 
-        P.graphLabelColor = parseColor(P.uiColors.labels ?? (this.ui.darkMode ? '#9b9b9b' : '#333'));
-        P.graphGridColor  = parseColor(P.uiColors.gridLines ?? (this.ui.darkMode ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"));
+        const _theme = this.ui.darkMode ? 'dark' : 'light';
+        P.graphLabelColor = parseColor(P.uiColors.labels ?? UI_COLOR_DEFAULTS.labels[_theme]);
+        P.graphGridColor  = parseColor(P.uiColors.gridLines ?? UI_COLOR_DEFAULTS.gridLines[_theme]);
         P.cursorLineColor = parseColor(P.uiColors.cursorLine ?? P.graphGridColor);
     }
 
@@ -517,7 +513,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, PERSISTENCE_CATEGORIES);
         this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, PERSISTENCE_CATEGORIES);
 
-        this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? '#0000001f');
+        this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? UI_COLOR_DEFAULTS.closeButton);
 
         this.instance.pconfig.infoPanelConfig = config.infoPanel;
         this.instance.pconfig.defaultInfoPanel = config.defaultInfoPanel;
@@ -577,12 +573,6 @@ class HistoryExplorerCard extends HTMLElement
         `;
 
         this.innerHTML = html;
-
-        // Processing spinner (not added to DOM by default)
-        this.instance.ui.spinOverlay = document.createElement('div');
-        this.instance.ui.spinOverlay.style = 'position:fixed;display:block;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:2;backdrop-filter:blur(5px)';
-        this.instance.ui.spinOverlay.innerHTML = `<svg width="38" height="38" viewBox="0 0 38 38" stroke="#fff" style="position:fixed;left:calc(50% - 20px);top:calc(50% - 20px);"><g fill="none" fill-rule="evenodd"><g transform="translate(1 1)" stroke-width="2"><circle stroke-opacity="0.5" cx="18" cy="18" r="18"/><path d="M36 18c0-9.94-8.06-18-18-18"><animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/></path></g></g></svg>`;
-
     }
 
     // The height of your card. Home Assistant uses this to automatically distribute all cards over the available columns.

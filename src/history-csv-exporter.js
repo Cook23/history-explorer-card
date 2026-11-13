@@ -35,6 +35,15 @@ function escapeSeperator(sep, state)
 // (_request) and its own lines (exportCallback)
 // --------------------------------------------------------------------------------------
 
+// The spinner shown over the page while a file is made
+function spinOverlay()
+{
+    const o = document.createElement('div');
+    o.style = 'position:fixed;display:block;width:100%;height:100%;top:0;left:0;right:0;bottom:0;background-color:rgba(0,0,0,0.5);z-index:2;backdrop-filter:blur(5px)';
+    o.innerHTML = `<svg width="38" height="38" viewBox="0 0 38 38" stroke="#fff" style="position:fixed;left:calc(50% - 20px);top:calc(50% - 20px);"><g fill="none" fill-rule="evenodd"><g transform="translate(1 1)" stroke-width="2"><circle stroke-opacity="0.5" cx="18" cy="18" r="18"/><path d="M36 18c0-9.94-8.06-18-18-18"><animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1s" repeatCount="indefinite"/></path></g></g></svg>`;
+    return o;
+}
+
 class CSVExporter {
 
     constructor()
@@ -44,9 +53,9 @@ class CSVExporter {
         this.timeFormat = undefined;
     }
 
-    // The series of graphs — the values their curves show: an entity's state, an attribute —,
-    // over the window shown
-    exportFile(cardstate, graphs)
+    // The series ids — the values curves show: an entity's state, an attribute —, over the
+    // window shown
+    exportFile(cardstate, ids)
     {
         this.separator = cardstate.pconfig.exportSeparator;
         this.window = [cardstate.startTime, cardstate.endTime];
@@ -54,14 +63,11 @@ class CSVExporter {
         this.timeFormat = cardstate.pconfig.exportTimeFormat;
         this.numberLocale = cardstate.pconfig.exportNumberLocale;
 
-        const l = [];
-        for( const g of graphs )
-            for( const e of g.entities ) {
-                if( !l.includes(e.entity) ) l.push(e.entity);
-            }
+        const l = [...new Set(ids)];
         if( !l.length ) return;
 
-        this.overlay = cardstate.ui.spinOverlay;
+        // (a spinner over the page while it's made)
+        this.overlay ??= spinOverlay();
         document.body.appendChild(this.overlay);
         this._request(cardstate, l).then(this.exportCallback.bind(this), this.exportFailed.bind(this));
     }
@@ -101,11 +107,11 @@ class CSVExporter {
 
 export class HistoryCSVExporter extends CSVExporter {
 
-    exportFile(cardstate, graphs)
+    exportFile(cardstate, ids)
     {
         this.saveAttributes = cardstate.pconfig.exportAttributes;
         this._hass = cardstate._hass;
-        super.exportFile(cardstate, graphs);
+        super.exportFile(cardstate, ids);
     }
 
     // (from the cache first, what it lacks asked to Home Assistant — with the attributes, all)
@@ -177,10 +183,10 @@ export class HistoryCSVExporter extends CSVExporter {
 export class StatisticsCSVExporter extends CSVExporter {
 
     // (period: the one chosen in the menu — STATS_EXPORT_PERIODS)
-    exportFile(cardstate, graphs, period)
+    exportFile(cardstate, ids, period)
     {
         this.period = period;
-        super.exportFile(cardstate, graphs);
+        super.exportFile(cardstate, ids);
     }
 
     // (from the cache first, what it lacks asked to Home Assistant)

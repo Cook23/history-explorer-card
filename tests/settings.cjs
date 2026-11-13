@@ -25,7 +25,7 @@ module.exports = async function()
         await t.page.reload(); await t.wait(3500);
     };
     const newDevice = async (cfg) => { await t.E('localStorage.clear()'); await reload(cfg); };
-    const typeMenuOpen = () => t.E(`getComputedStyle(el.querySelector('#et_0')).display !== 'none'`);
+    const curveMenuOpen = () => t.E(`getComputedStyle(el.querySelector('#et_0')).display !== 'none'`);
     const closeMenus = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(400); };
     // A press held ms on a curve label (mouse)
     const hold = async ms => { const p = await t.E('legendPt(0,0)'); const m = t.page.mouse; await m.move(p.x, p.y); await m.down(); await t.wait(ms); await m.up(); await t.wait(400); };
@@ -94,10 +94,10 @@ module.exports = async function()
         await enter('readingTimePerWord', 500); await closeMenus(); const s = await time();
         return d === 1700 && v.readingTimePerWord === 1000 && g.readingWordMs === 1000 && s === 2000 ? true : JSON.stringify({ d, v, g, s });
     });
-    await t.step('the long press duration: 1200 ms — a press of 800 ms opens no type menu, one of 1500 ms does', async () => {
+    await t.step('the long press duration: 1200 ms — a press of 800 ms opens no curve menu, one of 1500 ms does', async () => {
         await openAll(); await enter('longPress', 1200); await enter('precision', 10); await closeMenus();
-        await hold(800); const short = await typeMenuOpen(); await closeMenus();
-        await hold(1500); const long = await typeMenuOpen(); await closeMenus();
+        await hold(800); const short = await curveMenuOpen(); await closeMenus();
+        await hold(1500); const long = await curveMenuOpen(); await closeMenus();
         return !short && long ? true : JSON.stringify({ short, long });
     });
     await t.step('the precision: 20 px — a move of 15 px on the plot is no drag (the time stays), one of 60 px is', async () => {
@@ -113,9 +113,9 @@ module.exports = async function()
             return { x: r.left+b.left+b.width+15, y: r.top+b.top+b.height/2 }; })()`);
             const m = t.page.mouse; await m.move(p.x, p.y); await m.down(); await t.wait(1500); await m.up(); await t.wait(400); };
         await openAll(); await enter('precision', 20); await closeMenus();
-        await beside(); const at20 = await typeMenuOpen(); await closeMenus();
+        await beside(); const at20 = await curveMenuOpen(); await closeMenus();
         await openAll(); await enter('precision', 8); await closeMenus();
-        await beside(); const at8 = await typeMenuOpen(); await closeMenus();
+        await beside(); const at8 = await curveMenuOpen(); await closeMenus();
         await openAll(); await enter('precision', 20); await closeMenus();
         return at20 && !at8 ? true : JSON.stringify({ at20, at8 });
     });

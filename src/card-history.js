@@ -8,6 +8,7 @@ import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_E
 import { HORIZON } from "./card-yscale.js";
 import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
+import { appendAll } from "./history-arrays.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period)
@@ -46,6 +47,9 @@ const PHASE_SIDES = 3;
 // request may hold — larger, in HA_WORKERS groups once the window has moved, a request for each
 // entity at a first load (see _askMissing)
 const GROUP_MAX_ROWS = 200;
+// (the plot's width, a fraction of it: a change smaller ignored before drawing the window again
+// whole — see _withinAColumn)
+const PX_HYSTERESIS = 0.01;
 // (the answers drawn: no sooner than this after the last drawing — see _drawSoon)
 const DRAW_GAP_MIN_MS = 100;
 // The graphs far from the screen drawn after those on it (see _drawStaleSoon): each when the
@@ -202,7 +206,7 @@ export class CardHistory
         const _page = PAGE_CACHES.get(this.pageKey);
         clearTimeout(_page?.tid);
         if( _page?.cache.length ) {
-            this.cache.push(..._page.cache);
+            appendAll(this.cache, _page.cache);
             this.cacheSize = this.cache.length - 1;
             PAGE_CACHES.set(this.pageKey, { cache: this.cache });
             this._forgetToday();
@@ -262,30 +266,22 @@ export class CardHistory
         }
     }
 
+    // The cache slot holding time t, the start of a time span (a slot's start in it, its end
+    // not): before the cache, its first; after it, -1
     mapStartTimeToCacheSlot(t)
     {
-        let mt = moment(t);
-
-        for( let i = 0; i < this.cacheSize+1; i++ ) {
-            if( mt >= this.cache[i].start_m && mt < this.cache[i].end_m ) return i;
-        }
-
-        if( mt < this.cache[0].start_m ) return 0;
-
-        return -1;
+        const m = msOf(t), n = this.cache.length;
+        if( !n || m >= this.cache[n - 1].b ) return -1;
+        return m < this.cache[0].a ? 0 : this._slotAt(m);
     }
 
+    // The cache slot holding time t, the end of a time span (a slot's end in it, its start
+    // not): after the cache, its last; before it, -1
     mapEndTimeToCacheSlot(t)
     {
-        let mt = moment(t);
-
-        for( let i = 0; i < this.cacheSize+1; i++ ) {
-            if( mt > this.cache[i].start_m && mt <= this.cache[i].end_m ) return i;
-        }
-
-        if( mt > this.cache[this.cacheSize].end_m ) return this.cacheSize;
-
-        return -1;
+        const m = msOf(t), n = this.cache.length;
+        if( !n || m <= this.cache[0].a ) return -1;
+        return m > this.cache[n - 1].b ? n - 1 : this._slotAt(m - 1);
     }
 
     // The entities whose history is loaded: those shown, and those giving a shown entity
@@ -463,7 +459,7 @@ export class CardHistory
             if( this.state.drag ) return void ( this._staleTid = setTimeout(_next, STALE_GESTURE_WAIT_MS) );
             const g = this._staleGraphs.values().next().value;
             this._staleGraphs.delete(g);
-            if( this.graphs.includes(g) ) this.generateGraphDataFromCache(REDRAW_CAUSES.near, new Set(g.entities.map(e => e.entity)), true);
+            if( this.graphs.includes(g) ) this.generateGraphDataFromCache(REDRAW_CAUSES.later, new Set(g.entities.map(e => e.entity)), true);
             this._drawStaleSoon();
         };
         this._staleTid = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(_next, { timeout: STALE_IDLE_WAIT_MS }) : setTimeout(_next, 16);
@@ -515,7 +511,9 @@ export class CardHistory
         const d = this._drawnWhole;
         if( !d ) return false;
         const { r, px, column } = this._geometry(), s = msOf(this.startTime);
-        return d.px === px && Math.abs(r - d.r) < 1 && Math.abs(s - d.s) < column && d.graphs.length === this.graphs.length && d.graphs.every((g, k) => g === this.graphs[k]);
+        // (the plot's width: a change of less than PX_HYSTERESIS of it ignored — its labels' a few
+        // pixels: nothing drawn moves by a pixel)
+        return Math.abs(px - d.px) < PX_HYSTERESIS * d.px && Math.abs(r - d.r) < 1 && Math.abs(s - d.s) < column && d.graphs.length === this.graphs.length && d.graphs.every((g, k) => g === this.graphs[k]);
     }
 
     // The sources of a curve with statistics, from the finest: the history, the 5-minute
@@ -589,6 +587,13 @@ export class CardHistory
         if( fromLeft ) for( let a = A0; a < B0 && out.length < 5000; ) { const b = moment(a).add(_n, _unit).valueOf(); out.push([a, Math.min(b, B0)]); a = b; }
         else for( let b = B0; b > A0 && out.length < 5000; ) { const a = moment(b).subtract(_n, _unit).valueOf(); out.push([Math.max(a, A0), b]); b = a; }
         return out;
+    }
+
+    // A side of a window r long (ms): the time phase 1 asks before and after it, and the purge
+    // never touches — a width, a month at most (the zone: min(3 widths, width + 2 months))
+    _sideOf(r)
+    {
+        return Math.min(r, PERIOD_MS[MONTH_PERIOD]);
     }
 
     // The slot holding time t (ms): its index — the first's, the last's beyond the cache
@@ -877,18 +882,19 @@ export class CardHistory
         if( !_ids.length || r <= 0 ) return;
         const _statIds = this._statisticsIds(), _hasStats = new Set(_statIds);
 
-        // Phase 0: the entities with statistics not probed yet (none needed without the
-        // 5-minute ones among the sources) — nothing else asked meanwhile: the phases in their
-        // order, the probe one short request
+        // Phase 0: the entities with statistics not probed yet — needed when statistics shorter
+        // than a day are among the sources (the 5-minute ones, the hourly ones: see _relevant),
+        // whatever their period (statistics.period) — nothing else asked meanwhile: the phases
+        // in their order, the probe one short request
         if( !probesRead ) { probesRead = true; for( const [id, v] of this.keptProbes() ) if( !SENSOR_GAPS.has(id) ) { SENSOR_GAPS.set(id, { fine: v.fine, hour: v.hour }); PROBE_INFO.set(id, { at: v.at, kept: true }); } }
-        const _probing = new Set(this._sources().some(x => x.kind === 'fine') ? _statIds.filter(id => !SENSOR_GAPS.has(id)) : []);
+        const _probing = new Set(this._sources().some(x => x.kind !== 'history' && x.ms < PERIOD_MS[DAY_PERIOD]) ? _statIds.filter(id => !SENSOR_GAPS.has(id)) : []);
         this._probeFine([..._probing]);
         if( _probing.size ) { this.state.loading = this._loading(); return; }
 
         // (each request unit's plan — an entity, its attributes together)
         const plans = new Map();
         for( const u of this._histUnits(_ids) ) plans.set(u[0], { u, ...this._planOf(u[0], _hasStats.has(u[0]), G) });
-        const _side = Math.min(r, PERIOD_MS[MONTH_PERIOD]), _size = this._blockOf(r);
+        const _side = this._sideOf(r), _size = this._blockOf(r);
 
         // Phase 1: the coarse source over the window and a width on each side — where it isn't
         // compiled yet, the finer ones of its family. A part it lacks wholly outside the window
@@ -935,7 +941,7 @@ export class CardHistory
         this._blocks(t0, Math.min(t1, _now), _size).forEach(([a, b], k) => {
             for( const [kind, l] of _bySource ) for( const g of this._requestGroups(l.map(p => [p])) ) {
                 this._askGroup(kind, _series(kind, g), a, b, { phase: 2, rank: k });
-                const _empty = new Map(), _add = (f, ids) => { if( !_empty.has(f) ) _empty.set(f, []); _empty.get(f).push(...ids); };
+                const _empty = new Map(), _add = (f, ids) => { if( !_empty.has(f) ) _empty.set(f, []); appendAll(_empty.get(f), ids); };
                 for( const p of g ) {
                     if( !this._emptyIn(p.p2, p.u[0], a, b) ) continue;
                     const c = p.p1 ?? p.fam[0];
@@ -965,7 +971,7 @@ export class CardHistory
             if( _from >= t1 ) continue;
             const _k = _from + ' ' + ( p2 ? 2 : 1 );
             if( !_after.has(_k) ) _after.set(_k, { from: _from, phase: p2 ? 2 : 1, ids: [] });
-            _after.get(_k).ids.push(...u);
+            appendAll(_after.get(_k).ids, u);
         }
         for( const x of _after.values() ) this._askGroup('history', x.ids, x.from, t1, { phase: x.phase });
 
@@ -997,7 +1003,7 @@ export class CardHistory
         if( this._probeExports([...plans.values()].filter(p => p.fam.length).map(p => p.u[0])) ) return;
         if( this.cacheRows() < AHEAD_MAX_ROWS ) {
             // (the entities by source: phase 2's, fine; phase 1's, coarse)
-            const S = new Map(), _add = (x, coarse, ids) => { const k = x.kind + ' ' + coarse; if( !S.has(k) ) S.set(k, { kind: x.kind, coarse, ids: [] }); S.get(k).ids.push(...ids); };
+            const S = new Map(), _add = (x, coarse, ids) => { const k = x.kind + ' ' + coarse; if( !S.has(k) ) S.set(k, { kind: x.kind, coarse, ids: [] }); appendAll(S.get(k).ids, ids); };
             for( const { u, p1, p2 } of plans.values() ) { if( p2 ) _add(p2, false, p2.kind === 'history' ? u : [u[0]]); if( p1 ) _add(p1, true, [u[0]]); }
             let best = null;
             const _consider = (s, blocks, dist) => { const f = _first(s.kind, s.ids, blocks); if( f && ( !best || dist(f) < best.d ) ) best = { s, f, d: dist(f) }; };
@@ -1012,13 +1018,15 @@ export class CardHistory
 
     // The cache kept under CACHE_MAX_ROWS rows: past it, the least useful rows purged until
     // it's back under AHEAD_MAX_ROWS (see CACHE_MAX_ROWS) — a day purged is asked again when
-    // it's needed, drawn meanwhile from the coarser statistics kept
+    // it's needed, drawn meanwhile from the coarser statistics kept —, never in the window nor
+    // its sides (_sideOf): a long window may keep it past CACHE_MAX_ROWS
     _purge()
     {
         let n = this.cacheRows();
         if( n <= CACHE_MAX_ROWS ) return;
-        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), r = t1 - t0;
-        const [k0, k1] = this._slotsOf(t0 - r, t1 + r);
+        // (never the window and its sides: the zone phase 1 asks — _sideOf)
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime), side = this._sideOf(t1 - t0);
+        const [k0, k1] = this._slotsOf(t0 - side, t1 + side);
         if( k0 < 0 || k1 < 0 ) return;
         const _far = [];
         for( let i = 0; i < this.cache.length; i++ ) if( i < k0 || i > k1 ) _far.push(i);
@@ -1108,7 +1116,7 @@ export class CardHistory
             const out = {};
             for( const id of ids ) {
                 let rows = [];
-                for( let i = c0; i <= c1; i++ ) rows.push(...( this.cache[i][_src.layer].get(id) ?? [] ));
+                for( let i = c0; i <= c1; i++ ) appendAll(rows, this.cache[i][_src.layer].get(id) ?? []);
                 if( source === 'history' ) {
                     // (the last row before the window's days — the state in force at their start —,
                     // from the days before, as far back as they're loaded: see cachedHistory)
@@ -1182,7 +1190,7 @@ export class CardHistory
         // (a layer's rows over the window's days, the row before them first — see exportRows)
         const _rows = l => { const out = [];
             for( let i = c0 - 1; i >= 0; i-- ) { const a = this.cache[i][l].get(id); if( !a ) break; if( a.length ) { out.push(a[a.length - 1]); break; } }
-            for( let i = c0; i <= c1; i++ ) out.push(...( this.cache[i][l].get(id) ?? [] ));
+            for( let i = c0; i <= c1; i++ ) appendAll(out, this.cache[i][l].get(id) ?? []);
             return withoutRepeats(out); };
         const _of = layers => { let known = false, has = false;
             for( const l of layers ) {
@@ -1358,10 +1366,11 @@ export class CardHistory
             }
             perf.add('part', performance.now() - _t);
             this._cacheVersion = this.cacheVersion() + 1;
-            if( !error ) this._purge();
+            // (each timed while the performance test records)
+            if( !error ) { const _tp = performance.now(); this._purge(); perf.add('purge', performance.now() - _tp); }
             // (what's still lacking asked at once, before this answer is drawn: Home Assistant
             // works on it meanwhile)
-            if( !error ) this._askMissing();
+            if( !error ) { const _ta = performance.now(); this._askMissing(); perf.add('ask', performance.now() - _ta); }
         } finally {
             this.state.loading = this._loading();
             // (an answer for the time outside the window shown changes nothing shown: not drawn

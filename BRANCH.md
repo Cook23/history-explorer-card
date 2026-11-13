@@ -83,7 +83,7 @@ retention, the entity created later) — an attribute, told by its entity's hist
 - **Sending:**
   - one queue: by phase, then phase 2's block, then the graphs' order — phase 2 queued right
     behind phase 1, without waiting for its answers; phase 1's parts wholly outside the window
-    shown (its sides, the window moved) after phase 2; a request bringing nothing to the window
+    shown (its sides, the window moved) after phase 2 — phase 3; a request bringing nothing to the window
     shown now after — one asked for a window before, bringing some of this one, keeps its
     place (the window moved: arrows, a drag, a zoom);
   - the window shown loading as long as a request bringing some of it is under way;
@@ -95,9 +95,12 @@ retention, the entity created later) — an attribute, told by its entity's hist
   last one took, 1 s to 30 s):
   - first, the history of the circular axes over the window shown, where they're drawn from
     statistics (Home Assistant averages angles as plain numbers);
+  - then the exports' probes: what each source can give the entities exported, a request at
+    most;
   - then each side widened: phase 1's source in blocks 10 × phase 2's, phase 2's source in its
     own blocks — every entity alike, the entities of a source in one request;
-  - the memory bounds kept (AHEAD_MAX_ROWS 300 000, purge past 500 000).
+  - the memory bounds kept (AHEAD_MAX_ROWS 300 000, purge past 500 000) — never the zone phase
+    1 asks: the window and its sides, min(3 widths, width + 2 months).
 - **Drawing** what the cache holds:
   - the coarsest valid source whose period a column of pixels holds — no min, mean and max
     worked out from many values for nothing —, a finer one only where it lacks (the last

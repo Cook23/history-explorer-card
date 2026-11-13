@@ -25,7 +25,7 @@ module.exports = async function()
         const g1 = await t.graphs();
         return g1.length === g0.length && g1[0] !== g0[0] && names(g1[0]) === names(g0[0]) && !/\(h\)/.test(g1[0]) ? true : `${g0[0]} -> ${g1.join(' | ')}`;
     });
-    await t.step('barrel button held: a tap on a curve label opens its type menu, no browser menu', async () => {
+    await t.step('barrel button held: a tap on a curve label opens its curve menu, no browser menu', async () => {
         const a = await E('legendNamePt(0,1)');
         await E(`window.__ctx=0; document.addEventListener('contextmenu', e => { if( !e.defaultPrevented ) window.__ctx++; }, { once: true })`);
         await t.penTap(a, true);
@@ -252,14 +252,14 @@ module.exports = async function()
     // contact reported at all, only a context menu, a moment later, where the pen is
     const menuOpen = () => E(`getComputedStyle(el.instance._this.querySelector('#et_0')).display !== 'none'`);
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.wait(300); };
-    await t.step('a tap with the pen\'s button on a curve label (only a context menu): its type menu, no browser menu', async () => {
+    await t.step('a tap with the pen\'s button on a curve label (only a context menu): its curve menu, no browser menu', async () => {
         const a = await E('legendNamePt(0,0)');
         const prevented = await t.contextMenu(a); await t.wait(400);
         const open = await menuOpen(); const g = await t.graphs();
         await closeMenu();
         return open && prevented && !g.some(x => /\(h\)/.test(x)) ? true : JSON.stringify({ open, prevented, g });
     });
-    await t.step('a tap on a curve label, then a tap with the pen\'s button on it: the curve stays hidden, its type menu', async () => {
+    await t.step('a tap on a curve label, then a tap with the pen\'s button on it: the curve stays hidden, its curve menu', async () => {
         const a = await E('legendNamePt(0,0)');
         await t.penTap(a); await t.wait(800);
         const g1 = await t.graphs();

@@ -71,7 +71,7 @@ module.exports = async function()
         // on 0, beside 0, beside 1, halfway: none, far: none, on the curves under it: none (then the gap)
         return /^0,0,1,-1,-1,-1,/.test(r) ? true : r;
     });
-        await t.step('right click on a curve label: its type menu, the curve not hidden, no browser menu', async () => {
+        await t.step('right click on a curve label: its curve menu, the curve not hidden, no browser menu', async () => {
         const pt = await E('legendPt(0,1)');
         await E(`window.__ctxShown=0; document.addEventListener('contextmenu', e => { if( !e.defaultPrevented ) window.__ctxShown++; }, { once: true })`);
         await t.page.mouse.click(pt.x, pt.y, { button: 'right' }); await t.wait(500);
@@ -176,7 +176,7 @@ module.exports = async function()
         const g1 = await t.graphs();
         return g1[0] !== g0[0] ? true : 'unchanged ' + g1.join(' | ');
     });
-    await t.step('long-press a curve label opens the type menu', async () => {
+    await t.step('long-press a curve label opens the curve menu', async () => {
         const li = (await t.graphs()).findIndex(x => x.startsWith('l:'));
         await t.longPress(await E(`legendPt(${li},0)`));
         const open = await E('menuOpen()');
@@ -213,6 +213,20 @@ module.exports = async function()
         await unlock(li);
         await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await E('el.instance.decZoom()'); await t.wait(600);
         return box && gone && !mode && span(r1) < span(r0) && span(y1) < span(y0) && y1[0] >= y0[0] && y1[1] <= y0[1] && locked ? true : JSON.stringify({ box, gone, mode, r0, r1, y0, y1, locked });
+    });
+    await t.step('the elastic box, whatever its time (40 min, 3 h 10, 10, 15, 25, 40, 100 and 300 days, 6 years): the time range the first of the time ranges covering it — under an hour, its minutes —, centred on it', async () => {
+        const out = [];
+        for( const h of [2 / 3, 3 + 1 / 6, 240, 360, 600, 960, 2400, 7200, 6 * 8760] ) {
+            const r = await E(`(()=>{ const I = el.instance; I.applyTimeRange(10 * 8760, true); const s0 = +new Date(I.startTime), s1 = +new Date(I.endTime), m = ( s0 + s1 ) / 2, w = ${h} * 3600e3;
+                const f = t => ( t - s0 ) / ( s1 - s0 ); I.zoomToSelection(f(m - w / 2), f(m + w / 2));
+                return { a: +new Date(I.startTime), b: +new Date(I.endTime), lo: m - w / 2, hi: m + w / 2, hours: I.activeRange.timeRangeHours, minutes: I.activeRange.timeRangeMinutes }; })()`);
+            out.push({ h, ...r });
+        }
+        const ranges = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 48, 72, 96, 120, 144, 168, 336, 504, 720, 2184, 4368];
+        const ok = out.every(x => x.a <= x.lo + 1000 && x.b >= x.hi - 1000 && ( x.h < 1 ? x.minutes == Math.ceil(x.h * 60) : ranges.includes(+x.hours) || +x.hours % 8760 === 0 ))
+            && +out[1].hours === 4 && +out[2].hours === 336 && +out[7].hours === 8760 && +out[8].hours === 6 * 8760;
+        await E('el.instance.applyTimeRange(24, true)'); await t.wait(300);
+        return ok ? true : JSON.stringify(out);
     });
     await t.step('a mouse drag mostly horizontal: the time panned as ever, no box, the Y axis as it was', async () => {
         const li = await boxGraph();

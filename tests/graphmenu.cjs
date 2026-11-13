@@ -135,7 +135,7 @@ module.exports = async function()
         r.scissors = await buttons(); r.layout = await layout();
         return [r.outside, r.escape, r.scissors].every(b => b === ' |  |  | ') && r.layout === L0 ? true : JSON.stringify(r);
     });
-    await t.step('cut a curve (its type menu, Behavior): 📋 on the graphs it can go to — a timeline too, a number shown as a row there, as for a drag', async () => {
+    await t.step('cut a curve (its curve menu, Behavior): 📋 on the graphs it can go to — a timeline too, a number shown as a row there, as for a drag', async () => {
         await t.longPress(await t.E(`legendPt(${await gi('rain')},0)`));
         await click('behavior'); await click('cut');
         const b = await buttons();
@@ -195,7 +195,8 @@ module.exports = async function()
     await t.step('Straight: every curve of the graph straight, in its graph, saved with each', async () => {
         await pick(0, 'rep', '0');
         const r = { shown: await shown(), saved: await t.E(`['sensor.power','sensor.power2'].map(id=>el.instance.store.entry(id).lineMode).join()`) };
-        return r.shown.startsWith('line:power/lines+power2/lines | ') && r.saved === 'lines,lines' ? true : JSON.stringify(r);
+        // (each curve's interpolation its own, copied when it's added: monotone)
+        return r.shown.startsWith('line:power/lines/monotone+power2/lines/monotone | ') && r.saved === 'lines,lines' ? true : JSON.stringify(r);
     });
     await t.step('Bar: one bar graph of them, in its place', async () => {
         await pick(0, 'rep', '3');
@@ -210,14 +211,14 @@ module.exports = async function()
     await t.step('Smart again: one graph of curves again', async () => {
         await pick(0, 'rep', '6');
         const v = await shown();
-        return /^line:power\/smart\+power2\/smart \| line:rain/.test(v) ? true : v;
+        return /^line:power\/smart\/monotone\+power2\/smart\/monotone \| line:rain/.test(v) ? true : v;
     });
     await t.step('Interpolation on a graph: applied to its interpolated curves only, then marked', async () => {
         await pick(1, 'interp', 'algo_steffen');
         const v = await shown();
         await t.longPress(await t.E('moPt(1)')); await click('interp');
         const m = await subOf('interp'); await closeAll();
-        return / \| line:rain\/smart\/steffen\+tank\/lines \| /.test(v) && m.includes('Steffen*') ? true : v + ' ; ' + m;
+        return / \| line:rain\/smart\/steffen\+tank\/lines\/monotone \| /.test(v) && m.includes('Steffen*') ? true : v + ' ; ' + m;
     });
     await t.step('a graph of states: no Display, no Interpolation', async () => {
         await t.longPress(await t.E('moPt(2)'));

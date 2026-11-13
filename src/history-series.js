@@ -280,3 +280,6 @@ export function attributeHistories(ids, entityHistories)
 // A time of the history in ms, in whatever form it comes: ms (Home Assistant's websocket), a
 // date text, a Date or a moment
 export const msOf = tc => typeof tc === 'number' ? tc : typeof tc === 'string' ? Date.parse(tc) : +tc;
+
+// The series of graphs' curves, each once — what an export of them exports
+export const seriesOfGraphs = graphs => [...new Set(graphs.flatMap(g => g.entities.map(e => e.entity)))];

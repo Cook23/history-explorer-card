@@ -7,6 +7,7 @@
 import { Version } from "./version.js";
 import { PROBE_INFO } from "./card-history.js";
 import { REDRAW_CAUSES } from "./card-perf.js";
+import { minOf, maxOf } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
 const ISSUE_URL = 'https://github.com/Cook23/history-explorer-card/issues/new';
@@ -243,7 +244,7 @@ function buildPenEventsTest(body)
             if( !gaps.length ) return `${k}: ${long} gaps of ${_t} s or more`;
             const all = gapStats(gaps), two = gapRegimes(gaps);
             const regime = r => `${r.n} gaps (${Math.round(100 * r.n / all.n)} %): mean ${ms(r.mean)}, standard deviation ${ms(r.sd)}`;
-            return `${k}: ${all.n} gaps: mean ${ms(all.mean)}, min ${ms(Math.min(...gaps))}, max ${ms(Math.max(...gaps))}, standard deviation ${ms(all.sd)}; ${long} of ${_t} s or more`
+            return `${k}: ${all.n} gaps: mean ${ms(all.mean)}, min ${ms(minOf(gaps))}, max ${ms(maxOf(gaps))}, standard deviation ${ms(all.sd)}; ${long} of ${_t} s or more`
                 + ( two ? `\n  two regimes — fast: ${regime(two[0])}; slow: ${regime(two[1])}` : '' );
         });
         return _lines.length ? _lines.join('\n') : '— no hover yet —';
@@ -463,6 +464,10 @@ function buildPerformanceTest(body, card)
         for( const e of d ) n.set(e.info?.cause, ( n.get(e.info?.cause) ?? 0 ) + 1);
         return `the graphs drawn again ${d.length} times${d.length ? `: ${ms(sum(d))} in all, the longest ${ms(max(d))} (${[...n].map(([c, k]) => `${c} ${k}`).join(', ')})` : ''}`;
     };
+    // (after each answer put in the cache: the cache's size kept — purged past its bound —, what's
+    // still lacking worked out and asked)
+    const afterAnswers = r => { const p = of(r, 'purge'), a = of(r, 'ask');
+        return `after each answer: the cache's size kept ${ms(sum(p))} in all, the longest ${ms(max(p))}; what's still lacking asked ${ms(sum(a))} in all, the longest ${ms(max(a))}`; };
     const wait = t => new Promise(res => setTimeout(res, t));
     const step = text => { $('step').textContent = text; };
     // (a time of Home Assistant's, in days from the window's start)
@@ -597,6 +602,7 @@ function buildPerformanceTest(body, card)
         out(`  ${_whole === null ? `not whole after ${PERF_LOAD_MAX_S} s` : `whole after ${sec(_whole)}`}: ${_req.length} requests, ${_req.reduce((n, q) => n + q.info.values, 0)} values`);
         const _parts = of(r, 'part');
         out(`  ${_parts.length} answers put in the cache: ${ms(sum(_parts))} in all; ${drawn(r)} — Chart.js ${ms(sum(of(r, 'chart')))} of it`);
+        out(`  ${afterAnswers(r)}`);
         out(`  ${freezes(r)}`);
     };
 
@@ -614,6 +620,7 @@ function buildPerformanceTest(body, card)
         out(`  window: ${card.startTime} → ${card.endTime}`);
         requests(r, Date.parse(card.startTime));
         out(`  ${drawn(r)}`);
+        out(`  ${afterAnswers(r)}`);
         out(`  ${freezes(r)}`);
     };
     const moves = async () => {
@@ -639,6 +646,7 @@ function buildPerformanceTest(body, card)
         const r = stop();
         if( !r ) return;
         out(`  ${of(r, 'request').length} requests, ${drawn(r)}`);
+        out(`  ${afterAnswers(r)}`);
         out(`  ${freezes(r)}`);
     };
 
@@ -673,7 +681,9 @@ function buildPerformanceTest(body, card)
             await head;
             out(`\n== Back on the page, after ${sec(_shown - _hidden)} away`);
             const _all = [...r.events.filter(e => e.kind === 'card').map(e => ({ at: e.at, what: `card ${e.info.card}: ${e.info.step}${e.ms ? ` (${ms(e.ms)})` : ''}` })),
-                          ..._events, ...r.freezes.map(f => ({ at: f.at, what: `the page froze ${ms(f.ms)}` })),
+                          ..._events,
+                          // (a pause of the pulse begun before the return — the app left as the test asks —: away from the app, not a freeze)
+                          ...r.freezes.map(f => ({ at: f.at, what: f.at - f.ms < _shown ? `away from the app ${ms(f.ms)}` : `the page froze ${ms(f.ms)}` })),
                           ...of(r, 'redraw').map(e => ({ at: e.at, what: `graphs drawn again (${ms(e.ms)}): ${e.info?.cause}` })),
                           ...of(r, 'request').map(e => ({ at: e.at, what: `answer: ${e.info.type.startsWith('history') ? 'history' : e.info.period} (${e.info.values} values, ${sec(e.ms)})` }))]
                 .filter(e => e.at >= _hidden).sort((a, b) => a.at - b.at);

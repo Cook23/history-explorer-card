@@ -26,9 +26,9 @@ module.exports = async function()
         const i=g.entities.findIndex(e=>e.entity==='${id}'); const d=g.chart.data.datasets[i];
         return { type: g.entities[i].type ?? g.type, interpolation: d?.hecInterpolation ?? null, hidden: !!d?.hidden, graphs: el.instance.graphs.length }; })()`);
     const menu = (id, act) => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'));
-        I.showEntityTypeMenu(0, '${id}', g, { from: 'label', clientX: 100, clientY: 100 }); ${act} })()`);
+        I.showEntityCurveMenu(0, '${id}', g, { from: 'label', clientX: 100, clientY: 100 }); ${act} })()`);
     // (a line of the menu clicked: an algorithm, et_0_algo_<name>; a display type, et_0_<its index> —
-    // card-menus.js _TYPE_MENU_DEFS)
+    // card-menus.js _CURVE_MENU_DEFS)
     const TYPE_LINE = { 'line/lines': 0, 'line/curves': 1, 'line/stepped': 2, 'bar/null': 3, 'arrowline/null': 4, 'timeline/null': 5, 'line/smart': 6 };
     const clickType = (type, mode) => `el.querySelector('#et_0_${TYPE_LINE[type + '/' + mode]}').click();`;
     const setInterp = (id, a) => menu(id, `el.querySelector('#et_0_algo_${a}').click();`).then(() => t.wait(500));
@@ -57,7 +57,7 @@ module.exports = async function()
     // ENTITY_FIELD_SCOPE)
     const devicesPart = s => JSON.stringify(Object.fromEntries(Object.entries(s).map(([k, e]) => [k, e && { ...e, hidden: undefined }])));
     const changed = s => s.power.interpolation === 'makima' && s.power2.lineMode === 'stepped' && s.power2.hidden === true && s.energy.interval === 2;
-    const yamlLike = s => s.power.interpolation === null && s.power2.lineMode === 'curves' && !s.power2.hidden && s.energy.interval !== 2;
+    const yamlLike = s => s.power.interpolation === 'monotone' && s.power2.lineMode === 'curves' && !s.power2.hidden && s.energy.interval !== 2;
 
     // ── YAML entities, no persistence: the YAML comes back on reload ──
     t = await openCard(YAML(), { mock: { series: true }, height: 1200 });
@@ -92,38 +92,39 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The graph menu: the same as the type menu of each of its entities ──
+    // ── The graph menu: the same as the curve menu of each of its entities ──
     // (on the graph of sensor.power: Steffen for its curves, then bars)
     const graphMenu = act => t.E(`(()=>{ const I=el.instance; const g=I.graphs.find(g=>g.entities.some(e=>e.entity==='sensor.power')); I.showGraphMenu(0, g, 100, 100); ${act} })()`);
     const viaGraphMenu = async () => {
         await graphMenu(`el.querySelector('#et_0_algo_steffen').click();`); await t.wait(500);
         await graphMenu(clickType('bar', null)); await t.wait(1500);
     };
-    const viaTypeMenus = async () => {
+    const viaCurveMenus = async () => {
         for( const id of ['sensor.power', 'sensor.power2'] ) await setInterp(id, 'steffen');
         for( const id of ['sensor.power', 'sensor.power2'] ) await setType(id, 'bar', null);
     };
     const both = async () => [await entry('sensor.power'), await entry('sensor.power2')].map(e => [e.type, e.lineMode, e.interpolation].join('/')).join(' ');
-    // (bars saved with lineMode lines, as the type menu saves them)
+    // (bars saved with lineMode lines, as the curve menu saves them)
     const asBars = 'bar/lines/steffen bar/lines/steffen';
-    const asYaml = 'line/curves/ line/curves/';
+    // (the YAML's: the interpolation the levels give, copied on each curve when it's added — monotone)
+    const asYaml = 'line/curves/monotone line/curves/monotone';
     for( const [name, extra] of [['no persistence', {}], ['enable_persistence', { enable_persistence: 'entities' }], ['enable_multidevice_persistence', { enable_multidevice_persistence: 'entities' }]] ) {
-        // What the type menus save, on this device and on another one
+        // What the curve menus save, on this device and on another one
         t = await openCard(YAML(extra), { mock: { series: true }, height: 1200 });
-        await viaTypeMenus(); await reload();
-        const typeMenus = { after: await both() };
-        await newDevice(); typeMenus.other = await both();
+        await viaCurveMenus(); await reload();
+        const curveMenus = { after: await both() };
+        await newDevice(); curveMenus.other = await both();
         done(await t.close());
         t = await openCard(YAML(extra), { mock: { series: true }, height: 1200 });
-        await t.step(`${name}: the graph menu changes and saves what the type menu of each of its entities does`, async () => {
+        await t.step(`${name}: the graph menu changes and saves what the curve menu of each of its entities does`, async () => {
             await viaGraphMenu(); const now = await both(); const g = (await shown('sensor.power')).graphs;
             await reload(); const after = await both(); const s = [await shown('sensor.power'), await shown('sensor.power2')];
             await newDevice(); const other = await both();
             const kept = name !== 'no persistence';
-            const ok = now === asBars && g === 2 && after === typeMenus.after && other === typeMenus.other
+            const ok = now === asBars && g === 2 && after === curveMenus.after && other === curveMenus.other
                 && after === ( kept ? asBars : asYaml ) && other === ( name === 'enable_multidevice_persistence' ? asBars : asYaml )
                 && ( !kept || s.every(x => x.type === 'bar' && x.interpolation === 'steffen' && x.graphs === 2) );
-            return ok ? true : JSON.stringify({ now, g, after, s, other, typeMenus });
+            return ok ? true : JSON.stringify({ now, g, after, s, other, curveMenus });
         });
         done(await t.close());
     }
@@ -373,7 +374,7 @@ module.exports = async function()
                        hidden: (await shown('sensor.power')).hidden, range: await t.E('el.instance.activeRange.timeRangeHours') };
         await reload(); const reloaded = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, range: await t.E('el.instance.activeRange.timeRangeHours') };
         await newDevice(); const other = { ids: await ids(), interp: (await entry('sensor.power')).interpolation, mode: (await entry('sensor.power2')).lineMode, range: await t.E('el.instance.activeRange.timeRangeHours') };
-        const yaml = x => x.ids === 'energy,power,power2' && x.interp === null && x.range === 24;
+        const yaml = x => x.ids === 'energy,power,power2' && x.interp === 'monotone' && x.range === 24;
         return /tank/.test(before.ids) && before.mode === 'stepped' && before.range === 48 && yaml(here) && here.mode === 'curves' && !here.hidden
             && yaml(reloaded) && yaml(other) && other.mode === 'curves' ? true : JSON.stringify({ before, here, reloaded, other });
     });
@@ -477,6 +478,51 @@ module.exports = async function()
         return first && r.fine && r.range === 48 && r.kept === true ? true : JSON.stringify({ first, r });
     });
     done(await t.close());
+
+    // ── The last one to speak, at every level of the YAML: a parameter changed on the card,
+    // a graph or in entityOptions is the YAML speaking for each entity it reaches — as on the
+    // entity's own line; a choice made since on the card wins until the YAML speaks again ──
+    {
+        const base = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, enable_persistence: 'entities' };
+        const g = (graph = {}) => [{ type: 'line', ...graph, entities: [{ entity: 'sensor.power' }] }];
+        t = await openCard({ ...base, graphs: g() }, { mock: { series: true } });
+        await t.wait(1500);
+        await t.step('with persistence: lineWidth changed on the card, then on its graph, a lineMode in entityOptions — each applied after a reload; a line mode chosen on the card kept, until entityOptions changes it again — and kept when the YAML changes another option (option by option)', async () => {
+            const now = () => t.E(`(()=>{ const I = el.instance, e = I.pconfig.entities[0]; return { w: e.width, lm: e.lineMode, drawn: I.graphs[0].chart.data.datasets[0].borderWidth }; })()`);
+            const name = await t.E('window.CFG.cardName');
+            const yaml = async c => { await t.page.addInitScript(c => { window.CFG = c; }, { ...c, cardName: name }); await t.page.reload(); await t.wait(2500); return now(); };
+            const r = { first: await now() };
+            r.card = await yaml({ ...base, lineWidth: 6, graphs: g() });
+            r.graph = await yaml({ ...base, lineWidth: 6, graphs: g({ lineWidth: 4 }) });
+            const eo = lineMode => ({ ...base, lineWidth: 6, entityOptions: { 'sensor.power': { lineMode } }, graphs: g({ lineWidth: 4 }) });
+            r.entityOptions = await yaml(eo('stepped'));
+            await t.E("el.instance.setCurveType(el.instance.graphs[0], 0, 'line', 'curves')"); await t.wait(800);
+            r.chosen = await yaml(eo('stepped'));
+            r.again = await yaml(eo('lines'));
+            // (option by option: a line mode chosen on the card kept when the YAML changes another option)
+            await t.E("el.instance.setCurveType(el.instance.graphs[0], 0, 'line', 'curves')"); await t.wait(800);
+            r.other = await yaml({ ...base, lineWidth: 6, entityOptions: { 'sensor.power': { lineMode: 'lines' } }, graphs: g({ lineWidth: 5 }) });
+            return r.first.drawn === 2 && r.card.drawn === 6 && r.graph.drawn === 4 && r.entityOptions.lm === 'stepped' && r.chosen.lm === 'curves' && r.again.lm === 'lines'
+                && r.other.lm === 'curves' && r.other.drawn === 5 && !t.errors.length ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+
+        // (Home Assistant's user data — another device's changes —, option by option too)
+        const multi = { ...base, enable_persistence: undefined, enable_multidevice_persistence: 'entities' };
+        t = await openCard({ ...multi, graphs: g() }, { mock: { series: true } });
+        await t.wait(1500);
+        await t.step('with enableMultidevicePersistence: another device changes a curve\'s color in Home Assistant, this device its line mode meanwhile — after a reload, both: the color from Home Assistant, the line mode of this device (option by option)', async () => {
+            await t.E("el.instance.setCurveType(el.instance.graphs[0], 0, 'line', 'curves')"); await t.wait(1000);
+            const key = await t.E(`'history-explorer_card_' + el.instance.id`);
+            await t.E(`(async()=>{ const hs = el.instance._hass, v = (await hs.callWS({ type: 'frontend/get_user_data', key: '${key}' })).value;
+                v.entities[0].color = '#ff0000'; await hs.callWS({ type: 'frontend/set_user_data', key: '${key}', value: v });
+                const ls = JSON.parse(localStorage.getItem('${key}')); ls.entities[0].lineMode = 'stepped'; localStorage.setItem('${key}', JSON.stringify(ls)); })()`);
+            await t.page.reload(); await t.wait(2500);
+            const r = await t.E(`(()=>{ const e = el.instance.pconfig.entities[0]; return { color: e.color, lm: e.lineMode }; })()`);
+            return r.color === '#ff0000' && r.lm === 'stepped' && !t.errors.length ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

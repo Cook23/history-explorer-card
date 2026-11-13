@@ -695,15 +695,16 @@
     },
     // values (numbers) placed: each brought into [0, Q), then made continuous — a step of
     // more than half a turn is a crossing of the turn's edge (3, 1, 359 → 3, 1, -1) —, then
-    // moved by whole turns for the mean of those of the window shown (indices first to last)
-    // to sit nearest target (undefined: their circular mean, in [0, Q)); those outside the
+    // moved by whole turns for the middle of those of the window shown (indices first to
+    // last) to sit nearest target (undefined: mean — their circular mean, the caller's: Chart.js
+    // works out none —, brought into [0, Q); neither: the first's); those outside the
     // window put in the same turn, out of sight. Spanning more than a turn in the window:
     // each value put in the one turn around target instead (band). With no target (the Y
     // axis automatic), with a hysteresis — a value crossing the turn's edge goes on past
     // it, up to HYSTERESIS of a turn, and comes back with no jump; only further does it jump
     // a turn: no jumps back and forth over the edge, a turn and a tenth at most shown. A
     // target (a Y range set by hand) keeps each value within its turn. → { values, band }
-    place: function (values, Q, first, last, target) {
+    place: function (values, Q, first, last, target, mean) {
       var n = values.length, mod = function (v) { return Chart.hecCircular.wrap(v, Q); };
       if (!n) return { values: [], band: false };
       first = Math.max(0, first || 0);
@@ -714,12 +715,9 @@
         if (i) off -= Math.round((v - r[i - 1]) / Q) * Q;
         un.push(v + off);
       });
-      var lo = Infinity, hi = -Infinity, sum = 0, sS = 0, sC = 0;
-      for (var i = first; i <= last; i++) {
-        lo = Math.min(lo, un[i]); hi = Math.max(hi, un[i]); sum += un[i];
-        sS += Math.sin(r[i] / Q * 2 * Math.PI); sC += Math.cos(r[i] / Q * 2 * Math.PI);
-      }
-      var c = target != null ? target : Math.abs(sS) + Math.abs(sC) > 1e-9 ? mod(Math.atan2(sS, sC) / (2 * Math.PI) * Q) : r[first];
+      var lo = Infinity, hi = -Infinity;
+      for (var i = first; i <= last; i++) { lo = Math.min(lo, un[i]); hi = Math.max(hi, un[i]); }
+      var c = target != null ? target : mean != null && isFinite(mean) ? mod(mean) : r[first];
       // (a value put in the turn [base, base + Q) — one on its edge at base, whatever a
       // rounding of base's last digit gives)
       var base, into = function (v) { var p = mod(v - base); return base + (Q - p < Q * 1e-9 ? 0 : p); };
@@ -733,8 +731,8 @@
           return prev;
         }), band: true };
       }
-      var mean = sum / (last - first + 1), k = Math.round((c - mean) / Q) * Q;
-      base = mean + k - Q / 2;
+      var mid = (lo + hi) / 2, k = Math.round((c - mid) / Q) * Q;
+      base = mid + k - Q / 2;
       return { values: un.map(function (v, j) { return j < first || j > last ? into(r[j]) : v + k; }), band: false };
     },
     // Whether the step from a to b, two values placed, jumps across the edge of a turn
@@ -1338,7 +1336,7 @@
       name: 'pinch',
       test: function (c, p) { return !!c.gs.pinch; },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var gs = c.gs, pid = c.pid;
         var pinch = gs.pinch;
         if (pid == pinch.p1id) pinch.p1 = { x: e.x, y: e.y };
         else pinch.p2 = { x: e.x, y: e.y };
@@ -1357,7 +1355,7 @@
     {
       name: 'lockAndHandle',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         var _inZone = me._hecInLockAndHandleZone(p.x0, p.y0) && !me._hecHandleButtons();
         if (!_inZone) return false;
         var _gRect = me.canvas.getBoundingClientRect();
@@ -1365,7 +1363,7 @@
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         _hecDragMoveTick(c, p, e);
         if (e.native && e.native.clientX !== undefined) {
           var _hOther = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
@@ -1386,7 +1384,7 @@
     {
       name: 'yAxisPan',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         if (me.options.yAxisPanEnabled === false || !me.chartArea) return false;
         var _axes = me._hecValueYAxes();
         if (!_axes.length) return false;
@@ -1428,7 +1426,7 @@
     {
       name: 'legendDrag',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         var _idx = legendIndexAt(c, p.x0, p.y0);
         if (_idx < 0) return false;
         p.dragLegendIdx = _idx;
@@ -1440,7 +1438,7 @@
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         _hecDragMoveTick(c, p, e);
         var _found = me._hecFindLegendLabel(e.x, e.y, p.dragLegendIdx, true);
         if (_found && me.canvas) {
@@ -1455,7 +1453,7 @@
     {
       name: 'timelineDrag',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         if (me.config.type !== 'timeline' && me.config.type !== 'arrowline') return false;
         var _idx = yAxisIndexAt(c, p.x0, p.y0);
         if (_idx < 0) return false;
@@ -1467,7 +1465,7 @@
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         _hecDragMoveTick(c, p, e);
         var _mr2 = me.canvas.getBoundingClientRect();
         var _at = me._hecYAxisInsertAt(e.y, p.dragYIdx, false);
@@ -1526,13 +1524,12 @@
       // outside the plot area does nothing.
       name: 'panX',
       test: function (c, p) {
-        var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+        var me = c.me;
         if (me.options.zoomSelectMode === true) return false;
         panX(c, 'start');
         return true;
       },
       onMove: function (c, p, e) {
-        var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
         _hecDragMoveTick(c, p, e, true);
         panX(c, 'move', e.x - p.lastX);
       }
@@ -1544,7 +1541,7 @@
   // then follow with the drag ghost if one is showing. panX (the only
   // zone with no ghost) passes noGhost=true to skip the second half.
   function _hecDragMoveTick(c, p, e, noGhost) {
-    var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me;
     fire(c, 'dragmove', e.x, e.y, { overChart: e.native && e.native.clientX !== undefined ? me._hecChartAt(e.native.clientX, e.native.clientY) : null });
     if (!noGhost && me._hecDragGhostEl && e.native) {
       me._hecMoveDragGhost(e.native.clientX, e.native.clientY);
@@ -1560,7 +1557,7 @@
   // timelineDrag only; lockAndHandle does its own separate cross-graph
   // work above (whole-rectangle geometry, not legendIndex/yAxisIndex).
   function _hecCrossGraphDragFeedback(c, p, e) {
-    var me = c.me, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me;
     if (!e.native || e.native.clientX === undefined) return;
     var _other = me._hecFindInstanceAt(e.native.clientX, e.native.clientY);
     var _dragOverFound = (_other && typeof _other.options.customEvent === 'function') ? _other : null;
@@ -1606,16 +1603,16 @@
 
 
   function customEventTarget(c) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me;
     return typeof me.options.customEvent === 'function';
   }
   function legendIndexAt(c, x, y) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me;
     return me._hecLegendIndexAt(x, y);
   }
 
   function yAxisIndexAt(c, x, y) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me;
     return me._hecYAxisIndexAt(x, y);
   }
 
@@ -1678,7 +1675,7 @@
   // decides a gesture happened (nothing derives 'click' from mouseup on its own)
   // and tells everyone at once.
   function fire(c, gestureType, hitX, hitY, extra) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e, gs = c.gs, pointerType = c.pointerType;
     var _hx = hitX !== undefined ? hitX : e.x;
     var _hy = hitY !== undefined ? hitY : e.y;
     if (gestureType === 'click' || gestureType === 'dblclick') {
@@ -1789,7 +1786,7 @@
   // (source: 'drag' or 'pinch'; at a pinch's start and end, pointerFactors: where its
   // fingers are along the plot area, and at its end startFactors: where they were at its start)
   function panX(c, phase, deltaPixels, source, fingers) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e;
     if (me.options.panEnabled === false || typeof me.options.panX !== 'function') return;
     var _a = me.chartArea;
     var _w = _a ? _a.right - _a.left : 0;
@@ -1907,7 +1904,7 @@
   // pointerFactors (the pointer, or the fingers now) and startFactors (where the fingers
   // were at the pinch's start; for the wheel, the pointer)
   function zoomX(c, step, centerX, source, pointerFactors, startFactors) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e;
     if (me.options.zoomEnabled === false || typeof me.options.zoomX !== 'function') return;
     me.options.zoomX.call(me, { chart: me, step: step, centerFactor: me._hecPlotFactor(centerX), source: source,
       pointerFactors: pointerFactors, startFactors: startFactors || pointerFactors, event: e.native });
@@ -1916,7 +1913,7 @@
   // A drag from this chart is over another one, of its dragScope: that one's
   // customEvent gets a dragovergraph, at the point under the pointer
   function dragOver(c, other, native, extra) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var gs = c.gs, pointerType = c.pointerType;
     if (typeof other.options.customEvent !== 'function') return;
     var _r = other.canvas.getBoundingClientRect();
     var _ex = { element: null, pointerCount: gs.count, pointerType: pointerType };
@@ -1931,7 +1928,7 @@
   // over none; for a graph move, insertBefore: above the target's middle }.
   // undefined for any other drag.
   function _hecDropAt(c, p) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e;
     var _n = e.native;
     if (!_n || _n.clientX === undefined) return undefined;
     var _name = p.handler && p.handler.name;
@@ -1953,7 +1950,7 @@
   // drop target's highlight removed, then dragend fired (with the zoom selection's data
   // when there is one).
   function _hecEndDrag(c, p) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e, cfg = c.cfg;
     me._hecDestroyDragGhost();
     if (me.canvas) me.canvas.style.cursor = '';
     me._hecHideInsertionMarker();
@@ -2213,7 +2210,7 @@
 
   // mouseup
   function hecPointerUp(c) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e, gs = c.gs, pid = c.pid, pointerType = c.pointerType;
     // Legend/timeline label drag workaround: armed by the second press
     // (dblclickdown), always disarmed here on the raw mouseup itself — not
     // at the end of a drag — so it never stays stuck armed when no drag followed.
@@ -2264,7 +2261,7 @@
         // The barrel button was pressed while the tip stayed down: whatever it did
         // (a double press is a dblclick) was done then — no click at release
       } else if (pu.barrel) {
-        // Pen tapped with its barrel button held: the type menu, as a long-press
+        // Pen tapped with its barrel button held: the curve menu, as a long-press
         fire(c, 'longpress', pu.x0, pu.y0);
       } else if (pu.dblClickFired) {
         // The second press of a double-click, released without a drag: a
@@ -2285,7 +2282,7 @@
 
   // pointercancel
   function hecPointerCancel(c) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e, gs = c.gs, pid = c.pid, pointerType = c.pointerType;
     // A cancel after this pointer moved is the browser taking the contact over (a
     // swipe it scrolls): the gesture ends. One with no move before it (a long press
     // the browser turns into its context menu) leaves the gesture to finish as it was.
@@ -2317,7 +2314,7 @@
 
   // wheel
   function hecWheel(c) {
-    var me = c.me, e = c.e, gs = c.gs, cfg = c.cfg, pid = c.pid, pointerType = c.pointerType;
+    var me = c.me, e = c.e, cfg = c.cfg;
     if (!e.native) return;
     // Ctrl+wheel zooms the time range, never the page — every tick, including those
     // the debounce below coalesces away
@@ -4087,7 +4084,7 @@
           // it would start the browser's own drag-and-drop instead — a pointercancel
           // that lost the drag); on touch, no focus change by the emulated mouse
           // events (the click that follows a long-press would otherwise take the focus
-          // away from the type menu it just opened, closing it). Scrolling isn't one of
+          // away from the curve menu it just opened, closing it). Scrolling isn't one of
           // these: on touch it's only ever governed by touch-action.
           if (ev.type === 'pointerdown' || ev.type === 'contextmenu') ev.preventDefault();
           // (leaving it for the canvas or another of its zones isn't leaving the graph)

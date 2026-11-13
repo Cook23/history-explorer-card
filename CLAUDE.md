@@ -207,10 +207,17 @@ it each time. So:
   function, only when it reads better split — when groups of its own function can be
   isolated, each with a name saying what it does. Never for its size alone: the one
   question is "is it more readable factored out?".
-- a business default written once, in the one place of its family (`ARCHITECTURE.md` rule 9) —
-  `OPTION_DEFAULTS`, `GESTURE_SETTINGS`, the default colors; a value computed from business
-  circumstances is no default; a module's fallback, never used in practice, may stay in that
-  module, written once there.
+- **a parameter's default** (`ARCHITECTURE.md` rule 9 — said by the user again and again):
+  what a parameter (a YAML option, a setting) takes when it isn't given. Every one is written
+  once, all in the same place: the table of its family — `OPTION_DEFAULTS`,
+  `GESTURE_SETTINGS`, the default colors (`history-default-colors.js`) —, never where the
+  parameter is read or used (no `?? 'auto'`, no `?? '#0000001f'`). Only two things are not
+  concerned: what is the result of a computation (the line mode from the type, `circular`
+  from the unit, `hour24` from the language), and a module's fallback — there only to protect
+  that module's inputs, never used in practice. Words: a **parameter** is an input (an
+  option, a setting); a **variable** is what the code computes or holds — never mix them.
+  Never "value" ("valeur") on its own, in a discussion with the user above all: nobody knows
+  what it is. Name it — a parameter, its default, a variable, a sensor's state.
 - a list of names written once, as a named constant (`ARCHITECTURE.md` rule 3) — a list of
   options in `history-options.js`, with the others; never a list written by hand where it's
   used, nor the same list written twice (checked: `lists-once`, `option-lists`).
@@ -418,7 +425,7 @@ are in `tests/points.cjs`:
 
 ## Menus: a cascade, always visible — set by the user, not negotiable
 
-How every menu is designed (the type menu, a graph's, the info panel's, the options menu,
+How every menu is designed (the curve menu, a graph's, the info panel's, the options menu,
 and any one to come):
 - A menu has sections (*Display*, *Appearance*…), each line ▸ opening its submenu, and a
   submenu's line ▸ its own, at any depth — the selector's sub-attributes too. A submenu never replaces the content of the menu
@@ -580,7 +587,7 @@ Decided by the user about the silence detection:
 
 | card 1.2 | lowpass_dt |
 |---|---|
-| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`) — the one rule in `history-stats.js` | `filter.py` `update_from_source` (lines 64-70: the mean; 101-103: its σ) |
+| every mean of an angle: a column's point and its min/max (`card-datasets.js`), the average over a graph (`showStats`), the turn an angle's curve is shown in (`card-datasets.js` `_unwrapCircular`, given to `Chart.hecCircular.place`, which works out none) — the one rule in `history-stats.js` | `filter.py` `update_from_source` (lines 64-70: the mean; 101-103: its σ) |
 
 lowpass_dt's algorithm is the one to use — never another one (no sin/cos vector mean, no
 mean of unwrapped values): each value counts by its shortest-path difference to the mean,

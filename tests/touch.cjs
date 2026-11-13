@@ -97,7 +97,7 @@ module.exports = async function()
         const n1 = (await t.graphs()).length;
         return n1 === n0 - 1 ? true : `graphs ${n0} -> ${n1}`;
     });
-    await step('long-press a curve label opens the type menu', async () => {
+    await step('long-press a curve label opens the curve menu', async () => {
         await t.touchLongPress(await E(`legendPt(${await lineGraph()},0)`));
         const open = await E('menuOpen()');
         await t.page.keyboard.press('Escape'); await t.tap({ x: 5, y: 5 }); await t.wait(400);
@@ -230,7 +230,7 @@ module.exports = async function()
         const r = await pinchFrom(li, { x: 8, y: 6 }, { x: 8, y: 6 }, 8, 0.5);
         return r.t[0] < r0.t[0] - 60e3 && r.y[0] > r0.y[0] ? true : JSON.stringify({ r0, r });
     });
-    await step('entity selector: tapping an entry of the list opens the type menu for it', async () => {
+    await step('entity selector: tapping an entry of the list opens the curve menu for it', async () => {
         const inp = await E(`(()=>{ const r=el.querySelector('#b7_0').getBoundingClientRect(); return {x:r.left+20,y:r.top+r.height/2}; })()`);
         await t.tap(inp); await t.wait(400);
         await t.page.keyboard.type('energy'); await t.wait(500);
@@ -239,7 +239,7 @@ module.exports = async function()
         await t.tap(pt); await t.wait(600);
         const open = await E('menuOpen()');
         await t.page.keyboard.press('Escape'); await t.tap({ x: 5, y: 5 }); await t.wait(300);
-        return open ? true : 'type menu not open';
+        return open ? true : 'curve menu not open';
     });
     await t.step('the persisted entities agree with what is shown', async () => (await E('storeProblems()')) || true);
     const r = await t.close();

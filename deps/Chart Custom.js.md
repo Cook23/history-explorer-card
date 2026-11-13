@@ -173,10 +173,12 @@ The card sets both from its `lineMode: smart` (a silence: the curve held flat, t
 `Chart.hecCircular` — values that wrap around (an angle: period `Q`, 360), the one rule for
 the card and for Chart.js: `wrap(v, Q)` — a value brought into [0, Q), as the tooltip, the
 values over the graph and the Y axis' labels (`ticks.period`) show it; `place(values, Q,
-first, last, target)` → `{ values, band }` — the values brought into [0, Q), made continuous (a
+first, last, target, mean)` → `{ values, band }` — the values brought into [0, Q), made continuous (a
 step of more than half a turn is a crossing of the turn's edge), moved by whole turns for the
-mean of those of the window shown (indices `first` to `last`) to sit nearest `target`
-(`undefined`: their circular mean), those outside it put in the same turn; spanning more than
+middle of those of the window shown (indices `first` to `last`) to sit nearest `target`
+(`undefined`: `mean`, their circular mean as the caller works it out — Chart.js works out
+none, the card gives the one rule's, `history-stats.js` `circularMean` —, brought into [0, Q);
+neither: the first value), those outside it put in the same turn; spanning more than
 a turn there, each one put in the turn around `target` instead (`band: true`) — with no `target`
 (the Y axis automatic), with a hysteresis: a value crossing the turn's edge goes on past it, up
 to `HYSTERESIS` (a twentieth) of a turn, and comes back with no jump; only further does it jump
@@ -448,7 +450,7 @@ calls `preventDefault()`, for every pointer type: with a mouse or pen it starts 
 selection (dragging out of the zone would leave one on the page, and the next press on it
 would start the browser's own drag-and-drop — a `pointercancel` that loses the drag); on
 touch, no focus change by the emulated mouse events (the click after a long-press would
-otherwise close the type menu it just opened). Scrolling is never affected: on touch it
+otherwise close the curve menu it just opened). Scrolling is never affected: on touch it
 only depends on `touch-action`.
 
 The canvas takes the pointer capture at the press, so a drag toward another graph keeps
@@ -561,7 +563,8 @@ pointing to `deps/chart-hec.js` or to this file:
 | Linear scale, `buildTicks` | The ticks are `Chart.hecAxisTicks(parameters, maxTicks)` (`deps/chart-hec.js`), from the axis' parameters (§1). Each side: the lowest of `ticks.dataMin` and `ticks.min` (the highest of `ticks.dataMax` and `ticks.max`); imposed as it is — even off the grid of the step — where `dataMin` is not given or is above `min` (`dataMax` not given or below `max`); else rounded out to a multiple of the step. A side given neither: the data's (`dataMin`). The step: `ticks.stepSize` (the card's `ystepSize`), unless its labels would overlap; else the smallest of 1, 2, 5 × 10ⁿ whose labels don't — two labels never nearer than the axis' length over `maxTicks - 1`: a multiple of the step that near an imposed side is left out; two intervals at least when a free side is across 0 (a tick on the grid). Each tick the exact decimal of its multiple. The stock rule — the span rounded up, then the step rounded to the nearest — went past `maxTicks` or widened the axis. The step applied (`_hecStep`) is told once the layout is done (`ticks.hecTicksApplied`, §1) |
 | Linear scale, `getTickLimit` (vertical) | `maxTicks` from the length the axis is drawn over: its height less the half label the layout keeps above and below it (its `fit`'s `paddingTop` / `paddingBottom`, past the boxes there), which it takes off once the ticks are made — its height over twice the font size, 11 at most |
 | Time scale, `buildTicks` | An axis given a unit and a step (`time.unit`, `time.stepSize` — the card's, from its range and `timeTicks.density`): its ticks are `Chart.hecTimeTicks` (`deps/chart-hec.js`) — that step, the first of `Chart.hecTimeSteps` at least as long, unless its labels, each measured in its font (a day's, major, in the major one), with the room between two (`ticks.autoSkipPadding`), are wider than a step along the axis; then the next longer one, the longest at last. The step applied (`_hecTimeStep`) is told once the layout is done (`time.hecTicksApplied`, §1) |
-| Scale, `fit` | A vertical axis given `hecWidth` (§1) takes that width |
+| Scale, `fit` | A vertical axis given `hecWidth` (§1) takes that width; a horizontal axis keeps at each end the room of its widest label (half of it, centred on an end tick), worked out once per labels' format — font, time unit and step, rotation — and kept while the axis pans (`chart._hecEdgeRoom`): the text of the labels at the ends never changes the plot's width |
+| Scale, `draw` | A horizontal axis' label centred on its tick that would go past the chart's edge (3 px from it) is aligned on that edge — moved inwards half its font's size at most —, further not drawn |
 | Layout, `update` | `hecRightAxisRoom` (§1): the room of a right Y axis added to the right padding of a chart that has none displayed |
 | Linear and logarithmic scales, the tick parameters | Read through the scale's `_hecTickOptions()` (`deps/chart-hec.js`): its own `options.ticks`, the Y lock's range over them — a range set by the padlock, a drag or a pinch (`_hecSetYRanges`) is the chart's own state (`_hecLockRanges`), both sides imposed, never written in the axis' parameters; released, the parameters again. Its first and last labels removed when off the grid while it holds (`_hecLockedRange`) |
 | Scale, `update` | The data's limits worked out once per layout (`_dataLimitsCached`, cleared by the layout for each box — a timeline's or an arrowline's kept while its size is the same), and given back as they were (`_hecDataLimits`) at each of the layout's passes: making the ticks changes `min` and `max`, so each pass — the first at half the chart's height, the last at the axis' own — makes its ticks from the data's, for its own size, never from the ticks of the pass before |

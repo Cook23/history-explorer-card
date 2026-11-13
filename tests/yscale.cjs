@@ -523,7 +523,8 @@ module.exports = async function()
                 g[g.length - 1].canvas.scrollIntoView(); await w(1500);
                 const s = new Set(I.graphs.filter(x => I.graphShown(x)).map(x => x.entities[0].entity));
                 window.__ws.length = 0; I.moveTimeWindow(window.HXLocal_moment(I.startTime).subtract(3, 'month')); await w(8000);
-                return { shown: [...s], order: window.__ws.filter(q => /history|statistics/.test(q.type)).map(q => ( q.ids || [] ).map(id => s.has(id) ? 'S' : 'h').join('')) }; })()`);
+                // (phase 1's: the hourly statistics over the window and its sides)
+                return { shown: [...s], order: window.__ws.filter(q => /statistics/.test(q.type) && q.period === 'hour').map(q => ( q.ids || [] ).map(id => s.has(id) ? 'S' : 'h').join('')) }; })()`);
             const first = r.order.slice(0, r.order.findIndex(x => /h/.test(x)));
             return r.shown.length > 0 && r.shown.length < 8 && first.length > 0 && first.every(x => /^S+$/.test(x)) && r.order.every(x => /^S+$|^h+$/.test(x)) ? true : JSON.stringify(r);
         });
@@ -536,11 +537,14 @@ module.exports = async function()
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.tank' }] }] },
         { height: 900, mock: { series: true, fastStats: true, historyDays: 90 } });
     await t.wait(6000);
-    await t.step('a year: the window 30 months back, the cache purged (its last 6 months gone), back to the present, Home Assistant slow to answer: the curve stops where nothing is loaded yet — no line over the months asked again —; their answers come: drawn', async () => {
+    await t.step('a year: its last 5 months gone from the cache (as a purge leaves them), the window drawn again, Home Assistant slow to answer: the curve stops where nothing is loaded yet — no line over the months asked again —; their answers come: drawn', async () => {
         const look = `(()=>{ const c = el.instance.graphs[0].chart, now = Date.now(), x = p => typeof p.x === 'number' ? p.x : Date.parse(p.x), d = c.data.datasets[0].data;
             return { last5: d.filter(p => p.y !== null && x(p) > now - 150 * 864e5).length, before: d.filter(p => p.y !== null && x(p) < now - 190 * 864e5).length, gaps: d.filter(p => p.y === null).length }; })()`;
-        await t.E(`(async()=>{ const I = el.instance, w = ms => new Promise(r => setTimeout(r, ms)); I.moveTimeWindow(window.HXLocal_moment().subtract(30, 'month')); await w(3000);
-            const o = I.cacheRows; I.cacheRows = () => 600000; I._purge(); I.cacheRows = o; window.MOCK.historyDelay = 4000; I.today(); })()`);
+        // (the last 5 months emptied from the cache — as a purge leaves them —, the year before
+        // them loaded; then the window shown again, Home Assistant slow to answer)
+        await t.E(`(async()=>{ const I = el.instance, from = Date.now() - 150 * 864e5;
+            for( const s of I.cache ) if( s.b > from ) for( const l of ['hist', 'fine', 'stats', 'day', 'week', 'month'] ) { s[l].clear(); s.cover[l].clear(); s.askedAt[l].clear(); }
+            I._cacheVersion = I.cacheVersion() + 1; window.MOCK.historyDelay = 4000; I.updateHistory(); })()`);
         await t.wait(800);
         const a = await t.E(look);
         await t.wait(12000);
@@ -840,6 +844,45 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── An angle's turn chosen by its circular mean over the window — lowpass_dt's rule, each
+    // value weighted by how long it's in force (CLAUDE.md, the one mean of an angle) ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind' }] }] }, { height: 700, mock: { rows: { 'sensor.wind': [[30 * 3600, '350'], [3600, '20']] } } });
+    await t.wait(2500);
+    await t.step('an angle at 350° for 23 h of the window, then 20° for its last hour: the curve around 350° — its mean weighted by time (some 351°) —, the 20° drawn as 380°, never 350° as -10°', async () => {
+        const ys = await t.E(`el.instance.graphs[0].chart.data.datasets[0].data.filter(p => p.y != null).map(p => p.y)`);
+        return ys.length && ys.every(y => y >= 340 && y <= 390) && ys.some(y => y > 370) ? true : JSON.stringify(ys);
+    });
+    done(await t.close());
+
+    // ── statistics.period: 5minute — the 5-minute statistics the card's period: the probe made
+    // all the same, the 5-minute statistics used only where valid ──
+    for( const [step, valid] of [[3600, false], [60, true]] ) {
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '7d', statistics: { enabled: true, period: '5minute' },
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { height: 700, mock: { series: true, historyStep: step } });
+        await t.wait(5000);
+        await t.step(`statistics.period: 5minute, a value every ${step / 60} min: the probe made — the 5-minute statistics ${valid ? 'valid: asked and drawn' : 'not valid: never asked nor drawn'}`, async () => {
+            const r = await t.E(`(()=>{ const I = el.instance, d = I.graphs[0].chart.data.datasets[0].data;
+                return { fine: I._relevant('sensor.power', 300e3), asked: window.__ws.some(w => w.period === '5minute'), stats: d.filter(p => p.statistics).length }; })()`);
+            return r.fine === valid && r.asked === valid && ( valid ? r.stats > 0 : r.stats === 0 ) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── A dense curve (a value every 2 s): its neighbours in the cache near what a browser takes
+    // as a call's arguments (some 130 000) — the axis worked out all the same (history-arrays.js) ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '3d', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { height: 700, mock: { series: true, historyStep: 2 } });
+    await t.step('a value every 2 s, 3 days, the background filling the days around them: more than 120 000 rows near the window (the old spread failed there) — drawn again, no error, the Y axis worked out', async () => {
+        let n = 0;
+        for( let k = 0; k < 40 && n <= 120000; k++ ) { await t.wait(3000);
+            n = await t.E(`Math.max(0, ...[...el.instance._yScaleNeighbours(el.instance.graphs[0].chart, 'y-axis-0', y => y).values()].map(a => a.length))`); }
+        const r = await t.E(`(()=>{ try { el.instance.generateGraphDataFromCache('the test'); } catch(e) { return { error: e.message }; }
+            const s = el.instance.graphs[0].chart.scales['y-axis-0']; return { min: s.min, max: s.max }; })()`);
+        return n > 120000 && !r.error && isFinite(r.min) && isFinite(r.max) && r.max > r.min && !t.errors.length ? true : JSON.stringify({ n, r, errors: t.errors });
+    });
+    done(await t.close());
+
     // ── The cache purged past 500 000 rows: the history of the farthest days first, then their
     // 5-minute statistics; the hourly ones kept; never the window nor a window on each side ──
     t = await openCard(card('24h', { statistics: { enabled: true } }), { height: 900, mock: { series: true } });
@@ -858,6 +901,13 @@ module.exports = async function()
             const kept = d => ['hist', 'fine', 'stats'].map(l => I.cache[c0 - d][l].has(id) ? 1 : 0).join('');
             return { before, after, win: _win(['hist', 'fine', 'stats', 'day']) === win, near: kept(3), far: kept(42), hourlyFar: I.cache[c0 - 42].stats.has(id) }; })()`);
         return r.before > 500000 && r.after <= 300000 && r.win && r.near === '111' && r.far[0] === '0' && r.hourlyFar ? true : JSON.stringify(r);
+    });
+    await t.step('a window of 60 days: its sides kept a month each — the zone phase 1 asks —, never a width each: past 500 000 rows, history 45 days before the window purged, 20 days before it kept', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, id = 'sensor.power'; I.applyTimeRange(1440, true); const c0 = I.mapStartTimeToCacheSlot(I.startTime);
+            const rows = (n, t) => Array.from({ length: n }, (_, k) => ({ last_changed: t + k, state: '1' }));
+            for( const d of [20, 45] ) { const s = I.cache[c0 - d]; s.hist.set(id, rows(300000, s.start_m.valueOf())); }
+            I._purge(); return { d20: I.cache[c0 - 20].hist.has(id), d45: I.cache[c0 - 45].hist.has(id) }; })()`);
+        return r.d20 && !r.d45 ? true : JSON.stringify(r);
     });
     done(await t.close());
 

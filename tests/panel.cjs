@@ -32,8 +32,17 @@ module.exports = async function()
         const t1 = await t.E('timeRange()');
         return Date.parse(t1[0]) < Date.parse(t0[0]) - 20 * HOUR ? true : `${t0} -> ${t1}`;
     });
-    await t.step('the type menu turns the curve into bars, with their interval selector', async () => {
-        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityTypeMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); I._this.querySelector('#et_0_3').click(); })()`);
+    await t.step('the curve menu has Export ▸, as the card\'s curve menu: its history exported — the panel\'s entity\'s only', async () => {
+        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); })()`); await t.wait(400);
+        const has = await t.E(`!!inst()._this.querySelector('#et_0_export')`);
+        await t.E('captureSave()'); await t.E(`inst()._this.querySelector('#et_0_export').click()`); await t.wait(300); await t.E(`inst()._this.querySelector('#et_0_csv').click()`);
+        for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
+        const lines = ( ( await t.E('__saved') )?.text ?? '' ).split('\r\n'), id = await t.E('inst().graphs[0].entities[0].entity');
+        await t.page.keyboard.press('Escape');
+        return has && lines.includes(id) && lines.filter(l => /^[a-z_]+\.[a-z0-9_]+$/.test(l)).length === 1 ? true : JSON.stringify({ has, head: lines.slice(0, 3) });
+    });
+    await t.step('the curve menu turns the curve into bars, with their interval selector', async () => {
+        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); I._this.querySelector('#et_0_3').click(); })()`);
         await t.wait(1500);
         const g = await t.E(`[inst().graphs[0].type, !!inst()._this.querySelector('#bd-' + inst().graphs[0].id)]`);
         return g[0] === 'bar' && g[1] ? true : JSON.stringify(g);

@@ -1,4 +1,4 @@
-// The type menu: its order, the type pre-selected for an entity being added, and the keyboard
+// The curve menu: its order, the type pre-selected for an entity being added, and the keyboard
 const { openCard } = require('./lib.cjs');
 
 const card = (extra) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [], ...extra });
@@ -15,7 +15,7 @@ module.exports = async function()
     const bold = () => t.E(`[...el.querySelectorAll('#et_0_rep_sub a')].filter(a=>a.style.display!=='none' && a.style.fontWeight==='bold').map(a=>a.id).join(',')`);
     const highlighted = () => t.E(`[...el.querySelectorAll('#et_0_rep_sub a')].filter(a=>a.style.background).map(a=>a.id).join(',')`);
     const entry = id => t.E(`(()=>{ const e=el.instance.store.list.find(e=>typeof e==='object'&&e.entity==='${id}'); return e?{type:e.type,lineMode:e.lineMode??null}:null; })()`);
-    // Selects entity id in the entity selector, which opens the type menu for it
+    // Selects entity id in the entity selector, which opens the curve menu for it
     const select = async (id) => {
         await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(id); await t.wait(400);
         await t.page.click(`#es_0 a[data-entity="${id}"]`); await t.wait(500);

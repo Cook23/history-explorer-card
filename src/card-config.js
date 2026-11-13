@@ -31,24 +31,6 @@ export function baseTypePure(hass, entity)
     return ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
 }
 
-export function getEntityOptionsPure(hass, entityOptions, entity)
-{
-    // Simplified version of HistoryCardState.getEntityOptions: no glob/pattern-list
-    // matching, since history-info-panel.js's very first render (before an instance
-    // exists) only ever needs the direct entity/device_class/domain lookup.
-    let c = entityOptions?.[entity];
-    if( !c ) {
-        const dc = getDeviceClassPure(hass, entity);
-        c = dc ? entityOptions?.[dc] : undefined;
-        if( !c ) {
-            const dm = getDomainForEntityPure(entity);
-            c = dm ? entityOptions?.[dm] : undefined;
-        }
-    }
-
-    return normalizeOptions(c) ?? undefined;
-}
-
 // entityOptions in their one form (see normalizeOptions): each entry's — a list (with
 // patterns) or an object keyed by entity id, device class or domain
 function normalizeEntityOptions(eo)
@@ -118,8 +100,8 @@ export class CardConfig
         // (the values over a graph — see card-values.js)
         P.cardShow =               { showState: c.showState, showStats: c.showStats };
         P.defaultShowPoints =      c.showPoints;
-        P.defaultYAxis =           c.yAxis;
-        P.tapAction =              c.tapAction;
+        P.defaultYAxis =           c.yAxis ?? D.yAxis;
+        P.tapAction =              c.tapAction ?? D.tapAction;
         // (options of every curve an entity, its graph or entityOptions can set their own —
         // see resolveOption; hour24, the card's)
         P.cardOptions =            Object.fromEntries([...CURVE_OPTION_KEYS, ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
@@ -235,8 +217,9 @@ export class CardConfig
         return c ?? undefined;
     }
 
-    // The curve interpolation algorithm of an entity: its own (YAML entry or Interpolation
-    // submenu), else its graph's, else entityOptions', else the card's
+    // The curve interpolation algorithm of an entity: its own (its YAML line, the
+    // Interpolation submenu, or copied when it's added — card-graphs.js _levelFields), else
+    // its graph's, else entityOptions', else the card's
     resolveInterpolation(e)
     {
         return e?.interpolation
@@ -245,9 +228,9 @@ export class CardConfig
             ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
     }
 
-    // Option k of entity e: its own, else its graph's, else entityOptions', else the card's
-    // (P.cardOptions), else its default (OPTION_DEFAULTS) — resolved when used, never copied
-    // onto the entity: a curve moved to another graph takes that graph's
+    // Option k of entity e: its own — copied onto it when it's added (card-graphs.js
+    // _levelFields): a curve moved to another graph keeps it —, else its graph's, else
+    // entityOptions', else the card's (P.cardOptions), else its default (OPTION_DEFAULTS)
     resolveOption(e, k)
     {
         return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
@@ -315,12 +298,12 @@ export class CardConfig
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
     // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
-    // Resolved when drawn, never copied onto the entity: a curve moved to another graph
-    // takes that graph's.
+    // Resolved when drawn, never copied onto the entity — the graph's axes: a curve moved to
+    // another graph takes that graph's.
     resolveYAxis(e)
     {
         return e?.yAxis ?? this.pconfig.graphs[e?.groupId]?.yAxis ?? this.getEntityOptions(e?.entity)?.yAxis
-            ?? this.pconfig.defaultYAxis ?? 'auto';
+            ?? this.pconfig.defaultYAxis;
     }
 
     // The decimals of entity e's values (see formatNumber): its own `rounding`, else its
@@ -337,7 +320,7 @@ export class CardConfig
     tapActionOf(e)
     {
         return e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction
-            ?? this.pconfig.tapAction ?? { action: 'more-info' };
+            ?? this.pconfig.tapAction;
     }
 
     _matchGlob(str, pattern)
@@ -355,16 +338,16 @@ export class CardConfig
 
     isNumericEntity(entity_id)
     {
-        // The entity type menu (line/bar/arrowline/timeline) only offers a real choice for
+        // The entity curve menu (line/bar/arrowline/timeline) only offers a real choice for
         // entities whose current state can be treated as a number. Non-numeric states
         // (on/off, text) can only ever be represented as a timeline — the menu is still
-        // shown for these (see showEntityTypeMenu), just reduced to timeline only.
+        // shown for these (see showEntityCurveMenu), just reduced to timeline only.
         const state = this.stateOf(entity_id)?.state;
         return state !== undefined && state !== null && !isNaN(Number(state));
     }
 
     // The most fitting way to show an entity added from the UI — preselected (bold) in the
-    // type menu, and what "Default" gives for a wildcard match. An entity's own options
+    // curve menu, and what "Default" gives for a wildcard match. An entity's own options
     // (entityOptions type / lineMode) always win; otherwise:
     //   - an angle (circular: unit °, state class measurement_angle) — arrowline
     //   - a quantity that only adds up (energy, gas, water, volume: state class

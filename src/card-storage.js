@@ -173,6 +173,16 @@ function sameEntry(a, b, devices)
     return _canon(a) === _canon(b);
 }
 
+// The fields a source spoke of — those its entry now says otherwise than its image (what it
+// said last), option by option; none when the entry says the same (sameEntry, at once). From
+// another device (devices), never a field kept on each device (LOCAL_ONLY_FIELDS)
+function spokenFields(now, image, devices)
+{
+    if( sameEntry(now, image, devices) ) return [];
+    const _same = f => JSON.stringify(now?.[f] ?? null) === JSON.stringify(image?.[f] ?? null);
+    return [...new Set([...Object.keys(now ?? {}), ...Object.keys(image ?? {})])].filter(f => !_same(f) && !( devices && LOCAL_ONLY_FIELDS.includes(f) ));
+}
+
 // The automatic Y axes kept on this device, by card (see card-charts.js _autoYAxis): at most
 // AXES_KEPT graphs' — the last ones drawn
 const AXES_KEPT = 50;
@@ -277,7 +287,7 @@ export class CardStorage
             yaml_exportStatsPeriod : this.pconfig.yamlExportStatsPeriod,
             yaml_defaultInfoPanel  : this.pconfig.defaultInfoPanel,
             yaml_gestures          : this.pconfig.gestures,
-            yaml_entities          : this._pureYamlEntities ?? this.store.statics(),
+            yaml_entities          : this._yamlSeenEntities ?? this.store.statics().map(e => this.yamlEntryOf(e)),
             // HA user mirrors (last HA user value seen on this device — detect inter-device changes)
             ha_entities         : this._lastHaEntities,
             ha_timeRangeHours   : this._lastHaTimeRangeHours,
@@ -462,14 +472,16 @@ export class CardStorage
         const _lsEntities   = _read(_ls?.entities);
         const _haEntities   = _read(_haCard?.entities);
         const _yamlEntities = this.store.statics();
-        // Saved as-is (pure, pre-merge) for writeLocalState — the yaml_entities mirror must
-        // reflect only what YAML said, uncontaminated by whichever field values HA/local
-        // ended up winning below, or the YAML-changed detection breaks: a field overridden
-        // once by HA/local would get baked into the mirror, permanently masking later
-        // genuine YAML edits to that same field.
-        // (a copy: the entries themselves go on living in the card — also what the card goes
-        // back to, see defaultDisplay)
+        // The YAML's entries as they are (pure, pre-merge, a copy: the entries themselves go
+        // on living in the card) — what the card goes back to, see defaultDisplay
         this._pureYamlEntities = JSON.parse(JSON.stringify(_yamlEntities));
+        // The YAML's image saved by writeLocalState: what each entity gets from every level of
+        // the YAML (yamlEntryOf) — a change at any level is the YAML speaking —, only what the
+        // YAML says, uncontaminated by whichever fields HA/local ended up winning below: a
+        // field overridden once by HA/local baked into the image would mask every later YAML
+        // edit of that field
+        const _yamlSeen = _yamlEntities.map(e => this.yamlEntryOf(e));
+        this._yamlSeenEntities = JSON.parse(JSON.stringify(_yamlSeen));
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
         const _haMirror     = _read(_ls?.ha_entities);
         const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(keyOf);
@@ -524,21 +536,22 @@ export class CardStorage
 
         const _find = (arr, key) => arr.find(e => keyOf(e) === key);
         this.store.reset([..._entityIds].map(id => this._resolveEntity(
-            _find(_yamlEntities, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id))));
+            _find(_yamlEntities, id), _find(_yamlSeen, id), _find(_yamlMirror, id), _find(_haEntities, id), _find(_haMirror, id), _find(_lsEntities, id))));
 
         // (the next free dynamic group id — the saved lists repaired above, never the merge)
         this.store.setNextGroupId();
     }
 
-    // One entity's entry, from its YAML entry and its image, its HA entry and its image, and
-    // its entry on this device
-    _resolveEntity(_yamlE, _yamlImageE, _haE, _haImageE, _lsE)
+    // One entity's entry, from its YAML entry — and as every level of the YAML gives it
+    // (_yamlSeenE, see yamlEntryOf) — and its image, its HA entry and its image, and its
+    // entry on this device
+    _resolveEntity(_yamlE, _yamlSeenE, _yamlImageE, _haE, _haImageE, _lsE)
     {
-        // YAML front — per entity, always wins on change, unaffected by the enable flags
-        // (a copy — the live entry gets mutated later, e.g. graphKey, and _yamlE itself
-        // is also the pure YAML mirror saved by writeLocalState)
-        if( _yamlE && !sameEntry(_yamlE, _yamlImageE) )
-            return { ..._yamlE };
+        // YAML front — option by option: what every level of the YAML gives the entity
+        // compared with its image (the whole entry first: nothing changed, nothing to compare);
+        // an option it changed wins, unaffected by the enable flags, over whatever the other
+        // sources say of it (applied last, below)
+        const _yamlSpoke = _yamlE ? spokenFields(_yamlSeenE, _yamlImageE) : [];
 
         // Resolve which fields have persistence enabled at all — entity-level first,
         // falling back to the card-level 'entities' switch, itself defaulting to 'all'
@@ -553,7 +566,8 @@ export class CardStorage
         const { multi: _multiFields, local: _localFields } = this._persistedFieldSets(_yamlE);
         const _enabledFields = new Set([..._multiFields, ..._localFields]);
 
-        const _haChanged = _haE && !sameEntry(_haE, _haImageE, true);
+        // (Home Assistant's front: option by option too — the fields another device changed)
+        const _haSpoke = _haE ? spokenFields(_haE, _haImageE, true) : [];
         const _localE = _lsE ?? _yamlE ?? _haE;
 
         // Base: the YAML value for every field — nothing persists unless explicitly
@@ -572,9 +586,8 @@ export class CardStorage
         };
         for( const _f of _enabledFields )
             if( _localE ) _take(_localE, _f);
-        if( _haChanged )
-            for( const _f of _multiFields )
-                _take(_haE, _f);
+        for( const _f of _multiFields )
+            if( _haSpoke.includes(_f) ) _take(_haE, _f);
         // graphKey (which linked graph of its group the entity is shown in — see
         // splitCurve) and graphIndex (which graph of its group: the rebuild only combines
         // again the entities saved with one graphIndex — see buildGraphsFromStore) aren't
@@ -591,13 +604,22 @@ export class CardStorage
             if( _yamlE?.[_f] !== undefined ) _result[_f] = _yamlE[_f];
             else delete _result[_f];
         }
-        const _keySrc = ( _haChanged && _multiFields.has('groupId') ) ? _haE :
+        // (its placement a whole — PLACEMENT_FIELDS: any of them another device changed, all of its)
+        const _keySrc = ( _multiFields.has('groupId') && _haSpoke.some(f => PLACEMENT_FIELDS.includes(f)) ) ? _haE :
                         ( _enabledFields.has('groupId') ? _localE : null );
         if( _keySrc ) {
-            for( const _f of PLACEMENT_FIELDS.filter(f => f !== 'groupId') ) {
+            for( const _f of PLACEMENT_FIELDS ) {
                 if( _keySrc[_f] !== undefined ) _result[_f] = _keySrc[_f];
                 else delete _result[_f];
             }
+        }
+        // The options the YAML changed: its own — the entity's line's, else none, its levels
+        // applied when it's built (see yamlEntryOf) —; its placement changed, the whole
+        // placement its (the fields of PLACEMENT_FIELDS go together)
+        const _placed = _yamlSpoke.some(f => PLACEMENT_FIELDS.includes(f));
+        for( const _f of new Set([..._yamlSpoke, ...( _placed ? PLACEMENT_FIELDS : [] )]) ) {
+            if( _yamlE[_f] !== undefined ) _result[_f] = _yamlE[_f];
+            else delete _result[_f];
         }
         return _result;
     }
