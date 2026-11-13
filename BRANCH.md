@@ -26,8 +26,8 @@ A change that would break this is redesigned, not merged.
 What the window shown needs is asked to Home Assistant in phases (`card-history.js`), through
 the page's regulator (`ha-requests.js`). Each answer is drawn as soon as it comes — only the
 graphs of the entities it brought something to; answers coming close together (within twice
-what a drawing takes, 100 ms at least) drawn once; the graphs on the screen (and a screen's height
-around) first, the others right after, one at a time when the page is free — after a gesture,
+what a drawing takes, 100 ms at least) drawn once; the graphs on the screen (their plot area, the
+curves', at least in part in what the page shows) first, the others right after, one at a time when the page is free — after a gesture,
 never during it. What the cache already has is used, unless
 phase 0 makes it invalid. The history is never asked before where Home Assistant was seen to
 keep none for an entity (an answer empty, or beginning well after its start: the recorder's

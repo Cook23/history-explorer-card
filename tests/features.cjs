@@ -1721,11 +1721,11 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The graphs far from the screen: not drawn again, until they come near it ──
+    // ── The graphs off the screen: drawn after those on it ──
     t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: Array.from({ length: 8 }, () => ({ type: 'line', entities: [{ entity: 'sensor.power' }] })).map((g, k) => ({ ...g, entities: [{ entity: k % 2 ? 'sensor.rain' : 'sensor.power' }] })) }),
         { mock: { series: true }, height: 500 });
     await t.wait(3000);
-    await t.step('8 graphs, a 500 px screen: drawn again, those near it first — the others right after, one at a time when the page is free, without a scroll; never while a gesture moves the window', async () => {
+    await t.step('8 graphs, a 500 px screen: drawn again, those on it first — the others right after, one at a time when the page is free, without a scroll; never while a gesture moves the window', async () => {
         const r = await t.E(`(async()=>{ const I = el.instance, gs = I.graphsInDisplayOrder(), last = gs[gs.length - 1], d = () => gs.map(g => g.chart.data.datasets[0].data), before = d();
             I.generateGraphDataFromCache(); const after = d();
             await new Promise(r => setTimeout(r, 1500)); const later = d();
@@ -1737,6 +1737,21 @@ module.exports = async function()
             return { first: after[0] !== before[0], lastAtOnce: after[n] !== before[n], lastLater: later[n] !== after[n], scrolled: window.scrollY,
                      duringGesture: g1[n] !== g0[n], afterGesture: g2[n] !== g1[n], points: last.chart.data.datasets[0].data.length }; })()`);
         return r.first && !r.lastAtOnce && r.lastLater && r.scrolled === 0 && !r.duringGesture && r.afterGesture && r.points > 10 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── On the screen: a graph whose plot area — the curves' — is, at least in part, in what
+    // the page shows; its legend alone isn't ──
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: Array.from({ length: 6 }, (_, k) => ({ type: 'line', entities: [{ entity: k % 2 ? 'sensor.rain' : 'sensor.power' }] })) }),
+        { mock: { series: true }, height: 500 });
+    await t.wait(2500);
+    await t.step('a graph at the bottom of the screen: its legend alone shown — not on the screen; 4 px of its plot area shown — on it', async () => {
+        const at = async above => t.E(`(async()=>{ const I = el.instance, g = I.graphsInDisplayOrder()[3], r = g.canvas.getBoundingClientRect(), p = g.chart.hecPlotRect();
+            window.scrollBy(0, r.top + ${above === 'legend' ? 'p.top / 2' : 'p.top + 4'} - window.innerHeight); await new Promise(r => setTimeout(r, 400));
+            return I.graphShown(g); })()`);
+        const legend = await at('legend'), plot = await at('plot');
+        await t.E('window.scrollTo(0, 0)');
+        return legend === false && plot === true ? true : JSON.stringify({ legend, plot });
     });
     done(await t.close());
 

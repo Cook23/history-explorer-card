@@ -108,6 +108,26 @@ module.exports = async function()
             .replace('return { source', 'const _m = day(0); return { midnight: d.filter(p => t(p) === _m && !p.hecVirtual).length, source'));
         return r.back === -1 && r.wrong.length === 0 && r.plateaus >= 1 && r.midnight === 0 ? true : JSON.stringify(r);
     });
+
+    // ── A silence's end in a column of pixels whose point is drawn before it (the column holds
+    // the silence's last part): the plateau ends where that column begins — never left out
+    // unless the silence is within the column; whatever the hour (the columns on a grid from
+    // 1970, a silence's end anywhere in one) ──
+    await t.step('a silence of a day ending in a column of 4 h whose point is drawn an hour before its end: a plateau, ending where the column begins; a silence of 2 h within such a column: none, no point back in time', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, H = 3600e3, T = Date.now() - 10 * 24 * H;
+            const run = (ta, tb, from) => {
+                const raw = [], s = [];
+                for( let x = T; x <= ta; x += H ) { raw.push({ t: x, y: 1 }); s.push({ x, y: 1, columnFrom: x - H / 2, columnTo: x + H / 2 }); }
+                for( let x = tb; x < tb + 6 * H; x += H ) raw.push({ t: x, y: 2 });
+                s.push({ x: tb - H, y: 1.5, columnFrom: from, columnTo: tb + H });
+                for( let x = tb + 2 * H; x < tb + 6 * H; x += H ) s.push({ x, y: 2, columnFrom: x - H / 2, columnTo: x + H / 2 });
+                const out = I._applySilencePlateaus(s, raw, false), x = p => p.x;
+                return { ends: out.filter(p => p.hecPlateauEnd).map(p => ( x(p) - tb ) / H), back: out.findIndex((p, i) => i > 0 && x(p) < x(out[i - 1])) };
+            };
+            const ta = T + 5 * 24 * H, tb = ta + 24 * H;
+            return { day: run(ta, tb, tb - 3 * H), within: run(tb - 2 * H, tb, tb - 3 * H) }; })()`);
+        return r.day.ends.length === 1 && r.day.ends[0] === -3 && r.day.back === -1 && r.within.ends.length === 0 && r.within.back === -1 ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     return { passed, failed };

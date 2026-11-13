@@ -13,6 +13,9 @@ import { chooseYAxis, rangeIndex } from "./card-yscale.js";
 import { msOf, seriesOf } from "./history-series.js";
 import { REDRAW_CAUSES } from "./card-perf.js";
 import { appendAll } from "./history-arrays.js";
+
+// (a graph's canvas watched each fiftieth of it that comes on the screen or goes — see _watchShown)
+const SHOWN_THRESHOLDS = Array.from({ length: 51 }, (_, k) => k / 50);
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -1042,18 +1045,14 @@ export class CardCharts
         this._watchShown(g);
     }
 
-    // Whether graph g is on the screen, or near it (a screen's height above or below), watched
-    // (IntersectionObserver): one that isn't, drawn after those that are — marked to be drawn
-    // (_staleGraphs), one at a time when the page is free (card-history.js _drawStaleSoon) —,
-    // at once if it comes near the screen first. Not told yet: on the screen
-    // Whether graph g is on the screen or near it (a screen's height above or below — see
-    // _watchShown)
+    // Whether graph g is on the screen — its plot area, the curves', at least in part in the
+    // part of the page shown (see _watchShown); not told yet: on it
     graphShown(g)
     {
         return !this._offscreen?.has(g);
     }
 
-    // The series of the graphs on the screen or near it (graphShown), and their entities (an
+    // The series of the graphs on the screen (graphShown), and their entities (an
     // attribute's, whose history is its entity's)
     shownSeries()
     {
@@ -1062,6 +1061,11 @@ export class CardCharts
         return s;
     }
 
+    // Graph g watched (IntersectionObserver, its canvas — told again each fiftieth of it that
+    // comes or goes): on the screen when its plot area (Chart.js hecPlotRect) is, at least in
+    // part, in what the page shows of its canvas; one that isn't, drawn after those that are —
+    // marked to be drawn (_staleGraphs), one at a time when the page is free (card-history.js
+    // _drawStaleSoon) —, at once if it comes on the screen first
     _watchShown(g)
     {
         if( typeof IntersectionObserver === 'undefined' ) return;
@@ -1069,11 +1073,13 @@ export class CardCharts
             for( const en of entries ) {
                 const x = this.graphs.find(y => y.canvas === en.target);
                 if( !x ) continue;
-                if( !en.isIntersecting ) { ( this._offscreen ??= new Set() ).add(x); continue; }
+                const p = x.chart.hecPlotRect(), b = en.boundingClientRect, r = en.intersectionRect;
+                const _on = en.isIntersecting && r.bottom > b.top + p.top && r.top < b.top + p.bottom && r.right > b.left + p.left && r.left < b.left + p.right;
+                if( !_on ) { ( this._offscreen ??= new Set() ).add(x); continue; }
                 this._offscreen?.delete(x);
-                if( this._staleGraphs?.delete(x) ) this.generateGraphDataFromCache(REDRAW_CAUSES.near, new Set(x.entities.map(e => e.entity)));
+                if( this._staleGraphs?.delete(x) ) this.generateGraphDataFromCache(REDRAW_CAUSES.shown, new Set(x.entities.map(e => e.entity)));
             }
-        }, { rootMargin: '100% 0px' });
+        }, { threshold: SHOWN_THRESHOLDS });
         this._shownObserver.observe(g.canvas);
     }
 

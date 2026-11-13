@@ -11,7 +11,7 @@ export const REDRAW_CAUSES = {
     answers: 'answers from Home Assistant',
     moved: 'the window moved',
     window: 'the window or its settings changed',
-    near: 'a graph come near the screen',
+    shown: 'a graph come on the screen',
     later: 'a graph off the screen, drawn after those on the screen',
     test: 'the test',
 };
