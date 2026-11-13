@@ -32,7 +32,7 @@ module.exports = async function()
     // (the values a curve shows exported: an attribute's own — never its entity's state —, with
     // or without the entities' attributes)
     await t.step('Export of a graph of attributes: its history counted (the attributes with values in the window, as their curves have them), the file their own values, a CSV by its type (text/csv: HA Companion names it .csv) — with the attributes asked too, the attributes shown still their own values', async () => {
-        const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0], file = async () => { captureSave(); I.exportFile([g]); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100)); return window.__saved?.text.split('\\r\\n') ?? []; };
+        const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0], file = async () => { captureSave(); I.exportFile(g.entities.map(e => e.entity)); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100)); return window.__saved?.text.split('\\r\\n') ?? []; };
             const _num = l => l.filter(x => /^\\d{4}-/.test(x) && !isNaN(Number(x.split(/[,;\\t]/).pop()))).length;
             const a = I.exportAvailability(g.entities.map(e => e.entity)).history, f = await file();
             const type = window.__saved?.type;
@@ -50,7 +50,7 @@ module.exports = async function()
             { mock: { series: true }, height: 900, clock: d.toISOString() });
         await t.wait(2500);
         await t.step(`Export at ${String(h).padStart(2, '0')}:${m}, the window starting then: only the attributes with values within its time counted and exported — never one whose value comes before it, the same day`, async () => {
-            const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0]; captureSave(); I.exportFile([g]); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100));
+            const r = await t.E(`(async()=>{ const I = el.instance, g = I.graphs[0]; captureSave(); I.exportFile(g.entities.map(e => e.entity)); for( let i = 0; i < 30 && !window.__saved; i++ ) await new Promise(r => setTimeout(r, 100));
                 return { a: I.exportAvailability(g.entities.map(e => e.entity)).history, heads: ( window.__saved?.text.split('\\r\\n') ?? [] ).filter(x => /^climate/.test(x)) }; })()`);
             return r.a === 1 && r.heads.join() === 'climate.salon.current_temperature' ? true : JSON.stringify(r);
         });
@@ -104,7 +104,7 @@ module.exports = async function()
     await t.wait(800);
     // (the last series submenu open over the dropdown — the cascade —, else 'closed')
     const sub = () => t.E(`(()=>{ const s=(el.querySelector('#es_0')._cascade||[]).slice(1).pop(); return !s || s.style.display==='none' ? 'closed' : [...s.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
-    const typeMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._menuEntityId; })()`);
+    const curveMenuFor = () => t.E(`(()=>{ const m=el.querySelector('#et_0'); return m.style.display==='none' ? null : m._menuEntityId; })()`);
     const entryBold = id => t.E(`el.querySelector('#es_0 a[data-entity="${id}"]').style.fontWeight`);
     const search = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); };
     const closeAll = async () => { for( let i = 0; i < 3; i++ ) await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(400); };
@@ -116,7 +116,7 @@ module.exports = async function()
     });
     await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, a unit (X_unit: visibility_unit, even with no visibility), nor a reference to an entity or a web address, nor about a version or an update (installed_version, auto_update), nor a setting, a limit or a description (display_precision, min_temp, max_temp, target_temp_step, manufacturer), nor a date, with or without its time (last_seen, next_service); a temperature in Home Assistant\'s unit system', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
-        const v = await sub(); const b = await entryBold('climate.salon'); const m = await typeMenuFor();
+        const v = await sub(); const b = await entryBold('climate.salon'); const m = await curveMenuFor();
         return v === 'Value (heat)* | Current temperature (19.5 °C) | Temperature (20 °C) | Apparent temperature (21) | Hvac action (heating) | Humidity (45 %) | Led color (green)' && b === 'bold' && m === null ? true : JSON.stringify({ v, b, m });
     });
     await t.step('a weather entity: its attributes in the units Home Assistant shows them in (wind_gust_speed in wind_speed_unit, humidity in %, wind_bearing in °), no X_unit offered', async () => {
@@ -133,7 +133,7 @@ module.exports = async function()
         await t.page.click('#es_0 a[data-entity="weather.villeveyrac"]', { position: { x: 4, y: 6 } }); await t.wait(400); const again = await sub();
         await t.page.click('#es_0_series a:last-child'); await t.wait(300); await t.page.click('#es_0_series_more a:first-child'); await t.wait(300);
         await t.page.click('#es_0_series_more_more a[data-series="weather.villeveyrac.forecast.0.temperature"]'); await t.wait(500);
-        const m = await typeMenuFor(); await closeAll();
+        const m = await curveMenuFor(); await closeAll();
         const ok = l1 === '0 ▸* | 1 ▸' && l2 === 'Condition (sunny)* | Temperature (23.5 °C) | Templow (14 °C)' && back === l1 && /^Value \(rainy\)\*/.test(again) && /Forecast ▸$/.test(again)
             && m === 'weather.villeveyrac.forecast.0.temperature';
         return ok ? true : JSON.stringify({ l1, l2, back, again, m });
@@ -154,16 +154,16 @@ module.exports = async function()
         const r = { sub: await sub(), list: await t.E(`el.querySelector('#es_0').style.display`), b: await entryBold('climate.salon') };
         return r.sub === 'closed' && r.list !== 'none' && r.b !== 'bold' ? true : JSON.stringify(r);
     });
-    await t.step('Enter right away takes the value: the type menu for the entity itself', async () => {
+    await t.step('Enter right away takes the value: the curve menu for the entity itself', async () => {
         await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         await t.page.keyboard.press('Enter'); await t.wait(500);
-        const m = await typeMenuFor(); await closeAll();
+        const m = await curveMenuFor(); await closeAll();
         return m === 'climate.salon' ? true : m;
     });
-    await t.step('↓ ↓ Enter: Current temperature, its type menu (a smart line pre-selected), Enter adds it', async () => {
+    await t.step('↓ ↓ Enter: Current temperature, its curve menu (a smart line pre-selected), Enter adds it', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(500);
-        const m = await typeMenuFor();
+        const m = await curveMenuFor();
         const bold = await t.E(`[...el.querySelectorAll('#et_0_rep_sub a')].filter(a=>a.style.display!=='none' && a.style.fontWeight==='bold').map(a=>a.textContent).join()`);
         await t.page.keyboard.press('Enter'); await t.wait(1500);
         const v = await shown(t);
@@ -172,7 +172,7 @@ module.exports = async function()
     await t.step('a text attribute by the mouse: a timeline beside it', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         await t.page.click('#es_0_series a[data-series="climate.salon.hvac_action"]'); await t.wait(500);
-        const m = await typeMenuFor(); await t.page.keyboard.press('Enter'); await t.wait(1500);
+        const m = await curveMenuFor(); await t.page.keyboard.press('Enter'); await t.wait(1500);
         const v = await shown(t);
         return m === 'climate.salon.hvac_action' && /timeline:climate\.salon\.hvac_action#\d+/.test(v) ? true : JSON.stringify({ m, v });
     });
@@ -182,9 +182,9 @@ module.exports = async function()
         const tip = await t.E('tip()'); await closeAll();
         return /already|existe/i.test(tip || '') && /current_temperature/.test(tip || '') ? true : tip;
     });
-    await t.step('an entity without attributes to show: straight to its type menu', async () => {
+    await t.step('an entity without attributes to show: straight to its curve menu', async () => {
         await search('power two'); await t.page.click('#es_0 a[data-entity="sensor.power2"]'); await t.wait(500);
-        const r = { sub: await sub(), m: await typeMenuFor() }; await closeAll();
+        const r = { sub: await sub(), m: await curveMenuFor() }; await closeAll();
         return r.sub === 'closed' && r.m === 'sensor.power2' ? true : JSON.stringify(r);
     });
     await t.step('kept after a reload, and the selector and its submenu close when the focus leaves', async () => {

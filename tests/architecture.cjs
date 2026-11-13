@@ -37,10 +37,35 @@ const stringLists = (s, file) => {
     });
     return out;
 };
-// Every list of names of the card's sources, by its content: where it's written
+// The lists of names written in a source, whatever their shape — an array of strings, an
+// object's keys (a table of constants by name), the first strings of an array of pairs (a menu's values) —,
+// at least three names: { index, key: the names in order, as a set (same names, same list) }
+const nameLists = s => {
+    const out = [], _push = (index, names) => { if( names.length >= 3 ) out.push({ index, key: JSON.stringify([...new Set(names)].sort()) }); };
+    // (a row of a table — an object in a list, a property's, a call's argument: a record, its
+    // keys the table's columns — is no list of names of its own)
+    const _rows = new Set();
+    walk(acorn.parse(s, { ecmaVersion: 2022, sourceType: 'module' }), n => {
+        if( n.type === 'ArrayExpression' ) n.elements.forEach(e => e?.type === 'ObjectExpression' && _rows.add(e.start));
+        if( n.type === 'Property' && n.value.type === 'ObjectExpression' ) _rows.add(n.value.start);
+        if( /CallExpression|NewExpression/.test(n.type) ) n.arguments.forEach(e => e.type === 'ObjectExpression' && _rows.add(e.start));
+    });
+    walk(acorn.parse(s, { ecmaVersion: 2022, sourceType: 'module' }), n => {
+        if( n.type === 'ArrayExpression' && n.elements.length && n.elements.every(e => e?.type === 'Literal' && typeof e.value === 'string') )
+            _push(n.start, n.elements.map(e => e.value));
+        else if( n.type === 'ArrayExpression' && n.elements.length && n.elements.every(e => e?.type === 'ArrayExpression' && e.elements[0]?.type === 'Literal' && typeof e.elements[0].value === 'string') )
+            _push(n.start, n.elements.map(e => e.elements[0].value));
+        // (a table by name: its values constants — a literal, a list of them —, never a record of variables)
+        else if( n.type === 'ObjectExpression' && !_rows.has(n.start) && n.properties.length && n.properties.every(p => p.type === 'Property' && !p.computed && ( p.key.type === 'Identifier' || typeof p.key.value === 'string' )
+                 && ( p.value.type === 'Literal' || ( p.value.type === 'Identifier' && p.value.name === 'undefined' ) || ( p.value.type === 'ArrayExpression' && p.value.elements.every(e => e?.type === 'Literal') ) )) )
+            _push(n.start, n.properties.map(p => p.key.name ?? p.key.value));
+    });
+    return out;
+};
+// Every list of names of the card's sources, by its names: where it's written
 const LISTS = (() => {
     const m = new Map();
-    for( const f of CARD ) for( const l of stringLists(code(f), f) ) m.set(l.key, [...( m.get(l.key) ?? [] ), f]);
+    for( const f of CARD ) for( const l of nameLists(code(f)) ) m.set(l.key, [...( m.get(l.key) ?? [] ), f]);
     return m;
 })();
 // The options' names (history-options.js: its lists of option names, OPTION_DEFAULTS)
@@ -118,8 +143,10 @@ const RULES = [
       files: ['deps/chart-hec.js'], re: /\b(?:options|opts|_t|tickOpts)\.\w+(?:\.\w+)*\s*=(?!=)/g },
     { id: 'no-business-in-chart', why: "Chart.js never knows what an entity, Home Assistant, the store or the card's texts are",
       files: ['deps/chart-hec.js', 'deps/timeline.js'], re: /\b(entity|entities|entity_id|hass|pconfig|store|i18n|statistics?)\b/gi },
+    { id: 'no-spread-push', why: "an array is never spread into push or unshift: a browser takes a limited number of arguments (some 100 000 in Chrome) — past it, 'Maximum call stack size exceeded'; history-arrays.js appendAll appends any number",
+      files: [...CARD, 'deps/chart-hec.js'], re: /\.(?:push|unshift)\(\s*\.\.\./g },
     { id: 'pure-data', why: 'these parts are data only: no DOM, no style, no event',
-      files: ['src/history-entity-store.js', 'src/legend-names.js', 'src/history-units.js', 'src/history-options.js', 'src/history-series.js', 'src/history-stats.js', 'src/card-values.js', 'src/ha-requests.js'],
+      files: ['src/history-arrays.js', 'src/history-entity-store.js', 'src/legend-names.js', 'src/history-units.js', 'src/history-options.js', 'src/history-series.js', 'src/history-stats.js', 'src/card-values.js', 'src/ha-requests.js'],
       re: /\bdocument\b|getComputedStyle|querySelector|addEventListener|\.style\b|innerHTML|getBoundingClientRect|\bChart\b/g },
     { id: 'persistence', why: 'what is kept between sessions is read and written by card-storage.js only',
       files: CARD.filter(f => f !== 'src/card-storage.js'), re: /localStorage|frontend\/(set|get)_user_data/g },
@@ -161,6 +188,9 @@ const RULES = [
       re: new RegExp('\\b(?:resolveOption|graphOption)\\([^()]*\\)\\s*(?:\\?\\?|[!=]==\\s*(?:true|false)\\b)'
           + '|\\.(?:' + DEFAULTED.join('|') + ')\\s*(?:\\?\\?\\s*(?:true|false|-?\\d|[\'"`])|[!=]==\\s*(?:true|false)\\b)'
           + '|\\bpconfig\\.\\w+\\s*\\?\\?\\s*(?:true|false|-?\\d|[\'"`])', 'g') },
+    { id: 'defaults-in-family', why: "a parameter's default is written once, in the table of its family — the options' in history-options.js OPTION_DEFAULTS, the colors' in history-default-colors.js (uiColors: UI_COLOR_DEFAULTS), the gestures' in gesture-settings.js — never where the parameter is read or used, card-config.js included (CLAUDE.md, ARCHITECTURE.md rule 9)",
+      files: CARD.filter(f => !['src/history-options.js', 'src/history-default-colors.js', 'src/gesture-settings.js'].includes(f)),
+      re: /\buiColors\??\.\w+\s*\?\?\s*(?:\(|['"`#])|\bpconfig\.\w+\s*\?\?\s*(?:true|false|-?\d|['"`{])/g },
     { id: 'option-defaults-once', why: "the card's constructor gives no option a value of its own: applyConfig (card-config.js) sets them, with their defaults",
       files: ['src/history-explorer-card.js'],
       check: (s, f) => {
@@ -173,8 +203,8 @@ const RULES = [
       files: ['src/card-gestures.js', 'src/card-menus.js', 'src/card-selector.js', 'src/card-toolbar.js'],
       re: /this\.store\.(add|remove|reset|removeAllDynamic|moveToGroup|setGraphOrder|syncGroupOrder|moveBefore|regroup|setGraphKey|newGroupId|normalizeGroupIds|setNextGroupId)\(|this\.(addGraph|detachGraph|rebuildGraph|detachAndRebuildRemaining|removeGraphs|placeGraphs|buildGraphsFromStore|clearGraphs|writeLocalState)\(/g },
     // (a list written once, by name — ARCHITECTURE.md rule 3)
-    { id: 'lists-once', why: "a list of names is written once, as a named constant: never the same list written again",
-      files: CARD, check: (s, f) => stringLists(s, f).filter(l => LISTS.get(l.key).length > 1).map(l => ({ index: l.index, text: l.key + ' (also ' + LISTS.get(l.key).length + '×)' })) },
+    { id: 'lists-once', why: "a list of names is written once, as a named constant: never the same names written again — as an array, an object's keys or a menu's values",
+      files: CARD, check: s => nameLists(s).filter(l => LISTS.get(l.key).length > 1).map(l => ({ index: l.index, text: l.key + ' (' + LISTS.get(l.key).length + '×)' })) },
     { id: 'option-lists', why: "a list of options is written in history-options.js, named, with the others: the rest of the card uses it, never writes its own",
       files: CARD.filter(f => f !== 'src/history-options.js'),
       check: (s, f) => stringLists(s, f).filter(l => l.names.length >= 3 && l.names.every(n => OPTION_NAMES.has(n))).map(l => ({ index: l.index, text: l.key })) },

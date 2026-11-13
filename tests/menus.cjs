@@ -165,7 +165,7 @@ module.exports = async function()
         done(await t.close());
     }
 
-    // ── The info panel's type menu ──
+    // ── The info panel's curve menu ──
     t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
     const P = run(t, 'inst()._this');
@@ -184,7 +184,8 @@ module.exports = async function()
     // line it covers still show (40 px), the last line's submenu aside (as wide as the menu
     // when it needs it) ──
     // (the lines of box opening a submenu, shown — `${line id}_sub`)
-    const subLines = (t, root, box) => t.E(`[...${root}.querySelectorAll('#${box} a')].filter(a=>a.parentNode.id==='${box}' && a.id && a.offsetParent && ${root}.querySelector('#'+a.id+'_sub')).map(a=>a.id)`);
+    // (a line greyed — nothing to open: an export with no data — left out)
+    const subLines = (t, root, box) => t.E(`[...${root}.querySelectorAll('#${box} a')].filter(a=>a.parentNode.id==='${box}' && a.id && a.offsetParent && !a.getAttribute('aria-disabled') && ${root}.querySelector('#'+a.id+'_sub')).map(a=>a.id)`);
     // (with line's submenu open: the names of box's lines it covers, how much of box shows
     // left of it, whether line is box's last, whether the submenu is as wide as box)
     const covered = (t, root, box, line) => t.E(`(()=>{ const R=${root}, b=R.querySelector('#${box}'), s=R.querySelector('#${line}_sub'), l=R.querySelector('#${line}');

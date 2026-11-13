@@ -84,7 +84,7 @@ export class CardGestures
     _onValueClick(e, g)
     {
         const a = this.tapActionOf(e);
-        switch( a.action ?? 'more-info' ) {
+        switch( a.action ) {
             case 'none':
                 return;
             case 'navigate':
@@ -136,7 +136,7 @@ export class CardGestures
     }
 
     // Long press on a label — or the browser's context menu: a right click, a tap with a
-    // pen's button — the entity's type menu, under the label (line/bar: numeric entities only)
+    // pen's button — the entity's curve menu, under the label (line/bar: numeric entities only)
     // or level with the finger (timeline/arrowline row)
     _onGraphLongPress(info, g)
     {
@@ -152,10 +152,10 @@ export class CardGestures
         if( info.legendIndex >= 0 && !this.isRowGraph(g) ) {
             const _entity = g.entities[info.legendIndex];
             if( _entity && this.isNumericEntity(_entity.entity) )
-                this.showEntityTypeMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: _r.bottom });
+                this.showEntityCurveMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: _r.bottom });
         } else if( info.yAxisIndex >= 0 && this.isRowGraph(g) ) {
             const _entity = g.entities[info.yAxisIndex];
-            if( _entity ) this.showEntityTypeMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: info.clientY });
+            if( _entity ) this.showEntityCurveMenu(0, _entity.entity, g, { from: 'label', clientX: _r.left + 30, clientY: info.clientY });
         }
     }
 
@@ -364,7 +364,7 @@ export class CardGestures
     // Cut and paste — what a drag does, from the menus
     // --------------------------------------------------------------------------------------
 
-    // Cut: entity idx of graph g (from its type menu), or the whole graph g (idx null, from
+    // Cut: entity idx of graph g (from its curve menu), or the whole graph g (idx null, from
     // its graph menu). Until it's pasted, every graph's lock+handle zone shows its buttons
     // (_cutButtons): a curve is pasted into a graph (📋), a graph inserted below (↓) or
     // above (↑) another one; the place it was cut from shows ✂. A click anywhere else, or

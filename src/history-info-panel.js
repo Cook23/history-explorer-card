@@ -1,11 +1,14 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, buttonsColor } from "./history-default-colors";
 import { HistoryCardState } from "./history-explorer-card";
-import { getDomainForEntityPure, getDeviceClassPure, getEntityOptionsPure, baseTypePure } from "./card-config.js";
-import { typeMenuHtml } from "./card-menus.js";
+import { getDomainForEntityPure, getDeviceClassPure, baseTypePure } from "./card-config.js";
+import { curveMenuHtml } from "./card-menus.js";
 import { timeButtonsHtml, rangeControlsHtml } from "./card-toolbar.js";
 import { i18n } from "./languages.js";
 import { infoPanelData, fetchInfoPanelData, takeInfoLook } from "./card-storage.js";
+
+// The panel's label area (px), beside a curve's or bars' graph — a timeline's has none
+const PANEL_LABEL_AREA_WIDTH = 55;
 
 // --------------------------------------------------------------------------------------
 // Clone of lit html(), don't want to pull in the entire framework
@@ -95,7 +98,7 @@ function hxHookInfoPanel()
         instance.pconfig.nextDefaultColor = 0;
 
         // No label area for timelines
-        instance.pconfig.labelAreaWidth = ( type == 'timeline' || type == 'arrowline' ) ? 0 : 55;
+        instance.pconfig.labelAreaWidth = ( type == 'timeline' || type == 'arrowline' ) ? 0 : PANEL_LABEL_AREA_WIDTH;
 
         // Unified pipeline — static graph = dynamic graph with isStatic:true
         instance.pconfig.graphs = {};
@@ -182,18 +185,18 @@ function hxHookInfoPanel()
 
         this._setEntityOptions(instance);
 
-        // Entity type menu — "Type" link click opens the same menu as the main card,
+        // The curve menu — the "Curve ▾" link opens the same menu as the main card's,
         // conditioned identically (numeric entity state → full menu, otherwise not rendered)
         const _tf0 = instance._this.querySelector('#tf_0');
         if( _tf0 ) {
             instance.ui.inputField[0] = _tf0;
             // (the card's menu markup, without what only the card offers)
             const _etw = instance._this.querySelector('#etw_0');
-            if( _etw ) _etw.innerHTML = typeMenuHtml(0, false);
-            instance.initEntityTypeMenu(0);
+            if( _etw ) _etw.innerHTML = curveMenuHtml(0, false);
+            instance.initEntityCurveMenu(0);
             _tf0.addEventListener('click', () => {
                 const _g = instance.graphs[0];
-                if( _g ) instance.showEntityTypeMenu(0, _g.entities[0].entity, _g, { from: 'panel', align: 'center' });
+                if( _g ) instance.showEntityCurveMenu(0, _g.entities[0].entity, _g, { from: 'panel', align: 'center' });
             });
         }
 
@@ -278,11 +281,7 @@ function hxHookInfoPanel()
             return this._oldRender();
         }
 
-        const entityOptions = getEntityOptionsPure(this.hass, hec_panel?.config?.entityOptions, entity_id);
-
-        const type = entityOptions?.type || baseTypePure(this.hass, entity_id);
-
-        // Entity type menu access — same all-or-nothing rule as the main card:
+        // Entity curve menu access — same all-or-nothing rule as the main card:
         // only offered when the entity's current state is numeric-convertible
         const _state = this.hass.states[entity_id]?.state;
         const _isNumeric = _state !== undefined && _state !== null && !isNaN(Number(_state));
@@ -308,7 +307,7 @@ function hxHookInfoPanel()
                     <div id="dl_${i}" style="background-color:${bgcol};padding-left:5px;padding-right:5px;flex:0 0 auto;"></div>
                     <div id="sl_${i}" style="flex:1 1 auto;display:flex;justify-content:center;">
                     ${_isNumeric ? html`
-                        <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.type_label')}</span>
+                        <span id="tf_${i}" style="cursor:pointer;text-decoration:underline;color:var(--primary-text-color);">${i18n('ui.menu.curve_label')}</span>
                         <div id="etw_${i}" style="display:contents"></div>
                     ` : ''}
                     </div>

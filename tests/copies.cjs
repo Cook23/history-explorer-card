@@ -26,7 +26,7 @@ module.exports = async function()
     });
     await t.step('each curve its own: one hidden, one changed to stepped — the other unchanged, both kept after a reload', async () => {
         const p = await t.E('legendPt(1,0)'); await t.page.mouse.click(p.x, p.y); await t.wait(800);
-        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.showEntityTypeMenu(0, 'sensor.power', g, { from: 'label', clientX: 100, clientY: 100 }); el.querySelector('#et_0_2').click(); })()`); await t.wait(1000);
+        await t.E(`(()=>{ const I=el.instance; const g=I.graphsInDisplayOrder()[0]; I.showEntityCurveMenu(0, 'sensor.power', g, { from: 'label', clientX: 100, clientY: 100 }); el.querySelector('#et_0_2').click(); })()`); await t.wait(1000);
         const modes = () => t.E(`el.instance.store.list.filter(e=>e.entity==='sensor.power').map(e=>(e.copy||0)+':'+(e.lineMode||'-')+':'+!!e.hidden).join(' ')`);
         const before = { shown: await shown(t), modes: await modes() };
         await reload(t);
@@ -45,13 +45,13 @@ module.exports = async function()
     t = await openCard(card({ graphs: [], enable_multidevice_persistence: 'entities' }), { mock: { series: true }, height: 1100 });
     await t.wait(800);
     const choice = () => t.E(`(()=>{ const m=el.querySelector('#es_0_choice'); return m.style.display==='none' ? 'closed' : [...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | '); })()`);
-    const typeMenuOpen = () => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
+    const curveMenuOpen = () => t.E(`el.querySelector('#et_0').style.display !== 'none'`);
     const pick = async text => { await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type(text); await t.wait(400); await t.page.click(`#es_0 a[data-entity="sensor.power2"]`); await t.wait(500); };
     await t.E(`(()=>{ const I=el.instance; I.addCurves(['sensor.power2'], 'line', 'smart'); })()`);
     await t.wait(1500);
     await t.step('an entity already shown: said so, its graph outlined, then a choice — cancel first, marked', async () => {
         await pick('power two');
-        const r = { c: await choice(), tip: await t.E('tip()'), outl: await t.E(`el.instance.graphs[0].canvas.parentNode.style.outline`), menu: await typeMenuOpen() };
+        const r = { c: await choice(), tip: await t.E('tip()'), outl: await t.E(`el.instance.graphs[0].canvas.parentNode.style.outline`), menu: await curveMenuOpen() };
         return r.c === 'Cancel* | Second curve' && /Already/.test(r.tip || '') && /dashed/.test(r.outl) && !r.menu ? true : JSON.stringify(r);
     });
     await t.step('Enter: cancelled — nothing added, the field emptied', async () => {
@@ -59,10 +59,10 @@ module.exports = async function()
         const r = { c: await choice(), shown: await shown(t), input: await t.E(`el.querySelector('#b7_0').value`) };
         return r.c === 'closed' && r.shown === 'power2' && r.input === '' ? true : JSON.stringify(r);
     });
-    await t.step('↓ Enter: a second curve — through the type menu, in a graph of its own', async () => {
+    await t.step('↓ Enter: a second curve — through the curve menu, in a graph of its own', async () => {
         await pick('power two');
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(500);
-        const menu = await typeMenuOpen();
+        const menu = await curveMenuOpen();
         await t.page.keyboard.press('Enter'); await t.wait(1500);
         const r = { menu, shown: await shown(t), keys: await keys(t) };
         return r.menu && r.shown === 'power2 | power2' && r.keys === 'power2 power2#1' ? true : JSON.stringify(r);

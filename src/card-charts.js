@@ -5,13 +5,14 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { stateLabel, OPTION_DEFAULTS } from "./history-options.js";
+import { stateLabel, OPTION_DEFAULTS, DASH_MODES } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
 import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
 import { chooseYAxis, rangeIndex } from "./card-yscale.js";
 import { msOf, seriesOf } from "./history-series.js";
 import { REDRAW_CAUSES } from "./card-perf.js";
+import { appendAll } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
 
@@ -318,8 +319,6 @@ export class CardCharts
         // (without its line: its points, unless they're asked for otherwise)
         const _points = !d.showLine && d.pointsMode === 'hover' ? true : d.showPoints;
         const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(_points, config?.showPoints, d.width);
-        // (dashMode: a style's name, or its dashes and gaps)
-        const _dashes = { points: [1, 5], shortlines: [5, 5], longlines: [10, 8], pointline: [15, 3, 3, 3] };
         return {
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
@@ -331,7 +330,8 @@ export class CardCharts
             // (fill: fade — its own color fading out downwards, see deps/chart-hec.js)
             hecFillFade: d.fillFade && d.kind === 'line',
             borderWidth: d.width,
-            borderDash: Array.isArray(d.dashMode) ? d.dashMode : _dashes[d.dashMode],
+            // (dashMode: a style's name, or its dashes and gaps)
+            borderDash: Array.isArray(d.dashMode) ? d.dashMode : DASH_MODES[d.dashMode],
             pointRadius: _pointRadius,
             pointStyle: 'circle',
             pointBackgroundColor: d.bColor,
@@ -458,12 +458,13 @@ export class CardCharts
             if( ds.circularPeriod ) {
                 const t0 = msOf(this.startTime), t1 = msOf(this.endTime), _in = entries.filter(e => e.x >= t0 && e.x <= t1);
                 const _before = entries.filter(e => e.x < t0).pop(), _after = entries.find(e => e.x > t1);
-                entries.splice(0, entries.length, ...( _before ? [_before] : [] ), ..._in, ...( _after ? [_after] : [] ));
+                const _kept = [...( _before ? [_before] : [] ), ..._in, ...( _after ? [_after] : [] )];
+                entries.length = 0; appendAll(entries, _kept);
             }
         });
         if( _stacked ) { curves.clear(); curves.set(0, [..._points].map(([x, s]) => ({ x, lo: _v(s.neg), hi: _v(s.pos) }))); }
         // (and around them, the values the cache has of each curve — see _yScaleNeighbours)
-        else for( const [j, a] of this._yScaleNeighbours(chart, id, _v) ) curves.get(j)?.push(...a);
+        else for( const [j, a] of this._yScaleNeighbours(chart, id, _v) ) { const c = curves.get(j); if( c ) appendAll(c, a); }
         for( const a of curves.values() ) a.sort((p, q) => p.x - q.x);
         // (what the axis always reaches: a side fixed)
         const _keep = [freeLo ? undefined : fixedLo, freeHi ? undefined : fixedHi].map(k => k === undefined ? NaN : _v(k)).filter(k => !isNaN(k));

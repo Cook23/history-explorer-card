@@ -191,6 +191,39 @@ module.exports = async function()
     }
     done(await t.close());
 
+    // ── The time axis' labels never change the plot's width while the window pans; a label at
+    // an end that doesn't fit centred: aligned on the edge, a little moved, else not drawn ──
+    t = await openCard(card({ defaultTimeRange: '1y', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
+    await t.wait(2500);
+    await t.step('a year panned a week at a time over 3 months: the plot\'s width the same at every step, whatever the labels at its ends; every time label drawn within the chart', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, c = I.graphs[0].chart, w = ms => new Promise(r => setTimeout(r, ms)), widths = new Set(), out = [];
+            const ctx = c.ctx, f = ctx.fillText;
+            for( let k = 0; k < 13; k++ ) {
+                I.moveTimeWindow(window.HXLocal_moment(I.startTime).subtract(7, 'day')); await w(250);
+                widths.add(c.hecPlotWidth());
+                // (the labels drawn at the bottom: each within the chart's width)
+                ctx.fillText = function(text, x, y) { const m = this.measureText(text).width, a = this.textAlign, l = a === 'left' ? x : a === 'right' ? x - m : x - m / 2;
+                    const p = this.getTransform(); if( p.f > c.height * 0.8 * ( c.currentDevicePixelRatio || 1 ) && ( l + p.e / ( c.currentDevicePixelRatio || 1 ) < 0 || l + m + p.e / ( c.currentDevicePixelRatio || 1 ) > c.width ) ) out.push(text); return f.apply(this, arguments); };
+                c.update(0); ctx.fillText = f;
+            }
+            return { widths: [...widths], out }; })()`);
+        return r.widths.length === 1 && !r.out.length ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── A curve's menu: Export ▸, its own entity only — as a graph's, the options menu's ──
+    t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('a curve\'s menu (a long-press on its label): Export ▸ History — the history of its own entity only, not its graph\'s other curve', async () => {
+        await t.longPress(await t.E('legendPt(0,1)')); await t.wait(400);
+        await t.E('captureSave()'); await t.E(`el.querySelector('#et_0_export').click()`); await t.wait(300); await t.E(`el.querySelector('#et_0_csv').click()`);
+        for( let i = 0; i < 20 && !(await t.E('__saved')); i++ ) await t.wait(100);
+        const lines = ( ( await t.E('__saved') )?.text ?? '' ).split('\r\n');
+        return lines.includes('sensor.rain') && !lines.includes('sensor.power') ? true : lines.slice(0, 3).join(' | ') || 'nothing saved';
+    });
+    done(await t.close());
+
     // ── CSV export ──
     t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true } });
@@ -383,7 +416,7 @@ module.exports = async function()
     await t.step('entity selector: Enter on an entry, then a type, adds the entity', async () => {
         await t.page.keyboard.press('ArrowDown'); await t.page.keyboard.press('Enter'); await t.wait(500);
         const menu = await t.E('menuOpen()');
-        if( !menu ) return 'type menu not open';
+        if( !menu ) return 'curve menu not open';
         await t.E(`el.querySelector('#et_0_1').click()`); await t.wait(1200);
         const g = await t.graphs();
         return g.length === 1 && /^l:power/.test(g[0]) && (await t.E(`el.instance.store.has('sensor.power')`)) ? true : g.join(' | ');
@@ -391,7 +424,7 @@ module.exports = async function()
     await t.step('entity selector: clicking an entry, then a type, adds it', async () => {
         await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('rain'); await t.wait(400);
         await t.page.click(`#es_0 a[data-entity="sensor.rain"]`); await t.wait(500);
-        if( !(await t.E('menuOpen()')) ) return 'type menu not open';
+        if( !(await t.E('menuOpen()')) ) return 'curve menu not open';
         await t.E(`el.querySelector('#et_0_1').click()`); await t.wait(1200);
         return (await t.E(`el.instance.store.has('sensor.rain')`)) ? true : (await t.graphs()).join(' | ');
     });

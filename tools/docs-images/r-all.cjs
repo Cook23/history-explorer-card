@@ -255,7 +255,7 @@ const scenes = {
         },
     },
 
-    // ── Adding an entity: its type menu, the type that fits it in bold ──
+    // ── Adding an entity: its curve menu, the type that fits it in bold ──
     'add-type': {
         width: 900, height: 900, clock: '2025-12-20T00:00:00Z', states: climate,
         rows: { 'sensor.outside_temperature': numeric(DAY, 600, curve([[0, 3.2], [6, 2.4], [9, 4.5], [14, 9.8], [18, 7], [24, 4.1]]), { noise: 0.15, seed: 83, digits: 2 }) },

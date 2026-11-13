@@ -1,4 +1,4 @@
-// The card's menus: the type menu of an entity — the same menu for a graph — and the options
+// The card's menus: the curve menu of an entity — the same menu for a graph — and the options
 // menu, with their keyboard navigation. The sections of the curves (what they're shown as,
 // how they look, how they're interpolated, how they behave) are the same in each, for the
 // curves the menu acts on: an entity's, a graph's, the card's. Every menu and submenu is one
@@ -7,15 +7,16 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
+import { seriesOfGraphs } from "./history-series.js";
 const Chart = window.HXLocal_Chart;
 
-// The display types of the type menu (et_N_<index>)
-const _TYPE_MENU_DEFS = [
+// The display types of the curve menu (et_N_<index>)
+const _CURVE_MENU_DEFS = [
     { type: 'line', lineMode: 'lines',   label: 'ui.menu.type_line_straight' },
     { type: 'line', lineMode: 'curves',  label: 'ui.menu.type_line_curves' },
     { type: 'line', lineMode: 'stepped', label: 'ui.menu.type_line_stepped' },
@@ -23,15 +24,15 @@ const _TYPE_MENU_DEFS = [
     { type: 'arrowline', lineMode: null, label: 'ui.menu.type_arrowline' },
     { type: 'timeline',  lineMode: null, label: 'ui.menu.type_timeline' },
     // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // first (_TYPE_MENU_ORDER)
+    // first (_CURVE_MENU_ORDER)
     { type: 'line', lineMode: 'smart',   label: 'ui.menu.type_line_smart' },
 ];
-// Their display order (indices in _TYPE_MENU_DEFS)
-const _TYPE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
+// Their display order (indices in _CURVE_MENU_DEFS)
+const _CURVE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
 // A menu line's style
 const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
-// The sections of the menus acting on curves — an entity's type menu, a graph's, the card's
+// The sections of the menus acting on curves — an entity's curve menu, a graph's, the card's
 // options menu (every graph of the card) —, each a line opening its submenu over the menu,
 // right-aligned, level with it: what the curves are shown as (open when an entity's or a
 // graph's menu opens), how they look, how they are interpolated, how they behave (the
@@ -40,10 +41,8 @@ const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;co
 // (_scopeOf)
 const _SECTIONS = { rep: 'ui.menu.type_representation', appearance: 'ui.menu.type_appearance', interp: 'ui.menu.type_interpolation',
                     behavior: 'ui.menu.type_behavior' };
-// The type menu's lines: the sections, and, a graph's, its exports
+// The curve menu's lines: the sections, and its exports (its curve's, its graph's)
 const _TYPE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
-// The submenus only the card's menu has, not the info panel's (Export: a graph's menu only)
-const _CARD_ONLY_SUBMENUS = ['export'];
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
@@ -52,8 +51,7 @@ const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', ylock: 'ui.menu.ylocked'
                             delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
 // on one), the one nearest the pointer, both, every one
-const _TOOLTIP_MODES = [['selected', 'ui.menu.tooltip_selected'], ['nearest', 'ui.menu.tooltip_nearest'], ['mixed', 'ui.menu.tooltip_mixed'],
-                        ['all', 'ui.menu.tooltip_all']];
+const _TOOLTIP_MODES = TOOLTIP_MODES.map(v => [v, 'ui.menu.tooltip_' + v]);
 // The appearance submenu: the curve's color (the browser's color picker), its points and its
 // extremes (switches), and three lists, each opened in the submenu itself, over it (← or
 // Escape: back) — its fill, its line's width, its line's style. Each line: the entry's field
@@ -66,8 +64,7 @@ const _APPEARANCE = {
               values: [[false, 'ui.menu.fill_none'], [true, 'ui.menu.fill_solid'], ['fade', 'ui.menu.fill_fade']] },
     width:  { field: 'width', label: 'ui.menu.look_width', values: [1, 2, 3, 4, 5].map(w => [w, `${w} px`]) },
     dash:   { field: 'dashMode', label: 'ui.menu.look_dash',
-              values: [['solid', 'ui.menu.dash_solid'], ['points', 'ui.menu.dash_points'], ['shortlines', 'ui.menu.dash_shortlines'],
-                       ['longlines', 'ui.menu.dash_longlines'], ['pointline', 'ui.menu.dash_pointline']] },
+              values: Object.keys(DASH_MODES).map(k => [k, 'ui.menu.dash_' + k]) },
 };
 
 // The options menu's lines (the card's toolbar), each opening its submenu: the sections, for
@@ -84,25 +81,26 @@ const _OPTIONS_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', card
 const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
                         defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
 
-// Wide enough for the type menu's names with a submenu open beside them, over the menu
-const _TYPE_MENU_MIN_WIDTH = 260;
+// Wide enough for the curve menu's names with a submenu open beside them, over the menu
+const _CURVE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 // A menu's title line
 const _TITLE_STYLE = 'margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
 // A menu box (id), empty — filled when it opens (fillMenuItems) — and its submenus' boxes
-// (`${id}_${key}_sub`, its siblings: the same positioned parent), each a line wide at least
-function menuBoxesHtml(id, keys, minWidth, z)
+// (`${id}_${key}_sub`, its siblings: the same positioned parent), each a line wide at least;
+// attrs: the menu box's own attributes
+function menuBoxesHtml(id, keys, minWidth, z, attrs = '')
 {
-    const box = (bid, width, zi) => `<div id="${bid}" tabindex="0" style="${_MENU_BOX_STYLE};min-width:${width}px;z-index:${zi}"></div>`;
-    return box(id, minWidth, z) + keys.map(k => box(`${id}_${k}_sub`, 110, z + 1)).join('');
+    const box = (bid, width, zi, a = '') => `<div id="${bid}"${a} tabindex="0" style="${_MENU_BOX_STYLE};min-width:${width}px;z-index:${zi}"></div>`;
+    return box(id, minWidth, z, attrs) + keys.map(k => box(`${id}_${k}_sub`, 110, z + 1)).join('');
 }
 
-// The type menu et_N and its submenus — the card's (full: the tests submenu too)
-// and the info panel's
-export function typeMenuHtml(i, full)
+// The curve menu et_N and its submenus — the card's (full: marked so, data-card — what only
+// the card's offers: Info, the curves' place) and the info panel's
+export function curveMenuHtml(i, full)
 {
-    return menuBoxesHtml(`et_${i}`, Object.keys(_TYPE_SUBMENUS).filter(k => full || !_CARD_ONLY_SUBMENUS.includes(k)), _TYPE_MENU_MIN_WIDTH, 2);
+    return menuBoxesHtml(`et_${i}`, Object.keys(_TYPE_SUBMENUS), _CURVE_MENU_MIN_WIDTH, 2, full ? ' data-card' : '');
 }
 
 // The options menu eo_N and its submenus
@@ -196,7 +194,7 @@ const SUBMENU_MEMORY_MS = 10000;
 export class CardMenus
 {
     // --------------------------------------------------------------------------------------
-    // A menu, whichever it is — an entity's type menu, a graph's, the options menu: its box
+    // A menu, whichever it is — an entity's curve menu, a graph's, the options menu: its box
     // (prefix), what it shows — lines(): its own lines; sub(path): a submenu's, path the
     // keys of the lines that lead to it (['appearance', 'fill']) —, how it closes (close)
     // and the kind of menu its open submenu is remembered under (kind). Every one is
@@ -607,24 +605,24 @@ export class CardMenus
     }
 
     // --------------------------------------------------------------------------------------
-    // The type menu: Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸, Info, Tests ▸ —
+    // The curve menu: Display ▸, Appearance ▸, Interpolation ▸, Behavior ▸, Info, Tests ▸ —
     // for a graph, the same sections over all its curves, Behavior ▸ holding its Y axis
     // lock, merge back, cut and delete
     // --------------------------------------------------------------------------------------
 
-    _typeMenu(i)
+    _curveMenu(i)
     {
         return this._menuOf(`et_${i}`, {
             index: i,
             keys: Object.keys(_TYPE_SUBMENUS),
-            kind: () => this._typeMenuKind(i),
+            kind: () => this._curveMenuKind(i),
             lines: () => this._typeLines(i),
             sub: path => this._typeSubmenuLines(i, path),
-            close: () => this.hideEntityTypeMenu(i),
+            close: () => this.hideEntityCurveMenu(i),
         });
     }
 
-    // The graph the type menu acts on: the one it was opened on — else, rebuilt since by a
+    // The graph the curve menu acts on: the one it was opened on — else, rebuilt since by a
     // choice made in it (a type, a look), the one showing its curve now; null for an entity
     // being added
     _menuGraph(input_idx)
@@ -637,7 +635,7 @@ export class CardMenus
         return g;
     }
 
-    // The entities the type menu acts on — the graph's (a graph's menu), or the one entity —
+    // The entities the curve menu acts on — the graph's (a graph's menu), or the one entity —
     // and their graph
     _menuTargets(input_idx)
     {
@@ -647,28 +645,28 @@ export class CardMenus
         return { g, entities: _menu._menuForGraph ? g.entities : g.entities.filter(e => keyOf(e) === _menu._menuKey) };
     }
 
-    // What menu m acts on: its kind — an entity's type menu ('entity'; 'add' for one being
+    // What menu m acts on: its kind — an entity's curve menu ('entity'; 'add' for one being
     // added), a graph's ('graph'), the options menu ('card') — and each graph with the
     // entities of it it acts on (the card's: every graph, all their entities), as they are now
     _scopeOf(m)
     {
         if( m.prefix.startsWith('eo_') ) return { kind: 'card', pairs: this.graphs.map(g => ({ g, entities: g.entities })) };
         const { g, entities } = this._menuTargets(m.index);
-        return { kind: this._typeMenuKind(m.index), pairs: g ? [{ g, entities }] : [] };
+        return { kind: this._curveMenuKind(m.index), pairs: g ? [{ g, entities }] : [] };
     }
 
-    // Is entity e of graph g shown as the type menu's entry def? (its own type — a bar
+    // Is entity e of graph g shown as the curve menu's entry def? (its own type — a bar
     // graph can also hold line entities)
     _isShownAs(e, g, def)
     {
         return ( e.type ?? g.type ) === def.type && ( def.lineMode === null || this.lineModeOf(e) === def.lineMode );
     }
 
-    // The type menu for an entity: being added (from 'add', graph null; entity_id an array
+    // The curve menu for an entity: being added (from 'add', graph null; entity_id an array
     // for a wildcard match), or shown in graph — from a long-press on its label ('label', at
     // clientX, clientY), from the entity selector ('duplicate': added again), from the info
     // panel's Type ('panel', under it, align). Opens with its representation submenu.
-    showEntityTypeMenu(input_idx, entity_id, graph, { from, clientX = null, clientY = null, align = 'left' })
+    showEntityCurveMenu(input_idx, entity_id, graph, { from, clientX = null, clientY = null, align = 'left' })
     {
         if( !this._this.querySelector(`#et_${input_idx}`) ) return;
         // Where it opens: at the label's point, else under the field it belongs to (align)
@@ -681,7 +679,7 @@ export class CardMenus
         }
         // (entity_id a string — an entity shown, or a new one — or an array: new entities from
         // a wildcard match)
-        this._openTypeMenu(input_idx, {
+        this._openCurveMenu(input_idx, {
             entityId: entity_id, graphId: graph ? graph.id : null,
             key: graph ? keyOf(graph.entities.find(e => e.entity === entity_id) ?? entity_id) : null,
             forGraph: false, from, anchor: { clientX, clientY },
@@ -696,17 +694,17 @@ export class CardMenus
     showGraphMenu(input_idx, graph, clientX, clientY)
     {
         // (the info panel's menu has no graph menu: its one graph is its entity's)
-        if( !this._this.querySelector(`#et_${input_idx}`) || !this._cardsTypeMenu(`et_${input_idx}`) ) return;
-        this._openTypeMenu(input_idx, {
+        if( !this._this.querySelector(`#et_${input_idx}`) || !this._cardsCurveMenu(`et_${input_idx}`) ) return;
+        this._openCurveMenu(input_idx, {
             entityId: null, graphId: graph.id, key: keyOf(graph.entities[0]),
             forGraph: true, from: 'graph', anchor: { clientX, clientY },
         }, { x: clientX, y: clientY }, 'left', graph.canvas?.parentNode,
            graph.entities.every(e => this.isNumericEntity(e.entity)) ? 'rep' : 'behavior');
     }
 
-    // Type menu input_idx opened for ctx (what its choices act on), at the page point `at`
+    // Curve menu input_idx opened for ctx (what its choices act on), at the page point `at`
     // ({ x, y }; null: where it is), kept on anchorEl, its submenu `sub` opened if remembered
-    _openTypeMenu(input_idx, ctx, at, align, anchorEl, sub)
+    _openCurveMenu(input_idx, ctx, at, align, anchorEl, sub)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         _menu._menuEntityId = ctx.entityId;
@@ -715,36 +713,36 @@ export class CardMenus
         _menu._menuForGraph = ctx.forGraph;
         _menu._menuFrom     = ctx.from;
         _menu._menuAnchor   = ctx.anchor;
-        this._openMenuAt(this._typeMenu(input_idx), at, align, anchorEl);
+        this._openMenuAt(this._curveMenu(input_idx), at, align, anchorEl);
         this._openRememberedSubmenu(input_idx, sub);
     }
 
-    // Is the type menu id the card's — not the info panel's: its submenus the card's only
-    // (typeMenuHtml full: Export) there?
-    _cardsTypeMenu(id)
+    // Is the curve menu id the card's — not the info panel's (curveMenuHtml full: data-card)?
+    _cardsCurveMenu(id)
     {
-        return !!this._this.querySelector(`#${id}_export_sub`);
+        return !!this._this.querySelector(`#${id}`)?.hasAttribute('data-card');
     }
 
-    // The type menu's lines, as its entity — or its graph — is now: its title, then each
+    // The curve menu's lines, as its entity — or its graph — is now: its title, then each
     // section that applies (▸), Info (the card's menu, from a long-press on a label), a graph's
     // exports
     _typeLines(i)
     {
-        const m = this._typeMenu(i);
+        const m = this._curveMenu(i);
         const _menu = m.el();
         const { g, entities } = this._menuTargets(i);
         const _e = entities[0];
         const _label = _menu._menuFrom === 'label' && !!_e;
-        const _full = this._cardsTypeMenu(`et_${i}`);
+        const _full = this._cardsCurveMenu(`et_${i}`);
         const _lines = [this._typeTitle(i), ...this._sectionLines(m)];
         if( _full && _label )
-            _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityTypeMenu(i); this.openEntityInfo(_e, g); } });
-        if( _full && _menu._menuForGraph ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_TYPE_SUBMENUS.export), ['export']));
+            _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityCurveMenu(i); this.openEntityInfo(_e, g); } });
+        // (its exports: its curve's, its graph's — as the options menu's, every curve's)
+        if( entities.length ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_TYPE_SUBMENUS.export), ['export']));
         return _lines;
     }
 
-    // The type menu's title: the entity — '*' for a wildcard's —, or the graph's name; in a
+    // The curve menu's title: the entity — '*' for a wildcard's —, or the graph's name; in a
     // solid blue box for a new entity about to be added (as a drop allowed), a dashed red one
     // for one added again from the selector (as a duplicate), its line under it otherwise
     _typeTitle(i)
@@ -761,8 +759,8 @@ export class CardMenus
     // A type submenu's lines (path: see _menuOf): a section's, or the graph's exports
     _typeSubmenuLines(i, path)
     {
-        if( path[0] === 'export' ) { const { g } = this._menuTargets(i); return this._exportLines(this._typeMenu(i), path[1] ?? null, g ? [g] : []); }
-        return this._sectionItems(this._typeMenu(i), path);
+        if( path[0] === 'export' ) { const { entities } = this._menuTargets(i); return this._exportLines(this._curveMenu(i), path[1] ?? null, entities.map(e => e.entity)); }
+        return this._sectionItems(this._curveMenu(i), path);
     }
 
     // --------------------------------------------------------------------------------------
@@ -822,8 +820,8 @@ export class CardMenus
         }
         const _lines = _default ? [{ id: `${m.prefix}_default`, label: i18n('ui.menu.type_default'), marked: true, final: true,
                                      choose: () => this._typeChosen(m, 'default', null) }] : [];
-        for( const k of _TYPE_MENU_ORDER ) {
-            const d = _TYPE_MENU_DEFS[k];
+        for( const k of _CURVE_MENU_ORDER ) {
+            const d = _CURVE_MENU_DEFS[k];
             if( !_numeric && d.type !== 'timeline' ) continue;
             _lines.push({ id: `${m.prefix}_${k}`, label: i18n(d.label), marked: !_default && _active(d), final: true,
                           choose: () => this._typeChosen(m, d.type, d.lineMode) });
@@ -858,7 +856,7 @@ export class CardMenus
                                                          choose: () => this._behaviorChosen(m, 'tooltip', v) }));
         }
         const _menu = m.el();
-        const _full = m.prefix.startsWith('eo_') || this._cardsTypeMenu(m.prefix);
+        const _full = m.prefix.startsWith('eo_') || this._cardsCurveMenu(m.prefix);
         const _g = pairs[0]?.g;
         const _locks = this._yLocks(m);
         const _shown = {
@@ -880,13 +878,13 @@ export class CardMenus
 
     // --------------------------------------------------------------------------------------
     // A menu reopened soon after it was closed opens the submenu it had open, rather than
-    // its default one: each kind of menu (an entity's type menu, a graph's, the options
+    // its default one: each kind of menu (an entity's curve menu, a graph's, the options
     // menu) remembers its last open submenu, for SUBMENU_MEMORY_MS once closed. A new
-    // entity's type menu always opens on its display types: it's there to pick one
+    // entity's curve menu always opens on its display types: it's there to pick one
     // --------------------------------------------------------------------------------------
 
-    // The kind of type menu input_idx is showing now
-    _typeMenuKind(input_idx)
+    // The kind of curve menu input_idx is showing now
+    _curveMenuKind(input_idx)
     {
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         return _menu?._menuForGraph ? 'graph' : _menu?._menuFrom === 'add' ? 'add' : 'entity';
@@ -915,7 +913,7 @@ export class CardMenus
         if( _m && !_m.closedAt ) _m.closedAt = Date.now();
     }
 
-    // Opens the type menu's remembered submenu — else def — once the menu is open (a
+    // Opens the curve menu's remembered submenu — else def — once the menu is open (a
     // remembered submenu this menu doesn't show: def)
     _openRememberedSubmenu(input_idx, def)
     {
@@ -923,7 +921,7 @@ export class CardMenus
         // with the keyboard, so that Escape, or the focus leaving it, closes it)
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( _menu?.dataset.cramped ) { _menu.focus(); return; }
-        if( !this.showTypeSubmenu(input_idx, this._submenuToOpen(this._typeMenuKind(input_idx), def)) ) this.showTypeSubmenu(input_idx, def);
+        if( !this.showTypeSubmenu(input_idx, this._submenuToOpen(this._curveMenuKind(input_idx), def)) ) this.showTypeSubmenu(input_idx, def);
     }
 
     // A graph's name at the top of its menu: its title, else the start of its curves' names
@@ -943,23 +941,23 @@ export class CardMenus
         return [...new Set(_starts)].join(', ');
     }
 
-    hideEntityTypeMenu(input_idx)
+    hideEntityCurveMenu(input_idx)
     {
         if( !this._this.querySelector(`#et_${input_idx}`) ) return;
-        this._closeMenu(this._typeMenu(input_idx));
+        this._closeMenu(this._curveMenu(input_idx));
         this.resetEntityInput(this.ui.inputField[input_idx]);
     }
 
-    // Opens the type menu's submenu key (see _openSubmenu) → whether the menu has it
+    // Opens the curve menu's submenu key (see _openSubmenu) → whether the menu has it
     showTypeSubmenu(input_idx, key)
     {
-        return this._openFirstSubmenu(this._typeMenu(input_idx), key);
+        return this._openFirstSubmenu(this._curveMenu(input_idx), key);
     }
 
-    // Listeners of the type menu et_N and its submenus — the card's and the info panel's
-    initEntityTypeMenu(_ii)
+    // Listeners of the curve menu et_N and its submenus — the card's and the info panel's
+    initEntityCurveMenu(_ii)
     {
-        this._listenMenu(this._typeMenu(_ii));
+        this._listenMenu(this._curveMenu(_ii));
     }
 
     // --------------------------------------------------------------------------------------
@@ -1054,7 +1052,7 @@ export class CardMenus
         const _tb = this._menuParent(input_idx);
         const _p = _tb.getBoundingClientRect();
         const _c = Chart.helpers.color(this.entityColor(entities[0]) ?? '#000000');
-        this.hideEntityTypeMenu(input_idx);
+        this.hideEntityCurveMenu(input_idx);
         const _left = Math.max(0, ( window.innerWidth - PICKER_SIZE.width ) / 2) - _p.left;
         const _top = Math.max(0, ( window.innerHeight - PICKER_SIZE.height ) / 2) - _p.top;
         this.openNativePicker(_tb, 'color', _left, _top, _c.valid ? _c.hexString() : '#000000', v => {
@@ -1158,7 +1156,7 @@ export class CardMenus
         const [key, level = null] = path;
         const m = this._optionsMenu(i);
         if( _SECTIONS[key] ) return this._sectionItems(m, path);
-        if( key === 'export' ) return this._exportLines(m, level, this.graphs);
+        if( key === 'export' ) return this._exportLines(m, level, seriesOfGraphs(this.graphs));
         if( key === 'tests' ) return Object.keys(CARD_TESTS).map(k => ({ id: `eo_${i}_test_${k}`, label: i18n(CARD_TESTS[k].label),
                                                                          choose: () => { this.menuSetVisibility(i, false); openCardTest(k, this); } }));
         if( key === 'card' ) {
@@ -1174,21 +1172,20 @@ export class CardMenus
                     label: i18n(GESTURE_SETTINGS[k].label), value: _v[k], change: v => { this.setGesture(k, v); return localGestures()[k]; } }))];
     }
 
-    // The Export submenu of menu m — the options menu's (every graph), a graph's (graphs: that
-    // one) —, level null: its history and ▸ its statistics (with the long-term statistics on);
-    // level 'stats': their periods — each exported for the graphs' entities, over the window
+    // The Export submenu of menu m — the options menu's (every curve), a graph's, a curve's: ids,
+    // their series —, level null: its history and ▸ its statistics (with the long-term
+    // statistics on); level 'stats': their periods — each exported for ids, over the window
     // shown. Each line says how many of them have data there, at least in part (greyed, none:
     // see exportAvailability); a period the cache holds over the whole window in bold, the
     // one chosen last time in italic
-    _exportLines(m, level, graphs)
+    _exportLines(m, level, ids)
     {
-        const ids = [...new Set(graphs.flatMap(g => g.entities.map(e => e.entity)))];
         const a = this.exportAvailability(ids), _n = (label, n) => `${label} (${n})`;
         if( level === 'stats' )
             return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: _n(i18n(`ui.interval.${p.label}`), a.periods[p.period]),
                                                     marked: p.period === this.exportStatsPeriod(), markedItalic: true, strong: a.cached[p.period], disabled: !a.periods[p.period],
-                                                    choose: () => { m.close(); this.exportStatistics(p.period, graphs); } }));
-        return [{ id: `${m.prefix}_csv`, label: _n(i18n('ui.menu.export_csv'), a.history), disabled: !a.history, choose: () => { m.close(); this.exportFile(graphs); } },
+                                                    choose: () => { m.close(); this.exportStatistics(p.period, ids); } }));
+        return [{ id: `${m.prefix}_csv`, label: _n(i18n('ui.menu.export_csv'), a.history), disabled: !a.history, choose: () => { m.close(); this.exportFile(ids); } },
                 ...( this.statistics?.enabled ? [{ ...this._submenuLine(m, `${m.prefix}_stats`, _n(i18n('ui.menu.export_stats'), a.statistics), ['export', 'stats']), disabled: !a.statistics }] : [] )];
     }
 
@@ -1274,11 +1271,11 @@ export class CardMenus
     // --------------------------------------------------------------------------------------
 
     // Shared keyboard navigation for any open floating menu (entity selector dropdown,
-    // entity type menu, options menu) — Escape closes, ArrowUp/ArrowDown move the highlight,
+    // entity curve menu, options menu) — Escape closes, ArrowUp/ArrowDown move the highlight,
     // Enter activates the highlighted item (or the first visible one). This is purely menu
     // navigation, the same regardless of what the menu actually contains — any
     // menu-specific business logic (e.g. the entity selector's wildcard/multi-select/
-    // already-selected handling, or the entity type menu's default/active-type bolding)
+    // already-selected handling, or the entity curve menu's default/active-type bolding)
     // stays with the caller, hooked in via the optional callbacks rather than living inside
     // this function. Never touches fontWeight anywhere — that's business state, not
     // navigation state.
@@ -1303,7 +1300,7 @@ export class CardMenus
             event.preventDefault();
             // Clears the keyboard-navigation highlight only (background + selected
             // marker) — never fontWeight, which is menu-specific business state (e.g. the
-            // entity type menu's "bold = currently active type") set by the caller, not by
+            // entity curve menu's "bold = currently active type") set by the caller, not by
             // this generic navigation logic, and must survive closing/reopening the menu.
             for( let _a of menuEl.getElementsByTagName('a') ) {
                 _a.style.background = '';
@@ -1341,7 +1338,7 @@ export class CardMenus
     // --------------------------------------------------------------------------------------
 
     // Generic menu-opening action, shared by the menus (entity selector dropdown, entity
-    // type menu, options menu): makes the menu visible, applies the position its caller
+    // curve menu, options menu): makes the menu visible, applies the position its caller
     // already computed (each menu's own placement logic — above/below, anchored to a
     // button or an input, or at pointer coordinates — stays with the caller, since that
     // part genuinely differs), clears any leftover navigation highlight (background only)
@@ -1485,7 +1482,7 @@ export class CardMenus
 
     _navigateMenuArrowKey(visible, key)
     {
-        // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity type menu
+        // Shared ArrowUp/ArrowDown wraparound highlight logic for the entity curve menu
         // (et_N), the entity selector dropdown (es_N), and the options menu (eo_N) — moves
         // the highlighted <a> to the next/previous visible item, wrapping at either end.
         // Only ever touches the navigation highlight (background + selected marker) —
@@ -1493,8 +1490,8 @@ export class CardMenus
         // menu's "bold = default/currently active type", or the selector's wildcard-match
         // bolding) set by the caller, not by this generic navigation logic.
         const _cur = visible.find(a => a.dataset.selected);
-        // The entity type menu marks its default/active option with selected right when
-        // the menu opens (see showEntityTypeMenu), before any key is pressed — no blue
+        // The entity curve menu marks its default/active option with selected right when
+        // the menu opens (see showEntityCurveMenu), before any key is pressed — no blue
         // highlight is shown yet at that point. So selected alone doesn't mean "there's
         // already a highlight to move from" — check the highlight itself (background) too.
         // The very first arrow key press makes the highlight appear at that starting

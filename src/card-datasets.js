@@ -7,6 +7,7 @@ import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
 import { timeWeightedMean, circularMean } from "./history-stats.js";
 import { perf } from "./card-perf.js";
+import { minOf, maxOf } from "./history-arrays.js";
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -615,7 +616,7 @@ export class CardDatasets
             for( let j = k; j < _values.length && _values[j].t < _te; j++ ) group.push(_values[j]);
             let y;
             if( group.length ) {
-                y = this._aggregate(func, group, v => Math.min(v.end, _te), Math.min(...group.map(v => v.min)), Math.max(...group.map(v => v.max)));
+                y = this._aggregate(func, group, v => Math.min(v.end, _te), minOf(group.map(v => v.min)), maxOf(group.map(v => v.max)));
                 last = y;
             } else
                 y = func === 'delta' || func === 'diff' ? 0 : last;
@@ -745,7 +746,8 @@ export class CardDatasets
     // samples (they are shared with the cache) — before they're grouped by column: a mean
     // across 0 needs them continuous. The rule is Chart.js's, the one for every circular
     // curve (Chart.hecCircular.place: continuous, around the circular mean of the window
-    // shown — from the value in force at its start to the first one after its end —, what is
+    // shown — from the value in force at its start to the first one after its end, each
+    // weighted by how long it is in force in it: the one rule, circularMean —, what is
     // loaded around it in the same turn; more than a turn there: each value in the turn
     // around that mean, band true, its jumps dashed by _markCircularJumps). A Y range set by
     // hand places them again around its middle (Chart.js, dataset option circularPeriod).
@@ -768,7 +770,12 @@ export class CardDatasets
             if( t <= _t0 ) _first = m;
             if( t > _t1 ) { _last = m; break; }
         }
-        const { values, band } = Chart.hecCircular.place(vals, P, _first, _last);
+        // (their circular mean over the window: each value weighted by how long it's in force
+        // there — the one rule, circularMean)
+        const _until = Math.min(_t1, Date.now()), _at = m => msOf(data[idx[m]].last_changed);
+        const _win = Array.from({ length: _last - _first + 1 }, (_, k) => _first + k);
+        const _mean = circularMean(_win, m => vals[m], m => Math.max(_at(m), _t0), m => Math.min(m < _last ? _at(m + 1) : _until, _t1), P, vals[_first])?.mean;
+        const { values, band } = Chart.hecCircular.place(vals, P, _first, _last, undefined, _mean);
 
         const out = data.slice();
         idx.forEach((i, m) => {

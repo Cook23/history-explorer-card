@@ -27,7 +27,6 @@ export const defaultGood = '#66a61e';
 const defaultBad = '#b5342d';
 const defaultMultiple = '#e5ad23';
 
-const activeRed = '#cd3e3e';
 const activeGreen = '#3ecd3e';
 const multipleRed = 'rgb(213, 142, 142)';
 const multipleGreen = 'rgb(142, 213, 142)';
@@ -256,6 +255,14 @@ export function parseColor(c)
     const t = c.match(_RGB_TRIPLET);
     return t ? `rgb(${t[1]},${t[2]},${t[3]})` : c;
 }
+
+// The defaults of uiColors' colors (the parameters): the close button's; the labels' and the
+// grid lines', on a dark and a light background (the cursor line: the grid lines')
+export const UI_COLOR_DEFAULTS = {
+    closeButton: '#0000001f',
+    labels: { dark: '#9b9b9b', light: '#333' },
+    gridLines: { dark: 'rgba(255, 255, 255, 0.1)', light: 'rgba(0, 0, 0, 0.1)' },
+};
 
 // The toolbar buttons' background: uiColors.buttons, else the theme's primary color, faint —
 // the card's and the info panel's

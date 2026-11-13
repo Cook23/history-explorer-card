@@ -7,13 +7,14 @@ import { defaultColors, colorSpec, fillValue } from "./history-default-colors.js
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
-import { typesCompatible, GRAPH_SCOPE_KEYS } from "./history-options.js";
+import { typesCompatible, GRAPH_SCOPE_KEYS, HEADER_ALIGNS, CURVE_OPTION_KEYS } from "./history-options.js";
 
 // The icon of an entity without its own, by its device class (mini-graph-card's)
 const DEVICE_CLASS_ICONS = { humidity: 'mdi:water-percent', illuminance: 'mdi:brightness-5', temperature: 'mdi:thermometer',
     battery: 'mdi:battery', pressure: 'mdi:gauge', power: 'mdi:flash', signal_strength: 'mdi:wifi', motion: 'mdi:walk',
     door: 'mdi:door-closed', window: 'mdi:window-closed', presence: 'mdi:account', light: 'mdi:lightbulb' };
 import { baseTypePure } from "./card-config.js";
+import { appendAll } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
 // The room above a timeline's or arrowline's rows when they fill the graph, in px (rowsTopRoom):
@@ -86,7 +87,7 @@ export class CardGraphs
         if( _h.style.display === 'none' ) return;
         const _align = o('alignHeader') ?? 'center';
         Object.assign(_h.style, { alignItems: 'center', gap: '0.6em', padding: '0 10px', minWidth: '0',
-            justifyContent: { center: 'center', default: 'space-between', left: 'flex-start', right: 'flex-end' }[_align],
+            justifyContent: HEADER_ALIGNS[_align],
             fontSize: o('fontSizeHeader') ? o('fontSizeHeader') + 'px' : '' });
         const _color = _first ? this.entityColor(_first) : undefined;
         if( _name !== undefined ) {
@@ -172,7 +173,7 @@ export class CardGraphs
         let _blockGraphs = [];
         const _flushBlock = () => {
             _blockGraphs.sort((a, b) => (a.entities[0]?.graphIndex ?? 0) - (b.entities[0]?.graphIndex ?? 0));
-            _result.push(..._blockGraphs);
+            appendAll(_result, _blockGraphs);
             _blockGraphs = [];
         };
         for( let en of this.store.list ) {
@@ -562,6 +563,39 @@ export class CardGraphs
         return { graphProps, options: { ...this.pconfig.cardGraphDefaults, ...this.getEntityOptions(entity_id), ..._definedGraphProps, groupId } };
     }
 
+    // The options of a curve the levels above its own line give it — its graph's,
+    // entityOptions', the card's (options: _optionsInGraph's; the others as card-config.js
+    // resolves them for entity id in group groupId), else their defaults —, by its entry's
+    // fields: copied onto the entry when it's added (_applyEntityDefaults), its own from then
+    // on — a curve moved to another graph keeps them, as its color
+    _levelFields(options, id, groupId)
+    {
+        const o = options ?? {}, P = this.pconfig, at = { entity: id, groupId };
+        return {
+            dashMode: o.dashMode ?? P.defaultDashMode, width: o.lineWidth ?? P.defaultLineWidth, lineMode: o.lineMode ?? P.defaultLineMode,
+            interpolation: this.resolveInterpolation(at),
+            scale: o.scale, netBars: o.netBars ?? P.defaultNetBars, showPoints: o.showPoints ?? P.defaultShowPoints,
+            showMinMax: o.showMinMax ?? P.defaultShowMinMax, name: o.name, siConversionFactor: o.siConversionFactor,
+            unit: o.unit, process: o.process, circular: o.circular,
+            rounding: this.roundingOf(at), tapAction: this.tapActionOf(at),
+            showCurrentValues: this.showsCurrentValue(at),
+            ...Object.fromEntries(CURVE_OPTION_KEYS.map(k => [k, this.resolveOption(at, k)])),
+        };
+    }
+
+    // A YAML entry as the entity gets it from every level of the YAML — its own line, then
+    // its graph's, entityOptions', the card's (its type, color and fill as they set them, the
+    // others _levelFields'): what the YAML says of it, wherever it says it — a change at any
+    // level is the YAML speaking, option by option (card-storage.js _resolveEntity, the last
+    // one to speak)
+    yamlEntryOf(e)
+    {
+        const o = this._optionsInGraph(e.entity, e.groupId ?? null).options;
+        const L = { type: o.type, color: o.color, fill: o.fill, ...this._levelFields(o, e.entity, e.groupId ?? null) }, out = { ...e };
+        for( const k in L ) if( out[k] === undefined && L[k] !== undefined ) out[k] = L[k];
+        return out;
+    }
+
     // An entry's display settings it doesn't set itself: the color asked for (color, fill),
     // else the configuration's (colorSet), else the palette's; then each option from
     // entityOptions or the card's defaults. Returns the entry's own fill, as it was before
@@ -594,22 +628,10 @@ export class CardGraphs
         if( !colorSpec(e.color)?.color )
             e.paletteColor = e.paletteColor ?? this.getNextDefaultColor().color;
 
-        e.dashMode   = e.dashMode    ?? entityOptions?.dashMode ?? this.pconfig.defaultDashMode;
-        e.width      = e.width       ?? entityOptions?.lineWidth ?? this.pconfig.defaultLineWidth;
-        e.lineMode   = e.lineMode    ?? entityOptions?.lineMode ?? this.pconfig.defaultLineMode;
-        // (interpolation: not defaulted here — only an explicit choice is kept on the entity,
-        // its YAML entry or the Interpolation submenu, so that changing it on the card, a
-        // graph or in entityOptions still applies to it; see resolveInterpolation)
-        e.scale      = e.scale       ?? entityOptions?.scale;
+        // (every option of the curve the levels give it: its own from now on — see _levelFields)
+        const L = this._levelFields(entityOptions, e.entity, entityOptions?.groupId ?? null);
+        for( const k in L ) e[k] = e[k] ?? L[k];
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
-        e.netBars    = e.netBars     ?? entityOptions?.netBars ?? this.pconfig.defaultNetBars;
-        e.showPoints = e.showPoints  ?? entityOptions?.showPoints ?? this.pconfig.defaultShowPoints;
-        e.showMinMax = e.showMinMax  ?? entityOptions?.showMinMax ?? this.pconfig.defaultShowMinMax;
-        e.name       = e.name        ?? entityOptions?.name;
-        e.siConversionFactor = e.siConversionFactor ?? entityOptions?.siConversionFactor;
-        e.unit       = e.unit        ?? entityOptions?.unit;
-        e.process    = e.process     ?? entityOptions?.process;
-        e.circular   = e.circular    ?? entityOptions?.circular;
 
         if( type == 'bar' ) {
             e.fill = e.color;
@@ -650,7 +672,7 @@ export class CardGraphs
     // An entry joining graph g with a color another of its curves has: a free color of the
     // palette instead — only for a color the card picked: one the configuration sets
     // (colorSet) is kept. (Checked against the real target, whether or not the caller knew
-    // it — e.g. a brand-new entity created from the type menu.)
+    // it — e.g. a brand-new entity created from the curve menu.)
     _freeColorIn(g, e, ownFill)
     {
         if( e.color === undefined || e.colorSet ) return;

@@ -449,7 +449,7 @@ export class CardTimeRange
 
     // The elastic box's time (the magnifier's, or a mouse's drag mostly
     // vertical), between factor0 and factor1 along the time axis: the time range becomes
-    // the nearest preset covering it, centred on it
+    // the first of TIME_RANGES covering it — under an hour, its minutes —, centred on it
     zoomToSelection(_factor0, _factor1)
     {
         let st0 = this.factorToTimecode(_factor0);
@@ -457,38 +457,12 @@ export class CardTimeRange
         if( st1 < st0 ) [st1, st0] = [st0, st1];
 
         const tm = (moment(st1) + moment(st0)) / 2;
-
-        // Time delta in minutes
         const dt = moment.duration(st1 - st0).asMinutes();
 
-        // Time delta in hours, ceiled
-        let d = ( dt >= 60.0 ) ? Math.ceil(dt / 60.0) : 0;
-
-        if( d < 12 ) {
-
-            if( d < 1 )
-                this.applyTimeRangeMinutes(Math.ceil(dt), true, tm);
-            else
-                this.applyTimeRange(d, true, tm);
-
-        } else {
-
-            d = Math.ceil(d / 24.0);
-
-            if( d < 1 ) this.applyTimeRange(12, true, tm); else       // 12 hours
-            if( d < 2 ) this.applyTimeRange(24, true, tm); else       // 1 day
-            if( d < 3 ) this.applyTimeRange(48, true, tm); else       // 2 days
-            if( d < 4 ) this.applyTimeRange(72, true, tm); else       // 3 days
-            if( d < 5 ) this.applyTimeRange(96, true, tm); else       // 4 days
-            if( d < 6 ) this.applyTimeRange(120, true, tm); else      // 5 days
-            if( d < 7 ) this.applyTimeRange(144, true, tm); else      // 6 days
-            if( d < 13 ) this.applyTimeRange(168, true, tm); else     // 1 week
-            if( d < 20 ) this.applyTimeRange(336, true, tm); else     // 2 weeks
-            if( d < 28 ) this.applyTimeRange(504, true, tm); else     // 3 weeks
-            if( d < 45 ) this.applyTimeRange(720, true, tm); else     // 1 month
-            if( d < 105 ) this.applyTimeRange(2184, true, tm); else   // 3 months
-                          this.applyTimeRange(4368, true, tm);        // 6 months
-
+        if( dt < 60 ) this.applyTimeRangeMinutes(Math.ceil(dt), true, tm);
+        else {
+            const _covering = TIME_RANGES.filter(r => r.hours > 0 && r.hours * 60 >= dt);
+            this.applyTimeRange(( _covering[0] ?? TIME_RANGES[TIME_RANGES.length - 1] ).hours, true, tm);
         }
 
         this.writeLocalState();

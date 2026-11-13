@@ -43,7 +43,7 @@ module.exports = async function()
     const menu = `[...el.querySelector('#et_0').querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.textContent.trim()+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`;
     const sub = `(()=>{const m=el.querySelector('#et_0_interp_sub'); return m.style.display==='none'?'closed':[...m.querySelectorAll('a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ');})()`;
     const ds = `el.instance.graphs[0].chart.data.datasets.map(d=>d.hecInterpolation).join(',')`;
-    await t.step('a smart curve\'s type menu offers Interpolation, after Display', async () => {
+    await t.step('a smart curve\'s curve menu offers Interpolation, after Display', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const v = await t.E(menu); return /^Display ▸\* \| Appearance ▸ \| Interpolation ▸/.test(v) ? true : v;
     });
@@ -52,7 +52,7 @@ module.exports = async function()
         await t.wait(200);
         const v = await t.E(sub); return v === 'Monotone* | Steffen | Makima | Catmull-Rom | B-spline' ? true : v;
     });
-    await t.step('Escape goes back to the type menu, still open', async () => {
+    await t.step('Escape goes back to the curve menu, still open', async () => {
         await t.page.keyboard.press('Escape'); await t.wait(300);
         const v = await t.E(sub); const m = await t.E(`el.querySelector('#et_0').style.display`);
         return v === 'closed' && m === 'block' ? true : v + ' / ' + m;
@@ -121,11 +121,11 @@ module.exports = async function()
     // ── The submenu at the edges of the screen, inside a shadow root (as in Home
     // Assistant), on a touch screen; the load of the automatic refresh ──
     const LINE = { graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }, { entity: 'sensor.power2', lineMode: 'curves' }] }] };
-    // Boxes of the type menu, its Interpolation item and the submenu, and the viewport
+    // Boxes of the curve menu, its Interpolation item and the submenu, and the viewport
     const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
         return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#et_0_interp_sub'), vw:innerWidth, vh:innerHeight }; })()`;
     const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
-    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityTypeMenu(0, 'sensor.power', g, { from: 'label', clientX: ${x}, clientY: ${y} }); I.showTypeSubmenu(0, 'interp'); })()`;
+    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityCurveMenu(0, 'sensor.power', g, { from: 'label', clientX: ${x}, clientY: ${y} }); I.showTypeSubmenu(0, 'interp'); })()`;
 
     // ── Position ──
     t = await openCard(card(LINE), { height: 700 });
@@ -293,14 +293,16 @@ module.exports = async function()
         await t.step('the menu sets the option giving the mode where the card is: no largeChartTooltip set, largeScreenTooltip alone', async () => {
             const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'all');
                 const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, e.smallChartTooltip, e.smallScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
-            return v === ',all,,,all' ? true : v;
+            // (each curve's options copied on it when it's added: its smallScreenTooltip the default, selected)
+            return v === ',all,,selected,all' ? true : v;
         });
         done(await t.close());
         t = await openCard(card({ ...two, graphs: [{ ...two.graphs[0], options: { largeChartTooltip: 'selected' } }, two.graphs[1]] }), { mock: { series: true } });
         await t.step('largeChartTooltip set (on its graph): the menu sets the curve\'s own largeChartTooltip, its largeScreenTooltip untouched', async () => {
             const v = await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesTooltip(g, g.entities, 'nearest');
                 const e=g.entities[0]; return [e.largeChartTooltip, e.largeScreenTooltip, g.chart.data.datasets[0].hecTooltip].join(); })()`);
-            return v === 'nearest,,nearest' ? true : v;
+            // (its largeScreenTooltip copied when it's added: the default, mixed — untouched)
+            return v === 'nearest,mixed,nearest' ? true : v;
         });
         done(await t.close());
     }

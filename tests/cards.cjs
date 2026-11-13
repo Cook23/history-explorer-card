@@ -1,4 +1,4 @@
-// Two cards on one page, the entity type menu, an entity added twice
+// Two cards on one page, the entity curve menu, an entity added twice
 const { openCard } = require('./lib.cjs');
 
 const card = (graphs) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, graphs });
@@ -29,7 +29,7 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The type menu offers what fits the entity, its current type marked ──
+    // ── The curve menu offers what fits the entity, its current type marked ──
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power', lineMode: 'smart' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }]), { height: 900 });
     // The entries shown in the menu and in each submenu (the marked one with *); the open
     // submenu after a colon
@@ -37,17 +37,17 @@ module.exports = async function()
         const open=['rep','interp','behavior'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
         return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_behavior_sub')].join(' || '); })()`;
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300); };
-    await t.step('type menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Behavior (the tooltip, the Y axis lock, cut, delete)', async () => {
+    await t.step('curve menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Behavior (the tooltip, the Y axis lock, cut, delete), Info, Export', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Export ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
     });
-    await t.step('type menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis) — no Appearance', async () => {
+    await t.step('curve menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis), Info, Export — no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Behavior ▸ | Info || open: rep || Timeline* || Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Behavior ▸ | Info | Export ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
     });
     done(await t.close());
 
@@ -166,7 +166,7 @@ module.exports = async function()
             && r.cleared.gaps === '— no hover yet —' && r.cleared.log === '' && r.cleared.yes === 0 && r.first < 300;
         return ok ? true : JSON.stringify(r);
     });
-    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), those on the screen told, the window loaded again from nothing (each request: its phase, its source, its time, its entities on the screen, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the graphs drawn again counted by cause, the page\'s freezes counted', async () => {
+    await t.step('Tests ▸ Performance: the card as it is (its graphs, the statistics\' verdicts), its graphs drawn again (by graph), those on the screen told, the window loaded again from nothing (each request: its phase, its source, its time, its entities on the screen, waited, took), the window moved (\'<\', \'>\' 3 times, a drag), the real time — each timed, the graphs drawn again counted by cause, what follows each answer timed, the page\'s freezes counted', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
         await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
@@ -185,11 +185,13 @@ module.exports = async function()
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
             && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out)
             // (the graphs drawn again: each cause, how many times — the window moved, by '<' and '>')
-            && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come near the screen) \d+/.test(out)
-            && /== '<' clicked 3 times[^=]*the graphs drawn again \d+ times: [^\n]*the window moved \d+/.test(out);
+            && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come near the screen|a graph off the screen, drawn after those on the screen) \d+/.test(out)
+            && /== '<' clicked 3 times[^=]*the graphs drawn again \d+ times: [^\n]*the window moved \d+/.test(out)
+            // (after each answer: the cache's size kept, what's still lacking asked — timed)
+            && /answers put in the cache[^\n]*\n  after each answer: the cache's size kept \d+ ms in all, the longest \d+ ms; what's still lacking asked \d+ ms in all, the longest \d+ ms/.test(out);
         return ok ? true : JSON.stringify({ title, out });
     });
-    await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: the card it replaces taken back, its steps from the moment the page came back', async () => {
+    await t.step('Tests ▸ Performance, back on the page: armed, the page hidden then shown again — the card taken off the page and made again meanwhile (as Home Assistant does) —: the card it replaces taken back, its steps from the moment the page came back; the time away told as away from the app, never as a freeze', async () => {
         await t.E(`el.querySelector('#bo_0').click()`); await t.wait(300);
         await t.E(`el.querySelector('#eo_0_tests').click()`); await t.wait(200);
         await t.E(`el.querySelector('#eo_0_test_perf').click()`); await t.wait(300);
@@ -198,13 +200,16 @@ module.exports = async function()
         await t.E(`(()=>{ window.__vis = 'hidden'; Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => window.__vis }); document.dispatchEvent(new Event('visibilitychange')); })()`);
         await t.wait(300);
         await t.E(`(()=>{ const old = el, host = old.parentNode; old.remove(); const el2 = document.createElement('history-explorer-card'); el2.setConfig(window.CFG); host.appendChild(el2); el2.hass = mkHass(); window.el = el2; window.hassTargets = [el2];
+            const _t = performance.now(); while( performance.now() - _t < 600 );
             window.__vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); })()`);
         for( let k = 0; k < 30 && !/Done/.test(await t.E(`${dlg}.shadowRoot.getElementById('backStep').textContent`)); k++ ) await t.wait(1000);
         const out = await t.E(`${dlg}.shadowRoot.getElementById('out').textContent`);
         await t.page.keyboard.press('Escape'); await t.wait(200);
         await t.E(`delete document.visibilityState`);
         const ok = /== Back on the page, after [\d.]+ s away/.test(out) && /-[\d.]+ s  card \d+: off the page/.test(out)
-            && /card (\d+): off the page[\s\S]*card \1: taken back( \(\d+ ms\))?[\s\S]*card \1: first frame after it/.test(out);
+            && /card (\d+): off the page[\s\S]*card \1: taken back( \(\d+ ms\))?[\s\S]*card \1: first frame after it/.test(out)
+            // (the pulse held while away — here the page busy before it's shown again —: away from the app, not a freeze)
+            && /\+[\d.]+ s  away from the app \d+ ms/.test(out) && !/the page froze [6-9]\d\d ms/.test(out);
         return ok ? true : out;
     });
     done(await t.close());
@@ -276,7 +281,7 @@ module.exports = async function()
         const g2 = await t.graphs();
         return g2.length === 3 && /t:(a\+b|b\+a)/.test(g2.join()) ? (await check()) : g2.join(' | ');
     });
-    await t.step('the type menu\'s delete removes the entity for good', async () => {
+    await t.step('the curve menu\'s delete removes the entity for good', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         await t.E(`el.querySelector('#et_0_delete').click()`); await t.wait(600);
         const g = await t.graphs();

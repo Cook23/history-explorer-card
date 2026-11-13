@@ -1,6 +1,7 @@
-// Static check of the sources: every identifier read is declared somewhere in reach, and no
-// imported binding is assigned — what a refactoring that moves code between files can leave
-// behind shows up here, before any test has to run it
+// Static check of the sources: every identifier read is declared somewhere in reach, no
+// imported binding is assigned, no variable or import is declared and never read — what a
+// refactoring that moves code between files can leave behind shows up here, before any test
+// has to run it
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -96,7 +97,49 @@ function problems(ast)
         }
     };
     visit(ast, [], null, null);
-    return [...[...missing].map(m => 'undeclared: ' + m), ...[...assigned].map(a => 'import assigned: ' + a)];
+    return [...[...missing].map(m => 'undeclared: ' + m), ...[...assigned].map(a => 'import assigned: ' + a), ...unused(ast).map(u => 'never read: ' + u)];
+}
+
+// Variables (var, let, const — a plain name) and imports a function (or the program)
+// declares and nothing in it reads — an exported one excepted
+function unused(ast)
+{
+    const out = [];
+    const _exported = new Set(ast.body.filter(n => n.type === 'ExportNamedDeclaration').flatMap(n => n.declaration?.declarations?.map(d => d.id.name) ?? n.specifiers.map(s => s.local.name)));
+    const check = fn => {
+        const decl = [];
+        const walkDecl = (n, top) => {
+            if( !n || typeof n.type !== 'string' || ( /Function/.test(n.type) && !top ) ) return;
+            if( n.type === 'VariableDeclaration' ) n.declarations.forEach(d => { if( d.id.type === 'Identifier' ) decl.push(d.id); });
+            if( n.type === 'ImportDeclaration' ) n.specifiers.forEach(s => decl.push(s.local));
+            children(n).forEach(c => walkDecl(c, false));
+        };
+        walkDecl(fn.type === 'Program' ? fn : fn.body, true);
+        if( !decl.length ) return;
+        const reads = new Set();
+        const walk = (n, parent, key) => {
+            if( n.type === 'Identifier' ) {
+                const notARead = (parent?.type === 'MemberExpression' && key === 'property' && !parent.computed) ||
+                    (/^(Property|MethodDefinition|PropertyDefinition)$/.test(parent?.type) && key === 'key' && !parent.computed && !parent.shorthand) ||
+                    (parent?.type === 'VariableDeclarator' && key === 'id') || /Import/.test(parent?.type ?? '');
+                if( !notARead ) reads.add(n.name);
+                return;
+            }
+            for( const k in n ) {
+                const v = n[k];
+                if( Array.isArray(v) ) v.forEach(x => { if( x && typeof x.type === 'string' ) walk(x, n, k); });
+                else if( v && typeof v.type === 'string' ) walk(v, n, k);
+            }
+        };
+        walk(fn, null, null);
+        for( const d of decl ) if( !reads.has(d.name) && !( fn.type === 'Program' && _exported.has(d.name) ) ) out.push(d.name);
+    };
+    const all = n => {
+        if( /Function|Program/.test(n.type) ) check(n);
+        children(n).forEach(all);
+    };
+    all(ast);
+    return out;
 }
 
 module.exports = async function()

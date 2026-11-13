@@ -190,7 +190,7 @@ export class CardSelector
     }
 
     // Series id chosen in selector idx (an entity, or one of its attributes), shown as
-    // label in its input field: added, through the type menu. A choice in the dropdown is
+    // label in its input field: added, through the curve menu. A choice in the dropdown is
     // unambiguous (unlike a keyboard entry, which may still be a wildcard pattern needing a
     // preview step) — added at once.
     _selectSeries(idx, id, label)
@@ -254,7 +254,7 @@ export class CardSelector
 
     // Series id already shown (its graphs flagged, its message given): a choice under the
     // input field — cancel, pre-selected (Enter takes it, as Escape), or a second curve of
-    // it, in another graph, through the type menu
+    // it, in another graph, through the curve menu
     showDuplicateChoice(idx, id)
     {
         const _menu = this._this.querySelector(`#es_${idx}_choice`);
@@ -263,7 +263,7 @@ export class CardSelector
         const _cancel = () => { _menu.style.display = 'none'; this.resetEntityInput(_input); };
         this.fillMenuItems(_menu, [
             { label: i18n('ui.menu.duplicate_cancel'), marked: true, choose: _cancel },
-            { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityTypeMenu(idx, id, null, { from: 'add' }); } },
+            { label: i18n('ui.menu.duplicate_create'), choose: () => { _menu.style.display = 'none'; this.showEntityCurveMenu(idx, id, null, { from: 'add' }); } },
         ]);
         // (listened to once — the arrows, Enter; ← or Escape: Cancel — closed with the
         // selector when the focus leaves it)
@@ -275,7 +275,7 @@ export class CardSelector
             });
             _menu.addEventListener('focusout', () => this._closeSelectorIfLeft(idx));
         }
-        // (under the input field, as the type menu)
+        // (under the input field, as the curve menu)
         const _tb = this._this.querySelector(`#tb_${idx}`);
         const _parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         const _r = _input.getBoundingClientRect();
@@ -558,8 +558,8 @@ export class CardSelector
 
         this.entitiesPopulated = true;
 
-        // Entity type menu listeners (its gestures open it, with or without a selector)
-        for( let _ii = 0; _ii < 2; _ii++ ) this.initEntityTypeMenu(_ii);
+        // Entity curve menu listeners (its gestures open it, with or without a selector)
+        for( let _ii = 0; _ii < 2; _ii++ ) this.initEntityCurveMenu(_ii);
 
         // No point populating the datalist if the selector is not visible
         if( this.ui.hideSelector ) return;
@@ -605,7 +605,7 @@ export class CardSelector
     }
 
     // Shows the add/already-exists tooltip for a given entity_id, without any of the
-    // side effects that come with actually committing to it (no type menu, no graph
+    // side effects that come with actually committing to it (no curve menu, no graph
     // highlight) — a preview only. Used both on keyboard highlight (see
     // entitySelectorKeyDown's onHighlight) and on pointer hover over a dropdown entry, so
     // an ambiguous or duplicate friendly name can be resolved to its real entity_id before
@@ -666,11 +666,11 @@ export class CardSelector
                 _newIds.push(eid);
             }
 
-            // New entities take priority: defer creation, show the type menu for them —
+            // New entities take priority: defer creation, show the curve menu for them —
             // always, even if none is numeric (reduced to timeline only in that case)
             if( _newIds.length ) {
                 this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + _newIds.join('; '));
-                this.showEntityTypeMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null, { from: 'add' });
+                this.showEntityCurveMenu(ii, _newIds.length === 1 ? _newIds[0] : _newIds, null, { from: 'add' });
             }
 
             if( _duplicates.length ) {
@@ -682,7 +682,7 @@ export class CardSelector
                 const _dupG = Array.from(_duplicateGraphs)[0];
                 const _dupEntityId = _dupG?.entities.find(e => _duplicates.includes(e.entity))?.entity;
                 if( !_newIds.length && _dupEntityId ) {
-                    this.showEntityTypeMenu(ii, _dupEntityId, _dupG, { from: 'duplicate' });
+                    this.showEntityCurveMenu(ii, _dupEntityId, _dupG, { from: 'duplicate' });
                 }
                 this.flagGraphs(Array.from(_duplicateGraphs));
             }
@@ -709,10 +709,10 @@ export class CardSelector
             }
 
             if( _matchedIds.length ) {
-                // Show the type menu (with "Default"), even if none matched is numeric
+                // Show the curve menu (with "Default"), even if none matched is numeric
                 // (reduced to timeline only in that case) — deferred creation of the whole
                 // batch until the user chooses
-                this.showEntityTypeMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null, { from: 'add' });
+                this.showEntityCurveMenu(ii, _matchedIds.length === 1 ? _matchedIds[0] : _matchedIds, null, { from: 'add' });
             }
 
         } else {
@@ -728,14 +728,14 @@ export class CardSelector
                 return;
             }
 
-            // Brand-new entity — nothing created yet. Always show the type menu, even for
+            // Brand-new entity — nothing created yet. Always show the curve menu, even for
             // a non-numeric entity (reduced to timeline only, its one valid representation)
             // — keeps the same two-step add/cancel process homogeneous for every entity.
             this._selectorTooltip(ii, i18n('ui.label.add') + ': ' + entity_id);
-            this.showEntityTypeMenu(ii, entity_id, null, { from: 'add' });
+            this.showEntityCurveMenu(ii, entity_id, null, { from: 'add' });
 
         }
-        // (nothing added yet: the type menu adds what's chosen — addCurves)
+        // (nothing added yet: the curve menu adds what's chosen — addCurves)
     }
 
     // The names of entities just added, shown a moment in the selector's field ii, in bold

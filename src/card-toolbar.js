@@ -4,8 +4,9 @@
 
 import { i18n } from "./languages.js";
 import { BAR_INTERVALS, TIME_RANGES } from "./history-options.js";
-import { typeMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
+import { curveMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
 import { perf } from "./card-perf.js";
+import { seriesOfGraphs } from "./history-series.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -55,7 +56,7 @@ export class CardToolbar
     // the same — #hm_0 is their positioned parent, as #tb_0 is with the selector
     menusOnlyHtml()
     {
-        return `<div id="hm_0" style="position:relative;height:0;line-height:normal">${typeMenuHtml(0, true)}</div>`;
+        return `<div id="hm_0" style="position:relative;height:0;line-height:normal">${curveMenuHtml(0, true)}</div>`;
     }
 
     addUIHtml(tools, selector, bgcol, optionStyle, inputStyle, invertZoom, i)
@@ -88,7 +89,7 @@ export class CardToolbar
                 <div id="es_${i}" style="display:none;position:absolute;box-sizing:border-box;text-align:left;max-height:50vh;overflow:auto;border:1px solid #444;z-index:1;color:var(--primary-text-color);background-color:var(--card-background-color)"></div>
                 <div id="es_${i}_series" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
                 <div id="es_${i}_choice" tabindex="0" style="display:none;position:absolute;text-align:left;min-width:180px;max-height:50vh;overflow:auto;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);z-index:2;color:var(--primary-text-color);background-color:var(--card-background-color);outline:none"></div>
-                ${typeMenuHtml(i, true)}
+                ${curveMenuHtml(i, true)}
                 <button id="bo_${i}" style="border:0px solid black;color:inherit;background-color:#00000000;height:30px;margin-left:1px;margin-right:0px;"><svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align:middle;"><path fill="var(--primary-text-color)" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" /></svg></button>
                 ${optionsMenuHtml(i)}
             </div>`;
@@ -422,25 +423,25 @@ export class CardToolbar
     // Toolbar menu entries
     // --------------------------------------------------------------------------------------
 
-    // The history of graphs' entities exported (every graph's by default)
-    exportFile(graphs = this.graphs)
+    // The history of series ids exported — a curve's, a graph's, every graph's (by default)
+    exportFile(ids = seriesOfGraphs(this.graphs))
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
-        this.csvExporter.exportFile(this, graphs);
+        this.csvExporter.exportFile(this, ids);
     }
 
-    // The statistics of graphs' entities (every graph's by default) exported for period
-    // (STATS_EXPORT_PERIODS — the menu's by default), the period kept as the menu's
-    // (setExportStatsPeriod)
-    exportStatistics(period = this.exportStatsPeriod(), graphs = this.graphs)
+    // The statistics of series ids — a curve's, a graph's, every graph's (by default) —
+    // exported for period (STATS_EXPORT_PERIODS — the menu's by default), the period kept as
+    // the menu's (setExportStatsPeriod)
+    exportStatistics(period = this.exportStatsPeriod(), ids = seriesOfGraphs(this.graphs))
     {
         this.menuSetVisibility(0, false);
         this.menuSetVisibility(1, false);
 
         this.setExportStatsPeriod(period);
-        this.statsExporter.exportFile(this, graphs, period);
+        this.statsExporter.exportFile(this, ids, period);
     }
 
     // The statistics export menu's period: the one chosen there, else the YAML's

@@ -35,7 +35,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 - **v1.2.9** — Values over a graph and `look: mini`; an entity's attributes shown as curves.
 - **v1.2.6** — A graph's menu, cut and paste: every gesture also in a menu.
 - **v1.2.4** — Two Y axes on a graph; colors from thresholds or from another entity; the info panel on every page of Home Assistant.
-- **v1.2.2** — The type menu in submenus (*Display*, *Interpolation*, *Layout*); the tooltip opens on a click or a tap.
+- **v1.2.2** — The curve menu in submenus (*Display*, *Interpolation*, *Layout*); the tooltip opens on a click or a tap.
 - **v1.2.0** — Beta, alongside the 1.1 line: dragging on touch screens reworked (a swipe always scrolls the page), the code reorganized.
 
 ---
@@ -105,8 +105,8 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 ![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-curve.png)
 
-- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete).
-- **A graph's menu** — a long press on its ⠿ zone: the same for all its curves, and *Cut* / *Delete the graph*.
+- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV).
+- **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
 - **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
 
 A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
@@ -128,7 +128,7 @@ gestures:
 
 ![Adding an entity: the field, the matching entities](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/adding-entities.png)
 
-Type in the entity selector — it filters on the names and the ids, `*` as a wildcard (`*door*`, `sensor.*`) — and choose an entry with a click or Enter. An entity with attributes first offers its *Value* or one of its attributes. The type menu then opens, the most fitting type pre-selected (*Timeline* for a state that isn't a number, *Bar* for energy that adds up, *Direction* for an angle, else a *Smart* line); nothing is added before a type is picked.
+Type in the entity selector — it filters on the names and the ids, `*` as a wildcard (`*door*`, `sensor.*`) — and choose an entry with a click or Enter. An entity with attributes first offers its *Value* or one of its attributes. The curve menu then opens, the most fitting type pre-selected (*Timeline* for a state that isn't a number, *Bar* for energy that adds up, *Direction* for an angle, else a *Smart* line); nothing is added before a type is picked.
 
 ```yaml
 recordedEntitiesOnly: true          # only the entities recorded in the database
@@ -299,7 +299,7 @@ The card loads what the screen can show — the daily, hourly or 5-minute statis
 ```yaml
 statistics:
   enabled: true    # default
-  period: hour     # hour, day, month
+  period: hour     # 5minute, hour, day, week, month
 ```
 
 📖 [Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics) · [Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation)
@@ -486,7 +486,7 @@ timeTicks:
 
 ## CSV export
 
-The options menu (▾), *Export ▸ History* or *Statistics*.
+The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
 
 ```yaml
 csv:

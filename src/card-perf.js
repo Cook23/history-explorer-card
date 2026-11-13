@@ -12,6 +12,7 @@ export const REDRAW_CAUSES = {
     moved: 'the window moved',
     window: 'the window or its settings changed',
     near: 'a graph come near the screen',
+    later: 'a graph off the screen, drawn after those on the screen',
     test: 'the test',
 };
 

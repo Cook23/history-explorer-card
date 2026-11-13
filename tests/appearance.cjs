@@ -1,4 +1,4 @@
-// The type menu's Appearance submenu — a curve's color, points, extremes, fill, line width
+// The curve menu's Appearance submenu — a curve's color, points, extremes, fill, line width
 // and style, or every curve's of a graph —, the switches, the menus showing a choice half a
 // second before they close, and the info panel showing a curve as it looks on the card
 const { openCard } = require('./lib.cjs');
@@ -110,11 +110,11 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── The info panel: its type menu's title, and a curve shown as it looks on the card ──
+    // ── The info panel: its curve menu's title, and a curve shown as it looks on the card ──
     t = await openCard({}, { page: 'panel.html', panel: {}, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
-    await t.step('the info panel\'s type menu: its title with its line under it, never in a box (a box: an entity being added, or added again)', async () => {
-        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityTypeMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); })()`); await t.wait(200);
+    await t.step('the info panel\'s curve menu: its title with its line under it, never in a box (a box: an entity being added, or added again)', async () => {
+        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); })()`); await t.wait(200);
         const b = await t.E(`(()=>{ const s=inst()._this.querySelector('#et_0_title').style; return [s.borderTopStyle||'', s.borderBottomStyle||'']; })()`);
         const ap = await t.E(`inst()._this.querySelector('#et_0_appearance').style.display`);
         return b[0] === '' && b[1] === 'solid' && ap !== 'none' ? true : JSON.stringify({ b, ap });
