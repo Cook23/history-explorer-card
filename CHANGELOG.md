@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.74] - 2026-11-13
+
+### Fixed — a graph on the screen
+- A graph counted as on the screen — its requests and its drawings first, "on the screen" in the performance test's report — when it was within a screen's height above or below it: on a tablet, twice as many graphs as those shown went first. A graph is now on the screen when its plot area, the curves', is at least in part in what the page shows — its legend alone isn't (Chart.js `hecPlotRect`)
+- Tests (`features`): a graph at the bottom of the screen — its legend alone shown: not on the screen; 4 px of its plot area: on it
+
+### Fixed — a silence in smart mode, at some hours
+- The end of a silence in a column of pixels whose point is drawn before it — the column holding the silence's last part, its point at the middle of the time its values cover — was taken for a silence within a column: no plateau, a straight line over the silence. As the columns are on a grid fixed from 1970, it depended on the hour. The plateau now ends where that column begins; only a silence within a column has none
+- Tests (`smart`): a silence of a day ending in a column whose point is drawn before its end — a plateau, ending where the column begins; a silence within a column — none
+
 ## [v1.2.73] - 2026-11-13
 
 ### Fixed — a dense curve stopped the drawing

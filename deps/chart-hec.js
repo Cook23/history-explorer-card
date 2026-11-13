@@ -3497,6 +3497,13 @@
       return Math.round(A ? A.right - A.left : this.width || 0);
     },
 
+    // The plot area's box in the chart's canvas, in CSS pixels ({ left, top, right, bottom }) —
+    // the whole canvas before its first layout: where the curves are drawn
+    hecPlotRect: function () {
+      var A = this.chartArea;
+      return A ? { left: A.left, top: A.top, right: A.right, bottom: A.bottom } : { left: 0, top: 0, right: this.width || 0, bottom: this.height || 0 };
+    },
+
     // ── The values over the graph (hecSetValues) ──
 
     // Public (Chart Custom.js.md §1): the values shown over the chart, given by its owner —

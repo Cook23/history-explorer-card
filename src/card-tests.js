@@ -559,7 +559,7 @@ function buildPerformanceTest(body, card)
         out(`Window: ${card.startTime} → ${card.endTime} (${( G.r / 864e5 ).toFixed(1)} days), a column of pixels: ${( G.column / 60e3 ).toFixed(1)} min`);
         out(`Options: refresh ${P.refreshEnabled ? 'automatic' : 'off'}, statistics ${card.statistics?.enabled ? `on (their period: ${card.statistics.period})` : 'off'}`);
         out(`Graphs: ${g.length}, entities: ${ids.length} (${stats.size} with statistics), points drawn: ${g.reduce((a, x) => a + points(x), 0)}`);
-        // (on the screen: on it or within a screen's height — drawn first, see card-charts.js graphShown)
+        // (on the screen: its plot area at least in part — drawn first, see card-charts.js graphShown)
         for( const x of g ) out(`  ${x.type} — ${x.entities.length} entities, ${points(x)} points${card.graphShown(x) ? ', on the screen' : ''}`);
         // (the statistics probe's verdicts: see card-history.js SENSOR_GAPS)
         // (and what each found: when, its values and its short intervals — see card-history.js _speaks)

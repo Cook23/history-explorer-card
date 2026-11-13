@@ -194,14 +194,21 @@ export class CardDatasets
             while( k < out.length && tOf(out[k]) < gap.tb ) k++;
             if( k === 0 || k >= out.length ) continue;
             // (the point drawn before the value ending the silence already past the plateau's
-            // end — a silence within a column of pixels —: nothing to show, and a point put
-            // there would go back in time)
-            if( tOf(out[k - 1]) >= gap.tb - gap.lead ) continue;
-            k = ensureStart(k, gap.ta, gap.y);
+            // end: the column of pixels holding that value — its point drawn at the middle of
+            // the time its values cover, the silence's last part included. The plateau ends
+            // where that column begins; a silence within a column — it begins before the
+            // silence does —: nothing to show, a point put there would go back in time)
+            let _at = k, _end = gap.tb - gap.lead;
+            if( tOf(out[k - 1]) >= _end ) {
+                const _from = out[k - 1].columnFrom;
+                if( _from == null || _from <= gap.ta ) continue;
+                _at = k - 1; _end = _from;
+            }
+            _at = ensureStart(_at, gap.ta, gap.y);
             // (flat: the value of the point before it — the value held, ensureStart; or, the
             // silence beginning within a column of pixels, the value drawn for that column)
-            out.splice(k, 0, { x: gap.tb - gap.lead, y: out[k - 1].y, hecPlateauEnd: true, hecVirtual: true });
-            k++;
+            out.splice(_at, 0, { x: _end, y: out[_at - 1].y, hecPlateauEnd: true, hecVirtual: true });
+            k = _at + 1;
         }
 
         // Ongoing silence: from the last recorded value to the extension point at the end

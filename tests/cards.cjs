@@ -185,7 +185,7 @@ module.exports = async function()
             && /answers put in the cache/.test(out) && /== '<' clicked 3 times: whole after/.test(out) && /== '>' clicked 3 times: whole after/.test(out) && /== dragged back .*: whole after/.test(out)
             && /s of real time\n  \d+ requests, the graphs drawn again \d+ times/.test(out) && /freezes, /.test(out)
             // (the graphs drawn again: each cause, how many times — the window moved, by '<' and '>')
-            && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come near the screen|a graph off the screen, drawn after those on the screen) \d+/.test(out)
+            && /the graphs drawn again \d+ times: \d+ ms in all, the longest \d+ ms \((answers from Home Assistant|the window moved|the window or its settings changed|a graph come on the screen|a graph off the screen, drawn after those on the screen) \d+/.test(out)
             && /== '<' clicked 3 times[^=]*the graphs drawn again \d+ times: [^\n]*the window moved \d+/.test(out)
             // (after each answer: the cache's size kept, what's still lacking asked — timed)
             && /answers put in the cache[^\n]*\n  after each answer: the cache's size kept \d+ ms in all, the longest \d+ ms; what's still lacking asked \d+ ms in all, the longest \d+ ms/.test(out);

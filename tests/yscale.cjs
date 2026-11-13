@@ -512,7 +512,7 @@ module.exports = async function()
     done(await t.close());
 
     // ── The requests of the graphs on the screen first: within a phase, those of the graphs
-    // on it or near it in groups of their own, sent before the others' ──
+    // on it in groups of their own, sent before the others' ──
     {
         const E = ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.power_kw', 'sensor.wind', 'sensor.watering_cycle', 'sensor.days_to_watering'];
         t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true }, graphs: E.map(e => ({ type: 'line', entities: [{ entity: e }] })) },

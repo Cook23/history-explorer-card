@@ -403,8 +403,8 @@ export class CardHistory
     // indices stay in step with buildChartData), and the color entities' by entity_id.
     // cause: what has them drawn again (REDRAW_CAUSES), told to the performance test.
     // only: the series whose data changed (an answer's) — only the graphs showing one of
-    // them, or colored by one, worked out and drawn again; none: every graph. Never a graph far
-    // from the screen: drawn when it comes near it (_watchShown)
+    // them, or colored by one, worked out and drawn again; none: every graph. A graph off the
+    // screen: drawn after those on it, or when it comes on it (_watchShown)
     generateGraphDataFromCache(cause, only = null, offscreenToo = false)
     {
         const _t = performance.now();
@@ -416,8 +416,8 @@ export class CardHistory
         // (the window the graphs are drawn whole for — see _withinAColumn)
         if( !only ) { const { r, px } = this._geometry(); this._drawnWhole = { s: msOf(this.startTime), r, px, graphs: [...this.graphs] }; }
         let _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || only.has(colorEntityOf(e)))) : null;
-        // (a graph far from the screen: drawn after those on it — see _drawStaleSoon —, or when
-        // it comes near it, see _watchShown)
+        // (a graph off the screen: drawn after those on it — see _drawStaleSoon —, or when it
+        // comes on it, see _watchShown)
         const _all = _graphs ?? this.graphs, _near = offscreenToo ? _all : _all.filter(g => !this._offscreen?.has(g));
         if( _near.length < _all.length ) {
             for( const g of _all ) if( this._offscreen.has(g) ) ( this._staleGraphs ??= new Set() ).add(g);
@@ -682,7 +682,7 @@ export class CardHistory
 
     // Units (see _histUnits — of series ids, or of plans, see _planOf) in at most HA_WORKERS
     // groups, in their order — Home Assistant's workers all busy, a request each, and as few
-    // requests as that —: those of the graphs on the screen or near it (shownSeries) first, in
+    // requests as that —: those of the graphs on the screen (shownSeries) first, in
     // groups of their own — never held up by the others —, then the others'
     _requestGroups(units)
     {
@@ -1303,7 +1303,7 @@ export class CardHistory
         for( const id of ids ) { const k = LAYER[kind] + ' ' + id; if( !this._flying.has(k) ) this._flying.set(k, []); this._flying.get(k).push([a, b]); }
         let _p;
         try {
-            // (within a phase and a block: those of the graphs on the screen or near it first —
+            // (within a phase and a block: those of the graphs on the screen first —
             // see shownSeries —, then in the graphs' order)
             const _at = Math.min(...ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
             const _s = this.shownSeries(), _off = ids.some(id => _s.has(id)) ? 0 : 500;
@@ -1400,7 +1400,7 @@ export class CardHistory
         const _t = performance.now();
         let _sent = _t, _shown = null, _onScreen;
         // (whether it brought some of the window shown when it was sent: see _serves)
-        // (and how many of its entities are in a graph on the screen or near it when it's sent —
+        // (and how many of its entities are in a graph on the screen when it's sent —
         // see shownSeries)
         return haRequests.request(() => {
             _sent = performance.now(); _shown = o.stale ? !o.stale() : null; request = _make();

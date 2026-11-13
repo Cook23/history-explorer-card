@@ -24,7 +24,7 @@ only:
 | Direction | Channel | What goes through it |
 |---|---|---|
 | Card → Chart.js | `options` (§1) and stock 2.7.1 data/options | Configuration — its parameters: a Y axis' values (`ticks.dataMin` / `dataMax`), bounds, smallest range, margins, step, width; a time axis' unit and step; the magnifier's mode (`zoomSelectMode`, `zoomBoxAxes`) —, and the few answers the card gives during a gesture (`dropAllowed`, `insertionForbidden`, `handleButtons`) |
-| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width — nothing else |
+| Card → Chart.js | stock 2.7.1 methods, and `hecYAxisLocked()`, `hecSetYAxisLocked()`, `hecEndTooltip()`, `hecSetValues()`, `hecPlotWidth()`, `hecPlotRect()` (§1) | `update()`, `resize()`, `getDatasetMeta()`; whether the Y axes are locked, locking or releasing them (the padlock, from a menu); closing the tooltip; the values shown over the chart; the plot area's width and box — nothing else |
 | Chart.js → card | `options.customEvent(payload)` (§2) | Every gesture on labels, graphs and icons, already resolved: zone, label index, position along the time axis, drop target |
 | Chart.js → card | `options.panX` / `options.zoomX` (§1) | Moves of the time window, the one axis shared by every graph |
 | Both | `Chart.hecUi` (§7) | Floating elements, messages, outlines |
@@ -205,6 +205,11 @@ it on every chart when one of its menus opens, so nothing of a tooltip stays ove
 before its first layout): how many columns of pixels the time axis has, for a curve
 drawn as one point per column (the card aggregates each column's values: their mean, min and max),
 and for whether the history tells more than the statistics at that resolution.
+
+`chart.hecPlotRect()` — the plot area's box in the chart's canvas, in CSS pixels (`{ left, top,
+right, bottom }`; the whole canvas before its first layout): where the curves are drawn — for
+whether they're on the screen (the card: a graph on the screen is one whose plot area is, at
+least in part).
 
 `chart.hecSetValues(values)` — the values shown over the chart, given by the card (`null`:
 none), drawn by Chart.js in an element of its own right above the chart's box (its canvas'
