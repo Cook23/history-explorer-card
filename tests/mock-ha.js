@@ -11,7 +11,8 @@
 //   historyDelay, userDataDelay   ms Home Assistant takes to answer for the history and the
 //               statistics, and for the user data (none: at once)
 //   historyStep seconds between two values of a series (600)
-//   rows        an entity's history as given: { id: [[seconds before now, state], …] }
+//   rows        an entity's history as given: { id: [[seconds before now, state], …] } — [] none:
+//               only the states set (setState, setBefore)
 //   statsLag    seconds after an hour's end before its statistics exist (600)
 //   noStatistics entities without long-term statistics (whatever their state_class)
 //   statsFrom   { id: days }: an entity's statistics only for its last days (a unit changed)
@@ -28,12 +29,18 @@
 //   clones      that many more sensors with statistics: sensor.s1, sensor.s2…
 //   fastStats   the statistics worked out at once (from the sine), not compiled from the history
 //   states      more entities: { id: { state, unit, state_class } } (a data set's: see dataset.cjs)
+//   commitInterval  seconds Home Assistant's recorder takes to write a state set (setState) in
+//               the history (its commit_interval: it writes every so often) — pushed at once,
+//               in the history only then; none: at once
+//   setBefore   { id: [seconds before the page opened, state] }: a state set then (as setState —
+//               written by the recorder commitInterval later)
+//   notRecorded entities Home Assistant's recorder doesn't keep: no history at all
 //   system      Home Assistant tells what it runs on (system health, hardware), as to an
 //               administrator: a Raspberry Pi 5, Home Assistant OS, MariaDB — else nothing
 // The entity and device registries (hass.entities, hass.devices) give sensor.power and
 // sensor.rain the device 'Ecowitt', sensor.power2 'Météo-France Villeveyrac'.
 // Every WS request is logged in window.__ws ({type, start, end, ids, period}).
-// setState(id, value) pushes the change to every element in window.hassTargets.
+// setState(id, value, attributes) pushes the change to every element in window.hassTargets.
 window.logs=[]; window.onerror=(m)=>{logs.push('ERR '+m)};
 const _ce=console.error; console.error=(...a)=>{logs.push('CE '+a.join(' '));_ce(...a)};
 const MOCK=window.MOCK||{};
@@ -86,26 +93,69 @@ STATES['input_text.curve_color'].attributes.values=['red','#0000ff'];
 STATES['input_text.curve_thresholds'].attributes.values=[STATES['input_text.curve_thresholds'].state];
 STATES['sensor.net_energy'].attributes.device_class='energy';
 STATES['sensor.tank'].attributes.device_class='volume_storage';
+// (each entity's state when the page opened: the base of its series, whatever's set later)
+const INIT=Object.fromEntries(Object.entries(STATES).map(([id,st])=>[id,st.state]));
+// (the series's last step when the page opened: see valueAt)
+const T0=Math.floor(Date.now()/1000/(MOCK.historyStep||600))*(MOCK.historyStep||600);
 window.userData={};
 window.__ws=[];
-// A state change, as Home Assistant pushes it: new value, new last_changed, new hass object
-window.setState=(id,v)=>{ const t=new Date().toISOString(); STATES[id]={...STATES[id],state:String(v),last_changed:t,last_updated:t,setAt:Date.parse(t)/1000}; (window.hassTargets||[]).forEach(x=>{ x.hass=mkHass(); }); };
+// A state change, as Home Assistant pushes it: new state (and attributes changed), new
+// last_changed (last_updated alone for attributes alone), new hass object; the history from its
+// time on (SET: each state set, its attributes — the first one, those before it too)
+const SET={};
+window.setState=(id,v,attributes,at=Date.now())=>{ const t=new Date(at).toISOString(), was=inSeries(id) ? seriesState(id) : STATES[id], lu=Date.parse(t)/1000;
+  STATES[id]={...was,state:String(v),last_changed:String(v)===was.state ? was.last_changed : t,last_updated:t,attributes:{...was.attributes,...(attributes||{})}};
+  (SET[id]??=[]).push({s:String(v),lu,a:STATES[id].attributes,wasA:was.attributes,was:was.state});
+  (window.hassTargets||[]).forEach(x=>{ x.hass=mkHass(); }); };
+// (each entity's state as Home Assistant has it: in its history from its last_changed on — with
+// rows, its last one, at its time; a series's: its value now, see seriesState)
+for(const [id,st] of Object.entries(STATES)){
+  const r=MOCK.rows?.[id], last=r?.length ? r.reduce((x,y)=>x[0]<y[0]?x:y) : null;
+  if(last){ st.state=String(last[1]); st.last_changed=st.last_updated=new Date(Date.now()-last[0]*1000).toISOString(); }
+  if(r && !r.length || inSeries(id)) continue;
+  SET[id]=[{s:st.state,lu:Date.parse(st.last_changed)/1000,a:st.attributes,wasA:st.attributes,was:st.state}];
+}
+for(const [id,[ago,v]] of Object.entries(MOCK.setBefore||{})) setState(id,v,undefined,Date.now()-ago*1000);
+// The states set (setState) in the history, as Home Assistant's recorder has written them by now
+// (MOCK.commitInterval): an entity's history from the first one on, the state in force at t0 given
+// at t0 — the history before it as the mock gives it
+function withSet(e,pts,t0,t1){
+  const now=Date.now()/1000, w=(SET[e]||[]).filter(x=>x.lu+(MOCK.commitInterval||0)<=now);
+  if(!w.length) return pts;
+  const before=w.filter(x=>x.lu<t0).pop(), out=before ? [{s:before.s,lu:t0}] : pts.filter(p=>p.lu<w[0].lu);
+  for(const x of w) if(x.lu>=t0 && x.lu<t1) out.push({s:x.s,lu:x.lu});
+  return out;
+}
 // Value of entity id at time t (s) in the mocked history
-const isNum=id=>!isNaN(Number(STATES[id].state));
-const base=id=>Number(STATES[id].state)||1;
+const isNum=id=>!isNaN(Number(INIT[id] ?? STATES[id].state));
+const base=id=>Number(INIT[id] ?? STATES[id].state)||1;
+// (an entity whose history is a series — MOCK.series, no rows of its own —, no state set since)
+function inSeries(id){ return MOCK.series && !MOCK.rows?.[id] && !SET[id]?.length; }
+// The state of an entity in series as Home Assistant gives it now: its series's last value, since
+// the series's step it took it (last_changed), its attributes those of that step (last_updated)
+function seriesState(id){
+  const st=MOCK.historyStep||600, t=Math.floor(Date.now()/1000/st)*st, v=valueAt(id,t);
+  let t0=t; while(valueAt(id,t0-st)===v && t-t0<2*86400) t0-=st;
+  return {...STATES[id], state:isNaN(Number(v)) ? v : String(Number(v)), last_changed:new Date(t0*1000).toISOString(), last_updated:new Date(t*1000).toISOString(), attributes:attributesAt(id,t)};
+}
+// (each series through the entity's state when the page opened, at the last step then (T0):
+// a list of values or two states every 2 h from it, a sine around it; a total grows, its state
+// its value now — see seriesState)
+const _cycle=(t,n)=>((Math.floor((t-T0)/7200)%n)+n)%n;
 function valueAt(id,t){
-  const v=STATES[id].attributes.values; if(v) return v[Math.floor(t/7200)%v.length];
-  if(!isNum(id)) return Math.floor(t/7200)%2 ? 'on' : 'off';
+  const v=STATES[id].attributes.values; if(v) return v[(_cycle(t,v.length)+Math.max(0,v.indexOf(INIT[id])))%v.length];
+  if(!isNum(id)){ const s=INIT[id] ?? 'on'; return _cycle(t,2) ? ( s==='on' ? 'off' : s==='off' ? 'on' : 'off' ) : s; }
   if(STATES[id].attributes.state_class==='total_increasing') return (base(id)+t/36000%1000).toFixed(2);
-  return (base(id)*(1+0.5*Math.sin(t/3600))).toFixed(2);
+  return (base(id)*(1+0.5*Math.sin((t-T0)/3600))).toFixed(2);
 }
 // The attributes of entity id at time t (s): current_temperature a sine, humidity a sine
-// with its unit in its text, hvac_action on and off every 2 h, the others as they are now
+// around its own (its unit in its text, when it's a text), hvac_action on and off every 2 h, the others as they are now
 function attributesAt(id,t){
-  const a={...STATES[id].attributes};
-  if('current_temperature' in a) a.current_temperature=Number((a.current_temperature*(1+0.1*Math.sin(t/3600))).toFixed(2));
-  if('humidity' in a) a.humidity=(45*(1+0.1*Math.sin(t/3600))).toFixed(1)+' %';
-  if('hvac_action' in a) a.hvac_action=Math.floor(t/7200)%2 ? 'heating' : 'idle';
+  // (the attributes set at t — setState —, or before the first one, those before it)
+  const set=(SET[id]||[]).filter(x=>x.lu<=t).pop(), a={...(set ? set.a : SET[id]?.[0]?.wasA ?? STATES[id].attributes)};
+  if('current_temperature' in a) a.current_temperature=Number((a.current_temperature*(1+0.1*Math.sin((t-T0)/3600))).toFixed(2));
+  if('humidity' in a){ const h=(parseFloat(a.humidity)*(1+0.1*Math.sin((t-T0)/3600))).toFixed(1); a.humidity=typeof a.humidity==='string' ? h+' %' : Number(h); }
+  if('hvac_action' in a) a.hvac_action=_cycle(t,2) ? 'idle' : 'heating';
   return a;
 }
 // (no end_time: until now, as Home Assistant; with no_attributes false, each row with its
@@ -116,16 +166,20 @@ function history(d){
   // (d.compiling: the statistics compiled when the history was still there — no retention)
   const kept=MOCK.historyDays && !d.compiling ? Date.now()/1000-MOCK.historyDays*86400 : -Infinity;
   for(const e of d.entity_ids){
-    if(!STATES[e]) continue;
+    if(!STATES[e] || (MOCK.notRecorded||[]).includes(e)) continue;
+    let pts=[];
     if(MOCK.rows?.[e]){ const now=Date.now()/1000, all=MOCK.rows[e].map(([ago,s])=>({s,lu:now-ago})).sort((a,b)=>a.lu-b.lu);
-      const before=all.filter(p=>p.lu<t0).pop(), pts=all.filter(p=>p.lu>=t0 && p.lu<t1); if(before) pts.unshift({s:before.s,lu:t0}); if(pts.length) r[e]=pts; continue; }
-    if(!MOCK.series){ const lu=Math.max(t0,kept); r[e]=[{s:STATES[e].state,lu,...(d.no_attributes?{}:{a:attributesAt(e,lu)})}]; continue; }
-    const st=MOCK.historyStep||600, from=Math.max(t0,kept);
-    const pts=[]; for(let t=Math.ceil(from/st)*st; t<t1; t+=st) pts.push({s:valueAt(e,t),lu:t});
-    // (the state in force at the start, as Home Assistant gives it: at the start's time)
-    if(from<t1 && (!pts.length || pts[0].lu>from)) pts.unshift({s:valueAt(e,Math.floor(from/st)*st),lu:from});
-    // (a state the test set is the history from its time on)
-    const tSet=STATES[e].setAt; if(tSet>=t0 && tSet<t1){ while(pts.length && pts[pts.length-1].lu>=tSet) pts.pop(); pts.push({s:STATES[e].state,lu:tSet}); }
+      const before=all.filter(p=>p.lu<t0).pop(); pts=all.filter(p=>p.lu>=t0 && p.lu<t1); if(before) pts.unshift({s:before.s,lu:t0}); }
+    // (its state — before the first one set, see setState)
+    else if(!MOCK.series) pts=[{s:SET[e]?.[0]?.was ?? STATES[e].state,lu:Math.max(t0,kept)}];
+    else {
+      const st=MOCK.historyStep||600, from=Math.max(t0,kept);
+      for(let t=Math.ceil(from/st)*st; t<t1; t+=st) pts.push({s:valueAt(e,t),lu:t});
+      // (the state in force at the start, as Home Assistant gives it: at the start's time)
+      if(from<t1 && (!pts.length || pts[0].lu>from)) pts.unshift({s:valueAt(e,Math.floor(from/st)*st),lu:from});
+    }
+    // (the states the test set, from their time on)
+    pts=withSet(e,pts,t0,t1);
     if(!d.no_attributes) for(const p of pts) p.a=attributesAt(e,p.lu);
     if(pts.length) r[e]=pts;
   }
@@ -175,7 +229,7 @@ const mockConnection={ subscribeMessage:(cb,msg)=>{
   return Promise.resolve(()=>{}); } };
 function mkHass(){ return {
   connection: mockConnection,
-  states:{...STATES, ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...Object.fromEntries(Object.keys(STATES).map(id=>[id, inSeries(id) ? seriesState(id) : STATES[id]])), ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
   user:{id:'u1',name:'u'}, localize:()=>'',

@@ -137,14 +137,14 @@ module.exports = async function()
         const gap = async f => {
             const p = await t.E(`pointPt(0,${f})`); await t.page.mouse.click(p.x, p.y); await t.wait(400);
             const r = await t.E(`(()=>{ const b=document.getElementById('hec-tooltip-hover').getBoundingClientRect(), c=graphAt(0).chart, v=c.tooltip._view;
-                const x=c.canvas.getBoundingClientRect().left+v.caretX; return { side: v.xAlign, gap: Math.round(v.xAlign==='left' ? b.left-x : x-b.right) }; })()`);
+                const x=c.canvas.getBoundingClientRect().left+v.caretX; return { side: v.xAlign, beside: v.yAlign === 'center', gap: Math.round(v.xAlign==='left' ? b.left-x : x-b.right) }; })()`);
             // (until it has faded out, its reading time over)
             await t.page.mouse.move(5, 5); for( let i = 0; i < 40 && await tip(0) !== null; i++ ) await t.wait(200);
             return r;
         };
         // (a point whose tooltip stands beside it, on either side — above or below a peak it
         // stands under or over it, the data following the time of day)
-        const beside = async (fs, side) => { let r; for( const f of fs ) { r = await gap(f); if( r.side === side ) break; } return r; };
+        const beside = async (fs, side) => { let r; for( const f of fs ) { r = await gap(f); if( r.side === side && r.beside ) break; } return r; };
         const right = await beside([0.15, 0.2, 0.25, 0.3, 0.1], 'left'), left = await beside([0.95, 0.9, 0.85, 0.97, 0.8], 'right');
         return right.side === 'left' && left.side === 'right' && right.gap > 0 && Math.abs(right.gap - left.gap) <= 1 ? true : JSON.stringify({ right, left });
     });

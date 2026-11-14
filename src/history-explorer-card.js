@@ -19,6 +19,7 @@ import { CardOperations } from "./card-operations.js";
 import { CardToolbar } from "./card-toolbar.js";
 import { CardSelector } from "./card-selector.js";
 import { CardDatasets } from "./card-datasets.js";
+import { seriesOf } from "./history-series.js";
 import { CardGestures } from "./card-gestures.js";
 import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
@@ -309,11 +310,7 @@ export class HistoryCardState {
 
         for( let g of this.graphs ) {
             const _changed = [];
-            g.entities.forEach((e, i) => {
-                const lc = this.stateOf(e.entity)?.last_changed;
-                if( this.stateMap.has(e.entity) && lc != this.stateMap.get(e.entity) ) _changed.push(i);
-                this.stateMap.set(e.entity, lc);
-            });
+            g.entities.forEach((e, i) => { if( this._seeState(e.entity) ) _changed.push(i); });
             if( !_changed.length ) continue;
             changed = true;
             // (the values now: in the legend — each entity's own showCurrentValues — and over the graph)
@@ -327,6 +324,25 @@ export class HistoryCardState {
         }
 
         return changed;
+    }
+
+    // The state of series id Home Assistant gives now, looked at: new to the card — a time
+    // (last_changed) it hadn't seen —, a row of its history (addLiveState); whether it changed
+    // since the card last looked (none yet: no)
+    _seeState(id)
+    {
+        const _s = this.stateOf(id), lc = _s?.last_changed, _changed = this.stateMap.has(id) && lc != this.stateMap.get(id);
+        if( _s && lc != this.stateMap.get(id) ) this.addLiveState(id, lc, _s.state);
+        this.stateMap.set(id, lc);
+        return _changed;
+    }
+
+    // The states of the shown entities a request asks, looked at when it's sent (_seeState):
+    // a change after it — one it can't bring — seen as a change
+    noteAskedStates(request)
+    {
+        const _ids = new Set(request.entity_ids ?? request.statistic_ids ?? []);
+        for( const g of this.graphs ) for( const e of g.entities ) if( _ids.has(seriesOf(e.entity).entity) ) this._seeState(e.entity);
     }
 
 

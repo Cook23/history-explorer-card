@@ -932,7 +932,7 @@ module.exports = async function()
 
     // ── The real time paced by what drawing the graphs costs ──
     t = await openCard(card({ defaultTimeRange: '24', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
-    await t.E(`setState('sensor.power', '1')`); await t.wait(3000);   // (the card's first look at the states)
+    await t.E(`setState('sensor.power', '1')`); await t.wait(3000);   // (a first change and its refresh, before the ones measured)
     await t.step('a change: its value in the legend at once, the curves not worked out again until the refresh', async () => {
         await t.E(`(()=>{ window.__k=[]; el.instance.setPerfRecorder({ add: k => __k.push(k) }); })()`);
         await t.E(`setState('sensor.power', '777')`); await t.wait(500);
@@ -1771,6 +1771,130 @@ module.exports = async function()
                 const rows = ( await I.exportRows('history', ['sensor.power']) )['sensor.power'] ?? [];
                 return { pts, rows: rows.filter(x => mid(x.lu * 1000)).length, first: rows.length ? rows[0].lu * 1000 - t0 : null, n: rows.length }; })()`);
             return r.pts === 0 && r.rows === 0 && r.first === 0 && r.n > 3 ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── Home Assistant's recorder writing late (its commit_interval): a state pushed is a row of
+    // the history at its time (last_changed), known before the recorder writes it — drawn at
+    // once, at its time; an answer of the history without it (not written yet) doesn't take it
+    // away; once written, the history's row in its place. A state (a timeline), a value (a
+    // line), an attribute alike ──
+    // (the state drawn last, and since when: a timeline's last bar, a line's last run of the same value)
+    const _lastOf = id => `(()=>{ const g = el.instance.graphs.find(g => g.entities.some(e => e.entity === '${id}')), d = g.chart.data.datasets[0].data;
+        if( Array.isArray(d[0]) ) { const p = d[d.length - 1]; return { v: p[2], at: typeof p[0] === 'number' ? p[0] : Date.parse(p[0]) }; }
+        let k = d.length - 1; while( k > 0 && d[k - 1].y === d[k].y ) k--; return { v: d[k].y, at: +new Date(d[k].x) }; })()`;
+    const _lateMock = more => ({ commitInterval: 6, states: { 'remote.hub': { state: 'unavailable' }, 'sensor.late': { state: 100, unit: 'W', state_class: 'measurement' } },
+                                 rows: { 'remote.hub': [[30 * 3600, 'unavailable']], 'sensor.late': [[30 * 3600, '100']] }, ...more });
+    for( const [what, graph, id, set, last] of [
+        ['a timeline: unavailable, then off', { type: 'timeline', entities: [{ entity: 'remote.hub' }] }, 'remote.hub', `setState('remote.hub', 'off')`, 'off'],
+        ['a line: 100, then 250', { type: 'line', entities: [{ entity: 'sensor.late' }] }, 'sensor.late', `setState('sensor.late', '250')`, 250],
+        ['an attribute: 20, then 23', { type: 'line', entities: [{ entity: 'climate.salon.temperature' }] }, 'climate.salon.temperature', `setState('climate.salon', 'heat', { temperature: 23 })`, 23]] ) {
+        t = await openCard(card({ statistics: { enabled: false }, graphs: [graph, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }), { mock: _lateMock() });
+        await t.wait(3000);
+        const _t = await t.E(`(()=>{ const t = Date.now(); ${set}; return t; })()`);
+        await t.wait(3500);
+        await t.step(`${what}, written 6 s late: drawn at once, at its time — the refresh's answer, asked before it's written, doesn't take it away`, async () => {
+            const r = { ...await t.E(_lastOf(id)), asked: await t.E(`__ws.some(x => x.type === 'history/history_during_period' && x.at > ${_t} && x.at < ${_t} + 6000)`) };
+            return r.asked && String(r.v) === String(last) && Math.abs(r.at - _t) < 1000 ? true : JSON.stringify({ ...r, set: _t });
+        });
+        const _at = () => t.E(`(()=>{ const I = el.instance; return ( I.cache[I.cache.length - 1].hist.get('${id}') ?? [] ).filter(x => Math.abs(+new Date(x.last_changed) - ${_t}) < 1000).map(x => ({ v: x.state, live: !!x.live })); })()`);
+        await t.wait(4000);
+        await t.E(`setState('sensor.power2', '302')`); await t.wait(3500);   // (written since; another curve shown changing: a refresh, asked from after it)
+        await t.step(`${what}: written since, the next refresh — asked from after it — keeps it: one row at its time`, async () => {
+            const r = await _at();
+            return r.length === 1 && String(r[0].v) === String(last) ? true : JSON.stringify(r);
+        });
+        await t.E(`el.instance._ask('history', ${_t} - 60e3, Date.now(), ['${id}'], { phase: 2 })`); await t.wait(1500);
+        await t.step(`${what}: its time asked again once written: the history's row in its place — one row, Home Assistant's`, async () => {
+            const r = await _at();
+            return r.length === 1 && String(r[0].v) === String(last) && !r[0].live ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+    // (two states pushed before the recorder writes either — 100, 250, then 100 again —: each a row)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.late' }] }] }), { mock: _lateMock() });
+    await t.wait(3000);
+    {
+        const _t = await t.E(`(()=>{ const t = Date.now(); setState('sensor.late', '250'); return t; })()`);
+        await t.wait(1000); await t.E(`setState('sensor.late', '100')`); await t.wait(3000);
+        await t.step('100, 250, then 100 again, written 6 s late: the 250 between them in the history at once, at its time (shorter than a column: in the cache)', async () => {
+            const r = await t.E(`(()=>{ const I = el.instance; return ( I.cache[I.cache.length - 1].hist.get('sensor.late') ?? [] ).filter(x => +x.state === 250).map(x => +new Date(x.last_changed) - ${_t}); })()`);
+            return r.length === 1 && Math.abs(r[0]) < 1000 ? true : JSON.stringify(r);
+        });
+    }
+    done(await t.close());
+    // (a state set before the page opened, not written yet when the card asks the history: the
+    // state Home Assistant gives the card a row too)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'timeline', entities: [{ entity: 'remote.hub' }] }] }), { mock: _lateMock({ setBefore: { 'remote.hub': [3, 'off'] } }) });
+    await t.wait(1000);
+    await t.step('a state set 3 s before the page opened, written 6 s late — after the card asked its history —: drawn at once, at its time', async () => {
+        const r = { ...await t.E(_lastOf('remote.hub')), lc: await t.E(`Date.parse(el.instance._hass.states['remote.hub'].last_changed)`) };
+        return r.v === 'off' && Math.abs(r.at - r.lc) < 1000 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (an entity the recorder doesn't keep: the states the card was given, its only history)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.new' }] }] }),
+        { mock: { states: { 'sensor.new': { state: 7, unit: 'W', state_class: 'measurement' } }, notRecorded: ['sensor.new'] } });
+    await t.wait(1000);
+    {
+        const _t = await t.E(`(()=>{ const t = Date.now(); setState('sensor.new', '8'); return t; })()`);
+        await t.wait(3500);
+        await t.step('an entity the recorder doesn\'t keep: the states the card was given drawn — 7, then 8 from its time', async () => {
+            const r = await t.E(_lastOf('sensor.new'));
+            return r.v === 8 && Math.abs(r.at - _t) < 1000 ? true : JSON.stringify({ ...r, set: _t });
+        });
+    }
+    done(await t.close());
+    // (nothing late: the states the card was given already in the answers — nothing more asked)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'timeline', entities: [{ entity: 'remote.hub' }] }, { type: 'line', entities: [{ entity: 'sensor.late' }] }] }),
+        { mock: { states: { 'remote.hub': { state: 'off' }, 'sensor.late': { state: 100, unit: 'W', state_class: 'measurement' } }, rows: { 'remote.hub': [[30 * 3600, 'off']], 'sensor.late': [[30 * 3600, '100']] } } });
+    await t.wait(3000);
+    {
+        const n0 = await t.E(`__ws.length`);
+        await t.wait(6000);
+        await t.step('nothing changing: no request more', async () => {
+            const r = await t.E(`__ws.length - ${n0}`);
+            return r === 0 ? true : JSON.stringify(r);
+        });
+    }
+    done(await t.close());
+    // (a state changed after its history was asked, before the card's first look at the states:
+    // a change — the history asked again)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'timeline', entities: [{ entity: 'remote.hub' }] }] }),
+        { mock: { states: { 'remote.hub': { state: 'unavailable' } }, rows: { 'remote.hub': [[30 * 3600, 'unavailable']] } } });
+    await t.wait(1000);
+    await t.E(`setState('remote.hub', 'off')`); await t.wait(3500);
+    await t.step('a state changed after its history was asked, before the card\'s first look at the states: seen as a change — the history asked again, the new state drawn', async () => {
+        const r = await t.E(`(()=>{ const d = el.instance.graphs[0].chart.data.datasets[0].data; return d[d.length - 1][2]; })()`);
+        return r === 'off' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (an entity without any history yet — made 3 s before the page opened, its first row written
+    // 6 s late —: nothing told of where it begins)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.new' }] }] }),
+        { mock: { commitInterval: 6, states: { 'sensor.new': { state: 7, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.new': [] }, setBefore: { 'sensor.new': [3, '7'] } } });
+    await t.wait(1000);
+    await t.step('an empty history (an entity\'s first rows not written yet): never taken for where its history begins — no part of it left out of the next requests', async () => {
+        const r = await t.E(`({ from: el.instance._histFrom?.get('sensor.new') ?? null, asked: __ws.filter(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.new')).length })`);
+        return r.from === null && r.asked > 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (the hourly statistics compiled later than the card expects — STATS_LAG, 10 min —: at
+    // 10:12 the 9:00 hour hasn't come; at the refresh at 10:16, once it's compiled, it's there)
+    {
+        const d = new Date(); d.setUTCHours(10, 12, 0, 0);
+        const nine = d.getTime() - 72 * 60e3;
+        t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }),
+            { mock: { series: true, statsLag: 900 }, clock: d.toISOString() });
+        await t.wait(3000);
+        const _nine = () => t.E(`(()=>{ const I = el.instance; return ( I.cache[I._slotAt(${nine})].stats.get('sensor.power') ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
+        const before = await _nine();
+        await t.page.clock.fastForward('04:00');
+        await t.E(`setState('sensor.power2', '302')`); await t.wait(4000);   // (a curve shown changing: a refresh)
+        await t.step('an hour\'s statistics compiled later than expected (Home Assistant slow, 15 min): not there at 10:12, asked again at the next refresh until they come — there at 10:16', async () => {
+            const r = { before, after: await _nine() };
+            return !r.before && r.after ? true : JSON.stringify(r);
         });
         done(await t.close());
     }
