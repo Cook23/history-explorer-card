@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.75] - 2026-11-14
+
+### Fixed — a change Home Assistant hadn't written yet
+- A state that changed (a remote from `unavailable` to `off`) stayed drawn with its previous state until the page was reloaded. Home Assistant's recorder writes the history only every `commit_interval`: the history asked right after the change didn't have it yet, and the next request, starting after it, got it only as the state in force at its start — a row the card dropped as a repeat of what it held. A state Home Assistant gives the card — each change it pushes, and the state an entity has when the card asks its history — is now a row of the history at its time (`last_changed`), drawn at once; an answer of the history that doesn't have it yet doesn't take it away, and Home Assistant's own row replaces it when an answer brings it. A state the same as the row before it is no row (an attribute's time is its entity's last update, whatever changed)
+- The state in force at a request's start is dropped only where it repeats the row before it: it was dropped wherever the time before it was loaded
+- A change between the request of an entity's history and the card's first look at the states wasn't seen as a change: the states are now looked at when the request is sent
+- An empty answer of the history (an entity's first rows not written yet) was taken for where its history begins, never asked before it again: only a first row tells it now
+
+### Fixed — statistics compiled late
+- An hour's statistics Home Assistant compiled more than 10 minutes after its end were asked again only once the next hour was compiled. The last period compiled, missing, is now asked again at each refresh until it comes
+- Tests (`features`): a change written 6 s late — a timeline, a line, an attribute — drawn at once at its time, kept by the next answer, replaced by Home Assistant's row when its time is asked again; two changes before either is written; a state set before the page opened; an entity the recorder doesn't keep; nothing changing, no request more; a change before the card's first look at the states; an empty history; an hour's statistics compiled 15 minutes late. The tests' mock now follows Home Assistant: an entity's state in its history from its `last_changed` — a series through the entity's state when the page opens —, its recorder writing late (`commitInterval`); the tests that copied its formulas (`colors`, `pen`) read it from the mock, and `points` looks for a tooltip standing beside its point
+
 ## [v1.2.74] - 2026-11-13
 
 ### Fixed — a graph on the screen

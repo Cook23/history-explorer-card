@@ -69,16 +69,16 @@ module.exports = async function()
         const cols = Array.isArray(d.fill) ? [...new Set(d.fill)].sort().join() : null;
         return cols === '#0000ff,red' && d.legend.fill === d.fill[d.fill.length - 1] ? true : JSON.stringify({ cols, legend: d.legend });
     });
-    // (the mocked sensor.clim_mode: hot, cold, off, in turn every 2 h)
-    const mode = x => ['hot', 'cold', 'off'][Math.floor(x / 7200e3) % 3];
+    // (the mocked sensor.clim_mode: hot, cold, off, in turn every 2 h — its state at time x, as the mock gives it)
+    const modes = steps => t.E(`${JSON.stringify(( steps ?? [] ).map(s => s.x))}.map(x => valueAt('sensor.clim_mode', x / 1000))`);
     await t.step('thresholds on the value of an entity (its states): each point colored by the state then', async () => {
-        const d = await ds(6); const want = { hot: 'red', cold: 'blue', off: 'grey' };
-        const ok = d.steps && d.steps.every(s => s.borderColor === want[mode(s.x)]);
+        const d = await ds(6), m = await modes(d.steps); const want = { hot: 'red', cold: 'blue', off: 'grey' };
+        const ok = d.steps && d.steps.every((s, k) => s.borderColor === want[m[k]]);
         return d.steps && colorsOf(d) === 'blue,grey,red' && ok ? true : JSON.stringify(d.steps);
     });
     await t.step('thresholds on the value of an entity, a state not listed and no default: a color of the palette', async () => {
         const d = await ds(7);
-        const off = d.steps && d.steps.filter(s => mode(s.x) === 'off').map(s => s.borderColor);
+        const m = await modes(d.steps), off = d.steps && d.steps.filter((s, k) => m[k] === 'off').map(s => s.borderColor);
         return off && off.length && off.every(c => c !== 'red' && c !== 'blue') ? true : JSON.stringify(d.steps);
     });
     await t.step('the entity holding the color changes: the curve takes the new color from then on', async () => {
