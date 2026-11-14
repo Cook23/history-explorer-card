@@ -23,6 +23,14 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
   case and leave the user to find it later.
 - A special case found in the existing code: report it to the user as such, before anything
   else.
+- An exception agreed is written here, with the user's reason, and commented in the code
+  where it applies, with the same reason. The ones agreed:
+  - **A curve's options are copied onto it when it's added, and kept when it's moved to
+    another graph — except the graph's properties: `yAxis`, `showState`, `showStats`,
+    `showStateFor`, `showStatsFor`**, resolved from the graph when drawn (`card-config.js`
+    `resolveYAxis`, `card-values.js` `_resolveShow`). The user's reason: they are properties
+    of the graph, not of the curve — its axes, and what's shown over it (`showStateFor:
+    first` names the graph's first curve); a curve moved to another graph takes that graph's.
 
 ## Persistence — what is kept where, and why — set by the user, not negotiable
 
@@ -208,13 +216,13 @@ it each time. So:
   isolated, each with a name saying what it does. Never for its size alone: the one
   question is "is it more readable factored out?".
 - **a parameter's default** (`ARCHITECTURE.md` rule 9 — said by the user again and again):
-  what a parameter (a YAML option, a setting) takes when it isn't given. Every one is written
-  once, all in the same place: the table of its family — `OPTION_DEFAULTS`,
-  `GESTURE_SETTINGS`, the default colors (`history-default-colors.js`) —, never where the
-  parameter is read or used (no `?? 'auto'`, no `?? '#0000001f'`). Only two things are not
-  concerned: what is the result of a computation (the line mode from the type, `circular`
-  from the unit, `hour24` from the language), and a module's fallback — there only to protect
-  that module's inputs, never used in practice. Words: a **parameter** is an input (an
+  what a parameter (a YAML option mostly, a setting) takes when it isn't given. The
+  obligation: every one is written once, all in the same place, the table of its family —
+  `OPTION_DEFAULTS`, `GESTURE_SETTINGS`, the default colors (`history-default-colors.js`).
+  So, logically, it isn't found again where the parameter is read or used. Not concerned:
+  what is the result of a computation (the line mode from the type, `circular` from the
+  unit, `hour24` from the language, an entity's icon from its device class), and a module's
+  fallback — there only to protect that module's inputs (`scale ?? 1`). Words: a **parameter** is an input (an
   option, a setting); a **variable** is what the code computes or holds — never mix them.
   Never "value" ("valeur") on its own, in a discussion with the user above all: nobody knows
   what it is. Name it — a parameter, its default, a variable, a sensor's state.
@@ -540,7 +548,9 @@ values, with an EMA of their square for σ. An interval longer than `mean + 3σ 
 in the EMA, not as its real length.
 
 Differences (keep them in mind before calling the two "identical"):
-- **Seed.** The card has the whole history, so it starts the EMA from the median of the
+- **Seed.** The card has the history it has loaded at once — every value it knows of the
+  entity, never only the days the window touches (decided by the user: the limits may change
+  as the cache fills, never with the window) —, so it starts the EMA from the median of the
   intervals, with σ from their median absolute deviation × 1.4826. lowpass_dt runs online
   and starts from the first interval, with σ = 0. README_Full.md says so ("the rules of the
   lowpass_dt integration", the card starting from the median, lowpass_dt from the first

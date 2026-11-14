@@ -125,7 +125,7 @@ module.exports = async function()
     const boxes = (R = 'el') => `(()=>{ const q=s=>${R}.querySelector(s).getBoundingClientRect().toJSON();
         return { m:q('#et_0'), i:q('#et_0_interp'), s:q('#et_0_interp_sub'), vw:innerWidth, vh:innerHeight }; })()`;
     const inView = b => b.left >= 0 && b.top >= 0 && b.right <= b.vw + 0.5 && b.bottom <= b.vh + 0.5;
-    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityCurveMenu(0, 'sensor.power', g, { from: 'label', clientX: ${x}, clientY: ${y} }); I.showTypeSubmenu(0, 'interp'); })()`;
+    const openAt = (x, y) => `(()=>{ const I=el.instance; const g=I.graphs[0]; I.showEntityCurveMenu(0, 'sensor.power', g, { from: 'label', clientX: ${x}, clientY: ${y} }); I.showCurveSubmenu(0, 'interp'); })()`;
 
     // ── Position ──
     t = await openCard(card(LINE), { height: 700 });

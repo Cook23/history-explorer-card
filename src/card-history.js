@@ -8,7 +8,7 @@ import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_E
 import { HORIZON } from "./card-yscale.js";
 import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
-import { appendAll } from "./history-arrays.js";
+import { appendAll, minOf, maxOf } from "./history-arrays.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period)
@@ -176,6 +176,10 @@ const CACHE_MAX_ROWS = 500000;
 // How late Home Assistant may be with a period's statistics: it compiles them once the
 // period has ended (within seconds — room left for it being slow)
 const STATS_LAG = 10 * 60e3;
+// The longest Home Assistant's recorder may take to write a state in the history: well above
+// its commit_interval (5 s by default) — an empty history for a time ended earlier than that
+// before it was asked tells there is none, never one not written yet
+const RECORDER_WRITE_MAX_MS = 3600e3;
 
 export class CardHistory
 {
@@ -341,7 +345,7 @@ export class CardHistory
     _sourceIn(S)
     {
         if( !this.statistics.enabled ) return 'history';
-        const _px = Math.max(0, ...this.graphs.map(g => g.chart.hecPlotWidth()));
+        const _px = Math.max(0, maxOf(this.graphs.map(g => g.chart.hecPlotWidth())));
         const _column = moment(this.endTime).diff(moment(this.startTime)) / ( _px || 1000 );
         for( let k = S.length - 1; k >= 1; k-- ) if( _column >= S[k].ms ) return S[k].kind;
         return this.statistics.force && S[1] ? S[1].kind : 'history';
@@ -505,6 +509,14 @@ export class CardHistory
         this.generateGraphDataFromCache(moved ? REDRAW_CAUSES.moved : REDRAW_CAUSES.window);
     }
 
+    // The graphs resized: their curves worked out again when the plot's width changed by
+    // PX_HYSTERESIS or more since they were drawn whole — a point a column of pixels (see
+    // card-datasets.js _lineSamples): narrower, more values in a column; wider, fewer
+    plotWidthChanged()
+    {
+        if( this._drawnWhole && !this._withinAColumn() ) this.generateGraphDataFromCache(REDRAW_CAUSES.resized);
+    }
+
     // Whether the window is still, to a column of pixels, the one the graphs were last drawn
     // whole for (_drawnWhole): the same length, the same graphs as wide, its start moved less
     // than a column since — its answers drawing their own graphs meanwhile
@@ -536,7 +548,7 @@ export class CardHistory
     // pixels' time (ms)
     _geometry()
     {
-        const r = msOf(this.endTime) - msOf(this.startTime), px = Math.max(0, ...this.graphs.map(g => g.chart.hecPlotWidth())) || 1000;
+        const r = msOf(this.endTime) - msOf(this.startTime), px = Math.max(0, maxOf(this.graphs.map(g => g.chart.hecPlotWidth()))) || 1000;
         return { r, px, column: r / px };
     }
 
@@ -869,6 +881,50 @@ export class CardHistory
         const l = this._live?.get(id) ?? [], _in = x => x.last_changed >= a && x.last_changed < b;
         if( l.some(_in) ) this._live.set(id, l.filter(x => !_in(x)));
         return l.filter(_in);
+    }
+
+    // Is series id shown as a curve in smart mode — its silences worked out on all the cache
+    // knows of it (knownHistory)?
+    _inSmartMode(id)
+    {
+        return this.graphs.some(g => g.entities.some(e => e.entity === id && ( e.lineMode || this.pconfig.defaultLineMode ) === 'smart'));
+    }
+
+    // The values of series id's history the cache knows, in order — every one recorded, or
+    // given by Home Assistant (live); not the state in force repeated at a request's start
+    // (b) —: { t, state, afterGap: the time since the one before not all known — not loaded
+    // between them (a time after the last answer, pushed by Home Assistant since: known, see
+    // addLiveState) }
+    knownHistory(id)
+    {
+        // (the times known, joined across the days)
+        const cov = [];
+        for( const s of this.cache ) for( const [p, q] of s.cover.hist.get(id) ?? [] ) {
+            const l = cov[cov.length - 1];
+            if( l && p <= l[1] ) l[1] = Math.max(l[1], q); else cov.push([p, q]);
+        }
+        const _known = cov.length ? cov[cov.length - 1][1] : -Infinity;
+        const out = [];
+        let c = 0, prev = null;
+        for( const s of this.cache ) for( const x of s.hist.get(id) ?? [] ) {
+            if( x.b ) continue;
+            const t = msOf(x.last_changed);
+            if( prev !== null ) while( c < cov.length && cov[c][1] < prev ) c++;
+            const _r = prev !== null && c < cov.length && cov[c][0] <= prev ? cov[c] : null;
+            out.push({ t, state: x.state, afterGap: prev !== null && !( _r && _r[1] >= Math.min(t, _known) ) });
+            prev = t;
+        }
+        return out;
+    }
+
+    // Is entity id's history from a to b (ms) in the cache, all of it, without a number — no
+    // state in force then that is one (unavailable, unknown…)?
+    _withoutNumber(id, a, b)
+    {
+        if( this._lacking('hist', id, a, b, false).length ) return false;
+        const i = this._slotAt(a), _rows = this.cache.slice(i, this._slotAt(b - 1) + 1).flatMap(s => s.hist.get(id) ?? []);
+        const _start = _rows.filter(x => msOf(x.last_changed) <= a).pop() ?? this._lastRowBefore('hist', id, i);
+        return [_start, ..._rows.filter(x => msOf(x.last_changed) > a && msOf(x.last_changed) < b)].every(x => !x || x.state === '' || x.state === null || isNaN(Number(x.state)));
     }
 
     // The last row of entity id's layer before slot i, from the slots before it as far back as
@@ -1355,7 +1411,7 @@ export class CardHistory
         try {
             // (within a phase and a block: those of the graphs on the screen first —
             // see shownSeries —, then in the graphs' order)
-            const _at = Math.min(...ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
+            const _at = minOf(ids.map(id => { const k = this.historyEntityIds().indexOf(id); return k < 0 ? 499 : Math.min(k, 499); }));
             const _s = this.shownSeries(), _off = ids.some(id => _s.has(id)) ? 0 : 500;
             const _o = { order: q.background ? Infinity : ( o.phase ?? 9 ) * 1e6 + ( o.rank ?? 0 ) * 1000 + _off + _at, stale: () => !this._serves(q),
                          info: { phase: o.phase ?? null, background: q.background } };
@@ -1393,19 +1449,24 @@ export class CardHistory
             if( !error ) for( const id of q.ids ) {
                 const a = result?.[id] ?? [];
                 // (an entity's history — its state at the start included, see historyRequest —
-                // beginning well after the start: Home Assistant keeps none before — the
-                // recorder's retention, the entity created later —, never asked there again;
-                // empty, it tells nothing of where it begins: its first rows may not be written
-                // yet — the recorder writes them every commit_interval)
+                // beginning well after the start, or empty: Home Assistant keeps none before —
+                // the recorder's retention, the entity created later —, never asked there again.
+                // Empty, only for a time ended RECORDER_WRITE_MAX_MS before it was asked: near
+                // then, its first rows may not be written yet — the recorder writes them every
+                // commit_interval)
                 // (an attribute: where its entity's history begins — historyCall's entityFirst)
                 const _attr = seriesOf(id).attribute, _lu = _attr ? result?.entityFirst?.[id] : a[0]?.lu;
-                if( q.kind === 'history' && _lu != null ) {
-                    const _from = _lu * 1000;
-                    if( _from > q.b0 + 60e3 && _from > ( this._histFrom?.get(id) ?? -Infinity ) ) ( this._histFrom ??= new Map() ).set(id, _from);
+                if( q.kind === 'history' && ( !_attr || result?.entityFirst && id in result.entityFirst ) ) {
+                    const _from = _lu != null ? _lu * 1000 : q.b1 <= q.at - RECORDER_WRITE_MAX_MS ? q.b1 : null;
+                    if( _from !== null && _from > q.b0 + 60e3 && _from > ( this._histFrom?.get(id) ?? -Infinity ) ) ( this._histFrom ??= new Map() ).set(id, _from);
                 }
                 const _period = periodMs(periodOfKind(q.kind, this.statistics.period));
                 const rows = q.kind === 'history' ? a.map(x => ({ last_changed: x.lu * 1000, state: x.s })) : a.map(x => this._statisticsRow(x, _period));
                 const _layer = LAYER[q.kind];
+                // (the latest period of statistics Home Assistant was seen to have compiled, by
+                // layer — any entity's: it compiles a period for all of them at once, the
+                // periods in order — see _forgetToday)
+                if( q.kind !== 'history' && rows.length ) ( this._compiledUntil ??= new Map() ).set(_layer, Math.max(this._compiledUntil.get(_layer) ?? -Infinity, msOf(rows[rows.length - 1].last_changed)));
                 let p = 0;
                 for( let i = this._slotAt(q.b0), i1 = this._slotAt(q.b1 - 1); i <= i1; i++ ) {
                     const s = this.cache[i];
@@ -1426,8 +1487,13 @@ export class CardHistory
         } finally {
             this.state.loading = this._loading();
             // (an answer for the time outside the window shown changes nothing shown: not drawn
-            // again, a hover, a tooltip left as they are; the next drawing takes it)
-            if( q.gen === this._loadGen && this._inWindow(q.b0, q.b1) ) this._drawSoon(q.ids);
+            // again, a hover, a tooltip left as they are; the next drawing takes it — but the
+            // history of a curve in smart mode: its silences are worked out on all the cache
+            // knows of it, see card-datasets.js knownHistory — drawn again, those curves' graphs)
+            if( q.gen === this._loadGen ) {
+                if( this._inWindow(q.b0, q.b1) ) this._drawSoon(q.ids);
+                else if( q.kind === 'history' ) { const _smart = Array.from(q.ids).filter(id => this._inSmartMode(id)); if( _smart.length ) this._drawSoon(_smart); }
+            }
         }
     }
 
@@ -1575,6 +1641,7 @@ export class CardHistory
         this._requests = [];
         this._flying = new Map();
         this._histFrom = new Map();
+        this._compiledUntil = new Map();
         this.state.loading = false;
         this.cache.length = 0;
         // (from nothing: the page's cache of this card is this one, emptied — never one another
@@ -1602,8 +1669,13 @@ export class CardHistory
         // (the last period compiled when they were asked — the one ended before _compiled's —
         // if it's in slot s and not among its rows — Home Assistant later with it than
         // STATS_LAG —: its start, asked again from there at each refresh until it comes; else null)
+        // Never one that won't come: Home Assistant compiles a period for every entity at once,
+        // and none for an entity without a valid number in it — compiled for another entity
+        // since, or this one's history there without a number: no row for it
         const _missing = (s, l, id, at) => { const p = _period[l], k = _compiled(at, p), t = _unit[p] ? moment(k).subtract(1, p).valueOf() : ( k - 1 ) * periodMs(p);
-            return t >= s.a && t < s.b && !( s[l].get(id) ?? [] ).some(x => msOf(x.last_changed) === t) ? t : null; };
+            if( t < s.a || t >= s.b || ( s[l].get(id) ?? [] ).some(x => msOf(x.last_changed) === t) ) return null;
+            if( ( this._compiledUntil?.get(l) ?? -Infinity ) >= t ) return null;
+            return this._withoutNumber(id, t, _unit[p] ? moment(t).add(1, p).valueOf() : t + periodMs(p)) ? null : t; };
         for( const s of this.cache ) {
             const _end = msOf(s.end);
             // (every source's cover cut at the time it was asked, where something may have come
@@ -1614,7 +1686,7 @@ export class CardHistory
                 if( at < _end && ( !_period[l] || _compiled(_now, _period[l]) > _compiled(at, _period[l]) ) ) _cuts.push(at);
                 const _t = _period[l] ? _missing(s, l, id, at) : null;
                 if( _t !== null ) _cuts.push(_t);
-                const _at = Math.min(..._cuts);
+                const _at = minOf(_cuts);
                 if( _cuts.length ) s.cover[l].set(id, ( s.cover[l].get(id) ?? [] ).map(([p, q]) => [p, Math.min(q, _at)]).filter(([p, q]) => q > p));
             }
         }
@@ -1653,7 +1725,7 @@ export class CardHistory
         // keeps none of t0 to t1: a request planned before it was known asks no more than that)
         const _ask = (l, series, attributes) => l.length
             ? this._askHA(() => {
-                const _from = Math.max(msOf(t0), Math.min(...series.map(id => this._histFrom?.get(id) ?? -Infinity)));
+                const _from = Math.max(msOf(t0), minOf(series.map(id => this._histFrom?.get(id) ?? -Infinity)));
                 if( t1 !== null && _from >= msOf(t1) ) return null;
                 return { ...this.historyRequest(l, moment(_from), t1, attributes), ...( attributes ? { significant_changes_only: false } : {} ) };
             }, o)

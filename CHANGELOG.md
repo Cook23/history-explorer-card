@@ -4,6 +4,35 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.76] - 2026-11-14
+
+### Fixed — a value drawn as its column's mean, held until the next point (#293)
+- A curve with more values than columns of pixels is drawn one point a column: the mean of its values. A column holding a value and the one after it (30 for 2 minutes, then 0), the next ones without a value of their own, the curve went from that mean straight to the next point drawn — held at 21.96 for over an hour where the sensor was at 0. The next column, without a value of its own, now has the value in force: the curve at 0 until the next value, as an aggregated group's
+- The card made narrower or wider kept the columns of its former width until the next move or refresh: a change of the plot's width of 1 % or more now works the curves out again
+- Tests (`features`): the issue's values, a plot of 514 px over a day — in lines and stepped mode, the column's mean then 0; the card made narrower — the columns worked out again
+
+### Fixed — the smart line mode's silences, the same whatever the window
+- The silences were worked out on the values of the days the window touched: a window across midnight brought the day before into the sensor's usual interval, one starting at midnight didn't — the same values drawn with or without a plateau over the same time (#293). They're now worked out on every value of the history the card knows of the entity, never across a time it hasn't loaded: the same limits whatever the window, refined only as the card loads more. The state in force repeated at a request's start (at midnight, for a day) is no value of the sensor: never counted
+- Tests (`smart`): the same values, a window of 12 hours from midnight and one across it — the same plateaus
+
+### Fixed — requests that couldn't bring anything
+- A window entirely older than the history Home Assistant keeps asked its history again at each move (since 1.2.75: an empty answer no longer told where the history begins). An empty answer tells it again for a time ended an hour before it was asked — nearer, an entity's first rows may not be written yet by the recorder
+- The last period of statistics compiled, missing, was asked again at each refresh until it came — for ever for an entity without a valid number in it (offline: Home Assistant compiles no row for it). It's no longer asked once Home Assistant was seen to compile that period for another entity, or once the entity's own history shows no number there
+- Tests (`features`): a block of history empty 5 days back — nothing before it lacking any more; an entity made 10 minutes ago — its first value there; an entity offline for 2 hours, another with its statistics — its last hour not asked again; an entity unavailable for 3 hours, alone — the same
+
+### Fixed — an entity giving a curve its color
+- Its state Home Assistant hadn't written yet wasn't drawn (1.2.75 did it for the curves only): it's now looked at as the curves' entities — a row of its history at its time, the curve's color changing at once
+- Tests (`features`): the color's entity changed, written 6 s late — the curve colored by its new state at once
+
+### Fixed — an entity missing from the states at loading
+- An entity outside Home Assistant's registry, its integration not loaded yet when the card loads, has no state: what `entityOptions` gives it by its device class couldn't be worked out, which counted as the YAML speaking — a choice made on the card for that option was lost. Its YAML image as saved is kept: only what could be worked out is compared
+- Tests (`persistence`): `entityOptions` by device class, a line mode chosen on the card, the entity missing at a reload, then back — the choice kept
+
+### Internal
+- `alignHeader`'s default in `OPTION_DEFAULTS`, with the other options'
+- An array never spread into a call — `push`, `unshift`, `splice`, `Math.min`, `Math.max` —: one way, through `history-arrays.js` (`insertAll` added), checked by the `architecture` test
+- `showCurveSubmenu`, `_CURVE_SUBMENUS`: the curve menu's last names
+
 ## [v1.2.75] - 2026-11-14
 
 ### Fixed — a change Home Assistant hadn't written yet

@@ -22,16 +22,16 @@ const draw = f => `(()=>{
     const day = i => I.cache[last - i].start_m.valueOf();
     const H = (t, v) => ({ last_changed: t, state: String(v) });
     const S = (t, v) => ({ last_changed: t, state: v, statistics: { end: t + 300e3, min: v, mean: v, max: v } });
-    // (the history with the hours its rows cover)
+    // (the history with the time it covers: its day, as an answer of Home Assistant for it — today, until now)
     for( const { layer, slot, rows } of (${f})(day, now, H, S) ) { const c = I.cache[last - slot]; c[layer].set(id, rows);
-        if( layer === 'hist' && rows.length ) c.cover.hist.set(id, [[rows[0].last_changed, Math.max(rows[rows.length - 1].last_changed + 1, layer === 'hist' && slot === 0 ? now : 0)]]); }
+        if( layer === 'hist' && rows.length ) c.cover.hist.set(id, [[c.a, slot === 0 ? now : c.b]]); }
     I.generateGraphDataFromCache();
     const d = I.graphs[0].chart.data.datasets[0].data.filter(p => p.y !== null && p.y !== undefined);
     const t = p => typeof p.x === 'number' ? p.x : Date.parse(p.x);
     return { source: I._sourceNeeded(), n: d.length,
              back: d.findIndex((p, i) => i > 0 && t(p) < t(d[i - 1])),
              plateaus: d.filter(p => p.hecPlateauEnd).length,
-             wrong: d.filter((p, i) => i > 0 && p.hecVirtual && p.y !== d[i - 1].y).map(p => p.y),
+             wrong: d.filter((p, i) => i > 0 && p.hecPlateauEnd && p.y !== d[i - 1].y).map(p => p.y),
              endPlateau: !!d[d.length - 1]?.hecPlateauEnd };
 })()`;
 // (rows every step ms from t0 to t1, each value v(t))
@@ -129,6 +129,36 @@ module.exports = async function()
         return r.day.ends.length === 1 && r.day.ends[0] === -3 && r.day.back === -1 && r.within.ends.length === 0 && r.within.back === -1 ? true : JSON.stringify(r);
     });
     done(await t.close());
+
+    // ── The silences the same whatever the window: worked out on every value the card knows of
+    // the sensor, never on the days the window touches — a window of 12 hours from midnight
+    // and one across midnight, the same plateaus (issue #293) ──
+    {
+        // (a sensor sending a value for 2 minutes, then 0: every 6 minutes the day before from
+        // 13:00 — both windows load it all, a window on each side —, every 22 minutes from
+        // midnight; Berlin time, the page at 12:00 then at 11:00)
+        const at = x => Date.parse(x + '+01:00'), rows = [];
+        for( let t = at('2026-11-13T13:00:00'); t < at('2026-11-14T00:00:00'); t += 6 * 60e3 ) rows.push([t, '20'], [t + 120e3, '0']);
+        for( let t = at('2026-11-14T00:10:00'); t < at('2026-11-14T11:00:00'); t += 22 * 60e3 ) rows.push([t, '20'], [t + 120e3, '0']);
+        const open = async now => {
+            const NOW = at(now);
+            t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '12h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.pulse', lineMode: 'smart' }] }] },
+                { mock: { states: { 'sensor.pulse': { state: 0, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.pulse': rows.filter(([x]) => x <= NOW).map(([x, v]) => [(NOW - x) / 1000, v]) } },
+                  clock: new Date(NOW).toISOString(), timezone: 'Europe/Berlin' });
+            // (until the card knows the day before from 13:00 — its window on each side, loaded in
+            // the background one request at a time —, then drawn again)
+            for( let i = 0; i < 60 && !( await t.E(`( el.instance.knownHistory('sensor.pulse')[0]?.t ?? Infinity ) <= ${at('2026-11-13T13:00:01')}`) ); i++ ) await t.wait(500);
+            await t.wait(2000);
+            // (the plateaus' ends from 01:00 to 10:30: shown in both windows)
+            return t.E(`graphAt(0).chart.data.datasets[0].data.filter(p => p.hecPlateauEnd && +new Date(p.x) >= ${at('2026-11-14T01:00:00')} && +new Date(p.x) <= ${at('2026-11-14T10:30:00')}).map(p => Math.round(+new Date(p.x) / 60e3))`);
+        };
+        const fromMidnight = await open('2026-11-14T12:00:00');
+        done(await t.close());
+        const across = await open('2026-11-14T11:00:00');
+        await t.step('the same values, a window of 12 hours from midnight and one across midnight: the same plateaus', async () =>
+            fromMidnight.length && JSON.stringify(fromMidnight) === JSON.stringify(across) ? true : JSON.stringify({ fromMidnight, across }));
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

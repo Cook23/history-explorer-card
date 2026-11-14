@@ -235,6 +235,8 @@ export class CardToolbar
             if( this._tooltipFields !== _tf ) { this._tooltipFields = _tf; this.applyTooltipModes(); }
             // (the time labels' step: as the density and the plot's width allow — setStepSize)
             this.setStepSize(true);
+            // (the curves' columns of pixels: worked out again for the new width)
+            this.plotWidthChanged();
             // (timed while the performance test records)
             perf.add('card', performance.now() - _t, { step: `resized to ${Math.round(w)} px`, card: this.cid });
         }

@@ -7,7 +7,7 @@ import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series
 import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
 import { timeWeightedMean, circularMean } from "./history-stats.js";
 import { perf } from "./card-perf.js";
-import { minOf, maxOf } from "./history-arrays.js";
+import { minOf, maxOf, insertAll } from "./history-arrays.js";
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -164,6 +164,11 @@ export class CardDatasets
         let m2 = mean * mean + sigma0 * sigma0;
         const _limit = () => Math.max(mean + 3 * Math.sqrt(Math.max(0, m2 - mean * mean)) + 100, 1000);
 
+        const tOf = p => msOf(p.x);
+        // (the values known may go past what's drawn — a window in the past —: the ongoing
+        // silence judged at the last value at or before the end drawn, by the limit then)
+        const _endT = tOf(s[s.length - 1]);
+        let _limitEnd = _limit(), _lastIn = raw[0].t <= _endT ? raw[0] : null;
         const gaps = [];
         for( let i = 1; i < raw.length; i++ ) {
             const dt = raw[i].t - raw[i - 1].t;
@@ -176,9 +181,9 @@ export class CardDatasets
             }
             mean = 0.9 * mean + 0.1 * dtStat;
             m2   = 0.9 * m2   + 0.1 * dtStat * dtStat;
+            if( raw[i].t <= _endT ) { _limitEnd = _limit(); _lastIn = raw[i]; }
         }
 
-        const tOf = p => msOf(p.x);
         const out = s.slice();
 
         // Inserts the plateau start point (the last value before the silence) right before
@@ -212,9 +217,9 @@ export class CardDatasets
         }
 
         // Ongoing silence: from the last recorded value to the extension point at the end
-        const last = raw[raw.length - 1];
+        const last = _lastIn;
         const end = out[out.length - 1];
-        if( extended && tOf(end) - last.t > _limit() ) {
+        if( extended && last && tOf(end) - last.t > _limitEnd ) {
             const kEnd = ensureStart(out.length - 1, last.t, last.y);
             out[kEnd].hecPlateauEnd = true;
         }
@@ -409,12 +414,22 @@ export class CardDatasets
             const _y = _agg.func === 'delta' || _agg.func === 'diff' ? 0 : s[s.length - 1]?.y;
             if( _y !== undefined ) s.push({ x: ( gs + Math.min(ge, Math.max(_until, gs)) ) / 2, y: _y });
         };
+        // (a column of pixels drawn as one point of several values — their mean, not the value
+        // in force after it —, the next one without values of its own: the value in force
+        // from its start — as an aggregated group's (_empty), _carried —, without it the curve
+        // would go from the mean to the next point drawn, never at the value in force between
+        // them. No value recorded there: drawing only, never shown nor hovered — hecVirtual)
+        const _afterMean = (group, gs, until) => {
+            const g = _groups.next(gs), _c = !_agg.explicit && group.length > 1 && g < until ? _carried(prev, g) : null;
+            if( _c ) s.push({ x: g, y: _c.y, hecVirtual: true });
+        };
         let group = [], gs = null, prev = null;
         for( const v of _values ) {
             const _gs = _groups.start(v.t);
             if( _gs !== gs ) {
                 if( group.length ) {
                     _flush(group, gs, _groups.next(gs));
+                    _afterMean(group, gs, _gs);
                     if( _agg.explicit ) for( let g = _groups.next(gs); g < _gs; g = _groups.next(g) ) _empty(prev, g, _groups.next(g));
                 }
                 group = [];
@@ -427,6 +442,7 @@ export class CardDatasets
         }
         if( group.length ) {
             _flush(group, gs, _groups.next(gs));
+            _afterMean(group, gs, _until);
             if( _agg.explicit ) for( let g = _groups.next(gs); g < _until; g = _groups.next(g) ) _empty(prev, g, _groups.next(g));
         }
 
@@ -439,20 +455,20 @@ export class CardDatasets
         }
 
         if( !_agg.explicit && (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
-            // Silences are detected on every value recorded (not on the columns, nor on the
-            // statistics: an hour of them is no silence) — never across statistics: two values
-            // of the history with statistics between them (a day of history next to days of
-            // statistics, the history after the statistics) are no silence, however far apart
+            // Silences are detected on every value of the history the cache knows of the entity
+            // (card-history.js knownHistory) — not on the columns, nor on the statistics (an hour of them is no
+            // silence), nor only on the days the window touches: the same limits whatever the
+            // window, changing only as the cache fills. Never across a time the cache doesn't
+            // know (not loaded — drawn from statistics, or not asked yet): no interval there
             const _raw = [];
-            let _afterStats = false;
-            for( const v of _values ) {
-                if( v.stat ) { _afterStats = true; continue; }
-                _raw.push({ t: v.t, y: v.y, afterStats: _afterStats });
-                _afterStats = false;
+            for( const x of this.knownHistory(e.entity) ) {
+                const y = _num(x.state);
+                if( !isNaN(y) ) _raw.push({ t: x.t, y, afterStats: x.afterGap });
             }
             // (an ongoing silence only after a value of the history: statistics last until
             // their end)
-            s = this._applySilencePlateaus(s, _raw, _extended && !_afterStats);
+            const _last = _values[_values.length - 1];
+            s = this._applySilencePlateaus(s, _raw, _extended && !!_last && !_last.stat);
             s = this._heldPlateaus(s, _values);
         }
 
@@ -488,7 +504,7 @@ export class CardDatasets
             const _prev = values.filter(v => v.t < g).pop();
             s = s.filter(p => p.x <= g || p.x >= _next);
             const i = s.findIndex(p => p.x > g);
-            s.splice(i < 0 ? s.length : i, 0, ...( _prev ? [{ x: g, y: _prev.y }] : [] ), { x: g, y: null });
+            insertAll(s, i < 0 ? s.length : i, _prev ? [{ x: g, y: _prev.y }, { x: g, y: null }] : [{ x: g, y: null }]);
         }
         return s;
     }

@@ -369,7 +369,7 @@ export const OPTION_DEFAULTS = {
     // (a graph's — CardConfig.applyConfig, cardGraphDefaults)
     showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
     // (a graph's header — CardConfig.graphOption)
-    showIcon: false,
+    showIcon: false, alignHeader: 'center',
     // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
     interval: 1,
     // (the card's — CardConfig.applyConfig; the info panel gives some its own, see

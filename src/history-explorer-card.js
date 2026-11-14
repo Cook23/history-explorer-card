@@ -316,12 +316,8 @@ export class HistoryCardState {
             // (the values now: in the legend — each entity's own showCurrentValues — and over the graph)
             if( g !== this._frozenChart ) this.refreshCurrentValues(g, _changed);
         }
-        // (an entity giving a shown entity its color: that curve changes too)
-        for( const id of this.colorEntityIds() ) {
-            const lc = this.stateOf(id)?.last_changed;
-            if( this.stateMap.has(id) && lc != this.stateMap.get(id) ) changed = true;
-            this.stateMap.set(id, lc);
-        }
+        // (an entity giving a shown entity its color: looked at as the others — that curve changes too)
+        for( const id of this.colorEntityIds() ) if( this._seeState(id) ) changed = true;
 
         return changed;
     }
@@ -337,12 +333,13 @@ export class HistoryCardState {
         return _changed;
     }
 
-    // The states of the shown entities a request asks, looked at when it's sent (_seeState):
-    // a change after it — one it can't bring — seen as a change
+    // The states of the shown entities a request asks — those giving a curve its color too —,
+    // looked at when it's sent (_seeState): a change after it — one it can't bring — seen as a
+    // change
     noteAskedStates(request)
     {
         const _ids = new Set(request.entity_ids ?? request.statistic_ids ?? []);
-        for( const g of this.graphs ) for( const e of g.entities ) if( _ids.has(seriesOf(e.entity).entity) ) this._seeState(e.entity);
+        for( const id of [...this.graphs.flatMap(g => g.entities.map(e => e.entity)), ...this.colorEntityIds()] ) if( _ids.has(seriesOf(id).entity) ) this._seeState(id);
     }
 
 

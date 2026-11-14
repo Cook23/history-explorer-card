@@ -507,6 +507,23 @@ module.exports = async function()
         });
         done(await t.close());
 
+        // (an entity missing from the states when the card is loaded — outside Home Assistant's
+        // registry, its integration not loaded yet —: entityOptions by its device class can't
+        // reach it; the YAML hasn't spoken for all that — a choice made on the card kept)
+        t = await openCard({ ...base, entityOptions: { volume_storage: { lineMode: 'stepped' } }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.tank' }] }] }, { mock: { series: true } });
+        await t.wait(1500);
+        await t.step('entityOptions by device class, a line mode chosen on the card, the entity missing from the states at a reload, then back: the choice kept', async () => {
+            const lm = () => t.E(`el.instance.pconfig.entities[0].lineMode`);
+            const r = { yaml: await lm() };
+            await t.E("el.instance.setCurveType(el.instance.graphs[0], 0, 'line', 'curves')"); await t.wait(800);
+            r.chosen = await lm();
+            const mockWith = async more => { await t.page.addInitScript(m => { window.MOCK = { ...window.MOCK, ...m }; }, more); await t.page.reload(); await t.wait(2500); return lm(); };
+            r.absent = await mockWith({ absent: ['sensor.tank'] });
+            r.back = await mockWith({ absent: [] });
+            return r.yaml === 'stepped' && r.chosen === 'curves' && r.back === 'curves' && !t.errors.length ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+
         // (Home Assistant's user data — another device's changes —, option by option too)
         const multi = { ...base, enable_persistence: undefined, enable_multidevice_persistence: 'entities' };
         t = await openCard({ ...multi, graphs: g() }, { mock: { series: true } });

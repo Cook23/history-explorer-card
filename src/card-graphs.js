@@ -14,7 +14,7 @@ const DEVICE_CLASS_ICONS = { humidity: 'mdi:water-percent', illuminance: 'mdi:br
     battery: 'mdi:battery', pressure: 'mdi:gauge', power: 'mdi:flash', signal_strength: 'mdi:wifi', motion: 'mdi:walk',
     door: 'mdi:door-closed', window: 'mdi:window-closed', presence: 'mdi:account', light: 'mdi:lightbulb' };
 import { baseTypePure } from "./card-config.js";
-import { appendAll } from "./history-arrays.js";
+import { appendAll, insertAll } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
 // The room above a timeline's or arrowline's rows when they fill the graph, in px (rowsTopRoom):
@@ -85,7 +85,7 @@ export class CardGraphs
         _h.textContent = '';
         _h.style.display = ( _name === undefined && !_icon ) ? 'none' : 'flex';
         if( _h.style.display === 'none' ) return;
-        const _align = o('alignHeader') ?? 'center';
+        const _align = o('alignHeader');
         Object.assign(_h.style, { alignItems: 'center', gap: '0.6em', padding: '0 10px', minWidth: '0',
             justifyContent: HEADER_ALIGNS[_align],
             fontSize: o('fontSizeHeader') ? o('fontSizeHeader') + 'px' : '' });
@@ -359,7 +359,7 @@ export class CardGraphs
         }
         this.graphs = this.graphs.filter(g => !moved.includes(g));
         const _i = this.graphs.indexOf(tgt);
-        this.graphs.splice(before ? _i : _i + 1, 0, ...moved);
+        insertAll(this.graphs, before ? _i : _i + 1, moved);
         return true;
     }
 
@@ -567,7 +567,10 @@ export class CardGraphs
     // entityOptions', the card's (options: _optionsInGraph's; the others as card-config.js
     // resolves them for entity id in group groupId), else their defaults —, by its entry's
     // fields: copied onto the entry when it's added (_applyEntityDefaults), its own from then
-    // on — a curve moved to another graph keeps them, as its color
+    // on — a curve moved to another graph keeps them, as its color. Not the graph's
+    // properties (yAxis, showState, showStats, showStateFor, showStatsFor): an exception agreed
+    // by the user (CLAUDE.md, STANDARD) — they belong to the graph, resolved from it when drawn
+    // (resolveYAxis, _resolveShow)
     _levelFields(options, id, groupId)
     {
         const o = options ?? {}, P = this.pconfig, at = { entity: id, groupId };

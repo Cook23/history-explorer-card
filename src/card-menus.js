@@ -13,6 +13,7 @@ import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs } from "./history-series.js";
+import { maxOf } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the curve menu (et_N_<index>)
@@ -42,7 +43,7 @@ const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;co
 const _SECTIONS = { rep: 'ui.menu.type_representation', appearance: 'ui.menu.type_appearance', interp: 'ui.menu.type_interpolation',
                     behavior: 'ui.menu.type_behavior' };
 // The curve menu's lines: the sections, and its exports (its curve's, its graph's)
-const _TYPE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
+const _CURVE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
@@ -100,7 +101,7 @@ function menuBoxesHtml(id, keys, minWidth, z, attrs = '')
 // the card's offers: Info, the curves' place) and the info panel's
 export function curveMenuHtml(i, full)
 {
-    return menuBoxesHtml(`et_${i}`, Object.keys(_TYPE_SUBMENUS), _CURVE_MENU_MIN_WIDTH, 2, full ? ' data-card' : '');
+    return menuBoxesHtml(`et_${i}`, Object.keys(_CURVE_SUBMENUS), _CURVE_MENU_MIN_WIDTH, 2, full ? ' data-card' : '');
 }
 
 // The options menu eo_N and its submenus
@@ -614,7 +615,7 @@ export class CardMenus
     {
         return this._menuOf(`et_${i}`, {
             index: i,
-            keys: Object.keys(_TYPE_SUBMENUS),
+            keys: Object.keys(_CURVE_SUBMENUS),
             kind: () => this._curveMenuKind(i),
             lines: () => this._typeLines(i),
             sub: path => this._typeSubmenuLines(i, path),
@@ -738,7 +739,7 @@ export class CardMenus
         if( _full && _label )
             _lines.push({ id: `et_${i}_info`, label: i18n('ui.menu.entity_info'), choose: () => { this.hideEntityCurveMenu(i); this.openEntityInfo(_e, g); } });
         // (its exports: its curve's, its graph's — as the options menu's, every curve's)
-        if( entities.length ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_TYPE_SUBMENUS.export), ['export']));
+        if( entities.length ) _lines.push(this._submenuLine(m, `et_${i}_export`, i18n(_CURVE_SUBMENUS.export), ['export']));
         return _lines;
     }
 
@@ -921,7 +922,7 @@ export class CardMenus
         // with the keyboard, so that Escape, or the focus leaving it, closes it)
         const _menu = this._this.querySelector(`#et_${input_idx}`);
         if( _menu?.dataset.cramped ) { _menu.focus(); return; }
-        if( !this.showTypeSubmenu(input_idx, this._submenuToOpen(this._curveMenuKind(input_idx), def)) ) this.showTypeSubmenu(input_idx, def);
+        if( !this.showCurveSubmenu(input_idx, this._submenuToOpen(this._curveMenuKind(input_idx), def)) ) this.showCurveSubmenu(input_idx, def);
     }
 
     // A graph's name at the top of its menu: its title, else the start of its curves' names
@@ -949,7 +950,7 @@ export class CardMenus
     }
 
     // Opens the curve menu's submenu key (see _openSubmenu) → whether the menu has it
-    showTypeSubmenu(input_idx, key)
+    showCurveSubmenu(input_idx, key)
     {
         return this._openFirstSubmenu(this._curveMenu(input_idx), key);
     }
@@ -1411,12 +1412,12 @@ export class CardMenus
             const _lines = this._menuLines(menuEl);
             const _withSub = _lines.filter(a => this._submenuOf(a));
             if( !_withSub.length ) return menuEl.offsetWidth;
-            const _readable = Math.max(..._lines.map(a => this._lineTextWidth(a)));
+            const _readable = maxOf(_lines.map(a => this._lineTextWidth(a)));
             const _last = _lines[_lines.length - 1];
-            return Math.max(menuEl.offsetWidth, ..._withSub.map(a => {
+            return Math.max(menuEl.offsetWidth, maxOf(_withSub.map(a => {
                 const _sub = this._menuNeed(this._submenuOf(a), room);
                 return a === _last && _sub + _readable > room ? _sub : _sub + _readable;
-            }));
+            })));
         });
     }
 
@@ -1424,7 +1425,7 @@ export class CardMenus
     // 48 px — what a finger can still pick
     _menuStrip(menuEl)
     {
-        return Math.max(48, ...this._menuLines(menuEl).map(a => this._lineTextWidth(a, 3)));
+        return Math.max(48, maxOf(this._menuLines(menuEl).map(a => this._lineTextWidth(a, 3))));
     }
 
     // A menu's lines shown, and the submenu a line opens
