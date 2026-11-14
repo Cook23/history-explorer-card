@@ -30,7 +30,8 @@ what a drawing takes, 100 ms at least) drawn once; the graphs on the screen (the
 curves', at least in part in what the page shows) first, the others right after, one at a time when the page is free — after a gesture,
 never during it. What the cache already has is used, unless
 phase 0 makes it invalid. The history is never asked before where Home Assistant was seen to
-keep none for an entity (an answer empty, or beginning well after its start: the recorder's
+keep none for an entity (an answer beginning well after its start, or empty for a time ended
+an hour before it was asked — nearer, its first rows may not be written yet: the recorder's
 retention, the entity created later) — an attribute, told by its entity's history.
 
 - **Phase 0 — probes,** once a session per entity with statistics, all of them in one request,

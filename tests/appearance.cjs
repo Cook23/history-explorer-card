@@ -81,14 +81,14 @@ module.exports = async function()
         return !a ? true : a;
     });
     await t.step('the graph\'s menu: Appearance without Color, for every curve; Width 3 px: both curves', async () => {
-        await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showTypeSubmenu(0, 'appearance'); })()`); await t.wait(200);
+        await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showCurveSubmenu(0, 'appearance'); })()`); await t.wait(200);
         const l = await lines(t); await line(t, 3); await t.wait(150);
         await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='3 px').click()`); await t.wait(800);
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1);
         return l === 'Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' && a.width === 3 && b.width === 3 ? true : JSON.stringify({ l, a, b });
     });
     await t.step('the graph\'s menu: Y axis locked, a switch — on: the axis locked, the menu open half a second', async () => {
-        await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showTypeSubmenu(0, 'behavior'); })()`); await t.wait(200);
+        await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showCurveSubmenu(0, 'behavior'); })()`); await t.wait(200);
         const s0 = await t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
         await t.E(`el.querySelector('#et_0_ylock').click()`); await t.wait(150);
         const r = { s0, s1: await t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`), open: await menuOpen(t), locked: await t.E('!!graphAt(0).chart._hecYAxisLock') };

@@ -143,8 +143,8 @@ const RULES = [
       files: ['deps/chart-hec.js'], re: /\b(?:options|opts|_t|tickOpts)\.\w+(?:\.\w+)*\s*=(?!=)/g },
     { id: 'no-business-in-chart', why: "Chart.js never knows what an entity, Home Assistant, the store or the card's texts are",
       files: ['deps/chart-hec.js', 'deps/timeline.js'], re: /\b(entity|entities|entity_id|hass|pconfig|store|i18n|statistics?)\b/gi },
-    { id: 'no-spread-push', why: "an array is never spread into push or unshift: a browser takes a limited number of arguments (some 100 000 in Chrome) — past it, 'Maximum call stack size exceeded'; history-arrays.js appendAll appends any number",
-      files: [...CARD, 'deps/chart-hec.js'], re: /\.(?:push|unshift)\(\s*\.\.\./g },
+    { id: 'no-spread-push', why: "an array is never spread into a call — push, unshift, splice, Math.min, Math.max: a browser takes a limited number of arguments (some 100 000 in Chrome) — past it, 'Maximum call stack size exceeded'; one way, whatever the list's size: history-arrays.js appendAll, insertAll, minOf, maxOf",
+      files: [...CARD, 'deps/chart-hec.js'], re: /\.(?:push|unshift)\(\s*\.\.\.|\.splice\([^()]*,\s*\.\.\.|Math\.(?:min|max)\([^()]*?\.\.\./g },
     { id: 'pure-data', why: 'these parts are data only: no DOM, no style, no event',
       files: ['src/history-arrays.js', 'src/history-entity-store.js', 'src/legend-names.js', 'src/history-units.js', 'src/history-options.js', 'src/history-series.js', 'src/history-stats.js', 'src/card-values.js', 'src/ha-requests.js'],
       re: /\bdocument\b|getComputedStyle|querySelector|addEventListener|\.style\b|innerHTML|getBoundingClientRect|\bChart\b/g },
@@ -188,7 +188,7 @@ const RULES = [
       re: new RegExp('\\b(?:resolveOption|graphOption)\\([^()]*\\)\\s*(?:\\?\\?|[!=]==\\s*(?:true|false)\\b)'
           + '|\\.(?:' + DEFAULTED.join('|') + ')\\s*(?:\\?\\?\\s*(?:true|false|-?\\d|[\'"`])|[!=]==\\s*(?:true|false)\\b)'
           + '|\\bpconfig\\.\\w+\\s*\\?\\?\\s*(?:true|false|-?\\d|[\'"`])', 'g') },
-    { id: 'defaults-in-family', why: "a parameter's default is written once, in the table of its family — the options' in history-options.js OPTION_DEFAULTS, the colors' in history-default-colors.js (uiColors: UI_COLOR_DEFAULTS), the gestures' in gesture-settings.js — never where the parameter is read or used, card-config.js included (CLAUDE.md, ARCHITECTURE.md rule 9)",
+    { id: 'defaults-in-family', why: "a parameter's default is written once, in the table of its family — the options' in history-options.js OPTION_DEFAULTS, the colors' in history-default-colors.js (uiColors: UI_COLOR_DEFAULTS), the gestures' in gesture-settings.js —, so it isn't found again where the parameter is read or used, card-config.js included; a computation's result and a module's fallback are not concerned (CLAUDE.md, ARCHITECTURE.md rule 9)",
       files: CARD.filter(f => !['src/history-options.js', 'src/history-default-colors.js', 'src/gesture-settings.js'].includes(f)),
       re: /\buiColors\??\.\w+\s*\?\?\s*(?:\(|['"`#])|\bpconfig\.\w+\s*\?\?\s*(?:true|false|-?\d|['"`{])/g },
     { id: 'option-defaults-once', why: "the card's constructor gives no option a value of its own: applyConfig (card-config.js) sets them, with their defaults",

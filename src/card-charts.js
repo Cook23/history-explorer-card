@@ -12,7 +12,7 @@ import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
 import { chooseYAxis, rangeIndex } from "./card-yscale.js";
 import { msOf, seriesOf } from "./history-series.js";
 import { REDRAW_CAUSES } from "./card-perf.js";
-import { appendAll } from "./history-arrays.js";
+import { appendAll, minOf, maxOf } from "./history-arrays.js";
 
 // (a graph's canvas watched each fiftieth of it that comes on the screen or goes — see _watchShown)
 const SHOWN_THRESHOLDS = Array.from({ length: 51 }, (_, k) => k / 50);
@@ -474,7 +474,7 @@ export class CardCharts
         const _index = rangeIndex([...curves.values()].map(a => a.filter(_ok)));
         const rangeOf = (t0, t1) => {
             const r = _index(t0, t1);
-            return r && _keep.length ? { lo: Math.min(r.lo, ..._keep), hi: Math.max(r.hi, ..._keep) } : r;
+            return r && _keep.length ? { lo: Math.min(r.lo, minOf(_keep)), hi: Math.max(r.hi, maxOf(_keep)) } : r;
         };
         // (the axes chosen, by graph — its id and its curves, each with what changes its values
         // drawn (scale, valueFactor, SI conversion, process, stateMap): the same graph built

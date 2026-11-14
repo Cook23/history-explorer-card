@@ -16,6 +16,8 @@
 //   statsLag    seconds after an hour's end before its statistics exist (600)
 //   noStatistics entities without long-term statistics (whatever their state_class)
 //   statsFrom   { id: days }: an entity's statistics only for its last days (a unit changed)
+//   statsUntil  { id: hours }: an entity's statistics stopping that many hours ago (no valid
+//               number since: offline)
 //   json        the history and statistics answered as Home Assistant's websocket does: a
 //               JSON text parsed by the page
 //   cost        { base, history, statistics, workers }: Home Assistant answering the history and
@@ -34,6 +36,8 @@
 //               in the history only then; none: at once
 //   setBefore   { id: [seconds before the page opened, state] }: a state set then (as setState —
 //               written by the recorder commitInterval later)
+//   absent      entities missing from the states (an entity outside Home Assistant's registry,
+//               its integration not loaded yet: no state at all)
 //   notRecorded entities Home Assistant's recorder doesn't keep: no history at all
 //   system      Home Assistant tells what it runs on (system health, hardware), as to an
 //               administrator: a Raspberry Pi 5, Home Assistant OS, MariaDB — else nothing
@@ -199,8 +203,10 @@ function statistics(d){
     const sc=STATES[e]?.attributes.state_class;
     // (MOCK.statsFrom: an entity's statistics only for its last days — its unit just changed)
     const from=MOCK.statsFrom?.[e]!==undefined ? Date.now()-MOCK.statsFrom[e]*86400e3 : -Infinity;
+    // (MOCK.statsUntil: an entity's statistics stopping that many hours ago — no valid number since)
+    const until=MOCK.statsUntil?.[e]!==undefined ? Date.now()-MOCK.statsUntil[e]*3600e3 : Infinity;
     if(!sc||!isNum(e)||(MOCK.noStatistics||[]).includes(e)) continue;
-    const pts=[]; for(let t=Math.ceil(Math.max(t0, from)/P)*P; t+P<=t1; t+=P){
+    const pts=[]; for(let t=Math.ceil(Math.max(t0, from)/P)*P; t+P<=Math.min(t1, until); t+=P){
       if(sc==='measurement' && MOCK.fastStats){ const m=base(e)*(1+0.5*Math.sin((t+P/2)/3600e3)); pts.push({start:t,end:t+P,mean:m,min:m*0.9,max:m*1.1}); continue; }
       if(sc==='measurement'){
         // (as Home Assistant compiles them — sensor/recorder.py: the history's states over
@@ -229,7 +235,7 @@ const mockConnection={ subscribeMessage:(cb,msg)=>{
   return Promise.resolve(()=>{}); } };
 function mkHass(){ return {
   connection: mockConnection,
-  states:{...Object.fromEntries(Object.keys(STATES).map(id=>[id, inSeries(id) ? seriesState(id) : STATES[id]])), ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
+  states:{...Object.fromEntries(Object.keys(STATES).filter(id=>!(MOCK.absent||[]).includes(id)).map(id=>[id, inSeries(id) ? seriesState(id) : STATES[id]])), ...(MOCK.extraStates||{})}, config:{version:'2026.11.0', unit_system:{temperature:'°C', length:'km'}}, language:MOCK.language||'en', locale:{language:MOCK.language||'en'},
   themes:{darkMode:!!MOCK.dark}, selectedTheme:null,
   // (no translation: an empty string, as Home Assistant gives for a key it doesn't know)
   user:{id:'u1',name:'u'}, localize:()=>'',

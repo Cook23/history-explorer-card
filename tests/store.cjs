@@ -1,10 +1,7 @@
 // The entity store (src/history-entity-store.js) on its own — no browser
-const fs = require('fs');
-const path = require('path');
 
-// The module is ESM with no imports: loaded as is
-const load = () => import('data:text/javascript;base64,' +
-    Buffer.from(fs.readFileSync(path.join(__dirname, '../src/history-entity-store.js'))).toString('base64'));
+// The module is ESM: loaded by its path, its imports (history-arrays.js) with it
+const load = () => import('../src/history-entity-store.js');
 
 module.exports = async function()
 {

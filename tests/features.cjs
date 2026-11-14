@@ -1775,6 +1775,46 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── A column of pixels drawn as the mean of its values (issue #293): the value in force
+    // after it drawn in the next column, however long it lasts — never the mean held until the
+    // next point; and the columns worked out again when the plot's width changes ──
+    {
+        // (the issue's values, Berlin time, the page at 12:00 on 14 Nov: 30 for 2 min, then 0
+        // for 80 — in a plot of 514 px over a day, a column of 168 s holds the 30 and the 0)
+        const at = x => Date.parse(x + '+01:00'), NOW = at('2026-11-14T12:00:00');
+        const V = [['2026-11-13T23:51:40', 10], ['2026-11-13T23:53:43', 0], ['2026-11-13T23:59:52', 1], ['2026-11-14T00:01:55', 0], ['2026-11-14T01:03:26', 30], ['2026-11-14T01:05:29', 0],
+                   ['2026-11-14T02:27:31', 30], ['2026-11-14T02:29:35', 0], ['2026-11-14T02:41:53', 30], ['2026-11-14T02:43:56', 0]];
+        const mock = { states: { 'sensor.pulse': { state: 0, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.pulse': [[30 * 3600, '0'], ...V.map(([x, v]) => [(NOW - at(x)) / 1000, String(v)])] } };
+        // (the card that wide from the page's start: its style put in as soon as the page has a
+        // head — none yet when the page starts)
+        const width = w => `document.addEventListener('readystatechange', () => { if( document.getElementById('hec-test-width') || !document.head ) return;
+            const st = document.createElement('style'); st.id = 'hec-test-width'; st.textContent = 'body, #host { width: ${w}px !important; }'; document.head.appendChild(st); }, true);`;
+        // (the points from 00:55 to 02:50: their time, their value)
+        const pts = `graphAt(0).chart.data.datasets[0].data.filter(p => p.y !== null && +new Date(p.x) >= ${at('2026-11-14T00:55:00')} && +new Date(p.x) <= ${at('2026-11-14T02:50:00')}).map(p => [+new Date(p.x), Math.round(p.y * 100) / 100])`;
+        // (the mean of 01:02:47–01:05:35, then 0 drawn before the column of 02:27)
+        const zeroAfterMean = r => r.some(([, y]) => y > 20 && y < 25) && r.some(([x, y]) => y === 0 && x > at('2026-11-14T01:05:35') && x < at('2026-11-14T02:20:00'));
+        for( const mode of ['lines', 'stepped'] ) {
+            t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.pulse', lineMode: mode }] }] }),
+                { mock, clock: new Date(NOW).toISOString(), timezone: 'Europe/Berlin', init: width(608) });
+            await t.wait(3000);
+            await t.step(`${mode}: a column holding 30 for 2 min, then 0 (a plot of 514 px over a day): its mean, then 0 in the next column — never the mean held until the next point`, async () => {
+                const r = { pw: await t.E('graphAt(0).chart.hecPlotWidth()'), pts: await t.E(pts) };
+                return r.pw === 514 && zeroAfterMean(r.pts) ? true : JSON.stringify(r);
+            });
+            done(await t.close());
+        }
+        t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.pulse', lineMode: 'lines' }] }] }),
+            { mock, clock: new Date(NOW).toISOString(), timezone: 'Europe/Berlin' });
+        await t.wait(3000);
+        const before = await t.E(pts);
+        await t.E(`(()=>{ document.body.style.width = '608px'; document.getElementById('host').style.width = '608px'; })()`); await t.wait(2000);
+        await t.step('the card narrower (a plot of 906 px, then 514): the columns worked out again — the 30 and the 0 in one, its mean, then 0', async () => {
+            const r = { before, after: await t.E(pts) };
+            return !before.some(([, y]) => y > 20 && y < 25) && zeroAfterMean(r.after) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
     // ── Home Assistant's recorder writing late (its commit_interval): a state pushed is a row of
     // the history at its time (last_changed), known before the recorder writes it — drawn at
     // once, at its time; an answer of the history without it (not written yet) doesn't take it
@@ -1812,6 +1852,18 @@ module.exports = async function()
         });
         done(await t.close());
     }
+    // (an entity giving a curve its color, its state written late: the same — the color the
+    // state gives drawn at once)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.late', color: { entity: 'sensor.mode', hot: 'red', cold: 'blue' } }] }] }),
+        { mock: _lateMock({ states: { 'sensor.late': { state: 100, unit: 'W', state_class: 'measurement' }, 'sensor.mode': { state: 'hot' } }, rows: { 'sensor.late': [[30 * 3600, '100']], 'sensor.mode': [[30 * 3600, 'hot']] } }) });
+    await t.wait(3000);
+    await t.E(`setState('sensor.mode', 'cold')`); await t.wait(3500);
+    await t.step('an entity giving a curve its color, its state written 6 s late: the curve colored by the new state at once', async () => {
+        // (the color it ends with: its last step's — a single color, the curve's)
+        const r = await t.E(`(()=>{ const d = graphAt(0).chart.data.datasets[0], s = d.colorSteps ?? []; return s.length ? s[s.length - 1].borderColor : d.borderColor; })()`);
+        return r === 'blue' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
     // (two states pushed before the recorder writes either — 100, 250, then 100 again —: each a row)
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.late' }] }] }), { mock: _lateMock() });
     await t.wait(3000);
@@ -1875,9 +1927,51 @@ module.exports = async function()
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.new' }] }] }),
         { mock: { commitInterval: 6, states: { 'sensor.new': { state: 7, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.new': [] }, setBefore: { 'sensor.new': [3, '7'] } } });
     await t.wait(1000);
-    await t.step('an empty history (an entity\'s first rows not written yet): never taken for where its history begins — no part of it left out of the next requests', async () => {
-        const r = await t.E(`({ from: el.instance._histFrom?.get('sensor.new') ?? null, asked: __ws.filter(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.new')).length })`);
-        return r.from === null && r.asked > 0 ? true : JSON.stringify(r);
+    await t.step('an empty history (an entity\'s first rows not written yet): never taken for where its history begins — no part of it left out of the next requests: what\'s told of where it begins (an empty block ended an hour before it was asked) never after its first row', async () => {
+        const r = await t.E(`({ from: el.instance._histFrom?.get('sensor.new') ?? null, first: Date.parse(el.instance._hass.states['sensor.new'].last_changed), asked: __ws.filter(w => w.type === 'history/history_during_period' && w.ids.includes('sensor.new')).length })`);
+        return ( r.from === null || r.from <= r.first ) && r.asked > 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (the last hour's statistics that won't come — no valid number in it —: not asked again
+    // once Home Assistant was seen to compile it for another entity, or the entity's own history
+    // there shows no number)
+    for( const [what, graphs, mock, id] of [
+        ['two entities, one offline 2 hours: its hour compiled for the other', [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }],
+            { series: true, statsUntil: { 'sensor.power2': 2 } }, 'sensor.power2'],
+        ['one entity, unavailable for 3 hours: its history there without a number', [{ type: 'line', entities: [{ entity: 'sensor.off' }] }, { type: 'timeline', entities: [{ entity: 'binary_sensor.a' }] }],
+            { states: { 'sensor.off': { state: 5, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.off': [[30 * 3600, '5'], [3 * 3600, 'unavailable']] } }, 'sensor.off']] ) {
+        const d = new Date(); d.setUTCHours(10, 20, 0, 0);
+        t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs }), { mock, clock: d.toISOString() });
+        await t.wait(3000);
+        const n0 = await t.E('__ws.length');
+        for( const v of ['1', '2', '3'] ) { await t.E(`setState('binary_sensor.a', ${JSON.stringify(v === '2' ? 'off' : 'on')}); setState('sensor.power', '${400 + Number(v)}')`); await t.wait(3000); }
+        // (the hour missing: 9:00 — the background asking older days meanwhile, not counted)
+        const nine = d.getTime() - 80 * 60e3;
+        await t.step(`${what}: its last hour's statistics not asked again at each refresh`, async () => {
+            const r = await t.E(`__ws.slice(${n0}).filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('${id}') && Date.parse(w.start) <= ${nine} && Date.parse(w.end) > ${nine}).length`);
+            return r === 0 ? true : String(r);
+        });
+        done(await t.close());
+    }
+    // (an empty history for a time ended an hour before it was asked — past the recorder's
+    // retention —: none before that time, never asked again)
+    t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true, historyDays: 2 } });
+    await t.wait(3000);
+    await t.step('an empty history for a day ended long before it was asked (history kept 2 days, a block 5 days back): where it begins remembered — nothing before it lacking any more', async () => {
+        const r = await t.E(`(async()=>{ const I = el.instance, D = 86400e3, t1 = Date.now() - 5 * D; I._histFrom?.delete('sensor.power');
+            await I._ask('history', t1 - D, t1, ['sensor.power'], { phase: 2 });
+            return { from: I._histFrom?.get('sensor.power') ?? null, t1, lacking: I._lacking('hist', 'sensor.power', t1 - 3 * D, t1).length }; })()`);
+        return r.from === r.t1 && r.lacking === 0 ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (an entity made 10 minutes ago, a window of 3 days asked in blocks: the older days empty —
+    // nothing before them asked again —, its first rows there all the same)
+    t = await openCard(card({ defaultTimeRange: '3d', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.new' }] }] }),
+        { mock: { states: { 'sensor.new': { state: 7, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.new': [[600, '7']] } } });
+    await t.wait(3000);
+    await t.step('an entity made 10 minutes ago, a window of 3 days: its first value there, from its time', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, rows = I.cache.flatMap(s => s.hist.get('sensor.new') ?? []).filter(x => !x.live); return rows.map(x => Math.round(( Date.now() - +new Date(x.last_changed) ) / 60e3)); })()`);
+        return r.length && r.some(m => m >= 9 && m <= 11) ? true : JSON.stringify(r);
     });
     done(await t.close());
     // (the hourly statistics compiled later than the card expects — STATS_LAG, 10 min —: at

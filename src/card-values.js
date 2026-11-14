@@ -36,7 +36,10 @@ function curveStats(samples, t0, t1, P = 0)
 export class CardValues
 {
     // Entity e's showState / showStats: its own, else its graph's, else entityOptions', else
-    // the card's — resolved when shown, never copied onto the entity
+    // the card's — resolved when shown, never copied onto the entity: an exception agreed by
+    // the user to the rule that a curve's options are its own (CLAUDE.md, STANDARD) — what's
+    // shown over a graph is a property of the graph, not of the curve (showStateFor: first
+    // names the graph's first curve): a curve moved to another graph takes that graph's
     _resolveShow(e, key)
     {
         return e?.[key] ?? this.pconfig.graphs[e?.groupId]?.[key] ?? this.getEntityOptions(e?.entity)?.[key] ?? this.pconfig.cardShow[key];

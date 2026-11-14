@@ -1,6 +1,8 @@
 // Units and numbers: SI prefixes (m, k, M) — which units can share one Y axis, and the
 // prefix a graph's axis is shown in — and a value as the card writes it.
 
+import { maxOf } from "./history-arrays.js";
+
 // A number as the card writes it (legend, tooltip, values over a graph, selector): with
 // exactly `rounding` decimals (20.0); rounding not set, with at most 2 (20)
 export function formatNumber(v, rounding)
@@ -38,7 +40,7 @@ export function chooseSIUnit(unitsWithMax) {
     if( !unitsWithMax.length ) return { unit: '', factor: 1 };
     const base = getSIFactor(unitsWithMax[0].unit).base;
     // Compute global max in base unit
-    const globalMaxBase = Math.max(...unitsWithMax.map(u => Math.abs(u.maxVal) * getSIFactor(u.unit).factor));
+    const globalMaxBase = maxOf(unitsWithMax.map(u => Math.abs(u.maxVal) * getSIFactor(u.unit).factor));
     if( !isFinite(globalMaxBase) || globalMaxBase === 0 ) return { unit: unitsWithMax[0].unit, factor: 1 / getSIFactor(unitsWithMax[0].unit).factor };
     // Pick prefix that gives value between 1 and 999
     let bestPrefix = '', bestFactor = 1;

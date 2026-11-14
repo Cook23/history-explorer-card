@@ -298,8 +298,10 @@ export class CardConfig
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
     // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
-    // Resolved when drawn, never copied onto the entity — the graph's axes: a curve moved to
-    // another graph takes that graph's.
+    // Resolved when drawn, never copied onto the entity: an exception agreed by the user to
+    // the rule that a curve's options are its own (CLAUDE.md, STANDARD) — the axes are a
+    // property of the graph, not of the curve: a curve moved to another graph takes that
+    // graph's.
     resolveYAxis(e)
     {
         return e?.yAxis ?? this.pconfig.graphs[e?.groupId]?.yAxis ?? this.getEntityOptions(e?.entity)?.yAxis

@@ -141,9 +141,9 @@ show it, and the conductor starts the card and wires the parts together.
    when they have to differ before and after the persistence (what is read and saved, what
    is applied): the options' in `history-options.js` `OPTION_DEFAULTS` (rule 8), the
    gesture settings' in `gesture-settings.js` `GESTURE_SETTINGS`, the default colors in
-   `history-default-colors.js`. Nowhere else a value standing for a business default: no
-   `?? 65`, no `!== undefined ? … : 360` where the value is read or used — the code reads
-   the one place that holds it. Two exceptions:
+   `history-default-colors.js`. That's the obligation; so, logically, a business default
+   isn't found again where the parameter is read or used (no `?? 65`, no
+   `!== undefined ? … : 360`): the code reads the one place that holds it. Not concerned:
    - **a value computed from business circumstances** — the line mode taken from the type,
      `circular` detected from the unit, `hour24` from the language, a curve's color from
      the palette: no default, it is worked out where it's used (rule 8);

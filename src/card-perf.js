@@ -11,6 +11,7 @@ export const REDRAW_CAUSES = {
     answers: 'answers from Home Assistant',
     moved: 'the window moved',
     window: 'the window or its settings changed',
+    resized: 'the plot area\'s width changed',
     shown: 'a graph come on the screen',
     later: 'a graph off the screen, drawn after those on the screen',
     test: 'the test',

@@ -17,6 +17,8 @@
 // Pure data: it knows nothing about graphs, charts, the DOM or Home Assistant. The graphs
 // on screen are built from it by the card.
 
+import { insertAll, maxOf } from "./history-arrays.js";
+
 // An entry is a plain string or an object with an .entity field
 export function entityIdOf(e)
 {
@@ -205,7 +207,7 @@ export class EntityStore
         const first = this.list.findIndex(mine);
         const rest = this.list.filter(e => !mine(e));
         const ordered = entities.map(en => entries.find(e => keyOf(e) === keyOf(en)) || { entity: en.entity, copy: en.copy, groupId, color: en.color, fill: en.fill });
-        rest.splice(first < 0 ? rest.length : first, 0, ...ordered);
+        insertAll(rest, first < 0 ? rest.length : first, ordered);
         this.list = rest;
     }
 
@@ -240,7 +242,7 @@ export class EntityStore
             rest.forEach((e, k) => { if( isObj(e) && targetKeys.has(keyOf(e)) ) last = k; });
             at = last < 0 ? rest.length : last + 1;
         }
-        rest.splice(at < 0 ? rest.length : at, 0, ...moved);
+        insertAll(rest, at < 0 ? rest.length : at, moved);
         this.list = rest;
     }
 
@@ -255,7 +257,7 @@ export class EntityStore
     // The next free dynamic group id: above every id in use, 1000 at least
     setNextGroupId()
     {
-        this.nextGroupId = Math.max(1000, Math.max(0, ...this.list.map(e => e.groupId ?? 0)) + 1);
+        this.nextGroupId = Math.max(1000, Math.max(0, maxOf(this.list.map(e => e.groupId ?? 0))) + 1);
     }
 }
 
@@ -277,7 +279,7 @@ export function repairedGroupIds(list, typeOf)
     if( list.some(e => dyn(e) && grouped(e) && e.groupId < 1000) )
         list = list.map(e => ( dyn(e) && grouped(e) && e.groupId < 1000 ) ? { ...e, groupId: e.groupId + 1000 } : e);
 
-    const next = () => Math.max(1000, ...list.map(e => e.groupId ?? 0)) + 1;
+    const next = () => Math.max(1000, maxOf(list.map(e => e.groupId ?? 0))) + 1;
 
     // Dynamic entities without a group (left by a duplicate-entry bug fixed in 1.1.43):
     // one new group per graph, graphs told apart by their saved graphIndex

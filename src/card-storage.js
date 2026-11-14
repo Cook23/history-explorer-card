@@ -480,9 +480,12 @@ export class CardStorage
         // YAML says, uncontaminated by whichever fields HA/local ended up winning below: a
         // field overridden once by HA/local baked into the image would mask every later YAML
         // edit of that field
-        const _yamlSeen = _yamlEntities.map(e => this.yamlEntryOf(e));
-        this._yamlSeenEntities = JSON.parse(JSON.stringify(_yamlSeen));
+        // (an entity missing from Home Assistant's states — its integration not loaded yet —:
+        // what the YAML says of it by its device class can't be worked out; its image as
+        // saved — only what could be worked out is compared: the YAML hasn't spoken for that)
         const _yamlMirror   = _yamlImage?.yaml_entities ?? [];
+        const _yamlSeen = _yamlEntities.map(e => this.stateOf(e.entity) ? this.yamlEntryOf(e) : _yamlMirror.find(m => keyOf(m) === keyOf(e)) ?? this.yamlEntryOf(e));
+        this._yamlSeenEntities = JSON.parse(JSON.stringify(_yamlSeen));
         const _haMirror     = _read(_ls?.ha_entities);
         const _ids = (list, isStatic) => list.filter(e => !!e.isStatic === isStatic).map(keyOf);
 
