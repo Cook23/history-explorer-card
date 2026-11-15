@@ -24,28 +24,33 @@ module.exports = async function()
     const closeMenu = async t => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700); };
 
     let t = await openCard(card(), { height: 900 });
-    await t.step('a curve\'s menu: Appearance after Display; its lines — Color ▸, Points and Extremes (switches, off), Fill, Width, Line style', async () => {
+    await t.step('a curve\'s menu: Appearance after Display; its lines — Color ▸, Points ▸, Extremes ▸, Fill ▸, Width ▸, Line style ▸', async () => {
         await curveMenu(t, 0, 0);
         const m = await t.E(`[...el.querySelectorAll('#et_0 > a')].filter(a=>a.style.display!=='none').map(a=>a.textContent).join(' | ')`);
         const l = await lines(t); await closeMenu(t);
-        return m.startsWith('Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸') && l === 'Color ▸ | Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' ? true : `${m} / ${l}`;
+        return m.startsWith('Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸') && l === 'Color ▸ | Points ▸ | Extremes ▸ | Fill ▸ | Width ▸ | Line style ▸' ? true : `${m} / ${l}`;
     });
-    await t.step('Points, its switch clicked with the mouse (its line focused, then rebuilt): the curve\'s dots shown, the switch on, the menu still open 0.4 s later, then closed; again: hidden', async () => {
-        await curveMenu(t, 0, 0);
-        const p = await t.E(`(()=>{ const r=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[1].querySelector('[data-switch]').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
+    await t.step('Points ▸: its list (Hovered in bold); All chosen with the mouse: the curve\'s dots shown, the menu still open 0.4 s later, then closed; All then in bold; Hovered: hidden', async () => {
+        await curveMenu(t, 0, 0); await line(t, 1); await t.wait(150);
+        const l0 = await lines(t);
+        const p = await t.E(`(()=>{ const r=[...el.querySelectorAll('#et_0_appearance_points_sub a')].find(a=>a.textContent==='All').getBoundingClientRect(); return { x: r.left+r.width/2, y: r.top+r.height/2 }; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(400);
-        const r = { l: await lines(t), open: await menuOpen(t), dots: (await ds(t, 0, 0)).r };
+        const r = { l0, open: await menuOpen(t), dots: (await ds(t, 0, 0)).r };
         await t.wait(700); r.later = await menuOpen(t);
-        await curveMenu(t, 0, 0); await line(t, 1); await t.wait(800); r.off = (await ds(t, 0, 0)).r;
-        return r.l.includes('Points (on)') && r.open && r.dots > 0 && !r.later && r.off === 0 ? true : JSON.stringify(r);
+        await curveMenu(t, 0, 0); await line(t, 1); await t.wait(150); r.l1 = await lines(t);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_points_sub a')].find(a=>a.textContent==='Hovered').click()`); await t.wait(1000); r.off = (await ds(t, 0, 0)).r;
+        await closeMenu(t);
+        return r.l0 === 'None | Hovered* | All' && r.l1 === 'None | Hovered | All*' && r.open && r.dots > 0 && !r.later && r.off === 0 ? true : JSON.stringify(r);
     });
-    await t.step('Extremes: the switch moved at once, as the click ends — the graph built again only then —; the min/max band on, saved; the other curve as it was', async () => {
-        await curveMenu(t, 0, 0);
-        const now = await t.E(`(()=>{ const a=el.querySelector('#et_0_appearance_sub').querySelectorAll('a')[2]; a.click(); return [a.getAttribute('aria-checked'), graphAt(0).entities[0].showMinMax ?? null]; })()`);
-        await t.wait(150);
-        const l = await lines(t); await t.wait(800);
+    await t.step('Extremes ▸: its list (None in bold); Maximum chosen: the band drawn, saved as max, the other curve as it was; Maximum then in bold', async () => {
+        await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150);
+        const l0 = await lines(t);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_minmax_sub a')].find(a=>a.textContent==='Maximum').click()`); await t.wait(1000);
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1), saved = await t.E('graphAt(0).entities[0].showMinMax');
-        return now[0] === 'true' && now[1] !== true && l.includes('Extremes (on)') && a.minmax === true && !b.minmax && saved === true ? true : JSON.stringify({ now, l, a, b, saved });
+        await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150);
+        const l1 = await lines(t); await closeMenu(t);
+        return l0 === 'None* | Both sides | Maximum | Minimum | Statistics | History' && l1 === 'None | Both sides | Maximum* | Minimum | Statistics | History'
+            && a.minmax === true && !b.minmax && saved === 'max' ? true : JSON.stringify({ l0, l1, a, b, saved });
     });
     await t.step('Fill ▸: its list in a submenu over Appearance (the palette\'s fill: Solid in bold); Fade chosen: the curve fading out; Escape closes it, back to Appearance', async () => {
         await curveMenu(t, 0, 0); await line(t, 3); await t.wait(150);
@@ -85,7 +90,7 @@ module.exports = async function()
         const l = await lines(t); await line(t, 3); await t.wait(150);
         await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='3 px').click()`); await t.wait(800);
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1);
-        return l === 'Points (off) | Extremes (off) | Fill ▸ | Width ▸ | Line style ▸' && a.width === 3 && b.width === 3 ? true : JSON.stringify({ l, a, b });
+        return l === 'Points ▸ | Extremes ▸ | Fill ▸ | Width ▸ | Line style ▸' && a.width === 3 && b.width === 3 ? true : JSON.stringify({ l, a, b });
     });
     await t.step('the graph\'s menu: Y axis locked, a switch — on: the axis locked, the menu open half a second', async () => {
         await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showCurveSubmenu(0, 'behavior'); })()`); await t.wait(200);
@@ -126,6 +131,21 @@ module.exports = async function()
         await t.E(`(()=>{ P.remove(); openPanel('sensor.power'); })()`); await t.wait(2500);
         const e = await t.E(`(()=>{ const d=inst().graphs[0].chart.data.datasets[0]; return { width: d.borderWidth, dash: (d.borderDash||[]).join(), fade: !!d.hecFillFade }; })()`);
         return /255,\s*0,\s*0|#ff0000/i.test(d.color) && d.width === 4 && d.dash === '5,5' && d.fade && d.minmax && d.mode === 'stepped' && e.width !== 4 && e.dash === '' && !e.fade ? true : JSON.stringify({ d, e });
+    });
+    done(await t.close());
+
+    // ── Extremes: half a band — Maximum: from the curve up to each column's max; Minimum: down
+    // to its min; Both sides: both —, chosen in the menu ──
+    t = await openCard({ ...card(), defaultTimeRange: '7d' }, { height: 900, mock: { series: true } });
+    await t.wait(1500);
+    await t.step('Extremes ▸ Maximum: the band above the curve only; Minimum: below it only; Both sides: both', async () => {
+        const pick = async v => { await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150); await t.E(`[...el.querySelectorAll('#et_0_appearance_minmax_sub a')].find(a=>a.textContent==='${v}').click()`); await t.wait(1200); };
+        const band = () => t.E(`(()=>{ const p = graphAt(0).chart.data.datasets[0].data.filter(p => p.yMax != null); return { n: p.length, below: p.filter(p => p.yMin < p.y).length, above: p.filter(p => p.yMax > p.y).length, saved: graphAt(0).entities[0].showMinMax }; })()`);
+        await pick('Maximum'); const max = await band();
+        await pick('Minimum'); const min = await band();
+        await pick('Both sides'); const all = await band();
+        return max.n > 0 && max.below === 0 && max.above > 0 && max.saved === 'max' && min.n > 0 && min.above === 0 && min.below > 0 && min.saved === 'min'
+            && all.above > 0 && all.below > 0 && all.saved === 'all' ? true : JSON.stringify({ max, min, all });
     });
     done(await t.close());
 

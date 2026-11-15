@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -53,14 +53,15 @@ const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', ylock: 'ui.menu.ylocked'
 // The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
 // on one), the one nearest the pointer, both, every one
 const _TOOLTIP_MODES = TOOLTIP_MODES.map(v => [v, 'ui.menu.tooltip_' + v]);
-// The appearance submenu: the curve's color (the browser's color picker), its points and its
-// extremes (switches), and three lists, each opened in the submenu itself, over it (← or
-// Escape: back) — its fill, its line's width, its line's style. Each line: the entry's field
+// The appearance submenu: the curve's color (the browser's color picker), and five lists,
+// each opened in the submenu itself, over it (← or Escape: back) — its points (none, the
+// hovered one, all), its extremes (its min/max band: none, where, which sides), its fill,
+// its line's width, its line's style. Each line: the entry's field
 // it sets, its name; a list's values: the value set, its name
 const _APPEARANCE = {
     color:  { label: 'ui.menu.look_color' },
-    points: { label: 'ui.menu.look_points' },
-    minmax: { field: 'showMinMax', label: 'ui.menu.look_minmax' },
+    points: { field: 'showPoints', label: 'ui.menu.look_points', values: POINTS_VALUES.map(v => [v, 'ui.menu.points_' + v]) },
+    minmax: { field: 'showMinMax', label: 'ui.menu.look_minmax', values: MIN_MAX_VALUES.map(v => [v, 'ui.menu.minmax_' + v]) },
     fill:   { field: 'fill', label: 'ui.menu.look_fill',
               values: [[false, 'ui.menu.fill_none'], [true, 'ui.menu.fill_solid'], ['fade', 'ui.menu.fill_fade']] },
     width:  { field: 'width', label: 'ui.menu.look_width', values: [1, 2, 3, 4, 5].map(w => [w, `${w} px`]) },
@@ -82,10 +83,11 @@ const _OPTIONS_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', card
 const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
                         defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
 
-// The symbols before the Export lines' names: what goes to a file (a sheet, its corner
-// folded), what goes to the clipboard (a clipboard) — in the text's color
+// The symbols before the Export lines' names: what is saved to a file (a floppy disk: its
+// shutter at the top, its label at the bottom), what goes to the clipboard (a clipboard) —
+// in the text's color
 const _LEAD = d => `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="vertical-align:-2px;margin-right:6px"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
-const _FILE_ICON = _LEAD('M6 2h8l5 5v15H6z M14 2v5h5');
+const _FILE_ICON = _LEAD('M4 3h13l4 4v14H4z M8 3v5h8V3 M7 21v-7h10v7');
 const _CLIPBOARD_ICON = _LEAD('M9 4H6v18h12V4h-3 M9 2h6v4H9z');
 
 // Wide enough for the curve menu's names with a submenu open beside them, over the menu
@@ -1008,8 +1010,10 @@ export class CardMenus
         return Object.keys(_APPEARANCE).filter(k => k === 'color' ? _one : _curves);
     }
 
-    // Curve e's value of appearance list key — its fill: none (false), its color, light (true),
-    // fading out ('fade'); its width; its style ('solid' when it has none)
+    // Curve e's value of appearance list key — its points (POINTS_VALUES); its extremes
+    // (MIN_MAX_VALUES, none: false); its
+    // fill: none (false), its color, light (true), fading out ('fade'); its width; its style
+    // ('solid' when it has none)
     _lookValue(e, key)
     {
         if( key === 'fill' ) {
@@ -1018,12 +1022,13 @@ export class CardMenus
             return !( _c.valid && _c.alpha() === 0 );
         }
         if( key === 'width' ) return e.width;
+        if( key === 'minmax' ) return minMaxValue(e.showMinMax) ?? false;
+        if( key === 'points' ) return this.resolveOption(e, 'showPoints');
         return this.resolveOption(e, 'dashMode');
     }
 
     // The appearance submenu (list null): the color (▸: it opens the browser's picker), the
-    // points and the extremes (switches: on when all the menu's curves show them), the fill,
-    // the width and the style lists (▸, each a submenu over it) — or one list's values, the
+    // points, the extremes, the fill, the width and the style lists (▸, each a submenu over it) — or one list's values, the
     // one all the curves have in bold; a choice applied at once, saved (see setCurvesLook)
     _appearanceItems(m, level)
     {
@@ -1040,14 +1045,6 @@ export class CardMenus
         return this._appearanceLines(m).map(k => {
             const _label = i18n(_APPEARANCE[k].label);
             if( k === 'color' ) return { label: _label + ' ▸', choose: () => this._pickCurveColor(m.index) };
-            if( k === 'points' ) {
-                const _on = _byGraph.every(({ g, curves }) => !!this.curvesShowPoints(g, curves));
-                return { label: _label, on: _on, final: true, choose: () => { for( const { g, curves } of _byGraph ) this.setCurvePoints(g, curves, !_on); _chosen(); } };
-            }
-            if( k === 'minmax' ) {
-                const _on = _curves.every(({ e }) => !!e.showMinMax);
-                return { label: _label, on: _on, final: true, choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesLook(g, curves, 'showMinMax', !_on); _chosen(); } };
-            }
             return this._submenuLine(m, `${m.prefix}_appearance_${k}`, _label, ['appearance', k]);
         });
     }

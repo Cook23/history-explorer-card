@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.78] - 2026-11-15
+
+### Added — half a min/max band: `showMinMax: max`, `min`
+- `showMinMax: max` draws only the half of the band above the curve — from the curve to each column's max —, `min` only the half below it, everywhere, as `all` does both. `all` is the value's own name (`true` and `both` its other names, `history` still `states`'s): the YAML export writes it so
+- *Appearance ▸ Extremes* is a list (*None*, *Both sides*, *Maximum*, *Minimum*, *Statistics*, *History*) instead of a switch: the switch knew only on and off — a curve in `statistics` or `history`, switched off then on, became `true`
+- Tests (`appearance`, `features`): the list, the value in bold, saved; Maximum, Minimum, Both sides — the band's sides drawn; `true` and `both` read and exported as `all`, `states` as `history`
+
+### Added — `sizePoints`, the points' diameter; *Points* a list
+- `sizePoints`: a curve's dots' diameter, in px, at every level — the points shown, Alt's, the hovered one's guide; the tooltip's 2 px more. By default the line width + 2 px, as before. `showPoints` only says which points are shown: `hover`, `true`, `false` (a number, its former radius, is accepted: `true` with `sizePoints` twice it)
+- A width chosen in *Width ▸*: a `sizePoints` the YAML sets becomes the larger of it and the width + 2 px — never a dot hidden by its line; back to the YAML's for a thinner one; synced across devices as the width is
+- *Appearance ▸ Points* is a list (*None*, *Hovered*, *All*) instead of a switch: the switch wrote `true` or `hover` only — a YAML `showPoints: false` or a radius was lost after off and on. The long-press shows all the points, back to the hovered one when all are shown; *None* only from the list
+- Tests (`points`, `appearance`, `menus`): the list, the one chosen in bold; `sizePoints` — the dots, the tooltip's, Alt's; `showPoints: 4`; Width 5 px then 1 px over a YAML `sizePoints: 4`; the long-press
+
+### Fixed — a unit named "unknown"; the default type
+- A `unit_of_measurement` of `unknown`, in any case (an integration giving no unit so — #293), is no unit: none shown, none on the Y axis, none compared with others'
+- An entity shown as a timeline when nothing sets its type only with no state class, no unit and a state that isn't a number (a state telling nothing — `unavailable`, `unknown` —: no state class and no unit enough). A number without unit nor state class (a count) is a curve. The same rule for an entity added from the card and a YAML entity without a `type`
+- Tests (`features`): `Unknown` — no unit; the types of a number, a text, an unavailable state with or without a unit or a state class
+
+### Changed
+- The armed close button's circle as wide as the handle's six dots' diagonal (12.5 px, 8 before: ×1.57), its cross with it
+- The file exports' icon (*History*, *Statistics*): a floppy disk
+- Tests (`features`): the armed circle as wide as the handle's diagonal
+
 ## [v1.2.77] - 2026-11-15
 
 ### Added — Export ▸ YAML

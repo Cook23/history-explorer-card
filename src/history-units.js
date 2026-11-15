@@ -11,6 +11,15 @@ export function formatNumber(v, rounding)
     return String(Math.round(v * 100) / 100);
 }
 
+// The unit of an entity's state (state: Home Assistant's, or an attribute's made as one):
+// its unit_of_measurement — "unknown", in any case, none: no unit is named so (an
+// integration's way of giving none)
+export function unitOfState(state)
+{
+    const u = state?.attributes?.unit_of_measurement;
+    return typeof u === 'string' && u.trim().toLowerCase() === 'unknown' ? undefined : u;
+}
+
 // --------------------------------------------------------------------------------------
 // SI prefix helpers
 // --------------------------------------------------------------------------------------

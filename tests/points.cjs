@@ -1,8 +1,9 @@
 // A gesture on a curve — the nearest one, picked as a label is: a click or a tap puts it in the
-// tooltip mode (several curves can be), a long-press (a right click) shows or hides its
-// samples' dots, as the Points switch of the Appearance submenu of its menu or of its
-// graph's; every dot shown by default of a diameter of the line width + 2 px (Alt's too), the
-// hovered one 2 px wider
+// tooltip mode (several curves can be), a long-press (a right click) shows all its samples'
+// dots — back to the hovered one when it shows them all —, as the Points list of the
+// Appearance submenu of its menu or of its graph's (None, Hovered, All); every dot of a
+// diameter of sizePoints — by default the line width + 2 px — (Alt's too), the hovered one
+// 2 px wider
 const { openCard } = require('./lib.cjs');
 
 // (the tooltip of the curves selected — a click on one —, on this large screen too: what most
@@ -94,22 +95,25 @@ module.exports = async function()
         await t.longPress(await beside(t, 0)); const d = await dots(t, 0); const menu = await menuOpen(t);
         return d.r === 0 && !menu ? true : JSON.stringify({ d, menu });
     });
-    // (the Points switch of the open menu's Appearance submenu: its line, its state)
-    const pointsLine = `[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Points')`;
-    await t.step('Appearance ▸ Points, a switch, in a curve\'s menu: on, the dots shown; again, off, hidden', async () => {
+    // (a value of the Points list of the open menu's Appearance submenu chosen; the list's lines, * in bold)
+    const pointsList = async v => {
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Points ▸').click()`); await t.wait(200);
+        const l = await t.E(`[...el.querySelectorAll('#et_0_appearance_points_sub a')].map(a=>a.textContent+(a.style.fontWeight==='bold'?'*':'')).join(' | ')`);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_points_sub a')].find(a=>a.textContent==='${v}').click()`); await t.wait(1000);
+        return l;
+    };
+    await t.step('Appearance ▸ Points ▸, in a curve\'s menu: All, the dots shown; Hovered, hidden — the one chosen in bold', async () => {
         const open = async () => { await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300); };
-        await open(); const s1 = await t.E(`${pointsLine}.getAttribute('aria-checked')`);
-        await t.E(`${pointsLine}.click()`); await t.wait(800); const on = await dots(t, 0);
-        await open(); const s2 = await t.E(`${pointsLine}.getAttribute('aria-checked')`);
-        await t.E(`${pointsLine}.click()`); await t.wait(800); const off = await dots(t, 0);
-        return s1 === 'false' && s2 === 'true' && shown(on) && off.r === 0 ? true : JSON.stringify({ s1, s2, on, off });
+        await open(); const l1 = await pointsList('All'); const on = await dots(t, 0);
+        await open(); const l2 = await pointsList('Hovered'); const off = await dots(t, 0);
+        return l1 === 'None | Hovered* | All' && l2 === 'None | Hovered | All*' && shown(on) && on.saved === true && off.r === 0 && off.saved === 'hover' ? true : JSON.stringify({ l1, l2, on, off });
     });
-    await t.step('Appearance ▸ Points, in a graph\'s menu: every curve of the graph', async () => {
+    await t.step('Appearance ▸ Points ▸ All, in a graph\'s menu: every curve of the graph', async () => {
         await t.longPress(await t.E('moPt(1)'));
         await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300);
-        await t.E(`${pointsLine}.click()`); await t.wait(800);
+        await pointsList('All');
         const a = await dots(t, 1, 0), b = await dots(t, 1, 1);
-        return shown(a) && shown(b) && a.saved && b.saved ? true : JSON.stringify({ a, b });
+        return shown(a) && shown(b) && a.saved === true && b.saved === true ? true : JSON.stringify({ a, b });
     });
     // The tooltip of graph gi: its text, else null
     const tip = gi => t.E(`(()=>{ const el=graphAt(${gi}).chart.tooltip._hecHoverTooltipEl; return el && el.isConnected && getComputedStyle(el).display!=='none' && getComputedStyle(el).opacity!=='0' ? el.textContent : null; })()`);
@@ -297,14 +301,46 @@ module.exports = async function()
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: sp }] }] });
     t = await openCard(yamlCard(true), { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
-    await t.step('showPoints: true in the YAML, hidden by a long-press: still hidden after a reload; the YAML changed (showPoints: 4): shown, radius 4', async () => {
+    await t.step('showPoints: true in the YAML, hidden by a long-press: still hidden after a reload; the YAML changed (showPoints: false): none, not even the hovered one', async () => {
         const p = await valuePt(0, 3); await t.longPress(p);
         const hidden = (await dots(t, 0)).r;
         await t.page.reload(); await t.wait(3500); const reloaded = (await dots(t, 0)).r;
         const name = await t.E('window.CFG.cardName');
-        await t.page.addInitScript(c => { window.CFG = c; }, { ...yamlCard(4), cardName: name });
-        await t.page.reload(); await t.wait(3500); const yaml = (await dots(t, 0)).r;
-        return hidden === 0 && reloaded === 0 && yaml === 4 ? true : JSON.stringify({ hidden, reloaded, yaml });
+        await t.page.addInitScript(c => { window.CFG = c; }, { ...yamlCard(false), cardName: name });
+        await t.page.reload(); await t.wait(3500); const yaml = await dots(t, 0);
+        return hidden === 0 && reloaded === 0 && yaml.r === 0 && yaml.hover === 0 ? true : JSON.stringify({ hidden, reloaded, yaml });
+    });
+    done(await t.close());
+
+    // ── sizePoints: the dots' diameter — every dot of the curve that size, the tooltip's 2 px
+    // wider; showPoints: 4 (a radius, its former form): All, a diameter of 8; the Width menu
+    // raising a sizePoints smaller than its default for the width chosen; the long-press: All,
+    // back to Hovered when All — None only from the menu ──
+    t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
+        graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: true, sizePoints: 8 }, { entity: 'sensor.rain', showPoints: 4 }] },
+                 { type: 'line', entities: [{ entity: 'sensor.power_kw', showPoints: true, sizePoints: 4 }] }] }, { mock: { series: true }, clock: CLOCK });
+    await t.wait(800);
+    const look = k => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, hover: d.pointHoverRadius, dot: d.hecDotDiameter, show: g.entities[${k}].showPoints, size: g.entities[${k}].sizePoints }; })()`);
+    await t.step('sizePoints: 8 — the dots 8 px across (radius 4), the tooltip\'s 10, Alt\'s and the hover\'s 8; showPoints: 4 — All, sizePoints 8', async () => {
+        const a = await look(0), b = await look(1);
+        return a.r === 4 && a.hover === 5 && a.dot === 8 && b.show === true && b.size === 8 && b.r === 4 ? true : JSON.stringify({ a, b });
+    });
+    await t.step('Width ▸ 5 px on a curve with sizePoints: 4 in the YAML: 7 (the width + 2 px); Width ▸ 1 px: back to the YAML\'s 4', async () => {
+        const w = async (gi, px) => { await t.longPress(await t.E(`legendPt(${gi},0)`)); await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300);
+            await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Width ▸').click()`); await t.wait(200);
+            await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='${px} px').click()`); await t.wait(1000); };
+        const lookG = (gi, k) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${gi}], d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, size: g.entities[${k}].sizePoints }; })()`);
+        const four = await lookG(1, 0);
+        await w(1, 5); const five = await lookG(1, 0);
+        await w(1, 1); const one = await lookG(1, 0);
+        return four.size === 4 && five.size === 7 && five.r === 3.5 && one.size === 4 && one.r === 2 ? true : JSON.stringify({ four, five, one });
+    });
+    await t.step('the long-press: None → All; All → Hovered (never None)', async () => {
+        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvePoints(g, [g.entities[0]], false); })()`); await t.wait(400);
+        const none = await look(0);
+        const p = await valuePt(0, 3); await t.longPress(p); const all = await look(0);
+        await t.longPress(await valuePt(0, 3)); const hover = await look(0);
+        return none.show === false && all.show === true && all.r > 0 && hover.show === 'hover' && hover.r === 0 && hover.hover > 0 ? true : JSON.stringify({ none, all, hover });
     });
     done(await t.close());
 

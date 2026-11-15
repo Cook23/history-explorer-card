@@ -11,7 +11,7 @@
 
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
-import { typesCompatible, RAW_INTERVAL, STATS_EXPORT_PERIODS } from "./history-options.js";
+import { typesCompatible, RAW_INTERVAL, STATS_EXPORT_PERIODS, allPointsShown } from "./history-options.js";
 import { fillValue } from "./history-default-colors.js";
 
 // The Y axes' locked ranges saved this long after they last changed (keepYAxisLock)
@@ -415,7 +415,8 @@ export class CardOperations
     }
 
     // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
-    // showMinMax) set to value on each, saved so — the graph rebuilt in its place. A fill:
+    // showMinMax, showPoints) set to value on each, saved so — the graph rebuilt in its place. A width:
+    // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
     // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
     // color chosen: kept as the curve's own (colorSet), its fill of its color following it
     setCurvesLook(g, entities, field, value)
@@ -427,28 +428,32 @@ export class CardOperations
                 e.colorSet = true;
             } else
                 e[field] = field === 'fill' ? fillValue(value, e.color) : value;
+            // (a width: a sizePoints the YAML sets, the larger of it and the dots' default for
+            // that width — never a dot hidden by its own line; back to the YAML's for a thinner one)
+            const _yamlSize = field === 'width' ? this.yamlOptionOf(e, 'sizePoints') : undefined;
+            if( _yamlSize !== undefined ) e.sizePoints = Math.max(_yamlSize, this.dotDiameterOf(value));
         }
         this._rebuildInPlace(g);
         this.writeLocalState();
     }
 
-    // The samples' dots of the curves among entities of graph g shown — or hidden when all
-    // of them show theirs; saved as their showPoints
+    // The samples' dots of the curves among entities of graph g all shown (showPoints: true)
+    // — back to the hovered one only (hover) when they all are (a long-press: none, false, only
+    // from the Points submenu)
     toggleCurvePoints(g, entities)
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        if( _curves.length ) this.setCurvePoints(g, _curves, !this.curvesShowPoints(g, _curves));
+        if( _curves.length ) this.setCurvePoints(g, _curves, _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
     }
 
-    // The samples' dots of the curves among entities of graph g shown (show) or hidden —
-    // back to the hovered dot only, see _pointRadii —, saved as their showPoints
+    // The samples' dots of the curves among entities of graph g as show says (POINTS_VALUES:
+    // none, the hovered one only, all — see _pointRadii), saved as their showPoints
     setCurvePoints(g, entities, show)
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
         if( !_curves.length ) return;
-        const _show = show ? true : 'hover';
-        for( const e of _curves ) e.showPoints = _show;
-        this.showCurvePoints(g, _curves, _show);
+        for( const e of _curves ) e.showPoints = show;
+        this.showCurvePoints(g, _curves, show);
         this.writeLocalState();
     }
 

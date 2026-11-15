@@ -211,7 +211,7 @@ Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
 - **Display ▸**, **Appearance ▸** (its color aside), **Interpolation ▸**, **Behavior ▸** (*Tooltip ▸*, *Y axis locked*) — as in a graph's menu, for every curve of the card at once: the value all of them share in bold, a switch on when all of them show it; a choice in the card's menu, a graph's or a curve's applies to every curve it concerns, the last one made winning;
-- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics ▸* (their statistics, with long-term statistics on, for the period chosen in its submenu: *5 min*, *Hour*, *Day*, *Week*, *Month* — see [Exporting data as CSV](#exporting-data-as-csv)), each as a CSV file — a file icon before each —; *YAML ▸* (*Simplified*, *Complete*: the card's YAML, copied to the clipboard — a clipboard icon before it —, see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml));
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics ▸* (their statistics, with long-term statistics on, for the period chosen in its submenu: *5 min*, *Hour*, *Day*, *Week*, *Month* — see [Exporting data as CSV](#exporting-data-as-csv)), each as a CSV file — a floppy disk icon before each —; *YAML ▸* (*Simplified*, *Complete*: the card's YAML, copied to the clipboard — a clipboard icon before it —, see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml));
 - **Card ▸** — *Default graphs ▸*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display ▸*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu over *Card ▸*, right-aligned on it (*Confirm* / *Cancel*, Cancel marked: Enter changes nothing; Cancel, ← or Escape close it). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
 - **Global ▸** — what applies to every card of every dashboard, on every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red) — see `defaultInfoPanel` —, and the [gesture settings](#gesture-settings), entered right in the submenu.
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; *Performance* measures what the card costs on this device, with its entities and your Home Assistant — first what they run on (Home Assistant's version, its installation, its hardware, its memory, its disk and its database — an administrator's account tells it —; this device's model, system, processor, memory, graphics and screen; the browser or the Home Assistant app), each statistics probe's verdict with what it found (when, the values of the entity's last hour, its intervals under 4 minutes, the shortest), the card as it is (its graphs — those on the screen told —, its points, which statistics are valid), its graphs drawn again (the card's work — the rows read from the cache, the points worked out — and Chart.js's, graph by graph), the window loaded again from nothing (each request: its phase, its source, the time it asks, its entities — how many on the screen — and values, how long it waited and Home Assistant took), the window moved (*<* and *>* three times each, a drag), the real time — each time the graphs are drawn again, what had them drawn (answers from Home Assistant, the window moved, the window or its settings changed, a graph come on the screen, a graph off the screen drawn after those on it) —, when the page froze, and, on its own button, a return to the page after another app: what the card and Home Assistant's connection did until the graphs were drawn again — the card taken back, its graphs moved and shown, resized, each drawing and its cause. Its report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
@@ -297,8 +297,8 @@ The curve menu's items each open their submenu over the menu, level with it — 
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar (not a timeline's or an arrowline's row):
   - *Color ▸* — the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too;
-  - *Points* — a switch: the curve's samples' dots shown or not (`showPoints`), as a long-press near it;
-  - *Extremes* — a switch: its min/max band (`showMinMax`) everywhere, or none; on when the band is shown, partly too (`statistics`, `history`);
+  - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
+  - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *Both sides*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
   - *Fill ▸* — *None*, *Solid* (its color, light: `fill: true`), *Fade* (`fill: fade`);
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
@@ -315,7 +315,7 @@ The curve menu opens:
   - the entity's own `entityOptions` `type` / `lineMode`, when set;
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — direction arrows;
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
-  - no unit and not a measurement — timeline;
+  - no state class, no unit and a state that isn't a number — timeline (a state telling nothing, `unavailable` or `unknown`: no state class and no unit are enough) — the same rule for a YAML entity without a `type`. A `unit_of_measurement` of `unknown`, in any case, is no unit: none is named so;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
 - **On a long-press** (or a right click) of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type, the look or the layout of an entity that's already added.
 - **After *Create a second curve*** — selecting an entity (or attribute) that's already shown says so, outlines its graphs, and offers a choice under the field: *Cancel*, pre-selected (Enter, Escape or a click elsewhere cancel), or *Create a second curve* — the curve menu then opens as for a new entity, and the curve is added in a graph of its own.
@@ -1034,27 +1034,30 @@ lineWidth: 2
 
 ### Displaying individual samples
 
-Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. A long-press (or a right click) near a curve shows or hides its own, saved as its `showPoints` (hidden: `hover`); so does the *Points* switch in the *Appearance* submenu of its menu, or of its graph's. The points are as wide as the line plus 2 px; the one the tooltip shows, 2 px more:
+Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals all the individual samples making up its curves; moving without it, or leaving the graph, hides them again. A long-press (or a right click) near a curve shows all its own (`showPoints: true`) — when it shows them all, back to the hovered one only (`hover`); *None* (`false`) is chosen in the *Points ▸* list of the *Appearance* submenu of its menu, or of its graph's, with *Hovered* and *All*. The points are `sizePoints` across — by default the line width plus 2 px —; the one the tooltip shows, 2 px more:
 
 The long-press's choice and the YAML's `showPoints`: the last one to speak wins, kept on this device only, never synced across devices. When a curve's points aren't shown, hovering it (a mouse, or a pen above the screen) — or clicking, tapping it, for a pointer without hover — shows the point of its value nearest the pointer along the curve alone, a discreet guide to where the real values are (not on the tooltip's own point, drawn larger).
 
 ![A curve and its individual samples](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/samples.png)
 
-To show them permanently, use `showPoints` — on the card, in `entityOptions`, on a graph or on an entity: `true` (the line width + 2 px wide) or a radius in pixels; `hover`, the default, shows only the one hovered; `false` none, not even that one:
+To show them permanently, use `showPoints` — on the card, in `entityOptions`, on a graph or on an entity: `true` all; `hover`, the default, shows only the one hovered; `false` none, not even that one. A number is accepted too: all shown, that radius (`showPoints: 4` is `showPoints: true` with `sizePoints: 8`).
+
+Their diameter is `sizePoints`, in pixels, at the same levels — every point of the curve: shown, revealed with `Alt`, the hovered one's guide; the one the tooltip shows 2 px more. By default it's the line width + 2 px, following the width. A width chosen in the *Width ▸* menu keeps the points visible: a `sizePoints` the YAML sets becomes the larger of it and the width + 2 px:
 
 ```yaml
 type: custom:history-explorer-card
 entityOptions:
   humidity:
     showPoints: true     # always show sample dots for humidity graphs
-                         # or a number: the dot radius in pixels (showPoints: 6)
+    sizePoints: 6        # 6 px across
 graphs:
   - type: line
     options:
       showPoints: true   # show samples for this entire manually defined graph
     entities:
       - entity: sensor.outside_temperature
-        showPoints: 3     # show dots on this entity only, radius 3px
+        showPoints: true  # show dots on this entity only
+        sizePoints: 6     # 6 px across
 ```
 
 ### Showing the min/max statistical range
@@ -1063,10 +1066,12 @@ The `showMinMax` option draws a lighter band, in the curve's color, between the 
 
 | Value | Band |
 |---|---|
-| `false` / absent | No band (default) |
-| `true` | Everywhere: on the statistics (each hour's min and max) and on the history (the min and max of the values in each column) |
-| `statistics` | Only where the curve comes from the long-term statistics |
-| `history` / `states` | Only where the curve comes from the history |
+| `false` / absent | No band (default) — *None* in the menu |
+| `all` / `true` / `both` | Everywhere: on the statistics (each hour's min and max) and on the history (the min and max of the values in each column) — *Both sides* |
+| `max` | Everywhere, its half above the curve only: from the curve to the max — *Maximum* |
+| `min` | Everywhere, its half below the curve only: from the min to the curve — *Minimum* |
+| `statistics` | Only where the curve comes from the long-term statistics — *Statistics* |
+| `history` / `states` | Only where the curve comes from the history — *History* |
 
 No extra request is made: the band comes from the data drawn. Where a column of pixels holds a single value of the history, it's drawn as is, without band — zoomed in, every value is there, point by point.
 
@@ -1077,7 +1082,7 @@ graphs:
     entities:
       - entity: sensor.outside_temperature
         color: '#3e95cd'
-        showMinMax: true         # band everywhere
+        showMinMax: all          # band everywhere
       - entity: sensor.outside_pressure
         color: '#3ecd95'
         showMinMax: statistics   # band where the curve comes from the statistics only
@@ -1341,7 +1346,7 @@ What each variable obeys, for its persistence on this device and on every device
 | The time range | `range` (either option) | `enableMultidevicePersistence: range` |
 | The magnifier's mode | `range` (either option) | `enableMultidevicePersistence: range` |
 | The graphs' order, the linked graphs' too | `order` (either option) | `enableMultidevicePersistence: order` |
-| An entity's `type`, `color`, `fill`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
+| An entity's `type`, `color`, `fill`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `sizePoints`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
 | A curve hidden (`hidden`), its points (`showPoints`), its tooltip modes, its graph's Y axes locked with their ranges (`yAxisLock`: the padlock, or a gesture on a Y axis) | `enablePersistence: entities` — a YAML entity: its own `enablePersistence` first | Never |
 | The info panel's switch, the gesture thresholds | Always | Always |
 | The statistics export's period | Always | Never |
@@ -1416,7 +1421,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`, `yAxisLock` (its graph's Y axes locked, with their ranges). `hidden`, `showPoints`, the tooltip modes and `yAxisLock` are never synced across devices: only `enablePersistence` keeps them, on this device. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `sizePoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`, `yAxisLock` (its graph's Y axes locked, with their ranges). `hidden`, `showPoints`, the tooltip modes and `yAxisLock` are never synced across devices: only `enablePersistence` keeps them, on this device. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a purely dynamic card, see above).
 
@@ -1498,7 +1503,8 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `tooltip.largeChart` | string | `largeChartTooltip`, `large_chart_tooltip` | | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
 | `tooltip.smallChart` | string | `smallChartTooltip`, `small_chart_tooltip` | | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
 | `tooltip.behavior` | string | `tooltipBehavior`, `tooltip_behavior` | | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
-| `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none, not even the hovered one |
+| `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all; `false` none, not even the hovered one; a number: all, that radius (`sizePoints` twice it) |
+| `sizePoints` | number | | | The dots' diameter in px (the tooltip's: 2 px more). Default: the line width + 2 px |
 | `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
 | `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
 | `tapAction` | string or object | `tap_action` | an action's name alone: `tapAction: none` | What a click on its value does (in the legend, over the graph): Home Assistant's actions — `more-info` (default: its dialog, with the info panel when it's on), `navigate` (`navigation_path`), `url` (`url_path`), `perform-action` (`perform_action`, `data`, `target`), `call-service` (`service`, `service_data`), `none` |
@@ -1529,7 +1535,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `pointsPerHour` | number | `points_per_hour` | | Points an hour: groups of 1 / `pointsPerHour` hours — see [Aggregation](#aggregation) |
 | `groupBy` | string | `group_by` | | `interval`, `hour`, `date` — see [Aggregation](#aggregation) |
 | `aggregateFunc` | string | `aggregate_func` | | `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` — see [Aggregation](#aggregation) |
-| `showMinMax` | string or boolean | | | A lighter band between the min and max of each column of pixels: `true` (everywhere), `statistics`, `history`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
+| `showMinMax` | string or boolean | | | A lighter band between the min and max of each column of pixels: `all` (everywhere), `max`, `min` (its half above, below the curve), `statistics`, `history`, `false`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
 | `showTimeLabels` | boolean | | | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
 | `showState` | boolean | `show_state` | | The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
 | `showIndicator` | boolean | `show_indicator` | | A dot in its color before its value over the graph |
