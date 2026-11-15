@@ -24,6 +24,7 @@ import { CardGestures } from "./card-gestures.js";
 import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
+import { CardYaml } from "./card-yaml.js";
 import { withLook, OPTION_DEFAULTS, PERSISTENCE_CATEGORIES } from "./history-options.js";
 import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-settings.js";
 import { localGestures, versionIsNew } from "./card-storage.js";
@@ -156,14 +157,40 @@ export class HistoryCardState {
     applyTheme(darkBackground = false)
     {
         const P = this.pconfig;
-        this.ui.darkMode = !!( (this._hass.selectedTheme && this._hass.selectedTheme.dark) || (this._hass.themes && this._hass.themes.darkMode) ) || darkBackground;
-        if( P.uimode === 'dark' ) this.ui.darkMode = true; else
-        if( P.uimode === 'light' ) this.ui.darkMode = false;
+        this.ui.darkMode = this.themeIsDark(darkBackground);
 
         const _theme = this.ui.darkMode ? 'dark' : 'light';
         P.graphLabelColor = parseColor(P.uiColors.labels ?? UI_COLOR_DEFAULTS.labels[_theme]);
         P.graphGridColor  = parseColor(P.uiColors.gridLines ?? UI_COLOR_DEFAULTS.gridLines[_theme]);
         P.cursorLineColor = parseColor(P.uiColors.cursorLine ?? P.graphGridColor);
+    }
+
+    // Dark or not: Home Assistant's theme (or a dark background behind the card), unless
+    // uimode says
+    themeIsDark(darkBackground = false)
+    {
+        const P = this.pconfig;
+        if( P.uimode === 'dark' ) return true;
+        if( P.uimode === 'light' ) return false;
+        return !!( this._hass.selectedTheme?.dark || this._hass.themes?.darkMode ) || darkBackground;
+    }
+
+    // Is the card's background dark (its mean channel at most 100)? — a dark theme Home
+    // Assistant doesn't say is
+    _darkBackground()
+    {
+        const bgcol = getComputedStyle(this._this.querySelector('#maincard')).backgroundColor.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+        return !!( bgcol && bgcol.length == 4 && (((+bgcol[1]) + (+bgcol[2]) + (+bgcol[3])) / 3 <= 100) );
+    }
+
+    // Home Assistant's theme switched (dark ↔ light) once the graphs are shown — the card's
+    // (darkBackground: its background dark), the info panel's: their colors — labels, grid,
+    // cursor line, states — those of the new one, every graph built again in them, in its place
+    followTheme(darkBackground = false)
+    {
+        if( this.themeIsDark(darkBackground) === this.ui.darkMode ) return;
+        this.applyTheme(darkBackground);
+        this.rebuildGraphsInPlace();
     }
 
     // --------------------------------------------------------------------------------------
@@ -189,9 +216,7 @@ export class HistoryCardState {
             for( let i = 0; i < 2; i++ )
                 this.insertUIHtmlText(i);
 
-            let bgcol = getComputedStyle(this._this.querySelector('#maincard')).backgroundColor.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
-
-            this.applyTheme(!!( bgcol && bgcol.length == 4 && (((+bgcol[1]) + (+bgcol[2]) + (+bgcol[3])) / 3 <= 100) ));
+            this.applyTheme(this._darkBackground());
 
             this.clearGraphs();
 
@@ -347,7 +372,7 @@ export class HistoryCardState {
 
 // HistoryCardState's methods are spread over several files by role (see each file's
 // header) — added to it here, as if written in the class itself
-for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardCharts, CardOperations, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage, CardValues] )
+for( const part of [CardConfig, CardTimeRange, CardHistory, CardGraphs, CardCharts, CardOperations, CardDatasets, CardToolbar, CardSelector, CardGestures, CardMenus, CardStorage, CardValues, CardYaml] )
     for( const name of Object.getOwnPropertyNames(part.prototype) )
         if( name !== 'constructor' )
             Object.defineProperty(HistoryCardState.prototype, name, Object.getOwnPropertyDescriptor(part.prototype, name));
@@ -400,6 +425,9 @@ class HistoryExplorerCard extends HTMLElement
 {
     instance = null;
     configSet = false;
+    yamlConfig = null;
+    // (Home Assistant's theme as the last hass said it — see set hass)
+    _theme = undefined;
 
     // (the card off the page — Home Assistant drawing the dashboard again, another view —, or
     // back on it: its cache kept for a card made again meanwhile, see card-history.js)
@@ -467,6 +495,11 @@ class HistoryExplorerCard extends HTMLElement
         if( !this.instance ) return;
 
         this.instance._this = this;
+        // (Home Assistant's theme switched, dark ↔ light: followed once its colors are on the
+        // page — the next frame)
+        const _theme = `${hass.selectedTheme?.dark}|${hass.themes?.darkMode}`;
+        if( this._theme !== undefined && _theme !== this._theme ) requestAnimationFrame(() => this.instance?.contentValid && this.instance.followTheme(this.instance._darkBackground()));
+        this._theme = _theme;
         this.instance._hass = hass;
         // (a card taken back: what came while it was off the page asked, as a refresh does —
         // the same one as for the states changed meanwhile, see scheduleAutoRefresh: one refresh)
@@ -494,6 +527,8 @@ class HistoryExplorerCard extends HTMLElement
     {
         // (look: a set of options given at once — see history-options.js)
         this.config = withLook(config);
+        // (as written — what the YAML export compares with, see card-yaml.js)
+        this.yamlConfig = config;
         this.configSet = true;
     }
 

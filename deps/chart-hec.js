@@ -3341,8 +3341,15 @@
         _el.style.justifyContent = 'center';
         _el.style.borderRadius = CTRL_H / 2 + 'px';
         _el.style.userSelect = 'none';
-        // (the ×, drawn: centred as it is seen)
-        _el.innerHTML = '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 0 10 10" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.5" stroke-linecap="round"/></svg>';
+      }
+      // (the ×, drawn: centred as it is seen — armed (hecArmClose), red in a red circle,
+      // Home Assistant's color of an error)
+      var _armed = me.hecCloseArmed();
+      if (_el._hecArmed !== _armed) {
+        _el._hecArmed = _armed;
+        _el.innerHTML = _armed
+          ? '<svg width="' + CLOSE_H + '" height="' + CLOSE_H + '" viewBox="0 0 12 12" style="pointer-events:none;"><circle cx="6" cy="6" r="5.25" fill="none" stroke="var(--error-color, #db4437)" stroke-width="1.5"/><path d="M4,4L8,8M8,4L4,8" stroke="var(--error-color, #db4437)" stroke-width="1.5" stroke-linecap="round"/></svg>'
+          : '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 0 10 10" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.5" stroke-linecap="round"/></svg>';
       }
       me._hecPlaceControlBox(_el, _r.x, _r.y, _r.width, _r.height, 'flex');
       _el.title = me.options.closeButtonTitle || '';
@@ -3495,6 +3502,21 @@
     hecPlotWidth: function () {
       var A = this.chartArea;
       return Math.round(A ? A.right - A.left : this.width || 0);
+    },
+
+    // The close button armed for ms (the card's: a first click on it): its × red in a red
+    // circle until then — whether a click comes meanwhile, the card asks (hecCloseArmed)
+    hecArmClose: function (ms) {
+      var me = this;
+      me._hecCloseArmedUntil = Date.now() + ms;
+      clearTimeout(me._hecCloseArmTid);
+      me._hecCloseArmTid = setTimeout(function () { me._hecCloseArmedUntil = 0; me._hecUpdateCloseButton(); }, ms);
+      me._hecUpdateCloseButton();
+    },
+
+    // Whether the close button is armed (hecArmClose)
+    hecCloseArmed: function () {
+      return Date.now() < (this._hecCloseArmedUntil || 0);
     },
 
     // The plot area's box in the chart's canvas, in CSS pixels ({ left, top, right, bottom }) —

@@ -4,6 +4,32 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.77] - 2026-11-15
+
+### Added — Export ▸ YAML
+- *Export ▸ YAML ▸ Simplified / Complete*, in every export menu: the options menu's (the card), a graph's (that graph), a curve's — the info panel's too — (that curve), its settings copied to the clipboard as YAML: what the YAML says and what was chosen in the menus — to define it statically in another card. In the card's own syntax (an option's own name, never a synonym), what is kept on each device left out (a curve hidden, its points, the tooltip's modes, the Y axes locked). Each level writes what the level above it gives otherwise, the first one copied what differs from the defaults; *Simplified*: those only, the card's `look:` and `entityOptions` as its YAML says them; *Complete*: also, at each level, the options the look sets and those another graph of the card, or another curve of the graph, writes — each with its own —, no `entityOptions`: each curve says what they give it. A message says it's copied, or that the clipboard refused it
+- `interval: raw`: a bar graph's *Raw* in the YAML — the bar entities drawn as curves (exported so)
+- In the Export submenus, a file icon before *History* and *Statistics*, a clipboard icon before *YAML*
+- Tests (`features`): each menu's YAML — the card's simplified and complete, a graph's, a curve's —, a dash chosen in the menu exported, the points not; the clipboard refused; `look: mini` simplified and complete; the icons
+
+### Changed — a graph's close button, in two clicks
+- A first click on a graph's × turns it into a red cross in a red circle for one second; a second click during that second removes the graph (a single click removed it: too easy by mistake)
+- Tests (`features`): one click — the graph kept, the button armed, disarmed a second later; two clicks — removed
+
+### Fixed — the state in force at a day's start, repeated
+- The two days asked apart, the state in force at the second one's start (Home Assistant's answer, at midnight) repeating the last row of the day before stayed in the cache when the day before came after it: it's left out in both orders
+- Tests (`features`): a day's last row at 23:56, the next day asked apart — no row at 00:00
+
+### Fixed — Home Assistant's theme switched with the card shown
+- The theme was read once, when the card was made: switched from dark to light, the grid stayed white at 10 % — invisible —, the labels and the cursor line in the dark theme's colors, until the page was loaded again. A switch (dark ↔ light) is now followed, by the card and the info panel: the labels, the grid, the cursor line and the states' colors of the new theme, every graph built again in them, in its place — its curves as they were
+- Tests (`features`, `panel`): switched to the other theme, then back — the labels and the grid in each theme's colors; in the panel, the bars chosen and the color kept
+
+### Documentation
+- README_Full, *Info panel limitations*: the line saying the info panel has no CSV export removed — its curve menu has *Export ▸*
+
+### Internal
+- Tests (`settings`): the precision step on a curve of a constant value — a curve passing near the label made the result depend on the hour
+
 ## [v1.2.76] - 2026-11-14
 
 ### Fixed — a value drawn as its column's mean, held until the next point (#293)

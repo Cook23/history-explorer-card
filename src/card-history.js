@@ -853,6 +853,11 @@ export class CardHistory
             if( !x.b || !cov.some(([p, q]) => p < msOf(x.last_changed) && msOf(x.last_changed) <= q) ) return true;
             const r = _before(k); return !r || !r.live && !_repeats(r, x); }) : out);
         s.cover[layer].set(id, cov);
+        // (the next day loaded before this one: its first row, the state in force at its start
+        // given with it (b), dropped now that the row before it is known — this day covered to
+        // its end — and gives the same)
+        const n = _hist ? this.cache[i + 1] : null, _next = n?.hist.get(id), _last = s.hist.get(id)?.at(-1);
+        if( _next?.[0]?.b && _last && !_last.live && cov.some(([p, q]) => q >= s.b) && _repeats(_last, _next[0]) ) n.hist.set(id, _next.slice(1));
     }
 
     // A state of series id Home Assistant gave the card — pushed, or the one it had when the

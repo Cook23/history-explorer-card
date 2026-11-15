@@ -27,6 +27,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
 
+- **v1.2.77** — *Export ▸ YAML*: a card's, a graph's or a curve's settings as YAML, the menus' choices included.
 - **v1.2.60** — The automatic Y axis shows what is in the window and keeps its scale as the time moves (`yScaleSteadiness`); the graphs drawn at once from coarser statistics, then refined, the cache filled ahead: a year shown in 0.4 s instead of 20, six months in 0.3 s instead of 10, a pan back at once.
 - **v1.2.59** — Time ranges up to 10 years, drawn from Home Assistant's daily statistics.
 - **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
@@ -65,6 +66,7 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 - [Options](#options)
 - [UI configuration](#ui-configuration)
 - [CSV export](#csv-export)
+- [YAML export](#yaml-export)
 - [YAML graphs](#yaml-graphs)
 - [Running as a sidebar panel](#running-as-a-sidebar-panel)
 
@@ -105,9 +107,9 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 ![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-curve.png)
 
-- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV).
+- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
 - **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
-- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
+- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV, YAML), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
 
 A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
 
@@ -377,7 +379,7 @@ graphs:
 | `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `true` (everywhere), `statistics` or `history` (only where the curve comes from them) |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
-| `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
+| `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
 | `tapAction` | `tap_action` | an action's name alone: `tapAction: none` | ✓ | ✓ | ✓ | What a click on a value does: `more-info` (default: its dialog, with the info panel when it's on), `navigate`, `url`, `perform-action`, `call-service`, `none` |
 | `scale` | | | | | ✓ | Multiply values by this factor before drawing — see *6 |
@@ -498,6 +500,14 @@ csv:
 ```
 
 📖 [Exporting data as CSV](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-data-as-csv)
+
+---
+
+## YAML export
+
+The same menus: *Export ▸ YAML ▸ Simplified* or *Complete* — the settings of the card, the graph or the curve, the choices made in the menus included, copied to the clipboard in the card's own syntax, to define it statically in another card. *Simplified*: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
+
+📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
 
 ---
 

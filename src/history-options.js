@@ -437,14 +437,14 @@ export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked'
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its
 // YAML name, its label (ui.interval.*), and its length and start (moment) — raw: no
-// interval, the bar entities drawn as curves
+// interval (no length), the bar entities drawn as curves
 export const BAR_INTERVALS = [
     { code: 0, yaml: '10m',     label: '_10m',    length: [10, 'minute'], start: 'hour' },
     { code: 1, yaml: 'hourly',  label: 'hourly',  length: [1, 'hour'],    start: 'hour' },
     { code: 2, yaml: 'daily',   label: 'daily',   length: [1, 'day'],     start: 'day' },
     { code: 5, yaml: 'weekly',  label: 'weekly',  length: [1, 'week'],    start: 'isoWeek' },
     { code: 3, yaml: 'monthly', label: 'monthly', length: [1, 'month'],   start: 'month' },
-    { code: 4, yaml: null,      label: 'rawline' },
+    { code: 4, yaml: 'raw',     label: 'rawline' },
 ];
 export const RAW_INTERVAL = 4;
 // A year's hours (365 days), and the longest time range, in years
@@ -507,4 +507,12 @@ export function withLook(config)
         return c;
     }
     return { ..._look, ...c, uiLayout: { ..._look.uiLayout, ...c.uiLayout } };
+}
+
+// A card's configuration in its one form as it's written (raw), the options its look gives
+// (look: none for no look, or an unknown one), and both (card: withLook's)
+export function lookParts(config)
+{
+    const raw = normalizeOptions(config ?? {}) ?? {};
+    return { raw, look: LOOKS[raw.look] ?? {}, card: withLook(config ?? {}) ?? {} };
 }

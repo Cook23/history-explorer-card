@@ -388,6 +388,19 @@ export class CardOperations
         this.writeLocalState();
     }
 
+    // Every graph built again in its place, from its entities — as they are: their colors,
+    // looks, Y axes locked kept — e.g. in the colors of a new theme (followTheme)
+    rebuildGraphsInPlace()
+    {
+        for( const g of this.graphsInDisplayOrder() ) {
+            const _nextG = this.nextGraph(g);
+            this.detachGraph(g);
+            this.rebuildGraph(g.entities, g.groupId, _nextG);
+        }
+        this.refreshGraphControls();
+        this.updateHistory();
+    }
+
     // Graph g built again in its place, from its entities (options: more addGraph options for
     // each, see rebuildGraph) → its entities
     _rebuildInPlace(g, options = {})

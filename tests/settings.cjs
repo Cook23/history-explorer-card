@@ -40,7 +40,7 @@ module.exports = async function()
         await t.E(`el.querySelector('#eo_0_all').click()`); await t.wait(300);
         const r = { m, ex, exportClosed: !(await shown('#eo_0_export_sub')), all: await items('#eo_0_all_sub'), v: await inputs() };
         await closeMenus();
-        return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸ | Tests (beta) ▸' && r.ex === 'History (2)' && r.exportClosed
+        return r.m === 'Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ | Card ▸ | Global ▸ | Tests (beta) ▸' && r.ex === 'History (2) | YAML ▸' && r.exportClosed
             && /Enhanced native history/.test(r.all) && /Long press, mouse and pen/.test(r.all) && /Precision, finger/.test(r.all) && /Reading time per word/.test(r.all)
             && JSON.stringify(r.v) === JSON.stringify({ longPress: 500, longPressTouch: 500, precision: 8, precisionTouch: 12, readingTimePerWord: 400 }) ? true : JSON.stringify(r);
     });
@@ -109,14 +109,19 @@ module.exports = async function()
         return s1 === s0 && s2 !== s1 ? true : JSON.stringify({ s0, s1, s2 });
     });
     await t.step('the precision is also how near a target must be: 15 px beside a label, picked at 20 px, not at 8', async () => {
+        // (on a card whose curves stay away from the legend — its values constant, drawn at mid
+        // height: a curve passing under the label as near as it, the picking rule would rightly
+        // pick nothing, about halfway between them — its settings the same)
+        const t1 = t;
+        t = await openCard(YAML()); await t.wait(800);
         const beside = async () => { const p = await t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[1], r=c.canvas.getBoundingClientRect();
             return { x: r.left+b.left+b.width+15, y: r.top+b.top+b.height/2 }; })()`);
             const m = t.page.mouse; await m.move(p.x, p.y); await m.down(); await t.wait(1500); await m.up(); await t.wait(400); };
-        await openAll(); await enter('precision', 20); await closeMenus();
+        await openAll(); await enter('longPress', 1200); await enter('precision', 20); await closeMenus();
         await beside(); const at20 = await curveMenuOpen(); await closeMenus();
         await openAll(); await enter('precision', 8); await closeMenus();
         await beside(); const at8 = await curveMenuOpen(); await closeMenus();
-        await openAll(); await enter('precision', 20); await closeMenus();
+        done(await t.close()); t = t1;
         return at20 && !at8 ? true : JSON.stringify({ at20, at8 });
     });
     await t.step('saved on every device, without any persistence option: kept after a reload, and on a new device', async () => {

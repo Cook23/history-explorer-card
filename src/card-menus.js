@@ -82,6 +82,12 @@ const _OPTIONS_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export', card
 const _CARD_ACTIONS = { defgraphs: { label: 'ui.menu.default_graphs', run: 'defaultGraphs' },
                         defdisplay: { label: 'ui.menu.default_display', run: 'defaultDisplay' } };
 
+// The symbols before the Export lines' names: what goes to a file (a sheet, its corner
+// folded), what goes to the clipboard (a clipboard) — in the text's color
+const _LEAD = d => `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="vertical-align:-2px;margin-right:6px"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`;
+const _FILE_ICON = _LEAD('M6 2h8l5 5v15H6z M14 2v5h5');
+const _CLIPBOARD_ICON = _LEAD('M9 4H6v18h12V4h-3 M9 2h6v4H9z');
+
 // Wide enough for the curve menu's names with a submenu open beside them, over the menu
 const _CURVE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
@@ -543,7 +549,7 @@ export class CardMenus
         requestAnimationFrame(() => setTimeout(choose));
     }
 
-    // A menu's lines written in menuEl — { id, label, style, title, marked, markedItalic,
+    // A menu's lines written in menuEl — { id, label, lead, style, title, marked, markedItalic,
     // strong, disabled, on, final, input, choose(line) }: a title (a line of its own, not picked); an input (a number entered
     // there: its GESTURE_SETTINGS bounds, value, labelId, change(value) → the value kept); a
     // line — the marked one in bold (in italic: markedItalic) and pre-selected (Enter takes
@@ -579,6 +585,8 @@ export class CardMenus
                 // (a line shown by a symbol — an icon of the card's own: its markup)
                 if( it.icon ) _line.innerHTML = it.icon;
                 else ( _line.querySelector('[data-label]') ?? _line ).textContent = it.label;
+                // (a symbol before its name: lead's markup)
+                if( it.lead ) _line.insertAdjacentHTML('afterbegin', it.lead);
                 if( it.icon ) _line.title = it.label;
                 if( it.on !== undefined ) setSwitch(_line, it.on);
                 if( it.style ) _line.style.cssText += it.style;
@@ -760,7 +768,11 @@ export class CardMenus
     // A type submenu's lines (path: see _menuOf): a section's, or the graph's exports
     _typeSubmenuLines(i, path)
     {
-        if( path[0] === 'export' ) { const { entities } = this._menuTargets(i); return this._exportLines(this._curveMenu(i), path[1] ?? null, entities.map(e => e.entity)); }
+        if( path[0] === 'export' ) {
+            const { g, entities } = this._menuTargets(i);
+            const _scope = this._this.querySelector(`#et_${i}`)._menuForGraph ? { kind: 'graph', g } : { kind: 'curve', g, e: entities[0] };
+            return this._exportLines(this._curveMenu(i), path[1] ?? null, entities.map(e => e.entity), _scope);
+        }
         return this._sectionItems(this._curveMenu(i), path);
     }
 
@@ -1157,7 +1169,7 @@ export class CardMenus
         const [key, level = null] = path;
         const m = this._optionsMenu(i);
         if( _SECTIONS[key] ) return this._sectionItems(m, path);
-        if( key === 'export' ) return this._exportLines(m, level, seriesOfGraphs(this.graphs));
+        if( key === 'export' ) return this._exportLines(m, level, seriesOfGraphs(this.graphs), { kind: 'card' });
         if( key === 'tests' ) return Object.keys(CARD_TESTS).map(k => ({ id: `eo_${i}_test_${k}`, label: i18n(CARD_TESTS[k].label),
                                                                          choose: () => { this.menuSetVisibility(i, false); openCardTest(k, this); } }));
         if( key === 'card' ) {
@@ -1174,20 +1186,26 @@ export class CardMenus
     }
 
     // The Export submenu of menu m — the options menu's (every curve), a graph's, a curve's: ids,
-    // their series —, level null: its history and ▸ its statistics (with the long-term
-    // statistics on); level 'stats': their periods — each exported for ids, over the window
-    // shown. Each line says how many of them have data there, at least in part (greyed, none:
-    // see exportAvailability); a period the cache holds over the whole window in bold, the
-    // one chosen last time in italic
-    _exportLines(m, level, ids)
+    // their series; scope, what its YAML is (see CardYaml.yamlText) —, level null: its history
+    // and ▸ its statistics (with the long-term statistics on) — files (_FILE_ICON) —, ▸ its YAML
+    // (copied: _CLIPBOARD_ICON); level 'stats': their periods — each exported for ids, over the
+    // window shown; level 'yaml': simplified, complete — the message saying it's copied where
+    // the line was. Each file line says how many of them have data there, at least in part
+    // (greyed, none: see exportAvailability); a period the cache holds over the whole window in
+    // bold, the one chosen last time in italic
+    _exportLines(m, level, ids, scope)
     {
         const a = this.exportAvailability(ids), _n = (label, n) => `${label} (${n})`;
         if( level === 'stats' )
             return STATS_EXPORT_PERIODS.map(p => ({ id: `${m.prefix}_stats_${p.period}`, label: _n(i18n(`ui.interval.${p.label}`), a.periods[p.period]),
                                                     marked: p.period === this.exportStatsPeriod(), markedItalic: true, strong: a.cached[p.period], disabled: !a.periods[p.period],
                                                     choose: () => { m.close(); this.exportStatistics(p.period, ids); } }));
-        return [{ id: `${m.prefix}_csv`, label: _n(i18n('ui.menu.export_csv'), a.history), disabled: !a.history, choose: () => { m.close(); this.exportFile(ids); } },
-                ...( this.statistics?.enabled ? [{ ...this._submenuLine(m, `${m.prefix}_stats`, _n(i18n('ui.menu.export_stats'), a.statistics), ['export', 'stats']), disabled: !a.statistics }] : [] )];
+        if( level === 'yaml' )
+            return [['simple', false], ['full', true]].map(([k, full]) => ({ id: `${m.prefix}_yaml_${k}`, label: i18n(`ui.menu.export_yaml_${k}`),
+                choose: line => { const r = line.getBoundingClientRect(); m.close(); this.exportYaml(scope, full, { clientX: r.left, clientY: r.top + r.height / 2 }); } }));
+        return [{ id: `${m.prefix}_csv`, lead: _FILE_ICON, label: _n(i18n('ui.menu.export_csv'), a.history), disabled: !a.history, choose: () => { m.close(); this.exportFile(ids); } },
+                ...( this.statistics?.enabled ? [{ ...this._submenuLine(m, `${m.prefix}_stats`, _n(i18n('ui.menu.export_stats'), a.statistics), ['export', 'stats']), lead: _FILE_ICON, disabled: !a.statistics }] : [] ),
+                { ...this._submenuLine(m, `${m.prefix}_yaml`, i18n('ui.menu.export_yaml'), ['export', 'yaml']), lead: _CLIPBOARD_ICON }];
     }
 
     // The options menus open, as they are now (the info panel switched on another device)
@@ -1438,7 +1456,8 @@ export class CardMenus
         return line.id ? line.parentNode?.parentNode?.querySelector(`#${line.id}_sub`) : null;
     }
 
-    // A line's text width (its first n characters), with its left padding and a gap
+    // A line's width up to its text's end (its first n characters) — what's before the text
+    // with it: its left padding, a symbol (lead) —, and a gap
     _lineTextWidth(line, n = Infinity)
     {
         const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
@@ -1446,7 +1465,7 @@ export class CardMenus
         const _range = document.createRange();
         _range.setStart(_text, 0);
         _range.setEnd(_text, Math.min(n, _text.length));
-        return _range.getBoundingClientRect().width + ( parseFloat(getComputedStyle(line).paddingLeft) || 0 ) + 8;
+        return _range.getBoundingClientRect().right - line.getBoundingClientRect().left + 8;
     }
 
     // fn() run with el laid out at its own width — shown (hidden from sight) if it isn't,
