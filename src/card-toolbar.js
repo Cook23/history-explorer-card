@@ -43,6 +43,24 @@ export function rangeControlsHtml(i, optionStyle, invertZoom)
         `<button id="b${invertZoom ? 4 : 5}_${i}" class="hec-mag" style="${BUTTON_STYLE};margin-left:5px;height:30px;padding:0;vertical-align:top">${magnifierSvg('in', undefined, 20)}</button>`;
 }
 
+// text copied to the clipboard → whether it is: by the clipboard, else — refused, outside a
+// secure context — through a selection of a text box put in host for that time
+function copyToClipboard(text, host)
+{
+    const byHand = () => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+        ( host ?? document.body ).appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = !!document.execCommand?.('copy'); } catch( e ) { ok = false; }
+        ta.remove();
+        return ok;
+    };
+    return navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(() => true, byHand) : Promise.resolve(byHand());
+}
+
 export class CardToolbar
 {
     // --------------------------------------------------------------------------------------
@@ -432,6 +450,18 @@ export class CardToolbar
         this.menuSetVisibility(1, false);
 
         this.csvExporter.exportFile(this, ids);
+    }
+
+    // The YAML of what a menu exports (scope: see CardYaml.yamlText), simplified or complete
+    // (full), copied to the clipboard — the clipboard refused (outside a secure context):
+    // through a selection —, a message at `at` ({ clientX, clientY }) saying whether it is
+    exportYaml(scope, full, at)
+    {
+        this.menuSetVisibility(0, false);
+        this.menuSetVisibility(1, false);
+
+        const _say = ok => this.showMessage(i18n(ok ? 'ui.menu.yaml_copied' : 'ui.menu.yaml_refused'), at?.clientX, at?.clientY);
+        copyToClipboard(this.yamlText(scope, full), this._this).then(_say);
     }
 
     // The statistics of series ids — a curve's, a graph's, every graph's (by default) —

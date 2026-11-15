@@ -263,6 +263,9 @@ function hxHookInfoPanel()
 
             // New states, as for the card
             this.hec_instance._hass = this.hass;
+            // (Home Assistant's theme switched, dark ↔ light: its colors, the graph built again
+            // in them — as the card's, see followTheme)
+            this.hec_instance.followTheme();
             this.hec_instance.onStatesChanged();
 
         }

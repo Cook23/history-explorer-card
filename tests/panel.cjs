@@ -47,6 +47,15 @@ module.exports = async function()
         const g = await t.E(`[inst().graphs[0].type, !!inst()._this.querySelector('#bd-' + inst().graphs[0].id)]`);
         return g[0] === 'bar' && g[1] ? true : JSON.stringify(g);
     });
+    await t.step('Home Assistant switched to dark, then back to light: the labels and the grid in the new theme\'s colors each time, the graph as chosen (bars) and its color kept', async () => {
+        const look = () => t.E(`(()=>{ const g = inst().graphs[0], o = g.chart.options.scales.yAxes[0]; return [inst().ui.darkMode, String(o.ticks.fontColor), String(o.gridLines.color), g.type, g.entities[0].color]; })()`);
+        const c0 = await look();
+        await t.E('MOCK.dark = true; P.hass = mkHass()'); await t.wait(1200); const dark = await look();
+        await t.E('MOCK.dark = false; P.hass = mkHass()'); await t.wait(1200); const light = await look();
+        const isDark = c => c[0] && /9b9b9b|155, ?155, ?155/i.test(c[1]) && /255, ?255, ?255, ?0\.1/.test(c[2]), isLight = c => !c[0] && /#333|51, ?51, ?51/.test(c[1]) && /0, ?0, ?0, ?0\.1/.test(c[2]);
+        const kept = c => c[3] === 'bar' && c[4] === c0[4];
+        return isLight(c0) && isDark(dark) && isLight(light) && kept(dark) && kept(light) ? true : JSON.stringify({ c0, dark, light });
+    });
     await t.step('the type chosen in the panel isn\'t saved: the panel opened again shows the curve as before, the card\'s saved state untouched', async () => {
         const saved = () => t.E(`JSON.stringify(Object.keys(localStorage).filter(k => /history-explorer_card_/.test(k)).map(k => localStorage.getItem(k)))`);
         const s0 = await saved();

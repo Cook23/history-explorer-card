@@ -101,6 +101,7 @@ A highly interactive way to view the history of your entities in Home Assistant:
   - [Changing the horizontal time tick density](#changing-the-horizontal-time-tick-density)
 - [Multiple cards](#multiple-cards)
 - [Exporting data as CSV](#exporting-data-as-csv)
+- [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)
 - [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)
   - [Attributes](#attributes)
 - [Running as a panel in the sidebar](#running-as-a-panel-in-the-sidebar)
@@ -210,7 +211,7 @@ Click an item, or press Enter or → on it; ← or Escape goes back to the menu.
 
 The ▾ button beside the entity selector opens the options menu, in submenus:
 - **Display ▸**, **Appearance ▸** (its color aside), **Interpolation ▸**, **Behavior ▸** (*Tooltip ▸*, *Y axis locked*) — as in a graph's menu, for every curve of the card at once: the value all of them share in bold, a switch on when all of them show it; a choice in the card's menu, a graph's or a curve's applies to every curve it concerns, the last one made winning;
-- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics ▸* (their statistics, with long-term statistics on, for the period chosen in its submenu: *5 min*, *Hour*, *Day*, *Week*, *Month* — see [Exporting data as CSV](#exporting-data-as-csv)), each as a CSV file;
+- **Export ▸** — *History* (the history of the entities shown, over the time window shown), *Statistics ▸* (their statistics, with long-term statistics on, for the period chosen in its submenu: *5 min*, *Hour*, *Day*, *Week*, *Month* — see [Exporting data as CSV](#exporting-data-as-csv)), each as a CSV file — a file icon before each —; *YAML ▸* (*Simplified*, *Complete*: the card's YAML, copied to the clipboard — a clipboard icon before it —, see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml));
 - **Card ▸** — *Default graphs ▸*: the graphs added from the card removed, the YAML's kept as you changed them; *Default display ▸*: back to the YAML — the graphs added from the card removed, every change made from the card to the YAML's forgotten (their order, display, interpolation, colors, splits, hidden curves, points), and the YAML's time range. Each is confirmed in a submenu over *Card ▸*, right-aligned on it (*Confirm* / *Cancel*, Cancel marked: Enter changes nothing; Cancel, ← or Escape close it). Saved as any change: it reaches your other devices for what they share (a hidden curve and its points stay each device's own);
 - **Global ▸** — what applies to every card of every dashboard, on every device: *Enhanced native history*, a switch turning the info panel on (green) or off (red) — see `defaultInfoPanel` —, and the [gesture settings](#gesture-settings), entered right in the submenu.
 - **Tests (beta) ▸** — diagnostics run where the card is shown (browser, Home Assistant app), to report what that system gives the card: *Pen events* lists what the browser reports of a pen (hover, its button, a long press) on two test zones; *Performance* measures what the card costs on this device, with its entities and your Home Assistant — first what they run on (Home Assistant's version, its installation, its hardware, its memory, its disk and its database — an administrator's account tells it —; this device's model, system, processor, memory, graphics and screen; the browser or the Home Assistant app), each statistics probe's verdict with what it found (when, the values of the entity's last hour, its intervals under 4 minutes, the shortest), the card as it is (its graphs — those on the screen told —, its points, which statistics are valid), its graphs drawn again (the card's work — the rows read from the cache, the points worked out — and Chart.js's, graph by graph), the window loaded again from nothing (each request: its phase, its source, the time it asks, its entities — how many on the screen — and values, how long it waited and Home Assistant took), the window moved (*<* and *>* three times each, a drag), the real time — each time the graphs are drawn again, what had them drawn (answers from Home Assistant, the window moved, the window or its settings changed, a graph come on the screen, a graph off the screen drawn after those on it) —, when the page froze, and, on its own button, a return to the page after another app: what the card and Home Assistant's connection did until the graphs were drawn again — the card taken back, its graphs moved and shown, resized, each drawing and its cause. Its report can be copied or sent as a GitHub issue — with the device, the system and the browser or app used.
@@ -284,7 +285,7 @@ excludeFilterEntities:
   - 'sensor.power_supply_test'
 ```
 
-Dynamically added entities can be individually removed by clicking the `×` close button at the top right of their graph — a round button drawn over the graph, like the handle — or all together with *Card ▸ Default graphs* in the [options menu](#the-options-menu).
+Dynamically added entities can be individually removed by clicking twice the `×` close button at the top right of their graph — a round button drawn over the graph, like the handle: a first click turns it into a red cross in a red circle for one second, a second click during that second removes the graph — or all together with *Card ▸ Default graphs* in the [options menu](#the-options-menu).
 
 ### Choosing an entity's display type
 
@@ -305,7 +306,7 @@ The curve menu's items each open their submenu over the menu, level with it — 
   each list in a submenu over *Appearance* (← or Escape closes it), the value in use in bold — none when the curve has one the list doesn't hold (a fill of another color, a width of 1.5 px, dashes of its own). A choice is applied at once and saved with the entity as the matching option, as the interpolation is — a YAML entity's, when its options are saved (see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)); the last one to speak, the menu or the YAML, wins;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
 - **Behavior ▸** — *Tooltip ▸* (*Selected*, *Nearest*, *Mixed*, *All*: see [Interactive navigation](#interactive-navigation)), *Y axis locked* (a switch: its graph's padlock); opened by a long-press on a label, also *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card);
-- **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for this entity alone — in the info panel's curve menu too.
+- **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for this entity alone, and *YAML ▸* (*Simplified*, *Complete*): its curve's entry (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)) — in the info panel's curve menu too.
 
 The curve menu opens:
 
@@ -396,8 +397,8 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu, title
 - **Display ▸** — open with the menu (*Behavior* for a graph of timelines): the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
 - **Appearance ▸** — as in the curve menu, its color aside, for all the graph's curves at once: a switch on when all of them show it, a value in bold when all of them have it;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
-- **Behavior ▸** — *Tooltip ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as its × button);
-- **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities.
+- **Behavior ▸** — *Tooltip ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as two clicks on its × button);
+- **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities, and *YAML ▸* (*Simplified*, *Complete*): the graph's YAML (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)).
 
 ![A graph's menu, Behavior open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-graph.png)
 
@@ -520,7 +521,6 @@ Opened from a curve of a card — a click on its value, or *Info* in its menu �
 ### Info panel limitations
 
 - The info-panel shows a single entity graph only. Ungrouping, curve drag & drop and graph reordering are not available in the popup.
-- CSV export is not available in the info-panel.
 - The default time range shown in the popup follows the `defaultTimeRange` setting of the card.
 
 ---
@@ -535,7 +535,7 @@ Entities that represent a total (monotonically increasing or net metering) can b
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When adding an entity from the card, the curve menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
-Use the selector on the top right of the graph to choose the time interval your data is displayed at — on the legend's first line, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly` or `monthly`.
+Use the selector on the top right of the graph to choose the time interval your data is displayed at — on the legend's first line, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line. You can add the same entity multiple times in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly`, `monthly` or `raw` (*Raw*).
 
 Example configuration of a bar chart display for the entity `sensor.rain_amount` when added dynamically. The default interval is 10 minutes and the type is explicitly set to `bar`, so that the entity is shown as bars without picking it in the curve menu.
 
@@ -544,7 +544,7 @@ entityOptions:
   sensor.rain_amount:
     type: bar
     color: '#3e95cd'
-    interval: 10m     # Default interval for this entity can be 10m, hourly, daily, weekly or monthly
+    interval: 10m     # Default interval for this entity can be 10m, hourly, daily, weekly, monthly or raw
 ```
 
 Bar graphs can be manually added in the YAML too. Multiple entities can be combined into a single graph. The bars for each entity will then be displayed side by side:
@@ -1520,7 +1520,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
 | `height` | number | | | Graph height in pixels (overrides global height settings) |
 | `decimation` | | | | Accepted, without effect: see [Data decimation](#data-decimation) |
-| `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly` |
+| `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
 | `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |
 | `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
@@ -1900,6 +1900,23 @@ csv:
 ```
 
 A value missing leaves its cell empty (a value of 0 is written 0); a cell holding the separator, a quote or a line break is quoted, its quotes doubled.
+
+---
+
+## Exporting the configuration as YAML
+
+*Export ▸ YAML ▸* copies to the clipboard, as YAML, the settings of what its menu acts on — what the YAML says and what was chosen in the menus: from the options menu, the whole card; from a graph's menu, that graph (an item of `graphs:`); from a curve's menu (the info panel's too), that curve (an item of a graph's `entities:`). Pasted into another card's YAML, it makes there a graph or a curve defined statically, shown as it is here. A message says it's copied — or that the clipboard refused it.
+
+It's written in the card's own syntax: each option under its own name, never a synonym (`lineWidth`, not `width` or `line_width`), a bar interval by its name (`daily`, `raw`). What is kept on each device is left out: a curve hidden, its points, the tooltip's modes, the Y axes locked (see [What is kept, and where](#what-is-kept-and-where)). Each level — the card, a graph, a curve — writes what it holds that the level above it gives otherwise; the first level copied, what differs from the option's default:
+- **Simplified** — those only. The card's `look:` and `entityOptions` are written as its YAML says them: the options they give are left to them. A curve's color is written when it was set (in the YAML, `entityOptions` or the menu), not when it's the palette's.
+- **Complete** — those, plus, at each level, the options the look sets, and the ones another member of the same level writes (another graph of the card, another curve of the graph), each with its own value. No `entityOptions`: each curve writes what they give it.
+
+```yaml
+# Export ▸ YAML ▸ Simplified, from a curve's menu: its style chosen in Appearance ▸
+entity: sensor.power
+dashMode: points
+lineWidth: 3
+```
 
 ---
 

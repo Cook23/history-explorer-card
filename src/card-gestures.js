@@ -8,6 +8,9 @@ import { keepInfoLook } from "./card-storage.js";
 
 // The gestures that act (a hover or a drag under way doesn't): they end a cut or the magnifier
 const ACTION_GESTURES = ['click', 'dblclickdown', 'dblclick', 'longpress', 'dragstart'];
+// How long the close button stays armed after a first click: a second one meanwhile closes
+// the graph (see _onCloseButton)
+const CLOSE_CONFIRM_MS = 1000;
 
 const Chart = window.HXLocal_Chart;
 const moment = window.HXLocal_moment;
@@ -60,11 +63,12 @@ export class CardGestures
     }
 
     // Click on a legend label: shows/hides its curve, persisted; on the close button, the
-    // graph removed
+    // graph removed — at a second click within CLOSE_CONFIRM_MS of the first, which arms it
+    // (_onCloseButton)
     _onGraphClick(info, g)
     {
         if( info.zone === 'closeButton' ) {
-            if( info.gestureType === 'click' ) this.removeGraph(g);
+            if( info.gestureType === 'click' ) this._onCloseButton(g);
             return;
         }
         // (a value — over the graph, or at the end of a legend label: the entity's dialog, on a
@@ -125,8 +129,19 @@ export class CardGestures
     _onGraphDblClick(info, g)
     {
         if( info.zone === 'linkMarker' ) return this._refused(this.mergeGraphUp(g), info, g);
+        // (two clicks in a row on the close button: the second one, while it's armed)
+        if( info.zone === 'closeButton' ) return this._onCloseButton(g);
         const idx = info.legendIndex >= 0 ? info.legendIndex : this.isRowGraph(g) ? info.yAxisIndex : -1;
         if( idx >= 0 && this.canSplitCurve(g) ) this.splitCurve(g, idx);
+    }
+
+    // A click on graph g's close button: the graph removed if it's armed — a click on it
+    // within CLOSE_CONFIRM_MS —, else armed (its × red in a red circle meanwhile): a graph
+    // never closed by one click by mistake
+    _onCloseButton(g)
+    {
+        if( g.chart.hecCloseArmed() ) this.removeGraph(g);
+        else g.chart.hecArmClose(CLOSE_CONFIRM_MS);
     }
 
     // An operation refused (its reason, else null): said where the gesture was, on graph g

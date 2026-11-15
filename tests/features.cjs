@@ -224,6 +224,87 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Export ▸ YAML ▸ Simplified / Complete, in every export menu (the card's, a graph's, a
+    // curve's): what the card, the graph or the curve is now — the YAML and the menus —, copied
+    // to the clipboard, a message saying so; a file icon before History and Statistics, a
+    // clipboard icon before YAML ──
+    t = await openCard(card({ statistics: { enabled: true }, lineWidth: 3, entityOptions: { 'sensor.rain': { lineMode: 'stepped' } },
+        graphs: [{ type: 'line', title: 'Power', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] },
+                 { type: 'line', entities: [{ entity: 'sensor.power_kw' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    {
+        // (the clipboard caught: what's written to it, or refused)
+        await t.E(`(()=>{ window.__copied = []; window.__refuse = false; Object.defineProperty(navigator, 'clipboard', { configurable: true,
+            value: { writeText: x => window.__refuse ? Promise.reject(new Error('no')) : ( window.__copied.push(x), Promise.resolve() ) } }); })()`);
+        // (the curve's dashes set as its Appearance submenu does)
+        await t.E(`(()=>{ const I = el.instance, g = I.graphs[0]; I.setCurvesLook(g, [g.entities[0]], 'dashMode', 'points'); I.toggleCurvePoints(g, [g.entities[0]]); })()`); await t.wait(800);
+        const yaml = async (open, prefix, kind) => {
+            await t.E('__copied.length = 0'); await open();
+            await t.E(`el.querySelector('#${prefix}_export').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#${prefix}_yaml').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#${prefix}_yaml_${kind}').click()`);
+            for( let i = 0; i < 20 && !(await t.E('__copied.length')); i++ ) await t.wait(100);
+            return { text: await t.E('__copied[0] ?? ""'), message: await t.E(`document.querySelector('#hec-label-tooltip')?.textContent ?? ''`) };
+        };
+        const options = () => t.E(`el.querySelector('#bo_0').click()`).then(() => t.wait(300));
+        await t.step('the Export submenu: a file icon before History and Statistics, a clipboard icon before YAML ▸', async () => {
+            await options(); await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
+            const r = await t.E(`['csv', 'stats', 'yaml'].map(k => { const a = el.querySelector('#eo_0_' + k); return a.textContent.trim() + ':' + ( a.firstElementChild?.tagName === 'svg' ? a.firstElementChild.querySelector('path').getAttribute('d') : '' ); })`);
+            await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape');
+            const [csv, stats, y] = r.map(x => x.split(':'));
+            return csv[1] && csv[1] === stats[1] && y[0] === 'YAML ▸' && y[1] && y[1] !== csv[1] ? true : JSON.stringify(r);
+        });
+        await t.step('the card\'s menu: Export ▸ YAML ▸ Simplified — the card\'s options, entityOptions, each graph and only what each curve sets (the dashes chosen; never the points, kept on each device); copied, said so', async () => {
+            const { text, message } = await yaml(options, 'eo_0', 'simple');
+            const want = ['type: custom:history-explorer-card', 'lineWidth: 3', 'entityOptions:\n  sensor.rain:\n    lineMode: stepped',
+                          '  - type: line\n    title: Power\n    entities:\n      - entity: sensor.power\n        dashMode: points\n      - entity: sensor.rain\n  - type: line\n    entities:\n      - entity: sensor.power_kw\n'];
+            return want.every(w => text.includes(w)) && !/showPoints/.test(text) && message === 'YAML copied to the clipboard' ? true : JSON.stringify({ text, message });
+        });
+        await t.step('the card\'s menu: Export ▸ YAML ▸ Complete — no entityOptions: each curve says what they give it; what another curve of its graph sets, each curve its own', async () => {
+            const { text } = await yaml(options, 'eo_0', 'full');
+            return !/entityOptions/.test(text) && text.includes('      - entity: sensor.power\n        lineMode: curves\n        dashMode: points\n      - entity: sensor.rain\n        lineMode: stepped\n        dashMode: solid\n') ? true : text;
+        });
+        const graphMenu = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(400); };
+        await t.step('a graph\'s menu: Export ▸ YAML ▸ Simplified — that graph only, with what the card gives it', async () => {
+            const { text } = await yaml(graphMenu, 'et_0', 'simple');
+            return text === 'type: line\ntitle: Power\nlineWidth: 3\nentities:\n  - entity: sensor.power\n    dashMode: points\n  - entity: sensor.rain\n    lineMode: stepped\n' ? true : text;
+        });
+        const curveMenu = async () => { await t.longPress(await t.E('legendPt(0,1)')); await t.wait(400); };
+        await t.step('a curve\'s menu: Export ▸ YAML ▸ Simplified — that curve only, with what the levels above give it', async () => {
+            const { text } = await yaml(curveMenu, 'et_0', 'simple');
+            return text === 'entity: sensor.rain\nlineMode: stepped\nlineWidth: 3\n' ? true : text;
+        });
+        await t.step('the clipboard refused (and no copy through a selection): nothing copied, said so', async () => {
+            await t.E(`(()=>{ window.__refuse = true; document.execCommand = () => false; })()`);
+            await options(); await t.E(`el.querySelector('#eo_0_export').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#eo_0_yaml').click()`); await t.wait(300); await t.E(`el.querySelector('#eo_0_yaml_simple').click()`); await t.wait(500);
+            const message = await t.E(`document.querySelector('#hec-label-tooltip')?.textContent ?? ''`);
+            return message === 'The clipboard refused the YAML' ? true : message;
+        });
+    }
+    done(await t.close());
+
+    // ── Export ▸ YAML with a look: simplified — look: written, the options it gives left to it;
+    // complete — they're written too, at every level (a color quoted: # would start a comment) ──
+    t = await openCard(card({ look: 'mini', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', color: '#ff0000' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('look: mini — simplified: look: mini, none of its options; complete: its options on the card, the graph and the curve', async () => {
+        const [simple, full] = await t.E(`[false, true].map(f => el.instance.yamlText({ kind: 'card' }, f))`);
+        const ok = /^look: mini$/m.test(simple) && !/lineWidth|interpolation/.test(simple) && simple.includes('      - entity: sensor.power\n        color: "#ff0000"\n')
+            && /^look: mini$/m.test(full) && /^lineWidth: 5$/m.test(full) && /^    lineWidth: 5$/m.test(full) && /^        lineWidth: 5$/m.test(full) && /^        interpolation: bspline$/m.test(full);
+        return ok ? true : JSON.stringify({ simple, full });
+    });
+    done(await t.close());
+
+    // ── interval: raw — a bar graph's Raw in the YAML (the bar entities drawn as curves), exported so ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'bar', interval: 'raw', entities: [{ entity: 'sensor.energy' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('interval: raw — the graph shown in Raw (its selector on it); its YAML exported with interval: raw', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, g = I.graphs[0]; return { interval: g.interval, selector: el.querySelector('#bd-' + g.id)?.value, yaml: I.yamlText({ kind: 'graph', g }, false) }; })()`);
+        return r.interval === 4 && r.selector === '4' && /^interval: raw$/m.test(r.yaml) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── CSV export ──
     t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true } });
@@ -656,7 +737,7 @@ module.exports = async function()
             return [f({ showMinMax: true }, 'rgba(0,0,0,0)'), f({ hecFillFade: true, hecFillColor: 'rgba(10, 20, 30, 0.15)' }, {}), f({}, 'rgba(1,2,3,0.15)'), f({}, 'rgba(0,0,0,0)')].join(' | '); })()`);
         return r === 'rgba(10, 20, 30, 0.3) | rgba(10, 20, 30, 0.15) | rgba(1,2,3,0.15) | rgba(0,0,0,0)' ? true : r;
     });
-    await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it removes the graph', async () => {
+    await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it arms it (its × red in a red circle, 1 s), a second one meanwhile removes the graph', async () => {
         await controlsAt(1000);
         await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
         const look = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, e=c._hecCloseButtonEl, s=e&&getComputedStyle(e), r=c._hecCloseButtonRect(), cr=c.canvas.getBoundingClientRect(), er=e.getBoundingClientRect();
@@ -666,10 +747,16 @@ module.exports = async function()
         await controlsAt(168); const narrow = await look(); await controlsAt(1000);
         const p = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, r=c._hecCloseButtonRect(), b=c.canvas.getBoundingClientRect(); return { x: b.left+r.x+12, y: b.top+r.y+12 }; })()`);
         const n0 = await t.E('el.instance.graphs.length');
-        await t.page.mouse.click(p.x, p.y); await t.wait(1200);
+        // (armed: the × in a circle, red; the graph still there)
+        const armed = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), e=g[g.length-1].chart._hecCloseButtonEl; return !!e.querySelector('svg circle') && /error-color/.test(e.querySelector('svg path').getAttribute('stroke')); })()`);
+        await t.page.mouse.click(p.x, p.y); await t.wait(200);
+        const once = { n: await t.E('el.instance.graphs.length'), armed: await armed() };
+        await t.wait(1200);
+        const later = { n: await t.E('el.instance.graphs.length'), armed: await armed() };
+        await t.page.mouse.click(p.x, p.y); await t.wait(400); await t.page.mouse.click(p.x, p.y); await t.wait(1200);
         const n1 = await t.E('el.instance.graphs.length'), stored = await t.E(`el.instance.store.has('sensor.wind_rad')`);
         return wide.yaml === 'false,false,false' && wide.text === '×' && wide.box === '16px 17px 8.5px' && wide.symbol === '8x8' && wide.right === wide.edge && wide.top === 3 && wide.margin === 16 + wide.edge + 4 && wide.zone === 'closeButton' && !wide.old
-            && narrow.margin === 4 && narrow.zone === 'closeButton' && n1 === n0 - 1 && !stored ? true : JSON.stringify({ wide, narrow, n0, n1, stored });
+            && narrow.margin === 4 && narrow.zone === 'closeButton' && once.n === n0 && once.armed && later.n === n0 && !later.armed && n1 === n0 - 1 && !stored ? true : JSON.stringify({ wide, narrow, n0, once, later, n1, stored });
     });
     await t.step('the legend\'s first line never left empty: its first label, value included, too wide beside the controls — a shorter form there', async () => {
         await t.E(`el.instance.addCurves(['sensor.power2'], 'default')`); await t.wait(1500);
@@ -1363,6 +1450,13 @@ module.exports = async function()
         const c = await t.E(`[el.instance.ui.darkMode, graphAt(0).chart.options.scales.yAxes[0].ticks.fontColor]`);
         return !!c[0] && /9b9b9b|155, ?155, ?155/i.test(String(c[1])) ? true : JSON.stringify(c);
     });
+    await t.step('Home Assistant switched to light, then back to dark: the labels and the grid in the new theme\'s colors each time', async () => {
+        const look = () => t.E(`(()=>{ const o = graphAt(0).chart.options.scales.yAxes[0]; return [el.instance.ui.darkMode, String(o.ticks.fontColor), String(o.gridLines.color)]; })()`);
+        await t.E('MOCK.dark = false; el.hass = mkHass()'); await t.wait(1200); const light = await look();
+        await t.E('MOCK.dark = true; el.hass = mkHass()'); await t.wait(1200); const dark = await look();
+        const isLight = c => !c[0] && /#333|51, ?51, ?51/.test(c[1]) && /0, ?0, ?0, ?0\.1/.test(c[2]), isDark = c => c[0] && /9b9b9b|155, ?155, ?155/i.test(c[1]) && /255, ?255, ?255, ?0\.1/.test(c[2]);
+        return isLight(light) && isDark(dark) ? true : JSON.stringify({ light, dark });
+    });
     await t.step('dark theme: the entity selector in the theme\'s colors, not the browser\'s white field', async () => {
         const c = await t.E(`(()=>{ const s=getComputedStyle(el.querySelector('#b7_0')); return [s.backgroundColor, s.color]; })()`);
         return !/255, ?255, ?255/.test(c[0]) ? true : JSON.stringify(c);
@@ -1771,6 +1865,26 @@ module.exports = async function()
                 const rows = ( await I.exportRows('history', ['sensor.power']) )['sensor.power'] ?? [];
                 return { pts, rows: rows.filter(x => mid(x.lu * 1000)).length, first: rows.length ? rows[0].lu * 1000 - t0 : null, n: rows.length }; })()`);
             return r.pts === 0 && r.rows === 0 && r.first === 0 && r.n > 3 ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // ── The state in force at a day's start repeating the last row of the day before (the two
+    // days asked apart): left out of the cache when it's merged — whatever the hour, midnight is
+    // no row of the source ──
+    {
+        const at = x => Date.parse(x + '+01:00'), NOW = at('2026-11-14T12:00:00'), rows = [];
+        for( let x = at('2026-11-13T13:00:00'); x < at('2026-11-14T00:00:00'); x += 6 * 60e3 ) rows.push([x, '20'], [x + 120e3, '0']);
+        for( let x = at('2026-11-14T00:10:00'); x < at('2026-11-14T11:00:00'); x += 22 * 60e3 ) rows.push([x, '20'], [x + 120e3, '0']);
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '12h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.pulse' }] }] },
+            { mock: { states: { 'sensor.pulse': { state: 0, unit: 'W', state_class: 'measurement' } }, rows: { 'sensor.pulse': rows.map(([x, v]) => [( NOW - x ) / 1000, v]) } },
+              clock: new Date(NOW).toISOString(), timezone: 'Europe/Berlin' });
+        await t.wait(4000);
+        await t.step('the day before held (its last row 0 at 23:56), the day asked apart (Home Assistant: 0 in force at 00:00): no row at 00:00 in the cache', async () => {
+            const r = await t.E(`(()=>{ const I = el.instance, m = ${at('2026-11-14T00:00:00')};
+                const all = I.cache.flatMap(s => s.hist.get('sensor.pulse') ?? []).map(x => +new Date(x.last_changed));
+                return { midnight: all.filter(x => x === m).length, before: all.filter(x => x < m).length }; })()`);
+            return r.midnight === 0 && r.before > 0 ? true : JSON.stringify(r);
         });
         done(await t.close());
     }

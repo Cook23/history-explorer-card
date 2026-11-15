@@ -158,7 +158,7 @@ const ENTITY_FIELD_SCOPE = {
     // (its graph's Y axes locked — the padlock, a gesture on a Y axis —: their ranges)
     yAxisLock     : 'local',
 };
-const LOCAL_ONLY_FIELDS = Object.keys(ENTITY_FIELD_SCOPE).filter(f => ENTITY_FIELD_SCOPE[f] === 'local');
+export const LOCAL_ONLY_FIELDS = Object.keys(ENTITY_FIELD_SCOPE).filter(f => ENTITY_FIELD_SCOPE[f] === 'local');
 
 // Two saved entries of one entity the same — what they say, not how it's written: whatever
 // the order of their fields, a field undefined as one absent (as saved); from another device
