@@ -415,7 +415,8 @@ export class CardOperations
     }
 
     // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
-    // showMinMax, showPoints) set to value on each, saved so — the graph rebuilt in its place. A width:
+    // showMinMax, showPoints) set to value on each, saved so — the graph rebuilt in its place
+    // (showPoints: shown as it is, see showCurvePoints). A width:
     // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
     // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
     // color chosen: kept as the curve's own (colorSet), its fill of its color following it
@@ -433,7 +434,9 @@ export class CardOperations
             const _yamlSize = field === 'width' ? this.yamlOptionOf(e, 'sizePoints') : undefined;
             if( _yamlSize !== undefined ) e.sizePoints = Math.max(_yamlSize, this.dotDiameterOf(value));
         }
-        this._rebuildInPlace(g);
+        // (the points: only their size changes — shown on the graph as it is, never built again:
+        // the curves in the tooltip mode, the tooltip open, the point hovered kept)
+        if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this._rebuildInPlace(g);
         this.writeLocalState();
     }
 
@@ -443,18 +446,7 @@ export class CardOperations
     toggleCurvePoints(g, entities)
     {
         const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        if( _curves.length ) this.setCurvePoints(g, _curves, _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
-    }
-
-    // The samples' dots of the curves among entities of graph g as show says (POINTS_VALUES:
-    // none, the hovered one only, all — see _pointRadii), saved as their showPoints
-    setCurvePoints(g, entities, show)
-    {
-        const _curves = entities.filter(e => this.isCurve(g, g.entities.indexOf(e)));
-        if( !_curves.length ) return;
-        for( const e of _curves ) e.showPoints = show;
-        this.showCurvePoints(g, _curves, show);
-        this.writeLocalState();
+        if( _curves.length ) this.setCurvesLook(g, _curves, 'showPoints', _curves.every(e => allPointsShown(this.resolveOption(e, 'showPoints'))) ? 'hover' : true);
     }
 
     // The tooltip's mode of the curves among entities of graph g (see tooltipModeOf) — for

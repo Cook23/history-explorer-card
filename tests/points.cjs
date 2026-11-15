@@ -335,8 +335,18 @@ module.exports = async function()
         await w(1, 1); const one = await lookG(1, 0);
         return four.size === 4 && five.size === 7 && five.r === 3.5 && one.size === 4 && one.r === 2 ? true : JSON.stringify({ four, five, one });
     });
+    await t.step('Points ▸ Hovered from the menu, then a long-press: the points changed on the graph as it is — never built again (the same chart)', async () => {
+        await t.E(`window.__chart = graphAt(0).chart`);
+        await t.longPress(await t.E('legendPt(0,0)')); await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Points ▸').click()`); await t.wait(200);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_points_sub a')].find(a=>a.textContent==='Hovered').click()`); await t.wait(1000);
+        const menu = await t.E(`({ same: graphAt(0).chart === window.__chart, r: graphAt(0).chart.data.datasets[0].pointRadius })`);
+        await t.longPress(await valuePt(0, 3));
+        const press = await t.E(`({ same: graphAt(0).chart === window.__chart, r: graphAt(0).chart.data.datasets[0].pointRadius })`);
+        return menu.same && menu.r === 0 && press.same && press.r > 0 ? true : JSON.stringify({ menu, press });
+    });
     await t.step('the long-press: None → All; All → Hovered (never None)', async () => {
-        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvePoints(g, [g.entities[0]], false); })()`); await t.wait(400);
+        await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.setCurvesLook(g, [g.entities[0]], 'showPoints', false); })()`); await t.wait(400);
         const none = await look(0);
         const p = await valuePt(0, 3); await t.longPress(p); const all = await look(0);
         await t.longPress(await valuePt(0, 3)); const hover = await look(0);

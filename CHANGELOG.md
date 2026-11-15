@@ -14,7 +14,7 @@ Changelog for the HA History Explorer Card.
 ### Added — `sizePoints`, the points' diameter; *Points* a list
 - `sizePoints`: a curve's dots' diameter, in px, at every level — the points shown, Alt's, the hovered one's guide; the tooltip's 2 px more. By default the line width + 2 px, as before. `showPoints` only says which points are shown: `hover`, `true`, `false` (a number, its former radius, is accepted: `true` with `sizePoints` twice it)
 - A width chosen in *Width ▸*: a `sizePoints` the YAML sets becomes the larger of it and the width + 2 px — never a dot hidden by its line; back to the YAML's for a thinner one; synced across devices as the width is
-- *Appearance ▸ Points* is a list (*None*, *Hovered*, *All*) instead of a switch: the switch wrote `true` or `hover` only — a YAML `showPoints: false` or a radius was lost after off and on. The long-press shows all the points, back to the hovered one when all are shown; *None* only from the list
+- *Appearance ▸ Points* is a list (*None*, *Hovered*, *All*) instead of a switch: the switch wrote `true` or `hover` only — a YAML `showPoints: false` or a radius was lost after off and on. The long-press shows all the points, back to the hovered one when all are shown; *None* only from the list. The list and the long-press set them the same way, on the graph as it is — never built again: the curves in the tooltip mode, the tooltip open kept
 - Tests (`points`, `appearance`, `menus`): the list, the one chosen in bold; `sizePoints` — the dots, the tooltip's, Alt's; `showPoints: 4`; Width 5 px then 1 px over a YAML `sizePoints: 4`; the long-press
 
 ### Fixed — a unit named "unknown"; the default type
