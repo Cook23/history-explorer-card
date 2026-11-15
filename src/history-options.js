@@ -208,6 +208,10 @@ const _percent = v => { const n = typeof v === 'string' && v.trim() !== '' ? Num
 // Each option's value in its one form, whatever the user wrote — the rest of the card only
 // ever sees that form
 const OPTION_VALUES = {
+    // (a curve's samples' dots: hover, true, false — a number, a radius in its former form:
+    // see normalizeOptions —; their diameter, in pixels)
+    showPoints    : v => v === true || v === false || v === 'hover' ? v : Number(v) > 0 ? Number(v) : undefined,
+    sizePoints    : v => Number(v) > 0 ? Number(v) : undefined,
     ymin          : _yBound,
     ymax          : _yBound,
     yminRight     : _yBound,
@@ -289,7 +293,7 @@ const OPTION_VALUES = {
         return /^\d+(\.\d+)?$/.test(t) ? t + 'h' : t;
     },
     // (true: everywhere; states is history)
-    showMinMax    : v => v === 'states' ? 'history' : v,
+    showMinMax    : v => minMaxValue(v),
     // (a number of points an hour > 0, else not set)
     pointsPerHour : v => Number(v) > 0 ? Number(v) : undefined,
     aggregateFunc : v => AGGREGATE_FUNCS.find(f => f === String(v).trim().toLowerCase()),
@@ -353,6 +357,9 @@ export function normalizeOptions(o)
     // draws its bars)
     if( r.interval === undefined && ( r.groupBy === 'date' || r.groupBy === 'hour' ) ) r.interval = r.groupBy === 'date' ? 'daily' : 'hourly';
     for( const [name, fn] of Object.entries(OPTION_VALUES) ) if( r[name] !== undefined && r[name] !== null ) r[name] = fn(r[name]);
+    // (showPoints: a number, a radius — its former form, accepted —: the points shown, that
+    // radius their diameter's half, unless sizePoints says it)
+    if( typeof r.showPoints === 'number' ) { r.sizePoints ??= 2 * r.showPoints; r.showPoints = true; }
     // (tooltipBehavior: the default of largeScreenTooltip and smallScreenTooltip — auto, theirs)
     if( r.tooltipBehavior && r.tooltipBehavior !== 'auto' ) { r.largeScreenTooltip ??= r.tooltipBehavior; r.smallScreenTooltip ??= r.tooltipBehavior; }
     return r;
@@ -402,7 +409,7 @@ export const ENTITY_OPTION_KEYS = ['color', 'hidden', 'name', 'scale', 'siConver
 // The options of every curve the card can set (CardConfig.resolveOption: the entity's, else
 // its graph's, else entityOptions', else the card's, else OPTION_DEFAULTS)
 export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor',
-    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip'];
+    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'sizePoints'];
 // An entity's options the card can set for every entity, as mini-graph-card does
 export const CARD_ENTITY_KEYS = ['color', 'fill', 'unit'];
 // The persistence options' categories (enablePersistence, enableMultidevicePersistence)
@@ -411,7 +418,7 @@ export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
 const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
-    'showPoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
+    'showPoints', 'sizePoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
     'showName', 'showIcon', 'icon', 'iconImage', 'alignHeader', 'alignIcon', 'alignState', 'fontSize', 'fontSizeHeader', 'nameAdaptiveColor', 'iconAdaptiveColor',
@@ -507,6 +514,41 @@ export function withLook(config)
         return c;
     }
     return { ..._look, ...c, uiLayout: { ..._look.uiLayout, ...c.uiLayout } };
+}
+
+// A curve's samples' dots (showPoints), in the order the Points submenu shows them: none
+// (not even the hovered one), the hovered one only, all
+export const POINTS_VALUES = [false, 'hover', true];
+// Whether showPoints v shows all the points
+export function allPointsShown(v)
+{
+    return v === true;
+}
+
+// The min/max band's values (showMinMax), in the order the Extremes submenu shows them: none,
+// both sides everywhere, only above the curve, only below it — everywhere —, both sides
+// where the curve comes from the statistics only, from the history only
+export const MIN_MAX_VALUES = [false, 'all', 'max', 'min', 'statistics', 'history'];
+// (the other names of a value: all — true, both —; history — states)
+const MIN_MAX_SYNONYMS = { all: [true, 'both'], history: ['states'] };
+
+// showMinMax in its one form (MIN_MAX_VALUES) — whatever the name it's written with —,
+// undefined for an unknown one
+export function minMaxValue(v)
+{
+    if( v === undefined || v === null ) return undefined;
+    const _n = Object.keys(MIN_MAX_SYNONYMS).find(k => MIN_MAX_SYNONYMS[k].includes(v));
+    return _n ?? ( MIN_MAX_VALUES.includes(v) ? v : undefined );
+}
+
+// Where and which sides of a curve's min/max band are drawn (showMinMax, any of its names):
+// { where: 'all' | 'statistics' | 'history', min: below the curve, max: above it }; null: none
+export function minMaxBand(v)
+{
+    const m = minMaxValue(v);
+    if( !m ) return null;
+    if( m === 'min' || m === 'max' ) return { where: 'all', min: m === 'min', max: m === 'max' };
+    return { where: m, min: true, max: true };
 }
 
 // A card's configuration in its one form as it's written (raw), the options its look gives

@@ -12,7 +12,7 @@
 //               what they give it
 
 import { OPTION_DEFAULTS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS,
-         lookParts } from "./history-options.js";
+         lookParts, minMaxValue } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { baseTypePure } from "./card-config.js";
 import { seriesOf } from "./history-series.js";
@@ -148,6 +148,8 @@ export class CardYaml
             return !e.colorSet && defaultColors.some(c => c.color === e.color && c.fill === f) ? undefined : f;
         }
         if( k === 'interval' ) return x.root === 'curve' && e.type === 'bar' ? e.interval : undefined;
+        // (its band by the value's own name — all, not true)
+        if( k === 'showMinMax' ) return minMaxValue(e.showMinMax);
         return e[_FIELD[k] ?? k];
     }
 

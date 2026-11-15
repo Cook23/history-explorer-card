@@ -3,7 +3,7 @@
 // menu — or removes. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { formatNumber } from "./history-units.js";
+import { formatNumber, unitOfState } from "./history-units.js";
 import { seriesAttributes, isAttributeGroup, seriesId, attributeLabel } from "./history-series.js";
 
 // The domains never offered by the entity selector (nothing to draw)
@@ -543,7 +543,7 @@ export class CardSelector
     _valueText(state)
     {
         const _stateVal = state?.state;
-        const _unit = state?.attributes?.unit_of_measurement;
+        const _unit = unitOfState(state);
         if( _stateVal === undefined || _stateVal === 'unavailable' || _stateVal === 'unknown' ) return '';
         const _numVal = Number(_stateVal);
         if( !isNaN(_numVal) ) return formatNumber(_numVal, this.pconfig.rounding) + (_unit ? ' ' + _unit : '');

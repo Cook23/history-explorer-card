@@ -282,8 +282,8 @@
 
   // ---------------------------------------------------------------------------
   // Samples shown — while _hecShowSamples is set (Alt held over the chart, see
-  // _hecSetShowSamples), each sample of a curve is drawn as a dot of a diameter of the line
-  // width + 2 px, the ones its dataset already shows keeping their own size; a point that
+  // _hecSetShowSamples), each sample of a curve is drawn as a dot of its dataset's
+  // hecDotDiameter (else the line width + 2 px), the ones its dataset already shows keeping their own size; a point that
   // only shapes the curve (hecVirtual) stays hidden
   // The radius of a point not hovered: its own (radius, from the dataset), else — Alt held —
   // a sample's; one rule for every point shown, whether by Alt or by the dataset, also when
@@ -293,10 +293,10 @@
     var _ds = chart.data.datasets[pt._datasetIndex] || {}, _d = (_ds.data || [])[pt._index];
     return _d && _d.hecVirtual ? radius : Chart.hecDotRadius(_ds);
   };
-  // The radius of a dot shown by default on a curve (Alt's, the one hovered): a diameter of
-  // its line width + 2 px
+  // The radius of a dot shown on a curve (Alt's, the hover's guide): its dataset's
+  // hecDotDiameter, else a diameter of its line width + 2 px
   Chart.hecDotRadius = function (ds) {
-    return ((+ds.borderWidth || 0) + 2) / 2;
+    return (+ds.hecDotDiameter > 0 ? +ds.hecDotDiameter : (+ds.borderWidth || 0) + 2) / 2;
   };
   Chart.plugins.register({
     id: 'hecShowSamples',
@@ -2367,6 +2367,8 @@
   // circles) around two symbols
   var CTRL_TOP = 3, CTRL_H = 17, CTRL_W = 16;
   var LOCK_W = 10, LOCK_H = 12, HANDLE_W = 6, HANDLE_H = 11, CLOSE_W = 8, CLOSE_H = 8, CHAIN_W = 10, CHAIN_H = 11, CTRL_END = 4, CTRL_GAP = 3;
+  // (the armed close button's circle: as wide as the handle's six dots' diagonal)
+  var CLOSE_ARMED_D = Math.hypot(HANDLE_W, HANDLE_H);
 
   // The padlock's two symbols (Material Design's lock and lock-open, outlined: the same body,
   // so the same bounds): closed — the Y axis locked —, open — its range following the curves
@@ -3343,12 +3345,13 @@
         _el.style.userSelect = 'none';
       }
       // (the ×, drawn: centred as it is seen — armed (hecArmClose), red in a red circle,
-      // Home Assistant's color of an error)
+      // Home Assistant's color of an error, the circle as wide as the handle's six dots'
+      // diagonal: CLOSE_ARMED_D)
       var _armed = me.hecCloseArmed();
       if (_el._hecArmed !== _armed) {
         _el._hecArmed = _armed;
         _el.innerHTML = _armed
-          ? '<svg width="' + CLOSE_H + '" height="' + CLOSE_H + '" viewBox="0 0 12 12" style="pointer-events:none;"><circle cx="6" cy="6" r="5.25" fill="none" stroke="var(--error-color, #db4437)" stroke-width="1.5"/><path d="M4,4L8,8M8,4L4,8" stroke="var(--error-color, #db4437)" stroke-width="1.5" stroke-linecap="round"/></svg>'
+          ? '<svg width="' + CLOSE_ARMED_D + '" height="' + CLOSE_ARMED_D + '" viewBox="0 0 12 12" style="pointer-events:none;"><circle cx="6" cy="6" r="5.25" fill="none" stroke="var(--error-color, #db4437)" stroke-width="1.5"/><path d="M4,4L8,8M8,4L4,8" stroke="var(--error-color, #db4437)" stroke-width="1.5" stroke-linecap="round"/></svg>'
           : '<svg width="' + CLOSE_W + '" height="' + CLOSE_H + '" viewBox="0 0 10 10" style="pointer-events:none;"><path d="M1,1L9,9M9,1L1,9" stroke="var(--primary-text-color)" stroke-width="1.5" stroke-linecap="round"/></svg>';
       }
       me._hecPlaceControlBox(_el, _r.x, _r.y, _r.width, _r.height, 'flex');

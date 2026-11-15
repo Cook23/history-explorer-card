@@ -4,7 +4,7 @@
 
 import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
-import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED } from "./history-options.js";
+import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand } from "./history-options.js";
 import { timeWeightedMean, circularMean } from "./history-stats.js";
 import { perf } from "./card-perf.js";
 import { minOf, maxOf, insertAll } from "./history-arrays.js";
@@ -306,16 +306,15 @@ export class CardDatasets
         }
     }
 
-    // Whether entity e's band (showMinMax) is drawn for a point of a column with count
-    // values — stat: statistics in it: true, everywhere; 'statistics', on the statistics
-    // only; 'history' ('states'), on the history only; nowhere else (a single value of the
-    // history has no band: what's shown is what was recorded)
+    // Entity e's band (showMinMax, see minMaxBand) for a point of a column with count values —
+    // stat: statistics in it —: drawn everywhere ('all', 'min', 'max'), on the statistics only,
+    // on the history only; nowhere else (a single value of the history has no band: what's
+    // shown is what was recorded) → its sides ({ min, max }), null: none
     _bandWanted(e, stat, count)
     {
-        const m = e.showMinMax;
-        if( !m ) return false;
-        if( !stat && count < 2 ) return false;
-        return m === true || ( m === 'statistics' ? stat : ( m === 'history' || m === 'states' ) ? !stat : false );
+        const b = minMaxBand(e.showMinMax);
+        if( !b || ( !stat && count < 2 ) ) return null;
+        return b.where === 'all' || ( b.where === 'statistics' ) === !!stat ? b : null;
     }
 
     // A curve's points: its values — or, in each column of pixels of the plot area
@@ -402,7 +401,9 @@ export class CardDatasets
             if( period ) p.statisticsPeriod = period;
             // (its band over its time only: Chart.js links it to the next point's only where
             // their times meet — see showMinMax)
-            if( this._bandWanted(e, stat, _agg.explicit ? 2 : group.length) ) Object.assign(p, { yMin: min, yMax: max, xMin: _from, xMax: _to });
+            // (one side only — min, max —: from the curve to that side)
+            const _band = this._bandWanted(e, stat, _agg.explicit ? 2 : group.length);
+            if( _band ) Object.assign(p, { yMin: _band.min ? min : y, yMax: _band.max ? max : y, xMin: _from, xMax: _to });
             s.push(p);
         };
         // (aggregated, a group without values of its own: the value in force (_carried) — or,

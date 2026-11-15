@@ -5,6 +5,7 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
+import { unitOfState } from "./history-units.js";
 import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS, STATS_EXPORT_PERIODS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
@@ -21,14 +22,23 @@ export function getDeviceClassPure(hass, entity)
     return seriesState(hass, entity)?.attributes?.device_class;
 }
 
+// Whether an entity is shown as a timeline when nothing sets its type, by its state: no
+// state class, no unit (unitOfState), its state not a number — one that tells nothing
+// (unavailable, unknown) isn't one: the two others decide
+export function isTimelineState(state)
+{
+    const s = state?.state;
+    const _number = s !== undefined && s !== null && String(s).trim() !== '' && !isNaN(Number(s));
+    return state?.attributes?.state_class == null && unitOfState(state) == null && !_number;
+}
+
 // The type an entity is shown as when nothing sets it (a YAML entity, the info panel): a
-// quantity that only adds up (total_increasing) as bars, no unit and not a measurement as a
-// timeline, anything else as a line (entities added from the card: detectDefaultType)
+// quantity that only adds up (total_increasing) as bars, a timeline (isTimelineState),
+// anything else as a line (entities added from the card: detectDefaultType)
 export function baseTypePure(hass, entity)
 {
-    const _attr = seriesState(hass, entity)?.attributes;
-    const uom = _attr?.unit_of_measurement, sc = _attr?.state_class;
-    return ( sc === 'total_increasing' ) ? 'bar' : ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+    const _state = seriesState(hass, entity);
+    return ( _state?.attributes?.state_class === 'total_increasing' ) ? 'bar' : isTimelineState(_state) ? 'timeline' : 'line';
 }
 
 // entityOptions in their one form (see normalizeOptions): each entry's — a list (with
@@ -176,7 +186,7 @@ export class CardConfig
 
     getUnitOfMeasure(entity, manualUnit)
     {
-        return ( manualUnit === undefined ) ? this.stateOf(entity)?.attributes?.unit_of_measurement : manualUnit;
+        return ( manualUnit === undefined ) ? unitOfState(this.stateOf(entity)) : manualUnit;
     }
 
     getStateClass(entity)
@@ -354,7 +364,7 @@ export class CardConfig
     //   - an angle (circular: unit °, state class measurement_angle) — arrowline
     //   - a quantity that only adds up (energy, gas, water, volume: state class
     //     total_increasing, or total with such a device class or unit) — bar
-    //   - no unit and not a measurement (a state, a count...) — timeline
+    //   - no state class, no unit, not a number (a state...) — timeline (isTimelineState)
     //   - any other measurement — line, smart mode (or the card's own lineMode)
     // (YAML graph entities without a type keep addGraph's own simpler rule.)
     detectDefaultType(entity_id)
@@ -368,7 +378,7 @@ export class CardConfig
         const type = entityOptions?.type ? entityOptions.type :
                      this.circularPeriodOf({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
                      _cumulative ? 'bar' :
-                     ( uom == undefined && sc !== 'measurement' && sc !== 'measurement_angle' ) ? 'timeline' : 'line';
+                     isTimelineState(this.stateOf(entity_id)) ? 'timeline' : 'line';
         const lineMode = entityOptions?.lineMode || this.pconfig.defaultLineMode || 'smart';
         return { type, lineMode };
     }

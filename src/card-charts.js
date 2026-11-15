@@ -5,7 +5,7 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { stateLabel, OPTION_DEFAULTS, DASH_MODES } from "./history-options.js";
+import { stateLabel, OPTION_DEFAULTS, DASH_MODES, minMaxBand } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
 import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
@@ -225,18 +225,23 @@ export class CardCharts
         };
     }
 
-    // The samples' dots of a curve of line width `width`: the entity's showPoints, else the
-    // graph's — true: a diameter of the line width + 2 px, as every dot shown by default
-    // (Alt's too, see deps/chart-hec.js); a number: that radius; hover (the default): only
-    // the hovered dot — the one the tooltip shows, 2 px wider than the dots shown (than the
-    // default ones when none is); false: none, not even the hovered one
-    _pointRadii(own, graph, width)
+    // The diameter of a curve's dots by default — sizePoints' — for a line width: 2 px more
+    dotDiameterOf(width)
+    {
+        return (+width || 0) + 2;
+    }
+
+    // The samples' dots of a curve of line width `width`: their diameter — size (sizePoints),
+    // else the line width + 2 px —, every dot of the curve that size (Alt's and the hover's
+    // guide too, see deps/chart-hec.js: hecDotDiameter), the one the tooltip shows 2 px wider;
+    // the entity's showPoints, else the graph's — true: all shown; hover (the default): only
+    // the hovered one; false: none, not even the hovered one
+    _pointRadii(own, graph, width, size)
     {
         const _v = own !== undefined ? own : graph;
-        const _default = ( (+width || 0) + 2 ) / 2;
-        if( _v === false ) return { pointRadius: 0, pointHoverRadius: 0 };
-        const _radius = _v === true ? _default : ( +_v > 0 ? +_v : 0 );
-        return { pointRadius: _radius, pointHoverRadius: ( _radius || _default ) + 1 };
+        const _d = +size > 0 ? +size : this.dotDiameterOf(width);
+        if( _v === false ) return { pointRadius: 0, pointHoverRadius: 0, hecDotDiameter: _d };
+        return { pointRadius: _v === true ? _d / 2 : 0, pointHoverRadius: _d / 2 + 1, hecDotDiameter: _d };
     }
 
     // Whether entity i of graph g is drawn as a curve (not a bar, not a timeline's row)
@@ -244,15 +249,6 @@ export class CardCharts
     {
         const _ds = g.chart.data.datasets[i];
         return !!_ds && !this.isRowGraph(g) && ( g.type === 'line' || _ds.type === 'line' );
-    }
-
-    // Whether every curve of graph g — of its entities given — shows its samples' dots
-    // (none: undefined)
-    curvesShowPoints(g, entities = g.entities)
-    {
-        if( this.isRowGraph(g) ) return undefined;
-        const _idx = entities.map(e => g.entities.indexOf(e)).filter(i => this.isCurve(g, i));
-        return _idx.length ? _idx.every(i => g.chart.data.datasets[i].pointRadius > 0) : undefined;
     }
 
     // Entity idx of graph g shown or hidden, the other way round (its dataset's hidden);
@@ -312,7 +308,7 @@ export class CardCharts
     {
         for( const e of entities ) {
             const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
-            if( _ds ) Object.assign(_ds, this._pointRadii(show, undefined, _ds.borderWidth));
+            if( _ds ) Object.assign(_ds, this._pointRadii(show, undefined, _ds.borderWidth, this.resolveOption(e, 'sizePoints')));
         }
         this.redrawChart(g);
     }
@@ -321,7 +317,7 @@ export class CardCharts
     {
         // (without its line: its points, unless they're asked for otherwise)
         const _points = !d.showLine && d.pointsMode === 'hover' ? true : d.showPoints;
-        const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius } = this._pointRadii(_points, config?.showPoints, d.width);
+        const { pointRadius: _pointRadius, pointHoverRadius: _pointHoverRadius, hecDotDiameter: _dot } = this._pointRadii(_points, config?.showPoints, d.width, d.sizePoints);
         return {
             // A curve in a bar graph (mixed bar/line): drawn as a line, never stacked
             type: ( graphtype == 'bar' && d.kind === 'line' ) ? 'line' : undefined,
@@ -339,6 +335,7 @@ export class CardCharts
             pointStyle: 'circle',
             pointBackgroundColor: d.bColor,
             pointHoverRadius: _pointHoverRadius,
+            hecDotDiameter: _dot,
             hitRadius: 5,
             showLine: d.showLine,
             stateMap: d.stateMap,
@@ -365,7 +362,7 @@ export class CardCharts
             hidden: d.hidden || d.notDrawn,
             notDrawn: d.notDrawn,
             legendHidden: d.legendHidden,
-            showMinMax: d.showMinMax ? true : false,
+            showMinMax: !!minMaxBand(d.showMinMax),
             siConversionFactor: d.siConversionFactor,
             borderJoinStyle: 'round',
             borderCapStyle: 'round',
@@ -535,7 +532,9 @@ export class CardCharts
                 const t = msOf(row.last_changed);
                 if( t >= x0 && t <= x1 ) continue;
                 let lo = _num(row.state), hi = lo;
-                if( e.showMinMax && row.statistics ) { lo = Math.min(lo, _num(row.statistics.min)); hi = Math.max(hi, _num(row.statistics.max)); }
+                const _band = row.statistics ? minMaxBand(e.showMinMax) : null;
+                if( _band?.min ) lo = Math.min(lo, _num(row.statistics.min));
+                if( _band?.max ) hi = Math.max(hi, _num(row.statistics.max));
                 if( !isNaN(lo) && !isNaN(hi) ) a.push({ x: t, lo: Math.min(lo, hi), hi: Math.max(lo, hi) });
             }
         }
@@ -989,6 +988,7 @@ export class CardCharts
                 "showPoints": d.showPoints,
                 // (its points as resolved — hover, the default: only the one hovered)
                 "pointsMode": this.resolveOption(d, 'showPoints'),
+                "sizePoints": this.resolveOption(d, 'sizePoints'),
                 "showMinMax": d.showMinMax,
                 "tooltip": this.tooltipModeOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)

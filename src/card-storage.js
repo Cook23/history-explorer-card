@@ -144,6 +144,7 @@ const ENTITY_FIELD_SCOPE = {
     lineMode      : 'devices',
     interpolation : 'devices',
     width         : 'devices',
+    sizePoints    : 'devices',
     showPoints    : 'local',
     largeScreenTooltip : 'local',
     smallScreenTooltip : 'local',
@@ -543,6 +544,15 @@ export class CardStorage
 
         // (the next free dynamic group id — the saved lists repaired above, never the merge)
         this.store.setNextGroupId();
+    }
+
+    // Option k of curve e as the YAML gives it — its own YAML line (as written, before what the
+    // card or another device made of it), else its graph's, entityOptions', the card's (see
+    // yamlEntryOf); a curve added from the card: what the levels give it
+    yamlOptionOf(e, k)
+    {
+        const _own = this._pureYamlEntities?.find(m => keyOf(m) === keyOf(e)) ?? { entity: e.entity, groupId: e.groupId };
+        return this.yamlEntryOf(_own)[k];
     }
 
     // One entity's entry, from its YAML entry — and as every level of the YAML gives it

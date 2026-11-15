@@ -305,6 +305,32 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── showMinMax: all, its other names (true, both), history's (states): each read as its own
+    // name, exported so ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: true }, { entity: 'sensor.rain', showMinMax: 'both' }] },
+                                                                      { type: 'line', entities: [{ entity: 'sensor.power_kw', showMinMax: 'states' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('showMinMax: true and both read as all, states as history; exported as all and history', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance; return { v: I.graphsInDisplayOrder().flatMap(g => g.entities.map(e => e.showMinMax)), yaml: I.yamlText({ kind: 'card' }, false) }; })()`);
+        return r.v.join() === 'all,all,history' && ( r.yaml.match(/showMinMax: all/g) ?? [] ).length === 2 && /showMinMax: history/.test(r.yaml) && !/showMinMax: (true|both|states)/.test(r.yaml) ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
+    // ── An entity's unit "unknown" (any case): no unit; the default type — a timeline only with no
+    // state class, no unit and a state that isn't a number (one telling nothing: the two others
+    // decide) —, the same for a YAML entity without a type and one added from the card ──
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ entities: [{ entity: 'sensor.u1' }] }, { entities: [{ entity: 'sensor.u2' }] }, { entities: [{ entity: 'sensor.u3' }] }] }),
+        { mock: { states: { 'sensor.u1': { state: 12, unit: 'Unknown' }, 'sensor.u2': { state: 5 }, 'sensor.u3': { state: 'heating' },
+                            'sensor.u4': { state: 'unavailable' }, 'sensor.u5': { state: 'unavailable', unit: 'W' }, 'sensor.u6': { state: 'unavailable', state_class: 'measurement' } } } });
+    await t.wait(1500);
+    await t.step('unit Unknown: no unit — none in the legend; types: a number without unit nor state class a line, a text a timeline; unavailable: a timeline without unit nor state class, a line with either', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, gs = I.graphsInDisplayOrder();
+            return { yaml: gs.map(g => g.type).join(), unit: I.getUnitOfMeasure('sensor.u1') ?? null, legend: graphAt(0).chart.data.datasets[0].label,
+                     added: ['sensor.u1', 'sensor.u2', 'sensor.u3', 'sensor.u4', 'sensor.u5', 'sensor.u6'].map(id => I.detectDefaultType(id).type).join() }; })()`);
+        return r.yaml === 'line,line,timeline' && r.unit === null && !/unknown/i.test(String(r.legend)) && r.added === 'line,line,timeline,timeline,line,line' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+
     // ── CSV export ──
     t = await openCard(card({ statistics: { enabled: true }, csv: { separator: ';' },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }] }), { mock: { series: true } });
@@ -737,7 +763,7 @@ module.exports = async function()
             return [f({ showMinMax: true }, 'rgba(0,0,0,0)'), f({ hecFillFade: true, hecFillColor: 'rgba(10, 20, 30, 0.15)' }, {}), f({}, 'rgba(1,2,3,0.15)'), f({}, 'rgba(0,0,0,0)')].join(' | '); })()`);
         return r === 'rgba(10, 20, 30, 0.3) | rgba(10, 20, 30, 0.15) | rgba(1,2,3,0.15) | rgba(0,0,0,0)' ? true : r;
     });
-    await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it arms it (its × red in a red circle, 1 s), a second one meanwhile removes the graph', async () => {
+    await t.step('a graph added from the card: its close button a floating icon at the top right, mirroring the handle\'s box — beside the legend\'s first line on a wide card, over it on a narrow one; none on a YAML graph; a click on it arms it (its × red in a red circle as wide as the handle\'s dots\' diagonal, 1 s), a second one meanwhile removes the graph', async () => {
         await controlsAt(1000);
         await t.E(`el.instance.addCurves(['sensor.wind_rad'], 'default')`); await t.wait(1500);
         const look = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, e=c._hecCloseButtonEl, s=e&&getComputedStyle(e), r=c._hecCloseButtonRect(), cr=c.canvas.getBoundingClientRect(), er=e.getBoundingClientRect();
@@ -748,7 +774,8 @@ module.exports = async function()
         const p = await t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), c=g[g.length-1].chart, r=c._hecCloseButtonRect(), b=c.canvas.getBoundingClientRect(); return { x: b.left+r.x+12, y: b.top+r.y+12 }; })()`);
         const n0 = await t.E('el.instance.graphs.length');
         // (armed: the × in a circle, red; the graph still there)
-        const armed = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), e=g[g.length-1].chart._hecCloseButtonEl; return !!e.querySelector('svg circle') && /error-color/.test(e.querySelector('svg path').getAttribute('stroke')); })()`);
+        const armed = () => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder(), e=g[g.length-1].chart._hecCloseButtonEl; const h=g[g.length-1].chart._hecMoveHandleIconEl.querySelector('svg'), d=Math.hypot(+h.getAttribute('width'), +h.getAttribute('height'));
+            return !!e.querySelector('svg circle') && /error-color/.test(e.querySelector('svg path').getAttribute('stroke')) && Math.abs(e.querySelector('svg').getBoundingClientRect().width - d) < 0.1; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(200);
         const once = { n: await t.E('el.instance.graphs.length'), armed: await armed() };
         await t.wait(1200);

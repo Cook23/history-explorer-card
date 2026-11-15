@@ -226,7 +226,7 @@ frontend:
 - `lineMode`: `smart` (the default from the UI: a curve, and a flat dashed line over the silences of a sensor), `curves` (the default in YAML), `lines`, `stepped`.
 - `interpolation` (curves and smart): `monotone` (default, never overshoots), `steffen`, `makima`, `catmullrom` (the smoothest), `bspline` (mini-graph-card's).
 - `dashMode`: `solid`, `points`, `shortlines`, `longlines`, `pointline` or a pattern `[10, 4]`; `lineWidth`; `fill`.
-- `showMinMax: true`: a band between the minimum and the maximum around the curve.
+- `showMinMax: all`: a band between the minimum and the maximum around the curve — `max` or `min`: only its half above or below the curve.
 - Angles (unit `°`) are drawn without a jump at 0/360 (`circular`).
 - `showUnavailable: true`: gaps where the entity was unavailable; `showMissingState: true`: gaps where a text state isn't in its `stateMap`.
 
@@ -368,7 +368,8 @@ graphs:
 | `showLine` | `show_line` | | ✓ | ✓ | ✓ | `false`: its points only, no line |
 | `showGraph` | `show_graph` | `show.graph: bar` / `line`: drawn | ✓ | ✓ | ✓ | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot, only its header and values |
 | `fixedValue` | `fixed_value` | | ✓ | ✓ | ✓ | `true`: its last value in the window, flat over the whole window |
-| `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all, the line width + 2 px wide, or a radius in px; `false` none |
+| `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all; `false` none (a number: all, that radius) |
+| `sizePoints` | | | ✓ | ✓ | ✓ | The dots' diameter in px — default: the line width + 2 px |
 | `tooltip.largeScreen` | `largeScreenTooltip`, `large_screen_tooltip` | | ✓ | ✓ | ✓ | The tooltip on a large screen (a window 640 px wide or more), unless `tooltip.largeChart` or `tooltip.smallChart` is set for the card's room: `mixed` (default) the value pointed at on any curve, at a hover or a click, and the curves clicked; `nearest` that value only; `selected` the curves clicked only; `all` that value and each other curve's value at the same time (or nearest, a few pixels away at most). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
 | `tooltip.smallScreen` | `smallScreenTooltip`, `small_screen_tooltip` | | ✓ | ✓ | ✓ | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
 | `tooltip.largeChart` | `largeChartTooltip`, `large_chart_tooltip` | | ✓ | ✓ | ✓ | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
@@ -377,7 +378,7 @@ graphs:
 | `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
 | `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
 | `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
-| `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `true` (everywhere), `statistics` or `history` (only where the curve comes from them) |
+| `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `all` (everywhere; `true`, `both`), `max` / `min` (only its half above / below the curve, everywhere), `statistics` or `history` (only where the curve comes from them), `false` |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
