@@ -3,17 +3,16 @@
 // rebuilt, removed. What one graph is for Chart.js is card-charts.js's. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
-import { defaultColors, colorSpec, fillValue } from "./history-default-colors.js";
+import { defaultColors, colorSpec, fillValue, NO_FILL } from "./history-default-colors.js";
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
-import { typesCompatible, GRAPH_SCOPE_KEYS, HEADER_ALIGNS, CURVE_OPTION_KEYS } from "./history-options.js";
+import { typesCompatible, GRAPH_SCOPE_KEYS, HEADER_ALIGNS, CURVE_LEVEL_KEYS, CURVE_FIELD_OF, CARD_ENTITY_KEYS, GRAPH_DEFAULTS } from "./history-options.js";
 
 // The icon of an entity without its own, by its device class (mini-graph-card's)
 const DEVICE_CLASS_ICONS = { humidity: 'mdi:water-percent', illuminance: 'mdi:brightness-5', temperature: 'mdi:thermometer',
     battery: 'mdi:battery', pressure: 'mdi:gauge', power: 'mdi:flash', signal_strength: 'mdi:wifi', motion: 'mdi:walk',
     door: 'mdi:door-closed', window: 'mdi:window-closed', presence: 'mdi:account', light: 'mdi:lightbulb' };
-import { baseTypePure } from "./card-config.js";
 import { appendAll, insertAll } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
@@ -22,6 +21,9 @@ const Chart = window.HXLocal_Chart;
 // and the plot's top then: Chart.js keeps ROWS_LABELS_ROOM above them anyway (half their
 // labels' height — a smaller padding changes nothing), the room added above it
 const ROWS_TOP_ROOM = 5, ROWS_LABELS_ROOM = 6;
+// A graph flagged (flagGraphs): its outline cleared that long after it's been seen, at the
+// latest that long after it was flagged (ms)
+const FLAG_SEEN_MS = 1500, FLAG_LATEST_MS = 15000;
 
 export class CardGraphs
 {
@@ -397,7 +399,7 @@ export class CardGraphs
         const { graphProps: _graphProps, options: entityOptions } = this._optionsInGraph(entity_id, groupId);
 
         // (let: becomes the graph's type below, once combined)
-        let type = ( entry?.type ?? entityOptions?.type ) || baseTypePure(this._hass, entity_id);
+        let type = ( entry?.type ?? entityOptions?.type ) || this.baseTypeOf(entity_id);
 
         // The entity's single source of truth: entry is already the
         // pconfig.entities entry when the caller has one (the `_pe ?? en` pattern used
@@ -486,7 +488,7 @@ export class CardGraphs
         // configured one. Needed before the graph is built: it decides how bar entities
         // are drawn (bars, or raw curves for interval 4).
         const _graphInterval = interval ?? entities.map(e => e.interval).find(v => v !== undefined && v !== null)
-            ?? entityOptions?.interval ?? this.pconfig.defaultInterval;
+            ?? entityOptions?.interval ?? this.resolveOption(null, 'interval');
         entityOptions._graphInterval = _graphInterval;
 
         const _graphHeight = _graphProps.height ?? entityOptions?.height;
@@ -560,7 +562,10 @@ export class CardGraphs
         // Only keys the graph actually sets: a plain spread would let every graph-level key
         // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
         const _definedGraphProps = Object.fromEntries(Object.entries(graphProps).filter(([, v]) => v !== undefined));
-        return { graphProps, options: { ...this.pconfig.cardGraphDefaults, ...this.getEntityOptions(entity_id), ..._definedGraphProps, groupId } };
+        // (the card's for every entity — its color, fill and unit, as mini-graph-card sets them —
+        // and every graph — those of its scope —, under their defaults)
+        const _card = Object.fromEntries([...CARD_ENTITY_KEYS, ...GRAPH_SCOPE_KEYS].map(k => [k, this.pconfig.cardOptions[k]]).filter(([, v]) => v !== undefined));
+        return { graphProps, options: { ...GRAPH_DEFAULTS, ..._card, ...this.getEntityOptions(entity_id), ..._definedGraphProps, groupId } };
     }
 
     // The options of a curve the levels above its own line give it — its graph's,
@@ -571,19 +576,18 @@ export class CardGraphs
     // properties (yAxis, showState, showStats, showStateFor, showStatsFor): an exception agreed
     // by the user (CLAUDE.md, STANDARD) — they belong to the graph, resolved from it when drawn
     // (resolveYAxis, _resolveShow)
-    _levelFields(options, id, groupId)
+    _levelFields(id, groupId)
     {
-        const o = options ?? {}, P = this.pconfig, at = { entity: id, groupId };
-        return {
-            dashMode: o.dashMode ?? P.defaultDashMode, width: o.lineWidth ?? P.defaultLineWidth, lineMode: o.lineMode ?? P.defaultLineMode,
-            interpolation: this.resolveInterpolation(at),
-            scale: o.scale, netBars: o.netBars ?? P.defaultNetBars, showPoints: o.showPoints ?? P.defaultShowPoints,
-            showMinMax: o.showMinMax ?? P.defaultShowMinMax, name: o.name, siConversionFactor: o.siConversionFactor,
-            unit: o.unit, process: o.process, circular: o.circular,
-            rounding: this.roundingOf(at), tapAction: this.tapActionOf(at),
-            showCurrentValues: this.showsCurrentValue(at),
-            ...Object.fromEntries(CURVE_OPTION_KEYS.map(k => [k, this.resolveOption(at, k)])),
-        };
+        const at = { entity: id, groupId };
+        return Object.fromEntries(CURVE_LEVEL_KEYS.map(k => [CURVE_FIELD_OF[k] ?? k, this.resolveOption(at, k)]));
+    }
+
+    // The names of curve e's options copied onto it (_levelFields: their YAML names) — what's
+    // a curve's, as the YAML export writes it
+    curveOptionNames(e)
+    {
+        const _yaml = Object.fromEntries(Object.entries(CURVE_FIELD_OF).map(([k, f]) => [f, k]));
+        return Object.keys(this._levelFields(e.entity, e.groupId ?? null)).map(f => _yaml[f] ?? f);
     }
 
     // A YAML entry as the entity gets it from every level of the YAML — its own line, then
@@ -594,7 +598,7 @@ export class CardGraphs
     yamlEntryOf(e)
     {
         const o = this._optionsInGraph(e.entity, e.groupId ?? null).options;
-        const L = { type: o.type, color: o.color, fill: o.fill, ...this._levelFields(o, e.entity, e.groupId ?? null) }, out = { ...e };
+        const L = { type: o.type, color: o.color, fill: o.fill, ...this._levelFields(e.entity, e.groupId ?? null) }, out = { ...e };
         for( const k in L ) if( out[k] === undefined && L[k] !== undefined ) out[k] = L[k];
         return out;
     }
@@ -615,10 +619,10 @@ export class CardGraphs
         if( color ) {
             e.color = color;
             // (its own fill, else the default one — the card's, its graph's or entityOptions')
-            e.fill = fill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
+            e.fill = fill ?? entityOptions?.fill ?? NO_FILL;
         } else if( entityOptions?.color ) {
             e.color = entityOptions?.color;
-            e.fill = _ownFill ?? entityOptions?.fill ?? 'rgba(0,0,0,0)';
+            e.fill = _ownFill ?? entityOptions?.fill ?? NO_FILL;
             e.colorSet = true;
         } else if( e.color === "#000000" ) {
             const c = this.getNextDefaultColor();
@@ -632,13 +636,13 @@ export class CardGraphs
             e.paletteColor = e.paletteColor ?? this.getNextDefaultColor().color;
 
         // (every option of the curve the levels give it: its own from now on — see _levelFields)
-        const L = this._levelFields(entityOptions, e.entity, entityOptions?.groupId ?? null);
+        const L = this._levelFields(e.entity, entityOptions?.groupId ?? null);
         for( const k in L ) e[k] = e[k] ?? L[k];
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
 
         if( type == 'bar' ) {
             e.fill = e.color;
-            e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? 'lines';
+            e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? this.defaultLineModeOf(type);
         }
 
         return _ownFill;
@@ -854,15 +858,16 @@ export class CardGraphs
     }
 
     // Flags graphs — those already showing an entity being added again: a dashed red
-    // outline (Chart.hecUi.outline), cleared 1.5 s after it's been seen — right away if
-    // the graph is on screen, else once it scrolls into view, at the latest after 15 s.
+    // outline (Chart.hecUi.outline), cleared FLAG_SEEN_MS after it's been seen — right away
+    // if the graph is on screen, else once it scrolls into view, at the latest after
+    // FLAG_LATEST_MS.
     flagGraphs(graphs)
     {
         for( const g of graphs ) {
             const _w = g?.canvas?.parentNode;
             if( !_w ) continue;
             Chart.hecUi.outline(_w, false);
-            const _clearSoon = () => setTimeout(() => Chart.hecUi.clearOutline(_w), 1500);
+            const _clearSoon = () => setTimeout(() => Chart.hecUi.clearOutline(_w), FLAG_SEEN_MS);
             const _r = _w.getBoundingClientRect();
             if( _r.top >= 0 && _r.bottom <= window.innerHeight ) { _clearSoon(); continue; }
             const _obs = new IntersectionObserver((entries) => {
@@ -871,7 +876,7 @@ export class CardGraphs
                 clearTimeout(_late);
                 _clearSoon();
             }, { threshold: 0.1 });
-            const _late = setTimeout(() => { _obs.disconnect(); Chart.hecUi.clearOutline(_w); }, 15000);
+            const _late = setTimeout(() => { _obs.disconnect(); Chart.hecUi.clearOutline(_w); }, FLAG_LATEST_MS);
             _obs.observe(_w);
         }
     }

@@ -1022,12 +1022,12 @@
     // end() on any sign that it's gone — its leaving, a cancel, or a pen still (penHover: a
     // hovering pen is never still, the hand trembles; it may also have gone out of range,
     // sending nothing). Each called once per hover
-    hover: function (el, start, end) {
+    hover: function (el, start, end, move) {
       var _on = false;
       var _start = function () { if (!_on) { _on = true; start(); } };
       var _end = function () { if (_on) { _on = false; end(); } };
-      el.addEventListener('pointerdown', _start);
-      el.addEventListener('pointermove', function (e) { _start(); hecUi.penHover(el, e, _end); });
+      el.addEventListener('pointerdown', function (e) { _start(); if (move) move(e); });
+      el.addEventListener('pointermove', function (e) { _start(); hecUi.penHover(el, e, _end); if (move) move(e); });
       ['pointerleave', 'pointercancel'].forEach(function (t) { el.addEventListener(t, function () { hecUi.penHover(el, null); _end(); }); });
     },
 
@@ -2356,9 +2356,9 @@
   }
 
   // The Y labels shown on a hover (ticks.hecShowOnHover): how long they take to fade in or
-  // out (as mini-graph-card's), and how long they stay after a touch, which has no hover
+  // out (as mini-graph-card's) — after a touch, which has no hover, they stay their reading
+  // time (_hecHoverLabelsText)
   var LABELS_FADE = 250;
-  var LABELS_TOUCH_TIME = 3000;
 
   // The floating icons at the top (the handle, the padlock, the close button): each symbol
   // drawn as it is seen, centred in a box a few px larger, all the boxes on one line — from
@@ -3087,6 +3087,16 @@
 
     // ── Y labels shown on a hover (ticks.hecShowOnHover) ──
 
+    // What the labels shown on a hover say: each such scale's tick labels and its title
+    _hecHoverLabelsText: function () {
+      var me = this;
+      return Object.keys(me.scales || {}).map(function (id) { return me.scales[id]; }).filter(function (s) {
+        return s.options.ticks && s.options.ticks.hecShowOnHover;
+      }).map(function (s) {
+        return (s.ticks || []).concat(s.options.scaleLabel && s.options.scaleLabel.display ? [s.options.scaleLabel.labelString] : []).join(' ');
+      }).join(' ');
+    },
+
     // How opaque the labels of scale are drawn: 1, or with ticks.hecShowOnHover, as much as
     // the pointer being over the graph has made them (_hecSetPointerOver)
     _hecLabelsAlphaOf: function (scale) {
@@ -3094,11 +3104,12 @@
     },
 
     // The pointer over the graph (over) or not: the labels shown on a hover faded in or out
-    // (LABELS_FADE). A touch, which has no hover: shown for LABELS_TOUCH_TIME after it.
+    // (LABELS_FADE). A touch, which has no hover: shown for their reading time after it
+    // (hecUi.readingTime of _hecHoverLabelsText).
     _hecSetPointerOver: function (over, pointerType) {
       var me = this;
       clearTimeout(me._hecPointerOverTimer);
-      if (over && pointerType === 'touch') me._hecPointerOverTimer = setTimeout(function () { me._hecSetPointerOver(false); }, LABELS_TOUCH_TIME);
+      if (over && pointerType === 'touch') me._hecPointerOverTimer = setTimeout(function () { me._hecSetPointerOver(false); }, Chart.hecUi.readingTime(me._hecHoverLabelsText()));
       if (!!me._hecPointerOver === !!over) return;
       me._hecPointerOver = !!over;
       var _hover = (me.options.scales && me.options.scales.yAxes || []).some(function (a) { return a.ticks && a.ticks.hecShowOnHover; });

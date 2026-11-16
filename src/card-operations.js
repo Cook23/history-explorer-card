@@ -355,7 +355,7 @@ export class CardOperations
             this.updateHistory();
         } else {
             g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
-            this._keepFill(this._rebuildInPlace(g, { fill: null }));
+            this._keepFill(this.rebuildInPlace(g, { fill: null }));
         }
         this.writeLocalState();
     }
@@ -403,7 +403,7 @@ export class CardOperations
 
     // Graph g built again in its place, from its entities (options: more addGraph options for
     // each, see rebuildGraph) → its entities
-    _rebuildInPlace(g, options = {})
+    rebuildInPlace(g, options = {})
     {
         const _entities = g.entities;
         const _nextG = this.nextGraph(g);
@@ -415,7 +415,7 @@ export class CardOperations
     }
 
     // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
-    // showMinMax, showPoints) set to value on each, saved so — the graph rebuilt in its place
+    // showMinMax, showPoints, yAxis — its side, the Behavior submenu's) set to value on each, saved so — the graph rebuilt in its place
     // (showPoints: shown as it is, see showCurvePoints). A width:
     // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
     // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
@@ -436,7 +436,7 @@ export class CardOperations
         }
         // (the points: only their size changes — shown on the graph as it is, never built again:
         // the curves in the tooltip mode, the tooltip open, the point hovered kept)
-        if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this._rebuildInPlace(g);
+        if( field === 'showPoints' ) this.showCurvePoints(g, entities, value); else this.rebuildInPlace(g);
         this.writeLocalState();
     }
 

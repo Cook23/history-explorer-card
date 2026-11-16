@@ -54,8 +54,9 @@ module.exports = async function()
                 // (yesterday and today until 20 minutes ago: the 5-minute statistics, 33 then 36)
                 { layer: 'fine', slot: 1, rows: every(day(1), day(0), 300e3, t => 33, S) },
                 { layer: 'fine', slot: 0, rows: every(day(0), now - 20 * 60e3, 300e3, t => 36, S) },
-                // (the last 15 minutes: the history after the statistics, 43 then 44)
-                { layer: 'hist', slot: 0, rows: every(now - 15 * 60e3, now, 300e3, t => t < now - 8 * 60e3 ? 43 : 44, H) },
+                // (the last 15 minutes: the history after the statistics, 43 then 44 — each row in
+                // its day's slot, whatever the hour)
+                ...[1, 0].map(slot => ({ layer: 'hist', slot, rows: every(now - 15 * 60e3, now, 300e3, t => t < now - 8 * 60e3 ? 43 : 44, H).filter(r => ( r.last_changed < day(0) ) === ( slot === 1 )) })),
             ]; }`));
         return r.source === 'fine' && r.n > 100 && r.back === -1 && r.wrong.length === 0 && r.plateaus === 0 ? true : JSON.stringify(r);
     });
@@ -89,8 +90,9 @@ module.exports = async function()
     await t.step('the history alone, a source silent three hours: a plateau holding its last value, then the curve again', async () => {
         const r = await t.E(draw(`(day, now, H, S) => { const every = ${every};
             const a = now - 20 * 3600e3, b = now - 8 * 3600e3, c = now - 5 * 3600e3;
-            return [{ layer: 'hist', slot: 0, rows: [...every(a, b, 60e3, t => 20 + ( t / 60e3 ) % 5, H), ...every(c, now, 60e3, t => 30 + ( t / 60e3 ) % 5, H)] },
-                    { layer: 'hist', slot: 1, rows: [] }]; }`));
+            // (each row in its day's slot — whatever the hour: the silence may be yesterday's)
+            const rows = [...every(a, b, 60e3, t => 20 + ( t / 60e3 ) % 5, H), ...every(c, now, 60e3, t => 30 + ( t / 60e3 ) % 5, H)];
+            return [{ layer: 'hist', slot: 1, rows: rows.filter(r => r.last_changed < day(0)) }, { layer: 'hist', slot: 0, rows: rows.filter(r => r.last_changed >= day(0)) }]; }`));
         return r.source === 'history' && r.back === -1 && r.wrong.length === 0 && r.plateaus >= 1 ? true : JSON.stringify(r);
     });
     done(await t.close());

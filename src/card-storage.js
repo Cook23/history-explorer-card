@@ -6,7 +6,7 @@
 import { i18n } from "./languages.js";
 import { keyOf, repairedGroupIds, PLACEMENT_FIELDS } from "./history-entity-store.js";
 import { GESTURE_SETTINGS, clampGesture, gestureSettings, applyGestures } from "./gesture-settings.js";
-import { PERSISTENCE_CATEGORIES } from "./history-options.js";
+import { PERSISTENCE_CATEGORIES, listOf } from "./history-options.js";
 import { Version } from "./version.js";
 
 // --------------------------------------------------------------------------------------
@@ -144,6 +144,7 @@ const ENTITY_FIELD_SCOPE = {
     lineMode      : 'devices',
     interpolation : 'devices',
     width         : 'devices',
+    yAxis         : 'devices',
     sizePoints    : 'devices',
     showPoints    : 'local',
     largeScreenTooltip : 'local',
@@ -172,6 +173,19 @@ function sameEntry(a, b, devices)
         ? JSON.stringify(Object.keys(e).filter(k => e[k] !== undefined && ( !devices || !LOCAL_ONLY_FIELDS.includes(k) )).sort().map(k => [k, e[k]]))
         : JSON.stringify(e ?? null);
     return _canon(a) === _canon(b);
+}
+
+// The last one to speak wins (CLAUDE.md), for one value of the card: where it's taken from —
+// 'yaml' when the YAML spoke (its value now not its image: set, changed or removed — removed,
+// its default back), winning if both did; else 'ha' when Home Assistant's spoke (multi: synced
+// across devices); else 'local', this device's as it is. Neither kept (multi, local): the YAML's
+function lastToSpeak({ yaml, yamlImage, ha, haImage, multi = true, local = true })
+{
+    const _same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    if( !multi && !local ) return 'yaml';
+    if( !_same(yaml, yamlImage) ) return 'yaml';
+    if( multi && ha !== undefined && !_same(ha, haImage) ) return 'ha';
+    return 'local';
 }
 
 // The fields a source spoke of — those its entry now says otherwise than its image (what it
@@ -510,8 +524,7 @@ export class CardStorage
         const _yamlIds = _yamlEntities.map(keyOf);
         const _staticIds = this._resolveOrder(
             _yamlIds, _yamlIds, _yamlMirror.map(keyOf),
-            _ids(_haEntities, true), _ids(_haMirror, true), _ids(_lsEntities, true),
-            _staticOrder.multi || _staticOrder.local, _staticOrder.multi
+            _ids(_haEntities, true), _ids(_haMirror, true), _ids(_lsEntities, true), _staticOrder
         );
 
         // Dynamic entities another device added only reach this device if multi-device
@@ -529,8 +542,7 @@ export class CardStorage
         ])];
         const _dynamicIds = this._resolveOrder(
             _dynamicCandidates, null, null,
-            _ids(_haEntities, false), _ids(_haMirror, false), _ids(_lsEntities, false),
-            _dynamicOrder.multi || _dynamicOrder.local, _dynamicOrder.multi
+            _ids(_haEntities, false), _ids(_haMirror, false), _ids(_lsEntities, false), _dynamicOrder
         );
 
         const _entityIds = new Set([
@@ -641,99 +653,67 @@ export class CardStorage
     // Persisted by default only on a card without static entities (noStatics)
     _resolveTimeRange(_ls, _haCard, _yamlImage, noStatics)
     {
-        const _range = this._cardPersists('range', noStatics);
-        // HA user front (compare HA user value to its mirror in localStorage)
-        const _haTimeChanged = _range.multi &&
-            _haCard?.timeRangeHours !== undefined && (
-            _haCard.timeRangeHours   !== _ls?.ha_timeRangeHours ||
-            _haCard.timeRangeMinutes !== _ls?.ha_timeRangeMinutes
-        );
-        // YAML front — compared with the YAML image only
-        const _yamlTimeChanged = this.pconfig.yamlDefaultTimeRange !== undefined &&
-                                 this.pconfig.yamlDefaultTimeRange !== _yamlImage?.yaml_defaultTimeRange;
-
-        if( !_range.multi && !_range.local ) {
-            // Nothing enabled for range — nothing persists, always the YAML default
-            this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
-        } else if( _yamlTimeChanged || _haTimeChanged ) {
-            // YAML wins if both changed
-            if( _yamlTimeChanged ) {
-                this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
-            } else {
-                // HA user wins (only reachable when enable_multidevice_persistence covers range)
-                if( _haCard.timeRangeHours > 0 )
-                    this.applyTimeRange(this.validateRange(_haCard.timeRangeHours));
-                else if( _haCard.timeRangeMinutes > 0 )
-                    this.applyTimeRangeMinutes(_haCard.timeRangeMinutes);
-            }
-        } else {
-            // Local restore — reachable since at least one of the two options is enabled
-            if( _ls?.timeRangeHours > 0 )
-                this.applyTimeRange(this.validateRange(_ls.timeRangeHours));
-            else if( _ls?.timeRangeMinutes > 0 )
-                this.applyTimeRangeMinutes(_ls.timeRangeMinutes);
-        }
+        const _range = ( h, m ) => ( { h, m } );
+        const _who = lastToSpeak({ yaml: this.pconfig.yamlDefaultTimeRange, yamlImage: _yamlImage?.yaml_defaultTimeRange,
+                                   ha: _haCard?.timeRangeHours !== undefined ? _range(_haCard.timeRangeHours, _haCard.timeRangeMinutes) : undefined,
+                                   haImage: _range(_ls?.ha_timeRangeHours, _ls?.ha_timeRangeMinutes), ...this._cardPersists('range', noStatics) });
+        if( _who === 'yaml' ) return this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
+        const _from = _who === 'ha' ? _haCard : _ls;
+        if( _from?.timeRangeHours > 0 )
+            this.applyTimeRange(this.validateRange(_from.timeRangeHours));
+        else if( _from?.timeRangeMinutes > 0 )
+            this.applyTimeRangeMinutes(_from.timeRangeMinutes);
     }
 
     // --- Last one to speak wins — the magnifier's mode ---
     // Resolved as the time range is (_cardPersists('range')), its YAML being
-    // defaultMagnifierMode: nothing kept, the YAML's; the YAML when it changed (winning if
-    // both did), else Home Assistant's when it changed (persisted across devices), else
-    // this device's
+    // defaultMagnifierMode
     _resolveZoomBox(_ls, _haCard, _yamlImage, noStatics)
     {
-        const _range = this._cardPersists('range', noStatics);
-        const _haChanged = _range.multi && _haCard?.zoomBox !== undefined && _haCard.zoomBox !== _ls?.ha_zoomBox;
-        const _yamlChanged = this.pconfig.yamlDefaultMagnifierMode !== undefined &&
-                             this.pconfig.yamlDefaultMagnifierMode !== _yamlImage?.yaml_defaultMagnifierMode;
-        const _mode = !_range.multi && !_range.local || _yamlChanged ? this.pconfig.defaultMagnifierMode
-                    : _haChanged ? _haCard.zoomBox : _ls?.zoomBox;
+        const _who = lastToSpeak({ yaml: this.pconfig.yamlDefaultMagnifierMode, yamlImage: _yamlImage?.yaml_defaultMagnifierMode,
+                                   ha: _haCard?.zoomBox, haImage: _ls?.ha_zoomBox, ...this._cardPersists('range', noStatics) });
+        const _mode = _who === 'yaml' ? undefined : _who === 'ha' ? _haCard.zoomBox : _ls?.zoomBox;
         this.setZoomBoxMode(_mode ?? this.pconfig.defaultMagnifierMode, false);
     }
 
     // --- Last one to speak wins — the statistics export's period ---
     // Kept on this device only, whatever the persistence options (as a curve's tooltip mode:
     // nothing another device would use); its YAML being csv.statisticsPeriod: the YAML's when
-    // it changed, else this device's
+    // it spoke, else this device's
     _resolveExportStatsPeriod(_ls, _yamlImage)
     {
-        const _yamlChanged = this.pconfig.yamlExportStatsPeriod !== undefined &&
-                             this.pconfig.yamlExportStatsPeriod !== _yamlImage?.yaml_exportStatsPeriod;
-        this.setExportStatsPeriod(_yamlChanged ? null : _ls?.exportStatsPeriod ?? null, false);
+        const _who = lastToSpeak({ yaml: this.pconfig.yamlExportStatsPeriod, yamlImage: _yamlImage?.yaml_exportStatsPeriod, multi: false });
+        this.setExportStatsPeriod(_who === 'yaml' ? null : _ls?.exportStatsPeriod ?? null, false);
     }
 
     // --- Last one to speak wins — the info panel's switch ---
-    // Its YAML value (defaultInfoPanel) and its HA value each compared with their image,
-    // YAML winning if both changed. Returns whether the switch changed here.
+    // Synced on every device of the user, whatever the persistence options (an exception
+    // agreed by the user, CLAUDE.md), its YAML being defaultInfoPanel (removed: off, its
+    // default). Returns whether the switch changed here.
     _resolveInfoPanel(_ls, _haInfoEnabled, _yamlImage)
     {
-        const _haInfoChanged = _haInfoEnabled !== undefined &&
-                               _haInfoEnabled !== _ls?.ha_infoPanelEnabled;
-        const _yamlInfoChanged = this.pconfig.defaultInfoPanel !== undefined &&
-                                 this.pconfig.defaultInfoPanel !== _yamlImage?.yaml_defaultInfoPanel;
-        // (neither changed: the switch stays as read from localStorage when the module loaded)
-        if( !_yamlInfoChanged && !_haInfoChanged ) return false;
+        const _who = lastToSpeak({ yaml: this.pconfig.defaultInfoPanel, yamlImage: _yamlImage?.yaml_defaultInfoPanel, ha: _haInfoEnabled, haImage: _ls?.ha_infoPanelEnabled });
+        // (neither spoke: the switch stays as read from localStorage when the module loaded)
+        if( _who === 'local' ) return false;
 
-        const _active = _yamlInfoChanged ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
+        const _active = _who === 'yaml' ? !!this.pconfig.defaultInfoPanel : _haInfoEnabled;
         if( _active === infoPanelEnabled ) return false;
         infoPanelEnabled = _active;
         return true;
     }
 
     // --- Last one to speak wins — the gesture thresholds (super-global) ---
-    // Each of them on its own: its YAML value (gestures:) and its HA value (set from the
-    // options menu, on any device, by any card) each compared with their image, YAML
-    // winning if both changed; else it stays as this device has it
+    // Each of them on its own, synced on every device of the user whatever the persistence
+    // options (an exception agreed by the user, CLAUDE.md): its YAML value (gestures:;
+    // removed, its default) and its HA value (set from the options menu, on any device, by
+    // any card); else it stays as this device has it
     _resolveGestures(_ls, _haGestures, _yamlImage)
     {
         const _set = {};
         for( const k in GESTURE_SETTINGS ) {
-            const _yaml = this.pconfig.gestures?.[k];
-            const _yamlChanged = _yaml !== undefined && _yaml !== _yamlImage?.yaml_gestures?.[k];
-            const _ha = _haGestures?.[k];
-            const _haChanged = _ha !== undefined && _ha !== _ls?.ha_gestures?.[k];
-            if( _yamlChanged ) _set[k] = _yaml;
-            else if( _haChanged ) _set[k] = _ha;
+            const _who = lastToSpeak({ yaml: this.pconfig.gestures?.[k], yamlImage: _yamlImage?.yaml_gestures?.[k], ha: _haGestures?.[k], haImage: _ls?.ha_gestures?.[k] });
+            if( _who === 'yaml' ) _set[k] = this.pconfig.gestures?.[k] ?? GESTURE_SETTINGS[k].def;
+            else if( _who === 'ha' ) _set[k] = _haGestures[k];
         }
         keepGestures(_set);
     }
@@ -866,11 +846,13 @@ export class CardStorage
     // categories. 'all' expands to every category valid for the given scope; 'none' resolves
     // to an explicitly empty Set — distinct from returning undefined for an unset value, so
     // callers can tell "explicitly disabled" apart from "not configured, use the contextual
-    // default" (see _resolvePersistenceDefault).
-    normalizePersistenceCategories(value, allCategories)
+    // default" (see _resolvePersistenceDefault). Each value read as every list's (listOf,
+    // option: the option's name): its case and spaces ignored, an unknown one left out with
+    // a warning.
+    normalizePersistenceCategories(value, allCategories, option)
     {
         if( value === undefined || value === null ) return undefined;
-        const _arr = Array.isArray(value) ? value : [value];
+        const _arr = listOf(option, [...allCategories, 'all', 'none'])(value);
         if( _arr.includes('none') ) return new Set();
         return new Set(_arr.includes('all') ? allCategories : _arr.filter(c => allCategories.includes(c)));
     }
@@ -899,11 +881,11 @@ export class CardStorage
     // a shorthand for all coverable fields (the whole entity), or 'none' to explicitly cover
     // none of them. Shared by enable_multidevice_persistence and enable_persistence
     // entity-level parsing.
-    resolveEntityPersistenceFields(value)
+    resolveEntityPersistenceFields(value, option)
     {
         if( value === undefined || value === null ) return undefined;
-        const _arr = (Array.isArray(value) ? value : [value]).map(v => v === 'entities' ? 'all' : v);
-        return this.normalizePersistenceCategories(_arr, this._entityPersistenceFields());
+        const _arr = listOf(option, [...this._entityPersistenceFields(), 'all', 'none'], { synonyms: { all: ['entities'] } })(value);
+        return this.normalizePersistenceCategories(_arr, this._entityPersistenceFields(), option);
     }
 
     // Resolves the display order of a set of entity ids — static or dynamic — following the
@@ -919,22 +901,12 @@ export class CardStorage
     // Order is card-only (see the 'order' category, alongside 'range'/'entities') — not a
     // per-entity field: a position only means something relative to every other entity, so
     // there's no coherent way to persist one entity's position independently of the rest.
-    _resolveOrder(candidateIds, yamlIds, yamlIdsMirror, haIds, haIdsMirror, lsIds, orderEnabled, orderMultidevice)
+    // persisted: { multi, local } — _cardPersists('order'); one choice, lastToSpeak.
+    _resolveOrder(candidateIds, yamlIds, yamlIdsMirror, haIds, haIdsMirror, lsIds, persisted)
     {
-        // YAML front — always wins on change, unconditionally, exactly like any other field
-        if( yamlIds ) {
-            const _yamlChanged = JSON.stringify(yamlIds) !== JSON.stringify(yamlIdsMirror);
-            if( _yamlChanged ) return this._finishOrder(yamlIds, candidateIds);
-        }
-
-        // Nothing persists unless explicitly enabled — the order stays at its base (YAML's
-        // own order for static entities), mirroring how a field with nothing enabled simply
-        // keeps its initial YAML value
-        if( !orderEnabled ) return this._finishOrder(yamlIds ?? lsIds, candidateIds);
-
-        // HA front — only when multidevice is enabled, same as for individual fields
-        const _haChanged = orderMultidevice && JSON.stringify(haIds) !== JSON.stringify(haIdsMirror);
-        return this._finishOrder(_haChanged ? haIds : lsIds, candidateIds);
+        // (nothing kept, or the YAML spoke: its order — a dynamic entity's, none: this device's)
+        const _who = lastToSpeak({ yaml: yamlIds, yamlImage: yamlIdsMirror, ha: haIds, haImage: haIdsMirror, ...persisted });
+        return this._finishOrder(_who === 'yaml' ? yamlIds ?? lsIds : _who === 'ha' ? haIds : lsIds, candidateIds);
     }
 
     // Shared tail for _resolveOrder: drops ids no longer present in candidateIds (e.g. an

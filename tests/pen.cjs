@@ -215,6 +215,17 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(300);
         return m.length === 3 && m[0].endsWith(ids[0]) && m[1].endsWith(ids[1]) && m[2].endsWith(ids[0]) ? true : JSON.stringify({ ids, m });
     });
+    await t.step('the entity selector: a pen still over an entry for longer than its silence (PEN_HOVER_TIMEOUT) — gone, its hover over —; moving again over it: previewed again', async () => {
+        await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('power'); await t.wait(500);
+        const a = await E(`(()=>{ const e=el.querySelector('#es_0 a[data-entity]:not([style*="display: none"])'); const r=e.getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2, id: e.dataset.entity }; })()`);
+        await E(`window.__msgs=[]; window.__show=window.__show||el.instance.showMessage.bind(el.instance); el.instance.showMessage=(...m)=>{ __msgs.push(m[0]); return __show(...m); }`);
+        await t.pen('pointermove', a, 0, -1, 'pen', 7); await t.wait(900);
+        await t.pen('pointermove', { x: a.x + 2, y: a.y }, 0, -1, 'pen', 7); await t.wait(100);
+        const m = JSON.parse(await E('JSON.stringify(__msgs)'));
+        await t.pen('pointerleave', a, 0, -1, 'mouse', 1);
+        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 5); await t.wait(300);
+        return m.length === 2 && m.every(x => x.includes(a.id)) ? true : JSON.stringify({ m, id: a.id });
+    });
     await t.step('Chrome: the tooltip opened by a tap follows a "pen" hover entered by a "mouse", with its mousemoves; left by a "mouse": it closes', async () => {
         const p1 = await E(`pointPt(${gi},0.3)`), p2 = await E(`pointPt(${gi},0.7)`);
         await t.penTap(p1); await t.wait(400);

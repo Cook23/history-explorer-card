@@ -298,14 +298,14 @@ The curve menu's items each open their submenu over the menu, level with it — 
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar (not a timeline's or an arrowline's row):
   - *Color ▸* — the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too;
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
-  - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *Both sides*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
+  - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
   - *Fill ▸* — *None*, *Solid* (its color, light: `fill: true`), *Fade* (`fill: fade`);
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
 
   each list in a submenu over *Appearance* (← or Escape closes it), the value in use in bold — none when the curve has one the list doesn't hold (a fill of another color, a width of 1.5 px, dashes of its own). A choice is applied at once and saved with the entity as the matching option, as the interpolation is — a YAML entity's, when its options are saved (see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)); the last one to speak, the menu or the YAML, wins;
 - **Interpolation ▸** — for a curve shown in *Smart* or *Curve*: how the curve is drawn between its values (see [Curve interpolation](#curve-interpolation)), the algorithm in use in bold; the choice is saved with the entity;
-- **Behavior ▸** — *Tooltip ▸* (*Selected*, *Nearest*, *Mixed*, *All*: see [Interactive navigation](#interactive-navigation)), *Y axis locked* (a switch: its graph's padlock); opened by a long-press on a label, also *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card);
+- **Behavior ▸** — *Tooltip ▸* (*Selected*, *Nearest*, *Mixed*, *All*: see [Interactive navigation](#interactive-navigation)), *Y axis ▸* (*Left*, *Right*: see [Two Y axes](#two-y-axes)), *Y axis locked* (a switch: its graph's padlock); opened by a long-press on a label, also *Separate* (the entity taken out into its own graph, as a double-click on its label), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the entity moved to another graph, as a drag — see [The graph menu, cut and paste](#the-graph-menu-cut-and-paste)), *Delete* (the entity removed from the card);
 - **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for this entity alone, and *YAML ▸* (*Simplified*, *Complete*): its curve's entry (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)) — in the info panel's curve menu too.
 
 The curve menu opens:
@@ -315,7 +315,7 @@ The curve menu opens:
   - the entity's own `entityOptions` `type` / `lineMode`, when set;
   - an angle (`circular`: unit exactly `°`, or state class `measurement_angle`) — direction arrows;
   - a quantity that only adds up (energy, gas, water, volume: state class `total_increasing`, or `total` with such a device class or unit) — bar;
-  - no state class, no unit and a state that isn't a number — timeline (a state telling nothing, `unavailable` or `unknown`: no state class and no unit are enough) — the same rule for a YAML entity without a `type`. A `unit_of_measurement` of `unknown`, in any case, is no unit: none is named so;
+  - no state class, no unit and a state that isn't a number — timeline (a state telling nothing now, `unavailable` or `unknown`: the last state of the entity the card has already loaded that tells something takes its place — a number, not a timeline; none loaded, no state class and no unit are enough) — the same rule for a YAML entity without a `type`. A `unit_of_measurement` of `unknown`, in any case, is no unit: none is named so;
   - any other measurement — line, in smart mode (or in the card's own `lineMode` when it's set: `lineMode: curves` at the card level pre-selects *Curve*).
 - **On a long-press** (or a right click) of a legend label on a line/bar graph, or of an entity label on a timeline/arrowline graph — to change the type, the look or the layout of an entity that's already added.
 - **After *Create a second curve*** — selecting an entity (or attribute) that's already shown says so, outlines its graphs, and offers a choice under the field: *Cancel*, pre-selected (Enter, Escape or a click elsewhere cancel), or *Create a second curve* — the curve menu then opens as for a new entity, and the curve is added in a graph of its own.
@@ -347,7 +347,7 @@ SI unit conversion also applies to graphs defined manually in the YAML. If a man
 
 Timeline graphs will always automatically group if possible. Graphs defined manually in the YAML will never auto-group; their grouping can be controlled in the YAML.
 
-A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice; two groups of units get a Y axis each (see [Two Y axes](#two-y-axes)). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
+A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice; two groups of units get a Y axis each, more are shared between the two by the size of their values (see [Two Y axes](#two-y-axes)). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
 ![Three graphs of the same unit, then one with combineSameUnits](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/auto-grouping.png)
 
@@ -397,7 +397,7 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu, title
 - **Display ▸** — open with the menu (*Behavior* for a graph of timelines): the display types that fit every entity of the graph, the one they all share in bold: chosen, every entity of the graph is shown that way, saved with each, and the graph stays one graph, in its place (three curves made a timeline: one timeline of three rows). Not shown for a graph of entities that can only be a timeline;
 - **Appearance ▸** — as in the curve menu, its color aside, for all the graph's curves at once: a switch on when all of them show it, a value in bold when all of them have it;
 - **Interpolation ▸** — the algorithm for all the graph's curves in *Curve* or *Smart* mode (the only ones it applies to), in bold when they all share it; shown when the graph has such a curve;
-- **Behavior ▸** — *Tooltip ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as two clicks on its × button);
+- **Behavior ▸** — *Tooltip ▸* and *Y axis ▸* for all its curves, *Y axis locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock), *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as two clicks on its × button);
 - **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities, and *YAML ▸* (*Simplified*, *Complete*): the graph's YAML (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)).
 
 ![A graph's menu, Behavior open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-graph.png)
@@ -473,7 +473,7 @@ The card is capable of replacing the history graph in the HA more info popup tha
 
 ### Enabling the info panel
 
-The info panel is turned on or off with the switch *Global ▸ Enhanced native history* of the options menu (see [The options menu](#the-options-menu)), or from the YAML with `defaultInfoPanel` — the last one to speak wins: the YAML takes over only when its value changes. `infoPanel:` holds the panel's own options — the card's options, applied to its graphs:
+The info panel is turned on or off with the switch *Global ▸ Enhanced native history* of the options menu (see [The options menu](#the-options-menu)), or from the YAML with `defaultInfoPanel` — the last one to speak wins: the YAML takes over only when its value changes (removed, the panel off). `infoPanel:` holds the panel's own options — the card's options, applied to its graphs:
 
 ```yaml
 type: custom:history-explorer-card
@@ -840,7 +840,7 @@ graphs:
       ylock: true   # Disable all interactive Y axis modifications (pan and zoom)
 ```
 
-`ystepSize` sets the step between the Y axis' labels — unless, at the graph's height, they would overlap: the axis then takes its automatic step, and a warning in the browser's console says so (`ystepSize 5 ignored on graph '…'`). Without `ystepSize`, the axis takes the tightest round step (1, 2, 5, 10, 20…) its labels have room for.
+`ystepSize` sets the step between the Y axis' labels — unless, at the graph's height, they would overlap: the axis then takes its automatic step, and a warning in the browser's console says so (`ystepSize: 5 — ignored on graph '…'`). Without `ystepSize`, the axis takes the tightest round step (1, 2, 5, 10, 20…) its labels have room for.
 
 `ymin` and `ymax` set the initial Y axis range and the range restored when the padlock is unlocked. They do not prevent the user from modifying the axis interactively. Use `ylock: true` to fully disable interactive Y axis changes.
 
@@ -889,7 +889,7 @@ graphs:
 
 ### Two Y axes
 
-Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale and title, and the curves of the right axis are marked with a small arrow ▸ in the legend. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit; on a graph or on the card it applies to every curve that doesn't set its own — `yAxis: left` on a graph keeps it on one axis, and `yAxis: auto` on an entity brings back the choice by unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned. With more than two groups of units, the curves share one Y axis whose title is left empty; the legend and the tooltip still show each entity's value in its own unit. When their values aren't of the same order (a value between 0 and 1 next to one up to 1000), the small one looks flat — use `scale:` to bring it to comparable values (a negative factor flips it). The legend and tooltip keep showing the entity's real value, unless `unit:` is set too (see `scale` in the entity options).
+Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale, and the curves of the right axis are marked with a small arrow ▸ in the legend. With more than two groups of incompatible units, they're shared between the two axes by the size of the values they show: the small ones on one axis, the large ones on the other (split where the sizes of two groups next to each other differ the most), the axis with more curves on the left — as many: the first curve's. That's decided when the graph is shown, from the values it draws then — on the left meanwhile —, and then kept: a zoom, a move of the time or the cache filling never change it. Each axis' title lists its units, separated by " / " (`% / °C`). *Behavior ▸ Y axis ▸* in a curve's menu (or a graph's: all its curves) puts it on the left or the right axis, saved with it. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit; on a graph or on the card it applies to every curve that doesn't set its own — `yAxis: left` on a graph keeps it on one axis, and `yAxis: auto` on an entity brings back the choice by unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned.
 
 ![A power on the left axis, a temperature on the right one](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/two-y-axes.png)
 
@@ -1067,7 +1067,7 @@ The `showMinMax` option draws a lighter band, in the curve's color, between the 
 | Value | Band |
 |---|---|
 | `false` / absent | No band (default) — *None* in the menu |
-| `all` / `true` / `both` | Everywhere: on the statistics (each hour's min and max) and on the history (the min and max of the values in each column) — *Both sides* |
+| `all` / `true` / `both` | Everywhere: on the statistics (each hour's min and max) and on the history (the min and max of the values in each column) — *All* |
 | `max` | Everywhere, its half above the curve only: from the curve to the max — *Maximum* |
 | `min` | Everywhere, its half below the curve only: from the min to the curve — *Minimum* |
 | `statistics` | Only where the curve comes from the long-term statistics — *Statistics* |
@@ -1185,7 +1185,7 @@ A long time window holds far more values than the graph has pixels: a week of a 
 
 ### Aggregation
 
-Instead of a point per column of pixels, a curve can have a point per group of time you choose, each given by the function you choose. On the card, a graph, an entity or in `entityOptions`:
+Instead of a point per column of pixels, a curve can have a point per group of time you choose, each given by the function you choose. On the card, a graph, an entity or in `entityOptions` — the curve's own options: moved to another graph, a curve keeps them:
 
 | Option | Values | |
 |---|---|---|
@@ -1346,7 +1346,7 @@ What each variable obeys, for its persistence on this device and on every device
 | The time range | `range` (either option) | `enableMultidevicePersistence: range` |
 | The magnifier's mode | `range` (either option) | `enableMultidevicePersistence: range` |
 | The graphs' order, the linked graphs' too | `order` (either option) | `enableMultidevicePersistence: order` |
-| An entity's `type`, `color`, `fill`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `sizePoints`, `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
+| An entity's `type`, `color`, `fill`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width`, `sizePoints`, `yAxis` (its side, the *Behavior* menu's), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId` (its splits) | `entities` (either option) — a YAML entity: its own option first | `enableMultidevicePersistence: entities` — a YAML entity: its own `enableMultidevicePersistence` first |
 | A curve hidden (`hidden`), its points (`showPoints`), its tooltip modes, its graph's Y axes locked with their ranges (`yAxisLock`: the padlock, or a gesture on a Y axis) | `enablePersistence: entities` — a YAML entity: its own `enablePersistence` first | Never |
 | The info panel's switch, the gesture thresholds | Always | Always |
 | The statistics export's period | Always | Never |
@@ -1375,7 +1375,7 @@ enableMultidevicePersistence: range     # this device's time range syncs across 
 ```
 
 - **`enablePersistence`** — turns on persistence in local browser storage only. This device remembers its own changes; nothing syncs to or from your other devices.
-- **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. Every source is compared option by option — the YAML wherever it sets one for the entity: its own line, its graph, `entityOptions` or the card —: an option a source changed replaces what the others said of that option only (the entity's other options, and the other entities, are untouched); an option both the YAML and another source changed: the YAML's; reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML doesn't set at all (e.g. no `defaultTimeRange`) never speaks. A device opening the card for the very first time (or after its browser storage was cleared) has no image of its own yet: with `enableMultidevicePersistence`, it compares the YAML with the image saved in your HA account, so it gets what your other devices saved — unless the YAML changed since, which then wins there too; with `enablePersistence` alone, it gets the YAML.
+- **"Last one to speak wins"** — each source that can speak keeps its own image of what it said last: YAML (what YAML said the previous time on this device), your HA account (what this device last received from it — never what it wrote there itself, which may not have landed yet), and this device's own UI. On each load, every source is compared with its own image only; a difference means that source spoke, its image is updated, and its change applies. Every source is compared option by option — the YAML wherever it sets one for the entity: its own line, its graph, `entityOptions` or the card —: an option a source changed replaces what the others said of that option only (the entity's other options, and the other entities, are untouched); an option both the YAML and another source changed: the YAML's; reordering graphs in the YAML counts as a change for every entity of the moved graphs. An option the YAML has never set (e.g. no `defaultTimeRange`) never speaks; one it stops setting speaks — on the card as on a curve: its default comes back, what was chosen on the card is lost. A device opening the card for the very first time (or after its browser storage was cleared) has no image of its own yet: with `enableMultidevicePersistence`, it compares the YAML with the image saved in your HA account, so it gets what your other devices saved — unless the YAML changed since, which then wins there too; with `enablePersistence` alone, it gets the YAML.
 - **`enableMultidevicePersistence`** — syncs across devices: turns on persistence in both local storage *and* your Home Assistant user account, so this device's changes sync across all your other devices too. Where both options cover the same field, `enableMultidevicePersistence` always wins — that field syncs across devices, `enablePersistence` on the same field only matters for what `enableMultidevicePersistence` doesn't already cover.
 - **`none`** — explicitly turns persistence off for a scope that would otherwise default to `all` (e.g. a card with only dynamic entities that you *don't* want remembered), without needing the other option to also be `none`.
 
@@ -1421,7 +1421,7 @@ graphs:
                                                              # entity on its own — no cross-device sync
 ```
 
-Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `sizePoints`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`, `yAxisLock` (its graph's Y axes locked, with their ranges). `hidden`, `showPoints`, the tooltip modes and `yAxisLock` are never synced across devices: only `enablePersistence` keeps them, on this device. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
+Protectable/coverable fields (`order` isn't one of them — it's card-level only, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)): `type`, `color`, `fill`, `hidden`, `interval`, `name`, `scale`, `siConversionFactor`, `dashMode`, `lineMode`, `interpolation`, `width` (the line width), `showPoints`, `sizePoints`, `yAxis`, `largeScreenTooltip`, `smallScreenTooltip`, `largeChartTooltip`, `smallChartTooltip` (the tooltip modes), `showMinMax`, `unit`, `process`, `netBars`, `circular`, `groupId`, `yAxisLock` (its graph's Y axes locked, with their ranges). `hidden`, `showPoints`, the tooltip modes and `yAxisLock` are never synced across devices: only `enablePersistence` keeps them, on this device. `groupId` also covers how a YAML graph was split into linked graphs (double-click); the order of those linked graphs within their block follows `order`, like the order of everything else.
 
 This entity-level option only applies to static entities defined here in `graphs:`. Entities added dynamically through the UI have no YAML entry to attach it to — they're governed entirely by the card-level `enablePersistence`/`enableMultidevicePersistence` (which default to `all` for a purely dynamic card, see above).
 
@@ -1563,7 +1563,7 @@ Every option above, except `type`, `name`, `hidden`, `legendVisible`, `scale`, `
 
 The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 
-An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
+An option is spelled the same at every level, and its aliases — the names and values in the list above, mini-graph-card's among them — are accepted everywhere, mixed freely with the card's own names (an option set under two names: the card's own name wins). A value chosen from a list (`lineMode`, `interpolation`, `yAxis`, `tooltip.size`, `uiLayout.toolbar`…) is read whatever its case and spaces (`Curves`, `B-Spline`); an unknown one is left out — the option keeps its default — with a warning in the browser's console. A configuration that makes no sense is kept as written, with a warning in the console too (a `sizePoints` smaller than the line's width: its points hidden by it). A graph's options can be set under its `options:` or directly on the graph, next to `type:` and `entities:` (`options:` wins if both are set):
 
 ```yaml
 type: custom:history-explorer-card
@@ -1915,7 +1915,7 @@ A value missing leaves its cell empty (a value of 0 is written 0); a cell holdin
 
 It's written in the card's own syntax: each option under its own name, never a synonym (`lineWidth`, not `width` or `line_width`), a bar interval by its name (`daily`, `raw`). What is kept on each device is left out: a curve hidden, its points, the tooltip's modes, the Y axes locked (see [What is kept, and where](#what-is-kept-and-where)). Each level — the card, a graph, a curve — writes what it holds that the level above it gives otherwise; the first level copied, what differs from the option's default:
 - **Simplified** — those only. The card's `look:` and `entityOptions` are written as its YAML says them: the options they give are left to them. A curve's color is written when it was set (in the YAML, `entityOptions` or the menu), not when it's the palette's.
-- **Complete** — those, plus, at each level, the options the look sets, and the ones another member of the same level writes (another graph of the card, another curve of the graph), each with its own value. No `entityOptions`: each curve writes what they give it.
+- **Complete** — those, plus, at each level, the options the look sets, and the ones any of its neighbours writes — the others of its level in the export: the card exported, every graph and every curve of the card; a graph, its curves; a curve alone, none —, each with its own value. No `entityOptions`: each curve writes what they give it.
 
 ```yaml
 # Export ▸ YAML ▸ Simplified, from a curve's menu: its style chosen in Appearance ▸

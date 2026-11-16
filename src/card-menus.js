@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -47,7 +47,7 @@ const _CURVE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
 // it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
-const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', ylock: 'ui.menu.ylocked', split: 'ui.menu.entity_split',
+const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', yaxis: 'ui.menu.yaxis', ylock: 'ui.menu.ylocked', split: 'ui.menu.entity_split',
                             merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
                             delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
@@ -62,9 +62,8 @@ const _APPEARANCE = {
     color:  { label: 'ui.menu.look_color' },
     points: { field: 'showPoints', label: 'ui.menu.look_points', values: POINTS_VALUES.map(v => [v, 'ui.menu.points_' + v]) },
     minmax: { field: 'showMinMax', label: 'ui.menu.look_minmax', values: MIN_MAX_VALUES.map(v => [v, 'ui.menu.minmax_' + v]) },
-    fill:   { field: 'fill', label: 'ui.menu.look_fill',
-              values: [[false, 'ui.menu.fill_none'], [true, 'ui.menu.fill_solid'], ['fade', 'ui.menu.fill_fade']] },
-    width:  { field: 'width', label: 'ui.menu.look_width', values: [1, 2, 3, 4, 5].map(w => [w, `${w} px`]) },
+    fill:   { field: 'fill', label: 'ui.menu.look_fill', values: Object.entries(FILL_VALUES).map(([k, v]) => [v, 'ui.menu.fill_' + k]) },
+    width:  { field: 'width', label: 'ui.menu.look_width', values: LINE_WIDTHS.map(w => [w, `${w} px`]) },
     dash:   { field: 'dashMode', label: 'ui.menu.look_dash',
               values: Object.keys(DASH_MODES).map(k => [k, 'ui.menu.dash_' + k]) },
 };
@@ -855,7 +854,8 @@ export class CardMenus
                                          choose: () => this._interpolationChosen(m, k) }));
     }
 
-    // The behavior submenu (list null): the tooltip (▸, for curves), the Y axis lock (a
+    // The behavior submenu (list null): the tooltip (▸, for curves), the Y axis (▸, for curves:
+    // left, right — the one they all are on in bold), the Y axis lock (a
     // switch, when a graph has a lock — an entity's: its graph's —: on when all are locked),
     // and in the card's menu (not the info panel's) the curves' place — for an entity from
     // its label: separate, merge back, cut, delete; for a graph: merge back, cut, delete (one
@@ -870,12 +870,19 @@ export class CardMenus
             return _TOOLTIP_MODES.map(([v, label]) => ({ id: `${m.prefix}_tooltip_${v}`, label: i18n(label), marked: v === _cur, final: true,
                                                          choose: () => this._behaviorChosen(m, 'tooltip', v) }));
         }
+        if( list === 'yaxis' ) {
+            const _sides = new Set(_curves.map(({ g, e }) => this.yAxisSideOf(g, e)));
+            const _cur = _sides.size === 1 ? [..._sides][0] : undefined;
+            return Y_AXIS_SIDES.map(v => ({ id: `${m.prefix}_yaxis_${v}`, label: i18n('ui.menu.yaxis_' + v), marked: v === _cur, final: true,
+                                            choose: () => this._behaviorChosen(m, 'yaxis', v) }));
+        }
         const _menu = m.el();
         const _full = m.prefix.startsWith('eo_') || this._cardsCurveMenu(m.prefix);
         const _g = pairs[0]?.g;
         const _locks = this._yLocks(m);
         const _shown = {
             tooltip: _curves.length > 0,
+            yaxis: _curves.length > 0,
             ylock: _locks.length > 0,
             split: _full && kind === 'entity' && _menu._menuFrom === 'label' && this.canSplitCurve(_g),
             merge: _full && ( kind === 'graph' || ( kind === 'entity' && _menu._menuFrom === 'label' ) ) && this.canMergeGraphUp(_g),
@@ -885,7 +892,7 @@ export class CardMenus
         };
         return Object.keys(_BEHAVIOR_ENTRIES).filter(k => _shown[k]).map(k => {
             const _label = i18n(_BEHAVIOR_ENTRIES[k]);
-            if( k === 'tooltip' ) return this._submenuLine(m, `${m.prefix}_behavior_tooltip`, _label, ['behavior', 'tooltip']);
+            if( k === 'tooltip' || k === 'yaxis' ) return this._submenuLine(m, `${m.prefix}_behavior_${k}`, _label, ['behavior', k]);
             if( k === 'ylock' ) return { id: `${m.prefix}_ylock`, label: _label, on: _locks.every(l => l), final: true, choose: () => this._behaviorChosen(m, k) };
             return { id: `${m.prefix}_${k}`, label: _label, choose: () => this._behaviorChosen(m, k) };
         });
@@ -1023,7 +1030,7 @@ export class CardMenus
         }
         if( key === 'width' ) return e.width;
         if( key === 'minmax' ) return minMaxValue(e.showMinMax) ?? false;
-        if( key === 'points' ) return this.resolveOption(e, 'showPoints');
+        if( key === 'points' ) { const v = this.resolveOption(e, 'showPoints'); return allPointsShown(v) ? true : v; }
         return this.resolveOption(e, 'dashMode');
     }
 
@@ -1095,6 +1102,10 @@ export class CardMenus
         const { kind, pairs } = this._scopeOf(m);
         if( action === 'tooltip' ) {
             for( const { g, curves } of this._curvesByGraph(m) ) this.setCurvesTooltip(g, curves, value);
+            return this._menuChosen(m);
+        }
+        if( action === 'yaxis' ) {
+            for( const { g, curves } of this._curvesByGraph(m) ) this.setCurvesLook(g, curves, 'yAxis', value);
             return this._menuChosen(m);
         }
         if( action === 'ylock' ) {

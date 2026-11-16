@@ -10,6 +10,36 @@ module.exports = async function()
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
 
+    // ── The values of a list (history-options.js oneOf), on their own — no browser ──
+    {
+        const { normalizeOptions, withLook } = await import('../src/history-options.js');
+        const step = (name, fn) => {
+            let res;
+            try { res = fn(); } catch( ex ) { res = 'EXCEPTION ' + ex.message; }
+            if( res === true ) passed++; else failed++;
+            console.log((res === true ? '  ✓ ' : '  ✗ ') + name + (res === true ? '' : '  -> ' + res));
+        };
+        // (what the console is told meanwhile)
+        const warned = fn => { const w = [], _w = console.warn; console.warn = (...a) => w.push(a.join(' ')); try { fn(); } finally { console.warn = _w; } return w; };
+        step('a value of a list: its case and spaces ignored, its synonyms kept — flat, in a block, in a list of values, look', () => {
+            const o = withLook({ look: 'Mini', lineMode: 'Curves', interpolation: ' B-Spline ', yAxis: 'Secondary', showMinMax: 'Both', legendVisible: 'AUTO',
+                                 labelsLeft: 'Hover', showStats: ['Min', 'AVG'], aggregateFunc: 'MAX', interval: 'Daily',
+                                 tooltip: { size: 'SLIM' }, uiLayout: { toolbar: 'Top' }, cursor: { types: ['Line', 'timeline'] } });
+            const r = JSON.stringify([o.lineMode, o.interpolation, o.yAxis, o.showMinMax, o.legendVisible, o.labelsLeft, o.showStats, o.aggregateFunc, o.interval,
+                                      o.tooltip.size, o.uiLayout.toolbar, o.uiLayout.selector, o.cursor.types, o.showGrid]);
+            return r === JSON.stringify(['curves', 'bspline', 'right', 'all', 'auto', 'hover', ['min', 'average'], 'max', 2, 'slim', 'top', 'hide', ['line', 'timeline'], false]) ? true : r;
+        });
+        step('an unknown value: left out (the option\'s default), with a warning in one form — once, however often it\'s read', () => {
+            let o;
+            const w = warned(() => { for( let i = 0; i < 3; i++ ) o = normalizeOptions({ lineMode: 'wavy', alignHeader: 'middle', showStats: ['min', 'mean'] }); });
+            const want = ['history-explorer-card: alignHeader: "middle" — unknown value, ignored — expected default, left, right, center',
+                          'history-explorer-card: lineMode: "wavy" — unknown value, ignored — expected lines, curves, stepped, smart',
+                          'history-explorer-card: showStats: "mean" — unknown value, ignored — expected min, average, max'];
+            return o.lineMode === undefined && o.alignHeader === undefined && JSON.stringify(o.showStats) === '["min"]' && JSON.stringify(w) === JSON.stringify(want)
+                ? true : JSON.stringify({ o, w });
+        });
+    }
+
     // ── Every level, every spelling ──
     let t = await openCard(card({
         interpolation: 'makima', ylock: true, height: 300, showSamples: 3,
@@ -345,7 +375,7 @@ module.exports = async function()
     t = await openCard({}, { page: 'panel.html', panel: { lineMode: 'curve', ylock: true, showSamples: 3 }, mock: { series: true }, height: 800 });
     await t.E(`openPanel('sensor.power')`); await t.wait(2500);
     await t.step('info panel config: lineMode alias, a graph option and a synonym at its root, as on the card', async () => {
-        const v = await t.E(`(()=>{ const g=inst().graphs[0]; const d=g.chart.data.datasets[0]; return [inst().pconfig.defaultLineMode, g.ylock, d.pointRadius].join(':'); })()`);
+        const v = await t.E(`(()=>{ const g=inst().graphs[0]; const d=g.chart.data.datasets[0]; return [inst().pconfig.cardOptions.lineMode, g.ylock, d.pointRadius].join(':'); })()`);
         return v === 'curves:true:3' ? true : v;
     });
     done(await t.close());

@@ -14,29 +14,62 @@ export const INTERPOLATIONS = Object.keys(INTERPOLATION_LABELS);
 // the Y axes (y), both (xy)
 export const ZOOM_BOX_MODES = ['x', 'y', 'xy'];
 
-// (each unknown value is reported once: it's resolved again at each redraw)
-const _reportedInterpolations = new Set();
-
-// A line mode as the card knows it: the singular aliases accepted — 'line' → 'lines',
-// 'curve' → 'curves', 'step' → 'stepped' — and mini-graph-card's `smoothing` (an alias of
-// `lineMode`): true → 'curves', false → 'lines' ('smart': curves while the source reports,
-// flat dashed plateaus over its silences — see _applySilencePlateaus)
-function normalizeLineMode(m)
+// A warning about the configuration, in the console, always in this form: the option (or
+// what's wrong is in), what it's written with, what's wrong — each said once (a configuration
+// is read again and again). The YAML is free (CLAUDE.md): a warning, never a correction
+const _warned = new Set();
+export function configWarning(option, value, problem)
 {
-    if( m === 'line'  || m === false ) return 'lines';
-    if( m === 'curve' || m === true  ) return 'curves';
-    if( m === 'step'  ) return 'stepped';
-    return m;
+    const t = `history-explorer-card: ${option}: ${JSON.stringify(value)} — ${problem}`;
+    if( _warned.has(t) ) return;
+    _warned.add(t);
+    console.warn(t);
 }
+
+// (the key a value of a list is found by: a text whatever its case and spaces, anything else
+// itself)
+const _listKey = v => typeof v === 'string' ? v.replace(/\s+/g, '').toLowerCase() : v;
+
+// An option whose values form a list (values; a function: read when first used), each with
+// its other names maybe (synonyms: { value: [names] }): its parser — v in its one form, its
+// case and spaces ignored; else what other(v) makes of it (a value outside the list: a color,
+// a number…); else not set (the option's default), with a warning (expected: what it says is
+// expected, the values by default)
+export function oneOf(option, values, { synonyms = {}, other, expected } = {})
+{
+    let _map = null;
+    return v => {
+        if( v === undefined || v === null ) return undefined;
+        if( !_map ) {
+            _map = new Map();
+            for( const x of typeof values === 'function' ? values() : values ) _map.set(_listKey(x), x);
+            for( const [x, names] of Object.entries(synonyms) ) for( const n of names ) _map.set(_listKey(n), _map.get(_listKey(x)));
+        }
+        const k = _listKey(v);
+        if( _map.has(k) ) return _map.get(k);
+        const o = other?.(v);
+        if( o !== undefined ) return o;
+        configWarning(option, v, `unknown value, ignored — expected ${expected ?? [...new Set(_map.values())].map(String).join(', ')}`);
+        return undefined;
+    };
+}
+// An option whose value is a list of values of a list (one, or several): each read by
+// oneOf(option, values, o), the unknown ones left out
+export function listOf(option, values, o)
+{
+    const _one = oneOf(option, values, o);
+    return v => ( Array.isArray(v) ? v : [v] ).map(_one).filter(x => x !== undefined);
+}
+
+// The line modes (lineMode): lines, curves, stepped, smart (curves while the source reports,
+// flat dashed plateaus over its silences — see _applySilencePlateaus); the singular aliases
+// accepted, and mini-graph-card's `smoothing` (an alias of lineMode): true curves, false lines
+export const LINE_MODES = ['lines', 'curves', 'stepped', 'smart'];
+const normalizeLineMode = oneOf('lineMode', LINE_MODES, { synonyms: { lines: ['line', false], curves: ['curve', true], stepped: ['step'] } });
 
 // A Y axis as the card knows it: left, right or auto — mini-graph-card's primary and
-// secondary are aliases of left and right; undefined for any other value
-function normalizeYAxis(v)
-{
-    if( v === 'primary'   ) return 'left';
-    if( v === 'secondary' ) return 'right';
-    return ( v === 'left' || v === 'right' || v === 'auto' ) ? v : undefined;
-}
+// secondary are aliases of left and right
+const normalizeYAxis = oneOf('yAxis', ['left', 'right', 'auto'], { synonyms: { left: ['primary'], right: ['secondary'] } });
 
 // Can entities of types a and b share one graph? Lines and bars can (curves drawn over the
 // bars); a timeline or an arrowline only ever holds its own type
@@ -46,18 +79,10 @@ export function typesCompatible(a, b)
     return a === b || ( _xy(a) && _xy(b) );
 }
 
-function normalizeInterpolation(v)
-{
-    if( v === undefined || v === null ) return undefined;
-    const k = String(v).toLowerCase().replace(/[-_ ]/g, '');
-    const r = k === 'akima' ? 'makima' : k;
-    if( INTERPOLATIONS.includes(r) ) return r;
-    if( !_reportedInterpolations.has(v) ) {
-        _reportedInterpolations.add(v);
-        console.warn(`history-explorer-card: unknown interpolation '${v}' — expected one of ${INTERPOLATIONS.join(', ')}`);
-    }
-    return undefined;
-}
+// (an interpolation by its names: akima is makima; Catmull-Rom and B-spline as the
+// Interpolation submenu writes them)
+const normalizeInterpolation = oneOf('interpolation', INTERPOLATIONS,
+    { synonyms: { makima: ['akima'], catmullrom: ['catmull-rom', 'catmull_rom'], bspline: ['b-spline', 'b_spline'] } });
 
 // Options spelled differently depending on the level they were first offered at, or in
 // mini-graph-card's syntax: each spelling is accepted at every level (card, entityOptions,
@@ -142,6 +167,29 @@ const _isBlock = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const AGGREGATE_FUNCS = ['avg', 'median', 'min', 'max', 'first', 'last', 'sum', 'delta', 'diff'];
 const GROUP_BY = ['interval', 'hour', 'date'];
 
+// The values of the options grouped in a block whose values form a list: the tooltip's sizes,
+// the states' texts (as Home Assistant names them, raw, none — stateTextMode too, on the
+// card), the cursor line's modes and the graphs showing it (by type, or all), the time
+// labels' densities and date formats, Home Assistant's statistics periods (statistics,
+// the statistics export's), where the toolbar and the selector are (or which one is sticky)
+const STATE_TEXT_MODES = ['auto', 'raw', 'hide'];
+const GRAPH_TYPES = ['line', 'bar', 'timeline', 'arrowline'];
+// (a density's level: the steps it allows between two time labels, the most first — see
+// card-timerange.js computeTickDensity; a place's sides: 1 top, 2 bottom — see
+// history-explorer-card.js)
+export const TICK_DENSITIES = { low: 4, medium: 3, high: 2, higher: 1, highest: 0 };
+const HA_PERIODS = ['5minute', 'hour', 'day', 'week', 'month'];
+export const UI_PLACES = { hide: 0, top: 1, bottom: 2, both: 3 };
+const BLOCK_VALUES = {
+    tooltip   : { size: oneOf('tooltip.size', ['full', 'compact', 'slim', 'auto']), stateTextMode: oneOf('tooltip.stateTextMode', STATE_TEXT_MODES) },
+    cursor    : { mode: oneOf('cursor.mode', ['auto', 'all', 'hide']), types: listOf('cursor.types', [...GRAPH_TYPES, 'all']) },
+    timeTicks : { density: oneOf('timeTicks.density', Object.keys(TICK_DENSITIES)), densityOverride: oneOf('timeTicks.densityOverride', Object.keys(TICK_DENSITIES)),
+                  dateFormat: oneOf('timeTicks.dateFormat', ['normal', 'short']) },
+    statistics: { period: oneOf('statistics.period', HA_PERIODS) },
+    csv       : { statisticsPeriod: oneOf('csv.statisticsPeriod', HA_PERIODS) },
+    uiLayout  : Object.fromEntries(['toolbar', 'selector', 'sticky'].map(k => [k, oneOf(`uiLayout.${k}`, Object.keys(UI_PLACES))])),
+};
+
 // The statistics a curve can show over its graph (showStats), in the order they're shown
 const STATS = ['min', 'average', 'max'];
 
@@ -180,37 +228,36 @@ export function stateLabel(map, v)
 }
 
 // An axis' labels: shown (true), hidden (false) or shown on a hover ('hover')
-const _labelsShown = v => v === 'hover' ? v : v !== false;
+const _labelsShown = name => oneOf(name, [true, false, 'hover']);
 
 // A graph's header's alignments (alignHeader): how its content is spread (CSS
 // justify-content — see card-graphs.js updateGraphHeader)
 export const HEADER_ALIGNS = { default: 'space-between', left: 'flex-start', right: 'flex-end', center: 'center' };
 
 // The tooltip's mode of a curve (see card-charts.js tooltipModeOf): selected, nearest, mixed
-// or all, whatever its case; anything else not set, with a warning
+// or all
 export const TOOLTIP_MODES = ['selected', 'nearest', 'mixed', 'all'];
 // showStateFor / showStatsFor: the values over a graph for every curve, or for the first one
 const SHOWN_FOR = ['all', 'first'];
-const _tooltipMode = v => {
-    const m = String(v).trim().toLowerCase();
-    if( TOOLTIP_MODES.includes(m) ) return m;
-    console.warn(`history-explorer-card: invalid tooltip mode ${JSON.stringify(v)} — expected ${TOOLTIP_MODES.join(', ')}`);
-    return undefined;
-};
-// (tooltipBehavior: a tooltip mode, or auto — each screen's own default)
-const _tooltipBehavior = v => String(v).trim().toLowerCase() === 'auto' ? 'auto' : _tooltipMode(v);
+const _tooltipMode = name => oneOf(name, TOOLTIP_MODES);
 
 // A number > 0, else not set
 const _positive = v => Number(v) > 0 ? Number(v) : undefined;
 // A percentage from 0 to 100 — a number, or a string with or without its '%' —, else not set
 const _percent = v => { const n = typeof v === 'string' && v.trim() !== '' ? Number(v.trim().replace(/%$/, '')) : typeof v === 'number' ? v : NaN; return n >= 0 && n <= 100 ? n : undefined; };
 
+// (showStats' names: avg is average; a bar interval's YAML names)
+const _shownStats = listOf('showStats', STATS, { synonyms: { average: ['avg'] } });
+const _intervalName = oneOf('interval', () => BAR_INTERVALS.map(i => i.yaml));
+const _dashName = oneOf('dashMode', Object.keys(DASH_MODES), { expected: `${Object.keys(DASH_MODES).join(', ')} or its dashes and gaps` });
+
 // Each option's value in its one form, whatever the user wrote — the rest of the card only
 // ever sees that form
 const OPTION_VALUES = {
     // (a curve's samples' dots: hover, true, false — a number, a radius in its former form:
-    // see normalizeOptions —; their diameter, in pixels)
-    showPoints    : v => v === true || v === false || v === 'hover' ? v : Number(v) > 0 ? Number(v) : undefined,
+    // see card-charts.js pointsDiameterOf —; their diameter, in pixels)
+    showPoints    : oneOf('showPoints', () => POINTS_VALUES, { other: v => typeof v !== 'boolean' && Number(v) > 0 ? Number(v) : undefined,
+                                                              expected: 'false, hover, true or a diameter > 0' }),
     sizePoints    : v => Number(v) > 0 ? Number(v) : undefined,
     ymin          : _yBound,
     ymax          : _yBound,
@@ -224,10 +271,10 @@ const OPTION_VALUES = {
     yScaleSteadinessRight : _percent,
     // (an axis' labels: false hides them, hover shows them while the pointer is over the
     // graph — see card-charts.js _chartYAxis)
-    labelsLeft    : _labelsShown,
-    labelsRight   : _labelsShown,
+    labelsLeft    : _labelsShown('labelsLeft'),
+    labelsRight   : _labelsShown('labelsRight'),
     // (auto: the legend only when the graph has several labels in it)
-    legendVisible : v => v === 'auto' ? v : v !== false,
+    legendVisible : oneOf('legendVisible', [true, false, 'auto']),
     logarithmic   : v => v === true,
     // (a power of ten: an integer)
     valueFactor   : v => Number.isInteger(Number(v)) ? Number(v) : undefined,
@@ -237,17 +284,17 @@ const OPTION_VALUES = {
                                                                                        : { value: String(x), label: String(x) }) : undefined,
     // (a color, or a list of them: the entities' colors, in their order)
     lineColor     : v => ( Array.isArray(v) ? v : [v] ).map(normalizeColor).filter(c => c !== undefined),
-    colorTransition : v => v === 'smooth' || v === 'hard' ? v : undefined,
+    colorTransition : oneOf('colorTransition', ['smooth', 'hard']),
     showLine      : v => v !== false,
     hour24        : v => v === true || v === false ? v : undefined,
-    defaultMagnifierMode : v => ZOOM_BOX_MODES.includes(v) ? v : undefined,
+    defaultMagnifierMode : oneOf('defaultMagnifierMode', ZOOM_BOX_MODES),
     // (a graph's header — its name and its icon — and its values: see card-graphs.js
     // updateGraphHeader, card-values.js showValues)
     showName      : v => v !== false,
-    showIcon      : v => v !== false,
-    alignHeader   : v => v in HEADER_ALIGNS ? v : undefined,
-    alignIcon     : v => ['left', 'right', 'state'].includes(v) ? v : undefined,
-    alignState    : v => ['left', 'right', 'center'].includes(v) ? v : undefined,
+    showIcon      : v => v === true,
+    alignHeader   : oneOf('alignHeader', Object.keys(HEADER_ALIGNS)),
+    alignIcon     : oneOf('alignIcon', ['left', 'right', 'state']),
+    alignState    : oneOf('alignState', ['left', 'right', 'center']),
     fontSize      : _positive,
     fontSizeHeader: _positive,
     nameAdaptiveColor : v => v === true,
@@ -265,28 +312,25 @@ const OPTION_VALUES = {
     // (the values over a graph: for every curve, or for the first one and those setting their
     // own showState / showStats — mini-graph-card's; in their curve's color, or the text's —
     // see card-values.js showValues)
-    showStateFor  : v => SHOWN_FOR.includes(v) ? v : undefined,
-    showStatsFor  : v => SHOWN_FOR.includes(v) ? v : undefined,
+    showStateFor  : oneOf('showStateFor', SHOWN_FOR),
+    showStatsFor  : oneOf('showStatsFor', SHOWN_FOR),
     stateAdaptiveColor : v => v !== false,
     lineMode      : normalizeLineMode,
     interpolation : normalizeInterpolation,
     yAxis         : normalizeYAxis,
-    dashMode      : _dashList,
+    // (a style's name, or its dashes and gaps)
+    dashMode      : v => Array.isArray(_dashList(v)) ? _dashList(v) : _dashName(v),
     color         : normalizeColor,
     // (a color, or fade, true — the curve's color, light — or false)
-    fill          : v => ( v === true || v === false || v === 'fade' ) ? v : normalizeColor(v),
+    fill          : oneOf('fill', [true, false, 'fade'], { other: normalizeColor, expected: 'true, false, fade or a color' }),
     // (the decimals: a whole number ≥ 0, else not set)
     rounding      : v => ( v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 ) ? Number(v) : undefined,
     // (an action's name alone stands for it)
     tapAction     : v => typeof v === 'string' ? { action: v } : ( v && typeof v === 'object' ) ? v : undefined,
-    // (true: all of them; a name or a list of names — avg for average)
-    showStats     : v => {
-        if( v === true ) return STATS;
-        const _l = ( Array.isArray(v) ? v : typeof v === 'string' ? [v] : [] ).map(x => String(x).toLowerCase());
-        return STATS.filter(x => _l.includes(x) || ( x === 'average' && _l.includes('avg') ));
-    },
+    // (true: all of them; a name or a list of names — avg for average —, in STATS' order)
+    showStats     : v => v === true ? STATS : v === false ? [] : STATS.filter(x => _shownStats(v).includes(x)),
     // (a bar interval's YAML name: its code — see BAR_INTERVALS)
-    interval      : v => typeof v === 'number' ? v : BAR_INTERVALS.find(i => i.yaml && i.yaml === v)?.code,
+    interval      : v => typeof v === 'number' ? v : BAR_INTERVALS.find(i => i.yaml === _intervalName(v))?.code,
     // (a number and its unit — m, h, d, w, o, y; a number alone is in hours: 24 is 24h)
     defaultTimeRange : v => {
         const t = String(v).replace(/\s+/g, '');
@@ -296,13 +340,16 @@ const OPTION_VALUES = {
     showMinMax    : v => minMaxValue(v),
     // (a number of points an hour > 0, else not set)
     pointsPerHour : v => Number(v) > 0 ? Number(v) : undefined,
-    aggregateFunc : v => AGGREGATE_FUNCS.find(f => f === String(v).trim().toLowerCase()),
-    groupBy       : v => GROUP_BY.find(f => f === String(v).trim().toLowerCase()),
-    largeScreenTooltip : _tooltipMode,
-    smallScreenTooltip : _tooltipMode,
-    largeChartTooltip  : _tooltipMode,
-    smallChartTooltip  : _tooltipMode,
-    tooltipBehavior    : _tooltipBehavior,
+    aggregateFunc : oneOf('aggregateFunc', AGGREGATE_FUNCS),
+    groupBy       : oneOf('groupBy', GROUP_BY),
+    largeScreenTooltip : _tooltipMode('largeScreenTooltip'),
+    smallScreenTooltip : _tooltipMode('smallScreenTooltip'),
+    largeChartTooltip  : _tooltipMode('largeChartTooltip'),
+    smallChartTooltip  : _tooltipMode('smallChartTooltip'),
+    // (a tooltip mode, or auto — each screen's own default)
+    tooltipBehavior    : oneOf('tooltipBehavior', [...TOOLTIP_MODES, 'auto']),
+    stateTextMode : oneOf('stateTextMode', STATE_TEXT_MODES),
+    look          : oneOf('look', () => Object.keys(LOOKS)),
     // (same values as lowpass_dt: none — or absent — auto-detects, false never, a number or
     // numeric text the period, 2pi 2π; anything else, or a period ≤ 0, off with a warning)
     circular      : v => {
@@ -311,7 +358,7 @@ const OPTION_VALUES = {
         if( t === 'none' ) return undefined;
         const P = t === '2pi' ? 2 * Math.PI : t === '' ? NaN : Number(t);
         if( isFinite(P) && P > 0 ) return P;
-        console.warn(`history-explorer-card: invalid 'circular' value ${JSON.stringify(v)} — expected false, none, a period > 0 or '2pi'. Circular display disabled.`);
+        configWarning('circular', v, "expected false, none, a period > 0 or '2pi' — circular display disabled");
         return false;
     },
 };
@@ -357,9 +404,12 @@ export function normalizeOptions(o)
     // draws its bars)
     if( r.interval === undefined && ( r.groupBy === 'date' || r.groupBy === 'hour' ) ) r.interval = r.groupBy === 'date' ? 'daily' : 'hourly';
     for( const [name, fn] of Object.entries(OPTION_VALUES) ) if( r[name] !== undefined && r[name] !== null ) r[name] = fn(r[name]);
-    // (showPoints: a number, a radius — its former form, accepted —: the points shown, that
-    // radius their diameter's half, unless sizePoints says it)
-    if( typeof r.showPoints === 'number' ) { r.sizePoints ??= 2 * r.showPoints; r.showPoints = true; }
+    for( const [block, keys] of Object.entries(BLOCK_VALUES) ) {
+        if( !_isBlock(r[block]) ) continue;
+        const b = { ...r[block] };
+        for( const [k, fn] of Object.entries(keys) ) if( b[k] !== undefined && b[k] !== null ) b[k] = fn(b[k]);
+        r[block] = b;
+    }
     // (tooltipBehavior: the default of largeScreenTooltip and smallScreenTooltip — auto, theirs)
     if( r.tooltipBehavior && r.tooltipBehavior !== 'auto' ) { r.largeScreenTooltip ??= r.tooltipBehavior; r.smallScreenTooltip ??= r.tooltipBehavior; }
     return r;
@@ -373,7 +423,7 @@ export const OPTION_DEFAULTS = {
     // (a curve's — CardConfig.resolveOption)
     largeScreenTooltip: 'mixed', smallScreenTooltip: 'selected', showPoints: 'hover', dashMode: 'solid', netBars: false,
     showLine: true, showGraph: true, fixedValue: false, stateAdaptiveColor: true, showIndicator: false, valueFactor: 0,
-    // (a graph's — CardConfig.applyConfig, cardGraphDefaults)
+    // (a graph's — card-graphs.js _optionsInGraph)
     showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
     // (a graph's header — CardConfig.graphOption)
     showIcon: false, alignHeader: 'center',
@@ -409,7 +459,21 @@ export const ENTITY_OPTION_KEYS = ['color', 'hidden', 'name', 'scale', 'siConver
 // The options of every curve the card can set (CardConfig.resolveOption: the entity's, else
 // its graph's, else entityOptions', else the card's, else OPTION_DEFAULTS)
 export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor',
-    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'sizePoints'];
+    'largeScreenTooltip', 'smallScreenTooltip', 'largeChartTooltip', 'smallChartTooltip', 'sizePoints',
+    // (its aggregation — mini-graph-card's: a property of the curve, it follows it — see resolveAggregation)
+    'pointsPerHour', 'aggregateFunc', 'groupBy'];
+// A curve's options resolved from its graph when it's drawn, never copied onto it (an
+// exception agreed by the user, CLAUDE.md: its axes and what's shown over it)
+export const CURVE_GRAPH_KEYS = ['yAxis', 'showState', 'showStats', 'showStateFor', 'showStatsFor'];
+// The options copied onto a curve when it's added, from the levels above it (card-graphs.js
+// _levelFields — resolveOption): its own from then on, kept when it's moved to another graph
+export const CURVE_LEVEL_KEYS = ['dashMode', 'lineWidth', 'lineMode', 'interpolation', 'scale', 'netBars', 'showPoints', 'showMinMax', 'name',
+    'siConversionFactor', 'unit', 'process', 'circular', 'rounding', 'tapAction', 'showCurrentValues', ...CURVE_OPTION_KEYS];
+// A curve's options given when it's added besides the levels' (card-graphs.js
+// _applyEntityDefaults: the palette's when none is set)
+export const CURVE_LOOK_KEYS = ['type', 'color', 'fill'];
+// A curve's option kept on its entry under another name: YAML name → the entry's field
+export const CURVE_FIELD_OF = { lineWidth: 'width' };
 // An entity's options the card can set for every entity, as mini-graph-card does
 export const CARD_ENTITY_KEYS = ['color', 'fill', 'unit'];
 // The persistence options' categories (enablePersistence, enableMultidevicePersistence)
@@ -440,6 +504,16 @@ export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclu
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
 export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked', 'height', 'showTimeLabels', 'showGrid', 'yLabels',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'barSpacing'];
+
+// The options the card sets for its curves and its graphs — every curve's (CURVE_OPTION_KEYS,
+// and those copied onto a curve with them: card-graphs.js _levelFields), every graph's
+// (CURVE_GRAPH_KEYS, its header, its scope's but its height), every entity's
+// (CARD_ENTITY_KEYS): kept in one place (CardConfig.pconfig.cardOptions), read through one
+// chain — the entity's, its graph's, entityOptions', the card's, the default
+// (CardConfig.resolveOption)
+export const CARD_LEVEL_KEYS = [...new Set([...CURVE_OPTION_KEYS, ...CURVE_GRAPH_KEYS, ...GRAPH_HEADER_KEYS, ...CARD_ENTITY_KEYS,
+    ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height'),
+    ...CURVE_LEVEL_KEYS.filter(k => !ENTITY_OPTION_KEYS.includes(k)), 'interval'])];
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its
@@ -509,37 +583,36 @@ export function withLook(config)
     const c = normalizeOptions(config);
     if( c?.look === undefined ) return c;
     const _look = LOOKS[c.look];
-    if( !_look ) {
-        console.warn(`history-explorer-card: unknown look '${c.look}' — expected one of ${Object.keys(LOOKS).join(', ')}`);
-        return c;
-    }
+    if( !_look ) return c;
     return { ..._look, ...c, uiLayout: { ..._look.uiLayout, ...c.uiLayout } };
 }
+
+// A curve's fills the Fill submenu offers (fill), by the name it gives each: none, its color
+// light, fading out downwards
+export const FILL_VALUES = { none: false, solid: true, fade: 'fade' };
+// The line widths the Width submenu offers (lineWidth), in px
+export const LINE_WIDTHS = [1, 2, 3, 4, 5];
+
+// The Y axis sides a curve can be put on (yAxis, the Behavior submenu)
+export const Y_AXIS_SIDES = ['left', 'right'];
 
 // A curve's samples' dots (showPoints), in the order the Points submenu shows them: none
 // (not even the hovered one), the hovered one only, all
 export const POINTS_VALUES = [false, 'hover', true];
-// Whether showPoints v shows all the points
+// Whether showPoints v shows all the points: true — a number too, a radius (its former form,
+// accepted in the YAML: see card-charts.js pointsDiameterOf)
 export function allPointsShown(v)
 {
-    return v === true;
+    return v === true || ( typeof v === 'number' && v > 0 );
 }
 
 // The min/max band's values (showMinMax), in the order the Extremes submenu shows them: none,
 // both sides everywhere, only above the curve, only below it — everywhere —, both sides
 // where the curve comes from the statistics only, from the history only
 export const MIN_MAX_VALUES = [false, 'all', 'max', 'min', 'statistics', 'history'];
-// (the other names of a value: all — true, both —; history — states)
-const MIN_MAX_SYNONYMS = { all: [true, 'both'], history: ['states'] };
-
-// showMinMax in its one form (MIN_MAX_VALUES) — whatever the name it's written with —,
-// undefined for an unknown one
-export function minMaxValue(v)
-{
-    if( v === undefined || v === null ) return undefined;
-    const _n = Object.keys(MIN_MAX_SYNONYMS).find(k => MIN_MAX_SYNONYMS[k].includes(v));
-    return _n ?? ( MIN_MAX_VALUES.includes(v) ? v : undefined );
-}
+// showMinMax in its one form (MIN_MAX_VALUES) — whatever the name it's written with: all is
+// true, both too; history, states —, undefined for an unknown one
+export const minMaxValue = oneOf('showMinMax', MIN_MAX_VALUES, { synonyms: { all: [true, 'both'], history: ['states'] } });
 
 // Where and which sides of a curve's min/max band are drawn (showMinMax, any of its names):
 // { where: 'all' | 'statistics' | 'history', min: below the curve, max: above it }; null: none

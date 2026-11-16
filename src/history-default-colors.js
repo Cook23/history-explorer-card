@@ -357,13 +357,16 @@ export function parseColorValue(v)
     return colorSpec(normalizeColor(v));
 }
 
+// A fill that fills nothing
+export const NO_FILL = 'rgba(0,0,0,0)';
+
 // The fill of a curve of color `color` (both in their one form): `fill` — true, its color as
 // transparent as the palette's fills (for a color that varies — thresholds, an entity's —
 // only that transparency, each point's fill taking its own color: see _fillLike); false,
 // none; any other value as it is
 export function fillValue(fill, color)
 {
-    if( fill === false ) return 'rgba(0,0,0,0)';
+    if( fill === false ) return NO_FILL;
     if( fill !== true ) return fill;
     const c = colorSpec(color)?.color;
     const _c = c ? window.HXLocal_Chart?.helpers?.color(c) : null;

@@ -31,6 +31,16 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
     `resolveYAxis`, `card-values.js` `_resolveShow`). The user's reason: they are properties
     of the graph, not of the curve — its axes, and what's shown over it (`showStateFor:
     first` names the graph's first curve); a curve moved to another graph takes that graph's.
+    A curve's own `yAxis` — its YAML entity's, or the side chosen in its *Behavior ▸ Y axis*
+    menu (set by the user: "le menu comportement des courbes permet de réaffecter une courbe
+    à l'axe gauche ou droit") — is the curve's, saved with it and kept when it's moved; without
+    one, its side is its graph's (`yAxis` there), else the one decided when the graph is shown
+    (`card-charts.js` `_assignYAxes`, `_decideYAxes`).
+  - **The info panel's switch and the gesture settings are synced on every device of a user,
+    whatever the persistence options** (Home Assistant's user data: `card-storage.js`
+    `INFO_PANEL_SWITCH_KEY`, `GESTURES_KEY`), and are the same for every card. Set by the
+    user: "l'interrupteur du panneau d'info et les réglages de gestes est synchronisé pour
+    tous les postes d'un utilisateur quel que soit les options de persistence".
 
 ## Persistence — what is kept where, and why — set by the user, not negotiable
 
@@ -316,6 +326,35 @@ compromise, made as well as the room allows: what renders best at every size wit
 complicating the code too much — not a rule applied whatever the cost. In that compromise the functional goal
 comes before the accessory functions: the card is there to show curves; the controls,
 their boxes and everything around them take only the room the curves can spare.
+
+## The user's actions are checked, the YAML is free — set by the user, not negotiable
+
+Two kinds of inputs, two logics:
+
+- **An action of the user on the card** (a menu, a gesture, the selector) is checked so as
+  never to lead to an absurd situation. Example: a width chosen in *Appearance ▸ Width*
+  raises a `sizePoints` smaller than that width + 2 px (`card-operations.js` `setCurvesLook`)
+  — dots never hidden by their own line.
+- **A YAML parameter** is configuration, out of the user's reach from the card: it's free,
+  with less checking, and may give an absurd configuration (a `sizePoints` smaller than the
+  line's width: dots hidden by it). It's never corrected behind the YAML's back. The only
+  "check" on the YAML: sensible defaults, so that the card works well out of the box; past
+  them, the configuration is free.
+
+This is the rule, not an exception: never add a silent correction of a YAML configuration,
+and never report one as missing in a review.
+
+Free, but not silent — set by the user ("même règle partout. casse ignorée. écartée avec un
+avertissement console. … un avertissement aux configurations absurdes"):
+- **An option whose values form a list**: one parser for all (`history-options.js` `oneOf`,
+  `listOf`) — case and spaces ignored, synonyms kept; an unknown value is left out (the
+  option's default applies), with a console warning.
+- **An absurd configuration met** (e.g. a `sizePoints` under its line's width): kept as the
+  YAML says, with a console warning. Absurd cases are not searched for: each one is added
+  when met, and said to the user before being coded.
+- **Every warning about the configuration** goes through `history-options.js`
+  `configWarning(option, value, problem)` — one form (`history-explorer-card: option: value —
+  problem`), each said once; never a `console.warn` of its own.
 
 ## No patch for a special case — set by the user, not negotiable
 

@@ -30,9 +30,11 @@ const setIn = (s, from, to, re) => { const b = s.slice(s.indexOf(from), s.indexO
 const stringLists = (s, file) => {
     const out = [];
     walk(acorn.parse(s, { ecmaVersion: 2022, sourceType: 'module' }), n => {
+        // (an array of strings — with lists spread in it too: its own names counted)
         if( n.type !== 'ArrayExpression' || n.elements.length < 2 ) return;
-        if( !n.elements.every(e => e?.type === 'Literal' && typeof e.value === 'string') ) return;
-        const names = n.elements.map(e => e.value);
+        if( !n.elements.every(e => ( e?.type === 'Literal' && typeof e.value === 'string' ) || e?.type === 'SpreadElement') ) return;
+        const names = n.elements.filter(e => e.type === 'Literal').map(e => e.value);
+        if( names.length < 2 ) return;
         out.push({ index: n.start, key: JSON.stringify(names), names });
     });
     return out;
@@ -205,6 +207,12 @@ const RULES = [
     // (a list written once, by name — ARCHITECTURE.md rule 3)
     { id: 'lists-once', why: "a list of names is written once, as a named constant: never the same names written again — as an array, an object's keys or a menu's values",
       files: CARD, check: s => nameLists(s).filter(l => LISTS.get(l.key).length > 1).map(l => ({ index: l.index, text: l.key + ' (' + LISTS.get(l.key).length + '×)' })) },
+    { id: 'hover-one-way', why: "a hover is read one way, everywhere (CLAUDE.md, Pointer events): through Chart.hecUi.hover — never a pointer's moves or entries — the signs of a hover — listened to by the card itself (its tests aside: they report what the browser sends)",
+      files: CARD.filter(f => f !== 'src/card-tests.js'), re: /addEventListener\(\s*['"]pointer(?:move|over|enter)['"]|\[[^\]]*['"]pointer(?:move|over|enter)['"][^\]]*\]\s*\)\s*\w*\??\.?addEventListener/g },
+    { id: 'levels-once', why: "an option's levels — the entity's, its graph's, entityOptions', the card's, its default — are read through one chain, card-config.js resolveOption: never written again",
+      files: CARD.filter(f => f !== 'src/card-config.js'), re: /pconfig\.graphs\[[^\]]*\]\?\.\[?\w+\]?\s*\?\?[^;\n]*getEntityOptions/g },
+    { id: 'config-warnings', why: "a warning about the configuration goes through history-options.js configWarning — one form, each said once (CLAUDE.md, the YAML is free): never a console.warn of its own",
+      files: CARD.filter(f => f !== 'src/history-options.js' && f !== 'src/card-tests.js'), re: /console\.warn\(/g },
     { id: 'option-lists', why: "a list of options is written in history-options.js, named, with the others: the rest of the card uses it, never writes its own",
       files: CARD.filter(f => f !== 'src/history-options.js'),
       check: (s, f) => stringLists(s, f).filter(l => l.names.length >= 3 && l.names.every(n => OPTION_NAMES.has(n))).map(l => ({ index: l.index, text: l.key })) },

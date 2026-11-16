@@ -5,14 +5,15 @@
 // (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { stateLabel, OPTION_DEFAULTS, DASH_MODES, minMaxBand } from "./history-options.js";
-import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber } from "./history-units.js";
+import { stateLabel, OPTION_DEFAULTS, DASH_MODES, minMaxBand, allPointsShown, configWarning, CURVE_FIELD_OF } from "./history-options.js";
+import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber, yAxisSides, unitGroups, unitsLabel } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
 import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
 import { chooseYAxis, rangeIndex } from "./card-yscale.js";
 import { msOf, seriesOf } from "./history-series.js";
 import { REDRAW_CAUSES } from "./card-perf.js";
 import { appendAll, minOf, maxOf } from "./history-arrays.js";
+import { keyOf } from "./history-entity-store.js";
 
 // (a graph's canvas watched each fiftieth of it that comes on the screen or goes — see _watchShown)
 const SHOWN_THRESHOLDS = Array.from({ length: 51 }, (_, k) => k / 50);
@@ -194,6 +195,8 @@ export class CardCharts
     // what it shows: every drawing the card asks goes through here
     redrawChart(g, duration)
     {
+        // (its curves' Y axes decided once its values are drawn: built again with them)
+        if( g.yAxesPending && this._decideYAxes(g) ) return;
         const _auto = this._yAxesAuto?.get(g.chart);
         if( _auto ) for( const ax of g.chart.options.scales?.yAxes ?? [] ) { const a = _auto.get(ax.id); if( a ) this._autoYAxis(g.chart, ax, a); }
         g.chart.update(duration);
@@ -241,7 +244,21 @@ export class CardCharts
         const _v = own !== undefined ? own : graph;
         const _d = +size > 0 ? +size : this.dotDiameterOf(width);
         if( _v === false ) return { pointRadius: 0, pointHoverRadius: 0, hecDotDiameter: _d };
-        return { pointRadius: _v === true ? _d / 2 : 0, pointHoverRadius: _d / 2 + 1, hecDotDiameter: _d };
+        return { pointRadius: allPointsShown(_v) ? _d / 2 : 0, pointHoverRadius: _d / 2 + 1, hecDotDiameter: _d };
+    }
+
+    // The diameter of curve e's dots, for a line width `width`: its sizePoints as the levels
+    // give it, else — the YAML's showPoints a number, a radius (its former form; read from the
+    // YAML, never lost to a choice made since) — twice it, else the width's default
+    pointsDiameterOf(e, width)
+    {
+        // (a YAML whose sizePoints is under its line width: said — configWarning —, kept)
+        const _ySize = this.yamlOptionOf(e, 'sizePoints'), _yWidth = this.yamlOptionOf(e, CURVE_FIELD_OF.lineWidth) ?? this.resolveOption(null, 'lineWidth');
+        if( _ySize > 0 && _ySize < _yWidth ) configWarning('sizePoints', _ySize, `smaller than the line width (${_yWidth}) of ${e.entity}: its points are hidden by its line`);
+        const _size = this.resolveOption(e, 'sizePoints');
+        if( _size > 0 ) return _size;
+        const _radius = this.yamlOptionOf(e, 'showPoints');
+        return typeof _radius === 'number' && _radius > 0 ? 2 * _radius : this.dotDiameterOf(width);
     }
 
     // Whether entity i of graph g is drawn as a curve (not a bar, not a timeline's row)
@@ -308,7 +325,7 @@ export class CardCharts
     {
         for( const e of entities ) {
             const _ds = g.chart.data.datasets[g.entities.indexOf(e)];
-            if( _ds ) Object.assign(_ds, this._pointRadii(show, undefined, _ds.borderWidth, this.resolveOption(e, 'sizePoints')));
+            if( _ds ) Object.assign(_ds, this._pointRadii(show, undefined, _ds.borderWidth, this.pointsDiameterOf(e, _ds.borderWidth)));
         }
         this.redrawChart(g);
     }
@@ -532,7 +549,7 @@ export class CardCharts
                 const t = msOf(row.last_changed);
                 if( t >= x0 && t <= x1 ) continue;
                 let lo = _num(row.state), hi = lo;
-                const _band = row.statistics ? minMaxBand(e.showMinMax) : null;
+                const _band = row.statistics ? this.bandWanted(e, true) : null;
                 if( _band?.min ) lo = Math.min(lo, _num(row.statistics.min));
                 if( _band?.max ) hi = Math.max(hi, _num(row.statistics.max));
                 if( !isNaN(lo) && !isNaN(hi) ) a.push({ x: t, lo: Math.min(lo, hi), hi: Math.max(lo, hi) });
@@ -551,11 +568,10 @@ export class CardCharts
     {
         // The curves of the axis (see _assignYAxes)
         const _list = datasets.filter(d => ( d.yAxisID ?? LEFT_Y_AXIS ) === id);
-        // Its unit: its curves' (converted to one SI unit: see _applySIConversion) — none
-        // when they have incompatible units: no single unit describes the axis then, the
-        // legend and tooltip still show each entity's own
+        // Its units: its curves' (each group of compatible units converted to one SI unit: see
+        // _applySIConversion), each once, separated by " / " (unitsLabel)
         const _unit = ( graphtype == 'line' || graphtype == 'bar' )
-            ? ( _list.some(d => !areSICompatible(d.unit, _list[0].unit)) ? '' : ( _list[0]?.axisUnit ?? _list[0]?.unit ) )
+            ? unitsLabel(_list.map(d => d.axisUnit ?? d.unit))
             : undefined;
         // An axis of circular curves only, all of the same period: its labels show the real
         // values, in [0, period) (Chart.js ticks.period)
@@ -643,7 +659,7 @@ export class CardCharts
         if( _done.has(want) ) return;
         _done.add(want);
         this._stepWarned.set(config, _done);
-        console.warn(`history-explorer-card: ystepSize ${want} ignored on graph '${config.title ?? config.type ?? '?'}' — its labels would overlap (step applied: ${step})`);
+        configWarning('ystepSize', want, `ignored on graph '${config.title ?? config.type ?? '?'}' — its labels would overlap (step applied: ${step})`);
     }
 
     // Whether a graph's Y labels are drawn inside its plot: yLabels: inside; on a card
@@ -929,20 +945,48 @@ export class CardCharts
         return g.chart.data.datasets.reduce((a, d) => a + ( d.data?.length ?? 0 ), 0);
     }
 
-    // Each curve's Y axis (line and bar graphs): one per group of compatible units, at most
-    // two — the first group on the left, the second on the right; beyond two, every curve
-    // on one shared axis without a unit. `yAxis` (left, right — on the entity, its graph,
-    // entityOptions or the card, see resolveYAxis) puts a curve on that side whatever its
-    // unit: `left` on a whole graph keeps it on one axis.
+    // Each curve's Y axis (line and bar graphs): its own side (yAxis: left, right — its entry's,
+    // the menu's —, else its graph's, entityOptions', the card's: see resolveYAxis), else the
+    // one decided by yAxisSides — two groups of compatible units: one per axis; more: split by
+    // the size of their values, decided once the graph's values are drawn (_decideYAxes), on
+    // the left meanwhile — the sides decided kept for the session (_yAxisSides, by curve: a
+    // zoom, a move, the cache filling never change them) → whether some are still to decide
     _assignYAxes(datasets, entities)
     {
-        const _groups = [];
-        for( const d of datasets ) if( !_groups.some(u => areSICompatible(u, d.unit)) ) _groups.push(d.unit);
-        datasets.forEach((d, i) => {
-            const _side = this.resolveYAxis(entities[i]);
-            const _right = ( _side === 'right' || _side === 'left' ) ? _side === 'right' : _groups.length === 2 && !areSICompatible(d.unit, _groups[0]);
-            d.yAxisID = _right ? RIGHT_Y_AXIS : LEFT_Y_AXIS;
-        });
+        const _decided = this._yAxisSides ??= new Map();
+        const _own = entities.map(e => { const s = this.resolveYAxis(e); return s === 'left' || s === 'right' ? s : undefined; });
+        const _pending = unitGroups(datasets.map(d => d.unit)).length > 2 && entities.some((e, i) => !_own[i] && !_decided.has(keyOf(e)));
+        const _sides = _pending ? datasets.map(() => 'left')
+            : yAxisSides(datasets.map((d, i) => ({ unit: d.unit, side: _decided.get(keyOf(entities[i])) })));
+        datasets.forEach((d, i) => { d.yAxisID = ( _own[i] ?? _sides[i] ) === 'right' ? RIGHT_Y_AXIS : LEFT_Y_AXIS; });
+        return _pending;
+    }
+
+    // The side of the Y axis curve e of graph g is drawn on: 'left' or 'right'
+    yAxisSideOf(g, e)
+    {
+        return g.chart.data.datasets[g.entities.indexOf(e)]?.yAxisID === RIGHT_Y_AXIS ? 'right' : 'left';
+    }
+
+    // The sides of graph g's curves still to decide (_assignYAxes) decided from the values it
+    // draws in the window — once they're there: every curve drawn from the cache (its data a
+    // list: see card-datasets.js), each with a value, or the window loaded since the graph was
+    // built (windowLoads) —, kept for the session, the graph built again in its place with
+    // them → whether it is
+    _decideYAxes(g)
+    {
+        const _sets = g.chart.data.datasets;
+        if( !_sets.every(ds => Array.isArray(ds.data)) ) return false;
+        const t0 = msOf(this.startTime), t1 = msOf(this.endTime);
+        const _sizes = _sets.map(ds => maxOf(ds.data.filter(p => p && p.y !== null && p.y !== undefined && msOf(p.x) >= t0 && msOf(p.x) <= t1).map(p => Math.abs(p.y))));
+        if( !_sizes.every(x => isFinite(x)) && this.windowLoads() <= g.windowLoadsAtBuild ) return false;
+        const _decided = this._yAxisSides ??= new Map();
+        const _sides = yAxisSides(g.entities.map((e, i) => ({ unit: this.getUnitOfMeasure(e.entity, e.unit), magnitude: isFinite(_sizes[i]) ? _sizes[i] : undefined,
+                                                               side: _decided.get(keyOf(e)) })));
+        g.entities.forEach((e, i) => _decided.set(keyOf(e), _sides[i]));
+        g.yAxesPending = false;
+        setTimeout(() => { if( this.graphs.includes(g) ) this.rebuildInPlace(g); });
+        return true;
     }
 
     // The curves of one Y axis converted to one SI unit (W and kW: kW, from their values
@@ -982,13 +1026,13 @@ export class CardCharts
                 "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d)) : d.fill,
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
-                "mode": d.lineMode || this.pconfig.defaultLineMode,
+                "mode": this.lineModeOf(d),
                 "interpolation": this.resolveInterpolation(d),
-                "width": d.width || this.pconfig.defaultLineWidth,
+                "width": this.resolveOption(d, 'lineWidth'),
                 "showPoints": d.showPoints,
                 // (its points as resolved — hover, the default: only the one hovered)
                 "pointsMode": this.resolveOption(d, 'showPoints'),
-                "sizePoints": this.resolveOption(d, 'sizePoints'),
+                "sizePoints": this.pointsDiameterOf(d, this.resolveOption(d, 'lineWidth')),
                 "showMinMax": d.showMinMax,
                 "tooltip": this.tooltipModeOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)
@@ -1023,8 +1067,9 @@ export class CardCharts
         }
 
         // The Y axes, and on each one, its curves converted to one SI unit
+        let _yAxesPending = false;
         if( type === 'line' || type === 'bar' ) {
-            this._assignYAxes(datasets, entities);
+            _yAxesPending = this._assignYAxes(datasets, entities);
             for( const id of [LEFT_Y_AXIS, RIGHT_Y_AXIS] ) {
                 const _idx = datasets.map((d, i) => d.yAxisID === id ? i : -1).filter(i => i >= 0);
                 this._applySIConversion(_idx.map(i => datasets[i]), _idx.map(i => entities[i]));
@@ -1039,7 +1084,8 @@ export class CardCharts
 
         const h = config?._mixed ? this.calcGraphHeight('line', entities.length, config?.height) + 24 : this.calcGraphHeight(type, entities.length, config?.height);
 
-        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null };
+        const g = { "id": gid, "type": type, "canvas": canvas, "graphHeight": h, "chart": chart , "entities": entities, "interval": interval, "ylock": config.ylock, "showTimeLabels": config.showTimeLabels, "isStatic": isStatic, "groupId": config?.groupId ?? null, "yAxesPending": _yAxesPending,
+                    "windowLoadsAtBuild": this.windowLoads() };
 
         this.graphs.push(g);
         this._watchShown(g);
