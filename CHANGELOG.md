@@ -36,7 +36,7 @@ Changelog for the HA History Explorer Card.
 - *Tests ▸ Performance*: a page hidden during a measure counted as away, not as freezes
 - Tests (`points`, `yscale`, `features`, `pen`): `showPoints: 4` under a graph's `sizePoints: 10`; `showMinMax: history` and `all` — the statistics' extremes around the window; an hour compiled between two entities' requests (fails without the fix); a pen still over the selector's list
 
-### Added
+### Added — a warning for an absurd configuration
 - A warning in the console for a YAML `sizePoints` under its curve's line width (its points hidden by its line) — the configuration kept as written
 - Tests (`options`, `points`, `features`, `minigraph`, `persistence`): values of a list in any case, an unknown one warned once; the `sizePoints` warning; the type of an unavailable entity from the cache; the complete export of a graph and of a curve; a curve moved keeping its aggregation; `defaultTimeRange` and `defaultMagnifierMode` removed — their defaults back; the Y labels after a tap, their reading time
 
