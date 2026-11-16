@@ -4,11 +4,12 @@
 
 import { colorEntityOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
-import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS } from "./history-options.js";
+import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, configWarning } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
 import { perf, REDRAW_CAUSES } from "./card-perf.js";
 import { haRequests, HA_WORKERS } from "./ha-requests.js";
 import { appendAll, minOf, maxOf } from "./history-arrays.js";
+import { isMissingState } from "./history-units.js";
 const moment = window.HXLocal_moment;
 
 // The period of the long-term statistics asked, in ms (statistics.period)
@@ -288,6 +289,22 @@ export class CardHistory
         const m = msOf(t), n = this.cache.length;
         if( !n || m <= this.cache[0].a ) return -1;
         return m > this.cache[n - 1].b ? n - 1 : this._slotAt(m - 1);
+    }
+
+    // The last state of entity id (a series id) in the cache that tells something (not
+    // isMissingState) — the latest slot first, every layer's rows —; undefined when the cache
+    // has none (nothing asked for it: never asked here)
+    lastUsableState(id)
+    {
+        for( let i = ( this.cache?.length ?? 0 ) - 1; i >= 0; i-- ) {
+            let _best;
+            for( const layer of LAYERS ) {
+                const r = this.cache[i][layer]?.get(id)?.findLast(x => x.state !== undefined && x.state !== null && !isMissingState(x.state));
+                if( r && ( !_best || msOf(r.last_changed) > msOf(_best.last_changed) ) ) _best = r;
+            }
+            if( _best ) return _best.state;
+        }
+        return undefined;
     }
 
     // The entities whose history is loaded: those shown, and those giving a shown entity
@@ -888,13 +905,6 @@ export class CardHistory
         return l.filter(_in);
     }
 
-    // Is series id shown as a curve in smart mode — its silences worked out on all the cache
-    // knows of it (knownHistory)?
-    _inSmartMode(id)
-    {
-        return this.graphs.some(g => g.entities.some(e => e.entity === id && ( e.lineMode || this.pconfig.defaultLineMode ) === 'smart'));
-    }
-
     // The values of series id's history the cache knows, in order — every one recorded, or
     // given by Home Assistant (live); not the state in force repeated at a request's start
     // (b) —: { t, state, afterGap: the time since the one before not all known — not loaded
@@ -1355,6 +1365,13 @@ export class CardHistory
         return this._requests.some(q => this._serves(q));
     }
 
+    // How many times the window shown has been loaded — its requests all answered — since the
+    // card was made
+    windowLoads()
+    {
+        return this._windowLoads ?? 0;
+    }
+
     // Does a to b (ms) meet the window shown — the window shown now, whenever it's asked?
     _inWindow(a, b)
     {
@@ -1470,8 +1487,10 @@ export class CardHistory
                 const _layer = LAYER[q.kind];
                 // (the latest period of statistics Home Assistant was seen to have compiled, by
                 // layer — any entity's: it compiles a period for all of them at once, the
-                // periods in order — see _forgetToday)
-                if( q.kind !== 'history' && rows.length ) ( this._compiledUntil ??= new Map() ).set(_layer, Math.max(this._compiledUntil.get(_layer) ?? -Infinity, msOf(rows[rows.length - 1].last_changed)));
+                // periods in order —, and when it was seen — the time it was asked: compiled
+                // by then; see _forgetToday)
+                const _last = q.kind !== 'history' && rows.length ? msOf(rows[rows.length - 1].last_changed) : null, _seen = this._compiledUntil?.get(_layer);
+                if( _last !== null && _last > ( _seen?.until ?? -Infinity ) ) ( this._compiledUntil ??= new Map() ).set(_layer, { until: _last, seenAt: q.at });
                 let p = 0;
                 for( let i = this._slotAt(q.b0), i1 = this._slotAt(q.b1 - 1); i <= i1; i++ ) {
                     const s = this.cache[i];
@@ -1490,14 +1509,17 @@ export class CardHistory
             // works on it meanwhile)
             if( !error ) { const _ta = performance.now(); this._askMissing(); perf.add('ask', performance.now() - _ta); }
         } finally {
+            // (the window loaded: one load more — see windowLoads)
+            const _was = this.state.loading;
             this.state.loading = this._loading();
+            if( _was && !this.state.loading ) this._windowLoads = ( this._windowLoads ?? 0 ) + 1;
             // (an answer for the time outside the window shown changes nothing shown: not drawn
             // again, a hover, a tooltip left as they are; the next drawing takes it — but the
             // history of a curve in smart mode: its silences are worked out on all the cache
             // knows of it, see card-datasets.js knownHistory — drawn again, those curves' graphs)
             if( q.gen === this._loadGen ) {
                 if( this._inWindow(q.b0, q.b1) ) this._drawSoon(q.ids);
-                else if( q.kind === 'history' ) { const _smart = Array.from(q.ids).filter(id => this._inSmartMode(id)); if( _smart.length ) this._drawSoon(_smart); }
+                else if( q.kind === 'history' ) { const _smart = Array.from(q.ids).filter(id => this.drawnFromKnownHistory(id)); if( _smart.length ) this._drawSoon(_smart); }
             }
         }
     }
@@ -1602,7 +1624,7 @@ export class CardHistory
             f('undefined');
             return f;
         } catch( e ) {
-            console.warn(e.message);
+            configWarning('process', p, `not a valid expression (${e.message}) — ignored`);
             return null;
         }
     }
@@ -1676,10 +1698,13 @@ export class CardHistory
         // STATS_LAG —: its start, asked again from there at each refresh until it comes; else null)
         // Never one that won't come: Home Assistant compiles a period for every entity at once,
         // and none for an entity without a valid number in it — compiled for another entity
-        // since, or this one's history there without a number: no row for it
+        // since, or this one's history there without a number: no row for it. Compiled for
+        // another entity: only when this one was asked after that was seen (seenAt) — asked
+        // before, its row may not have been compiled yet: asked again
         const _missing = (s, l, id, at) => { const p = _period[l], k = _compiled(at, p), t = _unit[p] ? moment(k).subtract(1, p).valueOf() : ( k - 1 ) * periodMs(p);
             if( t < s.a || t >= s.b || ( s[l].get(id) ?? [] ).some(x => msOf(x.last_changed) === t) ) return null;
-            if( ( this._compiledUntil?.get(l) ?? -Infinity ) >= t ) return null;
+            const _c = this._compiledUntil?.get(l);
+            if( _c && _c.until >= t && at >= _c.seenAt ) return null;
             return this._withoutNumber(id, t, _unit[p] ? moment(t).add(1, p).valueOf() : t + periodMs(p)) ? null : t; };
         for( const s of this.cache ) {
             const _end = msOf(s.end);

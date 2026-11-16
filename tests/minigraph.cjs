@@ -207,6 +207,17 @@ module.exports = async function()
         return hourly && maxed === 'max' && r.length === p.length ? true : JSON.stringify({ n: p.length, maxed, rn: r.length });
     });
     done(await t.close());
+    t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, defaultTimeRange: '24',
+        graphs: [{ type: 'line', options: { pointsPerHour: 1, aggregateFunc: 'max' }, entities: [{ entity: 'sensor.power' }] },
+                 { type: 'line', options: { groupBy: 'date' }, entities: [{ entity: 'sensor.power2' }] }] }, { mock: { series: true, historyStep: 300 }, height: 900 });
+    await t.wait(2000);
+    await t.step('the aggregation is the curve\'s: moved to another graph, a curve keeps its own (pointsPerHour, aggregateFunc) — what no level gave it (groupBy), the graph\'s it lands in', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance, [a, b] = I.graphsInDisplayOrder(); I.moveCurve(a, 0, b, -1);
+            const e = I.graphs.flatMap(g => g.entities).find(e => e.entity === 'sensor.power'), x = I.resolveAggregation(e);
+            return { ppH: x.pointsPerHour, func: x.func, groupBy: x.groupBy ?? null, with: I.graphs.find(g => g.entities.includes(e)).entities.map(e => e.entity).join() }; })()`);
+        return r.ppH === 1 && r.func === 'max' && r.groupBy === 'date' && r.with === 'sensor.power2,sensor.power' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
 
     // ── The Y axis: soft bounds, a smallest range, the right axis' own, logarithmic ──
     // (graph i's Y axis k: its range drawn, its options)
@@ -389,12 +400,14 @@ module.exports = async function()
     t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', statistics: { enabled: false }, hours_to_show: 24,
         entities: ['sensor.power'] }, { mock: { series: true }, height: 700, touch: true });
     await t.wait(1500);
-    await t.step('show.labels: hover — a tap on the graph (no hover on a touch screen): the labels shown a while, then faded out', async () => {
-        await t.tap(await t.E('graphPtAt(0, 0.5)')); await t.wait(500);
+    await t.step('show.labels: hover — a tap on the graph (no hover on a touch screen): the labels shown their reading time (what they say), then faded out', async () => {
+        await t.tap(await t.E('graphPtAt(0, 0.5)'));
+        const ms = await t.E('(c => c.constructor.hecUi.readingTime(c._hecHoverLabelsText()))(graphAt(0).chart)');
+        await t.wait(ms - 300);
         const on = await labels(t);
-        await t.wait(3200);
+        await t.wait(600);
         const off = await labels(t);
-        return on.axes[0].alpha === 1 && off.axes[0].alpha === 0 ? true : JSON.stringify({ on, off });
+        return ms > 1000 && on.axes[0].alpha === 1 && off.axes[0].alpha === 0 ? true : JSON.stringify({ ms, on, off });
     });
     done(await t.close());
     t = await openCard({ type: 'custom:history-explorer-card', statistics: { enabled: false }, hours_to_show: 24, show: { labels: false, labels_secondary: true },

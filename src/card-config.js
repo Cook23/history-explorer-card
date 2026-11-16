@@ -5,8 +5,8 @@
 import { parseColor } from "./history-default-colors.js";
 import { seriesState, seriesId, seriesOf } from "./history-series.js";
 import { shortNames } from "./legend-names.js";
-import { unitOfState } from "./history-units.js";
-import { INTERPOLATIONS, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_SCOPE_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, OPTION_DEFAULTS, GRAPH_DEFAULTS, STATS_EXPORT_PERIODS } from "./history-options.js";
+import { unitOfState, isMissingState } from "./history-units.js";
+import { configWarning, CURVE_FIELD_OF, normalizeOptions, GRAPH_OPTION_KEYS, GRAPH_HEADER_KEYS, GRAPH_STORED_KEYS, ENTITY_OPTION_KEYS, CARD_LEVEL_KEYS, OPTION_DEFAULTS, STATS_EXPORT_PERIODS } from "./history-options.js";
 
 // Pure versions of a few HistoryCardState entity-lookup helpers, needed by
 // history-info-panel.js before an HistoryCardState instance exists (its very first
@@ -32,12 +32,21 @@ export function isTimelineState(state)
     return state?.attributes?.state_class == null && unitOfState(state) == null && !_number;
 }
 
+// An entity's state to decide its type by: its state now — one that tells nothing
+// (isMissingState) the last one that does, usable (the cache's: see
+// CardHistory.lastUsableState), if any
+function typeState(state, usable)
+{
+    return state && isMissingState(state.state) && usable !== undefined ? { ...state, state: usable } : state;
+}
+
 // The type an entity is shown as when nothing sets it (a YAML entity, the info panel): a
 // quantity that only adds up (total_increasing) as bars, a timeline (isTimelineState),
-// anything else as a line (entities added from the card: detectDefaultType)
-export function baseTypePure(hass, entity)
+// anything else as a line (entities added from the card: detectDefaultType) — its state
+// telling nothing now, by its last one that does (usable), if any
+function baseTypePure(hass, entity, usable)
 {
-    const _state = seriesState(hass, entity);
+    const _state = typeState(seriesState(hass, entity), usable);
     return ( _state?.attributes?.state_class === 'total_increasing' ) ? 'bar' : isTimelineState(_state) ? 'timeline' : 'line';
 }
 
@@ -93,33 +102,12 @@ export class CardConfig
         // line — see applyTheme)
         P.uimode =                 c.uimode;
         P.uiColors =               c.uiColors ?? {};
-        P.rounding =               c.rounding;
 
-        // Defaults of every entity and graph (an entity, its graph or entityOptions can set their own)
-        P.defaultLineMode =        c.lineMode ?? d('defaultLineMode', undefined);
-        P.defaultInterpolation =   c.interpolation ?? D.interpolation;
-        P.defaultLineWidth =       c.lineWidth ?? d('defaultLineWidth', D.lineWidth);
-        P.defaultDashMode =        c.dashMode;
-        P.defaultNetBars =         c.netBars;
-        P.defaultInterval =        c.interval ?? D.interval;
-        P.defaultShowMinMax =      c.showMinMax;
-        // (aggregation — see resolveAggregation)
-        P.defaultPointsPerHour =   c.pointsPerHour;
-        P.defaultAggregateFunc =   c.aggregateFunc;
-        P.defaultGroupBy =         c.groupBy;
-        // (the values over a graph — see card-values.js)
-        P.cardShow =               { showState: c.showState, showStats: c.showStats };
-        P.defaultShowPoints =      c.showPoints;
-        P.defaultYAxis =           c.yAxis ?? D.yAxis;
-        P.tapAction =              c.tapAction ?? D.tapAction;
-        // (options of every curve an entity, its graph or entityOptions can set their own —
-        // see resolveOption; hour24, the card's)
-        P.cardOptions =            Object.fromEntries([...CURVE_OPTION_KEYS, ...GRAPH_HEADER_KEYS].filter(k => c[k] !== undefined).map(k => [k, c[k]]));
+        // The options of every curve and graph the card sets (an entity, its graph or
+        // entityOptions can set their own — resolveOption), the host's own defaults under them
+        // and what it decides over them (fixed)
+        P.cardOptions =            Object.fromEntries(CARD_LEVEL_KEYS.map(k => [k, k in fixed ? fixed[k] : c[k] ?? defaults[k]]).filter(([, v]) => v !== undefined));
         P.hour24 =                 c.hour24;
-        // (and the color, fill and unit of every entity — as mini-graph-card sets them on the card;
-        // a graph's options the card doesn't set, their defaults)
-        P.cardGraphDefaults =      { ...GRAPH_DEFAULTS, ...Object.fromEntries(
-            [...CARD_ENTITY_KEYS, ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height')].filter(k => c[k] !== undefined).map(k => [k, c[k]])) };
         // (`height`: the height of every line and bar graph, unless lineGraphHeight /
         // barGraphHeight set their own)
         P.lineGraphHeight =      ( c.lineGraphHeight ?? c.height ?? D.lineGraphHeight ) * 1;
@@ -129,7 +117,6 @@ export class CardConfig
 
         P.showUnavailable =        c.showUnavailable ?? D.showUnavailable;
         P.showMissingState =       c.showMissingState ?? D.showMissingState;
-        P.showCurrentValues =      c.showCurrentValues ?? D.showCurrentValues;
         P.axisAddMarginMin =       c.axisAddMarginMin ?? D.axisAddMarginMin;
         P.axisAddMarginMax =       c.axisAddMarginMax ?? D.axisAddMarginMax;
         P.recordedEntitiesOnly =   c.recordedEntitiesOnly ?? D.recordedEntitiesOnly;
@@ -161,7 +148,7 @@ export class CardConfig
         this.statistics.period =    c.statistics?.period ?? D.statistics.period;
         this.statistics.force =     c.statistics?.force ?? undefined;
 
-        Object.assign(P, fixed);
+        Object.assign(P, Object.fromEntries(Object.entries(fixed).filter(([k]) => !CARD_LEVEL_KEYS.includes(k))));
     }
 
     // --------------------------------------------------------------------------------------
@@ -171,6 +158,13 @@ export class CardConfig
     getDomainForEntity(entity)
     {
         return getDomainForEntityPure(entity);
+    }
+
+    // The type entity id is shown as when nothing sets it (baseTypePure), its state telling
+    // nothing now: by the last one that does in the cache (lastUsableState)
+    baseTypeOf(id)
+    {
+        return baseTypePure(this._hass, id, this.lastUsableState(id));
     }
 
     // The state of a series (an entity's, or one of its attributes', see history-series.js)
@@ -227,23 +221,21 @@ export class CardConfig
         return c ?? undefined;
     }
 
-    // The curve interpolation algorithm of an entity: its own (its YAML line, the
-    // Interpolation submenu, or copied when it's added — card-graphs.js _levelFields), else
-    // its graph's, else entityOptions', else the card's
-    resolveInterpolation(e)
-    {
-        return e?.interpolation
-            ?? this.pconfig.graphs[e?.groupId]?.interpolation
-            ?? this.getEntityOptions(e?.entity)?.interpolation
-            ?? this.pconfig.defaultInterpolation ?? INTERPOLATIONS[0];
-    }
-
-    // Option k of entity e: its own — copied onto it when it's added (card-graphs.js
-    // _levelFields): a curve moved to another graph keeps it —, else its graph's, else
-    // entityOptions', else the card's (P.cardOptions), else its default (OPTION_DEFAULTS)
+    // Option k of entity e — the one chain of the levels, for every option (CARD_LEVEL_KEYS):
+    // its own (its entry's field — CURVE_FIELD_OF —, copied onto it when it's added:
+    // card-graphs.js _levelFields; a curve moved to another graph keeps it), else its graph's,
+    // else entityOptions', else the card's (P.cardOptions), else its default (OPTION_DEFAULTS).
+    // e: { groupId } alone, a graph's (no entity); null, the card's
     resolveOption(e, k)
     {
-        return e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
+        return e?.[CURVE_FIELD_OF[k] ?? k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? ( e?.entity !== undefined ? this.getEntityOptions(e.entity)?.[k] : undefined )
+            ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
+    }
+
+    // The curve interpolation algorithm of an entity (resolveOption)
+    resolveInterpolation(e)
+    {
+        return this.resolveOption(e, 'interpolation');
     }
 
     // The tooltip's mode of entity e from fields (card-charts.js tooltipFields): its room's
@@ -263,19 +255,17 @@ export class CardConfig
     }
 
     // Option k of the graph of group groupId (its header, its values — GRAPH_HEADER_KEYS):
-    // the graph's, else the card's, else its default (OPTION_DEFAULTS)
+    // the graph's, else the card's, else its default (resolveOption)
     graphOption(groupId, k)
     {
-        return this.pconfig.graphs[groupId]?.[k] ?? this.pconfig.cardOptions?.[k] ?? OPTION_DEFAULTS[k];
+        return this.resolveOption({ groupId }, k);
     }
 
-    // Whether entity e's value now is shown after its name in the legend: its own
-    // showCurrentValues (mini-graph-card's show_legend_state), else its graph's, else
-    // entityOptions', else the card's
+    // Whether entity e's value now is shown after its name in the legend: its
+    // showCurrentValues (mini-graph-card's show_legend_state — resolveOption)
     showsCurrentValue(e)
     {
-        return ( e?.showCurrentValues ?? this.pconfig.graphs[e?.groupId]?.showCurrentValues ?? this.getEntityOptions(e?.entity)?.showCurrentValues
-            ?? this.pconfig.showCurrentValues ) !== false;
+        return this.resolveOption(e, 'showCurrentValues') !== false;
     }
 
     // The factor entity e's values are drawn with: its scale, times 10 to the power of its
@@ -294,45 +284,41 @@ export class CardConfig
     }
 
     // How an entity's values are grouped into points (mini-graph-card's aggregation):
-    // { pointsPerHour, aggregateFunc as func, groupBy, explicit — any of them set }, each its
-    // own, else its graph's, else entityOptions', else the card's. None set: a point per
-    // column of pixels, their mean (see card-datasets.js _lineSamples)
+    // { pointsPerHour, aggregateFunc as func, groupBy, explicit — any of them set } — options
+    // of the curve, copied onto it when it's added: it keeps them, moved to another graph
+    // (resolveOption). None set: a point per column of pixels, their mean (see
+    // card-datasets.js _lineSamples)
     resolveAggregation(e)
     {
-        const _card = { pointsPerHour: this.pconfig.defaultPointsPerHour, aggregateFunc: this.pconfig.defaultAggregateFunc, groupBy: this.pconfig.defaultGroupBy };
-        const _of = k => e?.[k] ?? this.pconfig.graphs[e?.groupId]?.[k] ?? this.getEntityOptions(e?.entity)?.[k] ?? _card[k];
+        const _of = k => this.resolveOption(e, k);
         const r = { pointsPerHour: _of('pointsPerHour'), func: _of('aggregateFunc'), groupBy: _of('groupBy') };
         r.explicit = !!( r.pointsPerHour || r.func || ( r.groupBy && r.groupBy !== 'interval' ) );
         return r;
     }
 
     // The Y axis of a line or bar entity: 'left', 'right' or 'auto' (by its unit, see
-    // _assignYAxes) — its own, else its graph's, else entityOptions', else the card's.
-    // Resolved when drawn, never copied onto the entity: an exception agreed by the user to
-    // the rule that a curve's options are its own (CLAUDE.md, STANDARD) — the axes are a
-    // property of the graph, not of the curve: a curve moved to another graph takes that
-    // graph's.
+    // _assignYAxes) — resolveOption. Resolved when drawn, never copied onto the entity: an
+    // exception agreed by the user to the rule that a curve's options are its own (CLAUDE.md,
+    // STANDARD) — the axes are a property of the graph, not of the curve: a curve moved to
+    // another graph takes that graph's.
     resolveYAxis(e)
     {
-        return e?.yAxis ?? this.pconfig.graphs[e?.groupId]?.yAxis ?? this.getEntityOptions(e?.entity)?.yAxis
-            ?? this.pconfig.defaultYAxis;
+        return this.resolveOption(e, 'yAxis');
     }
 
-    // The decimals of entity e's values (see formatNumber): its own `rounding`, else its
-    // graph's, else entityOptions', else the card's — undefined: at most 2
+    // The decimals of entity e's values (see formatNumber; resolveOption) — undefined: at
+    // most 2
     roundingOf(e)
     {
-        return e?.rounding ?? this.pconfig.graphs[e?.groupId]?.rounding ?? this.getEntityOptions(e?.entity)?.rounding
-            ?? this.pconfig.rounding;
+        return this.resolveOption(e, 'rounding');
     }
 
     // What a click on entity e's value does (tapAction — Home Assistant's actions: more-info,
-    // navigate, url, perform-action / call-service, none): its own, else its graph's, else
-    // entityOptions', else the card's — more-info when none is set
+    // navigate, url, perform-action / call-service, none; resolveOption) — more-info when none
+    // is set
     tapActionOf(e)
     {
-        return e?.tapAction ?? this.pconfig.graphs[e?.groupId]?.tapAction ?? this.getEntityOptions(e?.entity)?.tapAction
-            ?? this.pconfig.tapAction;
+        return this.resolveOption(e, 'tapAction');
     }
 
     _matchGlob(str, pattern)
@@ -378,8 +364,8 @@ export class CardConfig
         const type = entityOptions?.type ? entityOptions.type :
                      this.circularPeriodOf({ entity: entity_id, circular: entityOptions?.circular }) ? 'arrowline' :
                      _cumulative ? 'bar' :
-                     isTimelineState(this.stateOf(entity_id)) ? 'timeline' : 'line';
-        const lineMode = entityOptions?.lineMode || this.pconfig.defaultLineMode || 'smart';
+                     isTimelineState(typeState(this.stateOf(entity_id), this.lastUsableState(entity_id))) ? 'timeline' : 'line';
+        const lineMode = this.resolveOption({ entity: entity_id }, 'lineMode') || 'smart';
         return { type, lineMode };
     }
 
@@ -401,10 +387,10 @@ export class CardConfig
             // shown in, see addGraph —: its header aside, the graph's only; its line width
             // kept as width; its interval, else the graph's)
             ...Object.fromEntries(_ENTITY_GRAPH_KEYS.map(k => [k, ent[k]])),
-            width             : ent.lineWidth,
+            [CURVE_FIELD_OF.lineWidth] : ent.lineWidth,
             interval          : ent.interval ?? interval,
-            enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enableMultidevicePersistence),
-            enablePersistence: this.resolveEntityPersistenceFields(ent.enablePersistence),
+            enableMultidevicePersistence: this.resolveEntityPersistenceFields(ent.enableMultidevicePersistence, 'enableMultidevicePersistence'),
+            enablePersistence: this.resolveEntityPersistenceFields(ent.enablePersistence, 'enablePersistence'),
         };
     }
 
@@ -430,18 +416,18 @@ export class CardConfig
         const testEntityExclusionList = function(entity, excludes) { for( let i of excludes ) if( i.test(entity) ) return true; return false; };
 
         if( !Array.isArray(graphs) ) {
-            console.warn(`history-explorer-card: 'graphs' must be a list — got ${JSON.stringify(graphs)}. No graphs loaded.`);
+            configWarning('graphs', graphs, 'not a list — no graphs loaded');
             return;
         }
 
         for( let graph of graphs ) {
             if( !graph || typeof graph !== 'object' ) {
-                console.warn(`history-explorer-card: skipping invalid graph entry (expected an object, got ${JSON.stringify(graph)})`);
+                configWarning('graphs', graph, 'not a graph (an object expected) — skipped');
                 continue;
             }
             if( !Array.isArray(graph.entities) ) {
                 if( graph.entities !== undefined )
-                    console.warn(`history-explorer-card: graph '${graph.title ?? graph.type ?? '?'}' has an invalid 'entities' (expected a list, got ${JSON.stringify(graph.entities)}) — graph skipped`);
+                    configWarning(`graph '${graph.title ?? graph.type ?? '?'}' entities`, graph.entities, 'not a list — graph skipped');
                 continue;
             }
             const _gid = this.newGraphId();
@@ -476,7 +462,7 @@ export class CardConfig
                 // (an entity_id alone: that entity)
                 if( typeof e === 'string' ) e = { entity: e };
                 if( !e || typeof e !== 'object' || typeof e.entity !== 'string' || e.entity === '' ) {
-                    console.warn(`history-explorer-card: skipping invalid entity entry in graph '${graph.title ?? graph.type ?? '?'}' (expected an object with a non-empty 'entity' string, got ${JSON.stringify(e)})`);
+                    configWarning(`graph '${graph.title ?? graph.type ?? '?'}' entities`, e, 'not an entity (an entity id, or an object with a non-empty entity) — skipped');
                     continue;
                 }
                 if( e.entity.indexOf('*') >= 0 ) {
@@ -521,10 +507,16 @@ export class CardConfig
         }
     }
 
+    // The line mode of an entity of type `type` none sets: a bar's lines, else curves
+    defaultLineModeOf(type)
+    {
+        return type === 'bar' ? 'lines' : 'curves';
+    }
+
     // The line mode an entity is drawn with
     lineModeOf(e)
     {
-        return e?.lineMode || this.pconfig.defaultLineMode || 'curves';
+        return this.resolveOption(e, 'lineMode') || 'curves';
     }
 
     // Is entity e of graph g a curve that's interpolated (curves or smart mode — the only

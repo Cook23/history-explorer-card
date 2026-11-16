@@ -3,8 +3,13 @@
 // menu — or removes. Part of HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { formatNumber, unitOfState } from "./history-units.js";
+import { formatNumber, unitOfState, isMissingState } from "./history-units.js";
 import { seriesAttributes, isAttributeGroup, seriesId, attributeLabel } from "./history-series.js";
+import { configWarning } from "./history-options.js";
+
+// The names of entities just added, shown in bold in the selector's field that long (ms): a
+// visual confirmation the add was taken — nothing to read, they were shown before
+const ADDED_CONFIRM_MS = 500;
 
 // The domains never offered by the entity selector (nothing to draw)
 const UNLISTED_DOMAINS = ['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'];
@@ -304,7 +309,7 @@ export class CardSelector
                 if( !j ) continue;
                 const _pattern = (typeof j === 'object') ? j.entity : j;
                 if( typeof _pattern !== 'string' || _pattern === '' ) {
-                    console.warn(`history-explorer-card: invalid entry in entity filter/exclude list (expected a string or {entity: string}, got ${JSON.stringify(j)}) — ignored`);
+                    configWarning('filterEntities / excludeFilterEntities', j, 'not an entity pattern (a text, or { entity: text }) — ignored');
                     continue;
                 }
                 const _regex = this.matchWildcardPattern(_pattern);
@@ -544,9 +549,9 @@ export class CardSelector
     {
         const _stateVal = state?.state;
         const _unit = unitOfState(state);
-        if( _stateVal === undefined || _stateVal === 'unavailable' || _stateVal === 'unknown' ) return '';
+        if( _stateVal === undefined || isMissingState(_stateVal) ) return '';
         const _numVal = Number(_stateVal);
-        if( !isNaN(_numVal) ) return formatNumber(_numVal, this.pconfig.rounding) + (_unit ? ' ' + _unit : '');
+        if( !isNaN(_numVal) ) return formatNumber(_numVal, this.resolveOption(null, 'rounding')) + (_unit ? ' ' + _unit : '');
         // Try to parse as date and show HH:MM
         const _d = new Date(_stateVal);
         return isNaN(_d.getTime()) ? _stateVal : (_d.getHours().toString().padStart(2,'0') + ':' + _d.getMinutes().toString().padStart(2,'0'));
@@ -596,7 +601,7 @@ export class CardSelector
     matchWildcardPattern(s)
     {
         if( typeof s !== 'string' || s === '' ) {
-            console.warn(`history-explorer-card: invalid entity pattern in configuration (expected a non-empty string, got ${JSON.stringify(s)}) — ignored`);
+            configWarning('entity', s, 'not an entity pattern (a non-empty text) — ignored');
             return null;
         }
         s = s.replace(new RegExp('[.\\\\+*?\\[\\^\\]$(){}=!<>|:\\-]', 'g'), '\\$&');
@@ -738,14 +743,15 @@ export class CardSelector
         // (nothing added yet: the curve menu adds what's chosen — addCurves)
     }
 
-    // The names of entities just added, shown a moment in the selector's field ii, in bold
+    // The names of entities just added, shown in the selector's field ii, in bold, a moment
+    // (ADDED_CONFIRM_MS)
     showAdded(ii, names)
     {
         const _fi = this.ui.inputField[ii];
         if( !names.length || !_fi ) return;
         _fi.value = names.join('; ');
         _fi.style.fontWeight = 'bold';
-        setTimeout(() => { this.resetEntityInput(_fi); }, 500);
+        setTimeout(() => { this.resetEntityInput(_fi); }, ADDED_CONFIRM_MS);
     }
 
     resetEntityInput(fi)

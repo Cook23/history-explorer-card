@@ -25,7 +25,7 @@ import { CardMenus } from "./card-menus.js";
 import { CardStorage } from "./card-storage.js";
 import { CardValues } from "./card-values.js";
 import { CardYaml } from "./card-yaml.js";
-import { withLook, OPTION_DEFAULTS, PERSISTENCE_CATEGORIES } from "./history-options.js";
+import { withLook, OPTION_DEFAULTS, PERSISTENCE_CATEGORIES, UI_PLACES } from "./history-options.js";
 import { GESTURE_SETTINGS, clampGesture, applyGestures } from "./gesture-settings.js";
 import { localGestures, versionIsNew } from "./card-storage.js";
 import "./history-info-panel.js"
@@ -558,8 +558,8 @@ class HistoryExplorerCard extends HTMLElement
         // (the card's own: what's saved and how, the info panel)
         this.instance.pconfig.yamlDefaultTimeRange =   config.defaultTimeRange;
         this.instance.pconfig.yamlDefaultMagnifierMode = config.defaultMagnifierMode;
-        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, PERSISTENCE_CATEGORIES);
-        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, PERSISTENCE_CATEGORIES);
+        this.instance.pconfig.enableMultidevicePersistence = this.instance.normalizePersistenceCategories(config.enableMultidevicePersistence, PERSISTENCE_CATEGORIES, 'enableMultidevicePersistence');
+        this.instance.pconfig.enablePersistence = this.instance.normalizePersistenceCategories(config.enablePersistence, PERSISTENCE_CATEGORIES, 'enablePersistence');
 
         this.instance.pconfig.closeButtonColor = parseColor(config.uiColors?.closeButton ?? UI_COLOR_DEFAULTS.closeButton);
 
@@ -583,8 +583,7 @@ class HistoryExplorerCard extends HTMLElement
         this.instance.ui.defaultTitle = !config.header;
         const bgcol = buttonsColor(config.uiColors);
 
-        const bitmask = { 'hide': 0, 'top': 1, 'bottom': 2, 'both': 3 };
-        const _layout = k => bitmask[config.uiLayout?.[k]] ?? bitmask[OPTION_DEFAULTS.uiLayout[k]];
+        const _layout = k => UI_PLACES[config.uiLayout?.[k]] ?? UI_PLACES[OPTION_DEFAULTS.uiLayout[k]];
         const tools = _layout('toolbar');
         const selector = _layout('selector');
         this.instance.ui.stickyTools = _layout('sticky');

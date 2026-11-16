@@ -8,6 +8,7 @@ import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand } from "./histo
 import { timeWeightedMean, circularMean } from "./history-stats.js";
 import { perf } from "./card-perf.js";
 import { minOf, maxOf, insertAll } from "./history-arrays.js";
+import { isMissingState } from "./history-units.js";
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -234,11 +235,10 @@ export class CardDatasets
         // The time window drawn: now, its start and end; a state without a value is a gap in a
         // curve (isGap) — unavailable or unknown with showUnavailable, one a stateMap doesn't
         // list with showMissingState —; else the curve goes over it
-        const _missing = state => ['unavailable', 'unknown'].includes(state);
         const w = {
             now: moment(), start: moment(this.startTime), end: moment(this.endTime),
-            isValid: state => !_missing(state) && state !== STATE_NOT_LISTED,
-            isGap: state => state === STATE_NOT_LISTED ? this.pconfig.showMissingState : this.pconfig.showUnavailable && _missing(state),
+            isValid: state => !isMissingState(state) && state !== STATE_NOT_LISTED,
+            isGap: state => state === STATE_NOT_LISTED ? this.pconfig.showMissingState : this.pconfig.showUnavailable && isMissingState(state),
         };
 
         let id = 0;
@@ -306,11 +306,18 @@ export class CardDatasets
         }
     }
 
+    // Is series id drawn from all the cache knows of it (knownHistory) — a curve in smart mode,
+    // its silences worked out there: drawn again when its history outside the window comes
+    drawnFromKnownHistory(id)
+    {
+        return this.graphs.some(g => g.entities.some(e => e.entity === id && this.lineModeOf(e) === 'smart'));
+    }
+
     // Entity e's band (showMinMax, see minMaxBand) for a point of a column with count values —
     // stat: statistics in it —: drawn everywhere ('all', 'min', 'max'), on the statistics only,
     // on the history only; nowhere else (a single value of the history has no band: what's
     // shown is what was recorded) → its sides ({ min, max }), null: none
-    _bandWanted(e, stat, count)
+    bandWanted(e, stat, count)
     {
         const b = minMaxBand(e.showMinMax);
         if( !b || ( !stat && count < 2 ) ) return null;
@@ -324,7 +331,7 @@ export class CardDatasets
     // whether statistics are in it (statistics: their period, statisticsPeriod) — what the screen can show of them, the
     // columns on a grid of time fixed from 1970 (the same from one refresh, or one part of
     // a long window, to the next); the band between their min and max (yMin, yMax) where
-    // showMinMax wants it (_bandWanted) —, its last value carried to the end of the window
+    // showMinMax wants it (bandWanted) —, its last value carried to the end of the window
     // (or now), its silences as plateaus in smart mode
     _lineSamples(e, data, process, scale, w, columns)
     {
@@ -402,7 +409,7 @@ export class CardDatasets
             // (its band over its time only: Chart.js links it to the next point's only where
             // their times meet — see showMinMax)
             // (one side only — min, max —: from the curve to that side)
-            const _band = this._bandWanted(e, stat, _agg.explicit ? 2 : group.length);
+            const _band = this.bandWanted(e, stat, _agg.explicit ? 2 : group.length);
             if( _band ) Object.assign(p, { yMin: _band.min ? min : y, yMax: _band.max ? max : y, xMin: _from, xMax: _to });
             s.push(p);
         };
@@ -455,7 +462,7 @@ export class CardDatasets
             _extended = true;
         }
 
-        if( !_agg.explicit && (e.lineMode || this.pconfig.defaultLineMode) === 'smart' ) {
+        if( !_agg.explicit && this.lineModeOf(e) === 'smart' ) {
             // Silences are detected on every value of the history the cache knows of the entity
             // (card-history.js knownHistory) — not on the columns, nor on the statistics (an hour of them is no
             // silence), nor only on the days the window touches: the same limits whatever the

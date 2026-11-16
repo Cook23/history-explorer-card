@@ -6,36 +6,28 @@
 // option's default:
 //   simplified  those only — the card's look (look:) and entityOptions as the YAML says
 //               them, the options they give left to them
-//   complete    those, plus at each level the options the look sets, and the ones any
-//               other member of the same level writes (another graph of the card, another
-//               curve of the graph), each with its own; no entityOptions: each curve says
+//   complete    those, plus at each level the options the look sets, and the ones any of
+//               its neighbours writes — the others of its level in the export: the card
+//               exported, every graph and every curve of the card; a graph, its curves; a
+//               curve alone, none —, each with its own; no entityOptions: each curve says
 //               what they give it
 
-import { OPTION_DEFAULTS, CURVE_OPTION_KEYS, CARD_ENTITY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS,
-         lookParts, minMaxValue } from "./history-options.js";
+import { OPTION_DEFAULTS, ENTITY_OPTION_KEYS, CARD_ENTITY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
+         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
-import { baseTypePure } from "./card-config.js";
 import { seriesOf } from "./history-series.js";
-import { defaultColors, fillValue } from "./history-default-colors.js";
+import { defaultColors, fillValue, NO_FILL } from "./history-default-colors.js";
 import { toYaml } from "./history-yaml.js";
 
 const _LOCAL = new Set(LOCAL_ONLY_FIELDS);
-// A curve's options (their YAML names), and the entry's field holding each when it isn't
-// the same name
-const CURVE_KEYS = ['type', 'color', 'fill', 'lineMode', 'interpolation', 'dashMode', 'lineWidth', 'showMinMax', 'netBars', 'scale', 'name',
-                    'siConversionFactor', 'unit', 'process', 'circular', 'rounding', 'tapAction', 'showCurrentValues', ...CURVE_OPTION_KEYS].filter(k => !_LOCAL.has(k));
-const _FIELD = { lineWidth: 'width' };
-// The card's options that are every curve's (CardConfig.applyConfig: the defaults of every
-// entity, cardOptions, CARD_ENTITY_KEYS)
-const CARD_CURVE_KEYS = new Set(['lineMode', 'interpolation', 'lineWidth', 'dashMode', 'netBars', 'showMinMax', 'rounding', 'tapAction', 'showCurrentValues',
-                                 ...CURVE_OPTION_KEYS, ...CARD_ENTITY_KEYS]);
+// The options only an entity sets — never the card for every curve (ENTITY_OPTION_KEYS but
+// those of CARD_ENTITY_KEYS)
+const _ENTITY_ONLY = new Set(ENTITY_OPTION_KEYS.filter(k => !CARD_ENTITY_KEYS.includes(k)));
 // A graph's options (its type and title aside), its bar interval last
 const GRAPH_KEYS = [...GRAPH_STORED_KEYS.filter(k => !_LOCAL.has(k)), 'interval'];
 // The card's keys that aren't options of the card: written apart (type, look, entityOptions,
 // its graphs) or made into graphs (entities)
 const CARD_APART = new Set(['type', 'look', 'graphs', 'entities', 'entityOptions']);
-// A fill that fills nothing (fillValue(false))
-const NO_FILL = 'rgba(0,0,0,0)';
 
 // (two values the same — whatever their keys' order, a key undefined as one absent)
 const _plain = v => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -56,13 +48,17 @@ const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? 
 
 export class CardYaml
 {
-    // The YAML of what a menu exports — the card (scope.kind 'card'), graph scope.g ('graph'),
-    // curve scope.e of graph scope.g ('curve') —, simplified or complete (full)
-    yamlText(scope, full)
+    // The configuration a menu exports — the card (scope.kind 'card'), graph scope.g ('graph'),
+    // curve scope.e of graph scope.g ('curve') —, simplified or complete (full): as an object,
+    // as YAML
+    yamlObject(scope, full)
     {
         const x = this._yamlContext(scope.kind, full);
-        const _o = scope.kind === 'card' ? this._cardYaml(x) : scope.kind === 'graph' ? this._graphsYaml(x, [scope.g])[0] : this._curvesYaml(x, scope.g, [scope.e])[0];
-        return toYaml(_o);
+        return scope.kind === 'card' ? this._cardYaml(x) : scope.kind === 'graph' ? this._graphsYaml(x, [scope.g])[0] : this._curvesYaml(x, scope.g, [scope.e])[0];
+    }
+    yamlText(scope, full)
+    {
+        return toYaml(this.yamlObject(scope, full));
     }
 
     // What every level of an export reads: its first level (root), complete or not (full), the
@@ -115,12 +111,12 @@ export class CardYaml
     _graphValue(x, g, k) { return this._graphOwn(g, k) ?? this._cardValue(x, k); }
     _graphBase(x, k)     { return x.root === 'card' ? this._cardValue(x, k) : OPTION_DEFAULTS[k]; }
 
-    // Graphs gs, each — every graph of the card its siblings (complete: the options any of
-    // them writes, each graph its own) —: its type, title, options, curves
+    // Graphs gs, the ones exported, each — the others its neighbours (complete: the options
+    // any of them writes, each graph its own) —: its type, title, options, curves
     _graphsYaml(x, gs)
     {
         const _written = g => GRAPH_KEYS.filter(k => ( k !== 'interval' || g.type === 'bar' ) && !_same(this._graphValue(x, g, k), this._graphBase(x, k)));
-        const _keys = x.full ? new Set([...this.graphs.flatMap(_written), ...GRAPH_KEYS.filter(k => k in x.look)]) : null;
+        const _keys = x.full ? new Set([...gs.flatMap(_written), ...GRAPH_KEYS.filter(k => k in x.look)]) : null;
         return gs.map(g => {
             const o = { type: this.pconfig.graphs[g.groupId]?.type ?? g.type };
             const _title = this.pconfig.graphs[g.groupId]?.title;
@@ -132,6 +128,15 @@ export class CardYaml
             o.entities = this._curvesYaml(x, g, g.entities);
             return o;
         });
+    }
+
+    // Curve e's options (their YAML names): its type, color and fill, those copied onto it
+    // (curveOptionNames), those resolved from its graph (CURVE_GRAPH_KEYS) — the ones kept on
+    // each device aside —; exported alone, its interval
+    _curveKeys(x, e)
+    {
+        const _ks = [...CURVE_LOOK_KEYS, ...this.curveOptionNames(e), ...CURVE_GRAPH_KEYS].filter(k => !_LOCAL.has(CURVE_FIELD_OF[k] ?? k));
+        return x.root === 'curve' ? [..._ks, 'interval'] : _ks;
     }
 
     // Curve e's option k as its entry holds it: its color when it's its own (colorSet — the
@@ -150,7 +155,7 @@ export class CardYaml
         if( k === 'interval' ) return x.root === 'curve' && e.type === 'bar' ? e.interval : undefined;
         // (its band by the value's own name — all, not true)
         if( k === 'showMinMax' ) return minMaxValue(e.showMinMax);
-        return e[_FIELD[k] ?? k];
+        return e[CURVE_FIELD_OF[k] ?? k];
     }
 
     // Curve e's option k as the levels above it in the export give it: its graph's (its
@@ -164,25 +169,26 @@ export class CardYaml
             const _gy = this.pconfig.graphs[g.groupId] ?? {};
             if( k === 'type' ) return _gy.type ?? g.type;
             const _eo = x.root === 'card' && !x.full ? this.getEntityOptions(e.entity) ?? {} : {};
-            const _card = ( x.root === 'card' && CARD_CURVE_KEYS.has(k) ) || ( x.root === 'graph' && GRAPH_KEYS.includes(k) ) ? x.card[k] : undefined;
+            const _card = ( x.root === 'card' && !_ENTITY_ONLY.has(k) && k !== 'type' ) || ( x.root === 'graph' && GRAPH_KEYS.includes(k) ) ? x.card[k] : undefined;
             const v = _gy[k] ?? _eo[k] ?? _card;
             if( v !== undefined ) return v;
         }
-        if( k === 'type' ) return baseTypePure(this._hass, e.entity);
-        if( k === 'lineMode' ) return e.type === 'bar' ? 'lines' : 'curves';
+        if( k === 'type' ) return this.baseTypeOf(e.entity);
+        if( k === 'lineMode' ) return this.defaultLineModeOf(e.type);
         if( k === 'fill' ) return e.colorSet ? false : undefined;
         if( k === 'interval' ) return OPTION_DEFAULTS.interval;
         return OPTION_DEFAULTS[k];
     }
 
-    // Curves es of graph g, each — the graph's curves its siblings (complete: the options any
-    // of them writes, each curve its own, else what the levels give it) —: its entity (and
-    // attribute), its options
+    // Curves es of graph g, each — the curves exported with it its neighbours: the card
+    // exported, every curve of the card; a graph, its curves; a curve alone, none (complete:
+    // the options any of them writes, each curve its own, else what the levels give it) —:
+    // its entity (and attribute), its options
     _curvesYaml(x, g, es)
     {
-        const _ks = x.root === 'curve' ? [...CURVE_KEYS, 'interval'] : CURVE_KEYS;
-        const _written = e => _ks.filter(k => { const v = this._curveOwn(x, e, k); return v !== undefined && !_same(v, this._curveBase(x, g, e, k)); });
-        const _keys = x.full ? new Set([...g.entities.flatMap(_written), ..._ks.filter(k => k in x.look)]) : null;
+        const _exported = x.root === 'card' ? this.graphs.flatMap(h => h.entities.map(e => [h, e])) : es.map(e => [g, e]);
+        const _written = (h, e) => this._curveKeys(x, e).filter(k => { const v = this._curveOwn(x, e, k); return v !== undefined && !_same(v, this._curveBase(x, h, e, k)); });
+        const _keys = x.full ? new Set([..._exported.flatMap(([h, e]) => _written(h, e)), ..._exported.flatMap(([, e]) => this._curveKeys(x, e)).filter(k => k in x.look)]) : null;
         // (what curve e shows of option k: its own, its color and fill as drawn, else what the
         // levels give it)
         const _shown = (e, k) => this._curveOwn(x, e, k) ?? ( k === 'color' ? e.color : k === 'fill' && e.type !== 'bar' ? e.fill : undefined ) ?? this._curveBase(x, g, e, k);
@@ -190,7 +196,7 @@ export class CardYaml
             const { entity, attribute } = seriesOf(e.entity);
             const o = { entity };
             if( attribute ) o.attribute = attribute;
-            for( const k of _ks.filter(k => _keys ? _keys.has(k) : _written(e).includes(k)) ) {
+            for( const k of this._curveKeys(x, e).filter(k => _keys ? _keys.has(k) : _written(g, e).includes(k)) ) {
                 const v = _keys ? _shown(e, k) : this._curveOwn(x, e, k);
                 const _v = k === 'interval' ? _intervalName(v) : v;
                 if( _v !== undefined ) o[k] = _v;

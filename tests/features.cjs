@@ -260,19 +260,28 @@ module.exports = async function()
                           '  - type: line\n    title: Power\n    entities:\n      - entity: sensor.power\n        dashMode: points\n      - entity: sensor.rain\n  - type: line\n    entities:\n      - entity: sensor.power_kw\n'];
             return want.every(w => text.includes(w)) && !/showPoints/.test(text) && message === 'YAML copied to the clipboard' ? true : JSON.stringify({ text, message });
         });
-        await t.step('the card\'s menu: Export ▸ YAML ▸ Complete — no entityOptions: each curve says what they give it; what another curve of its graph sets, each curve its own', async () => {
+        await t.step('the card\'s menu: Export ▸ YAML ▸ Complete — no entityOptions: each curve says what they give it; what any curve of the card sets (its neighbours: every curve exported), each curve its own — another graph\'s too', async () => {
             const { text } = await yaml(options, 'eo_0', 'full');
-            return !/entityOptions/.test(text) && text.includes('      - entity: sensor.power\n        lineMode: curves\n        dashMode: points\n      - entity: sensor.rain\n        lineMode: stepped\n        dashMode: solid\n') ? true : text;
+            return !/entityOptions/.test(text) && text.includes('      - entity: sensor.power\n        dashMode: points\n        lineMode: curves\n      - entity: sensor.rain\n        dashMode: solid\n        lineMode: stepped\n')
+                && text.includes('      - entity: sensor.power_kw\n        dashMode: solid\n        lineMode: curves\n') ? true : text;
         });
         const graphMenu = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(400); };
         await t.step('a graph\'s menu: Export ▸ YAML ▸ Simplified — that graph only, with what the card gives it', async () => {
             const { text } = await yaml(graphMenu, 'et_0', 'simple');
             return text === 'type: line\ntitle: Power\nlineWidth: 3\nentities:\n  - entity: sensor.power\n    dashMode: points\n  - entity: sensor.rain\n    lineMode: stepped\n' ? true : text;
         });
+        await t.step('a graph\'s menu: Export ▸ YAML ▸ Complete — its curves each other\'s neighbours, none of another graph\'s', async () => {
+            const { text } = await yaml(graphMenu, 'et_0', 'full');
+            return text.includes('entities:\n  - entity: sensor.power\n    dashMode: points\n    lineMode: curves\n  - entity: sensor.rain\n    dashMode: solid\n    lineMode: stepped\n') ? true : text;
+        });
         const curveMenu = async () => { await t.longPress(await t.E('legendPt(0,1)')); await t.wait(400); };
         await t.step('a curve\'s menu: Export ▸ YAML ▸ Simplified — that curve only, with what the levels above give it', async () => {
             const { text } = await yaml(curveMenu, 'et_0', 'simple');
-            return text === 'entity: sensor.rain\nlineMode: stepped\nlineWidth: 3\n' ? true : text;
+            return text === 'entity: sensor.rain\nlineWidth: 3\nlineMode: stepped\n' ? true : text;
+        });
+        await t.step('a curve\'s menu: Export ▸ YAML ▸ Complete — no neighbour: what it sets only (not the dashes the other curve of its graph sets)', async () => {
+            const { text } = await yaml(curveMenu, 'et_0', 'full');
+            return text === 'entity: sensor.rain\nlineWidth: 3\nlineMode: stepped\n' ? true : text;
         });
         await t.step('the clipboard refused (and no copy through a selection): nothing copied, said so', async () => {
             await t.E(`(()=>{ window.__refuse = true; document.execCommand = () => false; })()`);
@@ -305,6 +314,38 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Export ▸ YAML read back: the configuration exported given to a new card — the same
+    // graphs, the same curves, each with the same options as resolved (options at every level,
+    // look: mini, choices made in the menus) ──
+    {
+        // (each graph's type and title, each curve's options as the card resolves them)
+        const SIG = `(()=>{ const I = el.instance; return I.graphsInDisplayOrder().map(g => ({ type: g.type, title: I.pconfig.graphs[g.groupId]?.title ?? null,
+            curves: g.entities.map(e => ({ entity: e.entity, type: e.type, lineMode: I.lineModeOf(e), interpolation: I.resolveInterpolation(e), width: e.width,
+                dash: I.resolveOption(e, 'dashMode'), minmax: e.showMinMax ?? null, yAxis: I.resolveYAxis(e), rounding: I.roundingOf(e) ?? null,
+                showState: I._resolveShow(e, 'showState') ?? null, pph: I.resolveAggregation(e).pointsPerHour ?? null, size: e.sizePoints ?? null,
+                color: I.entityColor(e), fill: e.fill })) })); })()`;
+        const strip = sig => sig.map(g => ({ ...g, curves: g.curves.map(({ color, fill, ...c }) => c) }));
+        const cards = {
+            levels: card({ statistics: { enabled: false }, lineWidth: 3, interpolation: 'steffen', entityOptions: { 'sensor.rain': { lineMode: 'stepped', rounding: 1 } },
+                graphs: [{ type: 'line', title: 'P', yAxis: 'right', showState: true, entities: [{ entity: 'sensor.power', yAxis: 'left', color: '#ff0000', dashMode: 'shortlines' }, { entity: 'sensor.rain', sizePoints: 6 }] },
+                         { type: 'bar', entities: [{ entity: 'sensor.energy' }] },
+                         { type: 'line', entities: [{ entity: 'sensor.power_kw', showMinMax: 'max', pointsPerHour: 4 }] }] }),
+            mini: card({ look: 'mini', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', y_axis: 'secondary' }, { entity: 'sensor.power_kw' }] }] }),
+        };
+        for( const [name, cfg] of Object.entries(cards) ) {
+            t = await openCard(cfg, { mock: { series: true } });
+            await t.wait(1500);
+            // (choices made in the menus: a width, a line style)
+            await t.E(`(()=>{ const I = el.instance, g = I.graphsInDisplayOrder().at(-1); I.setCurvesLook(g, [g.entities[0]], 'width', 4); I.setCurvesLook(g, [g.entities[0]], 'dashMode', 'points'); })()`); await t.wait(800);
+            const sig0 = await t.E(SIG), simple = await t.E(`el.instance.yamlObject({ kind: 'card' }, false)`), full = await t.E(`el.instance.yamlObject({ kind: 'card' }, true)`);
+            const back = async o => { const b = await openCard(o, { mock: { series: true } }); await b.wait(1500); const r = await b.E(SIG); await b.close(); return r; };
+            const s1 = await back(simple), s2 = await back(full);
+            await t.step(`${name}: the simplified export read back by a new card — the same graphs, curves and options, colors and fills included`, async () => JSON.stringify(s1) === JSON.stringify(sig0) ? true : JSON.stringify({ sig0, s1, simple }));
+            await t.step(`${name}: the complete export read back — the same graphs, curves and options (the palette's colors aside: still to decide)`, async () => JSON.stringify(strip(s2)) === JSON.stringify(strip(sig0)) ? true : JSON.stringify({ sig0: strip(sig0), s2: strip(s2) }));
+            done(await t.close());
+        }
+    }
+
     // ── showMinMax: all, its other names (true, both), history's (states): each read as its own
     // name, exported so ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: true }, { entity: 'sensor.rain', showMinMax: 'both' }] },
@@ -328,6 +369,19 @@ module.exports = async function()
             return { yaml: gs.map(g => g.type).join(), unit: I.getUnitOfMeasure('sensor.u1') ?? null, legend: graphAt(0).chart.data.datasets[0].label,
                      added: ['sensor.u1', 'sensor.u2', 'sensor.u3', 'sensor.u4', 'sensor.u5', 'sensor.u6'].map(id => I.detectDefaultType(id).type).join() }; })()`);
         return r.yaml === 'line,line,timeline' && r.unit === null && !/unknown/i.test(String(r.legend)) && r.added === 'line,line,timeline,timeline,line,line' ? true : JSON.stringify(r);
+    });
+    done(await t.close());
+    // (its state telling nothing now: its last one that does in the cache decides — none
+    // there, the rule above)
+    t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.u7' }] }, { type: 'timeline', entities: [{ entity: 'sensor.u8' }] }] }),
+        { mock: { states: { 'sensor.u7': { state: 'unavailable' }, 'sensor.u8': { state: 'unknown' }, 'sensor.u9': { state: 'unavailable' } },
+                  rows: { 'sensor.u7': [[10 * 3600, '12'], [2 * 3600, 'unavailable']], 'sensor.u8': [[10 * 3600, 'heating'], [2 * 3600, 'unknown']] } } });
+    await t.wait(1500);
+    await t.step('a state unavailable or unknown now: the type by the last state of the cache telling something — a number a line, a text a timeline; nothing in the cache, the rule above (a timeline)', async () => {
+        const r = await t.E(`(()=>{ const I = el.instance;
+            return { cache: ['sensor.u7', 'sensor.u8', 'sensor.u9'].map(id => I.lastUsableState(id) ?? null), added: ['sensor.u7', 'sensor.u8', 'sensor.u9'].map(id => I.detectDefaultType(id).type).join(),
+                     base: ['sensor.u7', 'sensor.u8', 'sensor.u9'].map(id => I.baseTypeOf(id)).join() }; })()`);
+        return JSON.stringify(r.cache) === '["12","heating",null]' && r.added === 'line,timeline,timeline' && r.base === 'line,timeline,timeline' ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -1214,7 +1268,8 @@ module.exports = async function()
     await t.step('a request failing (Home Assistant down for a moment): no longer under way, the loading ends; asked again at the next update', async () => {
         await t.E(`(()=>{ MOCK.fail=['history/history_during_period']; el.instance.reloadHistory(); })()`); await t.wait(2500);
         const failed = await t.E('({ loading: el.instance.state.loading, requests: el.instance._requests.length })');
-        await t.E(`(()=>{ MOCK.fail=[]; el.instance.updateHistory(); })()`); await t.wait(10000);
+        await t.E(`(()=>{ MOCK.fail=[]; el.instance.updateHistory(); })()`);
+        for( let k = 0; k < 20 && ( await t.E('el.instance.state.loading || !el.instance.graphs[0].chart.data.datasets[0].data.length') ); k++ ) await t.wait(1000);
         const r = await firstShown(t);
         return !failed.loading && failed.requests === 0 && r.first !== null && !r.loading ? true : JSON.stringify({ failed, r });
     });
@@ -2130,6 +2185,28 @@ module.exports = async function()
         await t.step('an hour\'s statistics compiled later than expected (Home Assistant slow, 15 min): not there at 10:12, asked again at the next refresh until they come — there at 10:16', async () => {
             const r = { before, after: await _nine() };
             return !r.before && r.after ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+    }
+
+    // (the hour compiled between the requests of two entities: the first one, asked before,
+    // asked again — its row there at the next refresh, not an hour later)
+    {
+        const d = new Date(); d.setUTCHours(10, 12, 0, 0);
+        const nine = d.getTime() - 72 * 60e3;
+        t = await openCard(card({ defaultTimeRange: '1w', statistics: { enabled: true }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }),
+            { mock: { series: true, statsLag: 900 }, clock: d.toISOString() });
+        await t.wait(3000);
+        const _nine = id => t.E(`(()=>{ const I = el.instance; return ( I.cache[I._slotAt(${nine})].stats.get('${id}') ?? [] ).some(x => +new Date(x.last_changed) === ${nine}); })()`);
+        const before = await _nine('sensor.power');
+        await t.page.clock.fastForward('04:00');
+        // (only the second entity's statistics asked once the hour is compiled: the card sees it compiled)
+        await t.E(`el.instance._ask('stats', ${nine} - 3600e3, Date.now(), ['sensor.power2'], { phase: 2 })`); await t.wait(1500);
+        const seen = await _nine('sensor.power2');
+        await t.E(`setState('sensor.power2', '303')`); await t.wait(4000);   // (a curve shown changing: a refresh)
+        await t.step('an hour compiled between the requests of two entities: the one asked before asked again at the next refresh — its row there', async () => {
+            const r = { before, seen, after: await _nine('sensor.power') };
+            return !r.before && r.seen && r.after ? true : JSON.stringify(r);
         });
         done(await t.close());
     }

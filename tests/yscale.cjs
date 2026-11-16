@@ -41,6 +41,18 @@ module.exports = async function()
 {
     let passed = 0, failed = 0;
     const done = r => { passed += r.passed; failed += r.failed; };
+    // (the background done — the cache no longer growing between two looks, nothing asked
+    // meanwhile —, or cond true when given, maxMs at most: an attempt's state, never a time)
+    const settle = async (t, maxMs, cond) => {
+        let _rows = -1;
+        for( const end = Date.now() + maxMs; Date.now() < end; ) {
+            await t.wait(1000);
+            if( cond ) { if( await t.E(cond) ) return; continue; }
+            const r = await t.E(`({ rows: el.instance.cacheRows(), flying: [...( el.instance._flying?.values() ?? [] )].some(l => l.length) })`);
+            if( r.rows === _rows && !r.flying ) return;
+            _rows = r.rows;
+        }
+    };
 
     // ── The bounds the card gives: values, never rounded — the ticks (round bounds, their step)
     // are Chart.js' (card-yscale.js chooseYAxis, card-charts.js _autoYAxis) ──
@@ -244,7 +256,7 @@ module.exports = async function()
                         if( !fits ) ignored.add(I.graphs.indexOf(g));
                     }
                 }
-                return { bad, ignored: ignored.size, warns: __warns.filter(w => /ystepSize 5 ignored/.test(w)) }; })()`);
+                return { bad, ignored: ignored.size, warns: __warns.filter(w => /ystepSize: 5 — ignored/.test(w)) }; })()`);
             const once = new Set(r.warns).size === r.warns.length;
             return !r.bad.length && r.ignored > 0 && r.warns.length === r.ignored && once ? true : JSON.stringify(r);
         });
@@ -362,7 +374,8 @@ module.exports = async function()
             return ok ? true : JSON.stringify(r);
         });
         if( range === '24h' ) await t.step('the user idle: the history of the day before the window, quietly, in the background; one request at a time, a second at least between two', async () => {
-            await t.wait(20000);
+            await settle(t, 40000, `(()=>{ const t0 = Date.parse(el.instance.startTime); return !el.instance.state.loading && __ws.some(w => w.type === 'history/history_during_period' && Date.parse(w.end) <= t0 + 3600e3 && Date.parse(w.start) < t0 - 3600e3); })()`);
+            await t.wait(1500);
             const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime);
                 const fine = __ws.some(w => w.type === 'history/history_during_period' && Date.parse(w.end) <= t0 + 3600e3 && Date.parse(w.start) < t0 - 3600e3);
                 // (the background: what's asked after the first display's requests, a second at least after them)
@@ -517,7 +530,7 @@ module.exports = async function()
         const E = ['sensor.power', 'sensor.power2', 'sensor.tank', 'sensor.rain', 'sensor.power_kw', 'sensor.wind', 'sensor.watering_cycle', 'sensor.days_to_watering'];
         t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1y', statistics: { enabled: true }, graphs: E.map(e => ({ type: 'line', entities: [{ entity: e }] })) },
             { height: 500, mock: { series: true, fastStats: true, cost: { base: 300, history: 0.001, statistics: 0.001, workers: 4 } } });
-        await t.wait(12000);
+        await settle(t, 30000, `!el.instance.state.loading`);
         await t.step('8 graphs on a 500 px screen, scrolled to the last ones, the window moved back 3 months: phase 1\'s requests of the graphs on the screen sent first, in groups of their own — never mixed with the others\', nor after them', async () => {
             const r = await t.E(`(async()=>{ const I = el.instance, w = ms => new Promise(r => setTimeout(r, ms)), g = I.graphs;
                 g[g.length - 1].canvas.scrollIntoView(); await w(1500);
@@ -547,7 +560,7 @@ module.exports = async function()
             I._cacheVersion = I.cacheVersion() + 1; window.MOCK.historyDelay = 4000; I.updateHistory(); })()`);
         await t.wait(800);
         const a = await t.E(look);
-        await t.wait(12000);
+        await settle(t, 25000, `(${look}).last5 > 0 && !el.instance.state.loading`);
         const b = await t.E(look);
         return a.last5 === 0 && a.before > 0 && a.gaps > 0 && b.last5 > 0 && b.gaps === 0 ? true : JSON.stringify({ a, b });
     });
@@ -774,7 +787,7 @@ module.exports = async function()
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '30d', statistics: { enabled: true },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.wind' }, { entity: 'sensor.power' }] }] },
         { height: 900, mock: { series: true }, init: "document.addEventListener('DOMContentLoaded', ()=>{ document.body.style.width='400px'; const h=document.getElementById('host'); if( h ) h.style.width='400px'; })" });
-    await t.wait(45000);
+    await settle(t, 90000);
     await t.step('an angle drawn from statistics: drawn from them as the rest (phase 1), then its history over the window first of the background — from the right, one request at a time, a second at least between two —, the other curve\'s not; drawn as it comes', async () => {
         const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime), t1 = Date.parse(I.endTime);
             const st = __ws.filter(w => w.type === 'recorder/statistics_during_period' && w.ids.includes('sensor.wind'));
@@ -795,7 +808,7 @@ module.exports = async function()
             && !r.between.length && r.minGap >= 950 && r.drawn > 0 && r.fromStats === 0 ? true : JSON.stringify(r);
     });
     await t.step('the user idle: the hourly statistics further before the window (phase 1\'s source, in blocks 10 times as large), both curves in one request; the angle\'s history only over the window', async () => {
-        await t.wait(10000);
+        await settle(t, 30000, `(()=>{ const t0 = Date.parse(el.instance.startTime); return !el.instance.state.loading && __ws.some(w => w.period === 'hour' && Date.parse(w.end) <= t0 - 29 * 86400e3); })()`);
         const r = await t.E(`(()=>{ const I = el.instance, t0 = Date.parse(I.startTime);
             const far = __ws.filter(w => w.period === 'hour' && Date.parse(w.end) <= t0 - 29 * 86400e3);
             return { far: far.map(w => [w.ids.length, Math.round(( Date.parse(w.end) - Date.parse(w.start) ) / 864e5)]),
@@ -837,7 +850,7 @@ module.exports = async function()
     t = await openCard(card('3d', { statistics: { enabled: true } }), { height: 900, mock: { series: true, historyStep: 2 } });
     await t.wait(4000);
     await t.step('a value every 2 s over a window of 3 days: the window drawn; the background filling around it never past 300 000 rows in the cache (a block more at most)', async () => {
-        await t.wait(25000);
+        await settle(t, 60000);
         const r = await t.E(`(()=>{ const I = el.instance; I.cacheRows = () => 299999 + 1; const n0 = __ws.length; I._askMissing();
             return { rows: I.__proto__.cacheRows.call(I), asked: __ws.length - n0, n: I.graphs[0].chart.data.datasets[0].data.length }; })()`);
         return r.rows > 100000 && r.rows < 300000 + 43200 && r.asked === 0 && r.n > 100 ? true : JSON.stringify(r);
@@ -910,6 +923,19 @@ module.exports = async function()
         return r.d20 && !r.d45 ? true : JSON.stringify(r);
     });
     done(await t.close());
+
+    // ── The values around the window the automatic axis counts: a statistics row's min and max
+    // only where the band is drawn on the statistics (bandWanted) — showMinMax: history, never ──
+    for( const mm of ['history', 'all'] ) {
+        t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '1w', statistics: { enabled: true },
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showMinMax: mm }] }] }, { height: 700, mock: { series: true } });
+        await t.wait(6000);
+        await t.step(`showMinMax: ${mm} — the statistics' extremes around the window ${mm === 'history' ? 'never' : 'counted'} by the axis`, async () => {
+            const n = await t.E(`(()=>{ const a = [...el.instance._yScaleNeighbours(el.instance.graphs[0].chart, 'y-axis-0', y => y).values()].flat(); return { all: a.length, wide: a.filter(p => p.hi > p.lo).length }; })()`);
+            return n.all > 0 && ( mm === 'history' ? n.wide === 0 : n.wide > 0 ) ? true : JSON.stringify(n);
+        });
+        done(await t.close());
+    }
 
     return { passed, failed };
 };

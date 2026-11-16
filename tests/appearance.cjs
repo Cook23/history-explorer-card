@@ -49,7 +49,7 @@ module.exports = async function()
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1), saved = await t.E('graphAt(0).entities[0].showMinMax');
         await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150);
         const l1 = await lines(t); await closeMenu(t);
-        return l0 === 'None* | Both sides | Maximum | Minimum | Statistics | History' && l1 === 'None | Both sides | Maximum* | Minimum | Statistics | History'
+        return l0 === 'None* | All | Maximum | Minimum | Statistics | History' && l1 === 'None | All | Maximum* | Minimum | Statistics | History'
             && a.minmax === true && !b.minmax && saved === 'max' ? true : JSON.stringify({ l0, l1, a, b, saved });
     });
     await t.step('Fill ▸: its list in a submenu over Appearance (the palette\'s fill: Solid in bold); Fade chosen: the curve fading out; Escape closes it, back to Appearance', async () => {
@@ -135,15 +135,15 @@ module.exports = async function()
     done(await t.close());
 
     // ── Extremes: half a band — Maximum: from the curve up to each column's max; Minimum: down
-    // to its min; Both sides: both —, chosen in the menu ──
+    // to its min; All: both —, chosen in the menu ──
     t = await openCard({ ...card(), defaultTimeRange: '7d' }, { height: 900, mock: { series: true } });
     await t.wait(1500);
-    await t.step('Extremes ▸ Maximum: the band above the curve only; Minimum: below it only; Both sides: both', async () => {
+    await t.step('Extremes ▸ Maximum: the band above the curve only; Minimum: below it only; All: both', async () => {
         const pick = async v => { await curveMenu(t, 0, 0); await line(t, 2); await t.wait(150); await t.E(`[...el.querySelectorAll('#et_0_appearance_minmax_sub a')].find(a=>a.textContent==='${v}').click()`); await t.wait(1200); };
         const band = () => t.E(`(()=>{ const p = graphAt(0).chart.data.datasets[0].data.filter(p => p.yMax != null); return { n: p.length, below: p.filter(p => p.yMin < p.y).length, above: p.filter(p => p.yMax > p.y).length, saved: graphAt(0).entities[0].showMinMax }; })()`);
         await pick('Maximum'); const max = await band();
         await pick('Minimum'); const min = await band();
-        await pick('Both sides'); const all = await band();
+        await pick('All'); const all = await band();
         return max.n > 0 && max.below === 0 && max.above > 0 && max.saved === 'max' && min.n > 0 && min.above === 0 && min.below > 0 && min.saved === 'min'
             && all.above > 0 && all.below > 0 && all.saved === 'all' ? true : JSON.stringify({ max, min, all });
     });

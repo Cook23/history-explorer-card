@@ -6,7 +6,7 @@
 import { RIGHT_Y_AXIS } from "./card-charts.js";
 import { paintMagnifier } from "./card-menus.js";
 import { perf } from "./card-perf.js";
-import { ZOOM_BOX_MODES, OPTION_DEFAULTS, TIME_RANGES, MAX_RANGE_YEARS, YEAR_HOURS } from "./history-options.js";
+import { ZOOM_BOX_MODES, OPTION_DEFAULTS, TICK_DENSITIES, TIME_RANGES, MAX_RANGE_YEARS, YEAR_HOURS } from "./history-options.js";
 const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
@@ -261,9 +261,8 @@ export class CardTimeRange
 
     computeTickDensity(width)
     {
-        const densities = { 'low' : 4, 'medium' : 3, 'high' : 2, 'higher' : 1, 'highest' : 0 };
-        // (a value it doesn't know: the default density)
-        const _density = k => densities[k] ?? densities[OPTION_DEFAULTS.timeTicks.density];
+        // (not set: the default density)
+        const _density = k => TICK_DENSITIES[k] ?? TICK_DENSITIES[OPTION_DEFAULTS.timeTicks.density];
         if( this.pconfig.timeTickOverride === undefined )
             return Math.max(( width < 650 ) ? 4 : ( width < 1100 ) ? 3 : ( width < 1300 ) ? 2 : ( width < 1900 ) ? 1 : 0, _density(this.pconfig.timeTickDensity));
         else

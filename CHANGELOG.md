@@ -4,6 +4,53 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.79] - 2026-11-16
+
+### Added — more than two groups of units: two Y axes, by the size of their values
+- A graph with more than two groups of incompatible units no longer falls back on one Y axis without a unit: the groups are shared between the two axes by the size of the values they show — the small ones on one, the large ones on the other, split where two groups next in size differ the most —, the axis with more curves on the left (as many: the first curve's). Decided once the graph's values are drawn, then kept: a zoom, a move of the time or the cache filling never change it
+- Each Y axis' title lists its units, separated by " / " (`% / °C`), in every case — a `yAxis: left` graph of several units too
+- *Behavior ▸ Y axis ▸ Left / Right*, in a curve's menu or a graph's: the curve put on that axis, the side it's on in bold; saved with the curve (`yAxis`), synced as its other choices
+- Tests (`yaxes`): %, °C and W — % and °C on the left, W on the right, the titles; a zoom and a move — the same; the menu — on the right, saved; three groups — two axes, each group whole
+
+### Changed
+- *Appearance ▸ Extremes*: `all`'s line named *All* (*Tous*, *Alle*, *Todos*…) — *Both sides* before
+- A value chosen from a list — every such option, in a block too (`tooltip.size`, `cursor.mode`, `uiLayout.*`, `timeTicks.*`, `statistics.period`, `csv.statisticsPeriod`), `look` and the persistence options — is read whatever its case and spaces (`Curves`, `B-Spline`); an unknown one is left out, the option keeping its default, with a warning in the browser's console (before: ignored silently, or kept for some)
+- Every warning about the configuration in one form — `history-explorer-card: option: value — problem` —, each said once
+- A YAML option removed speaks, on the card as on a curve: `defaultTimeRange`, `defaultMagnifierMode`, `csv.statisticsPeriod`, `defaultInfoPanel` and the `gestures` removed bring their defaults back, what was chosen on the card lost (before: removing one said nothing)
+- The aggregation (`pointsPerHour`, `aggregateFunc`, `groupBy`) is the curve's: copied onto it when it's added, kept when it's moved to another graph (before: resolved from the graph it's in)
+- Export ▸ YAML ▸ Complete: the neighbours whose options each curve or graph writes too are what's exported — the card, all its graphs and curves; a graph, its curves only (before: also the card's other graphs); a curve alone, none (before: its graph's curves)
+- An entity whose state is `unavailable` or `unknown` now: the type it's shown as decided by its last state in what the card has loaded that tells something (a number: not a timeline); nothing loaded, as before
+- The Y labels shown after a touch stay their reading time (by their words) — before: 3 s
+- A curve takes the defaults of `dashMode`, `showPoints` and `netBars` when it's added, as it took those of its other options: on a YAML curve whose options are saved, a dash style, points or net bars chosen from a menu come back to their default once, at the first load of this version
+
+### Fixed — the YAML export read back
+- A curve's own `yAxis`, `showState`, `showStats`, `showStateFor`, `showStatsFor`, `pointsPerHour`, `aggregateFunc`, `groupBy` were left out of the export: read back, the curve took its graph's. The options a curve exports are now those the card gives it, never a list written apart
+- Tests (`features`): the export, simplified and complete, read back by a new card — the same graphs, curves and options (options at every level, `look: mini`, choices made in the menus)
+
+### Fixed
+- `showPoints: 4` on a curve no longer outweighs a `sizePoints` set on its graph: the points' diameter is worked out once the levels are resolved — `sizePoints`, else twice the YAML's `showPoints` number, else the line width + 2 px
+- The automatic Y axis counted the statistics' extremes around the window wherever the band is drawn, `showMinMax: history` too (no band on the statistics): only where it's drawn on them
+- An hour of statistics compiled between the requests of two entities: the entity asked before is asked again at the next refresh (it waited an hour)
+- `showIcon` lights up only for `true`, as every option off by default
+- The entity selector's preview reads the pointer as every hover of the card does: a pen still for a while ends it
+- *Tests ▸ Performance*: a page hidden during a measure counted as away, not as freezes
+- Tests (`points`, `yscale`, `features`, `pen`): `showPoints: 4` under a graph's `sizePoints: 10`; `showMinMax: history` and `all` — the statistics' extremes around the window; an hour compiled between two entities' requests (fails without the fix); a pen still over the selector's list
+
+### Added
+- A warning in the console for a YAML `sizePoints` under its curve's line width (its points hidden by its line) — the configuration kept as written
+- Tests (`options`, `points`, `features`, `minigraph`, `persistence`): values of a list in any case, an unknown one warned once; the `sizePoints` warning; the type of an unavailable entity from the cache; the complete export of a graph and of a curve; a curve moved keeping its aggregation; `defaultTimeRange` and `defaultMagnifierMode` removed — their defaults back; the Y labels after a tap, their reading time
+
+### Internal
+- The `languages/` folder removed (unused: the translations are in `src/languages.js`)
+- The last one to speak at the card's level in one function (`lastToSpeak`): the time range, the magnifier, the export's period, the info panel, the gestures, the graphs' order
+- An option's levels read through one chain (`resolveOption`), the card's values in one place (`cardOptions`), the options copied onto a curve a list (`CURVE_LEVEL_KEYS`); `architecture`: `levels-once`, `config-warnings`
+- The graph outline's durations and the selector's confirmation of an add named (`FLAG_SEEN_MS`, `FLAG_LATEST_MS`, `ADDED_CONFIRM_MS`); `unavailable` / `unknown` written once (`isMissingState`); the time ticks' densities and the toolbar's places written once
+- The line mode resolved in one place (`lineModeOf`); whether a series is drawn from all its known history decided by the part drawing the curves (`card-datasets.js`)
+- The *Fill* and *Width* menus' values, the type/color/fill keys, `lineWidth` ↔ `width`, the default line mode, the empty fill: each written once, read where used
+- `architecture`: a list of option names written with a spread in it caught too (`option-lists`); a hover's signs never listened to by the card itself (`hover-one-way`)
+- Tests waiting for the state they check, not a fixed time (`yscale`, `features`)
+- Tests (`smart`): their rows each in its day's slot — they failed just after midnight
+
 ## [v1.2.78] - 2026-11-15
 
 ### Added — half a min/max band: `showMinMax: max`, `min`

@@ -318,21 +318,23 @@ module.exports = async function()
     // back to Hovered when All — None only from the menu ──
     t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false },
         graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', showPoints: true, sizePoints: 8 }, { entity: 'sensor.rain', showPoints: 4 }] },
+                 { type: 'line', sizePoints: 10, entities: [{ entity: 'sensor.tank', showPoints: 4 }] },
                  { type: 'line', entities: [{ entity: 'sensor.power_kw', showPoints: true, sizePoints: 4 }] }] }, { mock: { series: true }, clock: CLOCK });
     await t.wait(800);
     const look = k => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[0], d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, hover: d.pointHoverRadius, dot: d.hecDotDiameter, show: g.entities[${k}].showPoints, size: g.entities[${k}].sizePoints }; })()`);
-    await t.step('sizePoints: 8 — the dots 8 px across (radius 4), the tooltip\'s 10, Alt\'s and the hover\'s 8; showPoints: 4 — All, sizePoints 8', async () => {
+    await t.step('sizePoints: 8 — the dots 8 px across (radius 4), the tooltip\'s 10, Alt\'s and the hover\'s 8; showPoints: 4 — all shown, 8 across; showPoints: 4 under a graph\'s sizePoints: 10 — 10 across', async () => {
         const a = await look(0), b = await look(1);
-        return a.r === 4 && a.hover === 5 && a.dot === 8 && b.show === true && b.size === 8 && b.r === 4 ? true : JSON.stringify({ a, b });
+        const c = await t.E(`(()=>{ const d = el.instance.graphsInDisplayOrder()[1].chart.data.datasets[0]; return { r: d.pointRadius, dot: d.hecDotDiameter }; })()`);
+        return a.r === 4 && a.hover === 5 && a.dot === 8 && b.r === 4 && b.dot === 8 && c.r === 5 && c.dot === 10 ? true : JSON.stringify({ a, b, c });
     });
     await t.step('Width ▸ 5 px on a curve with sizePoints: 4 in the YAML: 7 (the width + 2 px); Width ▸ 1 px: back to the YAML\'s 4', async () => {
         const w = async (gi, px) => { await t.longPress(await t.E(`legendPt(${gi},0)`)); await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(300);
             await t.E(`[...el.querySelectorAll('#et_0_appearance_sub a')].find(a=>a.textContent==='Width ▸').click()`); await t.wait(200);
             await t.E(`[...el.querySelectorAll('#et_0_appearance_width_sub a')].find(a=>a.textContent==='${px} px').click()`); await t.wait(1000); };
         const lookG = (gi, k) => t.E(`(()=>{ const g=el.instance.graphsInDisplayOrder()[${gi}], d=g.chart.data.datasets[${k}]; return { r: d.pointRadius, size: g.entities[${k}].sizePoints }; })()`);
-        const four = await lookG(1, 0);
-        await w(1, 5); const five = await lookG(1, 0);
-        await w(1, 1); const one = await lookG(1, 0);
+        const four = await lookG(2, 0);
+        await w(2, 5); const five = await lookG(2, 0);
+        await w(2, 1); const one = await lookG(2, 0);
         return four.size === 4 && five.size === 7 && five.r === 3.5 && one.size === 4 && one.r === 2 ? true : JSON.stringify({ four, five, one });
     });
     await t.step('Points ▸ Hovered from the menu, then a long-press: the points changed on the graph as it is — never built again (the same chart)', async () => {
@@ -658,6 +660,20 @@ module.exports = async function()
             const c = await t.E('pointPt(1,0.5)'); await t.page.mouse.click(c.x, c.y); await t.wait(400);
             const again = await tipEl();
             return shown && away === null && back === null && hover === 0 && again ? true : JSON.stringify({ shown, away, back, hover, again });
+        });
+        done(await t.close());
+    }
+
+    // ── A YAML whose sizePoints is under its line width: said in the console, kept ──
+    {
+        const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, lineWidth: 4,
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power', sizePoints: 3 }, { entity: 'sensor.power2', sizePoints: 6 }] }] },
+            { height: 700, mock: { series: true }, init: 'window.__warns = []; { const w = console.warn; console.warn = (...a) => { __warns.push(a.join(" ")); w(...a); }; }' });
+        await t.step('sizePoints 3 under a line width of 4: a warning, once, naming the curve — its points kept at 3 px; sizePoints 6: none', async () => {
+            const r = await t.E(`({ warns: __warns.filter(w => /sizePoints/.test(w)), size: graphAt(0).chart.data.datasets.map(d => d.sizePoints ?? null) })`);
+            const want = 'history-explorer-card: sizePoints: 3 — smaller than the line width (4) of sensor.power: its points are hidden by its line';
+            const sizes = await t.E('el.instance.graphs[0].entities.map(e => el.instance.pointsDiameterOf(e, 4))');
+            return r.warns.length === 1 && r.warns[0] === want && sizes.join() === '3,6' ? true : JSON.stringify({ r, sizes });
         });
         done(await t.close());
     }

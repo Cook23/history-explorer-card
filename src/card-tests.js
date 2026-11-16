@@ -443,17 +443,24 @@ function buildPerformanceTest(body, card)
     const sec = x => ( x / 1000 ).toFixed(1) + ' s';
     let stopped = false, pulse = 0;
 
-    // (what is recorded: every card's steps, each with its time, and the freezes of the page)
-    let rec = null;
+    // (what is recorded: every card's steps, each with its time, and the freezes of the page —
+    // a pause of the pulse while the page was hidden, or across its return (shownAt): away from
+    // it, not a freeze)
+    let rec = null, _shownAt = -Infinity;
+    const _onShown = () => { if( document.visibilityState === 'visible' ) _shownAt = performance.now(); };
     const recorder = { add: (kind, t, info) => rec && rec.events.push({ kind, ms: t, info, at: performance.now() }) };
     const record = () => {
-        rec = { events: [], freezes: [], t0: performance.now() };
+        rec = { events: [], freezes: [], away: [], t0: performance.now() };
         let _last = performance.now();
         clearInterval(pulse);
-        pulse = setInterval(() => { const n = performance.now(); if( n - _last > PERF_FREEZE_MS + PERF_TICK_MS ) rec.freezes.push({ ms: n - _last - PERF_TICK_MS, at: n }); _last = n; }, PERF_TICK_MS);
+        document.removeEventListener('visibilitychange', _onShown);
+        document.addEventListener('visibilitychange', _onShown);
+        pulse = setInterval(() => { const n = performance.now();
+            if( n - _last > PERF_FREEZE_MS + PERF_TICK_MS ) ( document.visibilityState === 'hidden' || _shownAt > _last ? rec.away : rec.freezes ).push({ ms: n - _last - PERF_TICK_MS, at: n });
+            _last = n; }, PERF_TICK_MS);
         card.setPerfRecorder(recorder);
     };
-    const stop = () => { const r = rec; card.setPerfRecorder(null); clearInterval(pulse); rec = null; if( r ) r.ms = performance.now() - r.t0; return r; };
+    const stop = () => { const r = rec; card.setPerfRecorder(null); clearInterval(pulse); document.removeEventListener('visibilitychange', _onShown); rec = null; if( r ) r.ms = performance.now() - r.t0; return r; };
     const of = (r, kind) => r.events.filter(e => e.kind === kind);
     const sum = l => l.reduce((a, e) => a + ( e.ms ?? e ), 0);
     const max = l => l.reduce((a, e) => Math.max(a, e.ms ?? e), 0);
@@ -682,8 +689,8 @@ function buildPerformanceTest(body, card)
             out(`\n== Back on the page, after ${sec(_shown - _hidden)} away`);
             const _all = [...r.events.filter(e => e.kind === 'card').map(e => ({ at: e.at, what: `card ${e.info.card}: ${e.info.step}${e.ms ? ` (${ms(e.ms)})` : ''}` })),
                           ..._events,
-                          // (a pause of the pulse begun before the return — the app left as the test asks —: away from the app, not a freeze)
-                          ...r.freezes.map(f => ({ at: f.at, what: f.at - f.ms < _shown ? `away from the app ${ms(f.ms)}` : `the page froze ${ms(f.ms)}` })),
+                          ...r.away.map(f => ({ at: f.at, what: `away from the app ${ms(f.ms)}` })),
+                          ...r.freezes.map(f => ({ at: f.at, what: `the page froze ${ms(f.ms)}` })),
                           ...of(r, 'redraw').map(e => ({ at: e.at, what: `graphs drawn again (${ms(e.ms)}): ${e.info?.cause}` })),
                           ...of(r, 'request').map(e => ({ at: e.at, what: `answer: ${e.info.type.startsWith('history') ? 'history' : e.info.period} (${e.info.values} values, ${sec(e.ms)})` }))]
                 .filter(e => e.at >= _hidden).sort((a, b) => a.at - b.at);

@@ -194,14 +194,15 @@ export class CardToolbar
         // is there: a move — a mouse's or a pen's hover, a finger dragged along the list —, or
         // a contact; never on an entry the list's scrolling brings under a pointer still or
         // gone. Choosing still happens on the entry's own click)
+        // (its hover through Chart.hecUi.hover, as every hover of the card: a pen silent for a
+        // while, gone, ends it as a leaving does)
         const _list = this._this.querySelector(`#es_${i}`);
         let _previewed = null;
         const _preview = (e) => {
             const _a = e.target.closest('a[data-entity]');
             if( _a && _a !== _previewed ) { _previewed = _a; this.previewEntityTooltip(_a.dataset.entity, i); }
         };
-        for( const t of ['pointerdown', 'pointermove'] ) _list?.addEventListener(t, _preview);
-        for( const t of ['pointerleave', 'pointercancel'] ) _list?.addEventListener(t, () => { _previewed = null; });
+        if( _list ) Chart.hecUi.hover(_list, () => {}, () => { _previewed = null; }, _preview);
 
         this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
         this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);

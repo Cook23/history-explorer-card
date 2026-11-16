@@ -266,6 +266,14 @@ module.exports = async function()
         await reload(); const m2 = await mode();
         return m1 === 'x/x' && m2 === 'y/y' ? true : [m1, m2].join(' → ');
     });
+    await t.step('defaultTimeRange and defaultMagnifierMode removed from the YAML: the YAML spoke — their defaults back (24 h, xy), the choices made on the card lost', async () => {
+        const mode = () => t.E('el.instance.state.zoomBox + "/" + graphAt(0).chart.options.zoomBoxAxes');
+        await t.E('el.instance.incZoom()'); await t.wait(1500);
+        const r0 = await range(), m0 = await mode();
+        await reload(YAML({ enable_multidevice_persistence: 'range' }));
+        const r1 = await range(), m1 = await mode();
+        return !r0.startsWith('24:') && m0 === 'y/y' && r1.startsWith('24:') && m1 === 'xy/xy' ? true : [r0, m0, r1, m1].join(' → ');
+    });
     done(await t.close());
 
     // ── The magnifier's mode, nothing persisted: always the YAML's (defaultMagnifierMode) ──

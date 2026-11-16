@@ -1,7 +1,7 @@
 
 import { defaultGood, defaultInactiveLight, defaultInactiveDark, stateColors, stateColorsDark, buttonsColor } from "./history-default-colors";
 import { HistoryCardState } from "./history-explorer-card";
-import { getDomainForEntityPure, getDeviceClassPure, baseTypePure } from "./card-config.js";
+import { getDomainForEntityPure, getDeviceClassPure } from "./card-config.js";
 import { curveMenuHtml } from "./card-menus.js";
 import { timeButtonsHtml, rangeControlsHtml } from "./card-toolbar.js";
 import { i18n } from "./languages.js";
@@ -92,7 +92,7 @@ function hxHookInfoPanel()
         // its line, its points, its extremes (keepInfoLook) —, else as the panel's options say
         const _look = takeInfoLook(entity_id) ?? {};
 
-        const type = _look.type || entityOptions?.type || baseTypePure(instance._hass, entity_id);
+        const type = _look.type || entityOptions?.type || instance.baseTypeOf(entity_id);
 
         // Make sure the panel always starts with the same default graph color
         instance.pconfig.nextDefaultColor = 0;
@@ -173,7 +173,7 @@ function hxHookInfoPanel()
         // The configuration, read as the card reads its own — with the panel's own defaults,
         // and what the panel decides whatever its configuration says
         instance.applyConfig(config, {
-            defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, defaultLineMode: 'lines', defaultLineWidth: 1.001 },
+            defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, lineMode: 'lines', lineWidth: 1.001 },
             fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
                      filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
                      // (no refresh.interval: the panel only lives while its dialog is open)

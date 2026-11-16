@@ -37,11 +37,11 @@ module.exports = async function()
         const open=['rep','interp','behavior'].filter(k=>{ const s=el.querySelector('#et_0_'+k+'_sub'); return s && s.style.display!=='none'; });
         return [list('#et_0'), 'open: '+open.join(), list('#et_0_rep_sub'), list('#et_0_behavior_sub')].join(' || '); })()`;
     const closeMenu = async () => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(300); };
-    await t.step('curve menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Behavior (the tooltip, the Y axis lock, cut, delete), Info, Export', async () => {
+    await t.step('curve menu of a numeric curve: Display (open: every type, smart first and marked), Appearance, Interpolation, Behavior (the tooltip, the Y axis, the Y axis lock, cut, delete), Info, Export', async () => {
         await t.longPress(await t.E('legendPt(0,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Export ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis locked | Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Export ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis ▸ | Y axis locked | Cut | Delete' ? true : m;
     });
     await t.step('curve menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis), Info, Export — no Appearance', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
@@ -65,12 +65,12 @@ module.exports = async function()
     await t.step('Behavior on a curve of a YAML graph: its tooltip, its graph\'s Y axis lock, separate, cut, delete; separate takes it into a linked graph', async () => {
         const v = await arrange(0, 0, 'split');
         const g = await t.graphs();
-        return v === 'behavior_tooltip,ylock,split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
+        return v === 'behavior_tooltip,behavior_yaxis,ylock,split,cut,delete' && g.length === 2 && (await t.E('chainShown()')) === '01' ? true : JSON.stringify({ v, g });
     });
     await t.step('Behavior on the curve taken out: its tooltip, the Y axis lock, merge back, cut, delete (no separate: alone in its graph); merged back', async () => {
         const v = await arrange(1, 0, 'merge');
         const g = await t.graphs();
-        return v === 'behavior_tooltip,ylock,merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
+        return v === 'behavior_tooltip,behavior_yaxis,ylock,merge,cut,delete' && g.length === 1 && /power\+power_kw|power_kw\+power/.test(g[0]) ? true : JSON.stringify({ v, g });
     });
     await t.step('Behavior, delete: the curve removed', async () => {
         const id = await t.E(`graphAt(0).entities[1].entity`);
