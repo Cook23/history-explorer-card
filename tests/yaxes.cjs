@@ -2,7 +2,7 @@
 // first on the left, the second on the right; more: split by the size of their values,
 // decided once they're drawn —, an entity's `yAxis` (or the Behavior menu) choosing its side;
 // each axis' units listed, separated by " / ";
-// a small arrow in the legend for the curves of the right axis; linked graphs keep the
+// with two axes, each legend label's swatch a triangle pointing to its axis' side (◀ ▶ here); linked graphs keep the
 // same room on the right, so that their time stays aligned
 const { openCard } = require('./lib.cjs');
 
@@ -14,7 +14,7 @@ module.exports = async function()
     const done = r => { passed += r.passed; failed += r.failed; };
     // Each graph: its type, its Y axes (id:unit), its plot area's right edge, each curve's axis and legend label
     const graphs = t => t.E(`el.instance.graphsInDisplayOrder().map(g=>({ type: g.type, group: g.groupId, axes: g.chart.options.scales.yAxes.map(a=>a.id+':'+(a.scaleLabel.labelString ?? '')).join(),
-        right: Math.round(g.chart.chartArea.right), curves: g.chart.data.datasets.map(d=>(d.yAxisID ?? '')+'|'+legendText(d)) }))`);
+        right: Math.round(g.chart.chartArea.right), curves: g.chart.data.datasets.map((d,i)=>(d.yAxisID ?? '')+'|'+legendText(d)+({ left: ' ◀', right: ' ▶' }[g.chart.legend.legendItems[i]?.hecMark] ?? '')) }))`);
 
     let t = await openCard(card({ graphs: [
         { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }, { entity: 'sensor.rain' }, { entity: 'binary_sensor.a', type: 'timeline' }] },
@@ -27,7 +27,7 @@ module.exports = async function()
 
     await t.step('two groups of units: the first on the left (W and kW: in kW), the second on the right', async () => {
         const x = g[0];
-        return x.axes === 'y-axis-0:kW,y-axis-1:mm' && x.curves.join() === 'y-axis-0|power (400 W),y-axis-0|power kw (1.2 kW),y-axis-1|rain (4 mm) ▸' ? true : JSON.stringify(x);
+        return x.axes === 'y-axis-0:kW,y-axis-1:mm' && x.curves.join() === 'y-axis-0|power (400 W) ◀,y-axis-0|power kw (1.2 kW) ◀,y-axis-1|rain (4 mm) ▶' ? true : JSON.stringify(x);
     });
     await t.step('three groups of units: two axes once the values are drawn, each group whole on one of them, each axis\' units listed', async () => {
         await t.wait(1500);
@@ -37,7 +37,7 @@ module.exports = async function()
     });
     await t.step('an entity\'s yAxis chooses its side, whatever its unit', async () => {
         const x = g[3];
-        return x.axes === 'y-axis-0:W / L,y-axis-1:°' && x.curves.join() === 'y-axis-0|power two (300 W),y-axis-0|tank (800 L),y-axis-1|wind direction (350 °) ▸' ? true : JSON.stringify(x);
+        return x.axes === 'y-axis-0:W / L,y-axis-1:°' && x.curves.join() === 'y-axis-0|power two (300 W) ◀,y-axis-0|tank (800 L) ◀,y-axis-1|wind direction (350 °) ▶' ? true : JSON.stringify(x);
     });
     await t.step('linked graphs: the timeline keeps the right axis\' room, an independent graph doesn\'t', async () => {
         const [line, timeline, , , alone] = g;
@@ -72,7 +72,7 @@ module.exports = async function()
     let gs = await graphs(t);
     await t.step('yAxis: left on a graph: every curve on one axis, whatever their units — their units listed', async () => {
         const x = gs[0];
-        return x.axes === 'y-axis-0:W / mm' && x.curves.every(c => c.startsWith('y-axis-0|') && !c.endsWith('▸')) ? true : JSON.stringify(x);
+        return x.axes === 'y-axis-0:W / mm' && x.curves.every(c => c.startsWith('y-axis-0|') && !/[◀▶]$/.test(c)) ? true : JSON.stringify(x);
     });
     await t.step('yAxis under the graph\'s options: the same; an entity\'s own yAxis wins over it', async () => {
         const x = gs[1];
@@ -387,7 +387,21 @@ module.exports = async function()
         const l = await t.E(`[...el.querySelectorAll('#et_0_behavior_yaxis_sub a')].map(a => a.textContent + (a.style.fontWeight === 'bold' ? '*' : '')).join(' | ')`);
         await t.E(`el.querySelector('#et_0_yaxis_right').click()`); await t.wait(1200);
         const r = await axes(), saved = await t.E(`graphAt(0).entities[0].yAxis`);
-        return l === 'Left* | Right' && r.axes === 'y-axis-0:°C,y-axis-1:% / W' && saved === 'right' ? true : JSON.stringify({ l, r, saved });
+        return l === 'Left* | Right | Locked' && r.axes === 'y-axis-0:°C,y-axis-1:% / W' && saved === 'right' ? true : JSON.stringify({ l, r, saved });
+    });
+    done(await t.close());
+
+    // ── With two Y axes: the legend's swatches triangles, each pointing to its axis' side; Behavior ▸ Y axis ▸ Locked, one label ──
+    t = await openCard(card({ graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.rain' }] }, { type: 'line', entities: [{ entity: 'sensor.power2' }] }] }),
+        { height: 1200, mock: { series: true, language: 'fr' } });
+    await t.wait(1200);
+    await t.step('two axes: each label\'s swatch a triangle (left, right); one axis: none — the lock "Verrouillé", with two axes as with one', async () => {
+        const marks = await t.E(`[0, 1].map(i => graphAt(i).chart.legend.legendItems.map(it => it.hecMark || '-').join(',')).join(' | ')`);
+        const lock = async (i) => { await t.longPress(await t.E(`moPt(${i})`)); await t.wait(400); await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(300);
+            await t.E(`el.querySelector('#et_0_behavior_yaxis').click()`); await t.wait(300); const l = await t.E(`el.querySelector('#et_0_ylock').textContent`);
+            await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1190); await t.wait(400); return l; };
+        const two = await lock(0), one = await lock(1);
+        return marks === 'left,right | -' && two === 'Verrouillé' && one === 'Verrouillé' ? true : JSON.stringify({ marks, two, one });
     });
     done(await t.close());
 

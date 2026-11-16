@@ -29,7 +29,7 @@ module.exports = async function()
         I.showEntityCurveMenu(0, '${id}', g, { from: 'label', clientX: 100, clientY: 100 }); ${act} })()`);
     // (a line of the menu clicked: an algorithm, et_0_algo_<name>; a display type, et_0_<its index> —
     // card-menus.js _CURVE_MENU_DEFS)
-    const TYPE_LINE = { 'line/lines': 0, 'line/curves': 1, 'line/stepped': 2, 'bar/null': 3, 'arrowline/null': 4, 'timeline/null': 5, 'line/smart': 6 };
+    const TYPE_LINE = { 'line/smart': 0, 'line/curves': 1, 'line/lines': 2, 'line/stepped': 3, 'bar/null': 4, 'arrowline/null': 5, 'timeline/null': 6 };
     const clickType = (type, mode) => `el.querySelector('#et_0_${TYPE_LINE[type + '/' + mode]}').click();`;
     const setInterp = (id, a) => menu(id, `el.querySelector('#et_0_algo_${a}').click();`).then(() => t.wait(500));
     const setType = (id, type, mode) => menu(id, clickType(type, mode ?? null)).then(() => t.wait(1500));
@@ -428,7 +428,7 @@ module.exports = async function()
     const DYNAMIC = { type: 'custom:history-explorer-card', defaultTimeRange: '24', statistics: { enabled: false }, combineSameUnits: true, graphs: [] };
     // (graph 0's lock and its left Y axis' range)
     const lock = () => t.E(`(()=>{ const c = graphAt(0).chart; return (c.hecYAxisLocked() ? 'locked ' : 'free ') + yRange(0).join(' '); })()`);
-    const menuLock = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(300); await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(300); await t.E(`el.querySelector('#et_0_ylock').click()`); await t.wait(900); };
+    const menuLock = async () => { await t.longPress(await t.E('moPt(0)')); await t.wait(300); await t.E(`el.querySelector('#et_0_behavior').click()`); await t.wait(300); await t.E(`el.querySelector('#et_0_behavior_yaxis').click()`); await t.wait(300); await t.E(`el.querySelector('#et_0_ylock').click()`); await t.wait(900); };
     t = await openCard(DYNAMIC, { mock: { series: true }, height: 1200 });
     await t.E(`el.instance.addCurves(['sensor.power', 'sensor.power_kw'], 'default')`); await t.wait(1500);
     await t.step('the padlock closed from the graph\'s menu: locked on the same range after a reload; opened: free after a reload', async () => {

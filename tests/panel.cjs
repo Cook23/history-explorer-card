@@ -42,7 +42,7 @@ module.exports = async function()
         return has && lines.includes(id) && lines.filter(l => /^[a-z_]+\.[a-z0-9_]+$/.test(l)).length === 1 ? true : JSON.stringify({ has, head: lines.slice(0, 3) });
     });
     await t.step('the curve menu turns the curve into bars, with their interval selector', async () => {
-        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); I._this.querySelector('#et_0_3').click(); })()`);
+        await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); I._this.querySelector('#et_0_4').click(); })()`);
         await t.wait(1500);
         const g = await t.E(`[inst().graphs[0].type, !!inst()._this.querySelector('#bd-' + inst().graphs[0].id)]`);
         return g[0] === 'bar' && g[1] ? true : JSON.stringify(g);

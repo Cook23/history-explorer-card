@@ -20,7 +20,8 @@ const graphAt=(gi)=>el.instance.graphsInDisplayOrder()[gi];
 window.state=()=>{ const I=el.instance; return JSON.stringify({range:[I.activeRange.timeRangeHours,I.activeRange.timeRangeMinutes], graphs:I.graphsInDisplayOrder().map(g=>g.type[0]+':'+g.entities.map(e=>e.entity.split('.')[1]+(e.type==='bar'?'[B]':'')+(e.hidden?'(h)':'')).join('+')+(g.entities[0].graphKey?'[k]':'')+(g.groupId!=null?'@'+g.groupId:'')), colors:Object.fromEntries(I.graphs.flatMap(g=>g.entities.map(e=>[e.entity.split('.')[1],e.color])))}); };
 // (a legend label's name, clear of the value after it — a click on the value opens the entity's dialog)
 window.legendNamePt=(gi,di)=>{ const g=graphAt(gi); const b=g.chart.legend.legendHitBoxes[di]; const r=g.canvas.getBoundingClientRect(); return {x:r.left+b.left+Math.min(b.width/2,24), y:r.top+b.top+b.height/2}; };
-window.legendPt=(gi,di)=>{ const g=graphAt(gi); const b=g.chart.legend.legendHitBoxes[di]; const r=g.canvas.getBoundingClientRect(); return {x:r.left+b.left+(b.width/2), y:r.top+b.top+b.height/2}; };
+// (a legend label's point on its name — a third of the way in: its middle can fall on its value)
+window.legendPt=(gi,di)=>{ const g=graphAt(gi); const b=g.chart.legend.legendHitBoxes[di]; const r=g.canvas.getBoundingClientRect(); return {x:r.left+b.left+(b.width/3), y:r.top+b.top+b.height/2}; };
 // (a timeline's row label: near its right end, clear of the floating handle at the top left)
 window.tlPt=(gi,li)=>{ const g=graphAt(gi); const y=g.chart.scales['y-axis-0'].getPixelForValue(null,li,li); const r=g.canvas.getBoundingClientRect(); return {x:r.left+g.chart.chartArea.left-20,y:r.top+y}; };
 // Client position of the point drawn within the plot area at fraction frac of graph gi's first dataset
@@ -54,7 +55,7 @@ window.datasets=(gi)=>graphAt(gi).chart.data.datasets.map(d=>{ const xs=d.data.m
 // The next file the card saves (FileSaver's saveAs), as text
 window.captureSave=()=>{ window.__saved=null; window.saveAs=(blob,name)=>blob.text().then(t=>{ window.__saved={name,text:t,type:blob.type}; }); };
 // A legend label as shown: its name, then its value and its mark (a legend item, or the dataset it comes from)
-window.legendText=o=>{ const v=o.hecValue??o.hecLegendValue, m=o.hecMark??o.hecLegendMark; return (o.text??o.label)+(v?' '+v:'')+(m?' '+m:''); };
+window.legendText=o=>{ const v=o.hecValue??o.hecLegendValue; return (o.text??o.label)+(v?' '+v:''); };
 // The text shown in full in place of a shortened one (Chart.hecUi.reveal): its text while shown, else null
 window.reveal=()=>{ const t=document.getElementById('hec-reveal'); return t&&t.isConnected&&getComputedStyle(t).opacity!=='0'?t.textContent:null; };
 window.tip=()=>{ const t=el.querySelector('#hec-label-tooltip')||document.getElementById('hec-label-tooltip'); return t?t.textContent:null; };

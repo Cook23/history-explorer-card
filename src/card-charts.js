@@ -49,12 +49,12 @@ export class CardCharts
     // A curve's legend label, as distinct parts Chart.js lays out (legend.labels): its name
     // (dataset.label — what's shortened, struck through when hidden, clicked to hide it),
     // its value now ('(400 W)', showCurrentValues: its own, else its graph's… — clicked to
-    // open its entity's dialog)
-    // and a small arrow when it's on the right Y axis
+    // open its entity's dialog) — on a graph with two Y axes, the side of its own is marked
+    // by Chart.js' legend (hecMark)
     _legendParts(d)
     {
         return { label: d.name, hecLegendValue: d.showCurrentValue !== false ? this._legendValue(d.entity_id, d.unit, d.shownScale, d.rounding, d.stateMap) : '',
-                 hecLegendMark: d.yAxisID === RIGHT_Y_AXIS ? '▸' : '', hecLegendHidden: !!d.legendHidden };
+                 hecLegendHidden: !!d.legendHidden };
     }
 
     // An entity's value now, in its unit, as the legend shows it after its name: '(400 W)' —

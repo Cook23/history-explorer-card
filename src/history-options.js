@@ -61,10 +61,13 @@ export function listOf(option, values, o)
     return v => ( Array.isArray(v) ? v : [v] ).map(_one).filter(x => x !== undefined);
 }
 
-// The line modes (lineMode): lines, curves, stepped, smart (curves while the source reports,
-// flat dashed plateaus over its silences — see _applySilencePlateaus); the singular aliases
-// accepted, and mini-graph-card's `smoothing` (an alias of lineMode): true curves, false lines
-export const LINE_MODES = ['lines', 'curves', 'stepped', 'smart'];
+// The line modes (lineMode), in the order the Display submenu shows them, each with the label
+// it gives it (ui.menu.*): smart (curves while the source reports, flat dashed plateaus over
+// its silences — see _applySilencePlateaus), curves, lines (straight), stepped; the singular
+// aliases accepted, and mini-graph-card's `smoothing` (an alias of lineMode): true curves,
+// false lines
+export const LINE_MODE_LABELS = { smart: 'type_line_smart', curves: 'type_line_curves', lines: 'type_line_straight', stepped: 'type_line_stepped' };
+export const LINE_MODES = Object.keys(LINE_MODE_LABELS);
 const normalizeLineMode = oneOf('lineMode', LINE_MODES, { synonyms: { lines: ['line', false], curves: ['curve', true], stepped: ['step'] } });
 
 // A Y axis as the card knows it: left, right or auto — mini-graph-card's primary and
@@ -171,7 +174,9 @@ const GROUP_BY = ['interval', 'hour', 'date'];
 // the states' texts (as Home Assistant names them, raw, none — stateTextMode too, on the
 // card), the cursor line's modes and the graphs showing it (by type, or all), the time
 // labels' densities and date formats, Home Assistant's statistics periods (statistics,
-// the statistics export's), where the toolbar and the selector are (or which one is sticky)
+// the statistics export's) and the statistics drawn (accepted, without effect: the mean, the
+// band its extremes), where the toolbar and the selector are (or which one is sticky), the
+// bar interval selector hidden
 const STATE_TEXT_MODES = ['auto', 'raw', 'hide'];
 const GRAPH_TYPES = ['line', 'bar', 'timeline', 'arrowline'];
 // (a density's level: the steps it allows between two time labels, the most first — see
@@ -185,9 +190,10 @@ const BLOCK_VALUES = {
     cursor    : { mode: oneOf('cursor.mode', ['auto', 'all', 'hide']), types: listOf('cursor.types', [...GRAPH_TYPES, 'all']) },
     timeTicks : { density: oneOf('timeTicks.density', Object.keys(TICK_DENSITIES)), densityOverride: oneOf('timeTicks.densityOverride', Object.keys(TICK_DENSITIES)),
                   dateFormat: oneOf('timeTicks.dateFormat', ['normal', 'short']) },
-    statistics: { period: oneOf('statistics.period', HA_PERIODS) },
+    statistics: { period: oneOf('statistics.period', HA_PERIODS), mode: oneOf('statistics.mode', ['mean', 'min', 'max']) },
     csv       : { statisticsPeriod: oneOf('csv.statisticsPeriod', HA_PERIODS) },
-    uiLayout  : Object.fromEntries(['toolbar', 'selector', 'sticky'].map(k => [k, oneOf(`uiLayout.${k}`, Object.keys(UI_PLACES))])),
+    uiLayout  : { ...Object.fromEntries(['toolbar', 'selector', 'sticky'].map(k => [k, oneOf(`uiLayout.${k}`, Object.keys(UI_PLACES))])),
+                  interval: oneOf('uiLayout.interval', ['hide']) },
 };
 
 // The statistics a curve can show over its graph (showStats), in the order they're shown

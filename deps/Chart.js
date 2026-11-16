@@ -11854,13 +11854,17 @@
               // HEC: colors given per element (an array): the swatch takes the last element's
               // — on a time axis, the most recent one, as the value shown in the label
               var last = function (c) { return helpers.isArray(c) ? c[c.length - 1] : c; };
+              // (fork) a chart with two Y axes: each label's side — its dataset's axis' position
+              var _yAxes = (chart.options.scales && chart.options.scales.yAxes) || [];
+              var _sideOf = function (id) { var a = _yAxes.find(function (y) { return y.id === id; }) || _yAxes[0]; return a && a.position === 'right' ? 'right' : 'left'; };
               return helpers.isArray(data.datasets) ? data.datasets.map(function (dataset, i) {
                 return {
                   text: dataset.label,
-                  // (fork) the label's other parts, after its name: its value ('(400 W)'),
-                  // a mark ('▸') — see Chart.hecLegendTail
+                  // (fork) the label's value, after its name ('(400 W)' — see
+                  // Chart.hecLegendTail); with two Y axes, the side of its own: a triangle
+                  // pointing to it, against its swatch on that side (drawLegendBox)
                   hecValue: dataset.hecLegendValue || '',
-                  hecMark: dataset.hecLegendMark || '',
+                  hecMark: _yAxes.length > 1 ? _sideOf(dataset.yAxisID) : '',
                   // (fork) no label in the legend (dataset.hecLegendHidden): it takes no room,
                   // its index kept — the legend's labels stay those of the datasets
                   hecHidden: !!dataset.hecLegendHidden,
@@ -11913,6 +11917,13 @@
         var LEGEND_DOT = 0.9;
         function getBoxWidth(labelOpts, fontSize) {
           return labelOpts.usePointStyle ? fontSize * LEGEND_DOT : labelOpts.boxWidth;
+        }
+        // (fork) a label's Y axis side (legend item hecMark, a point style): its swatch an
+        // equilateral triangle pointing to that side, its vertical side LEGEND_MARK.h × the font
+        // size (LEGEND_MARK.w × it wide); the width its swatch takes
+        var LEGEND_MARK = { h: 1, w: Math.sqrt(3) / 2 };
+        function getSwatchWidth(labelOpts, fontSize, legendItem) {
+          return labelOpts.usePointStyle && legendItem && legendItem.hecMark ? fontSize * LEGEND_MARK.w : getBoxWidth(labelOpts, fontSize);
         }
 
         Chart.Legend = Element.extend({
@@ -12115,7 +12126,7 @@
                   var _shortNames = labelOpts.hecShortNames(me.chart.data.datasets) || [];
                   var _roomOf = function (line) {
                     var _m = me._hecMarginsOf(line);
-                    return me.width - _m.l - _m.r - labelOpts.padding - getBoxWidth(labelOpts, fontSize) - fontSize / 2 - 1;
+                    return me.width - _m.l - _m.r - labelOpts.padding - getSwatchWidth(labelOpts, fontSize, me.legendItems[0]) - fontSize / 2 - 1;
                   };
                   var _items = me.legendItems.map(function (it) {
                     return { name: it.text, tail: Chart.hecLegendTail(it), forms: _shortNames[it.datasetIndex] };
@@ -12140,7 +12151,7 @@
                   // (fork) a label not shown: no room, its hit box out of reach
                   if (legendItem.hecHidden) { hitboxes[i] = { left: -1e6, top: -1e6, width: 0, height: 0 }; return; }
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var width = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
+                  var width = getSwatchWidth(labelOpts, fontSize, legendItem) + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   var _m = me._hecMarginsOf(lineWidths.length - 1);
                   if (lineWidths[lineWidths.length - 1] + width + labelOpts.padding >= me.width - _m.l - _m.r) {
@@ -12181,7 +12192,7 @@
 
                 helpers.each(me.legendItems, function (legendItem, i) {
                   var boxWidth = getBoxWidth(labelOpts, fontSize);
-                  var itemWidth = boxWidth + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
+                  var itemWidth = getSwatchWidth(labelOpts, fontSize, legendItem) + fontSize / 2 + ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
 
                   // If too tall, go to new column
                   if (currentColHeight + itemHeight > minSize.height) {
@@ -12285,7 +12296,18 @@
                   ctx.lineWidth = 2;
                   ctx.fillStyle = Chart.hecLegendFill(me.chart.data.datasets[legendItem.datasetIndex] || {}, legendItem.strokeStyle, legendItem.fillStyle) || 'rgba(0,0,0,0)';
                   ctx.beginPath();
-                  ctx.arc(x + radius, _cy, radius - 1, 0, Math.PI * 2);
+                  if (legendItem.hecMark) {
+                    // (fork) with two Y axes: a triangle pointing to its axis' side instead of
+                    // the dot, drawn as it is (LEGEND_MARK; inside its line, as the dot)
+                    var _w = getSwatchWidth(labelOpts, fontSize, legendItem) - 2, _h = fontSize * LEGEND_MARK.h - 2;
+                    var _base = legendItem.hecMark === 'right' ? x + 1 : x + 1 + _w, _tip = legendItem.hecMark === 'right' ? x + 1 + _w : x + 1;
+                    ctx.moveTo(_base, _cy - _h / 2);
+                    ctx.lineTo(_tip, _cy);
+                    ctx.lineTo(_base, _cy + _h / 2);
+                    ctx.closePath();
+                  } else {
+                    ctx.arc(x + radius, _cy, radius - 1, 0, Math.PI * 2);
+                  }
                   ctx.fill();
                   ctx.stroke();
                 } else {
@@ -12300,7 +12322,7 @@
               };
               var fillText = function (x, y, legendItem, textWidth) {
                 var halfFontSize = fontSize / 2;
-                var xLeft = boxWidth + halfFontSize + x;
+                var xLeft = getSwatchWidth(labelOpts, fontSize, legendItem) + halfFontSize + x;
                 var yMiddle = y + halfFontSize;
 
                 // (fork) its name, then its other parts (Chart.hecLegendTail)
@@ -12339,7 +12361,7 @@
               helpers.each(me.legendItems, function (legendItem, i) {
                 if (legendItem.hecHidden) return;
                 var textWidth = ctx.measureText(legendItem.text + Chart.hecLegendTail(legendItem)).width;
-                var width = boxWidth + fontSize / 2 + textWidth;
+                var width = getSwatchWidth(labelOpts, fontSize, legendItem) + fontSize / 2 + textWidth;
                 var x = cursor.x;
                 var y = cursor.y;
 

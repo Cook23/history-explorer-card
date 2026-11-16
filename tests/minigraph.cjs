@@ -113,8 +113,8 @@ module.exports = async function()
     // ── tap_action: a click on a value ──
     const clickValue = async (t, i) => {
         const p = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;
-            ctx.save(); ctx.font=c._hecLegendFont(); const m=it.hecMark?ctx.measureText(' '+it.hecMark).width:0, v=ctx.measureText(it.hecValue).width; ctx.restore();
-            return { x: r.left+b.left+b.width-m-v/2, y: r.top+b.top+b.height/2 }; })()`);
+            ctx.save(); ctx.font=c._hecLegendFont(); const v=ctx.measureText(it.hecValue).width; ctx.restore();
+            return { x: r.left+b.left+b.width-v/2, y: r.top+b.top+b.height/2 }; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(500);
     };
     t = await openCard(card({ tap_action: { action: 'none' }, graphs: [{ type: 'line', entities: [

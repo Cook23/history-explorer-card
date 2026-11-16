@@ -4,6 +4,18 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.80] - 2026-11-16
+
+### Changed
+- A graph with two Y axes: in its legend, each curve's color mark is a triangle pointing to its axis' side — on the left for the left axis, on the right for the right one — instead of a dot, drawn as the dot (its curve's color, its fill), as high as the text (before: a small ▸ after the label of the right axis' curves). A graph with one axis keeps its dots
+- *Behavior ▸ Y axis ▸ Locked*: the Y axis lock is in the *Y axis* submenu, after *Left* and *Right* (before: *Behavior ▸ Y axis locked*) — the graph's padlock, the same for every curve of the graph
+- `uiLayout.interval` and `statistics.mode` read as every value of a list: their case and spaces ignored, an unknown value left out with a warning in the console
+
+### Internal
+- The line modes and their labels written once (`LINE_MODE_LABELS`, in the order the *Display* submenu shows them): the menu reads them; its lines numbered in their display order
+- Tests (`yaxes`, `options`, `cards`, `graphmenu`, `menus`, `appearance`, `persistence`, `curvemenu`): the legend's triangles with two axes and the dots with one, the lock in *Y axis*, `uiLayout.interval` and `statistics.mode` in any case
+
+
 ## [v1.2.79] - 2026-11-16
 
 ### Added — more than two groups of units: two Y axes, by the size of their values

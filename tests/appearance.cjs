@@ -92,8 +92,9 @@ module.exports = async function()
         const a = await ds(t, 0, 0), b = await ds(t, 0, 1);
         return l === 'Points ▸ | Extremes ▸ | Fill ▸ | Width ▸ | Line style ▸' && a.width === 3 && b.width === 3 ? true : JSON.stringify({ l, a, b });
     });
-    await t.step('the graph\'s menu: Y axis locked, a switch — on: the axis locked, the menu open half a second', async () => {
+    await t.step('the graph\'s menu: Behavior ▸ Y axis ▸ Locked, a switch — on: the axis locked, the menu open half a second', async () => {
         await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showCurveSubmenu(0, 'behavior'); })()`); await t.wait(200);
+        await t.E(`el.querySelector('#et_0_behavior_yaxis').click()`); await t.wait(200);
         const s0 = await t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
         await t.E(`el.querySelector('#et_0_ylock').click()`); await t.wait(150);
         const r = { s0, s1: await t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`), open: await menuOpen(t), locked: await t.E('!!graphAt(0).chart._hecYAxisLock') };
