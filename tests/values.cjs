@@ -147,11 +147,11 @@ module.exports = async function()
     await t.wait(1000);
     await t.E(`window.__mi=[]; document.addEventListener('hass-more-info', e => __mi.push(e.detail.entityId))`);
     const mi = () => t.E('__mi.splice(0)');
-    // (a legend label's point, at fraction f of its width; its value's middle — before its mark)
+    // (a legend label's point, at fraction f of its width; its value's middle)
     const labelAt = (i, f) => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], r=c.canvas.getBoundingClientRect(); return { x: r.left+b.left+b.width*${f}, y: r.top+b.top+b.height/2 }; })()`);
     const valueOf = i => t.E(`(()=>{ const c=graphAt(0).chart, b=c.legend.legendHitBoxes[${i}], it=c.legend.legendItems[${i}], r=c.canvas.getBoundingClientRect(), ctx=c.ctx;
-        ctx.save(); ctx.font=c._hecLegendFont(); const m=it.hecMark?ctx.measureText(' '+it.hecMark).width:0, v=ctx.measureText(it.hecValue).width; ctx.restore();
-        return { x: r.left+b.left+b.width-m-v/2, y: r.top+b.top+b.height/2 }; })()`);
+        ctx.save(); ctx.font=c._hecLegendFont(); const v=ctx.measureText(it.hecValue).width; ctx.restore();
+        return { x: r.left+b.left+b.width-v/2, y: r.top+b.top+b.height/2 }; })()`);
     const hidden = i => t.E(`!!graphAt(0).chart.data.datasets[${i}].hidden`);
     await t.step('a click on a legend label\'s value: its entity\'s dialog, the curve still shown; on its name: the curve hidden', async () => {
         const v = await valueOf(1); await t.page.mouse.click(v.x, v.y); await t.wait(500);

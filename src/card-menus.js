@@ -7,7 +7,7 @@
 // HistoryCardState (added to it in history-explorer-card.js).
 
 import { i18n } from "./languages.js";
-import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES } from "./history-options.js";
+import { INTERPOLATIONS, INTERPOLATION_LABELS, ZOOM_BOX_MODES, STATS_EXPORT_PERIODS, DASH_MODES, TOOLTIP_MODES, MIN_MAX_VALUES, minMaxValue, POINTS_VALUES, allPointsShown, FILL_VALUES, LINE_WIDTHS, Y_AXIS_SIDES, LINE_MODES, LINE_MODE_LABELS } from "./history-options.js";
 import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
@@ -16,20 +16,14 @@ import { seriesOfGraphs } from "./history-series.js";
 import { maxOf } from "./history-arrays.js";
 const Chart = window.HXLocal_Chart;
 
-// The display types of the curve menu (et_N_<index>)
+// The display types of the curve menu (et_N_<index>), in the order it shows them: a line in
+// each line mode (LINE_MODES), a bar, direction arrows, a timeline
 const _CURVE_MENU_DEFS = [
-    { type: 'line', lineMode: 'lines',   label: 'ui.menu.type_line_straight' },
-    { type: 'line', lineMode: 'curves',  label: 'ui.menu.type_line_curves' },
-    { type: 'line', lineMode: 'stepped', label: 'ui.menu.type_line_stepped' },
+    ...LINE_MODES.map(lineMode => ({ type: 'line', lineMode, label: 'ui.menu.' + LINE_MODE_LABELS[lineMode] })),
     { type: 'bar',  lineMode: null,      label: 'ui.menu.type_bar' },
     { type: 'arrowline', lineMode: null, label: 'ui.menu.type_arrowline' },
     { type: 'timeline',  lineMode: null, label: 'ui.menu.type_timeline' },
-    // Appended rather than inserted, so the existing et_N_<index> ids stay put — shown
-    // first (_CURVE_MENU_ORDER)
-    { type: 'line', lineMode: 'smart',   label: 'ui.menu.type_line_smart' },
 ];
-// Their display order (indices in _CURVE_MENU_DEFS)
-const _CURVE_MENU_ORDER = [6, 1, 0, 2, 3, 4, 5];
 // A menu line's style
 const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
@@ -45,9 +39,9 @@ const _SECTIONS = { rep: 'ui.menu.type_representation', appearance: 'ui.menu.typ
 // The curve menu's lines: the sections, and its exports (its curve's, its graph's)
 const _CURVE_SUBMENUS = { ..._SECTIONS, export: 'ui.menu.options_export' };
 // The behavior submenu's lines (<prefix>_<key>): the tooltip (▸: its modes, in a submenu over
-// it), the Y axis lock (a switch: the graphs' padlocks), and the curves' place in the card —
+// it), the Y axis (▸: its sides, its lock), and the curves' place in the card —
 // for an entity: separate, merge back, cut, delete; for a graph: merge back, cut, delete it
-const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', yaxis: 'ui.menu.yaxis', ylock: 'ui.menu.ylocked', split: 'ui.menu.entity_split',
+const _BEHAVIOR_ENTRIES = { tooltip: 'ui.menu.tooltip', yaxis: 'ui.menu.yaxis', split: 'ui.menu.entity_split',
                             merge: 'ui.menu.entity_merge', cut: 'ui.menu.entity_cut',
                             delete: 'ui.menu.entity_delete', gdelete: 'ui.menu.graph_delete' };
 // The tooltip's modes, as the curves show it (see tooltipModeOf): the curves selected (a click
@@ -834,8 +828,7 @@ export class CardMenus
         }
         const _lines = _default ? [{ id: `${m.prefix}_default`, label: i18n('ui.menu.type_default'), marked: true, final: true,
                                      choose: () => this._typeChosen(m, 'default', null) }] : [];
-        for( const k of _CURVE_MENU_ORDER ) {
-            const d = _CURVE_MENU_DEFS[k];
+        for( const [k, d] of _CURVE_MENU_DEFS.entries() ) {
             if( !_numeric && d.type !== 'timeline' ) continue;
             _lines.push({ id: `${m.prefix}_${k}`, label: i18n(d.label), marked: !_default && _active(d), final: true,
                           choose: () => this._typeChosen(m, d.type, d.lineMode) });
@@ -854,10 +847,9 @@ export class CardMenus
                                          choose: () => this._interpolationChosen(m, k) }));
     }
 
-    // The behavior submenu (list null): the tooltip (▸, for curves), the Y axis (▸, for curves:
-    // left, right — the one they all are on in bold), the Y axis lock (a
-    // switch, when a graph has a lock — an entity's: its graph's —: on when all are locked),
-    // and in the card's menu (not the info panel's) the curves' place — for an entity from
+    // The behavior submenu (list null): the tooltip (▸, for curves), the Y axis (▸: for curves,
+    // left, right — the one they all are on in bold —; when a graph has a lock — an entity's:
+    // its graph's —, the lock, a switch on when all are locked), and in the card's menu (not the info panel's) the curves' place — for an entity from
     // its label: separate, merge back, cut, delete; for a graph: merge back, cut, delete (one
     // added from the card) — or the tooltip's modes, the one all the curves have in bold
     _behaviorItems(m, list)
@@ -873,8 +865,13 @@ export class CardMenus
         if( list === 'yaxis' ) {
             const _sides = new Set(_curves.map(({ g, e }) => this.yAxisSideOf(g, e)));
             const _cur = _sides.size === 1 ? [..._sides][0] : undefined;
-            return Y_AXIS_SIDES.map(v => ({ id: `${m.prefix}_yaxis_${v}`, label: i18n('ui.menu.yaxis_' + v), marked: v === _cur, final: true,
-                                            choose: () => this._behaviorChosen(m, 'yaxis', v) }));
+            const _locks = this._yLocks(m);
+            return [
+                ...( _curves.length ? Y_AXIS_SIDES.map(v => ({ id: `${m.prefix}_yaxis_${v}`, label: i18n('ui.menu.yaxis_' + v), marked: v === _cur, final: true,
+                                                               choose: () => this._behaviorChosen(m, 'yaxis', v) })) : [] ),
+                ...( _locks.length ? [{ id: `${m.prefix}_ylock`, label: i18n('ui.menu.ylocked'), on: _locks.every(l => l), final: true,
+                                        choose: () => this._behaviorChosen(m, 'ylock') }] : [] ),
+            ];
         }
         const _menu = m.el();
         const _full = m.prefix.startsWith('eo_') || this._cardsCurveMenu(m.prefix);
@@ -882,8 +879,7 @@ export class CardMenus
         const _locks = this._yLocks(m);
         const _shown = {
             tooltip: _curves.length > 0,
-            yaxis: _curves.length > 0,
-            ylock: _locks.length > 0,
+            yaxis: _curves.length > 0 || _locks.length > 0,
             split: _full && kind === 'entity' && _menu._menuFrom === 'label' && this.canSplitCurve(_g),
             merge: _full && ( kind === 'graph' || ( kind === 'entity' && _menu._menuFrom === 'label' ) ) && this.canMergeGraphUp(_g),
             cut: _full && ( kind === 'graph' || ( kind === 'entity' && _menu._menuFrom === 'label' ) ),
@@ -893,7 +889,6 @@ export class CardMenus
         return Object.keys(_BEHAVIOR_ENTRIES).filter(k => _shown[k]).map(k => {
             const _label = i18n(_BEHAVIOR_ENTRIES[k]);
             if( k === 'tooltip' || k === 'yaxis' ) return this._submenuLine(m, `${m.prefix}_behavior_${k}`, _label, ['behavior', k]);
-            if( k === 'ylock' ) return { id: `${m.prefix}_ylock`, label: _label, on: _locks.every(l => l), final: true, choose: () => this._behaviorChosen(m, k) };
             return { id: `${m.prefix}_${k}`, label: _label, choose: () => this._behaviorChosen(m, k) };
         });
     }

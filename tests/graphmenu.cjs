@@ -37,11 +37,11 @@ module.exports = async function()
     const graphMenu = async name => { await t.longPress(await t.E(`moPt(${await gi(name)})`)); };
     const L0 = 'power+power_kw | a | rain | tank';
 
-    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, behavior (the tooltip, the Y axis, the Y axis lock — a switch —, cut)', async () => {
+    await t.step('a long-press on a graph\'s zone opens its menu: display (open), appearance, interpolation, behavior (the tooltip, the Y axis — its lock, a switch, in it —, cut)', async () => {
         await graphMenu('rain');
         const m = await menu(); await click('behavior'); const l = await menu();
         return m === 'rain || Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Export ▸ || Smart | Curve | Straight | Stepped | Bar | Direction | Timeline'
-            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis ▸ | Y axis locked | Cut' ? true : `${m} / ${l}`;
+            && l === 'rain || Display ▸ | Appearance ▸ | Interpolation ▸ | Behavior ▸* | Export ▸ || Tooltip ▸ | Y axis ▸ | Cut' ? true : `${m} / ${l}`;
     });
     await t.step('reopened within 10 s of being closed, a menu opens the submenu it had open; later, its default one', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
@@ -49,15 +49,15 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(10500);
         await graphMenu('rain'); const late = await menu();
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1590); await t.wait(400);
-        return /Behavior ▸\* \| Export ▸ \|\| Tooltip ▸ \| Y axis ▸ \| Y axis locked/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
+        return /Behavior ▸\* \| Export ▸ \|\| Tooltip ▸ \| Y axis ▸ \| Cut/.test(soon) && /Display ▸\* /.test(late) ? true : `${soon} / ${late}`;
     });
-    await t.step('Y axis locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
+    await t.step('Behavior ▸ Y axis ▸ Locked, a switch: on, the axis locked; the menu then shows it on, and off releases it', async () => {
         const sw = () => t.E(`el.querySelector('#et_0_ylock').getAttribute('aria-checked')`);
-        await graphMenu('rain'); await click('behavior'); const r = { off: await sw() }; await click('ylock');
+        await graphMenu('rain'); await click('behavior'); await click('behavior_yaxis'); const r = { off: await sw(), label: await t.E(`el.querySelector('#et_0_ylock').textContent`) }; await click('ylock');
         r.locked = await t.E(`lockOf(${await gi('rain')})`);
-        await graphMenu('rain'); await click('behavior'); r.on = await sw(); await click('ylock');
+        await graphMenu('rain'); await click('behavior'); await click('behavior_yaxis'); r.on = await sw(); await click('ylock');
         r.released = await t.E(`lockOf(${await gi('rain')})`);
-        return r.off === 'false' && r.locked === 1 && r.on === 'true' && r.released === 0 ? true : JSON.stringify(r);
+        return r.off === 'false' && r.label === 'Locked' && r.locked === 1 && r.on === 'true' && r.released === 0 ? true : JSON.stringify(r);
     });
     await t.step('a right click on the zone opens the same menu', async () => {
         await t.contextMenu(await t.E(`moPt(${await gi('tank')})`)); await t.wait(500);
@@ -193,23 +193,23 @@ module.exports = async function()
         return !v.includes('*') ? true : v;
     });
     await t.step('Straight: every curve of the graph straight, in its graph, saved with each', async () => {
-        await pick(0, 'rep', '0');
+        await pick(0, 'rep', '2');
         const r = { shown: await shown(), saved: await t.E(`['sensor.power','sensor.power2'].map(id=>el.instance.store.entry(id).lineMode).join()`) };
         // (each curve's interpolation its own, copied when it's added: monotone)
         return r.shown.startsWith('line:power/lines/monotone+power2/lines/monotone | ') && r.saved === 'lines,lines' ? true : JSON.stringify(r);
     });
     await t.step('Bar: one bar graph of them, in its place', async () => {
-        await pick(0, 'rep', '3');
+        await pick(0, 'rep', '4');
         const v = await shown();
         return /^bar:power[^+|]*\+power2[^|]* \| line:rain/.test(v) ? true : v;
     });
     await t.step('Timeline: one timeline of them, in its place', async () => {
-        await pick(0, 'rep', '5');
+        await pick(0, 'rep', '6');
         const v = await shown();
         return /^timeline:power[^+|]*\+power2[^|]* \| line:rain/.test(v) ? true : v;
     });
     await t.step('Smart again: one graph of curves again', async () => {
-        await pick(0, 'rep', '6');
+        await pick(0, 'rep', '0');
         const v = await shown();
         return /^line:power\/smart\/monotone\+power2\/smart\/monotone \| line:rain/.test(v) ? true : v;
     });

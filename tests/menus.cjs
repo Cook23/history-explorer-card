@@ -47,7 +47,7 @@ module.exports = async function()
     const A = '#et_0_appearance_sub';
     await t.step('a curve\'s menu: Display, Interpolation, every Appearance choice — open half a second, then closed', async () => all([
         () => choice('Display Curve', curve, ['#et_0_1']),
-        () => choice('Display Smart', curve, ['#et_0_6']),
+        () => choice('Display Smart', curve, ['#et_0_0']),
         () => choice('Interpolation Steffen', curve, ['#et_0_interp', '#et_0_algo_steffen']),
         () => choice('Points All', curve, ['#et_0_appearance', [A, 'Points'], ['#et_0_appearance_points_sub', 'All']]),
         () => choice('Points Hovered', curve, ['#et_0_appearance', [A, 'Points'], ['#et_0_appearance_points_sub', 'Hovered']]),
@@ -71,16 +71,16 @@ module.exports = async function()
         const split = await shown('#et_0');
         return !color && !split ? true : JSON.stringify({ color, split });
     });
-    await t.step('a graph\'s menu: Display, Interpolation, Appearance, Y axis locked — open half a second, then closed', async () => all([
+    await t.step('a graph\'s menu: Display, Interpolation, Appearance, Y axis ▸ Locked — open half a second, then closed', async () => all([
         () => choice('graph Display Curve', graph, ['#et_0_1']),
         () => choice('graph Interpolation Makima', graph, ['#et_0_interp', '#et_0_algo_makima']),
         () => choice('graph Points All', graph, ['#et_0_appearance', [A, 'Points'], ['#et_0_appearance_points_sub', 'All']]),
         () => choice('graph Extremes All', graph, ['#et_0_appearance', [A, 'Extremes'], ['#et_0_appearance_minmax_sub', 'All']]),
         () => choice('graph Width 2 px', graph, ['#et_0_appearance', [A, 'Width'], ['#et_0_appearance_width_sub', '2 px']]),
-        () => choice('graph Y axis locked', graph, ['#et_0_behavior', '#et_0_ylock']),
-        () => choice('graph Y axis unlocked', graph, ['#et_0_behavior', '#et_0_ylock']),
+        () => choice('graph Y axis locked', graph, ['#et_0_behavior', '#et_0_behavior_yaxis', '#et_0_ylock']),
+        () => choice('graph Y axis unlocked', graph, ['#et_0_behavior', '#et_0_behavior_yaxis', '#et_0_ylock']),
     ]));
-    await t.step('a click on a line closes the submenu another line of its menu opened: Behavior ▸ Tooltip ▸ open over Y axis locked\'s switch, a click on its name closes Tooltip, the lock unchanged; a click on the switch locks', async () => {
+    await t.step('a click on a line closes the submenu another line of its menu opened: Behavior ▸ Tooltip ▸ open, a click on Y axis ▸ closes it and opens its own; there, a click on Locked\'s name leaves the lock unchanged, a click on the switch locks', async () => {
         const options = async () => { await click('#bo_0'); };
         // (the menu of the step before closed, its delay over)
         await t.page.mouse.click(5, 880); await t.wait(1500);
@@ -88,14 +88,15 @@ module.exports = async function()
         // (the options menu's lock: every graph's that has one)
         const lock = () => t.E('el.instance.graphs.some(g => g.chart.hecYAxisLocked())');
         const a = { tooltip: await shown('#eo_0_behavior_tooltip_sub'), lock: await lock() };
+        await click('#eo_0_behavior_yaxis'); await t.wait(300);
         const p = await t.E(`(()=>{ const r=el.querySelector('#eo_0_ylock').getBoundingClientRect(); return { x: r.left+20, y: r.top+r.height/2 }; })()`);
         await t.page.mouse.click(p.x, p.y); await t.wait(800);
-        const b = { tooltip: await shown('#eo_0_behavior_tooltip_sub'), behavior: await shown('#eo_0_behavior_sub'), lock: await lock() };
+        const b = { tooltip: await shown('#eo_0_behavior_tooltip_sub'), behavior: await shown('#eo_0_behavior_sub'), yaxis: await shown('#eo_0_behavior_yaxis_sub'), lock: await lock() };
         await click('#eo_0_ylock'); await t.wait(300);
         const c = { lock: await lock() };
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(1200);
-        if( c.lock ) { await options(); await t.wait(300); await click('#eo_0_behavior'); await t.wait(300); await click('#eo_0_ylock'); await t.wait(1500); }
-        return a.tooltip && !a.lock && !b.tooltip && b.behavior && !b.lock && c.lock ? true : JSON.stringify({ a, b, c });
+        if( c.lock ) { await options(); await t.wait(300); await click('#eo_0_behavior'); await t.wait(300); await click('#eo_0_behavior_yaxis'); await t.wait(300); await click('#eo_0_ylock'); await t.wait(1500); }
+        return a.tooltip && !a.lock && !b.tooltip && b.behavior && b.yaxis && !b.lock && c.lock ? true : JSON.stringify({ a, b, c });
     });
     await t.step('the options menu: Enhanced native history — open half a second, then closed (twice: back as it was)', async () => {
         const options = async () => { await click('#bo_0'); };

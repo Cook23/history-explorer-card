@@ -316,10 +316,10 @@
   }
 
   // ---------------------------------------------------------------------------
-  // What a legend label shows after its name (legend item: hecValue — its value, '(400 W)' —
-  // and hecMark — the right axis' '▸'), each after a space; '' without them
+  // What a legend label shows after its name (legend item: hecValue — its value, '(400 W)'),
+  // after a space; '' without it
   Chart.hecLegendTail = function (it) {
-    return (it.hecValue ? ' ' + it.hecValue : '') + (it.hecMark ? ' ' + it.hecMark : '');
+    return it.hecValue ? ' ' + it.hecValue : '';
   };
 
   // A chart's legend names fitted to room px each, with what follows them (legend.labels.
@@ -2431,10 +2431,10 @@
       if (!it.hecValue) return 'name';
       var ctx = this.ctx;
       ctx.save(); ctx.font = this._hecLegendFont();
-      // (the text ends at the hit box's right edge: name, ' ', value, then ' ' and the mark)
-      var _mark = it.hecMark ? ctx.measureText(' ' + it.hecMark).width : 0, _value = ctx.measureText(it.hecValue).width;
+      // (the text ends at the hit box's right edge: name, ' ', value)
+      var _value = ctx.measureText(it.hecValue).width;
       ctx.restore();
-      var _end = hb.left + hb.width - _mark;
+      var _end = hb.left + hb.width;
       return x >= _end - _value && x <= _end ? 'value' : 'name';
     },
 

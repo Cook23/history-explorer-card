@@ -21,19 +21,21 @@ module.exports = async function()
         };
         // (what the console is told meanwhile)
         const warned = fn => { const w = [], _w = console.warn; console.warn = (...a) => w.push(a.join(' ')); try { fn(); } finally { console.warn = _w; } return w; };
-        step('a value of a list: its case and spaces ignored, its synonyms kept — flat, in a block, in a list of values, look', () => {
+        step('a value of a list: its case and spaces ignored, its synonyms kept — flat, in a block (uiLayout.interval, statistics.mode too), in a list of values, look', () => {
             const o = withLook({ look: 'Mini', lineMode: 'Curves', interpolation: ' B-Spline ', yAxis: 'Secondary', showMinMax: 'Both', legendVisible: 'AUTO',
                                  labelsLeft: 'Hover', showStats: ['Min', 'AVG'], aggregateFunc: 'MAX', interval: 'Daily',
                                  tooltip: { size: 'SLIM' }, uiLayout: { toolbar: 'Top' }, cursor: { types: ['Line', 'timeline'] } });
             const r = JSON.stringify([o.lineMode, o.interpolation, o.yAxis, o.showMinMax, o.legendVisible, o.labelsLeft, o.showStats, o.aggregateFunc, o.interval,
                                       o.tooltip.size, o.uiLayout.toolbar, o.uiLayout.selector, o.cursor.types, o.showGrid]);
-            return r === JSON.stringify(['curves', 'bspline', 'right', 'all', 'auto', 'hover', ['min', 'average'], 'max', 2, 'slim', 'top', 'hide', ['line', 'timeline'], false]) ? true : r;
+            const n = normalizeOptions({ uiLayout: { interval: ' HIDE' }, statistics: { mode: 'Max' } });
+            return r === JSON.stringify(['curves', 'bspline', 'right', 'all', 'auto', 'hover', ['min', 'average'], 'max', 2, 'slim', 'top', 'hide', ['line', 'timeline'], false])
+                && n.uiLayout.interval === 'hide' && n.statistics.mode === 'max' ? true : r + ' ' + JSON.stringify(n);
         });
         step('an unknown value: left out (the option\'s default), with a warning in one form — once, however often it\'s read', () => {
             let o;
             const w = warned(() => { for( let i = 0; i < 3; i++ ) o = normalizeOptions({ lineMode: 'wavy', alignHeader: 'middle', showStats: ['min', 'mean'] }); });
             const want = ['history-explorer-card: alignHeader: "middle" — unknown value, ignored — expected default, left, right, center',
-                          'history-explorer-card: lineMode: "wavy" — unknown value, ignored — expected lines, curves, stepped, smart',
+                          'history-explorer-card: lineMode: "wavy" — unknown value, ignored — expected smart, curves, lines, stepped',
                           'history-explorer-card: showStats: "mean" — unknown value, ignored — expected min, average, max'];
             return o.lineMode === undefined && o.alignHeader === undefined && JSON.stringify(o.showStats) === '["min"]' && JSON.stringify(w) === JSON.stringify(want)
                 ? true : JSON.stringify({ o, w });

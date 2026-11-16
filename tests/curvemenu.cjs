@@ -3,7 +3,7 @@ const { openCard } = require('./lib.cjs');
 
 const card = (extra) => ({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [], ...extra });
 // et_N_<index>: 6 smart, 1 curves, 0 straight, 2 stepped, 3 bar, 4 arrowline, 5 timeline
-const ORDER = 'et_0_6,et_0_1,et_0_0,et_0_2,et_0_3,et_0_4,et_0_5';
+const ORDER = 'et_0_0,et_0_1,et_0_2,et_0_3,et_0_4,et_0_5,et_0_6';
 
 module.exports = async function()
 {
@@ -38,13 +38,13 @@ module.exports = async function()
         return r.opened === 'rep' && r.items === 'et_0_rep' && r.back === '' ? true : JSON.stringify(r);
     });
     const PRESELECT = [
-        ['sensor.power', 'et_0_6', 'a measurement: a line, smart'],
-        ['sensor.tank', 'et_0_6', 'a volume being measured (a tank): a line, smart'],
-        ['sensor.wind', 'et_0_4', 'an angle (°): arrowline'],
-        ['sensor.energy', 'et_0_3', 'energy that adds up (total_increasing): bar'],
-        ['sensor.net_energy', 'et_0_3', 'energy as a total (device class energy): bar'],
-        ['sensor.gas', 'et_0_3', 'a gas volume that adds up (m³): bar'],
-        ['binary_sensor.a', 'et_0_5', 'a state: timeline'],
+        ['sensor.power', 'et_0_0', 'a measurement: a line, smart'],
+        ['sensor.tank', 'et_0_0', 'a volume being measured (a tank): a line, smart'],
+        ['sensor.wind', 'et_0_5', 'an angle (°): arrowline'],
+        ['sensor.energy', 'et_0_4', 'energy that adds up (total_increasing): bar'],
+        ['sensor.net_energy', 'et_0_4', 'energy as a total (device class energy): bar'],
+        ['sensor.gas', 'et_0_4', 'a gas volume that adds up (m³): bar'],
+        ['binary_sensor.a', 'et_0_6', 'a state: timeline'],
     ];
     for( const [id, want, what] of PRESELECT ) {
         await t.step(`pre-selected for ${what}`, async () => {
@@ -63,7 +63,7 @@ module.exports = async function()
         await t.page.keyboard.press('ArrowDown'); const h2 = await highlighted();
         await t.page.keyboard.press('Enter'); await t.wait(1200);
         const e = await entry('sensor.wind');
-        return h1 === 'et_0_4' && h2 === 'et_0_5' && e?.type === 'timeline' ? true : JSON.stringify({ h1, h2, e });
+        return h1 === 'et_0_5' && h2 === 'et_0_6' && e?.type === 'timeline' ? true : JSON.stringify({ h1, h2, e });
     });
     await t.step('a pattern: "Default" gives each entity its own type', async () => {
         await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('sensor.energy*'); await t.wait(400);
@@ -80,14 +80,14 @@ module.exports = async function()
         await t.page.click('#b7_0'); await t.page.keyboard.type('sensor.power'); await t.wait(400);
         await t.page.click(`#es_0 a[data-entity="sensor.power"]`); await t.wait(500);
         const b = await t.E(`[...el.querySelectorAll('#et_0_rep_sub a')].filter(a=>a.style.display!=='none' && a.style.fontWeight==='bold').map(a=>a.id).join(',')`);
-        return b === 'et_0_0' ? true : b;
+        return b === 'et_0_2' ? true : b;
     });
     await t.step('entityOptions win: circular false makes an angle a smart line', async () => {
         await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 1090); await t.wait(300);
         await t.page.click('#b7_0'); await t.page.keyboard.press('Control+A'); await t.page.keyboard.type('sensor.wind'); await t.wait(400);
         await t.page.click(`#es_0 a[data-entity="sensor.wind"]`); await t.wait(500);
         const b = await t.E(`[...el.querySelectorAll('#et_0_rep_sub a')].filter(a=>a.style.display!=='none' && a.style.fontWeight==='bold').map(a=>a.id).join(',')`);
-        return b === 'et_0_6' ? true : b;
+        return b === 'et_0_0' ? true : b;
     });
     done(await t.close());
 
