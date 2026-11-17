@@ -212,9 +212,9 @@ gestures:
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
 
-1. Type in the entity selector: it filters on the names and the ids (`*` as a wildcard: `*door*`, `sensor.*`).
-2. Choose an entry with a click or Enter — for an entity with attributes, its *Value* or one of its attributes.
-3. Pick a type in the curve menu: the most fitting one is pre-selected (*Timeline*, *Bar*, *Direction* or *Smart* line).
+- **Search** — type in the entity selector: it filters on the names and the ids (`*` as a wildcard: `*door*`, `sensor.*`).
+- **Choose** — an entry, with a click or Enter; for an entity with attributes, its *Value* or one of its attributes.
+- **Type** — pick one in the curve menu; the most fitting one is pre-selected (*Timeline*, *Bar*, *Direction* or *Smart* line).
 
 ```yaml
 recordedEntitiesOnly: true          # only the entities recorded in the database
