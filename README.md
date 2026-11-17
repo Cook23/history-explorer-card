@@ -480,7 +480,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
 | **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
-| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light<br>The area under the curve: a color, `true` (light), `false` (none), `fade` — or thresholds, as `color` |
+| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light<br>The area under the curve: a color, `true` (light), `false` (none), `fade` — or thresholds on a value |
 | **`showState`**<br>*`show_state`* | **Default** `false`<br>`true`: its current value written large over the graph |
 | **`showIndicator`**<br>*`show_indicator`* | **Default** `false`<br>`true`: a dot in its color before its value over the graph |
 | **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: no current value in its legend label |
@@ -501,9 +501,9 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover`<br>Dots on the values: `hover` (the one pointed at), `true` (all), `false` (none), or a radius |
 | **`sizePoints`** | **Default** the line width + 2 px<br>The dots' diameter, in px |
 | **`tooltip.largeScreen`**<br>*`largeScreenTooltip`, `large_screen_tooltip`* | **Default** `mixed`<br>The tooltip on a screen 640 px wide or more: `mixed`, `nearest`, `selected`, `all` |
-| **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected`<br>The same, on a screen narrower than 640 px |
-| **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's<br>The same, in a card 600 px wide or more — wins over the screen's |
-| **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's<br>The same, in a card narrower than 600 px — wins over the screen's |
+| **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected`<br>The tooltip on a screen narrower than 640 px: `mixed`, `nearest`, `selected`, `all` |
+| **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card 600 px wide or more, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
+| **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card narrower than 600 px, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.behavior`**<br>*`tooltipBehavior`, `tooltip_behavior`* | **Default** `auto`<br>`tooltip.largeScreen` and `tooltip.smallScreen` set at once; `auto` keeps theirs |
 | **`pointsPerHour`**<br>*`points_per_hour`* | **Default** not set: a point per column of pixels<br>Points per hour (`2`: one per half hour), instead of one per column of pixels |
 | **`groupBy`**<br>*`group_by`* | **Default** `interval`<br>A point per `interval` (see `pointsPerHour`), per `hour`, or per `date` (day) |
@@ -525,12 +525,12 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`process`** | **Default** not set: the values as they are<br>A JavaScript expression changing each value (`state`) before it's drawn |
 | **`circular`** | **Default** automatic: an angle is circular<br>Angles drawn without a jump at 0/360: automatic, `false`, a period, or `2pi` — see *4 |
 | **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic: fitted to the values<br>The Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
-| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** the same as `ymin` / `ymax`<br>The same, for the right Y axis — see *6 |
+| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `ymin` / `ymax`<br>The right Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
 | **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** not set<br>The smallest range the Y axis shows — see *6 |
 | **`yScaleSteadiness` / `yScaleSteadinessRight`** | **Default** `50`<br>The automatic Y axis, 0 to 100: 0 follows the values, 100 keeps a steady scale — see *6 |
 | **`logarithmic`** | **Default** `false`<br>`true`: a logarithmic Y axis — see *6 |
 | **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
-| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The same, for the right Y axis — see *6 |
+| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
 | **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *6 |
 | **`ylock`** | **Default** `false`<br>`true`: the Y axis can't be moved or zoomed by hand — see *6 |
 | **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *6 |
