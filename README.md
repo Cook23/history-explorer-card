@@ -29,8 +29,6 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
-Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md).
-
 - **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
 - **v1.2.77** — YAML export of the card, a graph or a curve.
 - **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
@@ -43,6 +41,8 @@ Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.
 - **v1.2.4** — Two Y axes; colors from thresholds or another entity; the info panel everywhere.
 - **v1.2.2** — The curve menu in submenus; the tooltip on a click.
 - **v1.2.0** — Beta: dragging on touch screens reworked.
+
+📖 [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md)
 
 ---
 
