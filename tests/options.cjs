@@ -40,6 +40,38 @@ module.exports = async function()
             return o.lineMode === undefined && o.alignHeader === undefined && JSON.stringify(o.showStats) === '["min"]' && JSON.stringify(w) === JSON.stringify(want)
                 ? true : JSON.stringify({ o, w });
         });
+        step('arrowLength: a number from 0 to 100 — out of it, kept within, with a warning —, or an entity; arrowMax: as ymax (~: soft)', () => {
+            let a, b, c, d;
+            const w = warned(() => { a = normalizeOptions({ arrowLength: 150, arrowMax: '~20' }); b = normalizeOptions({ arrowLength: 'sensor.wind_speed' });
+                                     c = normalizeOptions({ arrowLength: '30', arrowMax: 12 }); d = normalizeOptions({ arrowLength: 'fast' }); });
+            const r = JSON.stringify([a.arrowLength, a.arrowMax, b.arrowLength, c.arrowLength, c.arrowMax, d.arrowLength, w.length]);
+            return r === JSON.stringify([100, { soft: 20 }, 'sensor.wind_speed', 30, 12, undefined, 2]) ? true : r + ' ' + JSON.stringify(w);
+        });
+        step('fill: a value (true, false, fade, a color), thresholds giving one, on the value or another entity\'s, or an entity holding one', () => {
+            const f = v => JSON.stringify(normalizeOptions({ fill: v }).fill);
+            const r = [f('Fade'), f({ 0: false, 20: 'fade', 30: '#ff0000' }), f({ entity: 'climate.salon', heating: true, default: false }), f('sensor.fill_now')];
+            const want = ['"fade"', '{"thresholds":[[0,false],[20,"fade"],[30,"#ff0000"]],"states":{}}',
+                          '{"thresholds":[],"states":{"heating":true},"default":false,"entity":"climate.salon"}', '"sensor.fill_now"'];
+            return JSON.stringify(r) === JSON.stringify(want) ? true : JSON.stringify(r);
+        });
+    }
+
+    // ── An entity's options at every level: on a graph, on the card ──
+    {
+        const t = await openCard(card({ process: 'state * 2', graphs: [
+            { type: 'line', hidden: true, scale: 0.5, fixedValue: true, legendVisible: false, entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2', legendVisible: true }] },
+            { type: 'line', circular: false, process: 'state', legendVisible: 'auto', entities: [{ entity: 'sensor.wind' }] },
+            { type: 'line', entities: [{ entity: 'sensor.tank' }] } ] }), { mock: { series: true } });
+        await t.wait(1200);
+        const r = await t.E(`el.instance.graphsInDisplayOrder().map(g=>[g.chart.options.legend.display, g.chart.data.datasets.map(d=>d.legendHidden),
+            g.entities.map(e=>[e.hidden, e.scale, e.fixedValue, e.process, e.circular])])`);
+        await t.step('hidden, scale, fixedValue, legendVisible on a graph; process on the card, circular on a graph — every curve of it, its own winning', async () => {
+            const want = [[true, [true, false], [[true, 0.5, true, 'state * 2', null], [true, 0.5, true, 'state * 2', null]]],
+                          [false, [false], [[null, null, false, 'state', false]]],
+                          [true, [false], [[null, null, false, 'state * 2', null]]]];
+            return JSON.stringify(r) === JSON.stringify(want) ? true : JSON.stringify(r);
+        });
+        done(await t.close());
     }
 
     // ── Every level, every spelling ──

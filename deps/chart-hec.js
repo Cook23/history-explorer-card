@@ -227,6 +227,39 @@
       fill: step && step.backgroundColor !== undefined ? step.backgroundColor : ds.backgroundColor };
   }
 
+  // A fill whose steps differ along the time, some fading out (colorSteps: a step's fill a
+  // color, or { fade: color } — its color fading out downwards, as hecFillFade): a pattern
+  // the size of the canvas, each step's part of the plot area painted with its own — px the
+  // steps' pixels, fillOf(k) step k's fill, first the fill before the first step
+  function _hecFillPattern(chart, area, px, fillOf, first) {
+    var cv = chart.canvas, r = cv.width / (chart.width || cv.width) || 1;
+    var off = document.createElement('canvas');
+    off.width = cv.width; off.height = cv.height;
+    var c = off.getContext('2d');
+    c.scale(r, r);
+    var paint = function (f, x0, x1) {
+      if (!f || x1 <= x0) return;
+      if (typeof f === 'object') {
+        var g = c.createLinearGradient(0, area.top, 0, area.bottom);
+        g.addColorStop(0, hecColorWithAlpha(f.fade, 0.4));
+        g.addColorStop(1, hecColorWithAlpha(f.fade, 0));
+        c.fillStyle = g;
+      } else c.fillStyle = f;
+      c.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+    };
+    var x = area.left, f = first;
+    for (var k = 0; k < px.length; k++) {
+      if (px[k] <= area.left) { f = fillOf(k); continue; }
+      if (px[k] >= area.right) break;
+      paint(f, x, px[k]);
+      x = px[k]; f = fillOf(k);
+    }
+    paint(f, x, area.right);
+    var p = chart.ctx.createPattern(off, 'no-repeat');
+    if (p && p.setTransform && window.DOMMatrix) p.setTransform(new window.DOMMatrix().scale(1 / r));
+    return p;
+  }
+
   Chart.plugins.register({
     id: 'hecColorSteps',
     beforeDatasetUpdate: function (chart, args) {
@@ -252,8 +285,10 @@
         return _hecStepColors(ds, steps[k]);
       };
       var stroke = chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
-      // (the fill too — unless it fades out (hecFillFade): its own gradient kept)
-      var fill = ds.hecFillFade ? null : chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
+      // (the fill too — unless it fades out (hecFillFade): its own gradient kept; a step's
+      // fill fading out ({ fade: color }): the fill drawn as a pattern, see _hecFillPattern)
+      var fades = !ds.hecFillFade && steps.some(function (st) { return st.backgroundColor && typeof st.backgroundColor === 'object'; });
+      var fill = ds.hecFillFade || fades ? null : chart.ctx.createLinearGradient(area.left, 0, area.right, 0);
       var cur = at(area.left);
       stroke.addColorStop(0, cur.border);
       if (fill) fill.addColorStop(0, cur.fill);
@@ -270,6 +305,10 @@
       if (fill) fill.addColorStop(1, cur.fill);
       line._model.borderColor = stroke;
       if (fill) line._model.backgroundColor = fill;
+      if (fades) line._model.backgroundColor = _hecFillPattern(chart, area, px, function (k) { return _hecStepColors(ds, steps[k]).fill; }, at(area.left).fill);
+      // (the points' colors: their step's — none when no step sets the line's: a color
+      // blended along the Y axis, each point's own, see hecValueGradient)
+      if (!steps.some(function (st) { return st.borderColor !== undefined; })) return;
       (meta.data || []).forEach(function (pt) {
         if (!pt._model) return;
         var c = at(pt._model.x);

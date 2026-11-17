@@ -712,7 +712,15 @@ var ArrowlineScale = Chart.scaleService.getScaleConstructor('time').extend({
     },
 });
 
-var arrowImageMap = new Map();
+// An arrowline's arrow: its outline in a box ARROW_BOX px square, pointing up (rotated to
+// its direction about the box's middle, scaled there to its length); a point of
+// ARROW_POINT_RADIUS for no length
+const ARROW_BOX = 24, ARROW_POINT_RADIUS = 1.5;
+const ARROW_PATH = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H11.03V18.89L13.04 18.92V9.97H17.03L12.03 4.97Z') : null;
+// (the same arrow in two parts — drawn so when its shaft is dashed: its head; its shaft, from
+// the head's base to its end, as wide)
+const ARROW_HEAD = typeof Path2D !== 'undefined' ? new Path2D('M7.03 9.97H17.03L12.03 4.97Z') : null;
+const ARROW_SHAFT = [9.97, 18.9], ARROW_SHAFT_WIDTH = 2;
 
 Chart.scaleService.registerScaleType('arrowline', ArrowlineScale, ArrowlineConfig);
 
@@ -870,27 +878,15 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
     // draw
     draw: function (ease) {
 
-        let color = ( this.index < this.chart.data.datasets.length ) ? this.chart.data.datasets[this.index].arrowColor : undefined;
-        let fill = ( this.index < this.chart.data.datasets.length ) ? this.chart.data.datasets[this.index].arrowBackground : undefined;
-
-        if( !arrowImageMap.has(color) ) {
-            let outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="${color ?? this.chart.options.elements.arrowColor ?? ( getComputedStyle(this.chart.canvas).getPropertyValue('--primary-text-color').trim() || '#000' )}" d="M7.03 9.97H11.03V18.89L13.04 18.92V9.97H17.03L12.03 4.97Z" /></svg>`;
-            let blob = new Blob([outerHTML], {type:'image/svg+xml;charset=utf-8'});
-            let URL = window.URL || window.webkitURL || window;
-            let blobURL = URL.createObjectURL(blob);
-            let image = new Image();
-            image.onload = () => { 
-                arrowImageMap.set(color, image);
-            }
-            image.src = blobURL;
-        }
+        const ds = this.chart.data.datasets[this.index];
+        const arrowColor = ds?.arrowColor ?? this.chart.options.elements.arrowColor ?? ( getComputedStyle(this.chart.canvas).getPropertyValue('--primary-text-color').trim() || '#000' );
+        const fill = ds?.arrowBackground;
 
         var metaData = this.getMeta().data;
 
-        if( !metaData.length || !arrowImageMap.has(color) ) return;
+        if( !metaData.length ) return;
 
-        const arrowImage = arrowImageMap.get(color);
-
+        const ctx = this.chart.ctx;
         const area = this.chart.chartArea;
 
         const arrow_spacing = 30;
@@ -899,51 +895,94 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
 
         const ybar = metaData[0].getMidPosition();
 
-        if( fill ) {
-            const y0 = ybar - arrowImage.height / 2;
-            this.chart.ctx.fillStyle = fill;
-            this.chart.ctx.lineWidth = 0;
-            this.chart.ctx.fillRect(area.left, y0-3, area.right - area.left, arrowImage.height+6);
+        // (the band behind the arrows: the dataset's arrowBackground — or each block's, its
+        // arrowBackgrounds, under the block)
+        const y0 = ybar - ARROW_BOX / 2;
+        ctx.lineWidth = 0;
+        if( ds?.arrowBackgrounds ) {
+            metaData.forEach((m, k) => {
+                const f = ds.arrowBackgrounds[k], x0 = Math.max(area.left, m.getPosition(0)), x1 = Math.min(area.right, m.getPosition(1));
+                if( !f || x1 <= x0 ) return;
+                ctx.fillStyle = f;
+                ctx.fillRect(x0, y0-3, x1 - x0, ARROW_BOX+6);
+            });
+        } else if( fill ) {
+            ctx.fillStyle = fill;
+            ctx.fillRect(area.left, y0-3, area.right - area.left, ARROW_BOX+6);
         }
 
-        const origMatrix = this.chart.ctx.getTransform();
+        const origMatrix = ctx.getTransform();
 
         let xScale = this.getScaleForId(this.getMeta().xAxisID);
         let xp = xScale.getPixelForValue(moment().startOf('day'));
         let ofs = xp % arrow_spacing;
 
+        // (its arrows' length — the dataset's arrowLength, see deps/timeline.js.md: none, every
+        // arrow its whole length; { fraction }, every arrow that part of it; { max }, each block's
+        // value [3] over max — its absolute value, at most the whole length; max 0, a point —, a
+        // block without one its whole length, its shaft dashed)
+        const L = ds?.arrowLength;
+        const lengthOf = block => !L ? { k: 1 } : L.fraction !== undefined ? { k: L.fraction }
+            : block[3] === undefined || block[3] === null ? { k: 1, dashed: true } : { k: L.max > 0 ? Math.min(1, Math.abs(block[3]) / L.max) : 0 };
+
         let j = 0;
 
         for( let i = 0; i < n; i++ ) {
 
-            let value = null;        
+            let value = null, block = null, at = -1;
 
             const x0 = i * arrow_spacing + area.left + ofs;
-            const y0 = ybar - arrowImage.height / 2;
 
-            const xmid = x0 + arrowImage.width / 2;
+            const xmid = x0 + ARROW_BOX / 2;
             for( ; j < metaData.length; j++ ) {
                 const x0 = metaData[j].getPosition(0);
                 const x1 = metaData[j].getPosition(1);
                 if( x1 > xmid ) {
                     if( xmid >= x0 ) {
                         value = metaData[j].getValue() * 1.0;
+                        block = ds.data[j];
+                        at = j;
                     }
                     break;
                 }
             }
 
             if( value != null ) {
-                let xc = x0 + arrowImage.width / 2;
-                let yc = y0 + arrowImage.height / 2;
-                this.chart.ctx.setTransform(origMatrix);
-                this.chart.ctx.translate(xc, yc);
+                const { k, dashed } = lengthOf(block ?? []);
+                // (its color: its block's — the dataset's arrowColors —, else the dataset's)
+                const color = ds?.arrowColors?.[at] ?? arrowColor;
+                ctx.setTransform(origMatrix);
+                ctx.translate(xmid, ybar);
+                if( k <= 0 ) {
+                    // (no length: a point)
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ARROW_POINT_RADIUS, 0, 2 * Math.PI);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    continue;
+                }
                 // (a full turn is the dataset's arrowPeriod — the entity's circular period, 360
                 // by default — so an angle in radians or grads points the right way too)
-                const period = this.chart.data.datasets[this.index]?.arrowPeriod || 360;
-                this.chart.ctx.rotate((value / period * 360 + 180) / 180.0 * Math.PI);
-                this.chart.ctx.translate(-xc, -yc);
-                this.chart.ctx.drawImage(arrowImage, x0, y0, arrowImage.width, arrowImage.height);
+                const period = ds?.arrowPeriod || 360;
+                ctx.rotate((value / period * 360 + 180) / 180.0 * Math.PI);
+                ctx.scale(k, k);
+                ctx.translate(-ARROW_BOX / 2, -ARROW_BOX / 2);
+                if( dashed ) {
+                    // (its head as always, its shaft dashed)
+                    ctx.fillStyle = color;
+                    ctx.fill(ARROW_HEAD);
+                    ctx.beginPath();
+                    ctx.moveTo(ARROW_BOX / 2, ARROW_SHAFT[0]);
+                    ctx.lineTo(ARROW_BOX / 2, ARROW_SHAFT[1]);
+                    ctx.setLineDash([2, 2]);
+                    ctx.lineWidth = ARROW_SHAFT_WIDTH;
+                    ctx.strokeStyle = color;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else {
+                    ctx.fillStyle = color;
+                    ctx.fill(ARROW_PATH);
+                }
             }
 
         }

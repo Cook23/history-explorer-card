@@ -289,7 +289,7 @@ const _isColor = c => typeof c === 'string' && c !== '' && ( typeof CSS === 'und
 const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.trim() !== '' ) ? Number(v) : NaN;
 
 // A series a color is read from (no CSS color has a dot): an entity_id, or one of its
-// attributes after it (climate.salon.hvac_action) — see colorEntityOf
+// attributes after it (climate.salon.hvac_action) — see card-datasets.js optionSeriesOf
 export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(s.trim());
 
 // Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
@@ -297,7 +297,7 @@ export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+
 // have one gets its value spaced evenly between them
 function _thresholdList(list)
 {
-    const _stops = list.map(x => typeof x === 'string' ? { value: NaN, color: x } : ( x && typeof x === 'object' ) ? { value: _number(x.value), color: x.color } : null)
+    const _stops = list.map(x => typeof x === 'string' ? { value: NaN, color: x } : ( x && typeof x === 'object' ) ? { value: _number(x.value), color: x.color ?? x.fill } : null)
                        .filter(x => x && x.color !== undefined);
     for( let i = 0; i < _stops.length; i++ ) {
         if( !isNaN(_stops[i].value) ) continue;
@@ -321,6 +321,38 @@ function _thresholdList(list)
 // - anything else → undefined
 export function normalizeColor(v)
 {
+    return normalizeIndirect(v, _colorLeaf);
+}
+
+// A color option's value itself — a color in any form, see parseColor —, or undefined
+function _colorLeaf(v)
+{
+    const c = parseColor(v);
+    return _isColor(c) ? c : undefined;
+}
+
+// A fill value itself: true (the curve's color, light), false (none), fade, or a color —
+// written as text too (an entity's state: 'true', 'Fade') —, or undefined
+export function fillLeaf(v)
+{
+    if( v === true || v === false ) return v;
+    const t = typeof v === 'string' ? v.trim().toLowerCase() : '';
+    if( t === 'true' || t === 'false' ) return t === 'true';
+    if( t === 'fade' ) return 'fade';
+    return _colorLeaf(v);
+}
+
+// A fill (fill — its leaves: see fillLeaf) in its one form, the same forms as a color's (see
+// normalizeColor): the value itself, the series it's read from, or thresholds
+export function normalizeFill(v)
+{
+    return normalizeIndirect(v, fillLeaf);
+}
+
+// An option read directly or indirectly — a color (normalizeColor), a fill (normalizeFill) —
+// in its one form, its values themselves read by leaf (the value, or undefined)
+export function normalizeIndirect(v, leaf)
+{
     if( v === undefined || v === null ) return undefined;
     if( typeof v === 'string' && v.trim().startsWith('{') ) v = _parseThresholdText(v.trim()) ?? v;
     if( Array.isArray(v) ) v = v.length >= 3 && v.slice(0, 3).every(x => !isNaN(_number(x))) ? parseColor(v) : _thresholdList(v);
@@ -329,18 +361,17 @@ export function normalizeColor(v)
         const spec = { thresholds: [], states: {}, default: undefined };
         for( const [k, c0] of Object.entries(v) ) {
             if( k === 'entity' || k === 'attribute' ) { spec[k] = c0; continue; }
-            const c = parseColor(c0);
-            if( !_isColor(c) ) continue;
+            const c = leaf(c0);
+            if( c === undefined ) continue;
             if( k === 'default' ) spec.default = c;
             else if( !isNaN(_number(k)) ) spec.thresholds.push([_number(k), c]);
             else spec.states[k] = c;
         }
         spec.thresholds.sort((a, b) => a[0] - b[0]);
-        return spec.thresholds.length || Object.keys(spec.states).length || spec.default ? spec : undefined;
+        return spec.thresholds.length || Object.keys(spec.states).length || spec.default !== undefined ? spec : undefined;
     }
     if( isColorSeries(v) ) return v.trim();
-    const c = parseColor(v);
-    return _isColor(c) ? c : undefined;
+    return leaf(v);
 }
 
 // A color value in its one form (see normalizeColor) as the colors it gives: { color } for
@@ -355,6 +386,14 @@ export function colorSpec(c)
 export function parseColorValue(v)
 {
     return colorSpec(normalizeColor(v));
+}
+
+// The fills an entity's state holds (a fill option read from an entity): its value in its one
+// form ({ color: the fill itself } for a value, thresholds as they are; null for nothing)
+export function parseFillValue(v)
+{
+    const f = normalizeFill(v);
+    return f === undefined || typeof f === 'string' && isColorSeries(f) ? null : ( typeof f === 'object' && f !== null ) ? f : { color: f };
 }
 
 // A fill that fills nothing
@@ -405,8 +444,8 @@ export function blendedColorForValue(spec, value)
 export function colorForValue(spec, value)
 {
     if( !spec ) return undefined;
-    if( spec.color ) return spec.color;
-    if( Object.prototype.hasOwnProperty.call(spec.states, String(value)) ) return spec.states[String(value)];
+    if( spec.color !== undefined ) return spec.color;
+    if( spec.states && Object.prototype.hasOwnProperty.call(spec.states, String(value)) ) return spec.states[String(value)];
     const n = _number(value);
     if( spec.thresholds.length && !isNaN(n) ) {
         let c = spec.thresholds[0][1];

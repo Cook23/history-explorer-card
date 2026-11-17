@@ -2,13 +2,19 @@
 // shown — line modes (smart, stepped...), bars by interval, circular values, timelines.
 // Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { parseColorValue, colorSpec, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
+import { parseColorValue, parseFillValue, fillValue, NO_FILL, colorForValue, isColorSeries, isBlendable, blendedColorForValue } from "./history-default-colors.js";
 import { seriesId, seriesOf, isDirectionAttribute, msOf } from "./history-series.js";
-import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand } from "./history-options.js";
+import { barInterval, RAW_INTERVAL, STATE_NOT_LISTED, minMaxBand, INDIRECT_OPTIONS } from "./history-options.js";
 import { timeWeightedMean, circularMean } from "./history-stats.js";
 import { perf } from "./card-perf.js";
 import { minOf, maxOf, insertAll } from "./history-arrays.js";
 import { isMissingState } from "./history-units.js";
+import { chooseYAxis, rangeIndex } from "./card-yscale.js";
+import { keyOf } from "./history-entity-store.js";
+
+// The steadiness of the scale of an arrowline's arrows' length (see arrowLengthMax): as the
+// automatic Y axis' yScaleSteadiness, its default — fixed
+const ARROW_SCALE_STEADY = 0.5;
 
 // (the functions of a group other than its mean — see _aggregate)
 const AGGREGATES_NOT_MEAN = new Set(['min', 'max', 'first', 'last', 'sum', 'delta', 'diff', 'median']);
@@ -19,16 +25,30 @@ const moment = window.HXLocal_moment;
 // _timelineRows)
 const MERGE_PX = 2;
 
-// The series an entity's `color` (in its one form, see normalizeColor) reads, or null: an
-// entity_id — or one of its attributes, after it (climate.salon.hvac_action) — whose state
-// then holds the color, in any form `color` itself accepts; or the `entity` (and
-// `attribute`) of thresholds, whose value they then compare instead of the value shown
-export function colorEntityOf(e)
+// The series option k of entity e reads (k: one of INDIRECT_OPTIONS, in its one form), or
+// null: an entity_id — or one of its attributes, after it (climate.salon.hvac_action) — whose
+// state then holds the value; or the `entity` (and `attribute`) of thresholds, whose value
+// they then compare instead of the value shown
+export function optionSeriesOf(e, k)
 {
-    const c = e?.color;
+    const c = e?.[k];
     const id = typeof c === 'string' ? c : ( c && typeof c === 'object' && typeof c.entity === 'string' ) ? seriesId(c.entity, c.attribute) : '';
     return isColorSeries(id) ? id : null;
 }
+
+// The series entity e's options read (optionSeriesOf), each once
+export function optionSeriesIdsOf(e)
+{
+    return [...new Set(INDIRECT_OPTIONS.map(k => optionSeriesOf(e, k)).filter(Boolean))];
+}
+
+// The parsers of a value an entity's state holds, by option (see _optionFunction): a color's,
+// a fill's; an arrows' length's, a number
+const _STATE_VALUE = {
+    color: parseColorValue,
+    fill: parseFillValue,
+    arrowLength: v => { const n = Number(v); return v !== '' && v !== null && Number.isFinite(n) ? { color: n } : null; },
+};
 
 export class CardDatasets
 {
@@ -39,37 +59,80 @@ export class CardDatasets
     // changes color on a point, never between two.
     // --------------------------------------------------------------------------------------
 
-    // The color of entity e at time t (ms) for the value v, or undefined when none applies
-    // (no valid color then): (t, v) => color. null when e's color is a constant — nothing
-    // to evaluate. colorHistory: the history of the color entities, by entity_id.
-    _colorFunction(e, colorHistory)
+    // Option k of entity e (INDIRECT_OPTIONS) at time t (ms) for the value v, or undefined
+    // when none applies: (t, v) => its value — thresholds compare v, or the series' value they
+    // name; a series' state holds it. null when e's option is a value itself — nothing to
+    // evaluate. history: the history of the series read, by id (see optionSeriesIds)
+    _optionFunction(e, k, history)
     {
-        const _ce = colorEntityOf(e);
-        const _spec = typeof e.color === 'object' ? e.color : null;
-        if( !_ce ) return _spec && !_spec.color ? (t, v) => colorForValue(_spec, v) : null;
-        // The color entity's states over time, each read once (the calls come in increasing
-        // time): thresholds compare them; else each holds a color value
-        const _states = ( colorHistory?.[_ce] ?? [] ).map(p => ({ t: msOf(p.last_changed), state: p.state,
-            spec: _spec ? null : parseColorValue(p.state) }));
-        let k = -1;
+        const _ce = optionSeriesOf(e, k);
+        const _spec = typeof e[k] === 'object' && e[k] !== null ? e[k] : null;
+        if( !_ce ) return _spec && !( 'color' in _spec ) ? (t, v) => colorForValue(_spec, v) : null;
+        // (the series' states over time, each read once — the calls come in increasing time:
+        // thresholds compare them; else each holds a value)
+        const _states = ( history?.[_ce] ?? [] ).map(p => ({ t: msOf(p.last_changed), state: p.state,
+            spec: _spec ? null : _STATE_VALUE[k](p.state) }));
+        let i = -1;
         return (t, v) => {
-            if( k >= 0 && _states[k].t > t ) k = -1;
-            while( k + 1 < _states.length && _states[k + 1].t <= t ) k++;
-            if( k < 0 ) return undefined;
-            return _spec ? colorForValue(_spec, _states[k].state) : colorForValue(_states[k].spec, v);
+            if( i >= 0 && _states[i].t > t ) i = -1;
+            while( i + 1 < _states.length && _states[i + 1].t <= t ) i++;
+            if( i < 0 ) return undefined;
+            return _spec ? colorForValue(_spec, _states[i].state) : colorForValue(_states[i].spec, v);
         };
+    }
+
+    // The color of entity e at time t for the value v (see _optionFunction)
+    _colorFunction(e, history)
+    {
+        return this._optionFunction(e, 'color', history);
+    }
+
+    // Option k of entity e now (INDIRECT_OPTIONS), for its current value: thresholds on it, or
+    // on the series' value now; the value the series holds now; else the option's value
+    // itself — undefined when none applies. blend: thresholds blended (colorTransition: smooth)
+    optionNow(e, k, blend)
+    {
+        const _ce = optionSeriesOf(e, k);
+        const _state = id => this.stateOf(id)?.state;
+        if( _ce && typeof e[k] === 'object' ) return colorForValue(e[k], _state(_ce));
+        const _spec = _ce ? _STATE_VALUE[k](_state(_ce)) : typeof e[k] === 'object' && e[k] !== null ? e[k] : e[k] === undefined ? null : { color: e[k] };
+        return ( blend ? blendedColorForValue : colorForValue )(_spec, Number(_state(e.entity)));
     }
 
     // The color of entity e now, for its current value — the legend's, and the curve's until
     // its history is drawn; the palette's (e.paletteColor) when no valid color applies
     entityColor(e)
     {
-        const _ce = colorEntityOf(e);
-        const _state = id => this.stateOf(id)?.state;
-        if( _ce && typeof e.color === 'object' ) return colorForValue(e.color, _state(_ce)) ?? e.paletteColor;
-        const _spec = _ce ? parseColorValue(_state(_ce)) : colorSpec(e.color);
-        const _of = !_ce && this.resolveOption(e, 'colorTransition') === 'smooth' ? blendedColorForValue : colorForValue;
-        return _of(_spec, Number(_state(e.entity))) ?? e.paletteColor;
+        const _blend = !optionSeriesOf(e, 'color') && this.resolveOption(e, 'colorTransition') === 'smooth';
+        const c = this.optionNow(e, 'color', _blend);
+        return typeof c === 'string' ? c : e.paletteColor;
+    }
+
+    // The fill of entity e as a style, f its fill's value (see fillLeaf) and c its color there
+    // — true, its color light; false, none; fade, { fade: c } (its color fading out downwards);
+    // a color: that one — in color c when its color varies (varies: its transparency, see
+    // _fillLike) —; undefined when none applies
+    fillStyle(f, c, varies)
+    {
+        if( f === undefined || f === false ) return undefined;
+        if( f === 'fade' ) return { fade: c };
+        const _f = fillValue(f, c);
+        return varies ? this._fillLike(c, _f) : _f;
+    }
+
+    // A fill style (see fillStyle) as one color: a fill fading out, its color light (as the
+    // top of its gradient); none, transparent
+    fillAsColor(f)
+    {
+        return typeof f === 'object' ? fillValue(true, f.fade) : f ?? NO_FILL;
+    }
+
+    // The fill of entity e now, as a style (see fillStyle): what its legend shows, an
+    // arrowline's background
+    entityFill(e)
+    {
+        const f = optionSeriesOf(e, 'fill') || typeof e.fill === 'object' ? this.optionNow(e, 'fill') : e.fill;
+        return this.fillStyle(f, this.entityColor(e), false);
     }
 
     // A fill color like `fill` (its transparency), in color c — or undefined when `fill`
@@ -82,43 +145,46 @@ export class CardDatasets
         return _c.valid ? _c.alpha(_f.alpha()).rgbString() : undefined;
     }
 
-    // The colors of a curve's points (see _colorFunction): the dataset's colorSteps (one
-    // where the color changes), and its own colors made those of the point now (the last
-    // one at or before now) — the legend's
-    // — or, thresholds blended (colorTransition: smooth, see isBlendable), the stops of the
-    // dataset's gradient over its Y axis (hecValueGradient: Chart.js draws it) and each
-    // point's own color
-    _applyPointColors(ds, e, s, colorFn, scale, fill)
+    // The colors of a curve's points (see _optionFunction — colorFn its color's, fillFn its
+    // fill's, one of them at least): the dataset's colorSteps (one where its color or its fill
+    // changes), and its own colors made those of the point now (the last one at or before now)
+    // — the legend's
+    // — or, its color's thresholds blended (colorTransition: smooth, see isBlendable), the
+    // stops of the dataset's gradient over its Y axis (hecValueGradient: Chart.js draws it) and
+    // each point's own color, its fill's steps along the time when it varies
+    _applyPointColors(ds, e, s, colorFn, fillFn, scale)
     {
         const _spec = typeof e.color === 'object' ? e.color : null;
+        const _f = scale || 1;
+        const _blend = this.resolveOption(e, 'colorTransition') === 'smooth' && !optionSeriesOf(e, 'color') && isBlendable(_spec);
+        const _fixed = this.entityColor(e);
+        // (a point's color, its fill — the curve's own fill when it doesn't vary: in its color,
+        // see _fillLike —, a fill applying nothing: none)
+        const _colorAt = (t, v) => _blend ? blendedColorForValue(_spec, v) ?? e.paletteColor : colorFn ? colorFn(t, v) ?? e.paletteColor : _fixed;
+        const _fillAt = (c, t, v) => fillFn ? this.fillStyle(fillFn(t, v), c, !!colorFn || _blend) ?? NO_FILL : this._fillLike(c, e.fill);
         ds.hecValueGradient = undefined;
-        if( this.resolveOption(e, 'colorTransition') === 'smooth' && !colorEntityOf(e) && isBlendable(_spec) ) {
-            const _f = scale || 1;
-            ds.colorSteps = undefined;
-            ds.hecValueGradient = _spec.thresholds.map(([k, c]) => ({ value: k * _f, color: c, fill: this._fillLike(c, fill) }));
-            ds.pointBackgroundColor = s.map(pt => blendedColorForValue(_spec, pt.y / _f) ?? e.paletteColor);
-            const _now = Date.now(), _last = [...s].reverse().find(pt => msOf(pt.x) <= _now) ?? s[0];
-            const _current = _last ? blendedColorForValue(_spec, _last.y / _f) : undefined;
-            if( _current ) {
-                ds.borderColor = _current;
-                ds.backgroundColor = this._fillLike(_current, fill) ?? ds.backgroundColor;
-            }
-            return;
+        if( _blend ) {
+            ds.hecValueGradient = _spec.thresholds.map(([k, c]) => ({ value: k * _f, color: c, fill: fillFn ? undefined : this._fillLike(c, e.fill) }));
+            ds.pointBackgroundColor = s.map(pt => _colorAt(msOf(pt.x), pt.y / _f));
         }
         const _steps = [];
         const _now = Date.now();
         let _prev, _current;
         for( const pt of s ) {
-            const t = msOf(pt.x);
-            const c = colorFn(t, scale ? pt.y / scale : pt.y) ?? e.paletteColor;
-            if( c !== _prev ) _steps.push({ x: t, borderColor: c, backgroundColor: this._fillLike(c, fill) });
-            _prev = c;
-            if( t <= _now || _current === undefined ) _current = c;
+            const t = msOf(pt.x), v = pt.y / _f;
+            const c = _colorAt(t, v), fill = _fillAt(c, t, v);
+            const _key = c + '|' + ( typeof fill === 'object' ? 'fade:' + fill.fade : fill );
+            if( _key !== _prev ) _steps.push({ x: t, borderColor: _blend ? undefined : c, backgroundColor: fill });
+            _prev = _key;
+            if( t <= _now || _current === undefined ) _current = { c, fill };
         }
-        ds.colorSteps = _steps.length > 1 ? _steps : undefined;
+        // (thresholds blended: the steps only for a fill that varies)
+        ds.colorSteps = _steps.length > 1 && ( !_blend || fillFn ) ? _steps : undefined;
         if( _current ) {
-            ds.borderColor = ds.pointBackgroundColor = _current;
-            ds.backgroundColor = this._fillLike(_current, fill) ?? ds.backgroundColor;
+            ds.borderColor = _current.c;
+            if( !_blend ) ds.pointBackgroundColor = _current.c;
+            const _cf = typeof _current.fill === 'object' ? fillValue(true, _current.c) : _current.fill;
+            ds.backgroundColor = _cf ?? ds.backgroundColor;
         }
     }
 
@@ -278,12 +344,17 @@ export class CardDatasets
                         const scale = this.drawScaleOf(e) * (e.siConversionFactor ?? 1.0);
                         s = this._lineSamples(e, result[id], process, scale, w, g.chart.hecPlotWidth());
                         if( _circBand ) this._markCircularJumps(s, _circP * Math.abs(scale));
-                        const _colorFn = this._colorFunction(e, colorHistory);
-                        if( _colorFn ) this._applyPointColors(_dataset, e, s, _colorFn, scale, e.fill);
+                        const _colorFn = this._colorFunction(e, colorHistory), _fillFn = this._optionFunction(e, 'fill', colorHistory);
+                        if( _colorFn || _fillFn || isBlendable(typeof e.color === 'object' ? e.color : null) && this.resolveOption(e, 'colorTransition') === 'smooth' )
+                            this._applyPointColors(_dataset, e, s, _colorFn, _fillFn, scale);
                     } else if( _kind == 'bar' && result[id].length > 0 ) {
                         ({ s, bcol } = this._barSamples(g, e, result[id], process, w, this._colorFunction(e, colorHistory)));
                     } else if( g.type == 'timeline' || g.type == 'arrowline' ) {
                         s = this._timelineRows(g, e, result[id], process, w);
+                        if( g.type == 'arrowline' ) {
+                            _dataset.arrowLength = this._arrowLengths(g, e, s, colorHistory);
+                            Object.assign(_dataset, this._arrowColors(e, s, colorHistory));
+                        }
                     }
 
                 }
@@ -725,6 +796,71 @@ export class CardDatasets
         }
 
         return g.type == 'arrowline' ? this._arrowColumns(s, _start, _end, g.chart.hecPlotWidth()) : s;
+    }
+
+    // An arrowline's arrows' length (arrowLength) for entity e of graph g — the dataset's
+    // arrowLength, see deps/timeline.js.md —: undefined, none set (their whole length);
+    // { fraction }, a number (that part of it, in %); { max, unit }, a series: each of its rows s
+    // ([start, end, state]) given the series' value at its middle ([3] — undefined where it has
+    // none), max its value giving the whole length (arrowLengthMax), unit its unit (the
+    // tooltip's). history: the history of the series read, by id
+    _arrowLengths(g, e, s, history)
+    {
+        const L = this.resolveOption(e, 'arrowLength');
+        if( L === undefined || L === null ) return undefined;
+        if( typeof L === 'number' ) return { fraction: L / 100 };
+        const fn = this._optionFunction({ ...e, arrowLength: L }, 'arrowLength', history);
+        for( const b of s ) { const v = fn(( msOf(b[0]) + msOf(b[1]) ) / 2); b[3] = typeof v === 'number' ? v : undefined; }
+        return { max: this.arrowLengthMax(g, e, L, history), unit: this.getUnitOfMeasure(L) };
+    }
+
+    // An arrowline's arrows' colors and backgrounds, each block's (its rows s, [start, end,
+    // state]: at its middle, for its value — as a curve's points', see _optionFunction): the
+    // dataset's arrowColors and arrowBackgrounds (deps/timeline.js.md) — each undefined when
+    // e's color, its fill, is a value itself (the dataset's arrowColor, arrowBackground: the
+    // same for every arrow). history: the history of the series read, by id
+    _arrowColors(e, s, history)
+    {
+        const colorFn = this._colorFunction(e, history), fillFn = this._optionFunction(e, 'fill', history);
+        if( !colorFn && !fillFn ) return { arrowColors: undefined, arrowBackgrounds: undefined };
+        const _fixed = this.entityColor(e), colors = [], fills = [];
+        for( const b of s ) {
+            const t = ( msOf(b[0]) + msOf(b[1]) ) / 2, v = Number(b[2]);
+            const c = colorFn ? colorFn(t, v) ?? e.paletteColor : _fixed;
+            colors.push(c);
+            // (a fill fading out: its color light, as an arrowline's fill: fade — see fillAsColor)
+            fills.push(fillFn ? this.fillAsColor(this.fillStyle(fillFn(t, v), c, !!colorFn)) : undefined);
+        }
+        return { arrowColors: colorFn ? colors : undefined, arrowBackgrounds: fillFn ? fills : undefined };
+    }
+
+    // The value of series id giving entity e's arrows (of graph g) their whole length: arrowMax
+    // set — a number —, that one; else chosen as the automatic Y axis chooses its top (see
+    // card-yscale.js chooseYAxis: what is shown first, a steady scale second, at
+    // ARROW_SCALE_STEADY), from the absolute values of the series over the time window and
+    // around it (history: the series' history, by id), 0 at the bottom; a soft arrowMax
+    // (~value) reached at least. Kept for the next update, by graph and curve
+    arrowLengthMax(g, e, id, history)
+    {
+        const M = this.resolveOption(e, 'arrowMax');
+        if( typeof M === 'number' ) return Math.abs(M);
+        const _soft = M?.soft !== undefined ? Math.abs(M.soft) : undefined;
+        const entries = [];
+        for( const p of history?.[id] ?? [] ) {
+            const v = Number(p.state);
+            if( p.state !== '' && p.state !== null && Number.isFinite(v) ) entries.push({ x: msOf(p.last_changed), lo: 0, hi: Math.abs(v) });
+        }
+        const _index = rangeIndex([entries]);
+        const rangeOf = (t0, t1) => {
+            const r = _index(t0, t1);
+            return _soft === undefined ? r : { lo: 0, hi: Math.max(r?.hi ?? 0, _soft) };
+        };
+        this._arrowScales ??= new Map();
+        const _key = g.id + ':' + keyOf(e);
+        const a = chooseYAxis(this._arrowScales.get(_key), rangeOf, msOf(this.startTime), msOf(this.endTime),
+                              { steady: ARROW_SCALE_STEADY, moving: !!this.state.drag, zero: true });
+        if( a ) this._arrowScales.set(_key, a);
+        return a?.max;
     }
 
     // An arrowline's rows (see _timelineRows) a block at most per pixel column of a plot w px

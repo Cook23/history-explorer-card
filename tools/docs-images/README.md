@@ -10,9 +10,10 @@ node tools/docs-images/render.cjs menu-graph # only the scenes named
 ```
 
 The images are written to `tools/docs-images/out/` (not committed), named as the READMEs
-link them. They are stored on `main`, in `images/screenshots/`: copy the ones you changed
-there, in a PR to `main`. The READMEs of every line link to
-`https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/…`.
+link them. They are stored on each line's branch, in `images/screenshots/`: copy the ones
+changed there. The READMEs of 1.2 link to
+`https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/…` — a
+file's raw link never follows a renamed branch (`main`, now `v1.1-legacy`).
 
 | File | What it renders |
 |---|---|
@@ -25,6 +26,6 @@ there, in a PR to `main`. The READMEs of every line link to
 | `r-drag.cjs` | `drag-label`, `drag-graph`, `drag-row`, `drag-yaxis` |
 | `r-all.cjs` | Every other scene, each with its entities, histories, config and what is done before the capture |
 
-The images are taken at a device pixel ratio of 2, in the light theme (`narrow-and-mini` also
+The images are taken at a device pixel ratio of 2 — the READMEs show each at its size on the screen, half its width in pixels (`<img … width="…">`: GitHub would stretch it to the column) —, in the light theme (`narrow-and-mini` also
 in the dark one). The time is set by each scene (`clock`), so a scene renders the same image
 whenever it runs.

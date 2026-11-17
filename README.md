@@ -10,10 +10,6 @@
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
 > 📖 [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md) — the complete documentation · What this fork adds: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION_FR.md) 🇫🇷
 
-A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
-
-![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/hero.png)
-
 ---
 
 > [!IMPORTANT]
@@ -23,28 +19,41 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
+## Overview
+
+A highly interactive history card for Home Assistant. Pan, zoom, and explore the history of the entities across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/hero.png" alt="The card: two temperatures, the pressure and a timeline over one day" width="924">
+
+---
+
 ## 📋 Version highlights
 
-A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
+- **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
+- **v1.2.77** — YAML export of the card, a graph or a curve.
+- **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
+- **v1.2.59** — Time ranges up to 10 years.
+- **v1.2.27** — Only what the screen can show is loaded.
+- **v1.2.18** — mini-graph-card's YAML read as is.
+- **v1.2.15** — Gesture settings; the options menu in submenus.
+- **v1.2.9** — Values over a graph, `look: mini`; attributes as curves.
+- **v1.2.6** — The graph menu, cut and paste.
+- **v1.2.4** — Two Y axes; colors from thresholds or another entity; the info panel everywhere.
+- **v1.2.2** — The curve menu in submenus; the tooltip on a click.
+- **v1.2.0** — Beta: dragging on touch screens reworked.
 
-- **v1.2.77** — *Export ▸ YAML*: a card's, a graph's or a curve's settings as YAML, the menus' choices included.
-- **v1.2.60** — The automatic Y axis shows what is in the window and keeps its scale as the time moves (`yScaleSteadiness`); the graphs drawn at once from coarser statistics, then refined, the cache filled ahead: a year shown in 0.4 s instead of 20, six months in 0.3 s instead of 10, a pan back at once.
-- **v1.2.59** — Time ranges up to 10 years, drawn from Home Assistant's daily statistics.
-- **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
-- **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
-- **v1.2.15** — Gesture settings for every card (long-press duration, pointer precision, for a mouse or a pen and for a finger); the options menu in submenus.
-- **v1.2.9** — Values over a graph and `look: mini`; an entity's attributes shown as curves.
-- **v1.2.6** — A graph's menu, cut and paste: every gesture also in a menu.
-- **v1.2.4** — Two Y axes on a graph; colors from thresholds or from another entity; the info panel on every page of Home Assistant.
-- **v1.2.2** — The curve menu in submenus (*Display*, *Interpolation*, *Layout*); the tooltip opens on a click or a tap.
-- **v1.2.0** — Beta, alongside the 1.1 line: dragging on touch screens reworked (a swipe always scrolls the page), the code reorganized.
+📖 [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md)
 
 ---
 
 ## Table of contents
 
-- [📋 Version highlights](#-version-highlights)
 - [Install](#install)
+- [Quick configuration](#quick-configuration)
+  - [YAML graphs](#yaml-graphs)
+  - [YAML export](#yaml-export)
+  - [Running as a sidebar panel](#running-as-a-sidebar-panel)
+  - [Info panel](#info-panel)
 - [Usage](#usage)
   - [Navigation](#navigation)
   - [Tooltip](#tooltip)
@@ -52,30 +61,96 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
   - [Adding entities](#adding-entities)
   - [Managing graphs](#managing-graphs)
   - [Y axis](#y-axis)
-- [Time range](#time-range)
-- [Persistence](#persistence)
-- [Info panel](#info-panel)
-- [Graph types](#graph-types)
-  - [Lines](#lines)
-  - [Bars](#bars)
-  - [Timelines](#timelines)
-  - [Compass arrows](#compass-arrows)
-- [Colors](#colors)
-- [Long term statistics](#long-term-statistics)
-- [Values over a graph, look: mini](#values-over-a-graph-look-mini)
+  - [CSV export](#csv-export)
+- [Detailed configuration](#detailed-configuration)
+  - [Time range](#time-range)
+  - [Persistence](#persistence)
+  - [Graph types](#graph-types)
+    - [Lines](#lines)
+    - [Bars](#bars)
+    - [Timelines](#timelines)
+    - [Compass arrows](#compass-arrows)
+  - [Colors](#colors)
+  - [Long term statistics](#long-term-statistics)
+  - [Values over a graph, look: mini](#values-over-a-graph-look-mini)
+  - [UI configuration](#ui-configuration)
 - [Options](#options)
-- [UI configuration](#ui-configuration)
-- [CSV export](#csv-export)
-- [YAML export](#yaml-export)
-- [YAML graphs](#yaml-graphs)
-- [Running as a sidebar panel](#running-as-a-sidebar-panel)
 
 ---
 
 ## Install
 
-- **HACS** (recommended): add `https://github.com/Cook23/history-explorer-card` as a custom repository.
-- **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings → Dashboards → ⋮ → Resources*, type JavaScript module).
+- **Marketplace** (recommended; HACS before Home Assistant 2026.11): *Settings › Marketplace › Add from link*, `https://github.com/Cook23/history-explorer-card`, then **Install**.
+- **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings › Dashboards › ⋮ › Resources*, type JavaScript module).
+
+Then reload the page (in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*) and add the card from *+ Add card*: *History Explorer Card*.
+
+📖 [Install](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#install)
+
+---
+
+## Quick configuration
+
+### YAML graphs
+
+Graphs written in the YAML, shown each time the dashboard opens — the entities added from the card come after them; without `graphs:`, every entity is added from the card:
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    title: Temperatures
+    options:
+      ymin: -10
+    entities:
+      - entity: sensor.outside_temperature
+        color: '#3e95cd'
+      - entity: climate.salon
+        attribute: current_temperature   # an attribute; forecast.0.temperature: a sub-attribute
+  - type: timeline
+    title: Doors and motion
+    entities:
+      - entity: binary_sensor.door_barn
+        name: Barn door
+      - entity: binary_sensor.pir_*      # a wildcard
+```
+
+An attribute that is a number is shown as a curve, in the unit Home Assistant shows it in (`unit:` to set it), from the history only (Home Assistant keeps no statistics of attributes); anything else as a timeline.
+
+📖 [YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs) · [Attributes](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#attributes)
+
+### YAML export
+
+The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸* copies the settings of the card, the graph or the curve to the clipboard, in the card's own syntax, the choices made in the menus included — *Simplified*, what is necessary: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*, what is useful to change it: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
+
+**In Home Assistant's card editor**, it helps write a card's YAML: set the card up in the editor's preview with its menus, export it from the options menu, and paste it in place of the YAML there — it holds `type:` and `cardName:` too. In the editor's preview, the card keeps room under itself for its menus to open.
+
+📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
+
+### Running as a sidebar panel
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
+
+The card on a page of its own, in Home Assistant's sidebar:
+
+1. *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
+2. Open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
+3. **+ Add card**: *History Explorer Card* — it takes the whole page.
+
+📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
+
+### Info panel
+
+The card can replace the history graph of Home Assistant's more info popup. Turn it on with the switch *Global ▸ Enhanced native history* of the options menu, or with `defaultInfoPanel: true`; `infoPanel:` holds the panel's own options. To have it on every page of Home Assistant, not only after a dashboard was opened:
+
+```yaml
+# configuration.yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the URL of the card's resource
+```
+
+📖 [Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
 
 ---
 
@@ -97,7 +172,7 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 
 ### Tooltip
 
-![A click on a curve: the tooltip, at the value pointed at](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/tooltip.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
 Click near a curve to put it in the tooltip; it then follows the pointer from value to value, and shows real values only. What it shows is each curve's tooltip mode — `selected` (the curves clicked), `nearest` (the value pointed at, on a hover), `mixed` (both) or `all` (every curve's value at that time) —, set by the screen — `tooltip.largeScreen` (a window 640 px wide or more, `mixed` by default), `tooltip.smallScreen` (`selected` by default) — or by the card's room, which wins when set — `tooltip.largeChart` (a card 600 px wide or more), `tooltip.smallChart` (narrower, and the info panel) —, or from a menu: *Behavior ▸ Tooltip ▸*, which sets the one giving the mode where the card is — the card's room's when set, else the screen's. `tooltip.size` sets how much it shows: `full`, `compact`, `slim`, or `auto` (by the card's width, the default).
 
@@ -105,7 +180,7 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 ### Menus
 
-![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-curve.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
 
 - **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
 - **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
@@ -128,7 +203,7 @@ gestures:
 
 ### Adding entities
 
-![Adding an entity: the field, the matching entities](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/adding-entities.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
 
 Type in the entity selector — it filters on the names and the ids, `*` as a wildcard (`*door*`, `sensor.*`) — and choose an entry with a click or Enter. An entity with attributes first offers its *Value* or one of its attributes. The curve menu then opens, the most fitting type pre-selected (*Timeline* for a state that isn't a number, *Bar* for energy that adds up, *Direction* for an angle, else a *Smart* line); nothing is added before a type is picked.
 
@@ -141,7 +216,7 @@ filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes m
 
 ### Managing graphs
 
-![A curve's label dragged onto another graph](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/drag-label.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png" alt="A curve's label dragged onto another graph" width="910">
 
 - **Click** a curve's name to hide or show it; a click on its value opens the entity's dialog.
 - **Double-click** a label to take the curve out into its own graph; double-click the chain icon 🔗 of linked graphs to merge them back.
@@ -156,7 +231,7 @@ combineSameUnits: true   # entities with compatible units (W and kW) added to th
 
 ### Y axis
 
-![The Y axis padlock](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/y-lock.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png" alt="The Y axis padlock" width="532">
 
 The Y axis scales itself (padlock open, green). Drag its labels to pan it, hold **Shift** to drag and zoom it on the graph; the padlock locks it (red). Two groups of units get an axis each, the second one on the right; more are shared between the two axes by the size of their values, each axis listing its units (`% / °C`); *Behavior ▸ Y axis* moves a curve to the other one.
 
@@ -171,9 +246,30 @@ graphs:
 
 📖 [Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#y-axis-scaling)
 
+### CSV export
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png" alt="The options menu, Export open" width="385">
+
+The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
+
+```yaml
+csv:
+  separator: ';'
+  timeFormat: 'DD/MM/YYYY HH:mm:ss'
+  statisticsPeriod: hour
+  exportAttributes: true
+  numberLocale: 'en-US'
+```
+
+📖 [Exporting data as CSV](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-data-as-csv)
+
 ---
 
-## Time range
+## Detailed configuration
+
+### Time range
+
+The time range shown when the card opens, where its window ends, and what the magnifying glass zooms:
 
 ```yaml
 defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
@@ -183,45 +279,26 @@ defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y 
 
 📖 [Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#default-view-and-time-ranges)
 
----
+### Persistence
 
-## Persistence
-
-What you change on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
+What is changed on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
 - the entities added from the UI are kept, on every device — and a card without YAML entities keeps its time range and its graphs' order too;
-- the YAML entities show what the YAML says, unless you choose otherwise:
+- the YAML entities show what the YAML says, unless these options say otherwise:
 
 ```yaml
 enablePersistence: entities           # kept on this device
-enableMultidevicePersistence: range   # kept and synced across your devices
+enableMultidevicePersistence: range   # kept and synced across the user's devices
 ```
 
 Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be set on a YAML entity for its own fields. The last one to speak wins: the YAML, when it changes, or the card.
 
 📖 [Persistence](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#persistence)
 
----
+### Graph types
 
-## Info panel
+#### Lines
 
-The card can replace the history graph of Home Assistant's more info popup. Turn it on with the switch *Global ▸ Enhanced native history* of the options menu, or with `defaultInfoPanel: true`; `infoPanel:` holds the panel's own options. To have it on every page of Home Assistant, not only after a dashboard was opened:
-
-```yaml
-# configuration.yaml
-frontend:
-  extra_module_url:
-    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the URL of the card's resource
-```
-
-📖 [Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
-
----
-
-## Graph types
-
-### Lines
-
-![The same values in the four line modes](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/line-modes.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png" alt="The same values in the four line modes" width="1287">
 
 - `lineMode`: `smart` (the default from the UI: a curve, and a flat dashed line over the silences of a sensor), `curves` (the default in YAML), `lines`, `stepped`.
 - `interpolation` (curves and smart): `monotone` (default, never overshoots), `steffen`, `makima`, `catmullrom` (the smoothest), `bspline` (mini-graph-card's).
@@ -232,9 +309,9 @@ frontend:
 
 📖 [Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-appearance)
 
-### Bars
+#### Bars
 
-![Rain by the hour and by 10 minutes, each graph with its interval](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/bars-interval.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-interval.png" alt="Rain by the hour and by 10 minutes, each graph with its interval" width="772">
 
 Energy, gas or water that adds up is shown as bars, by *10 min*, *Hour*, *Day*, *Week* or *Month* (the interval selector on the graph), or *Raw*. A bar graph can hold curves too.
 
@@ -247,9 +324,11 @@ entityOptions:
 
 📖 [Bar graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#bar-graphs-for-total-increasing-entities)
 
-### Timelines
+#### Timelines
 
-![A timeline: motion, a lock, a person](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/timeline.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png" alt="A timeline: motion, a lock, a person" width="652">
+
+A state that isn't a number is shown as a timeline, each state named as Home Assistant names it, in its own color:
 
 ```yaml
 stateTextMode: auto    # the states' names for their device class (default); raw; hide
@@ -261,25 +340,30 @@ stateColors:           # by entity, device class, domain or state
 
 📖 [Timeline charts](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#timeline-charts)
 
-### Compass arrows
+#### Compass arrows
 
-![Wind gusts and the wind direction as compass arrows](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/compass.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/compass.png" alt="Wind gusts and the wind direction as compass arrows" width="712">
+
+An angle — a wind's direction — is shown as arrows, their length from another entity's value — the wind's speed:
 
 ```yaml
 entityOptions:
   sensor.wind_bearing:
     type: arrowline
+    arrowLength: sensor.wind_speed   # each arrow as long as the wind is fast (0 to 100: a part of the whole length)
+    arrowMax: ~50                    # the whole length: 50 at least (a number alone: fixed)
 ```
 
 📖 [Compass arrow graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#compass-arrow-graphs)
 
----
+### Colors
 
-## Colors
-
-`color` takes a color, or thresholds on the value — or on another entity's or attribute's:
+`color` — and `fill`, its values `true`, `false`, `fade` or a color — takes a value, or thresholds on the value — or on another entity's or attribute's —, or an entity holding one:
 
 ```yaml
+graphs:
+  - type: line
+    entities:
       - entity: sensor.heat_pump_power
         color:
           entity: sensor.heat_pump_mode   # without it: thresholds on the value (0: blue, 1.5: red…)
@@ -290,11 +374,9 @@ entityOptions:
 
 📖 [Colors of curves and bars](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#colors-of-curves-and-bars)
 
----
+### Long term statistics
 
-## Long term statistics
-
-![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/long-term-stats.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png" alt="Statistics where the history is gone, the history where it is kept" width="1012">
 
 The card loads what the screen can show — the daily, hourly or 5-minute statistics, or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
 
@@ -306,15 +388,13 @@ statistics:
 
 📖 [Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics) · [Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation)
 
----
-
-## Values over a graph, look: mini
+### Values over a graph, look: mini
 
 `showState` shows each curve's value now over its graph, `showStats` its minimum, average and maximum over the window shown. `look: mini` gives the look of mini-graph-card at once — the time can still be panned and zoomed; any option set on the card wins.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/narrow-and-mini-dark.png">
-  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/narrow-and-mini.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
+  <img width="776" alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
 </picture>
 
 *Left: a card 168 px wide. Middle and right: `look: mini`, 374 and 168 px wide.*
@@ -323,123 +403,9 @@ statistics:
 
 📖 [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) · [mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
----
+### UI configuration
 
-## Options
-
-Each option can be set on the **card**, in **`entityOptions`** (by entity id, device class, domain or pattern), on a **graph** (under `options:` or on the graph) or on an **entity**; the most specific wins: **entity → graph → `entityOptions` → card**.
-
-```yaml
-type: custom:history-explorer-card
-lineWidth: 2                  # the card
-entityOptions:
-  - match: "sensor.*_power"   # entityOptions
-    lineMode: lines
-graphs:
-  - type: line
-    options:                  # a graph
-      showMinMax: statistics
-    entities:
-      - entity: sensor.*temperature*
-        exclude: '*fridge*'   # an entity
-```
-
-| Option | Name aliases | Value aliases | Card | Graph | Entity | Description |
-|---|---|---|:-:|:-:|:-:|---|
-| `type` | `graph` | | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
-| `colorTransition` | `color_thresholds_transition` | | ✓ | ✓ | ✓ | `smooth`: number thresholds blended from one to the next; `hard` (default): each value its threshold's color |
-| `lineColor` | `line_color` | | ✓ | ✓ | | A color, or a list of colors: each entity of a graph without its own takes the one at its place |
-| `color` | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` | ✓ | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
-| `fill` | `show_fill` | `true`: the curve's color, light; `false`: none | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards |
-| `showState` | `show_state` | | ✓ | ✓ | ✓ | The curve's value now, in large, over the graph |
-| `showIndicator` | `show_indicator` | | ✓ | ✓ | ✓ | A dot in its color before its value over the graph |
-| `showCurrentValues` | `show_legend_state` | | ✓ | ✓ | ✓ | `false`: its value now left out of its legend label |
-| `showName` / `showIcon` / `icon` / `iconImage` | `show_name` / `show_icon` / — / `icon_image` | | ✓ | ✓ | | The graph's header: its name, its icon — see [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) |
-| `alignHeader` / `alignIcon` / `alignState` | `align_header` / `align_icon` / `align_state` | | ✓ | ✓ | | The header's layout, the icon's place, the values' place |
-| `fontSizeHeader` / `fontSize` | `font_size_header` / `font_size` | | ✓ | ✓ | | The header's size (px); the values' size (%) |
-| `nameAdaptiveColor` / `iconAdaptiveColor` | `show_name_adaptive_color` / `show_icon_adaptive_color` | | ✓ | ✓ | | The header's name, its icon in the first curve's color now |
-| `showStats` | `show.extrema`, `show.average` | | ✓ | ✓ | ✓ | Its `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
-| `showStateFor`, `showStatsFor` | | | ✓ | ✓ | | `all` (default) or `first`: `showState`, `showStats` of the graph or the card for its first curve only, the others' set on them |
-| `stateAdaptiveColor` | `state_adaptive_color` | | ✓ | ✓ | ✓ | `false`: its values over the graph in the text's color |
-| `lineWidth` | `width`, `line_width` | | ✓ | ✓ | ✓ | Line width in pixels |
-| `lineMode` | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | ✓ | ✓ | ✓ | `curves`, `lines`, `stepped`, or `smart` |
-| `interpolation` | | `akima` = `makima`, `catmull-rom`, `b-spline` | ✓ | ✓ | ✓ | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` |
-| `dashMode` | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | ✓ | ✓ | ✓ | `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom array |
-| `showLine` | `show_line` | | ✓ | ✓ | ✓ | `false`: its points only, no line |
-| `showGraph` | `show_graph` | `show.graph: bar` / `line`: drawn | ✓ | ✓ | ✓ | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot, only its header and values |
-| `fixedValue` | `fixed_value` | | ✓ | ✓ | ✓ | `true`: its last value in the window, flat over the whole window |
-| `showPoints` | `showSamples`, `show_points` | | ✓ | ✓ | ✓ | Dots at measurement points: `hover` (default) only the hovered one; `true` all; `false` none (a number: all, that radius) |
-| `sizePoints` | | | ✓ | ✓ | ✓ | The dots' diameter in px — default: the line width + 2 px |
-| `tooltip.largeScreen` | `largeScreenTooltip`, `large_screen_tooltip` | | ✓ | ✓ | ✓ | The tooltip on a large screen (a window 640 px wide or more), unless `tooltip.largeChart` or `tooltip.smallChart` is set for the card's room: `mixed` (default) the value pointed at on any curve, at a hover or a click, and the curves clicked; `nearest` that value only; `selected` the curves clicked only; `all` that value and each other curve's value at the same time (or nearest, a few pixels away at most). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
-| `tooltip.smallScreen` | `smallScreenTooltip`, `small_screen_tooltip` | | ✓ | ✓ | ✓ | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
-| `tooltip.largeChart` | `largeChartTooltip`, `large_chart_tooltip` | | ✓ | ✓ | ✓ | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
-| `tooltip.smallChart` | `smallChartTooltip`, `small_chart_tooltip` | | ✓ | ✓ | ✓ | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
-| `tooltip.behavior` | `tooltipBehavior`, `tooltip_behavior` | | ✓ | ✓ | ✓ | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) |
-| `pointsPerHour` | `points_per_hour` | | ✓ | ✓ | ✓ | Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
-| `groupBy` | `group_by` | | ✓ | ✓ | ✓ | `interval` (default), `hour`, `date`: a point an hour, a day |
-| `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
-| `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `all` (everywhere; `true`, `both`), `max` / `min` (only its half above / below the curve, everywhere), `statistics` or `history` (only where the curve comes from them), `false` |
-| `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
-| `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
-| `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
-| `tapAction` | `tap_action` | an action's name alone: `tapAction: none` | ✓ | ✓ | ✓ | What a click on a value does: `more-info` (default: its dialog, with the info panel when it's on), `navigate`, `url`, `perform-action`, `call-service`, `none` |
-| `scale` | | | | | ✓ | Multiply values by this factor before drawing — see *6 |
-| `yAxis` | `y_axis` | `primary` = `left`, `secondary` = `right` | ✓ | ✓ | ✓ | `auto`, `left` or `right`: the Y axis of the curves (`auto`, the default: the second group of units goes on the right, more groups shared by the size of their values; `left` keeps one axis) |
-| `unit` | | | ✓ | | ✓ | Unit shown instead of the entity's own — see *6 |
-| `valueFactor` | `value_factor` | | ✓ | ✓ | ✓ | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see *6 |
-| `stateMap` | `state_map` | | ✓ | ✓ | ✓ | A text state drawn as a curve: each state at its place in the list, its label shown — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
-| `hidden` | | | | | ✓ | Hide by default in legend |
-| `legendVisible` | `show_legend` | | ✓ | | ✓ | `false`: no legend (the card); no label in the legend for this entity (an entity); `auto` (the card): a graph's legend only for several labels |
-| `process` | | | | | ✓ | JS expression to transform values before display |
-| `circular` | | | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
-| `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *7 |
-| `yminRight` / `ymaxRight` | `lower_bound_secondary` / `upper_bound_secondary` | | ✓ | ✓ | ✓ | The right Y axis' own bounds — see *7 |
-| `yrange` / `yrangeRight` | `min_bound_range` / `min_bound_range_secondary` | | ✓ | ✓ | ✓ | The smallest range the Y axis (the right one) shows — see *7 |
-| `yScaleSteadiness` / `yScaleSteadinessRight` | | | ✓ | ✓ | ✓ | The automatic Y axis' balance, 0 to 100 (default 50): 0, what is shown first; 100, a steady scale first — see *7 |
-| `logarithmic` | | | ✓ | ✓ | ✓ | A logarithmic Y axis (a line graph) — see *7 |
-| `labelsLeft` | `show_labels` | | ✓ | ✓ | ✓ | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see *7 |
-| `labelsRight` | `show_labels_secondary` | | ✓ | ✓ | ✓ | The right Y axis' labels, the same way — see *7 |
-| `ystepSize` | `ystepsize` | | ✓ | ✓ | ✓ | Fix Y axis tick step — see *7 |
-| `ylock` | | | ✓ | ✓ | ✓ | Disable all interactive Y axis pan and zoom — see *7 |
-| `stacked` | | | ✓ | ✓ | ✓ | Stack bars (bar graphs with multiple entities) — see *7 |
-| `barSpacing` | `bar_spacing` | | ✓ | ✓ | ✓ | The room between two bars, in pixels — see *7 |
-| `showTimeLabels` | | | ✓ | ✓ | ✓ | Show/hide time axis labels on timeline/arrowline graphs (default `true`) — see *7 |
-| `height` | | | ✓ | ✓ | ✓ | Graph height in pixels — see *2 and *7 |
-| `showGrid` | | | ✓ | ✓ | ✓ | `false`: no grid lines — see *7 |
-| `yLabels` | | | ✓ | ✓ | ✓ | `inside`: the Y labels inside the plot, which takes the whole width — see *7 |
-| `defaultTimeRange` | `hours_to_show` | | ✓ | | | The time range shown when the card opens — see [Time range](#time-range) |
-| `defaultMagnifierMode` | | | ✓ | | | What the magnifying glass's box zooms when the card opens: `x` the time, `y` the Y axis, `xy` both (default) |
-| `tooltip.size` | `tooltipSize` | | ✓ | | | Every tooltip's size: `full`, `compact`, `slim`, `auto` (default: by the card's width) |
-| `tooltip.showDuration` | `tooltipShowDuration` | | ✓ | | | `true`: a timeline's or arrowline's state lasted this long, after its time in the tooltip |
-| `tooltip.showColorsLine` / `tooltip.showColorsTimeline` | `showTooltipColorsLine` / `showTooltipColorsTimeline` | | ✓ | | | `false`: no color boxes in the tooltips of every graph but timelines / of timelines |
-| `timeTicks.density` | `timeTickDensity` | | ✓ | | | The time ticks' base density: `low`, `medium`, `high` (default), `higher`, `highest` |
-| `uiColors.gridLines` / `uiColors.cursorLine` | `uiColors.gridlines` / `uiColors.cursorline` | | ✓ | | | The color of the grid lines / of the cursor line |
-| `enablePersistence` / `enableMultidevicePersistence` | `enable_persistence` / `enable_multidevice_persistence` | | ✓ | | ✓ | What's remembered on this device / also synced across your devices — see [Persistence](#persistence) |
-| `labelsVisible` | | | ✓ | | | `false`: no names left of the timelines' rows |
-| `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-look-mini) |
-| `entityOptions` | | | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
-| `filterEntities` / `excludeFilterEntities` | | | ✓ | | | Limit which entities appear in the entity picker — see *4 |
-| `exclude` | | | | ✓ | ✓ | Exclude specific matches from a wildcard `entity:` pattern — see *4. Graph-level and entity-level excludes combine rather than override |
-
-*2 — `height` on the card sets the height of every line and bar graph; `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)) still set their own, and win over it.
-
-*3 — `entityOptions` accepts any property marked ✓ in the **Entity** column above, targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
-
-*4 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities).
-
-*5 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360; an attribute in `°` only when it's a direction, like `wind_bearing`), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. On an arrowline, it sets what a full turn of the arrows is (360 without a period).
-
-*6 — `scale` and `valueFactor` both multiply the values. `scale` is the factor itself; without `unit` it only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W. `valueFactor` is a power of 10, and multiplies what is drawn **and** shown, with or without `unit`: `valueFactor: -3` is `scale: 0.001` with the entity's own unit. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
-
-*7 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
-
-An option is spelled the same at every level, and its aliases — the names and values in the table — are accepted everywhere. A graph's options can be set under its `options:` or on the graph itself (`options:` wins).
-
-📖 [Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#entity-options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
-
----
-
-## UI configuration
+The card's look and layout — its header, its colors, its toolbars, its sizes, its cursor line, its time ticks:
 
 ```yaml
 type: custom:history-explorer-card
@@ -487,61 +453,116 @@ timeTicks:
 
 ---
 
-## CSV export
+## Options
 
-The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
-
-```yaml
-csv:
-  separator: ';'
-  timeFormat: 'DD/MM/YYYY HH:mm:ss'
-  statisticsPeriod: hour
-  exportAttributes: true
-  numberLocale: 'en-US'
-```
-
-📖 [Exporting data as CSV](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-data-as-csv)
-
----
-
-## YAML export
-
-The same menus: *Export ▸ YAML ▸ Simplified* or *Complete* — the settings of the card, the graph or the curve, the choices made in the menus included, copied to the clipboard in the card's own syntax, to define it statically in another card. *Simplified*: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
-
-📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
-
----
-
-## YAML graphs
+Each option can be set on the **card**, in **`entityOptions`** (by entity id, device class, domain or pattern), on a **graph** (under `options:` or on the graph) or on an **entity**; the most specific wins: **entity → graph → `entityOptions` → card**. Every option below at the four levels, unless its description says otherwise (in italics); its other names under it.
 
 ```yaml
 type: custom:history-explorer-card
+lineWidth: 2                  # the card
+entityOptions:
+  - match: "sensor.*_power"   # entityOptions
+    lineMode: lines
 graphs:
   - type: line
-    title: Temperatures
-    options:
-      ymin: -10
+    options:                  # a graph
+      showMinMax: statistics
     entities:
-      - entity: sensor.outside_temperature
-        color: '#3e95cd'
-      - entity: climate.salon
-        attribute: current_temperature   # an attribute; forecast.0.temperature: a sub-attribute
-  - type: timeline
-    title: Doors and motion
-    entities:
-      - entity: binary_sensor.door_barn
-        name: Barn door
-      - entity: binary_sensor.pir_*      # a wildcard
+      - entity: sensor.*temperature*
+        exclude: '*fridge*'   # an entity
 ```
 
-An attribute that is a number is shown as a curve, in the unit Home Assistant shows it in (`unit:` to set it), from the history only (Home Assistant keeps no statistics of attributes); anything else as a timeline.
+| Option | Description |
+|---|---|
+| **`type`**<br>*`graph`* | **Default** by the entity — `line`, `bar`, `timeline`, `arrowline` — *an entity's only* |
+| **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard` — `smooth`: number thresholds blended from one to the next; `hard`: each value its threshold's color |
+| **`lineColor`**<br>*`line_color`* | **Default** none — A color, or a list of colors: each entity of a graph without its own takes the one at its place — a graph's above its `color`, the card's below `entityOptions`' — *the card and a graph only* |
+| **`color`**<br>*`color_thresholds`* | **Default** the palette's — Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either — also thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` |
+| **`fill`**<br>*`show_fill`* | **Default** the palette's light fill; none with a color set — Fill color under the line, or `fade`: the curve's color fading out downwards — or, as `color`, thresholds giving one, or an entity holding one — also `true`: the curve's color, light; `false`: none |
+| **`showState`**<br>*`show_state`* | **Default** `false` — The curve's value now, in large, over the graph |
+| **`showIndicator`**<br>*`show_indicator`* | **Default** `false` — A dot in its color before its value over the graph |
+| **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true` — `false`: its value now left out of its legend label |
+| **`showName` / `showIcon` / `icon` / `iconImage`**<br>*`show_name` / `show_icon` / — / `icon_image`* | **Default** `showName`: none; `showIcon`: `false`; `icon`: the entity's; `iconImage`: none — The graph's header: its name, its icon — see [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) — *the card and a graph only* |
+| **`alignHeader` / `alignIcon` / `alignState`**<br>*`align_header` / `align_icon` / `align_state`* | **Default** `alignHeader`: `center`; `alignIcon`: `right`; `alignState`: `left` — The header's layout, the icon's place, the values' place — *the card and a graph only* |
+| **`fontSizeHeader` / `fontSize`**<br>*`font_size_header` / `font_size`* | **Default** `fontSizeHeader`: the theme's; `fontSize`: `100` (%) — The header's size (px); the values' size (%) — *the card and a graph only* |
+| **`nameAdaptiveColor` / `iconAdaptiveColor`**<br>*`show_name_adaptive_color` / `show_icon_adaptive_color`* | **Default** `false` — The header's name, its icon in the first curve's color now — *the card and a graph only* |
+| **`showStats`**<br>*`show.extrema`, `show.average`* | **Default** `false` — Its `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
+| **`showStateFor`, `showStatsFor`** | **Default** `all` — `all` or `first`: `showState`, `showStats` of the graph or the card for its first curve only, the others' set on them — *the card and a graph only* |
+| **`stateAdaptiveColor`**<br>*`state_adaptive_color`* | **Default** `true` — `false`: its values over the graph in the text's color |
+| **`lineWidth`**<br>*`width`, `line_width`* | **Default** `2` — Line width in pixels |
+| **`lineMode`**<br>*`smoothing`* | **Default** `curves` in the YAML, `smart` added from the card — `curves`, `lines`, `stepped`, or `smart` — also `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` |
+| **`interpolation`** | **Default** `monotone` — Interpolation algorithm in `curves` and `smart` modes: `monotone`, `steffen`, `makima`, `catmullrom`, `bspline` — also `akima` = `makima`, `catmull-rom`, `b-spline` |
+| **`dashMode`**<br>*`line_style`* | **Default** `solid` — `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom array — also dashes and gaps as CSS writes them: `'10,10'` |
+| **`showLine`**<br>*`show_line`* | **Default** `true` — `false`: its points only, no line |
+| **`showGraph`**<br>*`show_graph`* | **Default** `true` — `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot, only its header and values — also `show.graph: bar` / `line`: drawn |
+| **`fixedValue`**<br>*`fixed_value`* | **Default** `false` — `true`: its last value in the window, flat over the whole window |
+| **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover` — Dots at measurement points: `hover` only the hovered one; `true` all; `false` none (a number: all, that radius) |
+| **`sizePoints`** | **Default** the line width + 2 px — The dots' diameter in px |
+| **`tooltip.largeScreen`**<br>*`largeScreenTooltip`, `large_screen_tooltip`* | **Default** `mixed` — The tooltip on a large screen (a window 640 px wide or more), unless `tooltip.largeChart` or `tooltip.smallChart` is set for the card's room: `mixed` the value pointed at on any curve, at a hover or a click, and the curves clicked; `nearest` that value only; `selected` the curves clicked only; `all` that value and each other curve's value at the same time (or nearest, a few pixels away at most). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
+| **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected` — The same on a small screen (a window narrower than 640 px); set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
+| **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** none — The same in a card 600 px wide or more, winning over the screen's when set; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
+| **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** none — The same in a card narrower than 600 px, and in the info panel; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
+| **`tooltip.behavior`**<br>*`tooltipBehavior`, `tooltip_behavior`* | **Default** `auto` — Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` leaves theirs (`mixed`, `selected`) |
+| **`pointsPerHour`**<br>*`points_per_hour`* | **Default** none — Points an hour (groups of 1 / `pointsPerHour` hours) instead of one per column of pixels |
+| **`groupBy`**<br>*`group_by`* | **Default** `interval` — `interval`, `hour`, `date`: a point an hour, a day |
+| **`aggregateFunc`**<br>*`aggregate_func`* | **Default** `avg` — Each group's value: `avg` (weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
+| **`showMinMax`** | **Default** `false` — Min/max band around the mean curve: `all` (everywhere; `true`, `both`), `max` / `min` (only its half above / below the curve, everywhere), `statistics` or `history` (only where the curve comes from them), `false` |
+| **`netBars`** | **Default** `false` — Net metering mode for bar graphs |
+| **`arrowLength`** | **Default** none (the whole length) — An arrowline's arrows' length: 0 to 100 (% of their whole length), or an entity whose value gives it, its scale automatic — see [Compass arrows](#compass-arrows) |
+| **`arrowMax`** | **Default** automatic — The value giving the arrows their whole length (no automatic scale); `~`: at least that value |
+| **`interval`** | **Default** `hourly` — The bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
+| **`rounding`**<br>*`decimals`* | **Default** none (2 decimals at most) — The values' decimals — exactly that many; not set: at most 2 |
+| **`tapAction`**<br>*`tap_action`* | **Default** `more-info` — What a click on a value does: `more-info` (its dialog, with the info panel when it's on), `navigate`, `url`, `perform-action`, `call-service`, `none` — also an action's name alone: `tapAction: none` |
+| **`scale`** | **Default** `1` — Multiply values by this factor before drawing — see *5 |
+| **`yAxis`**<br>*`y_axis`* | **Default** `auto` — `auto`, `left` or `right`: the Y axis of the curves (`auto`: the second group of units goes on the right, more groups shared by the size of their values; `left` keeps one axis) — also `primary` = `left`, `secondary` = `right` |
+| **`unit`** | **Default** the entity's — Unit shown instead of the entity's own — see *5 |
+| **`valueFactor`**<br>*`value_factor`* | **Default** `0` — Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see *5 |
+| **`stateMap`**<br>*`state_map`* | **Default** none — A text state drawn as a curve: each state at its place in the list, its label shown — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
+| **`hidden`** | **Default** `false` — Hidden at first (its label struck through in the legend) |
+| **`legendVisible`**<br>*`show_legend`* | **Default** `true` — `false`: no label in the legend for its curves (every one: no legend); `auto` (a graph, the card): a graph's legend only for several labels |
+| **`process`** | **Default** none — JS expression to transform values before display |
+| **`circular`** | **Default** automatic — Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *4 |
+| **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic — Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *6 |
+| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `yminRight`: `ymin`; `ymaxRight`: `ymax` — The right Y axis' own bounds — see *6 |
+| **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** `yrange`: none; `yrangeRight`: `yrange` — The smallest range the Y axis (the right one) shows — see *6 |
+| **`yScaleSteadiness` / `yScaleSteadinessRight`** | **Default** `yScaleSteadiness`: `50`; `yScaleSteadinessRight`: `yScaleSteadiness` — The automatic Y axis' balance, 0 to 100: 0, what is shown first; 100, a steady scale first — see *6 |
+| **`logarithmic`** | **Default** `false` — A logarithmic Y axis (a line graph) — see *6 |
+| **`labelsLeft`**<br>*`show_labels`* | **Default** `true` — The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see *6 |
+| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true` — The right Y axis' labels, the same way — see *6 |
+| **`ystepSize`**<br>*`ystepsize`* | **Default** automatic — Fix Y axis tick step — see *6 |
+| **`ylock`** | **Default** `false` — Disable all interactive Y axis pan and zoom — see *6 |
+| **`stacked`** | **Default** `false` — Stack bars (bar graphs with multiple entities) — see *6 |
+| **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic — The room between two bars, in pixels — see *6 |
+| **`showTimeLabels`** | **Default** `true` — Show/hide time axis labels on timeline/arrowline graphs — see *6 |
+| **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150) — Graph height in pixels — see *1 and *6 |
+| **`showGrid`** | **Default** `true` — `false`: no grid lines — see *6 |
+| **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px — `inside`: the Y labels inside the plot, which takes the whole width — see *6 |
+| **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h` — The time range shown when the card opens — see [Time range](#time-range) — *the card's only* |
+| **`defaultMagnifierMode`** | **Default** `xy` — What the magnifying glass's box zooms when the card opens: `x` the time, `y` the Y axis, `xy` both — *the card's only* |
+| **`tooltip.size`**<br>*`tooltipSize`* | **Default** `auto` — Every tooltip's size: `full`, `compact`, `slim`, `auto` (by the card's width) — *the card's only* |
+| **`tooltip.showDuration`**<br>*`tooltipShowDuration`* | **Default** `false` — `true`: a timeline's or arrowline's state lasted this long, after its time in the tooltip — *the card's only* |
+| **`tooltip.showColorsLine` / `tooltip.showColorsTimeline`**<br>*`showTooltipColorsLine` / `showTooltipColorsTimeline`* | **Default** `true` — `false`: no color boxes in the tooltips of every graph but timelines / of timelines — *the card's only* |
+| **`timeTicks.density`**<br>*`timeTickDensity`* | **Default** `high` — The time ticks' base density: `low`, `medium`, `high`, `higher`, `highest` — *the card's only* |
+| **`uiColors.gridLines` / `uiColors.cursorLine`**<br>*`uiColors.gridlines` / `uiColors.cursorline`* | **Default** `uiColors.gridLines`: the theme's; `uiColors.cursorLine`: the grid lines' — The color of the grid lines / of the cursor line — *the card's only* |
+| **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none` — `entities` for the entities added from the card, `all` on a card without YAML graphs — What's remembered on this device / also synced across the user's devices — see [Persistence](#persistence) — *the card and an entity only* |
+| **`labelsVisible`** | **Default** `true` — `false`: no names left of the timelines' rows — *the card's only* |
+| **`look`** | **Default** none — `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-look-mini) — *the card's only* |
+| **`entityOptions`** | **Default** none — Targeted defaults by entity id, device class, domain, or glob pattern — see *2 — *the card's only* |
+| **`filterEntities` / `excludeFilterEntities`** | **Default** none — Limit which entities appear in the entity picker — see *3 — *the card's only* |
+| **`exclude`** | **Default** none — Exclude specific matches from a wildcard `entity:` pattern — see *3. Graph-level and entity-level excludes combine rather than override — *a graph and an entity only* |
 
-📖 [YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs) · [Attributes](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#attributes)
+*1 — `height` on the card sets the height of every line and bar graph; `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)) still set their own, and win over it.
 
----
+*2 — `entityOptions` accepts every option an entity takes (all but the card's only ones), targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
 
-## Running as a sidebar panel
+*3 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities).
 
-Add an empty dashboard with **Show in sidebar** checked, set the view type to **Panel (1 card)**, and add the history explorer card.
+*4 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360; an attribute in `°` only when it's a direction, like `wind_bearing`), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. On an arrowline, it sets what a full turn of the arrows is (360 without a period).
 
-📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
+*5 — `scale` and `valueFactor` both multiply the values. `scale` is the factor itself; without `unit` it only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W. `valueFactor` is a power of 10, and multiplies what is drawn **and** shown, with or without `unit`: `valueFactor: -3` is `scale: 0.001` with the entity's own unit. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
+
+*6 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
+
+An option is spelled the same at every level, and its aliases — the names and values in the table — are accepted everywhere. A graph's options can be set under its `options:` or on the graph itself (`options:` wins).
+
+📖 [Options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default

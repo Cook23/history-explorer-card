@@ -16,7 +16,7 @@ import { CardHistory } from "./card-history.js";
 import { CardGraphs } from "./card-graphs.js";
 import { CardCharts } from "./card-charts.js";
 import { CardOperations } from "./card-operations.js";
-import { CardToolbar } from "./card-toolbar.js";
+import { CardToolbar, SELECTOR_LIST_MAX_HEIGHT } from "./card-toolbar.js";
 import { CardSelector } from "./card-selector.js";
 import { CardDatasets } from "./card-datasets.js";
 import { seriesOf } from "./history-series.js";
@@ -342,7 +342,7 @@ export class HistoryCardState {
             if( g !== this._frozenChart ) this.refreshCurrentValues(g, _changed);
         }
         // (an entity giving a shown entity its color: looked at as the others — that curve changes too)
-        for( const id of this.colorEntityIds() ) if( this._seeState(id) ) changed = true;
+        for( const id of this.optionSeriesIds() ) if( this._seeState(id) ) changed = true;
 
         return changed;
     }
@@ -364,7 +364,7 @@ export class HistoryCardState {
     noteAskedStates(request)
     {
         const _ids = new Set(request.entity_ids ?? request.statistic_ids ?? []);
-        for( const id of [...this.graphs.flatMap(g => g.entities.map(e => e.entity)), ...this.colorEntityIds()] ) if( _ids.has(seriesOf(id).entity) ) this._seeState(id);
+        for( const id of [...this.graphs.flatMap(g => g.entities.map(e => e.entity)), ...this.optionSeriesIds()] ) if( _ids.has(seriesOf(id).entity) ) this._seeState(id);
     }
 
 
@@ -479,6 +479,18 @@ class HistoryExplorerCard extends HTMLElement
         this._tookBack = true;
         return true;
     }
+
+    // Home Assistant's card editor shows the card in its preview (preview: true — hui-card.ts):
+    // room kept under it there, always, for its menus and the entity selector's lists to open
+    // in — the preview scrolls, and is no higher than the card when its YAML is short: a menu
+    // that doesn't fit in it closes at once (card-menus.js followAnchor)
+    set preview(on)
+    {
+        this._preview = !!on;
+        this.style.display = on ? 'block' : '';
+        this.style.paddingBottom = on ? SELECTOR_LIST_MAX_HEIGHT : '';
+    }
+    get preview() { return !!this._preview; }
 
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
     set hass(hass)

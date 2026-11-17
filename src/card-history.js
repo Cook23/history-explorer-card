@@ -2,7 +2,7 @@
 // long-term statistics), filled on demand for the time window shown, and the user's own
 // state process function. Part of HistoryCardState (added to it in history-explorer-card.js).
 
-import { colorEntityOf } from "./card-datasets.js";
+import { optionSeriesIdsOf } from "./card-datasets.js";
 import { seriesOf, attributeHistories, msOf } from "./history-series.js";
 import { STATE_NOT_LISTED, OPTION_DEFAULTS, YEAR_HOURS, MAX_RANGE_YEARS, STATS_EXPORT_PERIODS, configWarning } from "./history-options.js";
 import { HORIZON } from "./card-yscale.js";
@@ -307,26 +307,26 @@ export class CardHistory
         return undefined;
     }
 
-    // The entities whose history is loaded: those shown, and those giving a shown entity
-    // its color (see colorEntityOf) — each once
+    // The entities whose history is loaded: those shown, and the series a shown entity's
+    // options read (see optionSeriesOf: its color, its fill, its arrows' length) — each once
     historyEntityIds()
     {
         const ids = new Set();
         for( const g of this.graphs ) for( const e of g.entities ) ids.add(e.entity);
-        for( const id of this.colorEntityIds() ) ids.add(id);
+        for( const id of this.optionSeriesIds() ) ids.add(id);
         return [...ids];
     }
 
-    // The entities giving a shown entity its color
-    colorEntityIds()
+    // The series the shown entities' options read (optionSeriesIdsOf)
+    optionSeriesIds()
     {
         const ids = new Set();
-        for( const g of this.graphs ) for( const e of g.entities ) { const c = colorEntityOf(e); if( c ) ids.add(c); }
+        for( const g of this.graphs ) for( const e of g.entities ) for( const id of optionSeriesIdsOf(e) ) ids.add(id);
         return ids;
     }
 
     // The entities whose long-term statistics are asked: those Home Assistant keeps statistics
-    // of (a state_class) — shown or giving a curve its color, however they're shown: a curve,
+    // of (a state_class) — shown or read by a curve's options (optionSeriesOf), however they're shown: a curve,
     // bars, a timeline, an arrowline; an angle too (its history asked besides: _angleIds) —,
     // not an attribute (no statistics); none when the statistics are off
     _statisticsIds()
@@ -438,7 +438,7 @@ export class CardHistory
         this._lastDrawAt = performance.now();
         // (the window the graphs are drawn whole for — see _withinAColumn)
         if( !only ) { const { r, px } = this._geometry(); this._drawnWhole = { s: msOf(this.startTime), r, px, graphs: [...this.graphs] }; }
-        let _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || only.has(colorEntityOf(e)))) : null;
+        let _graphs = only ? this.graphs.filter(g => g.entities.some(e => only.has(e.entity) || optionSeriesIdsOf(e).some(id => only.has(id)))) : null;
         // (a graph off the screen: drawn after those on it — see _drawStaleSoon —, or when it
         // comes on it, see _watchShown)
         const _all = _graphs ?? this.graphs, _near = offscreenToo ? _all : _all.filter(g => !this._offscreen?.has(g));
@@ -457,7 +457,7 @@ export class CardHistory
             const _layers = this._drawLayers(this._statisticsIds());
             for( const g of this.graphs ) for( const e of g.entities ) result.push(!_graphs || _graphs.includes(g) ? this.cachedHistory(e.entity, c0, c1, _layers.get(e.entity)) : null);
             const colorHistory = {};
-            for( const id of this.colorEntityIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1, _layers.get(id));
+            for( const id of this.optionSeriesIds() ) colorHistory[id] = this.cachedHistory(id, c0, c1, _layers.get(id));
             // (timed while the performance test records: the rows read from the cache)
             perf.add('from cache', performance.now() - _tc);
             this.buildChartData(result, colorHistory, _graphs);

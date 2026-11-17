@@ -1,7 +1,7 @@
 // The card's options: the curve interpolation algorithms, the synonyms of the option
 // names, and which options can be set at which level (card, entityOptions, graph, entity).
 
-import { normalizeColor } from "./history-default-colors.js";
+import { normalizeColor, normalizeFill, isColorSeries } from "./history-default-colors.js";
 
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes), each as the Interpolation submenu names it (not translated) — the first one is
@@ -219,6 +219,27 @@ function _yBound(v)
     return v !== '' && v !== true && v !== false && isFinite(n) ? n : undefined;
 }
 
+// A bound as its YAML writes it: soft ({ soft }), '~' and its value; else as it is
+export function boundText(v)
+{
+    return v && typeof v === 'object' && v.soft !== undefined ? `~${v.soft}` : v;
+}
+
+// An arrowline's arrows' length (arrowLength): a number — a part of their whole length, in %,
+// kept within 0 to 100 (a warning outside) —, or a series — an entity_id, or one of its
+// attributes after it — whose value gives it; else not set, with a warning
+function _arrowLength(v)
+{
+    if( isColorSeries(v) ) return v.trim();
+    const n = Number(v);
+    if( v === '' || v === true || v === false || !isFinite(n) ) {
+        configWarning('arrowLength', v, 'unknown value, ignored — expected a number from 0 to 100, or an entity');
+        return undefined;
+    }
+    if( n < 0 || n > 100 ) configWarning('arrowLength', v, 'out of 0 to 100, kept within');
+    return Math.min(100, Math.max(0, n));
+}
+
 // A state a stateMap doesn't list, once mapped (see processOf): no value — a gap in the curve
 // with showMissingState, else the curve goes over it
 export const STATE_NOT_LISTED = '\u0000not listed';
@@ -267,6 +288,11 @@ const OPTION_VALUES = {
     sizePoints    : v => Number(v) > 0 ? Number(v) : undefined,
     ymin          : _yBound,
     ymax          : _yBound,
+    // (an arrowline's arrows' length: a part of their whole length, in % — kept within 0 to
+    // 100, with a warning —, or the series whose value gives it, see card-datasets.js
+    // arrowLengthOf; the value giving the whole length, as ymax)
+    arrowLength   : _arrowLength,
+    arrowMax      : _yBound,
     yminRight     : _yBound,
     ymaxRight     : _yBound,
     yrange        : _positive,
@@ -328,7 +354,7 @@ const OPTION_VALUES = {
     dashMode      : v => Array.isArray(_dashList(v)) ? _dashList(v) : _dashName(v),
     color         : normalizeColor,
     // (a color, or fade, true — the curve's color, light — or false)
-    fill          : oneOf('fill', [true, false, 'fade'], { other: normalizeColor, expected: 'true, false, fade or a color' }),
+    fill          : oneOf('fill', [true, false, 'fade'], { other: normalizeFill, expected: 'true, false, fade, a color, thresholds or an entity' }),
     // (the decimals: a whole number ≥ 0, else not set)
     rounding      : v => ( v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 ) ? Number(v) : undefined,
     // (an action's name alone stands for it)
@@ -430,7 +456,7 @@ export const OPTION_DEFAULTS = {
     largeScreenTooltip: 'mixed', smallScreenTooltip: 'selected', showPoints: 'hover', dashMode: 'solid', netBars: false,
     showLine: true, showGraph: true, fixedValue: false, stateAdaptiveColor: true, showIndicator: false, valueFactor: 0,
     // (a graph's — card-graphs.js _optionsInGraph)
-    showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
+    legendVisible: true, showGrid: true, showTimeLabels: true, stacked: false, logarithmic: false, ylock: false, labelsLeft: true, labelsRight: true, yScaleSteadiness: 50,
     // (a graph's header — CardConfig.graphOption)
     showIcon: false, alignHeader: 'center',
     // (a bar graph's interval — CardConfig.applyConfig, defaultInterval)
@@ -459,9 +485,16 @@ export const OPTION_DEFAULTS = {
 const _GRAPH_DEFAULT_KEYS = ['showGrid', 'showTimeLabels', 'stacked', 'logarithmic', 'ylock', 'labelsLeft', 'labelsRight', 'yScaleSteadiness'];
 export const GRAPH_DEFAULTS = Object.fromEntries(_GRAPH_DEFAULT_KEYS.map(k => [k, OPTION_DEFAULTS[k]]));
 
-// An entity's own options (never a graph's): set on the entity, its entityOptions, or — for
-// those of CARD_ENTITY_KEYS — on the card
+// An entity's own options, kept on its entry — set on the entity, else its graph, entityOptions,
+// the card (the one chain: CardConfig.resolveOption), but those only an entity sets
+// (ENTITY_ONLY_KEYS)
 export const ENTITY_OPTION_KEYS = ['color', 'hidden', 'name', 'scale', 'siConversionFactor', 'type', 'unit', 'process', 'circular', 'legendVisible', 'fixedValue'];
+// The options of an entity no level above it sets — exceptions agreed by the user (CLAUDE.md,
+// STANDARD), each for its reason: `type` on the card is Home Assistant's (the card's type), on a
+// graph the graph's own (written apart: `type:` beside its `entities:`); `name` on the card is
+// mini-graph-card's (its graph's title), on a graph it would name every curve alike (its `title`
+// names the graph); siConversionFactor isn't an option: the card works it out from the units
+export const ENTITY_ONLY_KEYS = ['type', 'name', 'siConversionFactor'];
 // The options of every curve the card can set (CardConfig.resolveOption: the entity's, else
 // its graph's, else entityOptions', else the card's, else OPTION_DEFAULTS)
 export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 'showLine', 'showIndicator', 'showGraph', 'fixedValue', 'stateAdaptiveColor',
@@ -473,21 +506,28 @@ export const CURVE_OPTION_KEYS = ['valueFactor', 'stateMap', 'colorTransition', 
 export const CURVE_GRAPH_KEYS = ['yAxis', 'showState', 'showStats', 'showStateFor', 'showStatsFor'];
 // The options copied onto a curve when it's added, from the levels above it (card-graphs.js
 // _levelFields — resolveOption): its own from then on, kept when it's moved to another graph
-export const CURVE_LEVEL_KEYS = ['dashMode', 'lineWidth', 'lineMode', 'interpolation', 'scale', 'netBars', 'showPoints', 'showMinMax', 'name',
+export const CURVE_LEVEL_KEYS = ['dashMode', 'lineWidth', 'lineMode', 'interpolation', 'scale', 'netBars', 'showPoints', 'showMinMax', 'name', 'arrowLength', 'arrowMax',
     'siConversionFactor', 'unit', 'process', 'circular', 'rounding', 'tapAction', 'showCurrentValues', ...CURVE_OPTION_KEYS];
 // A curve's options given when it's added besides the levels' (card-graphs.js
 // _applyEntityDefaults: the palette's when none is set)
 export const CURVE_LOOK_KEYS = ['type', 'color', 'fill'];
+// The options that are bounds (a number, or soft — '~' and a number: see _yBound)
+export const BOUND_OPTIONS = Object.keys(OPTION_VALUES).filter(k => OPTION_VALUES[k] === _yBound);
+// The options a curve reads directly or indirectly — a value, thresholds on the value shown
+// or on another series' value, or a series whose state holds the value (see
+// history-default-colors.js normalizeIndirect, card-datasets.js optionSeriesOf): its color, its
+// fill, an arrowline's arrows' length
+export const INDIRECT_OPTIONS = ['color', 'fill', 'arrowLength'];
 // A curve's option kept on its entry under another name: YAML name → the entry's field
 export const CURVE_FIELD_OF = { lineWidth: 'width' };
-// An entity's options the card can set for every entity, as mini-graph-card does
-export const CARD_ENTITY_KEYS = ['color', 'fill', 'unit'];
+// An entity's options the card sets for every entity (its look's too: fill)
+export const CARD_ENTITY_KEYS = [...ENTITY_OPTION_KEYS, 'fill'].filter(k => !ENTITY_ONLY_KEYS.includes(k));
 // The persistence options' categories (enablePersistence, enableMultidevicePersistence)
 export const PERSISTENCE_CATEGORIES = ['range', 'entities', 'order'];
 
 // Options that can be set at the graph level — under the graph's `options:`, or directly
 // on the graph next to `type:` / `entities:` (`options:` wins when both are set)
-const _GRAPH_OPTIONS = ['fill', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
+const _GRAPH_OPTIONS = [...ENTITY_OPTION_KEYS.filter(k => !ENTITY_ONLY_KEYS.includes(k)), 'fill', 'arrowLength', 'arrowMax', 'showMinMax', 'showState', 'showStats', 'dashMode', 'lineMode', 'interpolation', 'lineWidth',
     'showPoints', 'sizePoints', 'netBars', 'interval', 'exclude', 'height', 'stacked', 'ylock',
     'ymin', 'ymax', 'ystepSize', 'showTimeLabels', 'showGrid', 'yLabels', 'yAxis', 'tapAction', 'rounding', 'pointsPerHour', 'aggregateFunc', 'groupBy',
     'yminRight', 'ymaxRight', 'yrange', 'yrangeRight', 'yScaleSteadiness', 'yScaleSteadinessRight', 'logarithmic', 'labelsLeft', 'labelsRight', 'valueFactor', 'stateMap', 'lineColor', 'colorTransition', 'showLine',
@@ -502,9 +542,8 @@ export const GRAPH_HEADER_KEYS = ['showName', 'showIcon', 'icon', 'iconImage', '
 export const GRAPH_OPTION_KEYS = [..._GRAPH_OPTIONS, ..._GRAPH_OPTIONS.flatMap(k => OPTION_SYNONYMS[k] ?? []), 'show', 'tooltip'];
 // The graph options kept on the graph (CardConfig.pconfig.graphs) and on its entities: all
 // but those consumed while the graph is read — interval (its entities'), exclude (its
-// wildcards'), lineColor (its entities' colors) — and tooltipBehavior (folded into the
-// tooltips by normalizeOptions)
-export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclude', 'lineColor', 'tooltipBehavior'].includes(k));
+// wildcards') — and tooltipBehavior (folded into the tooltips by normalizeOptions)
+export const GRAPH_STORED_KEYS = _GRAPH_OPTIONS.filter(k => !['interval', 'exclude', 'tooltipBehavior'].includes(k));
 
 // Options of the graph an entity is shown in (its Y axis, its size...) that can also be set
 // on the card (for every graph), in entityOptions or on an entity (for the graph it's in)
@@ -518,8 +557,7 @@ export const GRAPH_SCOPE_KEYS = ['ymin', 'ymax', 'ystepSize', 'ylock', 'stacked'
 // chain — the entity's, its graph's, entityOptions', the card's, the default
 // (CardConfig.resolveOption)
 export const CARD_LEVEL_KEYS = [...new Set([...CURVE_OPTION_KEYS, ...CURVE_GRAPH_KEYS, ...GRAPH_HEADER_KEYS, ...CARD_ENTITY_KEYS,
-    ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height'),
-    ...CURVE_LEVEL_KEYS.filter(k => !ENTITY_OPTION_KEYS.includes(k)), 'interval'])];
+    ...GRAPH_SCOPE_KEYS.filter(k => k !== 'height'), ...CURVE_LEVEL_KEYS, 'interval', 'lineColor'])].filter(k => !ENTITY_ONLY_KEYS.includes(k));
 
 // A bar graph's intervals, in the order its selector shows them: the code saved for each
 // (weekly, added last, gets the next one: the codes saved before keep their meaning), its

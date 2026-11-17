@@ -8,6 +8,7 @@ import { i18n } from "./languages.js";
 import { stateLabel, OPTION_DEFAULTS, DASH_MODES, minMaxBand, allPointsShown, configWarning, CURVE_FIELD_OF } from "./history-options.js";
 import { getSIFactor, areSICompatible, chooseSIUnit, formatNumber, yAxisSides, unitGroups, unitsLabel } from "./history-units.js";
 import { fillValue } from "./history-default-colors.js";
+import { optionSeriesOf } from "./card-datasets.js";
 import { TICK_LABEL_GAP_PX } from "./card-timerange.js";
 import { chooseYAxis, rangeIndex } from "./card-yscale.js";
 import { msOf, seriesOf } from "./history-series.js";
@@ -142,9 +143,10 @@ export class CardCharts
                 // (a timeline's or arrowline's rows moved down when they fill the graph: rowsTopRoom)
                 ...( graphtype == 'timeline' || graphtype == 'arrowline' ? { layout: { padding: { top: this.rowsTopPadding(datasets.length) } } } : {} ),
                 legend: {
-                    display: ( graphtype == 'line' || graphtype == 'bar' ) && this.pconfig.hideLegend != true &&
-                             // (legendVisible: auto — only for several labels in it)
-                             ( !this.pconfig.legendAuto || datasets.filter(d => !d.legendHidden).length > 1 ),
+                    // (its labels — legendVisible, each curve's: false, none; auto, the graph's or the
+                    // card's: only for several labels in it)
+                    display: ( graphtype == 'line' || graphtype == 'bar' ) &&
+                             datasets.filter(d => !d.legendHidden).length > ( this.graphOption(config?.groupId ?? null, 'legendVisible') === 'auto' ? 1 : 0 ),
                     labels: {
                         fontColor: this.pconfig.graphLabelColor,
                         usePointStyle: ( graphtype == 'line' || graphtype == 'bar' ),
@@ -849,13 +851,16 @@ export class CardCharts
     // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
     // [0, period); a column of values: their min / mean / max — see _lineSamples), a
     // timeline's state (named as Home Assistant names it: tooltip.stateTextMode auto), an
-    // arrowline's value in its unit
+    // arrowline's value in its unit — and its arrows' length's, when a series gives it
     _tooltipValue(graphtype, ds, item)
     {
         const _unit = ' ' + ( ds.unit || '' );
         if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
             const _state = ds.data[item.index][2];
-            if( graphtype == 'arrowline' ) return formatNumber(_state, ds.rounding) + _unit;
+            // (an arrowline's arrows' length from a series: its value there, signed, in its unit)
+            const _len = ds.arrowLength?.unit !== undefined ? ds.data[item.index][3] : undefined;
+            if( graphtype == 'arrowline' ) return formatNumber(_state, ds.rounding) + _unit
+                + ( _len !== undefined ? ' · ' + formatNumber(_len, ds.rounding) + ( ds.arrowLength.unit ? ' ' + ds.arrowLength.unit : '' ) : '' );
             return this._stateText(_state, ds, this.pconfig.tooltipStateTextMode);
         }
         const _siFactor = ds.siConversionFactor ?? 1;
@@ -1023,7 +1028,9 @@ export class CardCharts
                 "bColor": this.entityColor(d),
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar is filled with its own color)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d)) : d.fill,
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d))
+                    // (read indirectly: its fill now — its steps, when it varies, see _applyPointColors)
+                    : typeof d.fill === 'object' || optionSeriesOf(d, 'fill') ? this.fillAsColor(this.entityFill(d)) : d.fill,
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
                 "mode": this.lineModeOf(d),
@@ -1055,8 +1062,8 @@ export class CardCharts
                 "showLine": this.resolveOption(d, 'showLine'),
                 // (show_graph: false — not drawn)
                 "notDrawn": !this.resolveOption(d, 'showGraph'),
-                // (show_legend: false on the entity — no label in the legend; nor when not drawn)
-                "legendHidden": ( d.legendVisible ?? this.getEntityOptions(d.entity)?.legendVisible ) === false || !this.resolveOption(d, 'showGraph'),
+                // (legendVisible: false — no label in the legend; nor when not drawn)
+                "legendHidden": !this.resolveOption(d, 'legendVisible') || !this.resolveOption(d, 'showGraph'),
                 // (its value now after its name in the legend: see showsCurrentValue)
                 "showCurrentValue": this.showsCurrentValue(d),
                 "domain": this.getDomainForEntity(d.entity),

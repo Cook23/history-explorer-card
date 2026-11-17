@@ -60,8 +60,9 @@ function normalizeEntityOptions(eo)
 }
 
 // A YAML entity's options (CardConfig._makeStaticEntityEntry) that are the graph's
-// (GRAPH_STORED_KEYS): its header aside, the graph's only, and lineWidth, kept as width
-const _ENTITY_GRAPH_KEYS = GRAPH_STORED_KEYS.filter(k => !GRAPH_HEADER_KEYS.includes(k) && k !== 'lineWidth');
+// (GRAPH_STORED_KEYS): its header aside, the graph's only, and lineWidth, kept as width;
+// lineColor, a color by place in a graph, the graph's and the card's only
+const _ENTITY_GRAPH_KEYS = GRAPH_STORED_KEYS.filter(k => !GRAPH_HEADER_KEYS.includes(k) && k !== 'lineWidth' && k !== 'lineColor');
 
 export class CardConfig
 {
@@ -85,9 +86,6 @@ export class CardConfig
 
         P.labelAreaWidth =         c.labelAreaWidth ?? D.labelAreaWidth;
         P.labelsVisible =          c.labelsVisible ?? D.labelsVisible;
-        P.hideLegend =           ( c.legendVisible == false ) ? true : undefined;
-        // (auto: a graph's legend only when it has several labels — see card-charts.js newGraph)
-        P.legendAuto =             c.legendVisible === 'auto';
         P.cursorMode =             c.cursor?.mode ?? d('cursorMode', D.cursor.mode);
         P.cursorTypes =            c.cursor?.types ?? d('cursorTypes', D.cursor.types);
         P.showTooltipColors[0] =   c.tooltip?.showColorsLine ?? D.tooltip.showColorsLine;
@@ -399,13 +397,9 @@ export class CardConfig
     // bar) — then `graphs` (undefined when there's none)
     yamlGraphs(config)
     {
-        // (the card's line_color: every graph's, unless it sets its own)
-        const _lc = config?.lineColor ?? config?.line_color;
-        const _withColors = gs => _lc === undefined || !Array.isArray(gs) ? gs
-            : gs.map(g => g && typeof g === 'object' && g.lineColor === undefined && g.line_color === undefined && g.options?.lineColor === undefined && g.options?.line_color === undefined ? { ...g, lineColor: _lc } : g);
-        if( !Array.isArray(config?.entities) || !config.entities.length ) return _withColors(config?.graphs);
+        if( !Array.isArray(config?.entities) || !config.entities.length ) return config?.graphs;
         const _own = { type: config.show_graph === 'bar' ? 'bar' : 'line', title: config.name, entities: config.entities };
-        return _withColors([_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )]);
+        return [_own, ...( Array.isArray(config.graphs) ? config.graphs : [] )];
     }
 
     // Builds the static graph/entity list from the YAML `graphs:` option. Defensive at every
@@ -444,15 +438,12 @@ export class CardConfig
             // way: the same sensor's max, min and mean, each its aggregate_func; in the YAML
             // only, the card's own gestures never put a curve twice in a graph) —: a second
             // curve of it (its copy number — see keyOf)
-            // (mini-graph-card's line_color: the graph's, else the card's — see yamlGraphs —, a
-            // color or a list of them: each entity without its own color takes the one at its
-            // place in the graph)
-            const _lineColor = _opts.lineColor;
+            // (each entity's place in the graph: its color by lineColor, see card-graphs.js
+            // _applyEntityDefaults)
             let _place = 0;
             const _addStatic = (id, ent) => {
-                if( ent.color === undefined && ent.color_thresholds === undefined && _lineColor?.[_place] !== undefined ) ent = { ...ent, color: _lineColor[_place] };
-                _place++;
                 const _entry = this._makeStaticEntityEntry(id, _groupId, ent, _interval);
+                _entry.linePlace = _place++;
                 const _copy = this.store.newCopy(id);
                 if( _copy ) _entry.copy = _copy;
                 this.store.add(_entry);
@@ -492,13 +483,8 @@ export class CardConfig
                 }
             }
             // Store graph-level properties indexed by groupId — consumed at rebuild, never persisted.
-            // fill/showMinMax/dashMode/lineMode/width/showPoints/netBars act as
-            // per-entity defaults here (see addGraph's entityOptions merge) — same role as
-            // entityOptions matched by entity_id/device_class/domain, but scoped to entities
-            // sharing this graph instead. Deliberately excluded: color/name/scale/
-            // siConversionFactor/unit/process/hidden — each is inherently per-entity, a
-            // shared default for any of them would be meaningless or actively wrong (e.g. a
-            // shared 'hidden' default would hide every entity in the graph by default).
+            // (its options act as defaults for its entities — see _optionsInGraph, the same
+            // role as entityOptions', for the entities of this graph)
             this.pconfig.graphs[_groupId] = {
                 type           : graph.type,
                 title          : graph.title,

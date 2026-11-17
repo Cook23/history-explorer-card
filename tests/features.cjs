@@ -305,6 +305,33 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── Export ▸ YAML: a soft bound written as the YAML writes it, '~' and its value ──
+    t = await openCard(card({ statistics: { enabled: false }, ymin: '~0', graphs: [
+        { type: 'line', ymax: '~700', entities: [{ entity: 'sensor.power' }] },
+        { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power', arrowMax: '~1200' }] }] }), { mock: { series: true } });
+    await t.wait(1500);
+    await t.step('a soft bound (ymin, ymax, arrowMax: ~ and a value) exported as written — the card\'s, a graph\'s, a curve\'s', async () => {
+        const y = await t.E(`el.instance.yamlText({ kind: 'card' }, false)`);
+        return /^ymin: ~0$/m.test(y) && /^    ymax: ~700$/m.test(y) && /^        arrowMax: ~1200$/m.test(y) && !/soft/.test(y) ? true : y;
+    });
+    done(await t.close());
+
+    // ── Home Assistant's card editor: the card in its preview, a box that scrolls as high as
+    // what it holds — room kept under the card for its menus (preview: true) ──
+    for( const preview of [false, true] ) {
+        t = await openCard(card({ statistics: { enabled: false } }), { mock: { series: true }, height: 900 });
+        await t.wait(800);
+        await t.E(`(()=>{ const box=document.createElement('div'); box.style.cssText='overflow:auto;position:relative;width:600px'; el.parentNode.insertBefore(box, el); box.appendChild(el); el.preview=${preview}; })()`);
+        await t.wait(400);
+        await t.page.click('#b7_0'); await t.page.keyboard.type('power'); await t.wait(400);
+        const _id = await t.E(`[...el.querySelectorAll('#es_0 a')].find(a=>a.style.display!=='none' && !a.textContent.endsWith(' ▸')).dataset.entity`);
+        await t.page.click(`#es_0 a[data-entity="${_id}"]`); await t.wait(600);
+        const _open = await t.E(`el.querySelector('#et_0').style.display !== 'none'`);
+        if( preview ) await t.step('in the card editor\'s preview (preview: true): room kept under the card — an entity chosen there, its menu opens, the entity can be added', async () => _open ? true : 'closed');
+        else await t.step('(without that room, in a box no higher than the card, the menu closes at once: what the room is for)', async () => !_open ? true : 'open');
+        done(await t.close());
+    }
+
     // ── interval: raw — a bar graph's Raw in the YAML (the bar entities drawn as curves), exported so ──
     t = await openCard(card({ statistics: { enabled: false }, graphs: [{ type: 'bar', interval: 'raw', entities: [{ entity: 'sensor.energy' }] }] }), { mock: { series: true } });
     await t.wait(1500);

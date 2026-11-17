@@ -131,5 +131,48 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── color and unit on a graph; line_color below the graph's and entityOptions' color ──
+    t = await openCard(card({ lineColor: ['#00ff00'], entityOptions: { 'sensor.tank': { color: '#0000ff' } }, graphs: [
+        { type: 'line', color: '#ff0000', unit: 'kW', entities: [{ entity: 'sensor.power' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power2' }] },
+        { type: 'line', lineColor: ['#ffff00'], color: '#ff0000', entities: [{ entity: 'sensor.rain' }, { entity: 'sensor.tank', color: '#000000' }] } ] }), { mock: { series: true }, height: 1100 });
+    await t.wait(1200);
+    const _cu = () => t.E(`el.instance.graphsInDisplayOrder().map(g=>g.chart.data.datasets.map(d=>d.borderColor+' '+d.unit).join(', ')).join(' | ')`);
+    await t.step('color and unit on a graph: every curve of it; the card\'s line_color below a graph\'s color and entityOptions\', a graph\'s line_color above its color, an entity\'s own color above all', async () => {
+        const v = await _cu();
+        return v === '#ff0000 kW | #0000ff L | #00ff00 W | #ffff00 mm, #000000 L' ? true : v;
+    });
+    done(await t.close());
+
+    // ── line_color for the curves added from the card too, by their place ──
+    t = await openCard(card({ lineColor: ['#123456', '#654321'], combineSameUnits: true }), { mock: { series: true }, height: 900 });
+    await t.wait(800);
+    await t.E(`el.instance.addGraph('sensor.power', {})`); await t.wait(300);
+    await t.E(`el.instance.addGraph('sensor.power2', {})`); await t.wait(800);
+    await t.step('line_color: the curves added from the card take the color at their place in their graph', async () => {
+        const v = await t.E(`el.instance.graphs.map(g=>g.entities.map(e=>e.color).join(',')).join(' | ')`);
+        return v === '#123456,#654321' ? true : v;
+    });
+    done(await t.close());
+
+    // ── fill read indirectly, as color: thresholds on the value, on another entity's ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power', fill: { 0: false, 500: 'fade', 590: '#ff000080' } }] },
+        { type: 'line', entities: [{ entity: 'sensor.power', fill: { entity: 'sensor.clim_mode', hot: 'fade', cold: true, default: false } }] } ] }), { mock: { series: true }, height: 900 });
+    await t.wait(1200);
+    // (each graph's fills along the time, each change once: none, fade, a color)
+    const _fills = gi => t.E(`(()=>{ const d=graphAt(${gi}).chart.data.datasets[0], out=[];
+        for( const s of d.colorSteps ?? [] ) { const f=typeof s.backgroundColor==='object' ? 'fade' : s.backgroundColor; if( out[out.length-1]!==f ) out.push(f); } return out; })()`);
+    await t.step('fill thresholds on the value: none below 500, fading out from 500, a color from 590 — along the time, as each point\'s value', async () => {
+        const f = await _fills(0);
+        return f.includes('rgba(0,0,0,0)') && f.includes('fade') && f.includes('#ff000080') ? true : JSON.stringify(f);
+    });
+    await t.step('fill thresholds on another entity\'s state: its fill there (hot: fading out, cold: its color light, else none)', async () => {
+        const f = await _fills(1);
+        return f.length >= 2 && f.includes('fade') ? true : JSON.stringify(f);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };
