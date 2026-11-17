@@ -23,9 +23,13 @@ Changelog for the HA History Explorer Card.
 - An arrowline's arrows drawn as a path instead of an image (drawn at once, scaled to their length)
 
 ### Docs
-- The READMEs in one plan, README.md's, README_Full.md following it: Overview, Install, Quick configuration, Usage, Detailed configuration, Options; the version highlights summed up; the YAML export as a help in Home Assistant's card editor
+- The READMEs in one plan, README.md's, README_Full.md following it: Overview, Install, Quick configuration, Usage, Detailed configuration, Options — the sections in order of use; the version highlights summed up; the YAML export as a help in Home Assistant's card editor
 - Install from Home Assistant's Marketplace (HACS before Home Assistant 2026.11), step by step; reload the page, add the card; the sidebar panel step by step
-- The READMEs made homogeneous: each section opening on what it's about, the screenshots README_Full has taken up in README.md, the YAML export described once, written without "you", Home Assistant's menu paths with `›`, *Manual install* step by step as the Marketplace's, *Multiple cards*: what the name keys; each screenshot shown at its size on the screen (its width set: GitHub stretched it to the column); the options' tables in two columns — the option, its other names under it; what it does, its value aliases, the levels it isn't set at (README.md) and its type (README_Full.md) — the description no longer squeezed; each option's name in bold, its default first in its description; README.md's notes numbered from *1 again (*1 gone with the aliases' column)
+- The READMEs made homogeneous: one writing style, in the present; lists as **Label** — text; long paragraphs and dense passages split into lists and tables (an attribute's units: a table); each screenshot at its size on the screen; Home Assistant's menu paths with `›`
+- The options' tables complete — every option of the card, a graph and an entity —, by theme, in order of use, the same rows in both READMEs: each option in bold, its aliases in italics under it; its default, then what it does — short in README.md, detailed with a link to its section in README_Full.md; each table's notes under it (README.md)
+- README_Full.md's Options: `entityOptions` and the four levels before the tables; *Scaling values* and *Custom data processing functions* in Detailed configuration
+- `full-reference-config.yaml`: `uimode` and `sizePoints`; `uiLayout.selector`'s default `top` and `gestures.readingTimePerWord`'s `400`, as the card's; the statistics' periods and the interpolations completed
+- The info panel's link to the curve menu named as the card shows it, *Curve ▾*; link titles brought up to date
 
 ### Internal
 - One function for an option read directly or indirectly (`color`, `fill`, `arrowLength`: `INDIRECT_OPTIONS`, `optionSeriesOf`, `_optionFunction`); the series they read loaded with the entities' history

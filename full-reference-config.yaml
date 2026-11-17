@@ -5,8 +5,11 @@
 type: custom:history-explorer-card
 cardName: 'default'
 
-# Header of the card
+# Header of the card: not set, 'History explorer' and the card's version; ' ', none, its room kept; hide, none at all
 header: 'History explorer'
+
+# dark or light: the card's colors forced, whatever Home Assistant's theme; not set, the theme's
+uimode: null
 
 # List of pre-configured (or locked) graphs
 graphs:
@@ -112,6 +115,9 @@ graphs:
       # width + 2 px wide (a number: their radius in px); hover: only the hovered one; false: none at all.
       # A long-press near the curve shows or hides them
       showPoints: hover
+
+      # The dots' diameter, in px; not set, the line width + 2
+      sizePoints: null
 
       # (bar graph only) If true, this entity is treated as net-metering — its value can go down as
       # well as up, rather than a decrease being interpreted as the state having been reset
@@ -419,6 +425,7 @@ lineMode: null
 #   steffen    — monotone too, flat only at the real peaks and troughs, weighted by the spacing of the values
 #   makima     — modified Akima: follows the local trend, flat over flat stretches, hardly any overshoot
 #   catmullrom — the smoothest, may overshoot a little around sharp changes
+#   bspline    — mini-graph-card's smoothing: a B-spline, softer, not through every value
 # Also settable in $.entityOptions, on a graph, on an entity, and from the type menu (Interpolation)
 interpolation: "monotone"
 
@@ -578,7 +585,7 @@ gestures:
   precisionTouch: 12
   # How long a word of a tooltip or a message is given to be read (ms): it stays up 0.5 s, plus this per
   # word (100 to 1000)
-  readingTimePerWord: 300
+  readingTimePerWord: 400
 
 # Whether the info panel (see $.infoPanel below) is enabled by default, replacing HA's native more-info
 # history for every entity — a super-global setting shared by every History Explorer card on the page/HA
@@ -653,7 +660,7 @@ statistics:
   # The statistics of the whole window are loaded first; finer data only where it shows more: the 5-minute
   # statistics for a column of pixels shorter than the period, the history for one shorter than 5 minutes
   # (and always for the last minutes, after the 5-minute statistics). mode and retention: accepted, without effect
-  # Reporting period that statistics are averaged over. Can be hour, day, or month
+  # Reporting period that statistics are averaged over. Can be 5minute, hour, day, week or month
   period: 'hour'
   # If set to true, graph will use long term statistics only (5-minute ones included), forgoing normal
   # history data (except the last minutes, and entities without statistics)
@@ -684,7 +691,7 @@ uiLayout:
   # Location of the toolbar, including date and interval selector. Options are: top, bottom, both, or hide
   toolbar: 'top'
   # Location of the entity selector. Options are: top, bottom, both, or hide
-  selector: 'bottom'
+  selector: 'top'
   # Where the toolbars should stick, when scrolling. By default they do not stick to screen. But here they can be made to stick to the top, bottom, or both sides of the screen when scrolling.
   sticky: 'hide'
   # Whether to switch the magnifiers + and - around on the interval selector
