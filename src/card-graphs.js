@@ -562,8 +562,8 @@ export class CardGraphs
         // Only keys the graph actually sets: a plain spread would let every graph-level key
         // left unset in YAML (stored as undefined) wipe the matching entityOptions value.
         const _definedGraphProps = Object.fromEntries(Object.entries(graphProps).filter(([, v]) => v !== undefined));
-        // (the card's for every entity — its color, fill and unit, as mini-graph-card sets them —
-        // and every graph — those of its scope —, under their defaults)
+        // (the card's for every entity — CARD_ENTITY_KEYS — and every graph — those of its
+        // scope —, under their defaults)
         const _card = Object.fromEntries([...CARD_ENTITY_KEYS, ...GRAPH_SCOPE_KEYS].map(k => [k, this.pconfig.cardOptions[k]]).filter(([, v]) => v !== undefined));
         return { graphProps, options: { ...GRAPH_DEFAULTS, ..._card, ...this.getEntityOptions(entity_id), ..._definedGraphProps, groupId } };
     }
@@ -610,6 +610,17 @@ export class CardGraphs
     _applyEntityDefaults(e, type, entityOptions, { color, fill, hidden })
     {
         const _ownFill = e.fill;
+        // (lineColor — a color by place in a graph, its place: the YAML's, else where it's added —:
+        // its graph's above its graph's color, the card's above the card's color, below
+        // entityOptions' — each level's the more precise of its own, below the levels above it)
+        const _gid = entityOptions?.groupId ?? null;
+        e.linePlace ??= this.graphs.find(g => g.groupId === _gid)?.entities.length ?? 0;
+        if( color == null ) {
+            const _g = this.pconfig.graphs[_gid];
+            const _lc = _g?.lineColor?.[e.linePlace]
+                     ?? ( _g?.color === undefined && this.getEntityOptions(e.entity)?.color === undefined ? this.pconfig.cardOptions.lineColor?.[e.linePlace] : undefined );
+            if( _lc !== undefined ) { color = _lc; e.colorSet = true; }
+        }
 
         e.color = e.color ?? "#000000";
         e.fill = e.fill ?? "#00000000";

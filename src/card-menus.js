@@ -14,6 +14,7 @@ import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs } from "./history-series.js";
 import { maxOf } from "./history-arrays.js";
+import { optionSeriesOf } from "./card-datasets.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the curve menu (et_N_<index>), in the order it shows them: a line in
@@ -1020,6 +1021,8 @@ export class CardMenus
     {
         if( key === 'fill' ) {
             if( e.fill === 'fade' ) return 'fade';
+            // (a fill read indirectly — thresholds, a series —: none of the list's)
+            if( typeof e.fill === 'object' && e.fill !== null || optionSeriesOf(e, 'fill') ) return undefined;
             const _c = Chart.helpers.color(e.fill ?? 'rgba(0,0,0,0)');
             return !( _c.valid && _c.alpha() === 0 );
         }

@@ -49,5 +49,63 @@ module.exports = async function()
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }
+    // ── The arrows' length (arrowLength, arrowMax) ──
+    {
+        const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 50 }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power' }] },
+            { type: 'arrowline', arrowMax: 1200, entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power' }] },
+            { type: 'arrowline', arrowMax: '~2400', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.nothing_here' }] },
+            { type: 'arrowline', arrowLength: 0, entities: [{ entity: 'sensor.wind' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', color: { entity: 'sensor.power', 0: '#0000ff', 400: '#ff0000' },
+                                              fill: { entity: 'sensor.power', 0: false, 400: 'rgba(255,0,0,0.25)' } }] },
+        ] }, { mock: { series: true }, height: 1600 });
+        await t.wait(1500);
+        // (how graph gi's arrows are drawn: their scales — each arrow's length, 1 its whole
+        // length —, the dashed ones, the points)
+        const drawn = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, r={ k: [], dashed: 0, points: 0 };
+            const o={ scale: ctx.scale, setLineDash: ctx.setLineDash, arc: ctx.arc };
+            ctx.scale=function(a,b){ r.k.push(Math.round(a*100)/100); return o.scale.call(this,a,b); };
+            ctx.setLineDash=function(d){ if(d.length) r.dashed++; return o.setLineDash.call(this,d); };
+            ctx.arc=function(...a){ r.points++; return o.arc.apply(this,a); };
+            c.render(0); Object.assign(ctx, o); delete ctx.scale; delete ctx.setLineDash; delete ctx.arc; return r; })()`);
+        await t.step('arrowLength unset: every arrow its whole length', async () => {
+            const r = await drawn(0);
+            return r.k.length > 5 && r.k.every(k => k === 1) && !r.dashed && !r.points ? true : JSON.stringify(r);
+        });
+        await t.step('arrowLength: 50 — every arrow half its whole length; 0 (on the graph): a point each', async () => {
+            const a = await drawn(1), b = await drawn(6);
+            return a.k.length > 5 && a.k.every(k => k === 0.5) && b.points > 5 && !b.k.length ? true : JSON.stringify({ a, b });
+        });
+        await t.step('arrowLength: an entity — each arrow its value over the scale chosen automatically (its largest value around the window: the whole length)', async () => {
+            const r = await drawn(2), m = await t.E(`graphAt(2).chart.data.datasets[0].arrowLength`);
+            return r.k.length > 5 && Math.max(...r.k) > 0.9 && Math.min(...r.k) < 0.5 && r.k.every(k => k > 0 && k <= 1) && m.max >= 590 && m.max <= 700 && m.unit === 'W' ? true : JSON.stringify({ r, m });
+        });
+        await t.step('arrowMax: 1200 — the whole length at 1200, no automatic scale; ~2400: at least 2400', async () => {
+            const a = await drawn(3), m3 = await t.E(`graphAt(3).chart.data.datasets[0].arrowLength.max`), m4 = await t.E(`graphAt(4).chart.data.datasets[0].arrowLength.max`);
+            return m3 === 1200 && m4 >= 2400 && a.k.every(k => k <= 0.51) ? true : JSON.stringify({ a, m3, m4 });
+        });
+        await t.step('a negative value: drawn by its absolute value, signed in the tooltip', async () => {
+            await t.E(`(()=>{ for( const b of graphAt(3).chart.data.datasets[0].data ) b[3] = -600; })()`);
+            const a = await drawn(3), tip = await t.E(`el.instance._tooltipValue('arrowline', graphAt(3).chart.data.datasets[0], { index: 5 })`);
+            return a.k.length > 5 && a.k.every(k => k === 0.5) && / · -600 W$/.test(tip) ? true : JSON.stringify({ a, tip });
+        });
+        await t.step('color and fill read indirectly: each arrow the color of the time it shows, the band under it its own fill', async () => {
+            const r = await t.E(`(()=>{ const ds=graphAt(7).chart.data.datasets[0]; return { c: [...new Set(ds.arrowColors ?? [])], f: [...new Set(ds.arrowBackgrounds ?? [])] }; })()`);
+            return r.c.length === 2 && r.c.includes('#ff0000') && r.c.includes('#0000ff') && r.f.length >= 2 ? true : JSON.stringify(r);
+        });
+        await t.step('arrowLength from an entity without a value there: each arrow its whole length, dashed', async () => {
+            const r = await drawn(5);
+            return r.dashed > 5 && r.k.every(k => k === 1) ? true : JSON.stringify(r);
+        });
+        await t.step('the tooltip: the direction, then the length\'s value, signed, in its unit', async () => {
+            const tip = await t.E(`(()=>{ const ds=graphAt(2).chart.data.datasets[0]; return el.instance._tooltipValue('arrowline', ds, { index: 5 }) + ' | ' + ds.data[5][3]; })()`);
+            const [text, v] = tip.split(' | ');
+            return new RegExp('^-?[\\d.]+ ° · ' + v.replace('.', '\\.') + ' W$').test(text) ? true : tip;
+        });
+        const r = await t.close(); passed += r.passed; failed += r.failed;
+    }
     return { passed, failed };
 };

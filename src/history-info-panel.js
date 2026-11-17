@@ -174,7 +174,7 @@ function hxHookInfoPanel()
         // and what the panel decides whatever its configuration says
         instance.applyConfig(config, {
             defaults: { cursorMode: 'hide', cursorTypes: ['all'], tooltipShowDuration: true, lineMode: 'lines', lineWidth: 1.001 },
-            fixed: { labelsVisible: false, hideLegend: true, showCurrentValues: false, recordedEntitiesOnly: false,
+            fixed: { labelsVisible: false, legendVisible: false, showCurrentValues: false, recordedEntitiesOnly: false,
                      filterEntities: null, excludeFilterEntities: null, combineSameUnits: false, timelineBarSpacing: 40,
                      // (no refresh.interval: the panel only lives while its dialog is open)
                      refreshInterval: undefined },

@@ -12,17 +12,16 @@
 //               curve alone, none —, each with its own; no entityOptions: each curve says
 //               what they give it
 
-import { OPTION_DEFAULTS, ENTITY_OPTION_KEYS, CARD_ENTITY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
-         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue } from "./history-options.js";
+import { OPTION_DEFAULTS, ENTITY_ONLY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
+         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { seriesOf } from "./history-series.js";
 import { defaultColors, fillValue, NO_FILL } from "./history-default-colors.js";
 import { toYaml } from "./history-yaml.js";
 
 const _LOCAL = new Set(LOCAL_ONLY_FIELDS);
-// The options only an entity sets — never the card for every curve (ENTITY_OPTION_KEYS but
-// those of CARD_ENTITY_KEYS)
-const _ENTITY_ONLY = new Set(ENTITY_OPTION_KEYS.filter(k => !CARD_ENTITY_KEYS.includes(k)));
+// The options only an entity sets (ENTITY_ONLY_KEYS)
+const _ENTITY_ONLY = new Set(ENTITY_ONLY_KEYS);
 // A graph's options (its type and title aside), its bar interval last
 const GRAPH_KEYS = [...GRAPH_STORED_KEYS.filter(k => !_LOCAL.has(k)), 'interval'];
 // The card's keys that aren't options of the card: written apart (type, look, entityOptions,
@@ -45,6 +44,8 @@ function _diff(v, base)
 }
 // (a bar interval's YAML name)
 const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? undefined;
+// (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its '~')
+const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v) : v;
 
 export class CardYaml
 {
@@ -82,7 +83,7 @@ export class CardYaml
             if( CARD_APART.has(k) || _ownGraph.includes(k) ) continue;
             const _base = x.full ? OPTION_DEFAULTS[k] : _plain(x.look[k]) ? { ...OPTION_DEFAULTS[k], ...x.look[k] } : x.look[k] ?? OPTION_DEFAULTS[k];
             const v = x.full && k in x.look ? _src[k] : _diff(_src[k], _base);
-            if( v !== undefined ) o[k] = v;
+            if( v !== undefined ) o[k] = _yamlValue(k, v);
         }
         if( !x.full && x.raw.entityOptions !== undefined ) o.entityOptions = x.raw.entityOptions;
         o.graphs = this._graphsYaml(x, this.graphsInDisplayOrder());
@@ -122,7 +123,7 @@ export class CardYaml
             const _title = this.pconfig.graphs[g.groupId]?.title;
             if( _title !== undefined ) o.title = _title;
             for( const k of GRAPH_KEYS.filter(k => _keys ? _keys.has(k) : _written(g).includes(k)) ) {
-                const v = k === 'interval' ? _intervalName(this._graphValue(x, g, k)) : this._graphValue(x, g, k);
+                const v = _yamlValue(k, this._graphValue(x, g, k));
                 if( v !== undefined ) o[k] = v;
             }
             o.entities = this._curvesYaml(x, g, g.entities);
@@ -198,7 +199,7 @@ export class CardYaml
             if( attribute ) o.attribute = attribute;
             for( const k of this._curveKeys(x, e).filter(k => _keys ? _keys.has(k) : _written(g, e).includes(k)) ) {
                 const v = _keys ? _shown(e, k) : this._curveOwn(x, e, k);
-                const _v = k === 'interval' ? _intervalName(v) : v;
+                const _v = _yamlValue(k, v);
                 if( _v !== undefined ) o[k] = _v;
             }
             return o;

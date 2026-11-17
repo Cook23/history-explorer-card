@@ -689,7 +689,7 @@ All drag operations show a ghost element and horizontal insertion marker for pre
 
 ### Legend / entity labels
 
-You can hide an entity in a graph by clicking its label on the top — its name, struck through then, not its value. Click it a second time to make the entity visible again. A click on its value — `(400 W)` at the end of its label — or on its value shown over the graph (`showState`) opens Home Assistant's dialog of the entity, with the [info panel](#info-panel--replacing-the-ha-more-info-popup) in it when it's on; so does *Info* in its menu. An entity can be hidden by default using the `hidden` property in your entityOptions or in the manual YAML (see the advanced example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)). A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
+You can hide an entity in a graph by clicking its label on the top — its name, struck through then, not its value. Click it a second time to make the entity visible again. A click on its value — `(400 W)` at the end of its label — or on its value shown over the graph (`showState`) opens Home Assistant's dialog of the entity, with the [info panel](#info-panel--replacing-the-ha-more-info-popup) in it when it's on; so does *Info* in its menu. An entity can be hidden by default using the `hidden` property — on the entity, its graph, in `entityOptions` or on the card — (see the advanced example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)). A curve hidden (or shown again) from its label is kept on this device only, as the card's persistence options say — never synced across devices, as its points shown (`showPoints`).
 
 A text shortened or hidden — a legend's label shortened, a timeline's row name cut, a timeline's state too long for its bar — is shown in full where it is while hovered; a click or a tap on a row name or on a legend label shows it too, for a while.
 
@@ -1151,6 +1151,24 @@ Entities representing a directional angle value, like a bearing or direction, ca
 
 Compass arrow graphs use the `arrowline` type and can be used in both dynamically and statically added entities. See [Entity options](#entity-options) for an example of the former and the advanced example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs) for the latter.
 
+**The arrows' length** — `arrowLength`, on the card, in `entityOptions`, on a graph or on an entity:
+- not set: every arrow its whole length;
+- a number from 0 to 100: every arrow that part of its whole length, in % (0: a point); out of 0 to 100, it's kept within, with a warning in the browser's console;
+- an entity, or one of its attributes (`weather.home.wind_speed`): each arrow its value at that time — the wind's speed with its direction. Its scale is chosen as the [automatic Y axis](#the-automatic-scale) chooses its top, with `yScaleSteadiness` at 50: the largest value in the window and around it gives the whole length, 0 a point; a negative value is drawn by its absolute value. Where the entity has no value, the arrow is drawn its whole length, its shaft dashed. The tooltip shows the value, signed, in its unit, after the direction.
+
+`arrowMax` sets the value giving the whole length, as `ymax` sets a Y axis' top: a number — fixed, no automatic scale, a larger value drawn its whole length —, or `~` and a number — soft: the whole length at least that value, more where the values go past it. The bottom is always 0.
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: arrowline
+    title: Wind
+    arrowMax: ~50                          # the whole length: 50 km/h at least
+    entities:
+      - entity: sensor.wind_bearing
+        arrowLength: sensor.wind_speed     # each arrow as long as the wind is fast
+```
+
 ### Line appearance
 
 #### Line modes
@@ -1420,7 +1438,7 @@ template:
 
 ![Bars colored by thresholds on their value](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/bars-colors.png)
 
-- The color is evaluated at each point (each bar): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
+- The color is evaluated at each point (each bar, each arrow of an arrowline — its fill, the band under it): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
 - The legend shows the color now — as the value shown in the label is the value now.
 - When no valid color applies (a value thresholds don't cover and no `default`, the entity holding the color unavailable, its state not a color, or no history of it — an entity holding text has no long-term statistics), the curve takes a color of the automatic palette.
 - Two curves of one graph whose `color` you set to the same value both keep it; only a color the card chose itself is changed to tell a curve from the others.
@@ -1437,7 +1455,18 @@ graphs:
         color: { '0': blue, '20': green, '30': red }
 ```
 
-**A color for each entity of a graph.** `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's.
+**A color for each entity of a graph.** `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's. A graph's `lineColor` comes above its `color`; the card's, as every option of the card, below a graph's `color` and `entityOptions`', above the card's `color`.
+
+**The fill** (`fill`) takes the same forms as `color`, its values being a fill's — `true` (the curve's color, light), `false` (none), `fade` (the curve's color fading out downwards) or a color: thresholds on the value shown, thresholds on the value of another entity or attribute, or an entity holding a fill. It's evaluated at each point, as the color.
+
+```yaml
+      - entity: sensor.heat_pump_power
+        fill:
+          entity: climate.salon            # its fill from the thermostat's action
+          attribute: hvac_action
+          heating: fade
+          default: false
+```
 
 ### Long term statistics
 
@@ -1875,7 +1904,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `colorTransition` | string | `color_thresholds_transition` | | `smooth`: thresholds blended from one to the next; `hard` (default): each value its threshold's color — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | `lineColor` | string or list | `line_color` | | On a graph or the card: a color, or a list of colors — each entity without its own color takes the one at its place in the graph |
 | `color` | string, list or object | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` — a stop without a value spaced between its neighbours | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors-of-curves-and-bars) |
-| `fill` | string or boolean | `show_fill` | `true`: the curve's color, light; `false`: none | Fill color under the line, or `fade`: the curve's color fading out downwards |
+| `fill` | string, boolean or object | `show_fill` | `true`: the curve's color, light; `false`: none | Fill color under the line, or `fade`: the curve's color fading out downwards — or, as `color`, thresholds giving one, or an entity holding one — see [Colors](#colors-of-curves-and-bars) |
 | `lineWidth` | number | `width`, `line_width` | | Line width in pixels |
 | `lineMode` | string or boolean | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
 | `interpolation` | string | | `akima` = `makima`, `catmull-rom`, `b-spline` | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` — see [Curve interpolation](#curve-interpolation) |
@@ -1897,8 +1926,8 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `unit` | string | | | Unit shown instead of the entity's own (see `scale`) |
 | `valueFactor` | integer | `value_factor` | | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see [Scaling values](#scaling-values-scale-unit-and-valuefactor) |
 | `stateMap` | list | `state_map` | | A text state drawn as a curve: each state (`off`, or `{ value: off, label: Off }`) at its place in the list — 0, 1, 2… —, its label shown in the legend, the tooltip and on the Y axis — see [Text states as a curve](#text-states-as-a-curve) |
-| `hidden` | boolean | | | Hide this entity by default in the legend |
-| `legendVisible` | boolean or `auto` | `show_legend` | | `false` on an entity: no label for it in the legend (on the card: no legend); `auto` on the card: a graph's legend only for several labels |
+| `hidden` | boolean | | | Hidden at first, its label struck through in the legend |
+| `legendVisible` | boolean or `auto` | `show_legend` | | `false`: no label in the legend for its curves (every one: no legend); `auto`, on a graph or the card: a graph's legend only for several labels |
 | `ymin` | number or `~`number | `lower_bound` | | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked); `~0`: soft — the minimum unless the values go below it — see [Bounds](#bounds) |
 | `ymax` | number or `~`number | `upper_bound` | | Set the initial Y axis maximum, the same way |
 | `yminRight`, `ymaxRight` | number or `~`number | `lower_bound_secondary`, `upper_bound_secondary` | | The right Y axis' own bounds (else `ymin` / `ymax`) — see [Two Y axes](#two-y-axes) |
@@ -1914,6 +1943,8 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 | `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
 | `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
 | `netBars` | boolean | | | Enable net metering mode for bar graphs |
+| `arrowLength` | number or string | | | An arrowline's arrows' length: a part of their whole length, 0 to 100 (%), or an entity (or attribute) whose value gives it, its scale automatic — see [Compass arrow graphs](#compass-arrow-graphs) |
+| `arrowMax` | number or `~`number | | | The value of `arrowLength`'s entity giving the whole length (no automatic scale); `~`: at least that value |
 | `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
 | `barSpacing` | number | `bar_spacing` | | The room between two bars, in pixels |
 | `process` | string | | | Javascript expression to transform state values before display |
@@ -1944,7 +1975,7 @@ Each option can be set on the card, in `entityOptions` (keyed by entity id, devi
 
 ##### The same options at every level
 
-Every option above, except `type`, `name`, `hidden`, `legendVisible`, `scale`, `process` and `circular` (an entity's only), `color` and `unit` (an entity's or the card's — the card's: every entity's), and `lineColor` (a graph's or the card's), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**. A curve takes its own options — how it's drawn, its values, its tooltip, its color — from the levels when it's added, and keeps them: moved to another graph, it keeps them, as its color (changed only when another curve there already has it). The graph's options — its Y axes (`yAxis`), its values over it (`showState`, `showStats`, `showStateFor`, `showStatsFor`)… — are the graph's: a curve moved takes those of the graph it lands in. A curve of the YAML follows every change the YAML makes to them later, at whatever level, option by option (see "Last one to speak wins" in [Persistence](#persistence)); a curve added from the card isn't a curve of the YAML: a change of the YAML doesn't reach it.
+Every option above, except `type` and `name` (an entity's only: on the card, `type` is the card's own and `name` mini-graph-card's title; on a graph, `type` is the graph's own and its `title` names it) and `lineColor` (a graph's or the card's: a color by place in a graph), can be set at four levels: on the card (for every graph), in `entityOptions`, on a graph (for its entities) and on an entity. When an option is set at several levels, the most specific one wins: **entity → graph → `entityOptions` → card**. A curve takes its own options — how it's drawn, its values, its tooltip, its color — from the levels when it's added, and keeps them: moved to another graph, it keeps them, as its color (changed only when another curve there already has it). The graph's options — its Y axes (`yAxis`), its values over it (`showState`, `showStats`, `showStateFor`, `showStatsFor`)… — are the graph's: a curve moved takes those of the graph it lands in. A curve of the YAML follows every change the YAML makes to them later, at whatever level, option by option (see "Last one to speak wins" in [Persistence](#persistence)); a curve added from the card isn't a curve of the YAML: a change of the YAML doesn't reach it.
 
 The options of the graph itself — `ymin`, `ymax`, `yminRight`, `ymaxRight`, `yrange`, `yrangeRight`, `yScaleSteadiness`, `yScaleSteadinessRight`, `ystepSize`, `ylock`, `logarithmic`, `labelsLeft`, `labelsRight`, `stacked`, `barSpacing`, `height`, `showTimeLabels`, `showGrid`, `yLabels` — set on an entity or in `entityOptions`, apply to the graph the entity is shown in; the graph's own value wins. `height` on the card sets the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` set their own and win over it.
 

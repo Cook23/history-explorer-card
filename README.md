@@ -31,6 +31,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md).
 
+- **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
 - **v1.2.77** — YAML export of the card, a graph or a curve.
 - **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
 - **v1.2.59** — Time ranges up to 10 years.
@@ -331,13 +332,15 @@ stateColors:           # by entity, device class, domain or state
 entityOptions:
   sensor.wind_bearing:
     type: arrowline
+    arrowLength: sensor.wind_speed   # each arrow as long as the wind is fast (0 to 100: a part of the whole length)
+    arrowMax: ~50                    # the whole length: 50 at least (a number alone: fixed)
 ```
 
 📖 [Compass arrow graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#compass-arrow-graphs)
 
 ### Colors
 
-`color` takes a color, or thresholds on the value — or on another entity's or attribute's:
+`color` — and `fill`, its values `true`, `false`, `fade` or a color — takes a value, or thresholds on the value — or on another entity's or attribute's —, or an entity holding one:
 
 ```yaml
       - entity: sensor.heat_pump_power
@@ -450,9 +453,9 @@ graphs:
 |---|---|---|:-:|:-:|:-:|---|
 | `type` | `graph` | | | | ✓ | `line`, `bar`, `timeline`, `arrowline` |
 | `colorTransition` | `color_thresholds_transition` | | ✓ | ✓ | ✓ | `smooth`: number thresholds blended from one to the next; `hard` (default): each value its threshold's color |
-| `lineColor` | `line_color` | | ✓ | ✓ | | A color, or a list of colors: each entity of a graph without its own takes the one at its place |
-| `color` | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` | ✓ | | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
-| `fill` | `show_fill` | `true`: the curve's color, light; `false`: none | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards |
+| `lineColor` | `line_color` | | ✓ | ✓ | | A color, or a list of colors: each entity of a graph without its own takes the one at its place — a graph's above its `color`, the card's below `entityOptions`' |
+| `color` | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` | ✓ | ✓ | ✓ | Line/bar color: a color, thresholds (on the value, or on another entity's or attribute's), or an entity or attribute holding either |
+| `fill` | `show_fill` | `true`: the curve's color, light; `false`: none | ✓ | ✓ | ✓ | Fill color under the line, or `fade`: the curve's color fading out downwards — or, as `color`, thresholds giving one, or an entity holding one |
 | `showState` | `show_state` | | ✓ | ✓ | ✓ | The curve's value now, in large, over the graph |
 | `showIndicator` | `show_indicator` | | ✓ | ✓ | ✓ | A dot in its color before its value over the graph |
 | `showCurrentValues` | `show_legend_state` | | ✓ | ✓ | ✓ | `false`: its value now left out of its legend label |
@@ -482,18 +485,20 @@ graphs:
 | `aggregateFunc` | `aggregate_func` | | ✓ | ✓ | ✓ | Each group's value: `avg` (default, weighted by time), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
 | `showMinMax` | | | ✓ | ✓ | ✓ | Min/max band around the mean curve: `all` (everywhere; `true`, `both`), `max` / `min` (only its half above / below the curve, everywhere), `statistics` or `history` (only where the curve comes from them), `false` |
 | `netBars` | | | ✓ | ✓ | ✓ | Net metering mode for bar graphs |
+| `arrowLength` | | | ✓ | ✓ | ✓ | An arrowline's arrows' length: 0 to 100 (% of their whole length), or an entity whose value gives it, its scale automatic — see [Compass arrows](#compass-arrows) |
+| `arrowMax` | | | ✓ | ✓ | ✓ | The value giving the arrows their whole length (no automatic scale); `~`: at least that value |
 | `interval` | | | ✓ | ✓ | ✓ | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
 | `rounding` | `decimals` | | ✓ | ✓ | ✓ | The values' decimals — exactly that many; not set: at most 2 |
 | `tapAction` | `tap_action` | an action's name alone: `tapAction: none` | ✓ | ✓ | ✓ | What a click on a value does: `more-info` (default: its dialog, with the info panel when it's on), `navigate`, `url`, `perform-action`, `call-service`, `none` |
-| `scale` | | | | | ✓ | Multiply values by this factor before drawing — see *6 |
+| `scale` | | | ✓ | ✓ | ✓ | Multiply values by this factor before drawing — see *6 |
 | `yAxis` | `y_axis` | `primary` = `left`, `secondary` = `right` | ✓ | ✓ | ✓ | `auto`, `left` or `right`: the Y axis of the curves (`auto`, the default: the second group of units goes on the right, more groups shared by the size of their values; `left` keeps one axis) |
-| `unit` | | | ✓ | | ✓ | Unit shown instead of the entity's own — see *6 |
+| `unit` | | | ✓ | ✓ | ✓ | Unit shown instead of the entity's own — see *6 |
 | `valueFactor` | `value_factor` | | ✓ | ✓ | ✓ | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see *6 |
 | `stateMap` | `state_map` | | ✓ | ✓ | ✓ | A text state drawn as a curve: each state at its place in the list, its label shown — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
-| `hidden` | | | | | ✓ | Hide by default in legend |
-| `legendVisible` | `show_legend` | | ✓ | | ✓ | `false`: no legend (the card); no label in the legend for this entity (an entity); `auto` (the card): a graph's legend only for several labels |
-| `process` | | | | | ✓ | JS expression to transform values before display |
-| `circular` | | | | | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
+| `hidden` | | | ✓ | ✓ | ✓ | Hidden at first (its label struck through in the legend) |
+| `legendVisible` | `show_legend` | | ✓ | ✓ | ✓ | `false`: no label in the legend for its curves (every one: no legend); `auto` (a graph, the card): a graph's legend only for several labels |
+| `process` | | | ✓ | ✓ | ✓ | JS expression to transform values before display |
+| `circular` | | | ✓ | ✓ | ✓ | Angles: no jump at 0/360 — auto-detected, `false`, a period, or `2pi` — see *5 |
 | `ymin` / `ymax` | `lower_bound` / `upper_bound` | | ✓ | ✓ | ✓ | Set initial Y axis bounds (can still be modified interactively); `~0`: soft — the bound unless the values go past it — see *7 |
 | `yminRight` / `ymaxRight` | `lower_bound_secondary` / `upper_bound_secondary` | | ✓ | ✓ | ✓ | The right Y axis' own bounds — see *7 |
 | `yrange` / `yrangeRight` | `min_bound_range` / `min_bound_range_secondary` | | ✓ | ✓ | ✓ | The smallest range the Y axis (the right one) shows — see *7 |

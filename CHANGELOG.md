@@ -4,6 +4,33 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.82] - 2026-11-17
+
+### Added
+- An arrowline's arrows' length, `arrowLength`: a part of their whole length (0 to 100 %; out of it, kept within with a warning), or an entity or attribute whose value gives it — the wind's speed with its direction —, its scale chosen as the automatic Y axis chooses its top (steadiness 50 %), 0 a point, a negative value by its absolute value, no value there: the whole length, its shaft dashed; the tooltip shows the value, signed, in its unit. `arrowMax`, as `ymax`: the value giving the whole length (no automatic scale), `~`: at least that value
+- `fill` read indirectly, as `color`: thresholds on the value or on another entity's or attribute's, or an entity holding a fill — its values `true`, `false`, `fade` or a color —, evaluated at each point
+
+### Fixed
+- Home Assistant's card editor, a card with a short YAML and no graph yet ([#301](https://github.com/Cook23/history-explorer-card/issues/301)): an entity chosen in the selector wasn't added — the editor's preview, a box that scrolls, is no higher than the card there: the entity's menu, opening under the field out of it, closed at once, the entity selector's list cut. The card keeps room under itself in the editor's preview (`preview`: Home Assistant's), always, as high as the selector's lists open (`SELECTOR_LIST_MAX_HEIGHT`)
+- *Export ▸ YAML*: a soft bound (`ymin`, `ymax`, `yminRight`, `ymaxRight`, `arrowMax`) was written in its internal form (`soft: 700`); now as the YAML writes it, `~700`
+- An arrowline's `color` read indirectly (thresholds, another entity's value, an entity holding it) was evaluated once, for its value now, every arrow drawn in it: each arrow now takes the color of the time it shows, as a curve's point and a bar do; its `fill` too, the band under each arrow its own
+
+### Changed
+- Every option of an entity set at the four levels — the card, `entityOptions`, a graph, the entity —, by the one chain: `color`, `unit`, `hidden`, `scale`, `process`, `circular`, `legendVisible`, `fixedValue` on a graph too, and on the card for those it didn't take; but `type` and `name` (an entity's only: on the card the card's type and mini-graph-card's title, on a graph the graph's own type and its `title`). `legendVisible` the same at every level: `false`, no label for its curves; `auto`, on a graph or the card, a graph's legend only for several labels (before: on the card, no legend at all, whatever an entity said)
+- `lineColor`: a color by place in a graph for the entities added from the card too (before: the YAML's only); a graph's above its `color`, the card's below a graph's `color` and `entityOptions`' (above before), above the card's `color`
+- Internal: the levels an option takes derived from one list of exceptions (`ENTITY_ONLY_KEYS`); `lineColor` resolved with the other options when a curve is added (`_applyEntityDefaults`) — no longer written onto the YAML's entities while its graphs are read; the card's legend read as every option (`hideLegend`, `legendAuto` gone)
+- An arrowline's arrows drawn as a path instead of an image (drawn at once, scaled to their length)
+
+### Docs
+- The READMEs in one plan, README.md's, README_Full.md following it: Overview, Install, Quick configuration, Usage, Detailed configuration, Options; the version highlights summed up; the YAML export as a help in Home Assistant's card editor
+- Install from Home Assistant's Marketplace (HACS before Home Assistant 2026.11), step by step; reload the page, add the card
+
+### Internal
+- One function for an option read directly or indirectly (`color`, `fill`, `arrowLength`: `INDIRECT_OPTIONS`, `optionSeriesOf`, `_optionFunction`); the series they read loaded with the entities' history
+- Tests (`features`): the card in the editor's preview, its menu opening; a soft bound exported with its `~`
+- Tests (`options`, `colors`, `arrowline`): `arrowLength` and `arrowMax` (parsing, lengths, scale, dashed, points, negative values, tooltip), `fill` read indirectly, `color` and `unit` on a graph, `lineColor`'s place among the levels
+
+
 ## [v1.2.81] - 2026-11-17
 
 ### Fixed — adding an entity in Home Assistant's card editor ([#301](https://github.com/Cook23/history-explorer-card/issues/301))

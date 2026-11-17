@@ -18,6 +18,9 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
   as the others of its kind** — same storage, same persistence rules, same defaults, same
   "last one to speak wins", same code path. "Like the others" means exactly that: never a
   variant.
+- **Documents: standard too.** A line added to a list, a table or a section takes the form of
+  its neighbours — their length, their structure, their wording. Read them first, and write
+  the new one as they are written; never longer, never in another style.
 - **An EXCEPTION must be agreed by the user, after being warned** that it is a special case,
   not similar to everything else, and which rule it breaks. Warn first; never code a special
   case and leave the user to find it later.
@@ -41,6 +44,14 @@ The 1.1 docs still link to `blob/main/`: GitHub redirects those web links to `v1
     `INFO_PANEL_SWITCH_KEY`, `GESTURES_KEY`), and are the same for every card. Set by the
     user: "l'interrupteur du panneau d'info et les réglages de gestes est synchronisé pour
     tous les postes d'un utilisateur quel que soit les options de persistence".
+  - **`type` and `name` are set on an entity or in `entityOptions` only — never on a graph nor
+    on the card** (`history-options.js` `ENTITY_ONLY_KEYS`; every other option of an entity is
+    set at the four levels, by the one chain). The reasons, agreed by the user ("homogénéise
+    tout sauf les cas particuliers qui ont une raison d'être des cas particuliers"): on the
+    card, `type` is Home Assistant's (the card's type) and `name` mini-graph-card's (its graph's
+    title); on a graph, `type` is the graph's own, written beside its `entities:`, and a `name`
+    would name every curve alike (its `title` names the graph). `lineColor` (a color by place
+    in a graph) is a graph's or the card's: an entity has no place of its own to give it.
 
 ## Persistence — what is kept where, and why — set by the user, not negotiable
 

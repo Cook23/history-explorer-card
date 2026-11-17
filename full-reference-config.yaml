@@ -48,8 +48,16 @@ graphs:
       color: null
 
       # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color';
-      # fade: the line's colour fading out downwards; true: the line's colour, light; false: none
+      # fade: the line's colour fading out downwards; true: the line's colour, light; false: none —
+      # or, as 'color', thresholds giving one (on the value, or with `entity:` on that entity's), or an entity holding one
       fill: null
+
+      # An arrowline's arrows' length: not set, their whole length; 0 to 100, that part of it (%);
+      # an entity (or attribute) whose value gives it, its scale automatic (its largest value around the window: the whole length)
+      arrowLength: null
+
+      # The value of arrowLength's entity giving the whole length (no automatic scale); '~' and a value: at least that one
+      arrowMax: null
 
       # The value now, in large, over the graph (the curve's colour and unit)
       showState: false
@@ -154,6 +162,10 @@ graphs:
 
     # The default interval that bar graphs will be summarised over. Can be one of "10m", "hourly", "daily", "weekly" or "monthly".
     interval: "hourly"
+
+    # Colour and unit of every entity of this graph without its own (see $.graphs.entities.color, unit)
+    color: null
+    unit: null
 
     # Fill colour of the area under each line in this graph, defaults to a lighter shade of each entity's own colour
     fill: null
