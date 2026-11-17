@@ -326,7 +326,7 @@ stateColors:           # by entity, device class, domain or state
   off: '#ff0000'
 ```
 
-📖 [Timeline charts](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#timeline-charts)
+📖 [Timeline graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#timeline-graphs)
 
 #### Compass arrows
 
