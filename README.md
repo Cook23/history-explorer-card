@@ -85,7 +85,6 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
   - [Card options](#card-options)
   - [CSV export options](#csv-export-options)
   - [Gesture options](#gesture-options)
-  - [Notes](#notes)
 
 ---
 
@@ -473,6 +472,8 @@ graphs:
 
 Each option in **bold**, its aliases — other names it is read under — in *italics* under it.
 
+An option is spelled the same at every level.
+
 ### Graph and entity options
 
 | Option | Description |
@@ -484,12 +485,16 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`entity`** | **Default** none: required<br>The entity's id — `*` as a wildcard (`sensor.*`) — *an entity's only* |
 | **`attribute`** | **Default** not set: the entity's state<br>One of the entity's attributes instead of its state (`forecast.0.temperature`: a sub-attribute) — *an entity's only* |
 | **`name`** | **Default** the entity's name<br>The curve's name — *an entity's only* |
-| **`exclude`** | **Default** not set<br>Entities left out of a wildcard `entity:`; a graph's and an entity's combine — see *3 — *a graph and an entity only* |
+| **`exclude`** | **Default** not set<br>Entities left out of a wildcard `entity:`; a graph's and an entity's combine — see *1 — *a graph and an entity only* |
 | **`entityOptions`** | **Default** not set<br>Options given by entity id, device class, domain or pattern — see *2 — *the card's only* |
-| **`filterEntities`** | **Default** every entity listed<br>The entities the selector lists (`*` as a wildcard) — see *3 — *the card's only* |
-| **`excludeFilterEntities`** | **Default** none<br>The entities the selector leaves out of `filterEntities` — see *3 — *the card's only* |
+| **`filterEntities`** | **Default** every entity listed<br>The entities the selector lists (`*` as a wildcard) — see *1 — *the card's only* |
+| **`excludeFilterEntities`** | **Default** none<br>The entities the selector leaves out of `filterEntities` — see *1 — *the card's only* |
 | **`recordedEntitiesOnly`** | **Default** `false`<br>`true`: the selector lists only the entities recorded in the database — *the card's only* |
 | **`combineSameUnits`** | **Default** `false`<br>`true`: an entity added from the card goes into a graph of compatible units — *the card's only* |
+
+*1 — `filterEntities`, `excludeFilterEntities`, `exclude`: a string or a list of strings, `*` as a wildcard; `exclude` also `{entity: '...'}` — see [Adding entities](#adding-entities).
+
+*2 — `entityOptions`: every option but the card's only ones, given once for the entities it targets, by entity id, device class, domain or pattern.
 
 ### Curve and graph options
 
@@ -513,17 +518,23 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`stateMap`**<br>*`state_map`* | **Default** not set<br>A text state drawn as a curve: each state at its place in the list — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
 | **`showUnavailable`** | **Default** `false`<br>`true`: gaps where the entity was unavailable — *the card's only* |
 | **`showMissingState`** | **Default** `false`<br>`true`: gaps where a text state isn't in its `stateMap` — *the card's only* |
-| **`circular`** | **Default** automatic: an angle is circular<br>Angles drawn without a jump at 0/360: automatic, `false`, a period, or `2pi` — see *4 |
+| **`circular`** | **Default** automatic: an angle is circular<br>Angles drawn without a jump at 0/360: automatic, `false`, a period, or `2pi` — see *1 |
 | **`interval`** | **Default** `hourly`<br>The bars' interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (drawn as curves) |
 | **`netBars`** | **Default** `false`<br>`true`: bars of a total that can decrease (net metering) |
-| **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *6 |
-| **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px — see *6 |
+| **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *2 |
+| **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px — see *2 |
 | **`arrowLength`** | **Default** not set: every arrow its whole length<br>The arrows' length: 0 to 100 %, or an entity giving it, scaled automatically — see [Compass arrows](#compass-arrows) |
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity giving the whole length; `~`: at least that |
-| **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *1 and *6 |
-| **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *6 |
-| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — see *6 |
+| **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *2 and *3 |
+| **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *2 |
+| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — see *2 |
 | **`labelsVisible`** | **Default** `true`<br>`false`: no names left of a timeline's rows — *the card's only* |
+
+*1 — `circular`: automatic for an angle (unit `°`, state class `measurement_angle`, an attribute named as a direction); `false` off; a number the period; `2pi` 2π. On an arrowline: a full turn of the arrows.
+
+*2 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
+
+*3 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
 
 ### Color options
 
@@ -565,17 +576,19 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | Option | Description |
 |---|---|
 | **`yAxis`**<br>*`y_axis`* | **Default** `auto`<br>Its Y axis: `auto`, `left`, `right` (`auto`: a second group of units on the right) |
-| **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic: fitted to the values<br>The Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
-| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `ymin` / `ymax`<br>The right Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
-| **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** not set<br>The smallest range the Y axis shows — see *6 |
-| **`yScaleSteadiness` / `yScaleSteadinessRight`**<br>*`yScaleSteadinessLeft` / —* | **Default** `50`<br>The automatic Y axis, 0 to 100: 0 follows the values, 100 keeps a steady scale — see *6 |
-| **`ylock`** | **Default** `false`<br>`true`: the Y axis can't be moved or zoomed by hand — see *6 |
-| **`logarithmic`** | **Default** `false`<br>`true`: a logarithmic Y axis — see *6 |
-| **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *6 |
-| **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
-| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
-| **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *6 |
+| **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic: fitted to the values<br>The Y axis' bounds when the card opens; `~` and a value: a soft bound — see *1 |
+| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `ymin` / `ymax`<br>The right Y axis' bounds when the card opens; `~` and a value: a soft bound — see *1 |
+| **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** not set<br>The smallest range the Y axis shows — see *1 |
+| **`yScaleSteadiness` / `yScaleSteadinessRight`**<br>*`yScaleSteadinessLeft` / —* | **Default** `50`<br>The automatic Y axis, 0 to 100: 0 follows the values, 100 keeps a steady scale — see *1 |
+| **`ylock`** | **Default** `false`<br>`true`: the Y axis can't be moved or zoomed by hand — see *1 |
+| **`logarithmic`** | **Default** `false`<br>`true`: a logarithmic Y axis — see *1 |
+| **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *1 |
+| **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
+| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *1 |
+| **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *1 |
 | **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`true`: room added under / over a line graph's values, for curves going past them — *the card's only* |
+
+*1 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
 ### Tooltip options
 
@@ -596,9 +609,9 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 
 | Option | Description |
 |---|---|
-| **`unit`** | **Default** the entity's own unit<br>The unit shown instead of the entity's — see *5 |
-| **`scale`** | **Default** `1`<br>The values multiplied by this factor — see *5 |
-| **`valueFactor`**<br>*`value_factor`* | **Default** `0`<br>The values multiplied by 10 to this power (`-3`: 400 W shown as 0.4) — see *5 |
+| **`unit`** | **Default** the entity's own unit<br>The unit shown instead of the entity's — see *1 |
+| **`scale`** | **Default** `1`<br>The values multiplied by this factor — see *1 |
+| **`valueFactor`**<br>*`value_factor`* | **Default** `0`<br>The values multiplied by 10 to this power (`-3`: 400 W shown as 0.4) — see *1 |
 | **`process`** | **Default** not set: the values as they are<br>A JavaScript expression changing each value (`state`) before it's drawn |
 | **`pointsPerHour`**<br>*`points_per_hour`* | **Default** not set: a point per column of pixels<br>Points per hour (`2`: one per half hour), instead of one per column of pixels |
 | **`groupBy`**<br>*`group_by`* | **Default** `interval`<br>A point per `interval` (see `pointsPerHour`), per `hour`, or per `date` (day) |
@@ -611,6 +624,8 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`siConversionFactor`** | **Default** automatic, from the units<br>The factor converting the entity's unit into its graph's, when units are combined — *an entity's only* |
 | **`decimation`** | **Default** —<br>Accepted, no effect |
 | **`statistics.mode` / `statistics.retention`** | **Default** —<br>Accepted, no effect — *the card's only* |
+
+*1 — `scale` multiplies what is drawn; with `unit`, what is shown too (`scale: 0.001`, `unit: kW` for a power in W). `valueFactor` multiplies both by a power of 10, the unit kept. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
 
 ### Card options
 
@@ -648,6 +663,8 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`defaultInfoPanel`** | **Default** not set: the menu's switch<br>`true`: the card replaces the history of Home Assistant's more info popup — *the card's only* |
 | **`infoPanel`** | **Default** not set<br>The info panel's own options, as the card's — *the card's only* |
 
+*1 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
+
 ### CSV export options
 
 | Option | Description |
@@ -665,21 +682,5 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`gestures.longPress` / `gestures.longPressTouch`** | **Default** `500`<br>A long press's duration, in ms (200 to 2000): mouse and pen / finger — *the card's only* |
 | **`gestures.precision` / `gestures.precisionTouch`** | **Default** `8` / `12`<br>The pointer's precision, in px (2 to 40): mouse and pen / finger — *the card's only* |
 | **`gestures.readingTimePerWord`** | **Default** `400`<br>How long a tooltip or a message stays per word, in ms (100 to 1000) — *the card's only* |
-
-### Notes
-
-*1 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
-
-*2 — `entityOptions`: every option but the card's only ones, given once for the entities it targets, by entity id, device class, domain or pattern.
-
-*3 — `filterEntities`, `excludeFilterEntities`, `exclude`: a string or a list of strings, `*` as a wildcard; `exclude` also `{entity: '...'}` — see [Adding entities](#adding-entities).
-
-*4 — `circular`: automatic for an angle (unit `°`, state class `measurement_angle`, an attribute named as a direction); `false` off; a number the period; `2pi` 2π. On an arrowline: a full turn of the arrows.
-
-*5 — `scale` multiplies what is drawn; with `unit`, what is shown too (`scale: 0.001`, `unit: kW` for a power in W). `valueFactor` multiplies both by a power of 10, the unit kept. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
-
-*6 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
-
-An option is spelled the same at every level.
 
 📖 [Options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
