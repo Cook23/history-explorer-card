@@ -4,6 +4,16 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.81] - 2026-11-17
+
+### Fixed — adding an entity in Home Assistant's card editor ([#301](https://github.com/Cook23/history-explorer-card/issues/301))
+- An entity chosen in the selector's list is added: its click, on a link (`#s_0`), is no longer taken by Home Assistant for a navigation — which closes its open dialogs first, so its card editor asked to be closed, the entity not added
+- A click on the date the same (a link, `#`)
+
+### Internal
+- Tests (`attributes`): a click on an entity of the list, or on the date, leaves the page's address as it is
+
+
 ## [v1.2.80] - 2026-11-16
 
 ### Changed

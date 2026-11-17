@@ -149,7 +149,8 @@ export class CardToolbar
         this._this.querySelector(`#b5_${i}`)?.addEventListener('click', this.incZoom.bind(this), false);
         // (the date: a click opens the calendar, a double-click goes back to real time — the
         // calendar only once a double-click can't follow any more: the long press' delay)
-        this._this.querySelector(`#bx_${i}`)?.addEventListener('click', () => {
+        this._this.querySelector(`#bx_${i}`)?.addEventListener('click', (e) => {
+            e.preventDefault(); // (its link's navigation not followed — see entitySelectorEntryClicked)
             clearTimeout(this._dateClickTimer);
             this._dateClickTimer = setTimeout(() => this.openCalendar(i), Chart.hecGestures('mouse').longPressMs);
         }, false);

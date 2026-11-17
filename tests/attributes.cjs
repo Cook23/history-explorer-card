@@ -114,6 +114,16 @@ module.exports = async function()
         await search('power'); r.push(...await list()); await closeAll();
         return r.includes('climate.salon=true') && r.some(x => /^sensor\..*=false$/.test(x)) ? true : JSON.stringify(r);
     });
+    await t.step('a click on an entity of the list, or on the date, leaves the page\'s address as it is: its link\'s navigation prevented (else taken by Home Assistant for a navigation, which closes its card editor)', async () => {
+        const _href = await t.E(`location.href`);
+        await search('power');
+        const id = await t.E(`[...el.querySelectorAll('#es_0 a')].find(a=>a.style.display!=='none' && !a.textContent.endsWith(' ▸')).dataset.entity`);
+        await t.page.click(`#es_0 a[data-entity="${id}"]`); await t.wait(400);
+        const r = [await t.E(`location.href`)]; await closeAll();
+        await t.page.click('#eh_0'); await t.wait(400);
+        r.push(await t.E(`location.href`)); await closeAll();
+        return r.every(h => h === _href) ? true : JSON.stringify(r);
+    });
     await t.step('an entity with attributes: its series submenu opens — the value first, marked, then the attributes; not a list, Home Assistant\'s own, a unit (X_unit: visibility_unit, even with no visibility), nor a reference to an entity or a web address, nor about a version or an update (installed_version, auto_update), nor a setting, a limit or a description (display_precision, min_temp, max_temp, target_temp_step, manufacturer), nor a date, with or without its time (last_seen, next_service); a temperature in Home Assistant\'s unit system', async () => {
         await search('salon'); await t.page.click('#es_0 a[data-entity="climate.salon"]'); await t.wait(400);
         const v = await sub(); const b = await entryBold('climate.salon'); const m = await curveMenuFor();

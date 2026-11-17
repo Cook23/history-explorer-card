@@ -186,6 +186,9 @@ export class CardSelector
 
     entitySelectorEntryClicked(event)
     {
+        // (a link's navigation not followed: Home Assistant takes a click on a link not
+        // prevented for a navigation, and closes its open dialogs first — its card editor's)
+        event.preventDefault();
         const idx = event.target.href.slice(-1) * 1;
         const entity_id = event.target.dataset.entity;
         // (an entity with attributes that can be shown: which one — its value or one of
