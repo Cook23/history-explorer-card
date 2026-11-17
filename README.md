@@ -172,11 +172,10 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 
 ### Navigation
 
-- **Pan and zoom** — drag left or right to pan; zoom with the magnifiers − and +, Ctrl + the wheel, or a box drawn on the graph.
-- **Date** — `<` `>` move the window, a click on the date opens a calendar; a window reaching the present follows it.
-- **Tooltip** — click near a curve: the tooltip follows the pointer from value to value.
-- **Points** — a long press (or a right click) near a curve shows or hides its points.
-- **Touch screen and pen** — two fingers zoom and pan; to drag a label, tap, then press again and drag. A pen works as a finger.
+- **Pan and zoom** — drag left or right to pan. Zoom with the magnifiers − and +, Ctrl + the wheel, or a box drawn on the graph (drag up or down with a mouse, or turn the magnifying glass on). A long press on the glass chooses what its box zooms — the time, the Y axis or both; a double-click gets the default range back.
+- **Date and real time** — `<` `>` move the window; a click on the date opens a calendar, a double-click goes back to the present. A window reaching the present follows it: the curves grow and slide.
+- **Tooltip and points** — click near a curve to put it in the tooltip: it follows the pointer from value to value. Hover a curve to see its nearest point; a long press (or a right click) shows or hides all its points; **Alt** shows every curve's.
+- **Touch screen and pen** — a swipe scrolls the page; two fingers zoom (horizontally the time, vertically the Y axis) and pan. To drag a label, the ⠿ handle or the Y axis labels: tap, then press again right away and drag. A pen's tip works as a finger, its button (where the browser passes it on) as a right click.
 
 📖 [Interactive navigation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#interactive-navigation)
 
