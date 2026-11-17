@@ -26,6 +26,6 @@ file's raw link never follows a renamed branch (`main`, now `v1.1-legacy`).
 | `r-drag.cjs` | `drag-label`, `drag-graph`, `drag-row`, `drag-yaxis` |
 | `r-all.cjs` | Every other scene, each with its entities, histories, config and what is done before the capture |
 
-The images are taken at a device pixel ratio of 2, in the light theme (`narrow-and-mini` also
+The images are taken at a device pixel ratio of 2 — the READMEs show each at its size on the screen, half its width in pixels (`<img … width="…">`: GitHub would stretch it to the column) —, in the light theme (`narrow-and-mini` also
 in the dark one). The time is set by each scene (`clock`), so a scene renders the same image
 whenever it runs.

@@ -16,7 +16,7 @@
 
 A highly interactive way to view the history of the entities in Home Assistant: it loads only what the screen can show — the daily, hourly or 5-minute statistics, or the history — so that panning and zooming stay smooth.
 
-![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/hero.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/hero.png" alt="The card: two temperatures, the pressure and a timeline over one day" width="924">
 
 ---
 
@@ -324,7 +324,7 @@ The history explorer can be run as a sidebar panel: the card on a page of its ow
 2. Open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
 3. **+ Add card**: *History Explorer Card* — it takes the whole page.
 
-![The card as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
 
 ### Info panel — replacing the HA more info popup
 
@@ -425,7 +425,7 @@ The last one to speak wins, whatever is loading: a range chosen, a zoom, a drag,
 
 A click or a tap near a curve puts that curve in the tooltip, which shows the value pointed at — near a value, in time and in height. A tooltip shows real values, never a point of the line between two: a click on the line far from its values shows none. A click near another curve adds it, so several curves can show their values together; a click beside the curves changes nothing. Next to the plot area — under the legend, beside the Y axis' labels —, a click goes to what's nearest, a curve or a label, as everywhere: a value drawn on the plot area's edge opens its tooltip, a click on a label is the label's. Leaving the plot area closes it. Bars, timelines and arrowlines work the same way, a bar, a state or an arrow being a value: a hover or a click opens the tooltip of the element pointed at (under the pointer or just beside it), a click puts its series (its row) in the tooltip.
 
-![A click on a curve: the tooltip, at the value pointed at](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
 The tooltip then moves to the value pointed at as the mouse — or a pen held above the screen, in the browsers that report it — moves over the curves; away from every value it stays where it is, and fades out after its reading time. Beside its point, it stands behind the pointer's move when there is room: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new value, kept while it stays on it; with a finger, on the side of the point away from the graph's nearest edge; with no room on either side, above or below. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
 
@@ -470,7 +470,7 @@ tooltip:
 
 A long-press — or a right click — opens a menu: on a curve's or a row's label (its [curve menu](#choosing-an-entitys-display-type)), on a graph's ⠿ zone ([the graph menu](#the-graph-menu-cut-and-paste)); the ▾ button beside the entity selector opens the options menu. Every action of a gesture is also in a menu.
 
-![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
 
 Click an item, or press Enter or → on it; ← or Escape goes back to the menu. A click on a line closes the submenu another line of its menu opened (a line with a submenu then opens its own). A choice that changes what the menu shows — a display type, an interpolation, a look, a switch — is applied at once, and the menu stays open half a second showing it (the new type in bold, the switch moved), then closes; another choice made meanwhile is applied too, and the half second starts again. An action whose result is elsewhere — *Separate*, *Merge back*, *Cut*, *Delete*, *Info*, a test, *Color* (the picker takes over), a type for an entity being added (a second one would add it again) — closes the menu at once. A switch is a line with its name and, on its right, Home Assistant's switch: green and on the right when on, red and on the left when off; it's toggled by a click on the switch itself, or Enter on its line — a click on its name doesn't toggle it. A menu reopened less than 10 s after it was closed opens the submenu it had open (a new entity's always opens on *Display*). A menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page scrolls — or the dialog, the panel holding the card —, even under a sticky toolbar; a submenu follows its line when its menu scrolls (the entity list, a long list of attributes). Each shows in its zone: for a menu, the screen minus what covers it (a sticky toolbar, the page's header); for a submenu, its menu at the top and that same zone at the bottom. What goes past it, at the top or at the bottom, is masked; the menu closes once its own first line is wholly out of its zone — a submenu opened from a menu's first or last line isn't closed by the least scroll. A menu is wider than each of its submenus, so its lines stay readable beside the one open and another can be picked — the last line's too; only without room for that, the last line's submenu, which hides no line below it, may be as wide as the menu. On a card or a screen too narrow for that, the menu opens without any submenu — its lines read first —, and a submenu opened leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
 
@@ -485,7 +485,7 @@ The ▾ button beside the entity selector opens the options menu, in submenus:
 
 Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
-![The options menu, Export open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-options.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-options.png" alt="The options menu, Export open" width="918">
 
 ### Adding entities
 
@@ -493,7 +493,7 @@ The entities visible on the history explorer card can be defined in the card con
 
 The entities added from the UI are managed like this:
 
-![Adding an entity: the field, the matching entities](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
 
 To manage every entity from the UI, the YAML has no graphs — it can still hold the card's other settings.
 
@@ -517,7 +517,7 @@ Clicking an entry chooses it, as Enter does.
 
 An entity can also be shown through one of its attributes (a thermostat's measured temperature, its setpoint, what it's doing…). Selecting an entity with attributes that can be shown opens a submenu first, over the list, level with the entity (in bold while it's open): *Value* (the entity's own state) first, pre-selected — Enter takes it at once — then each attribute with its current value. Arrows move through it, Enter or a click chooses, ← or Escape goes back to the list. An entity without such attributes goes straight to the curve menu; a wildcard pattern adds entities' states only.
 
-![An entity with attributes: the submenu of its value and its attributes](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/attributes.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/attributes.png" alt="An entity with attributes: the submenu of its value and its attributes" width="912">
 
 The attributes offered hold a number, a text or a yes/no — or a dictionary, or a list of dictionaries (a forecast), holding some: marked ▸, a click opens them in a submenu over the attributes (← or Escape closes it). Not offered, though any of them can still be written in the YAML (`attribute:`):
 - a list of plain values (`hvac_modes`: a set of choices);
@@ -558,7 +558,7 @@ Dynamically added entities can be individually removed by clicking twice the `×
 
 An entity whose current state can be read as a number can be shown as a line (*Smart*, *Curve*, *Straight* or *Stepped*), as bars (*Bar*), as direction arrows (*Direction*, the `arrowline` type) or as a timeline (*Timeline*); any other entity only as a timeline.
 
-![An entity being added: its curve menu, the type that fits it in bold](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/add-type.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/add-type.png" alt="An entity being added: its curve menu, the type that fits it in bold" width="912">
 
 The curve menu's items each open their submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
@@ -616,7 +616,7 @@ Timeline graphs will always automatically group if possible. Graphs defined manu
 
 A graph defined manually in the YAML always shows all its entities on the same graph, whatever their units of measure (or lack of one) — it's the YAML author's explicit choice; two groups of units get a Y axis each, more are shared between the two by the size of their values (see [Two Y axes](#two-y-axes)). Lines and bars share one chart too (the curves drawn over the bars, see [Bar graphs](#bar-graphs-for-total-increasing-entities)). Only timeline and arrowline entities can't share a chart with anything else: they are shown as separate *linked* graphs, see below.
 
-![Three graphs of the same unit, then one with combineSameUnits](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/auto-grouping.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/auto-grouping.png" alt="Three graphs of the same unit, then one with combineSameUnits" width="724">
 
 #### Ungrouping a curve
 
@@ -640,7 +640,7 @@ Within a group, curves can always be shown together again, as long as their disp
 
 A curve can be moved to another graph by dragging its legend label and dropping it onto the target graph. Any line or bar graph accepts it, whatever its unit — lines and bars mixed, a graph defined in YAML included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see [Two Y axes](#two-y-axes)). Dropped onto a graph of another display type, an entity whose state is a number takes that graph's: a curve dropped onto a timeline becomes one of its rows, an arrowline's entity dropped onto a line graph becomes a curve — its own default display when it fits that graph (*Smart* or the line mode set for it, *Bar* for a quantity that adds up), else the graph's. An entity whose state isn't a number (on/off, text) can only be shown as a timeline: dropped onto any other graph, the drop is refused with a brief tooltip (e.g. `timeline ≠ line`). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own. The curve's color is preserved; if it conflicts with a color already in use on the target graph, a free color from the default palette is assigned automatically. On a touch screen, tap the label, then press it again right away and drag.
 
-![A curve's label dragged onto another graph](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png" alt="A curve's label dragged onto another graph" width="910">
 
 A drop is saved only when the placement of both graphs is (the `entities` persistence of their entities, see [Enabling persistence](#enabling-persistence-enablepersistence--enablemultidevicepersistence)). A graph defined in YAML saves nothing by default: a curve dropped onto it, or taken out of it, is saved where it was before the drop, so a reload brings both graphs back as they were — nothing duplicated, nothing lost. Dropped back into its own graph, the curve is saved there again.
 
@@ -652,7 +652,7 @@ Curve labels in the legend can be dragged left or right to change their display 
 
 Graphs can be reordered by dragging on the ⠿ symbol at the top left of each graph (its box, with the padlock). Drag a graph up or down and drop it onto another graph: releasing above the midpoint of the target inserts it above, releasing below the midpoint inserts it below. A simple click on that same area toggles the Y axis lock. The handle, the padlock and the chain icon of linked graphs keep only the room they need beside the legend's first line; on a narrow card they take none — each is drawn in a small box of the card's background over the legend's labels (or a timeline's rows): on the box, a gesture is theirs; beside it, on a label, the label's. The new order is synchronized with the Home Assistant user account. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
 
-![A graph dragged by its ⠿ zone: the line shows where it goes](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-graph.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-graph.png" alt="A graph dragged by its ⠿ zone: the line shows where it goes" width="910">
 
 Linked graphs (same group, chain icon) always form one solid block: another graph can't be dropped between them, and moving one of them outside of its block moves the whole block along, keeping its internal order. Moving a graph within its own block just reorders it there.
 
@@ -667,7 +667,7 @@ A long-press (or a right click) on the ⠿ zone of a graph opens its menu, title
 - **Behavior ▸** — *Tooltip ▸* and *Y axis ▸* for all its curves — in it, *Locked* (a switch, as a click on the padlock — not on a timeline or arrowline graph, which have no lock) —, *Merge back* (a linked graph put back into the one above, as a double-click on the chain icon), *Cut* (the graph moved elsewhere, as a drag of its ⠿ zone), *Delete the graph* (a graph added from the card, as two clicks on its × button);
 - **Export ▸** — *History* and *Statistics ▸* (by the period chosen), as the [options menu's](#exporting-data-as-csv), for the graph's own entities, and *YAML ▸* (*Simplified*, *Complete*): the graph's YAML (see [Exporting the configuration as YAML](#exporting-the-configuration-as-yaml)).
 
-![A graph's menu, Behavior open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-graph.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-graph.png" alt="A graph's menu, Behavior open" width="918">
 
 *Cut* is also in the *Behavior* submenu of the curve menu (a curve's, a timeline entity's). Once something is cut, the ⠿ zone of every graph shows where it can go, instead of the ⠿ symbol and the padlock:
 - a curve or an entity: 📋 — click it to paste it into that graph, at the end of its legend, exactly as a drop there (same rules: any graph for an entity whose state is a number — shown the way that graph shows its entities —, a timeline only for one whose state isn't; saved only when both graphs are);
@@ -684,11 +684,11 @@ Entities in timeline and arrowline graphs can also be reorganized interactively:
 - Drag an entity label up or down to reorder it within the same graph (on a touch screen, tap it, then press it again right away and drag)
 - Long labels that don't fit in the label area are truncated; click a truncated label to reveal the full name in a tooltip
 
-![A timeline row's menu](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-timeline.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-timeline.png" alt="A timeline row's menu" width="918">
 
 All drag operations show a ghost element and horizontal insertion marker for precise positioning. All changes are synchronized with the Home Assistant user account.
 
-![A timeline row dragged onto another graph](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-row.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-row.png" alt="A timeline row dragged onto another graph" width="910">
 
 ### Legend / entity labels
 
@@ -721,7 +721,7 @@ type: custom:history-explorer-card
 showCurrentValues: false
 ```
 
-![The current value beside the label](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/current-values.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/current-values.png" alt="The current value beside the label" width="412">
 
 #### Rounding
 
@@ -738,13 +738,13 @@ By default the min/max scales for the Y axis are adjusted automatically to the d
 
 Pressing the axis lock icon — or the *Behavior ▸ Y axis ▸ Locked* switch in the [graph menu](#the-graph-menu-cut-and-paste) — disables autoscaling and locks the Y axis to the currently active range; a drag or a zoom of a Y axis locks it too, on the range it's moved to. The lock and its range are kept on this device, as the card's persistence options say — as a hidden curve (see [What is kept, and where](#what-is-kept-and-where)). Pressing it again will revert back to the defaults for the graph:
 
-![The Y axis padlock](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png" alt="The Y axis padlock" width="532">
 
 The Y axis can also be interactively modified. Pressing and holding the `SHIFT` key will unlock interactive zooming and panning of the graph in vertical direction. Pressing the mouse button while holding `SHIFT` over a graph drags the graph both horizontally and vertically: the time and the Y axis move together. Using the mousewheel while holding `SHIFT` will change the Y axis scale. When interacting with the Y axis, the axis lock icon will automatically be enabled. Click the icon to go back to the default scale at any time.
 
 **On desktop**, a drag directly on the Y axis label area (the left 65px of the graph) pans the Y scale — the cursor changes to `↕` when hovering over that zone.
 
-![The Y axis dragged: the curves move up](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-yaxis.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-yaxis.png" alt="The Y axis dragged: the curves move up" width="910">
 
 **Labels inside the plot** (a card narrower than 300 px, `yLabels: inside`, `look: mini`): the Y axis zone is a column along the labels, as wide as their boxes and the pointer's precision more. There, as on the ⠿ zone, the gesture decides: a drag moves the axis (with a mouse at once; with a finger or a pen, after a tap then a second press right away), a click, a long press or a hover is for the curves (tooltip, points, the point hovered).
 
@@ -823,7 +823,7 @@ graphs:
 
 Line and bar graphs have up to two Y axes, one per group of compatible units: with two groups (a power in W and kW, and a temperature), the first one is on the left, the second one on the right, each with its own scale; in the legend, each curve's color mark is then a triangle pointing to its axis' side, ◀ on the left, ▶ on the right (a dot with one axis). With more than two groups of incompatible units, they're shared between the two axes by the size of the values they show: the small ones on one axis, the large ones on the other (split where the sizes of two groups next to each other differ the most), the axis with more curves on the left — as many: the first curve's. That's decided when the graph is shown, from the values it draws then — on the left meanwhile —, and then kept: a zoom, a move of the time or the cache filling never change it. Each axis' title lists its units, separated by " / " (`% / °C`). *Behavior ▸ Y axis ▸* in a curve's menu (or a graph's: all its curves) puts it on the left or the right axis, saved with it. `yAxis: left` or `yAxis: right` on an entity (or in `entityOptions`) puts it on that side whatever its unit; on a graph or on the card it applies to every curve that doesn't set its own — `yAxis: left` on a graph keeps it on one axis, and `yAxis: auto` on an entity brings back the choice by unit. `ymin`, `ymax` and `ystepSize` apply to both axes. Linked graphs keep the same room on the right when one of them has a right axis, so that their time stays aligned.
 
-![A power on the left axis, a temperature on the right one](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/two-y-axes.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/two-y-axes.png" alt="A power on the left axis, a temperature on the right one" width="912">
 
 The right axis takes `yminRight`, `ymaxRight` and `yrangeRight` when they're set, else `ymin`, `ymax` and `yrange` like the left one; `labelsRight` shows its labels, as `labelsLeft` the left one's (see [Y axis scaling](#y-axis-scaling)).
 
@@ -837,7 +837,7 @@ Home Assistant's recorder keeps two kinds of statistics, for the entities with a
 
 Each line says, in brackets, how many of the entities exported have values within the window's time, at least in part — *History (3)*, *Statistics (2) ▸*, *Hour (2)* —, a line greyed when none has: what the card has loaded tells it, and Home Assistant's recorder (its hourly, daily, weekly and monthly statistics come from the same long-term statistics; its 5-minute ones are kept as long as the history; attributes, timelines and entities without a state class have no statistics); what it can't tell yet is asked quietly in the background once the window is loaded. 5-minute statistics not valid for an entity (see [Only valid statistics](#long-term-statistics)) don't count it, and the entity is left out of their file: they would make up values. The hourly ones, daily, weekly and monthly are exported wherever Home Assistant has them. An export holds the values the curves show: a curve of an attribute exports that attribute's values, not its entity's state; a series without a value within the window is left out; the history of a series begins with its state in force at the window's start. An export takes what the card has already loaded and asks Home Assistant only for the days it lacks — the history with its attributes (`exportAttributes`), all of it.
 
-![The options menu, Export open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png" alt="The options menu, Export open" width="385">
 
 The exported CSV can be customized. The following settings are optional. If they are not present, the defaults will be used.
 ```yaml
@@ -988,7 +988,7 @@ This entity-level option only applies to static entities defined here in `graphs
 
 Entities that represent a total (monotonically increasing or net metering) can be visualized as adaptive bar charts. This applies to entities such as, for example, consumed energy, water or gas, rainfall, or network data usage. The data is visualized over a time interval (10 minutes, an hour, a day, a week — from Monday — or a month) that can be toggled on the fly and independently for each graph.
 
-![Rain by the hour and by 10 minutes, each graph with its interval](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-interval.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-interval.png" alt="Rain by the hour and by 10 minutes, each graph with its interval" width="772">
 
 Bar charts use the `bar` chart type and can be used in both dynamically and statically added entities by setting the type accordingly. When adding an entity from the card, the curve menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
@@ -1006,7 +1006,7 @@ entityOptions:
 
 Bar graphs can be manually added in the YAML too. Multiple entities can be combined into a single graph. The bars for each entity will then be displayed side by side:
 
-![Two rain gauges, side by side, by day](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-side.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-side.png" alt="Two rain gauges, side by side, by day" width="712">
 
 ```yaml
 graphs:
@@ -1043,7 +1043,7 @@ Bars and curves follow the same rule: energy bars and a power curve, two groups 
 
 Set the `stacked` option to `true` to display the bars on top of each other rather than side by side (with two Y axes, the bars of each axis are stacked in a column of their own):
 
-![Two energies stacked, by day](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-stacked.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-stacked.png" alt="Two energies stacked, by day" width="652">
 
 ##### Net metering
 
@@ -1066,7 +1066,7 @@ NOTE: This is very similar to the way Home Assistant implements the `total` stat
 
 Timeline charts are typically used to visualize entities with non-numerical data. When an entity is added from the card, the curve menu pre-selects *Timeline* for an entity whose state isn't a number (the only choice then), and for one without unit of measure that isn't a measurement.
 
-![A timeline: motion, a lock, a person](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png" alt="A timeline: motion, a lock, a person" width="652">
 
 The horizontal time axis labels on a timeline or arrowline graph can be hidden per graph:
 
@@ -1137,7 +1137,7 @@ stateColors:
 
 There is a special virtual state that is added to all entities, the *multiple* state. This state substitutes an aggregation of multiple states on the timeline when they were merged, each too thin to be seen (see [Data decimation](#data-decimation)). Like normal states, this special state's color can be set for individual entities, device classes, domains or globally.
 
-![States too short to see merged into one multiple block, its tooltip](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline-multiple.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline-multiple.png" alt="States too short to see merged into one multiple block, its tooltip" width="552">
 
 The random colors assigned to states not covered by `stateColors` are generated from a fixed seed. Another seed gives another set of automatic colors:
 
@@ -1150,7 +1150,7 @@ stateColorSeed: 42   # Any integer. Default is 137.
 
 Entities representing a directional angle value, like a bearing or direction, can be displayed using a timeline of compass arrows. This is especially useful for visualizing wind directions:
 
-![Wind gusts and the wind direction as compass arrows](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/compass.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/compass.png" alt="Wind gusts and the wind direction as compass arrows" width="712">
 
 Compass arrow graphs use the `arrowline` type and can be used in both dynamically and statically added entities. See [Entity options](#entity-options) for an example of the former and the advanced example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs) for the latter.
 
@@ -1178,7 +1178,7 @@ graphs:
 
 Four modes are available for line charts: cubic splines, line segments, stepped and smart. Cubic splines (`curves`) are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve interpolation](#curve-interpolation). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
 
-![The same values in the four line modes](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png" alt="The same values in the four line modes" width="1287">
 
 The line mode is set in the YAML, on the card. Possible options are `curves`, `lines`, `stepped` or `smart`. If the option is not present, the curves of YAML graphs are drawn as `curves`, and an entity added from the UI gets `smart` (the curve menu pre-selects it). When it's set, it applies to both: with `lineMode: curves`, entities added from the UI are pre-selected as *Curve* too. To keep a mode for the YAML's graphs only, set it under each graph's `options:` (or on each entity) instead.
 
@@ -1311,7 +1311,7 @@ Holding the `Alt` key (or `Option` key on Mac) while moving over a graph reveals
 
 The long-press's choice and the YAML's `showPoints`: the last one to speak wins, kept on this device only, never synced across devices. When a curve's points aren't shown, hovering it (a mouse, or a pen above the screen) — or clicking, tapping it, for a pointer without hover — shows the point of its value nearest the pointer along the curve alone, a discreet guide to where the real values are (not on the tooltip's own point, drawn larger).
 
-![A curve and its individual samples](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/samples.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/samples.png" alt="A curve and its individual samples" width="632">
 
 To show them permanently, use `showPoints` — on the card, in `entityOptions`, on a graph or on an entity: `true` all; `hover`, the default, shows only the one hovered; `false` none, not even that one. A number is accepted too: all shown, that radius (`showPoints: 4` is `showPoints: true` with `sizePoints: 8`).
 
@@ -1439,7 +1439,7 @@ template:
         state: "{{ {'heat': 'red', 'off': 'grey'}.get(states('climate.living_room'), 'blue') }}"
 ```
 
-![Bars colored by thresholds on their value](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-colors.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-colors.png" alt="Bars colored by thresholds on their value" width="652">
 
 - The color is evaluated at each point (each bar, each arrow of an arrowline — its fill, the band under it): a curve changes color on a point, never between two. Its fill takes the same color, with the transparency of its `fill`.
 - The legend shows the color now — as the value shown in the label is the value now.
@@ -1504,7 +1504,7 @@ For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 mi
 - **Entities without statistics** — attributes, entities without a state class — always come from the history: past the history retention limit, their graph is blank. How an entity is shown — a curve, bars, a timeline, an arrowline, or the color of another curve — changes nothing to where its data comes from.
 - **Angles** (`circular`) are loaded as the rest, in the same phases; Home Assistant averaging them as plain numbers, their history is asked besides wherever the window is drawn from the statistics: over the window, first of the background, from the right (see [Circular values](#circular-values-angles)).
 
-![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png" alt="Statistics where the history is gone, the history where it is kept" width="1012">
 
 In the screenshot above, the blue graph is the outdoor temperature, the red graph is the temperature of a barn. The outdoor temperature has statistics available, the barn temperature does not. So the red line stops where the history database retention period ends (Oct 11th). The outdoor temperature continues way past this point, from its long term statistics.
 
@@ -1530,7 +1530,7 @@ A long time window holds far more values than the graph has pixels: a week of a 
 - **Aggregated — groups chosen.** See [Aggregation](#aggregation): a point a day, an hour, or `pointsPerHour` points an hour, each the function chosen.
 - **Timelines — merged under 2 pixels.** States following each other that are each narrower than 2 pixels — too thin to tell apart, or to point at — are merged into one *multiple* block; zoom in and they appear. A state 2 pixels wide or more is always drawn, and a short state alone, between two longer ones, keeps its own color. A timeline with a `process` function is never merged. A timeline of directions (`arrowline`) keeps a state per column of pixels at most: the one in force at the column's middle, the one its arrow shows.
 
-![Five days of a value every minute, one point per column of pixels](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/decimation.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/decimation.png" alt="Five days of a value every minute, one point per column of pixels" width="912">
 
 `decimation` is accepted — on the card, a graph, an entity or in `entityOptions` — without effect: the card draws what the screen can show, and only that, for a faithful drawing with the best display performance.
 
@@ -1606,7 +1606,7 @@ graphs:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
-  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
+  <img width="776" alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
 </picture>
 
 *Left: a card 168 px wide (two cards side by side on a phone). Middle and right: `look: mini`, 374 and 168 px wide.*
@@ -1848,15 +1848,15 @@ timeTicks:
 
 Example with no `timeTicks` and everything set to automatic defaults:
 
-![Time ticks, automatic density](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-auto.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-auto.png" alt="Time ticks, automatic density" width="632">
 
 Using `densityOverride` at `higher`, leaving the date format at normal:
 
-![Time ticks, densityOverride: higher](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-higher.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-higher.png" alt="Time ticks, densityOverride: higher" width="632">
 
 And same as above but setting the dateFormat to short:
 
-![Time ticks, densityOverride: higher, dateFormat: short](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-short.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tick-density-short.png" alt="Time ticks, densityOverride: higher, dateFormat: short" width="632">
 
 Overriding the density will disable automatic density calculations depending on card or screen width. The labels can then overlap.
 

@@ -23,7 +23,7 @@
 
 A highly interactive history card for Home Assistant. Pan, zoom, and explore the history of the entities across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
 
-![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/hero.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/hero.png" alt="The card: two temperatures, the pressure and a timeline over one day" width="924">
 
 ---
 
@@ -129,7 +129,7 @@ The options menu (▾), a graph's menu or a curve's (the info panel's too): *Exp
 
 ### Running as a sidebar panel
 
-![The card as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
 
 The card on a page of its own, in Home Assistant's sidebar:
 
@@ -172,7 +172,7 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 
 ### Tooltip
 
-![A click on a curve: the tooltip, at the value pointed at](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
 Click near a curve to put it in the tooltip; it then follows the pointer from value to value, and shows real values only. What it shows is each curve's tooltip mode — `selected` (the curves clicked), `nearest` (the value pointed at, on a hover), `mixed` (both) or `all` (every curve's value at that time) —, set by the screen — `tooltip.largeScreen` (a window 640 px wide or more, `mixed` by default), `tooltip.smallScreen` (`selected` by default) — or by the card's room, which wins when set — `tooltip.largeChart` (a card 600 px wide or more), `tooltip.smallChart` (narrower, and the info panel) —, or from a menu: *Behavior ▸ Tooltip ▸*, which sets the one giving the mode where the card is — the card's room's when set, else the screen's. `tooltip.size` sets how much it shows: `full`, `compact`, `slim`, or `auto` (by the card's width, the default).
 
@@ -180,7 +180,7 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 ### Menus
 
-![A curve's menu, Appearance open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
 
 - **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
 - **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
@@ -203,7 +203,7 @@ gestures:
 
 ### Adding entities
 
-![Adding an entity: the field, the matching entities](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
 
 Type in the entity selector — it filters on the names and the ids, `*` as a wildcard (`*door*`, `sensor.*`) — and choose an entry with a click or Enter. An entity with attributes first offers its *Value* or one of its attributes. The curve menu then opens, the most fitting type pre-selected (*Timeline* for a state that isn't a number, *Bar* for energy that adds up, *Direction* for an angle, else a *Smart* line); nothing is added before a type is picked.
 
@@ -216,7 +216,7 @@ filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes m
 
 ### Managing graphs
 
-![A curve's label dragged onto another graph](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png" alt="A curve's label dragged onto another graph" width="910">
 
 - **Click** a curve's name to hide or show it; a click on its value opens the entity's dialog.
 - **Double-click** a label to take the curve out into its own graph; double-click the chain icon 🔗 of linked graphs to merge them back.
@@ -231,7 +231,7 @@ combineSameUnits: true   # entities with compatible units (W and kW) added to th
 
 ### Y axis
 
-![The Y axis padlock](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png" alt="The Y axis padlock" width="532">
 
 The Y axis scales itself (padlock open, green). Drag its labels to pan it, hold **Shift** to drag and zoom it on the graph; the padlock locks it (red). Two groups of units get an axis each, the second one on the right; more are shared between the two axes by the size of their values, each axis listing its units (`% / °C`); *Behavior ▸ Y axis* moves a curve to the other one.
 
@@ -248,7 +248,7 @@ graphs:
 
 ### CSV export
 
-![The options menu, Export open](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png" alt="The options menu, Export open" width="385">
 
 The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
 
@@ -298,7 +298,7 @@ Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be
 
 #### Lines
 
-![The same values in the four line modes](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png" alt="The same values in the four line modes" width="1287">
 
 - `lineMode`: `smart` (the default from the UI: a curve, and a flat dashed line over the silences of a sensor), `curves` (the default in YAML), `lines`, `stepped`.
 - `interpolation` (curves and smart): `monotone` (default, never overshoots), `steffen`, `makima`, `catmullrom` (the smoothest), `bspline` (mini-graph-card's).
@@ -311,7 +311,7 @@ Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be
 
 #### Bars
 
-![Rain by the hour and by 10 minutes, each graph with its interval](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-interval.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/bars-interval.png" alt="Rain by the hour and by 10 minutes, each graph with its interval" width="772">
 
 Energy, gas or water that adds up is shown as bars, by *10 min*, *Hour*, *Day*, *Week* or *Month* (the interval selector on the graph), or *Raw*. A bar graph can hold curves too.
 
@@ -326,7 +326,7 @@ entityOptions:
 
 #### Timelines
 
-![A timeline: motion, a lock, a person](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png" alt="A timeline: motion, a lock, a person" width="652">
 
 A state that isn't a number is shown as a timeline, each state named as Home Assistant names it, in its own color:
 
@@ -342,7 +342,7 @@ stateColors:           # by entity, device class, domain or state
 
 #### Compass arrows
 
-![Wind gusts and the wind direction as compass arrows](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/compass.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/compass.png" alt="Wind gusts and the wind direction as compass arrows" width="712">
 
 An angle — a wind's direction — is shown as arrows, their length from another entity's value — the wind's speed:
 
@@ -376,7 +376,7 @@ graphs:
 
 ### Long term statistics
 
-![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png)
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png" alt="Statistics where the history is gone, the history where it is kept" width="1012">
 
 The card loads what the screen can show — the daily, hourly or 5-minute statistics, or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
 
@@ -394,7 +394,7 @@ statistics:
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
-  <img alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
+  <img width="776" alt="A card 168 px wide; look: mini, 374 and 168 px wide" src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini.png">
 </picture>
 
 *Left: a card 168 px wide. Middle and right: `look: mini`, 374 and 168 px wide.*
