@@ -23,7 +23,8 @@ Changelog for the HA History Explorer Card.
 
 ### Docs
 - The READMEs in one plan, README.md's, README_Full.md following it: Overview, Install, Quick configuration, Usage, Detailed configuration, Options; the version highlights summed up; the YAML export as a help in Home Assistant's card editor
-- Install from Home Assistant's Marketplace (HACS before Home Assistant 2026.11), step by step; reload the page, add the card
+- Install from Home Assistant's Marketplace (HACS before Home Assistant 2026.11), step by step; reload the page, add the card; the sidebar panel step by step
+- The READMEs made homogeneous: each section opening on what it's about, the screenshots README_Full has taken up in README.md, the YAML export described once, written without "you", Home Assistant's menu paths with `›`, *Manual install* step by step as the Marketplace's, *Multiple cards*: what the name keys
 
 ### Internal
 - One function for an option read directly or indirectly (`color`, `fill`, `arrowLength`: `INDIRECT_OPTIONS`, `optionSeriesOf`, `_optionFunction`); the series they read loaded with the entities' history

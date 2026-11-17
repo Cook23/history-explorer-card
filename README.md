@@ -21,7 +21,7 @@
 
 ## Overview
 
-A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
+A highly interactive history card for Home Assistant. Pan, zoom, and explore the history of the entities across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
 
 ![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/hero.png)
 
@@ -81,15 +81,19 @@ Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.
 ## Install
 
 - **Marketplace** (recommended; HACS before Home Assistant 2026.11): *Settings › Marketplace › Add from link*, `https://github.com/Cook23/history-explorer-card`, then **Install**.
-- **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings → Dashboards → ⋮ → Resources*, type JavaScript module).
+- **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings › Dashboards › ⋮ › Resources*, type JavaScript module).
 
 Then reload the page (in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*) and add the card from *+ Add card*: *History Explorer Card*.
+
+📖 [Install](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#install)
 
 ---
 
 ## Quick configuration
 
 ### YAML graphs
+
+Graphs written in the YAML, shown each time the dashboard opens — the entities added from the card come after them; without `graphs:`, every entity is added from the card:
 
 ```yaml
 type: custom:history-explorer-card
@@ -117,15 +121,21 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 
 ### YAML export
 
-**In Home Assistant's card editor** — a help to write a card's YAML: set the card up in the editor's preview with its menus (the entities added, their display, their look), then *Export ▸ YAML ▸* from the options menu (▾) and paste it into the editor in place of the YAML there — it holds `type:` and `cardName:` too. *Simplified* gives what is necessary; *Complete*, what is useful to change it, the options at their default value included.
+The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸* copies the settings of the card, the graph or the curve to the clipboard, in the card's own syntax, the choices made in the menus included — *Simplified*, what is necessary: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*, what is useful to change it: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
 
-The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸ Simplified* or *Complete* — the settings of the card, the graph or the curve, the choices made in the menus included, copied to the clipboard in the card's own syntax, to define it statically in another card. *Simplified*: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
+**In Home Assistant's card editor**, it helps write a card's YAML: set the card up in the editor's preview with its menus, export it from the options menu, and paste it in place of the YAML there — it holds `type:` and `cardName:` too. In the editor's preview, the card keeps room under itself for its menus to open.
 
 📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
 
 ### Running as a sidebar panel
 
-Add an empty dashboard with **Show in sidebar** checked, set the view type to **Panel (1 card)**, and add the history explorer card.
+![The card as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/sidebar-panel.png)
+
+The card on a page of its own, in Home Assistant's sidebar:
+
+1. *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
+2. Open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
+3. **+ Add card**: *History Explorer Card* — it takes the whole page.
 
 📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
 
@@ -238,6 +248,8 @@ graphs:
 
 ### CSV export
 
+![The options menu, Export open](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/menu-export.png)
+
 The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
 
 ```yaml
@@ -257,6 +269,8 @@ csv:
 
 ### Time range
 
+The time range shown when the card opens, where its window ends, and what the magnifying glass zooms:
+
 ```yaml
 defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
 defaultTimeOffset: 1D    # uppercase: snapped — here the current day, from midnight
@@ -267,13 +281,13 @@ defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y 
 
 ### Persistence
 
-What you change on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
+What is changed on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
 - the entities added from the UI are kept, on every device — and a card without YAML entities keeps its time range and its graphs' order too;
-- the YAML entities show what the YAML says, unless you choose otherwise:
+- the YAML entities show what the YAML says, unless these options say otherwise:
 
 ```yaml
 enablePersistence: entities           # kept on this device
-enableMultidevicePersistence: range   # kept and synced across your devices
+enableMultidevicePersistence: range   # kept and synced across the user's devices
 ```
 
 Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be set on a YAML entity for its own fields. The last one to speak wins: the YAML, when it changes, or the card.
@@ -314,6 +328,8 @@ entityOptions:
 
 ![A timeline: motion, a lock, a person](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/timeline.png)
 
+A state that isn't a number is shown as a timeline, each state named as Home Assistant names it, in its own color:
+
 ```yaml
 stateTextMode: auto    # the states' names for their device class (default); raw; hide
 stateColors:           # by entity, device class, domain or state
@@ -327,6 +343,8 @@ stateColors:           # by entity, device class, domain or state
 #### Compass arrows
 
 ![Wind gusts and the wind direction as compass arrows](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/compass.png)
+
+An angle — a wind's direction — is shown as arrows, their length from another entity's value — the wind's speed:
 
 ```yaml
 entityOptions:
@@ -343,6 +361,9 @@ entityOptions:
 `color` — and `fill`, its values `true`, `false`, `fade` or a color — takes a value, or thresholds on the value — or on another entity's or attribute's —, or an entity holding one:
 
 ```yaml
+graphs:
+  - type: line
+    entities:
       - entity: sensor.heat_pump_power
         color:
           entity: sensor.heat_pump_mode   # without it: thresholds on the value (0: blue, 1.5: red…)
@@ -383,6 +404,8 @@ statistics:
 📖 [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) · [mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
 ### UI configuration
+
+The card's look and layout — its header, its colors, its toolbars, its sizes, its cursor line, its time ticks:
 
 ```yaml
 type: custom:history-explorer-card
@@ -521,7 +544,7 @@ graphs:
 | `tooltip.showColorsLine` / `tooltip.showColorsTimeline` | `showTooltipColorsLine` / `showTooltipColorsTimeline` | | ✓ | | | `false`: no color boxes in the tooltips of every graph but timelines / of timelines |
 | `timeTicks.density` | `timeTickDensity` | | ✓ | | | The time ticks' base density: `low`, `medium`, `high` (default), `higher`, `highest` |
 | `uiColors.gridLines` / `uiColors.cursorLine` | `uiColors.gridlines` / `uiColors.cursorline` | | ✓ | | | The color of the grid lines / of the cursor line |
-| `enablePersistence` / `enableMultidevicePersistence` | `enable_persistence` / `enable_multidevice_persistence` | | ✓ | | ✓ | What's remembered on this device / also synced across your devices — see [Persistence](#persistence) |
+| `enablePersistence` / `enableMultidevicePersistence` | `enable_persistence` / `enable_multidevice_persistence` | | ✓ | | ✓ | What's remembered on this device / also synced across the user's devices — see [Persistence](#persistence) |
 | `labelsVisible` | | | ✓ | | | `false`: no names left of the timelines' rows |
 | `look` | | | ✓ | | | `mini`: a set of default options at once — see [Values over a graph](#values-over-a-graph-look-mini) |
 | `entityOptions` | | | ✓ | | | Targeted defaults by entity id, device class, domain, or glob pattern — see *3 |
@@ -542,4 +565,4 @@ graphs:
 
 An option is spelled the same at every level, and its aliases — the names and values in the table — are accepted everywhere. A graph's options can be set under its `options:` or on the graph itself (`options:` wins).
 
-📖 [Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#entity-options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
+📖 [Options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
