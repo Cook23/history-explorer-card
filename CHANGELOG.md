@@ -11,6 +11,7 @@ Changelog for the HA History Explorer Card.
 - `fill` read indirectly, as `color`: thresholds on the value or on another entity's or attribute's, or an entity holding a fill — its values `true`, `false`, `fade` or a color —, evaluated at each point
 
 ### Fixed
+- The READMEs' screenshots: their links pointed to the branch `main`, renamed `v1.1-legacy` — GitHub doesn't redirect a file's raw link: every image missing (404). The screenshots copied into `v1.2-dev` (`images/screenshots/`), the links pointing there
 - Home Assistant's card editor, a card with a short YAML and no graph yet ([#301](https://github.com/Cook23/history-explorer-card/issues/301)): an entity chosen in the selector wasn't added — the editor's preview, a box that scrolls, is no higher than the card there: the entity's menu, opening under the field out of it, closed at once, the entity selector's list cut. The card keeps room under itself in the editor's preview (`preview`: Home Assistant's), always, as high as the selector's lists open (`SELECTOR_LIST_MAX_HEIGHT`)
 - *Export ▸ YAML*: a soft bound (`ymin`, `ymax`, `yminRight`, `ymaxRight`, `arrowMax`) was written in its internal form (`soft: 700`); now as the YAML writes it, `~700`
 - An arrowline's `color` read indirectly (thresholds, another entity's value, an entity holding it) was evaluated once, for its value now, every arrow drawn in it: each arrow now takes the color of the time it shows, as a curve's point and a bar do; its `fill` too, the band under each arrow its own
