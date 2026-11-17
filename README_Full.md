@@ -121,20 +121,20 @@ A highly interactive way to view the history of the entities in Home Assistant: 
 
 Home Assistant 2026.11 or later; on an older version, [HACS](https://hacs.xyz): *HACS › ⋮ › Custom repositories*, the same link, type *Dashboard*.
 
-1. **Settings › Marketplace** — the first time, accept its warning.
-2. **Add from link** (top right) — **GitHub link**: `https://github.com/Cook23/history-explorer-card` — **Add**. The first time, Home Assistant asks to connect GitHub: enter the code it shows on GitHub, approve.
-3. Select *history-explorer-card* in the list (type *Dashboard*), then **Install**, and **Install** again.
-4. Reload the page in the browser — in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
-5. Add the card: edit a dashboard, **+ Add card**, search *History Explorer Card*.
+- **Marketplace** — *Settings › Marketplace*; the first time, accept its warning.
+- **Add from link** (top right) — **GitHub link**: `https://github.com/Cook23/history-explorer-card`, then **Add**. The first time, Home Assistant asks to connect GitHub: enter the code it shows on GitHub, approve.
+- **Install** — select *history-explorer-card* in the list (type *Dashboard*), then **Install**, and **Install** again.
+- **Reload** — reload the page in the browser; in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
+- **Card** — edit a dashboard, **+ Add card**, search *History Explorer Card*.
 
 The card's dashboard resource is added by itself (resources managed in YAML: the install dialog shows the one to add), and its new versions are shown as updates.
 
 ### Manual install
 
-1. Copy `history-explorer-card.js` (from the [releases](https://github.com/Cook23/history-explorer-card/releases)) into the `config/www` folder.
-2. **Settings › Dashboards › ⋮ › Resources › Add resource** — **URL**: `/local/history-explorer-card.js`, **Resource type**: *JavaScript module* — **Create** (see Home Assistant's [Registering resources](https://developers.home-assistant.io/docs/frontend/custom-ui/registering-resources)).
-3. Reload the page in the browser — in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
-4. Add the card: edit a dashboard, **+ Add card**, search *History Explorer Card*.
+- **Copy** — `history-explorer-card.js` (from the [releases](https://github.com/Cook23/history-explorer-card/releases)) into the `config/www` folder.
+- **Resource** — *Settings › Dashboards › ⋮ › Resources › Add resource*: **URL** `/local/history-explorer-card.js`, **Resource type** *JavaScript module*, then **Create** (see Home Assistant's [Registering resources](https://developers.home-assistant.io/docs/frontend/custom-ui/registering-resources)).
+- **Reload** — reload the page in the browser; in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
+- **Card** — edit a dashboard, **+ Add card**, search *History Explorer Card*.
 
 ---
 
@@ -320,9 +320,9 @@ lineWidth: 3
 
 The history explorer can be run as a sidebar panel: the card on a page of its own, in Home Assistant's sidebar.
 
-1. *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
-2. Open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
-3. **+ Add card**: *History Explorer Card* — it takes the whole page.
+- **Dashboard** — *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
+- **View** — open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
+- **Card** — **+ Add card**: *History Explorer Card*; it takes the whole page.
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
 
