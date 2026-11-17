@@ -156,9 +156,14 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
   version is dead, before merging.
 - **The CHANGELOG's section is the version's number** (`## [v1.2.53] - 2026-10-30`), released or not — never
   `[Unreleased]`. Whether a version is released is on GitHub (its releases), not in the files.
-- **Build numbers** (`1.2.53b1`, `b2`…) only in Claude's working copy and in discussions with
-  the user — never merged: not in `package.json`, `src/version.js`, the built `history-explorer-card.js`, the CHANGELOG, the docs, a code comment, or a commit
-  or PR title.
+- **Build numbers** (`1.2.53b1`, `b2`…) only in Claude's working copy, the work branches
+  (`claude/v1.1-legacy-port`, `claude/v1.2-dev-port`) and discussions with the user — never
+  merged: not in `package.json`, `src/version.js`, the built `history-explorer-card.js`, the
+  CHANGELOG, the docs or a code comment of what is merged into the line, nor in a PR title (the
+  squash merge's title).
+- **The work branches are the working repository** (set by the user, said several times): a
+  build is pushed there for the user to test it (its built `history-explorer-card.js`, its
+  build number in it and in its commits' titles) — no history rewritten there for that.
 
 ## Pointer events — what the browsers send (measured on the user's tablet), set by the user
 
