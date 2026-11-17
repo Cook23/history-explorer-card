@@ -19,7 +19,6 @@ Changelog for the HA History Explorer Card.
 ### Changed
 - Every option of an entity set at the four levels — the card, `entityOptions`, a graph, the entity —, by the one chain: `color`, `unit`, `hidden`, `scale`, `process`, `circular`, `legendVisible`, `fixedValue` on a graph too, and on the card for those it didn't take; but `type` and `name` (an entity's only: on the card the card's type and mini-graph-card's title, on a graph the graph's own type and its `title`). `legendVisible` the same at every level: `false`, no label for its curves; `auto`, on a graph or the card, a graph's legend only for several labels (before: on the card, no legend at all, whatever an entity said)
 - `lineColor`: a color by place in a graph for the entities added from the card too (before: the YAML's only); a graph's above its `color`, the card's below a graph's `color` and `entityOptions`' (above before), above the card's `color`
-- Internal: the levels an option takes derived from one list of exceptions (`ENTITY_ONLY_KEYS`); `lineColor` resolved with the other options when a curve is added (`_applyEntityDefaults`) — no longer written onto the YAML's entities while its graphs are read; the card's legend read as every option (`hideLegend`, `legendAuto` gone)
 - An arrowline's arrows drawn as a path instead of an image (drawn at once, scaled to their length)
 
 ### Docs
@@ -32,6 +31,7 @@ Changelog for the HA History Explorer Card.
 - The info panel's link to the curve menu named as the card shows it, *Curve ▾*; link titles brought up to date
 
 ### Internal
+- The levels an option takes derived from one list of exceptions (`ENTITY_ONLY_KEYS`); `lineColor` resolved with the other options when a curve is added (`_applyEntityDefaults`) — no longer written onto the YAML's entities while its graphs are read; the card's legend read as every option (`hideLegend`, `legendAuto` gone)
 - One function for an option read directly or indirectly (`color`, `fill`, `arrowLength`: `INDIRECT_OPTIONS`, `optionSeriesOf`, `_optionFunction`); the series they read loaded with the entities' history
 - Tests (`features`): the card in the editor's preview, its menu opening; a soft bound exported with its `~`
 - Tests (`options`, `colors`, `arrowline`): `arrowLength` and `arrowMax` (parsing, lengths, scale, dashed, points, negative values, tooltip), `fill` read indirectly, `color` and `unit` on a graph, `lineColor`'s place among the levels
