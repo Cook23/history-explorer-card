@@ -121,7 +121,7 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 
 ### YAML export
 
-The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸* copies the settings of the card, the graph or the curve to the clipboard, in the card's own syntax, the choices made in the menus included — *Simplified*, what is necessary: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*, what is useful to change it: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
+The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸* copies the settings of the card, the graph or the curve to the clipboard, the choices made in the menus included — *Simplified*: what differs from the defaults; *Complete*: everything that applies.
 
 **In Home Assistant's card editor**, it helps write a card's YAML: set the card up in the editor's preview with its menus, export it from the options menu, and paste it in place of the YAML there — it holds `type:` and `cardName:` too. In the editor's preview, the card keeps room under itself for its menus to open.
 
@@ -174,7 +174,11 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
-Click near a curve to put it in the tooltip; it then follows the pointer from value to value, and shows real values only. What it shows is each curve's tooltip mode — `selected` (the curves clicked), `nearest` (the value pointed at, on a hover), `mixed` (both) or `all` (every curve's value at that time) —, set by the screen — `tooltip.largeScreen` (a window 640 px wide or more, `mixed` by default), `tooltip.smallScreen` (`selected` by default) — or by the card's room, which wins when set — `tooltip.largeChart` (a card 600 px wide or more), `tooltip.smallChart` (narrower, and the info panel) —, or from a menu: *Behavior ▸ Tooltip ▸*, which sets the one giving the mode where the card is — the card's room's when set, else the screen's. `tooltip.size` sets how much it shows: `full`, `compact`, `slim`, or `auto` (by the card's width, the default).
+Click near a curve to put it in the tooltip; it then follows the pointer from value to value.
+
+- **Mode** — `selected`: the curves clicked; `nearest`: the value pointed at; `mixed`: both; `all`: every curve's value at that time.
+- **Set by** — the screen's width (`tooltip.largeScreen`, `tooltip.smallScreen`), the card's (`tooltip.largeChart`, `tooltip.smallChart`), or *Behavior ▸ Tooltip ▸*.
+- **Size** — `tooltip.size`: `full`, `compact`, `slim` or `auto`.
 
 📖 [Tooltip](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#tooltip)
 
@@ -358,7 +362,7 @@ entityOptions:
 
 ### Colors
 
-`color` — and `fill`, its values `true`, `false`, `fade` or a color — takes a value, or thresholds on the value — or on another entity's or attribute's —, or an entity holding one:
+`color` takes a color, thresholds on the value or on another entity's or attribute's value, or an entity holding the color. `fill` takes the same forms, plus `true`, `false` and `fade`:
 
 ```yaml
 graphs:
@@ -408,43 +412,17 @@ statistics:
 The card's look and layout — its header, its colors, its toolbars, its sizes, its cursor line, its time ticks:
 
 ```yaml
-type: custom:history-explorer-card
 header: 'My history'   # ' ': none, its room kept; hide: none at all
 uimode: dark           # force dark or light mode
 cardName: my-card      # required with several cards on the same dashboard
-hour24: true           # the 24-hour clock (false: the 12-hour one; not set: Home Assistant's setting)
-
 uiColors:
   gridLines: '#ff000040'
-  labels: green
-  buttons: '#80f00050'
-  cursorLine: '#ff000080'
-  selector: 'rgba(255,255,255,255)'
-  closeButton: '#0000001f'  # the bar interval selector's background
-
 uiLayout:
   toolbar: top         # top, bottom, both, hide
-  selector: bottom
-  sticky: top          # keep the toolbar visible while scrolling
-  invertZoom: true     # swap the magnifiers − and +
-  interval: hide       # hide the bar interval selector
-
-labelAreaWidth: 65
-lineGraphHeight: 250
-barGraphHeight: 150
-timelineBarHeight: 24
-timelineBarSpacing: 40
-legendVisible: false      # no legend (auto: only for several curves)
-stateColorSeed: 137       # seed for automatic state colors
-
-cursor:                   # the vertical line following the pointer
-  mode: all               # auto (the graph pointed at), all (every graph), hide
-  types: [line, timeline] # default: timelines
-
+cursor:
+  mode: all            # the vertical line following the pointer: auto, all, hide
 timeTicks:
-  density: high           # low, medium, high, higher, highest
-  densityOverride: higher # force this level
-  dateFormat: short       # normal (default) or short
+  density: high        # low, medium, high, higher, highest
 ```
 
 **A narrow card** — under 300 px wide (two cards side by side on a phone), the card keeps its graphs readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, the text a little smaller, the legend's names shortened, a slim tooltip.
@@ -553,18 +531,18 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`filterEntities` / `excludeFilterEntities`** | **Default** `filterEntities`: every entity listed; `excludeFilterEntities`: none excluded<br>The entities the selector lists / those it leaves out (`*` as a wildcard) — see *3 — *the card's only* |
 | **`exclude`** | **Default** not set<br>Entities left out of a wildcard `entity:`; a graph's and an entity's combine — see *3 — *a graph and an entity only* |
 
-*1 — `height` on the card sets the height of every line and bar graph; `lineGraphHeight`/`barGraphHeight` (see [UI configuration](#ui-configuration)) still set their own, and win over it.
+*1 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
 
-*2 — `entityOptions` accepts every option an entity takes (all but the card's only ones), targeted by entity id, device class, domain, or glob pattern instead of repeating it on every entity.
+*2 — `entityOptions`: every option but the card's only ones, given once for the entities it targets, by entity id, device class, domain or pattern.
 
-*3 — `filterEntities`, `excludeFilterEntities` and `exclude` each accept a single string, a list of strings, or (for `exclude`) the object form `{entity: '...'}` — see [Adding entities](#adding-entities).
+*3 — `filterEntities`, `excludeFilterEntities`, `exclude`: a string or a list of strings, `*` as a wildcard; `exclude` also `{entity: '...'}` — see [Adding entities](#adding-entities).
 
-*4 — `circular`: absent (or `none`) detects angles automatically (unit exactly `°`, or state class `measurement_angle`: period 360; an attribute in `°` only when it's a direction, like `wind_bearing`), `false` turns it off, a number or numeric string (`360`, `6.28`) sets the period, `2pi` sets 2π. On an arrowline, it sets what a full turn of the arrows is (360 without a period).
+*4 — `circular`: automatic for an angle (unit `°`, state class `measurement_angle`, an attribute named as a direction); `false` off; a number the period; `2pi` 2π. On an arrowline: a full turn of the arrows.
 
-*5 — `scale` and `valueFactor` both multiply the values. `scale` is the factor itself; without `unit` it only changes how the curve is drawn (to make it visible next to larger values, or to flip it with a negative factor): the legend and tooltip show the entity's real value. With `unit`, `scale` is a conversion into that unit, and the legend and tooltip show the converted value — e.g. `scale: 0.001` and `unit: kW` for a power in W. `valueFactor` is a power of 10, and multiplies what is drawn **and** shown, with or without `unit`: `valueFactor: -3` is `scale: 0.001` with the entity's own unit. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
+*5 — `scale` multiplies what is drawn; with `unit`, what is shown too (`scale: 0.001`, `unit: kW` for a power in W). `valueFactor` multiplies both by a power of 10, the unit kept. 📖 [Scaling values](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#scaling-values-scale-unit-and-valuefactor)
 
 *6 — an option of the graph itself (its Y axis, its stacking, its bars' spacing, its height, its time labels, its grid, its Y labels): set on an entity or in `entityOptions`, it applies to the graph the entity is shown in; the graph's own value wins.
 
-An option is spelled the same at every level, and its aliases — the names and values in the table — are accepted everywhere. A graph's options can be set under its `options:` or on the graph itself (`options:` wins).
+An option is spelled the same at every level.
 
 📖 [Options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
