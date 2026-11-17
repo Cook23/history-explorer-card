@@ -52,28 +52,28 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 - [Quick configuration](#quick-configuration)
   - [YAML graphs](#yaml-graphs)
   - [YAML export](#yaml-export)
-  - [Running as a sidebar panel](#running-as-a-sidebar-panel)
   - [Info panel](#info-panel)
+  - [Running as a sidebar panel](#running-as-a-sidebar-panel)
 - [Usage](#usage)
+  - [Adding entities](#adding-entities)
   - [Navigation](#navigation)
   - [Tooltip](#tooltip)
-  - [Menus](#menus)
-  - [Adding entities](#adding-entities)
   - [Managing graphs](#managing-graphs)
   - [Y axis](#y-axis)
+  - [Menus](#menus)
   - [CSV export](#csv-export)
 - [Detailed configuration](#detailed-configuration)
-  - [Time range](#time-range)
-  - [Persistence](#persistence)
   - [Graph types](#graph-types)
     - [Lines](#lines)
     - [Bars](#bars)
     - [Timelines](#timelines)
     - [Compass arrows](#compass-arrows)
   - [Colors](#colors)
-  - [Long term statistics](#long-term-statistics)
   - [Values over a graph, look: mini](#values-over-a-graph-look-mini)
+  - [Time range](#time-range)
+  - [Long term statistics](#long-term-statistics)
   - [UI configuration](#ui-configuration)
+  - [Persistence](#persistence)
 - [Options](#options)
   - [Graph and entity options](#graph-and-entity-options)
   - [Curve and graph options](#curve-and-graph-options)
@@ -139,18 +139,6 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 
 📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
 
-### Running as a sidebar panel
-
-<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
-
-The card on a page of its own, in Home Assistant's sidebar:
-
-- **Dashboard** — *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
-- **View** — open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
-- **Card** — **+ Add card**: *History Explorer Card*; it takes the whole page.
-
-📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
-
 ### Info panel
 
 The card can replace the history graph of Home Assistant's more info popup: the switch *Global ▸ Enhanced native history* of the options menu, or `defaultInfoPanel: true`. To have it on every page, not only after a dashboard was opened:
@@ -164,11 +152,38 @@ frontend:
 
 📖 [Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
 
+### Running as a sidebar panel
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/sidebar-panel.png" alt="The card as a panel in the sidebar" width="652">
+
+The card on a page of its own, in Home Assistant's sidebar:
+
+- **Dashboard** — *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
+- **View** — open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
+- **Card** — **+ Add card**: *History Explorer Card*; it takes the whole page.
+
+📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
+
 ---
 
 ## Usage
 
 https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
+
+### Adding entities
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
+
+- **1** — type a name or an id in the entity selector (`*` as a wildcard: `*door*`, `sensor.*`).
+- **2** — click an entry, or press Enter; for an entity with attributes, its value or one of its attributes.
+- **3** — the curve menu opens, the best type pre-selected: pick one to add the curve.
+
+```yaml
+recordedEntitiesOnly: true          # only the entities recorded in the database
+filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes matches again
+```
+
+📖 [Adding entities](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#adding-entities)
 
 ### Navigation
 
@@ -190,44 +205,6 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 - **Size** — `tooltip.size`: `full`, `compact`, `slim` or `auto`.
 
 📖 [Tooltip](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#tooltip)
-
-### Menus
-
-<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
-
-- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
-- **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
-- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV, YAML), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
-
-A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
-
-The gesture settings (long-press duration, pointer precision, for a mouse or a pen and for a finger; the reading time of a word of a tooltip or a message) apply to every card, on every device:
-
-```yaml
-gestures:
-  longPress: 500        # ms, mouse and pen
-  longPressTouch: 500   # ms, finger
-  precision: 8          # px, mouse and pen
-  precisionTouch: 12    # px, finger
-  readingTimePerWord: 400   # ms per word of a tooltip or a message
-```
-
-📖 [Menus](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#menus) · [Gesture settings](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#gesture-settings)
-
-### Adding entities
-
-<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
-
-- **1** — type a name or an id in the entity selector (`*` as a wildcard: `*door*`, `sensor.*`).
-- **2** — click an entry, or press Enter; for an entity with attributes, its value or one of its attributes.
-- **3** — the curve menu opens, the best type pre-selected: pick one to add the curve.
-
-```yaml
-recordedEntitiesOnly: true          # only the entities recorded in the database
-filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes matches again
-```
-
-📖 [Adding entities](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#adding-entities)
 
 ### Managing graphs
 
@@ -263,6 +240,29 @@ graphs:
 
 📖 [Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#y-axis-scaling)
 
+### Menus
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
+
+- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
+- **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
+- **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV, YAML), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
+
+A choice made in a menu applies to every curve it concerns: the last one made wins, whatever its level.
+
+The gesture settings (long-press duration, pointer precision, for a mouse or a pen and for a finger; the reading time of a word of a tooltip or a message) apply to every card, on every device:
+
+```yaml
+gestures:
+  longPress: 500        # ms, mouse and pen
+  longPressTouch: 500   # ms, finger
+  precision: 8          # px, mouse and pen
+  precisionTouch: 12    # px, finger
+  readingTimePerWord: 400   # ms per word of a tooltip or a message
+```
+
+📖 [Menus](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#menus) · [Gesture settings](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#gesture-settings)
+
 ### CSV export
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png" alt="The options menu, Export open" width="385">
@@ -283,33 +283,6 @@ csv:
 ---
 
 ## Detailed configuration
-
-### Time range
-
-The time range shown when the card opens, where its window ends, and what the magnifying glass zooms:
-
-```yaml
-defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
-defaultTimeOffset: 1D    # uppercase: snapped — here the current day, from midnight
-defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y the Y axis, xy both (default)
-```
-
-📖 [Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#default-view-and-time-ranges)
-
-### Persistence
-
-What is changed on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
-- the entities added from the UI are kept, on every device — and a card without YAML entities keeps its time range and its graphs' order too;
-- the YAML entities show what the YAML says, unless these options say otherwise:
-
-```yaml
-enablePersistence: entities           # kept on this device
-enableMultidevicePersistence: range   # kept and synced across the user's devices
-```
-
-Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be set on a YAML entity for its own fields. The last one to speak wins: the YAML, when it changes, or the card.
-
-📖 [Persistence](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#persistence)
 
 ### Graph types
 
@@ -391,20 +364,6 @@ graphs:
 
 📖 [Colors of curves and bars](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#colors-of-curves-and-bars)
 
-### Long term statistics
-
-<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png" alt="Statistics where the history is gone, the history where it is kept" width="1012">
-
-The card loads what the screen can show — the daily, hourly or 5-minute statistics, or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
-
-```yaml
-statistics:
-  enabled: true    # default
-  period: hour     # 5minute, hour, day, week, month
-```
-
-📖 [Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics) · [Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation)
-
 ### Values over a graph, look: mini
 
 - `showState` — each curve's current value, over its graph.
@@ -421,6 +380,32 @@ statistics:
 **Replacing a mini-graph-card**: change its `type` to `custom:history-explorer-card` and add `look: mini`, its other lines kept — its options are read as the card's own.
 
 📖 [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) · [mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
+
+### Time range
+
+The time range shown when the card opens, where its window ends, and what the magnifying glass zooms:
+
+```yaml
+defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
+defaultTimeOffset: 1D    # uppercase: snapped — here the current day, from midnight
+defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y the Y axis, xy both (default)
+```
+
+📖 [Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#default-view-and-time-ranges)
+
+### Long term statistics
+
+<img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/long-term-stats.png" alt="Statistics where the history is gone, the history where it is kept" width="1012">
+
+The card loads what the screen can show — the daily, hourly or 5-minute statistics, or the history, by how long a column of pixels lasts —, so a graph reaches beyond the history's retention and panning and zooming stay smooth.
+
+```yaml
+statistics:
+  enabled: true    # default
+  period: hour     # 5minute, hour, day, week, month
+```
+
+📖 [Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics) · [Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation)
 
 ### UI configuration
 
@@ -443,6 +428,21 @@ timeTicks:
 **A narrow card** (under 300 px wide) stays readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, smaller text, shortened names, a slim tooltip.
 
 📖 [Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
+
+### Persistence
+
+What is changed on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
+- the entities added from the UI are kept, on every device — and a card without YAML entities keeps its time range and its graphs' order too;
+- the YAML entities show what the YAML says, unless these options say otherwise:
+
+```yaml
+enablePersistence: entities           # kept on this device
+enableMultidevicePersistence: range   # kept and synced across the user's devices
+```
+
+Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be set on a YAML entity for its own fields. The last one to speak wins: the YAML, when it changes, or the card.
+
+📖 [Persistence](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#persistence)
 
 ---
 
