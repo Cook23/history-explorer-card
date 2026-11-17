@@ -90,8 +90,8 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## Install
 
-- **Marketplace** (recommended; HACS before Home Assistant 2026.11): *Settings › Marketplace › Add from link*, `https://github.com/Cook23/history-explorer-card`, then **Install**.
-- **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings › Dashboards › ⋮ › Resources*, type JavaScript module).
+- **Marketplace** (recommended; HACS before Home Assistant 2026.11) — *Settings › Marketplace › Add from link*, `https://github.com/Cook23/history-explorer-card`, then **Install**.
+- **Manually** — copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings › Dashboards › ⋮ › Resources*, type JavaScript module).
 
 Then reload the page (in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*) and add the card from *+ Add card*: *History Explorer Card*.
 
@@ -135,7 +135,7 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 - *Simplified* — what differs from the defaults;
 - *Complete* — everything that applies.
 
-**In Home Assistant's card editor**: set the card up in the preview with its menus, export it from the options menu, and paste it in place of the editor's YAML.
+**In Home Assistant's card editor** — set the card up in the preview with its menus, export it from the options menu, and paste it in place of the editor's YAML.
 
 📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
 
@@ -198,8 +198,6 @@ filterEntities: 'sensor.*energy*'   # or a list; excludeFilterEntities removes m
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
-Click near a curve to put it in the tooltip; it then follows the pointer from value to value.
-
 - **Mode** — `selected`: the curves clicked; `nearest`: the value pointed at; `mixed`: both; `all`: every curve's value at that time.
 - **Set by** — the screen's width (`tooltip.largeScreen`, `tooltip.smallScreen`), the card's (`tooltip.largeChart`, `tooltip.smallChart`), or *Behavior ▸ Tooltip ▸*.
 - **Size** — `tooltip.size`: `full`, `compact`, `slim` or `auto`.
@@ -210,9 +208,9 @@ Click near a curve to put it in the tooltip; it then follows the pointer from va
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png" alt="A curve's label dragged onto another graph" width="910">
 
-- **Click** a curve's name to hide or show it; a click on its value opens the entity's dialog.
-- **Double-click** a label to take the curve out into its own graph; double-click the chain icon 🔗 of linked graphs to merge them back.
-- **Drag** a label to reorder curves, or onto another graph to move the curve there; drag the ⠿ handle to reorder graphs.
+- **Click** — on a curve's name, hides or shows it; on its value, opens the entity's dialog.
+- **Double-click** — on a label, takes the curve out into its own graph; on the chain icon 🔗 of linked graphs, merges them back.
+- **Drag** — a label reorders the curves, or moves the curve onto another graph; the ⠿ handle reorders the graphs.
 - **Cut and paste** — *Cut* in a menu, then 📋 (into a graph) or ↓ / ↑ (a graph below or above) on the ⠿ zones.
 
 ```yaml
@@ -267,7 +265,7 @@ gestures:
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-export.png" alt="The options menu, Export open" width="385">
 
-The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
+*Export ▸ History* or *Statistics ▸* (the options menu ▾, a graph's or a curve's menu) exports the values of the window shown as a CSV file — of the card's, the graph's or the curve's entities:
 
 ```yaml
 csv:
@@ -290,12 +288,12 @@ csv:
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png" alt="The same values in the four line modes" width="1287">
 
-- `lineMode`: `smart` (the default from the UI: a curve, and a flat dashed line over the silences of a sensor), `curves` (the default in YAML), `lines`, `stepped`.
-- `interpolation` (curves and smart): `monotone` (default, never overshoots), `steffen`, `makima`, `catmullrom` (the smoothest), `bspline` (mini-graph-card's).
-- `dashMode`: `solid`, `points`, `shortlines`, `longlines`, `pointline` or a pattern `[10, 4]`; `lineWidth`; `fill`.
-- `showMinMax: all`: a band between the minimum and the maximum around the curve — `max` or `min`: only its half above or below the curve.
-- Angles (unit `°`) are drawn without a jump at 0/360 (`circular`).
-- `showUnavailable: true`: gaps where the entity was unavailable; `showMissingState: true`: gaps where a text state isn't in its `stateMap`.
+- `lineMode` — `smart` (the default from the UI: a curve, and a flat dashed line over the silences of a sensor), `curves` (the default in YAML), `lines`, `stepped`.
+- `interpolation` — in `curves` and `smart`: `monotone` (the default, never overshoots), `steffen`, `makima`, `catmullrom` (the smoothest), `bspline` (mini-graph-card's).
+- `dashMode` — `solid`, `points`, `shortlines`, `longlines`, `pointline` or a pattern `[10, 4]`; `lineWidth`, the line's width.
+- `showMinMax` — a band between the minimum and the maximum around the curve (`all`); `max` or `min`, only its half above or below the curve.
+- `circular` — angles (unit `°`) drawn without a jump at 0/360.
+- `showUnavailable` — gaps where the entity was unavailable; `showMissingState`, where a text state isn't in its `stateMap`.
 
 📖 [Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-appearance)
 
@@ -377,7 +375,7 @@ graphs:
 
 *Left: a card 168 px wide. Middle and right: `look: mini`, 374 and 168 px wide.*
 
-**Replacing a mini-graph-card**: change its `type` to `custom:history-explorer-card` and add `look: mini`, its other lines kept — its options are read as the card's own.
+**Replacing a mini-graph-card** — change its `type` to `custom:history-explorer-card` and add `look: mini`, its other lines kept — its options are read as the card's own.
 
 📖 [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) · [mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
 
@@ -425,7 +423,7 @@ timeTicks:
   density: high        # low, medium, high, higher, highest
 ```
 
-**A narrow card** (under 300 px wide) stays readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, smaller text, shortened names, a slim tooltip.
+**A narrow card** — under 300 px wide, it stays readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, smaller text, shortened names, a slim tooltip.
 
 📖 [Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
 
@@ -465,9 +463,7 @@ graphs:
         exclude: '*fridge*'   # an entity
 ```
 
-Each option in **bold**, its aliases — other names it is read under — in *italics* under it.
-
-An option is spelled the same at every level.
+Each option in **bold**, its aliases — other names it is read under — in *italics* under it; an option is spelled the same at every level.
 
 ### Graph and entity options
 
