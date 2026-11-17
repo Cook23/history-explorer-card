@@ -446,7 +446,11 @@ The attributes offered hold a number, a text or a yes/no — or a dictionary, or
 - a setting, a limit or a description of the entity (`display_precision`, `min_temp` / `max_temp`, `min` / `max` / `step`, `manufacturer`, `model`, `serial_number`, `code_format`…);
 - a date, with or without its time (`last_triggered`, `next_rising`, `last_seen`…).
 
-Choosing an entity (by click, or Enter) doesn't add it right away: the curve menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*. Nothing is created in the graph or persisted until a type is picked; the choice both sets the type and performs the add in one step. The menu always opens, even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, the only way to show it, to check before adding. See [Choosing an entity's display type](#choosing-an-entitys-display-type) below for the full behavior, including long-press access on existing labels and the wildcard "Default" option.
+Choosing an entity (a click, or Enter) doesn't add it right away: the curve menu opens first, the most fitting type pre-selected — line (*Smart*, *Curve*, *Straight* or *Stepped*), *Bar*, *Direction* or *Timeline*.
+- **Nothing added before a type is picked** — the choice sets the type and adds the entity, in one step;
+- **Always opened** — even for an entity whose state isn't a number (on/off, text…): it then only offers *Timeline*, to check before adding.
+
+The full behavior — the long-press on existing labels, the wildcard's *Default* — in [Choosing an entity's display type](#choosing-an-entitys-display-type) below.
 
 The entity selector accepts the `*` wildcard, to add every matching entity at once: the matches are shown in bold in the list, a first Enter selects them all, a second one opens the curve menu for the whole batch (see below):
 
@@ -551,7 +555,10 @@ A click or a tap near a curve puts it in the tooltip, at the value pointed at �
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/tooltip.png" alt="A click on a curve: the tooltip, at the value pointed at" width="912">
 
-The tooltip then moves to the value pointed at as the mouse — or a pen held above the screen, in the browsers that report it — moves over the curves; away from every value it stays where it is, and fades out after its reading time. Beside its point, it stands behind the pointer's move when there is room: reaching a value moving rightward, on its left, and the other way round — decided when it shows a new value, kept while it stays on it; with a finger, on the side of the point away from the graph's nearest edge; with no room on either side, above or below. A drag never acts on the tooltip: it moves the curves, and an open tooltip with them.
+Once open, the tooltip:
+- **Follows the pointer** — it moves to the value pointed at as the mouse (or a pen held above the screen, in the browsers that report it) moves over the curves; away from every value it stays, and fades out after its reading time;
+- **Stands behind the move** — beside its point, on the side the pointer comes from when there is room (reaching a value moving rightward: on its left), decided when it shows a new value and kept while it stays on it; with a finger, on the side away from the graph's nearest edge; with no room on either side, above or below;
+- **Never moved by a drag** — a drag moves the curves, and an open tooltip with them.
 
 **Which values it shows** — each curve's tooltip mode, set by the screen or by the card's room:
 - by the screen: `tooltip.largeScreen` in a window 640 px wide or more, `tooltip.smallScreen` in a narrower one — every card of the window alike, whatever its width;
@@ -647,7 +654,9 @@ A curve's label dragged left or right reorders the curves of its graph; the orde
 
 #### Reordering graphs
 
-A graph is moved by dragging its ⠿ symbol, at its top left (its box, with the padlock): dropped onto another graph, above its midpoint it goes above it, below it below. A simple click on that same area toggles the Y axis lock. The handle, the padlock and the chain icon of linked graphs keep only the room they need beside the legend's first line; on a narrow card they take none — each is drawn in a small box of the card's background over the legend's labels (or a timeline's rows): on the box, a gesture is theirs; beside it, on a label, the label's. The order is kept in the Home Assistant user's account. On a touch screen, tap the ⠿ symbol, then press it again right away and drag.
+A graph is moved by dragging its ⠿ symbol, at its top left (its box, with the padlock): dropped onto another graph, above its midpoint it goes above it, below it below. On a touch screen, tap the ⠿ symbol, then press it again right away and drag. The order is kept in the Home Assistant user's account.
+- **A click** on the same zone toggles the Y axis lock;
+- **Its room** — the handle, the padlock and the chain icon of linked graphs keep only the room they need beside the legend's first line; on a narrow card none: each is drawn in a small box of the card's background over the legend's labels (or a timeline's rows) — on the box, a gesture is theirs; beside it, on a label, the label's.
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-graph.png" alt="A graph dragged by its ⠿ zone: the line shows where it goes" width="910">
 
@@ -874,7 +883,10 @@ Arrows move through it, Enter or → opens a submenu, ← or Escape goes back.
 
 *Export ▸ History* — or *Export ▸ Statistics ▸* and a period — of the options menu (▾ beside the entity selector) exports the values of the entities shown, over the window shown, as a CSV file; a graph's own entities from the same *Export ▸* in its menu (a long-press on its ⠿ zone), a curve's own entity from its menu (a long-press on its label) or the info panel's.
 
-Home Assistant's recorder keeps two kinds of statistics, for the entities with a state class: every 5 minutes (short-term, kept as long as the history — the recorder's `purge_keep_days`) and every hour (long-term, kept for ever). *5 min* exports the first, *Hour* the second; *Day*, *Week* and *Month* are computed by Home Assistant from the hourly ones. The period in italic is the one chosen last, kept on this device whatever the persistence options (see [What is kept, and where](#what-is-kept-and-where)) — else `csv.statisticsPeriod`; a change of `csv.statisticsPeriod` in the YAML wins (the last one to speak wins). A period in bold is already loaded by the card over the whole window: exported at once.
+Home Assistant's recorder keeps two kinds of statistics, for the entities with a state class: every 5 minutes (short-term, kept as long as the history — the recorder's `purge_keep_days`) and every hour (long-term, kept for ever).
+- **The periods** — *5 min* exports the first, *Hour* the second; *Day*, *Week* and *Month* are computed by Home Assistant from the hourly ones;
+- **In italic** — the period chosen last, kept on this device whatever the persistence options (see [What is kept, and where](#what-is-kept-and-where)), else `csv.statisticsPeriod`; a change of `csv.statisticsPeriod` in the YAML wins (the last one to speak wins);
+- **In bold** — a period already loaded by the card over the whole window: exported at once.
 
 **The counts in brackets** — each line says how many of the entities exported have values within the window, at least in part (*History (3)*, *Statistics (2) ▸*, *Hour (2)*), a line greyed when none has:
 - **What tells it** — what the card has loaded, and Home Assistant's recorder: its hourly, daily, weekly and monthly statistics come from the same long-term statistics; its 5-minute ones are kept as long as the history; attributes, timelines and entities without a state class have none. What can't be told yet is asked quietly once the window is loaded;
@@ -912,7 +924,10 @@ An entity that is a total (increasing, or net metering) — the energy, the wate
 
 A bar graph is the `bar` type, for the entities added from the card and the YAML's alike. When an entity is added from the card, the curve menu pre-selects *Bar* for energy, gas, water or volume that adds up (state class `total_increasing`, or `total` with such a device class or unit); any other entity can be shown as bars by picking *Bar* in the menu, or with `type: bar`.
 
-The selector on the top right of the graph chooses the time interval the data is displayed at — on the legend's first line, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line. The same entity can be added several times, in separate graphs with different intervals. Selecting *Raw* will show the raw data of the bar entities as curves; selecting an interval again turns them back into bars. The default interval is hourly. It can be overridden using the `interval` option. Possible values are `10m`, `hourly`, `daily`, `weekly`, `monthly` or `raw` (*Raw*).
+The interval selector, at the top right of the graph, chooses the interval of the bars — on the legend's first line, before the `×`; when the legend's first label doesn't fit beside it, centred between the handle (or the padlock) and the `×`, the legend starting on the next line.
+- **Several intervals** — the same entity can be added several times, in separate graphs with different intervals;
+- **Raw** — shows the bar entities' raw data as curves; an interval chosen again turns them back into bars;
+- **`interval`** — the default interval, `hourly` unless set: `10m`, `hourly`, `daily`, `weekly`, `monthly` or `raw` (*Raw*).
 
 `sensor.rain_amount` added from the card, shown as bars of 10 minutes without picking *Bar* in the curve menu:
 
@@ -1098,7 +1113,11 @@ graphs:
 
 #### Line modes
 
-Four modes are available for line graphs: cubic splines, line segments, stepped and smart. Cubic splines (`curves`) are smooth and natural-looking, appropriate for signals already filtered; by default they use a monotone cubic interpolation (Fritsch–Carlson), guaranteed never to overshoot — other algorithms can be chosen with `interpolation`, see [Curve interpolation](#curve-interpolation). Line segments (`lines`) connect data points with perfectly straight segments using zero-tension monotone interpolation — the most faithful representation of the raw data. Stepped mode (`stepped`) displays the raw quantized data as a staircase. Smart mode (`smart`) is described below.
+Four modes are available for line graphs:
+- **`curves`** — cubic splines, smooth and natural-looking, for signals already filtered; by default a monotone cubic interpolation (Fritsch–Carlson), never overshooting — other algorithms with `interpolation` (see [Curve interpolation](#curve-interpolation));
+- **`lines`** — straight segments between the values (a zero-tension monotone interpolation): the most faithful drawing of the raw data;
+- **`stepped`** — the raw quantized data as a staircase;
+- **`smart`** — described below.
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/line-modes.png" alt="The same values in the four line modes" width="1287">
 
@@ -1136,7 +1155,10 @@ interpolation: makima
 
 Many sensors report irregularly: every few seconds while something happens, then nothing for minutes or hours. `curves` and `lines` then bridge each silence with a long spline or diagonal from the last value before it to the first one after it — suggesting a slow, gradual change that never happened. `stepped` avoids that, but loses the smooth shape of the curve while the sensor reports.
 
-`smart` combines both: a curve (same as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat line at the last known value — drawn dashed — until one usual interval before the next value, where the curve resumes. An ongoing silence (from the last value to now) is drawn the same way. Statistics are never a silence: where the curve is drawn from them (a long time range), the values of the history next to them — another day, the last minutes they don't cover yet — neither start nor end one; but a run of statistics Home Assistant made up while the sensor was silent (see [Long term statistics](#long-term-statistics)) is one, drawn the same way. A plateau has no min/max band (`showMinMax`): nothing varies in a silence.
+`smart` combines both: a curve (as `curves`) while the sensor reports at its usual rhythm, and during a silence a flat dashed line at the last known value, until one usual interval before the next value, where the curve resumes.
+- **An ongoing silence** — from the last value to now, drawn the same way;
+- **Statistics** — never a silence: where the curve is drawn from them (a long time range), the history's values next to them (another day, the last minutes they don't cover yet) neither start nor end one; but a run of statistics Home Assistant made up while the sensor was silent (see [Long term statistics](#long-term-statistics)) is one, drawn the same way;
+- **No min/max band** (`showMinMax`) on a plateau — nothing varies in a silence.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1257,7 +1279,9 @@ graphs:
 
 #### Showing the min/max statistical range
 
-The `showMinMax` option draws a lighter band, in the curve's color, between the minimum and the maximum of each column of pixels, around the curve of their mean — similar to the confidence band shown in Home Assistant's own history panel. The band of a point covers only the time its values cover: it goes from one point to the next only where their times meet, never across a time without values; a point alone is a bar over its time. Its edges are drawn as the curve is — straight, in steps, or curves of the same interpolation (see [Line modes](#line-modes), [Curve interpolation](#curve-interpolation)) —, without a line of their own.
+`showMinMax` draws a lighter band, in the curve's color, between the minimum and the maximum of each column of pixels, around the curve of their mean — like the band of Home Assistant's own history panel.
+- **Only where there are values** — a point's band covers only the time its values cover: from one point to the next only where their times meet, never across a time without values; a point alone is a bar over its time;
+- **Its edges** — drawn as the curve is (straight, in steps, or curves of the same interpolation — see [Line modes](#line-modes), [Curve interpolation](#curve-interpolation)), without a line of their own.
 
 | Value | Band |
 |---|---|
@@ -1398,11 +1422,15 @@ graphs:
 A graph can show, over its plot:
 - **`showState: true`** — each curve's value now, in large, in its color and unit (the first one on the left, the last one on the right), updated with the entity; the times shown over a graph are written as the time axis writes them (`hour24`, else Home Assistant's own setting);
 - **(hover)** — a hover on a curve shows, in place of its value now, the value it's on with its time, as mini-graph-card does; a value or a name cut (a narrow card) is shown in full while hovered, and on a click; a click on a value opens its entity's dialog (with the info panel when it's on);
-- **`showStats`** — each curve's statistics over the time window shown: `min`, `average`, `max` (a name or a list; `true`: all three), on a row — the minimum and the maximum with their time (the hour on a window of a day or less, else the date and the hour). Taken from the values loaded — the history, or the statistics where the curve is drawn from them (each hour's own minimum and maximum) — never from the points drawn, between the start of the window and its end (or now); the average is weighted by time — each value counts for as long as it lasted. Recomputed as the window moves or zooms, and when new values arrive. With several curves showing them, each row is named after its curve. For curves (lines) only.
+- **`showStats`** — each curve's statistics over the time window shown: `min`, `average`, `max` (a name or a list; `true`: all three), on a row — the minimum and the maximum with their time (the hour on a window of a day or less, else the date and the hour). For curves (lines) only:
+  - **Taken from the values loaded** — the history, or the statistics where the curve is drawn from them (each hour's own minimum and maximum), never from the points drawn, between the start of the window and its end (or now); the average weighted by time;
+  - **Kept up to date** — recomputed as the window moves or zooms, and when new values arrive;
+  - **Several curves** — each row named after its curve.
 
 A curve hidden from its legend shows neither. Both are set at every level — card, `entityOptions`, graph, entity (`showStats: false` on one curve of a graph that shows them turns them off for it).
 
-`showStateFor` and `showStatsFor` — on a graph or the card — say which curves a graph's or the card's `showState` and `showStats` are for: `all` (the default), or `first` — its first curve only, as mini-graph-card shows its first entity's; the others then show theirs only when it's set on them (on the entity, or in `entityOptions`: mini-graph-card's `show_state` on an entity). `stateAdaptiveColor: false` (mini-graph-card's `state_adaptive_color`, on the card, a graph, an entity or in `entityOptions`) writes a curve's values in the text's color instead of its own (the default); its `showIndicator` dot keeps the curve's color.
+- **`showStateFor`, `showStatsFor`** — on a graph or the card: which curves a graph's or the card's `showState` and `showStats` are for — `all` (the default), or `first`, its first curve only, as mini-graph-card shows its first entity's; the others then show theirs only when it's set on them (on the entity, or in `entityOptions`: mini-graph-card's `show_state` on an entity).
+- **`stateAdaptiveColor: false`** — mini-graph-card's `state_adaptive_color`, on the card, a graph, an entity or in `entityOptions`: a curve's values written in the text's color instead of its own (the default); its `showIndicator` dot keeps the curve's color.
 
 The values' place along their row: `alignState` — `left` (the default), `center`, `right`; their size: `fontSize`, a percentage (`80`); `showIndicator` on an entity: a dot in its color before its value.
 
@@ -1546,7 +1574,9 @@ For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 mi
   - **Not valid** — 5-minute statistics are never used, neither drawn nor exported (the history is kept as long). Hourly ones are drawn only where the history isn't kept (past the recorder's retention, their periods made up held — see below), the history first wherever it is: better than daily statistics coarser than a column of pixels; they're always exported.
 - **The coarsest source a column holds, first.** Where the card has several sources loaded, it draws the coarsest valid one whose period a column of pixels holds — the hourly statistics for six months, even where the history is loaded too: the same mean, minimum and maximum, from far fewer values —, a finer one only where it lacks (the last minutes, not compiled yet), a coarser one where nothing finer is kept. An angle is drawn from its history wherever it's loaded: its statistics are wrong (see below).
 - **Statistics made up, a value held.** Home Assistant compiles statistics for a period even when the sensor sent nothing: its last value, carried — its minimum, mean and maximum the same. A run of 5-minute or hourly statistics like that, at the same value, is drawn as that value held: one value lasting until the run's end — a silence in smart mode, a plateau (see [Smart mode](#smart-mode-silences-shown-as-flat-dashed-plateaus)) —, never a point each period.
-- **In the background, while the graphs are looked at.** Once the window has come, the card fills its cache around it: first, the history of the angles drawn from statistics over the window (Home Assistant averages them as plain numbers); then what each source can give the entities for the export menu; then each side, the block nearest the window first, every entity alike — the fine source a window on each side, in its blocks, the coarse one up to four windows on each side, in blocks ten times as large. One request at a time, the entities of a source together, without showing the window as loading, only when nothing else is under way, a second after the last change of the window, then a pause after each one of twice what it took (a second to 30 seconds: Home Assistant busy for it a third of the time at most), and only while the cache stays under some 300 000 values.
+- **In the background, while the graphs are looked at** — once the window has come, the card fills its cache around it:
+  - **What** — first, the history of the angles drawn from statistics over the window (Home Assistant averages them as plain numbers); then what each source can give the entities for the export menu; then each side, the block nearest the window first, every entity alike — the fine source a window on each side, in its blocks, the coarse one up to four windows on each side, in blocks ten times as large;
+  - **How** — one request at a time, the entities of a source together, without showing the window as loading; only when nothing else is under way, a second after the last change of the window, then a pause after each one of twice what it took (a second to 30 seconds: Home Assistant busy for it a third of the time at most); only while the cache stays under some 300 000 values.
 - **Requests to Home Assistant** — its database answers a few requests at a time (its recorder's workers: 4 with MariaDB), in the order they come, and reads every hourly row for the daily, weekly and monthly statistics, whatever their period: ten years of an entity are 87 600 rows.
   - **One queue** — the card sends its requests by phase, then phase 2's block, then the graphs' order, at once, 4 in flight at most, never asked again (an answer always comes). Every card on the page shares it.
   - **Grouped** — each request costs Home Assistant a fixed time, so: the probes in one request; phase 1, the heavy one, an entity at a time, each drawn as it comes — its short parts the entities together, its larger ones, once the window has moved, in 4 groups; phase 2, block by block, the entities of a source in 4 groups, a request each, every worker busy; the background, the entities of a source together.
@@ -1554,8 +1584,13 @@ For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 mi
   - **Drawing** — an answer draws again only the graphs of the entities it brought something to, and answers coming close together are drawn once; the graphs on the screen (their plot area, at least in part, in what the page shows) first, the others right after, one at a time when the page is free — after a gesture that moves the window, never during it.
   - **A history's start remembered** — where an entity's history comes back beginning well after the time asked, or empty for a time ended an hour before it was asked (past the recorder's retention, or before the entity existed — nearer, its first rows may not be written yet), the card never asks its history (its attributes' too) before that time again.
 - **A reasonable cache.** Past some 500 000 values (about 50 MB), the card drops the least useful ones until it's back under 300 000: the history of the days farthest from the window first, then their 5-minute statistics, the hourly, daily, weekly and monthly ones last — never the window nor its sides, as the coarse source asks them (each side a width, a month at most): a window of years may keep the cache past 500 000 values. A day dropped is drawn again at once from the statistics kept, and asked again when it's shown.
-- **Kept when the card is drawn again.** Home Assistant drawing the dashboard again (coming back to it, the app back from the background) makes the card again: put on the page, it takes back the card it replaces as it was — its graphs, already drawn, shown at once, nothing built or drawn again — and asks only what came since; a card that wasn't drawn yet takes back what its cache held on the page. A card off the page and its cache are let go 10 minutes later, unless taken back; two cards are never given each other's, whatever their name. The page loaded again (the app's page dropped meanwhile) starts its cache again, but keeps on this device the probes' verdicts (see *Only valid statistics*), for a day, and the automatic Y axes (see [Y axis scaling](#y-axis-scaling)): no probe asked again, the axes as they were.
-- **The last minutes from the history.** Home Assistant compiles a period's statistics once it has ended: the periods not compiled yet come from the finer statistics, down to the hourly ones, and the minutes after the finest drawn from the history — from the hour before their period and 10 minutes ago (room for Home Assistant being slow), or from where they stop when they stop earlier (Home Assistant late with them) —, the entities from the same time in one request. The automatic refresh asks again what came since each source was asked: today's statistics, and of the history only the hours since — never the day's history again. The card keeps every source the same way, by the time it covers.
+- **Kept when the card is drawn again** — Home Assistant drawing the dashboard again (coming back to it, the app back from the background) makes the card again:
+  - **Taken back** — put on the page, the new card takes back the one it replaces as it was — its graphs, already drawn, shown at once, nothing built or drawn again — and asks only what came since; a card that wasn't drawn yet takes back what its cache held on the page;
+  - **Let go** — a card off the page and its cache, 10 minutes later, unless taken back; two cards are never given each other's, whatever their name;
+  - **The page loaded again** (the app's page dropped meanwhile) — its cache starts again, but this device keeps the probes' verdicts (see *Only valid statistics*), for a day, and the automatic Y axes (see [Y axis scaling](#y-axis-scaling)): no probe asked again, the axes as they were.
+- **The last minutes from the history** — Home Assistant compiles a period's statistics once it has ended:
+  - **Not compiled yet** — those periods come from the finer statistics, down to the hourly ones, and the minutes after the finest from the history — from the hour before their period and 10 minutes ago (room for Home Assistant being slow), or from where they stop when they stop earlier (Home Assistant late with them) —, the entities from the same time in one request;
+  - **The automatic refresh** — asks again what came since each source was asked: today's statistics, and of the history only the hours since — never the day's history again. The card keeps every source the same way, by the time it covers.
 - **The same values from both.** A point computed from the history has the same mean, minimum and maximum as Home Assistant's statistics over the same time (see [Data decimation](#data-decimation)): nothing shows where the history meets the statistics.
 - **`statistics.period`** (below) is the hourly threshold of the table — an hour by default; with `period: day`, `week` or `month`, those statistics replace the hourly ones; with `period: 5minute`, the 5-minute ones do — used only where they're valid, as everywhere (see *Only valid statistics* above); with `statistics.force`, the card never goes down to the history (the 5-minute statistics at most), but for the last minutes.
 - **How long they're kept.** Home Assistant keeps the 5-minute statistics as long as the history (the recorder's `purge_keep_days`), the hourly ones for ever (the daily, weekly and monthly ones are computed from them): the card takes what it returns, however far back.
@@ -1606,7 +1641,11 @@ Instead of a point per column of pixels, a curve can have a point per group of t
 | `groupBy` (`group_by`) | `interval` (default), `hour`, `date` | `hour`: an hour each; `date`: a day each, from midnight to midnight — and a bar graph's interval hourly or daily, unless set |
 | `aggregateFunc` (`aggregate_func`) | `avg` (default), `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` | each group's value: its mean (each value weighted by how long it lasted), median, lowest, highest, first, last, the sum of its values, its highest less its lowest, its last less its first |
 
-In the YAML, the same entity can be written several times in one graph, each with its own `aggregateFunc` — its highest, its lowest and its mean, as mini-graph-card shows them; the card's gestures never put a curve twice in a graph. A group is never narrower than a column of pixels. A group without any value carries the value before (`delta` and `diff`: 0). The min/max band (`showMinMax`) is each group's lowest and highest, whatever the function. On a bar graph, `aggregateFunc` gives each bar the function over its interval (`max`: the day's total of a sensor reset every day). Where the long-term statistics are drawn (long windows), an hour of them counts as one value, its mean: `median`, `first`, `last`, `sum` and `diff` are then approximate — exact where the history is loaded.
+- **The same entity several times** — in the YAML, in one graph, each with its own `aggregateFunc` (its highest, its lowest and its mean, as mini-graph-card shows them); the card's gestures never put a curve twice in a graph;
+- **Groups** — never narrower than a column of pixels; a group without any value carries the value before (`delta` and `diff`: 0);
+- **The min/max band** (`showMinMax`) — each group's lowest and highest, whatever the function;
+- **On a bar graph** — `aggregateFunc` gives each bar the function over its interval (`max`: the day's total of a sensor reset every day);
+- **From the long-term statistics** (long windows) — an hour of them counts as one value, its mean: `median`, `first`, `last`, `sum` and `diff` are then approximate — exact where the history is loaded.
 
 ```yaml
 type: custom:history-explorer-card
@@ -1819,7 +1858,7 @@ hour24: true
 
 #### Changing the horizontal time tick density
 
-By default, time tick density is automatic and adjusts to the width of the screen. Whatever the density, the time labels always fit side by side along the axis: when they wouldn't, the step between two grows (two hours instead of one, a week instead of a day, two months instead of one…) until they do. That's always a compromise between looking good (no clipping), being readable at all screen sizes from mobile to wall sized 8k TV and subjective preferences over tick densities. In most cases, the default automatic selection will yield good results. But if needed, the density can be customized using the `timeTicks` setting.
+By default, the time ticks' density is automatic, by the screen's width. Whatever the density, the time labels always fit side by side: when they wouldn't, the step between two grows (two hours instead of one, a week instead of a day, two months instead of one…) until they do. It's a compromise between looking good (no clipping), being readable on every screen, from a phone to a wall-sized 8k TV, and taste: the default suits most cases; `timeTicks` sets another density.
 
 The year of the window's left end is shown in bold, in the margin left of the plot, on the line of the time labels — on every graph that shows its time labels and has room for it there (none when its Y labels are inside the plot, as on a narrow card). When the axis already shows that year at its left end (a window ticked by month starting on 1 January), the margin shows none.
 
@@ -2223,7 +2262,9 @@ graphs:
         interpolation: steffen # this curve only
 ```
 
-`fill`, `showMinMax`, `showState`, `showStats`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `netBars` and `exclude` set on a graph act as the default for every entity in that graph. An entity's own value (if set directly on it) always wins over the graph default. `options.exclude` is the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:` rather than being overridden by it, so both apply together. This is especially useful with several wildcard `entity:` patterns sharing one graph — set the common styling once instead of repeating it on each pattern:
+`fill`, `showMinMax`, `showState`, `showStats`, `dashMode`, `lineMode`, `interpolation`, `lineWidth`, `showPoints`, `netBars` and `exclude` set on a graph are the default of every entity of that graph; an entity's own value always wins.
+- **`options.exclude`** — the one exception to "most specific wins": it combines with each wildcard entity's own `exclude:`, both applying together;
+- **Useful** with several wildcard `entity:` patterns sharing one graph: the common styling set once instead of on each pattern:
 
 ```yaml
 type: custom:history-explorer-card
