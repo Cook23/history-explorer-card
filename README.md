@@ -135,9 +135,9 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 
 The card on a page of its own, in Home Assistant's sidebar:
 
-1. *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
-2. Open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
-3. **+ Add card**: *History Explorer Card* — it takes the whole page.
+- **Dashboard** — *Settings › Dashboards › Add dashboard › New dashboard from scratch*: a title and an icon, **Add to sidebar** on, then **Create**.
+- **View** — open it, **Edit dashboard**, then edit its view (✏ beside its name): **Layout**: *Panel (single card)*, then **Save**. A view already holding sections keeps its layout: add a view (**+**) with that one instead.
+- **Card** — **+ Add card**: *History Explorer Card*; it takes the whole page.
 
 📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
 
@@ -459,7 +459,7 @@ graphs:
         exclude: '*fridge*'   # an entity
 ```
 
-Each option in **bold**, its aliases — other names it is read under — in *italics* under it; its default value first in its description.
+Each option in **bold**, its aliases — other names it is read under — in *italics* under it.
 
 | Option | Description |
 |---|---|

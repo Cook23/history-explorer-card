@@ -1901,7 +1901,7 @@ entityOptions:
 
 Each option can be set on the card, in `entityOptions` (keyed by entity id, device class or domain), on a graph (under `options:`) or on an entity in `graphs` — except where its description says otherwise, see [The same options at every level](#the-same-options-at-every-level).
 
-Each option in **bold**, its aliases — other names it is read under — in *italics* under it; its default value first in its description.
+Each option in **bold**, its aliases — other names it is read under — in *italics* under it.
 
 | Option | Description |
 |---|---|
