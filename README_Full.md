@@ -1645,15 +1645,15 @@ The card loads what the screen can show, and no more. A graph can't draw anythin
 For example, on a graph 900 pixels wide: a day is drawn from the history (1.6 min a column), a week or a month from the 5-minute statistics (11 or 48 min), three months from the hourly statistics (2.4 h), five or ten years from the daily statistics (2 or 4 days) — ten years on 500 pixels from the weekly ones. The history is used up to some 29 hours on 350 pixels, 3 days on 900, 5 days on 1500.
 
 - **What the window needs, in phases** — what the card has loaded is drawn at once; what it lacks is asked to Home Assistant in phases, each answer drawn as it comes:
-  0. once a session, each entity's statistics checked (see *Only valid statistics* below);
-  1. the coarse source — the most precise valid statistics among the hourly, daily, weekly and monthly ones giving the window a hundred values at least (never finer than a column of pixels shows), over the window and a window on each side (a month at most; in real time, the left side only); the automatic Y axis is worked out from it:
-     - one request per entity; a short part (a day, a side, the hours not compiled yet) the same for several entities, one request for them all; a larger one, once the window has moved, in 4 groups of entities, a request each;
-     - a window too short for a hundred hourly values (some 4 days) has no phase 1;
-  2. only when a column of pixels lasts less than an hour: the fine source over the window — the 5-minute statistics where a column lasts 5 minutes or more and they're valid, else the history:
-     - in blocks from the right, all the same size for a width: up to a day, one block of the window (whole hours); up to 10 days, a day; beyond, a tenth of the window in whole days, a month at most;
-     - an entity without statistics always has phase 2, from its history;
-     - without phase 1, where the fine source comes back empty or starting late (past the recorder's retention): the hourly statistics there;
-     - without phase 2, where the statistics begin after the window's start (a state class given later, a change of unit): the history before them.
+  - **Phase 0** — once a session, each entity's statistics checked (see *Only valid statistics* below);
+  - **Phase 1** — the coarse source — the most precise valid statistics among the hourly, daily, weekly and monthly ones giving the window a hundred values at least (never finer than a column of pixels shows), over the window and a window on each side (a month at most; in real time, the left side only); the automatic Y axis is worked out from it:
+    - one request per entity; a short part (a day, a side, the hours not compiled yet) the same for several entities, one request for them all; a larger one, once the window has moved, in 4 groups of entities, a request each;
+    - a window too short for a hundred hourly values (some 4 days) has no phase 1;
+  - **Phase 2** — only when a column of pixels lasts less than an hour: the fine source over the window — the 5-minute statistics where a column lasts 5 minutes or more and they're valid, else the history:
+    - in blocks from the right, all the same size for a width: up to a day, one block of the window (whole hours); up to 10 days, a day; beyond, a tenth of the window in whole days, a month at most;
+    - an entity without statistics always has phase 2, from its history;
+    - without phase 1, where the fine source comes back empty or starting late (past the recorder's retention): the hourly statistics there;
+    - without phase 2, where the statistics begin after the window's start (a state class given later, a change of unit): the history before them.
 - **Only valid statistics** — statistics of a period shorter than an entity's own would make up values between its values: a value held, drawn as twelve the same, then a step.
   - **The probe** — once a session, at the start (kept in the cache), all the entities in one request, judged from Home Assistant's answer itself:
     - their last hour — the 5-minute statistics valid, and the hourly ones, where 5 intervals between values are each under 4 minutes (how often the sensor speaks when it speaks, whatever its silences); the hourly ones where the mean time between values (an hour divided by their count; none: infinite) is under 15 minutes;
