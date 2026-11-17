@@ -10,9 +10,10 @@ node tools/docs-images/render.cjs menu-graph # only the scenes named
 ```
 
 The images are written to `tools/docs-images/out/` (not committed), named as the READMEs
-link them. They are stored on `main`, in `images/screenshots/`: copy the ones you changed
-there, in a PR to `main`. The READMEs of every line link to
-`https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/…`.
+link them. They are stored on each line's branch, in `images/screenshots/`: copy the ones
+changed there. The READMEs of 1.2 link to
+`https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/…` — a
+file's raw link never follows a renamed branch (`main`, now `v1.1-legacy`).
 
 | File | What it renders |
 |---|---|
