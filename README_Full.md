@@ -1901,80 +1901,80 @@ entityOptions:
 
 Each option can be set on the card, in `entityOptions` (keyed by entity id, device class or domain), on a graph (under `options:`) or on an entity in `graphs` — except where its description says otherwise, see [The same options at every level](#the-same-options-at-every-level).
 
-| Property | Type | Name aliases | Value aliases | Description |
-|---|---|---|---|---|
-| `type` | string | `graph` | | Graph type: `line`, `bar`, `timeline`, `arrowline` |
-| `colorTransition` | string | `color_thresholds_transition` | | `smooth`: thresholds blended from one to the next; `hard` (default): each value its threshold's color — see [Colors of curves and bars](#colors-of-curves-and-bars) |
-| `lineColor` | string or list | `line_color` | | On a graph or the card: a color, or a list of colors — each entity without its own color takes the one at its place in the graph |
-| `color` | string, list or object | `color_thresholds` | thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` — a stop without a value spaced between its neighbours | Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors-of-curves-and-bars) |
-| `fill` | string, boolean or object | `show_fill` | `true`: the curve's color, light; `false`: none | Fill color under the line, or `fade`: the curve's color fading out downwards — or, as `color`, thresholds giving one, or an entity holding one — see [Colors](#colors-of-curves-and-bars) |
-| `lineWidth` | number | `width`, `line_width` | | Line width in pixels |
-| `lineMode` | string or boolean | `smoothing` | `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` | Interpolation mode: `curves`, `lines`, `stepped`, `smart` |
-| `interpolation` | string | | `akima` = `makima`, `catmull-rom`, `b-spline` | Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` — see [Curve interpolation](#curve-interpolation) |
-| `dashMode` | string or array | `line_style` | dashes and gaps as CSS writes them: `'10,10'` | Stroke style: `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array |
-| `showLine` | boolean | `show_line` | | `false`: its points only, no line between them |
-| `showGraph` | boolean | `show_graph` | `show.graph: bar` / `line`: drawn | `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `fixedValue` | boolean | `fixed_value` | | `true`: its last value in the window, flat over the whole window — see [Line modes](#line-modes) |
-| `tooltip.largeScreen` | string | `largeScreenTooltip`, `large_screen_tooltip` | | The curve's tooltip on a large screen (a window 640 px wide or more), unless the card's room has its own (`tooltip.largeChart`, `tooltip.smallChart`): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
-| `tooltip.smallScreen` | string | `smallScreenTooltip`, `small_screen_tooltip` | | The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
-| `tooltip.largeChart` | string | `largeChartTooltip`, `large_chart_tooltip` | | The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
-| `tooltip.smallChart` | string | `smallChartTooltip`, `small_chart_tooltip` | | The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
-| `tooltip.behavior` | string | `tooltipBehavior`, `tooltip_behavior` | | Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
-| `showPoints` | string, boolean or number | `showSamples`, `show_points` | | Dots at the measurement points: `hover` (default) only the hovered one; `true` all; `false` none, not even the hovered one; a number: all, that radius (`sizePoints` twice it) |
-| `sizePoints` | number | | | The dots' diameter in px (the tooltip's: 2 px more). Default: the line width + 2 px |
-| `yAxis` | string | `y_axis` | `primary` = `left`, `secondary` = `right` | `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own |
-| `rounding` | number | `decimals` | | The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
-| `tapAction` | string or object | `tap_action` | an action's name alone: `tapAction: none` | What a click on its value does (in the legend, over the graph): Home Assistant's actions — `more-info` (default: its dialog, with the info panel when it's on), `navigate` (`navigation_path`), `url` (`url_path`), `perform-action` (`perform_action`, `data`, `target`), `call-service` (`service`, `service_data`), `none` |
-| `scale` | number | | | Multiply all values by this factor before drawing (see [Scaling values](#scaling-values-scale-unit-and-valuefactor)). Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
-| `unit` | string | | | Unit shown instead of the entity's own (see `scale`) |
-| `valueFactor` | integer | `value_factor` | | Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see [Scaling values](#scaling-values-scale-unit-and-valuefactor) |
-| `stateMap` | list | `state_map` | | A text state drawn as a curve: each state (`off`, or `{ value: off, label: Off }`) at its place in the list — 0, 1, 2… —, its label shown in the legend, the tooltip and on the Y axis — see [Text states as a curve](#text-states-as-a-curve) |
-| `hidden` | boolean | | | Hidden at first, its label struck through in the legend |
-| `legendVisible` | boolean or `auto` | `show_legend` | | `false`: no label in the legend for its curves (every one: no legend); `auto`, on a graph or the card: a graph's legend only for several labels |
-| `ymin` | number or `~`number | `lower_bound` | | Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked); `~0`: soft — the minimum unless the values go below it — see [Bounds](#bounds) |
-| `ymax` | number or `~`number | `upper_bound` | | Set the initial Y axis maximum, the same way |
-| `yminRight`, `ymaxRight` | number or `~`number | `lower_bound_secondary`, `upper_bound_secondary` | | The right Y axis' own bounds (else `ymin` / `ymax`) — see [Two Y axes](#two-y-axes) |
-| `yrange`, `yrangeRight` | number | `min_bound_range`, `min_bound_range_secondary` | | The smallest range the Y axis (the right one) shows — see [Bounds](#bounds) |
-| `yScaleSteadiness`, `yScaleSteadinessRight` | 0 to 100 | `yScaleSteadinessLeft` (`yScaleSteadiness`) | | The automatic Y axis' (the right one's) balance, 50 by default: 0, what is shown first; 100, a steady scale first — see [The automatic scale](#the-automatic-scale) |
-| `logarithmic` | boolean | | | A logarithmic Y axis (a line graph) |
-| `labelsLeft` | boolean or `hover` | `show_labels` | | The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see [Y axis scaling](#y-axis-scaling) |
-| `labelsRight` | boolean or `hover` | `show_labels_secondary` | | The right Y axis' labels, the same way |
-| `ystepSize` | number | `ystepsize` | | Fix the Y axis tick step size — unless its labels would overlap at the graph's height (then the automatic step, with a warning in the console) |
-| `ylock` | boolean | | | Disable all interactive Y axis pan and zoom for this graph |
-| `height` | number | | | Graph height in pixels (overrides global height settings) |
-| `decimation` | | | | Accepted, without effect: see [Data decimation](#data-decimation) |
-| `interval` | string | | | Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
-| `circular` | `null`, `false`, number or `2pi` | | | Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
-| `netBars` | boolean | | | Enable net metering mode for bar graphs |
-| `arrowLength` | number or string | | | An arrowline's arrows' length: a part of their whole length, 0 to 100 (%), or an entity (or attribute) whose value gives it, its scale automatic — see [Compass arrow graphs](#compass-arrow-graphs) |
-| `arrowMax` | number or `~`number | | | The value of `arrowLength`'s entity giving the whole length (no automatic scale); `~`: at least that value |
-| `stacked` | boolean | | | Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
-| `barSpacing` | number | `bar_spacing` | | The room between two bars, in pixels |
-| `process` | string | | | Javascript expression to transform state values before display |
-| `pointsPerHour` | number | `points_per_hour` | | Points an hour: groups of 1 / `pointsPerHour` hours — see [Aggregation](#aggregation) |
-| `groupBy` | string | `group_by` | | `interval`, `hour`, `date` — see [Aggregation](#aggregation) |
-| `aggregateFunc` | string | `aggregate_func` | | `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` — see [Aggregation](#aggregation) |
-| `showMinMax` | string or boolean | | | A lighter band between the min and max of each column of pixels: `all` (everywhere), `max`, `min` (its half above, below the curve), `statistics`, `history`, `false`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
-| `showTimeLabels` | boolean | | | Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
-| `showState` | boolean | `show_state` | | The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `showIndicator` | boolean | `show_indicator` | | A dot in its color before its value over the graph |
-| `showCurrentValues` | boolean | `show_legend_state` | | `false`: its value now left out of its legend label |
-| `showName`, `showIcon` | boolean | `show_name`, `show_icon` | | On a graph or the card: the header's name (its title, else its first curve's name) and icon — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `icon`, `iconImage` | string | `icon_image` | | On a graph or the card: the header's icon (`mdi:home`), or an image's address |
-| `alignHeader`, `alignIcon`, `alignState` | string | `align_header`, `align_icon`, `align_state` | | On a graph or the card: the header's layout (`center`, `default`, `left`, `right`), the icon's place (`right`, `left`, `state`), the values' place (`left`, `center`, `right`) |
-| `fontSizeHeader`, `fontSize` | number | `font_size_header`, `font_size` | | On a graph or the card: the header's size in pixels; the values' size, a percentage |
-| `nameAdaptiveColor`, `iconAdaptiveColor` | boolean | `show_name_adaptive_color`, `show_icon_adaptive_color` | | On a graph or the card: the header's name, its icon in the color of the first curve now |
-| `showStats` | boolean, string or list | `show.extrema`, `show.average` | | The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
-| `showStateFor`, `showStatsFor` | string | | | `all` (default) or `first`: a graph's or the card's `showState`, `showStats` for its first curve only, the others' set on them — see [Values over a graph](#values-over-a-graph-a-compact-look) |
-| `stateAdaptiveColor` | boolean | `state_adaptive_color` | | `false`: its values over the graph in the text's color |
-| `showGrid` | boolean | | | `false`: no grid lines on the graph |
-| `yLabels` | string | | | `inside`: the Y labels inside the plot, which takes the whole width |
-| `defaultTimeRange` | string | `hours_to_show` | a number alone: hours | On the card: the time range shown when the card opens — see [Default view and time ranges](#default-view-and-time-ranges) |
-| `defaultMagnifierMode` | string | | | On the card: what the magnifying glass's box zooms when the card opens — `x` the time, `y` the Y axis, `xy` both (default) — see [Default view and time ranges](#default-view-and-time-ranges) |
-| `labelsVisible` | boolean | | | On the card: `false` hides the entity names left of the timelines' rows |
-| `hour24` | boolean | | | On the card: the 24-hour clock (`true`) or the 12-hour one (`false`) — see [The clock](#the-clock) |
-| `show` | block | | | mini-graph-card's block, read as the options it names: `show: { points: true }` is `showPoints: true` |
-| `exclude` | string, list, or `{entity: ...}` | | | Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
+| Option | Description |
+|---|---|
+| `type`<br>*`graph`* | *string* — Graph type: `line`, `bar`, `timeline`, `arrowline` |
+| `colorTransition`<br>*`color_thresholds_transition`* | *string* — `smooth`: thresholds blended from one to the next; `hard` (default): each value its threshold's color — see [Colors of curves and bars](#colors-of-curves-and-bars) |
+| `lineColor`<br>*`line_color`* | *string or list* — On a graph or the card: a color, or a list of colors — each entity without its own color takes the one at its place in the graph |
+| `color`<br>*`color_thresholds`* | *string, list or object* — Line/bar color: a color, thresholds (on the value, or on another entity's), or an entity holding either — see [Colors](#colors-of-curves-and-bars) — also thresholds as a list: `[{ value: 0, color: blue }, green, { value: 20, color: red }]` — a stop without a value spaced between its neighbours |
+| `fill`<br>*`show_fill`* | *string, boolean or object* — Fill color under the line, or `fade`: the curve's color fading out downwards — or, as `color`, thresholds giving one, or an entity holding one — see [Colors](#colors-of-curves-and-bars) — also `true`: the curve's color, light; `false`: none |
+| `lineWidth`<br>*`width`, `line_width`* | *number* — Line width in pixels |
+| `lineMode`<br>*`smoothing`* | *string or boolean* — Interpolation mode: `curves`, `lines`, `stepped`, `smart` — also `true` = `curves`, `false` = `lines`; `line`, `curve`, `step` |
+| `interpolation` | *string* — Interpolation algorithm in `curves` and `smart` modes: `monotone` (default), `steffen`, `makima`, `catmullrom`, `bspline` — see [Curve interpolation](#curve-interpolation) — also `akima` = `makima`, `catmull-rom`, `b-spline` |
+| `dashMode`<br>*`line_style`* | *string or array* — Stroke style: `solid`, `points`, `shortlines`, `longlines`, `pointline`, or custom `[on, off, ...]` array — also dashes and gaps as CSS writes them: `'10,10'` |
+| `showLine`<br>*`show_line`* | *boolean* — `false`: its points only, no line between them |
+| `showGraph`<br>*`show_graph`* | *boolean* — `false`: not drawn, nor in the legend, its value kept over the graph; a graph none of whose curves is drawn shows no plot — see [Values over a graph](#values-over-a-graph-a-compact-look) — also `show.graph: bar` / `line`: drawn |
+| `fixedValue`<br>*`fixed_value`* | *boolean* — `true`: its last value in the window, flat over the whole window — see [Line modes](#line-modes) |
+| `tooltip.largeScreen`<br>*`largeScreenTooltip`, `large_screen_tooltip`* | *string* — The curve's tooltip on a large screen (a window 640 px wide or more), unless the card's room has its own (`tooltip.largeChart`, `tooltip.smallChart`): `mixed` (default), `nearest`, `selected` or `all` — see [Interactive navigation](#interactive-navigation). Set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set; kept on this device only |
+| `tooltip.smallScreen`<br>*`smallScreenTooltip`, `small_screen_tooltip`* | *string* — The same on a small screen (a window narrower than 640 px): `selected` by default; set from *Behavior ▸ Tooltip ▸* on that screen, where the card's room has no mode set |
+| `tooltip.largeChart`<br>*`largeChartTooltip`, `large_chart_tooltip`* | *string* — The same in a card 600 px wide or more, winning over the screen's when set: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set; kept on this device only |
+| `tooltip.smallChart`<br>*`smallChartTooltip`, `small_chart_tooltip`* | *string* — The same in a card narrower than 600 px, and in the info panel: no default; set from *Behavior ▸ Tooltip ▸* in such a card, once set |
+| `tooltip.behavior`<br>*`tooltipBehavior`, `tooltip_behavior`* | *string* — Changes the default of `tooltip.largeScreen` and `tooltip.smallScreen`: `mixed`, `nearest`, `selected` or `all`, on both screens; `auto` (default) leaves theirs (`mixed`, `selected`) — see [Interactive navigation](#interactive-navigation) |
+| `showPoints`<br>*`showSamples`, `show_points`* | *string, boolean or number* — Dots at the measurement points: `hover` (default) only the hovered one; `true` all; `false` none, not even the hovered one; a number: all, that radius (`sizePoints` twice it) |
+| `sizePoints` | *number* — The dots' diameter in px (the tooltip's: 2 px more). Default: the line width + 2 px |
+| `yAxis`<br>*`y_axis`* | *string* — `auto` (default), `left` or `right`: the Y axis of a line or bar entity. `auto`: a graph with two groups of compatible units puts the second one on the right; with more, every curve shares the left axis. Also on a graph or the card, for every curve that doesn't set its own — also `primary` = `left`, `secondary` = `right` |
+| `rounding`<br>*`decimals`* | *number* — The decimals of its values — exactly that many (`1`: `20.0`); not set: at most 2 — see [Rounding](#rounding) |
+| `tapAction`<br>*`tap_action`* | *string or object* — What a click on its value does (in the legend, over the graph): Home Assistant's actions — `more-info` (default: its dialog, with the info panel when it's on), `navigate` (`navigation_path`), `url` (`url_path`), `perform-action` (`perform_action`, `data`, `target`), `call-service` (`service`, `service_data`), `none` — also an action's name alone: `tapAction: none` |
+| `scale` | *number* — Multiply all values by this factor before drawing (see [Scaling values](#scaling-values-scale-unit-and-valuefactor)). Without `unit`, it only changes how the curve is drawn: the legend and tooltip show the entity's real value. With `unit`, it's a conversion into that unit: the legend and tooltip show the converted value (e.g. `scale: 0.001` and `unit: kW` for a power in W) |
+| `unit` | *string* — Unit shown instead of the entity's own (see `scale`) |
+| `valueFactor`<br>*`value_factor`* | *integer* — Its values shown and drawn multiplied by 10 to that power (`-3`: 400 W shows 0.4) — see [Scaling values](#scaling-values-scale-unit-and-valuefactor) |
+| `stateMap`<br>*`state_map`* | *list* — A text state drawn as a curve: each state (`off`, or `{ value: off, label: Off }`) at its place in the list — 0, 1, 2… —, its label shown in the legend, the tooltip and on the Y axis — see [Text states as a curve](#text-states-as-a-curve) |
+| `hidden` | *boolean* — Hidden at first, its label struck through in the legend |
+| `legendVisible`<br>*`show_legend`* | *boolean or `auto`* — `false`: no label in the legend for its curves (every one: no legend); `auto`, on a graph or the card: a graph's legend only for several labels |
+| `ymin`<br>*`lower_bound`* | *number or `~`number* — Set the initial Y axis minimum (can still be modified interactively; restored when padlock is unlocked); `~0`: soft — the minimum unless the values go below it — see [Bounds](#bounds) |
+| `ymax`<br>*`upper_bound`* | *number or `~`number* — Set the initial Y axis maximum, the same way |
+| `yminRight`, `ymaxRight`<br>*`lower_bound_secondary`, `upper_bound_secondary`* | *number or `~`number* — The right Y axis' own bounds (else `ymin` / `ymax`) — see [Two Y axes](#two-y-axes) |
+| `yrange`, `yrangeRight`<br>*`min_bound_range`, `min_bound_range_secondary`* | *number* — The smallest range the Y axis (the right one) shows — see [Bounds](#bounds) |
+| `yScaleSteadiness`, `yScaleSteadinessRight`<br>*`yScaleSteadinessLeft` (`yScaleSteadiness`)* | *0 to 100* — The automatic Y axis' (the right one's) balance, 50 by default: 0, what is shown first; 100, a steady scale first — see [The automatic scale](#the-automatic-scale) |
+| `logarithmic` | *boolean* — A logarithmic Y axis (a line graph) |
+| `labelsLeft`<br>*`show_labels`* | *boolean or `hover`* — The left Y axis' labels: `false` none, `hover` shown while the pointer is over the graph — see [Y axis scaling](#y-axis-scaling) |
+| `labelsRight`<br>*`show_labels_secondary`* | *boolean or `hover`* — The right Y axis' labels, the same way |
+| `ystepSize`<br>*`ystepsize`* | *number* — Fix the Y axis tick step size — unless its labels would overlap at the graph's height (then the automatic step, with a warning in the console) |
+| `ylock` | *boolean* — Disable all interactive Y axis pan and zoom for this graph |
+| `height` | *number* — Graph height in pixels (overrides global height settings) |
+| `decimation` | Accepted, without effect: see [Data decimation](#data-decimation) |
+| `interval` | *string* — Default bar interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (the bar entities drawn as curves) |
+| `circular` | *`null`, `false`, number or `2pi`* — Angles drawn without jumps at 0/360 — see [Circular values](#circular-values-angles) |
+| `netBars` | *boolean* — Enable net metering mode for bar graphs |
+| `arrowLength` | *number or string* — An arrowline's arrows' length: a part of their whole length, 0 to 100 (%), or an entity (or attribute) whose value gives it, its scale automatic — see [Compass arrow graphs](#compass-arrow-graphs) |
+| `arrowMax` | *number or `~`number* — The value of `arrowLength`'s entity giving the whole length (no automatic scale); `~`: at least that value |
+| `stacked` | *boolean* — Stack bars on top of each other rather than side by side (bar graphs with multiple entities) |
+| `barSpacing`<br>*`bar_spacing`* | *number* — The room between two bars, in pixels |
+| `process` | *string* — Javascript expression to transform state values before display |
+| `pointsPerHour`<br>*`points_per_hour`* | *number* — Points an hour: groups of 1 / `pointsPerHour` hours — see [Aggregation](#aggregation) |
+| `groupBy`<br>*`group_by`* | *string* — `interval`, `hour`, `date` — see [Aggregation](#aggregation) |
+| `aggregateFunc`<br>*`aggregate_func`* | *string* — `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` — see [Aggregation](#aggregation) |
+| `showMinMax` | *string or boolean* — A lighter band between the min and max of each column of pixels: `all` (everywhere), `max`, `min` (its half above, below the curve), `statistics`, `history`, `false`. See [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
+| `showTimeLabels` | *boolean* — Show or hide the horizontal time axis labels on a timeline or arrowline graph. Default is `true`. |
+| `showState`<br>*`show_state`* | *boolean* — The curve's value now, in large, over the graph — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `showIndicator`<br>*`show_indicator`* | *boolean* — A dot in its color before its value over the graph |
+| `showCurrentValues`<br>*`show_legend_state`* | *boolean* — `false`: its value now left out of its legend label |
+| `showName`, `showIcon`<br>*`show_name`, `show_icon`* | *boolean* — On a graph or the card: the header's name (its title, else its first curve's name) and icon — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `icon`, `iconImage`<br>*`icon_image`* | *string* — On a graph or the card: the header's icon (`mdi:home`), or an image's address |
+| `alignHeader`, `alignIcon`, `alignState`<br>*`align_header`, `align_icon`, `align_state`* | *string* — On a graph or the card: the header's layout (`center`, `default`, `left`, `right`), the icon's place (`right`, `left`, `state`), the values' place (`left`, `center`, `right`) |
+| `fontSizeHeader`, `fontSize`<br>*`font_size_header`, `font_size`* | *number* — On a graph or the card: the header's size in pixels; the values' size, a percentage |
+| `nameAdaptiveColor`, `iconAdaptiveColor`<br>*`show_name_adaptive_color`, `show_icon_adaptive_color`* | *boolean* — On a graph or the card: the header's name, its icon in the color of the first curve now |
+| `showStats`<br>*`show.extrema`, `show.average`* | *boolean, string or list* — The curve's `min`, `average` and `max` over the window shown, over the graph (`true`: all three) |
+| `showStateFor`, `showStatsFor` | *string* — `all` (default) or `first`: a graph's or the card's `showState`, `showStats` for its first curve only, the others' set on them — see [Values over a graph](#values-over-a-graph-a-compact-look) |
+| `stateAdaptiveColor`<br>*`state_adaptive_color`* | *boolean* — `false`: its values over the graph in the text's color |
+| `showGrid` | *boolean* — `false`: no grid lines on the graph |
+| `yLabels` | *string* — `inside`: the Y labels inside the plot, which takes the whole width |
+| `defaultTimeRange`<br>*`hours_to_show`* | *string* — On the card: the time range shown when the card opens — see [Default view and time ranges](#default-view-and-time-ranges) — also a number alone: hours |
+| `defaultMagnifierMode` | *string* — On the card: what the magnifying glass's box zooms when the card opens — `x` the time, `y` the Y axis, `xy` both (default) — see [Default view and time ranges](#default-view-and-time-ranges) |
+| `labelsVisible` | *boolean* — On the card: `false` hides the entity names left of the timelines' rows |
+| `hour24` | *boolean* — On the card: the 24-hour clock (`true`) or the 12-hour one (`false`) — see [The clock](#the-clock) |
+| `show` | *block* — mini-graph-card's block, read as the options it names: `show: { points: true }` is `showPoints: true` |
+| `exclude` | *string, list, or `{entity: ...}`* — Exclude matches from a wildcard `entity:` pattern. Also settable under a graph's `options:` — see below |
 
 ##### The same options at every level
 
