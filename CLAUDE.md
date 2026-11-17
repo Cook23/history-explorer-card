@@ -526,8 +526,16 @@ and any one to come):
 
 - The header holds the title, the links (README_Full, FORK_DESCRIPTION) and the disclaimer,
   nothing else.
+- **The plan** — README.md makes it, README_Full.md follows it (each of its sections in the
+  part where README.md's section linking to it is): the header; *Overview* (the presentation:
+  its sentence and its picture); *📋 Version highlights* (README.md only, summed up as much as
+  possible); the table of contents; then the parts — *Install*, *Quick configuration* (a basic
+  YAML card, the YAML export as a help in Home Assistant's card editor, the sidebar panel, the
+  info panel), *Usage* (the whole user interface), *Detailed configuration* (every parameter),
+  *Options* (the table of options).
 - The table of contents is the list of the headings, each under its parent, with their own
-  titles — one entry per section, every section listed, no two entries to one place.
+  titles — one entry per section, every section listed but *Overview* and *📋 Version
+  highlights*, no two entries to one place.
 - Each paragraph goes in the section of its subject (a color in Colors, an axis in the Y
   axis section, a mini-graph-card option in mini-graph-card compatibility…), never where
   it was convenient to add it.

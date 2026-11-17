@@ -10,10 +10,6 @@
 > **A custom history card for Home Assistant — fork of [SpangleLabs/history-explorer-card](https://github.com/SpangleLabs/history-explorer-card).**
 > 📖 [README_Full.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md) — the complete documentation · What this fork adds: [FORK_DESCRIPTION.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION.md) 🇬🇧 / [FORK_DESCRIPTION_FR.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/FORK_DESCRIPTION_FR.md) 🇫🇷
 
-A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
-
-![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/hero.png)
-
 ---
 
 > [!IMPORTANT]
@@ -23,28 +19,40 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore you
 
 ---
 
+## Overview
+
+A highly interactive history card for Home Assistant. Pan, zoom, and explore your entity history across any time range, with full support for line charts, bar charts, timelines and compass arrow graphs.
+
+![The card: two temperatures, the pressure and a timeline over one day](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/hero.png)
+
+---
+
 ## 📋 Version highlights
 
-A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md) for the complete, version-by-version detail.
+Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/CHANGELOG.md).
 
-- **v1.2.77** — *Export ▸ YAML*: a card's, a graph's or a curve's settings as YAML, the menus' choices included.
-- **v1.2.60** — The automatic Y axis shows what is in the window and keeps its scale as the time moves (`yScaleSteadiness`); the graphs drawn at once from coarser statistics, then refined, the cache filled ahead: a year shown in 0.4 s instead of 20, six months in 0.3 s instead of 10, a pan back at once.
-- **v1.2.59** — Time ranges up to 10 years, drawn from Home Assistant's daily statistics.
-- **v1.2.27** — Loading only what the screen can show: the hourly statistics, the 5-minute statistics or the history, chosen by how long a column of pixels lasts; every action taken at once, whatever is loading.
-- **v1.2.18** — mini-graph-card's YAML read as the card's own: a mini-graph-card is replaced by changing its `type` and adding `look: mini`.
-- **v1.2.15** — Gesture settings for every card (long-press duration, pointer precision, for a mouse or a pen and for a finger); the options menu in submenus.
-- **v1.2.9** — Values over a graph and `look: mini`; an entity's attributes shown as curves.
-- **v1.2.6** — A graph's menu, cut and paste: every gesture also in a menu.
-- **v1.2.4** — Two Y axes on a graph; colors from thresholds or from another entity; the info panel on every page of Home Assistant.
-- **v1.2.2** — The curve menu in submenus (*Display*, *Interpolation*, *Layout*); the tooltip opens on a click or a tap.
-- **v1.2.0** — Beta, alongside the 1.1 line: dragging on touch screens reworked (a swipe always scrolls the page), the code reorganized.
+- **v1.2.77** — YAML export of the card, a graph or a curve.
+- **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
+- **v1.2.59** — Time ranges up to 10 years.
+- **v1.2.27** — Only what the screen can show is loaded.
+- **v1.2.18** — mini-graph-card's YAML read as is.
+- **v1.2.15** — Gesture settings; the options menu in submenus.
+- **v1.2.9** — Values over a graph, `look: mini`; attributes as curves.
+- **v1.2.6** — The graph menu, cut and paste.
+- **v1.2.4** — Two Y axes; colors from thresholds or another entity; the info panel everywhere.
+- **v1.2.2** — The curve menu in submenus; the tooltip on a click.
+- **v1.2.0** — Beta: dragging on touch screens reworked.
 
 ---
 
 ## Table of contents
 
-- [📋 Version highlights](#-version-highlights)
 - [Install](#install)
+- [Quick configuration](#quick-configuration)
+  - [YAML graphs](#yaml-graphs)
+  - [YAML export](#yaml-export)
+  - [Running as a sidebar panel](#running-as-a-sidebar-panel)
+  - [Info panel](#info-panel)
 - [Usage](#usage)
   - [Navigation](#navigation)
   - [Tooltip](#tooltip)
@@ -52,23 +60,20 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
   - [Adding entities](#adding-entities)
   - [Managing graphs](#managing-graphs)
   - [Y axis](#y-axis)
-- [Time range](#time-range)
-- [Persistence](#persistence)
-- [Info panel](#info-panel)
-- [Graph types](#graph-types)
-  - [Lines](#lines)
-  - [Bars](#bars)
-  - [Timelines](#timelines)
-  - [Compass arrows](#compass-arrows)
-- [Colors](#colors)
-- [Long term statistics](#long-term-statistics)
-- [Values over a graph, look: mini](#values-over-a-graph-look-mini)
+  - [CSV export](#csv-export)
+- [Detailed configuration](#detailed-configuration)
+  - [Time range](#time-range)
+  - [Persistence](#persistence)
+  - [Graph types](#graph-types)
+    - [Lines](#lines)
+    - [Bars](#bars)
+    - [Timelines](#timelines)
+    - [Compass arrows](#compass-arrows)
+  - [Colors](#colors)
+  - [Long term statistics](#long-term-statistics)
+  - [Values over a graph, look: mini](#values-over-a-graph-look-mini)
+  - [UI configuration](#ui-configuration)
 - [Options](#options)
-- [UI configuration](#ui-configuration)
-- [CSV export](#csv-export)
-- [YAML export](#yaml-export)
-- [YAML graphs](#yaml-graphs)
-- [Running as a sidebar panel](#running-as-a-sidebar-panel)
 
 ---
 
@@ -76,6 +81,63 @@ A quick look at the milestones — see [CHANGELOG.md](https://github.com/Cook23/
 
 - **HACS** (recommended): add `https://github.com/Cook23/history-explorer-card` as a custom repository.
 - **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings → Dashboards → ⋮ → Resources*, type JavaScript module).
+
+---
+
+## Quick configuration
+
+### YAML graphs
+
+```yaml
+type: custom:history-explorer-card
+graphs:
+  - type: line
+    title: Temperatures
+    options:
+      ymin: -10
+    entities:
+      - entity: sensor.outside_temperature
+        color: '#3e95cd'
+      - entity: climate.salon
+        attribute: current_temperature   # an attribute; forecast.0.temperature: a sub-attribute
+  - type: timeline
+    title: Doors and motion
+    entities:
+      - entity: binary_sensor.door_barn
+        name: Barn door
+      - entity: binary_sensor.pir_*      # a wildcard
+```
+
+An attribute that is a number is shown as a curve, in the unit Home Assistant shows it in (`unit:` to set it), from the history only (Home Assistant keeps no statistics of attributes); anything else as a timeline.
+
+📖 [YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs) · [Attributes](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#attributes)
+
+### YAML export
+
+**In Home Assistant's card editor** — a help to write a card's YAML: set the card up in the editor's preview with its menus (the entities added, their display, their look), then *Export ▸ YAML ▸* from the options menu (▾) and paste it into the editor in place of the YAML there — it holds `type:` and `cardName:` too. *Simplified* gives what is necessary; *Complete*, what is useful to change it, the options at their default value included.
+
+The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸ Simplified* or *Complete* — the settings of the card, the graph or the curve, the choices made in the menus included, copied to the clipboard in the card's own syntax, to define it statically in another card. *Simplified*: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
+
+📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
+
+### Running as a sidebar panel
+
+Add an empty dashboard with **Show in sidebar** checked, set the view type to **Panel (1 card)**, and add the history explorer card.
+
+📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
+
+### Info panel
+
+The card can replace the history graph of Home Assistant's more info popup. Turn it on with the switch *Global ▸ Enhanced native history* of the options menu, or with `defaultInfoPanel: true`; `infoPanel:` holds the panel's own options. To have it on every page of Home Assistant, not only after a dashboard was opened:
+
+```yaml
+# configuration.yaml
+frontend:
+  extra_module_url:
+    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the URL of the card's resource
+```
+
+📖 [Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
 
 ---
 
@@ -171,9 +233,26 @@ graphs:
 
 📖 [Y axis scaling](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#y-axis-scaling)
 
+### CSV export
+
+The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
+
+```yaml
+csv:
+  separator: ';'
+  timeFormat: 'DD/MM/YYYY HH:mm:ss'
+  statisticsPeriod: hour
+  exportAttributes: true
+  numberLocale: 'en-US'
+```
+
+📖 [Exporting data as CSV](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-data-as-csv)
+
 ---
 
-## Time range
+## Detailed configuration
+
+### Time range
 
 ```yaml
 defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
@@ -183,9 +262,7 @@ defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y 
 
 📖 [Default view and time ranges](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#default-view-and-time-ranges)
 
----
-
-## Persistence
+### Persistence
 
 What you change on the card — its entities, its graphs' order, its time range, an entity's options — is kept or not:
 - the entities added from the UI are kept, on every device — and a card without YAML entities keeps its time range and its graphs' order too;
@@ -200,26 +277,9 @@ Each takes `range`, `entities`, `order`, `all` or `none` (or a list), and can be
 
 📖 [Persistence](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#persistence)
 
----
+### Graph types
 
-## Info panel
-
-The card can replace the history graph of Home Assistant's more info popup. Turn it on with the switch *Global ▸ Enhanced native history* of the options menu, or with `defaultInfoPanel: true`; `infoPanel:` holds the panel's own options. To have it on every page of Home Assistant, not only after a dashboard was opened:
-
-```yaml
-# configuration.yaml
-frontend:
-  extra_module_url:
-    - /hacsfiles/history-explorer-card/history-explorer-card.js?hacstag=...   # the URL of the card's resource
-```
-
-📖 [Info panel](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#info-panel--replacing-the-ha-more-info-popup)
-
----
-
-## Graph types
-
-### Lines
+#### Lines
 
 ![The same values in the four line modes](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/line-modes.png)
 
@@ -232,7 +292,7 @@ frontend:
 
 📖 [Line appearance](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#line-appearance)
 
-### Bars
+#### Bars
 
 ![Rain by the hour and by 10 minutes, each graph with its interval](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/bars-interval.png)
 
@@ -247,7 +307,7 @@ entityOptions:
 
 📖 [Bar graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#bar-graphs-for-total-increasing-entities)
 
-### Timelines
+#### Timelines
 
 ![A timeline: motion, a lock, a person](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/timeline.png)
 
@@ -261,7 +321,7 @@ stateColors:           # by entity, device class, domain or state
 
 📖 [Timeline charts](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#timeline-charts)
 
-### Compass arrows
+#### Compass arrows
 
 ![Wind gusts and the wind direction as compass arrows](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/compass.png)
 
@@ -273,9 +333,7 @@ entityOptions:
 
 📖 [Compass arrow graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#compass-arrow-graphs)
 
----
-
-## Colors
+### Colors
 
 `color` takes a color, or thresholds on the value — or on another entity's or attribute's:
 
@@ -290,9 +348,7 @@ entityOptions:
 
 📖 [Colors of curves and bars](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#colors-of-curves-and-bars)
 
----
-
-## Long term statistics
+### Long term statistics
 
 ![Statistics where the history is gone, the history where it is kept](https://github.com/Cook23/history-explorer-card/raw/main/images/screenshots/long-term-stats.png)
 
@@ -306,9 +362,7 @@ statistics:
 
 📖 [Long term statistics](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#long-term-statistics) · [Aggregation](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#aggregation)
 
----
-
-## Values over a graph, look: mini
+### Values over a graph, look: mini
 
 `showState` shows each curve's value now over its graph, `showStats` its minimum, average and maximum over the window shown. `look: mini` gives the look of mini-graph-card at once — the time can still be panned and zoomed; any option set on the card wins.
 
@@ -322,6 +376,52 @@ statistics:
 **Replacing a mini-graph-card**: change its `type` to `custom:history-explorer-card` and add `look: mini`, its other lines kept — its options are read as the card's own.
 
 📖 [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) · [mini-graph-card compatibility](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#mini-graph-card-compatibility)
+
+### UI configuration
+
+```yaml
+type: custom:history-explorer-card
+header: 'My history'   # ' ': none, its room kept; hide: none at all
+uimode: dark           # force dark or light mode
+cardName: my-card      # required with several cards on the same dashboard
+hour24: true           # the 24-hour clock (false: the 12-hour one; not set: Home Assistant's setting)
+
+uiColors:
+  gridLines: '#ff000040'
+  labels: green
+  buttons: '#80f00050'
+  cursorLine: '#ff000080'
+  selector: 'rgba(255,255,255,255)'
+  closeButton: '#0000001f'  # the bar interval selector's background
+
+uiLayout:
+  toolbar: top         # top, bottom, both, hide
+  selector: bottom
+  sticky: top          # keep the toolbar visible while scrolling
+  invertZoom: true     # swap the magnifiers − and +
+  interval: hide       # hide the bar interval selector
+
+labelAreaWidth: 65
+lineGraphHeight: 250
+barGraphHeight: 150
+timelineBarHeight: 24
+timelineBarSpacing: 40
+legendVisible: false      # no legend (auto: only for several curves)
+stateColorSeed: 137       # seed for automatic state colors
+
+cursor:                   # the vertical line following the pointer
+  mode: all               # auto (the graph pointed at), all (every graph), hide
+  types: [line, timeline] # default: timelines
+
+timeTicks:
+  density: high           # low, medium, high, higher, highest
+  densityOverride: higher # force this level
+  dateFormat: short       # normal (default) or short
+```
+
+**A narrow card** — under 300 px wide (two cards side by side on a phone), the card keeps its graphs readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, the text a little smaller, the legend's names shortened, a slim tooltip.
+
+📖 [Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
 
 ---
 
@@ -436,112 +536,3 @@ graphs:
 An option is spelled the same at every level, and its aliases — the names and values in the table — are accepted everywhere. A graph's options can be set under its `options:` or on the graph itself (`options:` wins).
 
 📖 [Entity options](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#entity-options) · [full-reference-config.yaml](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/full-reference-config.yaml) — every option, at every level, with its default
-
----
-
-## UI configuration
-
-```yaml
-type: custom:history-explorer-card
-header: 'My history'   # ' ': none, its room kept; hide: none at all
-uimode: dark           # force dark or light mode
-cardName: my-card      # required with several cards on the same dashboard
-hour24: true           # the 24-hour clock (false: the 12-hour one; not set: Home Assistant's setting)
-
-uiColors:
-  gridLines: '#ff000040'
-  labels: green
-  buttons: '#80f00050'
-  cursorLine: '#ff000080'
-  selector: 'rgba(255,255,255,255)'
-  closeButton: '#0000001f'  # the bar interval selector's background
-
-uiLayout:
-  toolbar: top         # top, bottom, both, hide
-  selector: bottom
-  sticky: top          # keep the toolbar visible while scrolling
-  invertZoom: true     # swap the magnifiers − and +
-  interval: hide       # hide the bar interval selector
-
-labelAreaWidth: 65
-lineGraphHeight: 250
-barGraphHeight: 150
-timelineBarHeight: 24
-timelineBarSpacing: 40
-legendVisible: false      # no legend (auto: only for several curves)
-stateColorSeed: 137       # seed for automatic state colors
-
-cursor:                   # the vertical line following the pointer
-  mode: all               # auto (the graph pointed at), all (every graph), hide
-  types: [line, timeline] # default: timelines
-
-timeTicks:
-  density: high           # low, medium, high, higher, highest
-  densityOverride: higher # force this level
-  dateFormat: short       # normal (default) or short
-```
-
-**A narrow card** — under 300 px wide (two cards side by side on a phone), the card keeps its graphs readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, the text a little smaller, the legend's names shortened, a slim tooltip.
-
-📖 [Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
-
----
-
-## CSV export
-
-The options menu (▾) — every curve —, a graph's menu or a curve's (the info panel's too): *Export ▸ History* or *Statistics*.
-
-```yaml
-csv:
-  separator: ';'
-  timeFormat: 'DD/MM/YYYY HH:mm:ss'
-  statisticsPeriod: hour
-  exportAttributes: true
-  numberLocale: 'en-US'
-```
-
-📖 [Exporting data as CSV](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-data-as-csv)
-
----
-
-## YAML export
-
-The same menus: *Export ▸ YAML ▸ Simplified* or *Complete* — the settings of the card, the graph or the curve, the choices made in the menus included, copied to the clipboard in the card's own syntax, to define it statically in another card. *Simplified*: what differs from the defaults, the card's `look:` and `entityOptions` kept as they are; *Complete*: also what the look and `entityOptions` give, and what any other graph, or curve of the same graph, sets.
-
-📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
-
----
-
-## YAML graphs
-
-```yaml
-type: custom:history-explorer-card
-graphs:
-  - type: line
-    title: Temperatures
-    options:
-      ymin: -10
-    entities:
-      - entity: sensor.outside_temperature
-        color: '#3e95cd'
-      - entity: climate.salon
-        attribute: current_temperature   # an attribute; forecast.0.temperature: a sub-attribute
-  - type: timeline
-    title: Doors and motion
-    entities:
-      - entity: binary_sensor.door_barn
-        name: Barn door
-      - entity: binary_sensor.pir_*      # a wildcard
-```
-
-An attribute that is a number is shown as a curve, in the unit Home Assistant shows it in (`unit:` to set it), from the history only (Home Assistant keeps no statistics of attributes); anything else as a timeline.
-
-📖 [YAML configuration](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#yaml-configuration-for-preconfigured-graphs) · [Attributes](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#attributes)
-
----
-
-## Running as a sidebar panel
-
-Add an empty dashboard with **Show in sidebar** checked, set the view type to **Panel (1 card)**, and add the history explorer card.
-
-📖 [Running as a panel in the sidebar](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#running-as-a-panel-in-the-sidebar)
