@@ -800,7 +800,8 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
             width: Math.max(width, minBarWidth),
             height: height,
             base: x + width,
-            backgroundColor: '#000000',
+            // (the tooltip's color box: the arrow's color — its block's, else the dataset's)
+            backgroundColor: dataset.arrowColors?.[index] ?? dataset.arrowColor ?? ( getComputedStyle(me.chart.canvas).getPropertyValue('--primary-text-color').trim() || '#000' ),
             borderSkipped: custom.borderSkipped ? custom.borderSkipped : rectangleElementOptions.borderSkipped,
             borderColor: custom.borderColor ? custom.borderColor : helpers.getValueAtIndexOrDefault(dataset.borderColor, index, rectangleElementOptions.borderColor),
             borderWidth: custom.borderWidth ? custom.borderWidth : helpers.getValueAtIndexOrDefault(dataset.borderWidth, index, rectangleElementOptions.borderWidth),

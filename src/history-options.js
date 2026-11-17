@@ -354,7 +354,7 @@ const OPTION_VALUES = {
     dashMode      : v => Array.isArray(_dashList(v)) ? _dashList(v) : _dashName(v),
     color         : normalizeColor,
     // (a color, or fade, true — the curve's color, light — or false)
-    fill          : oneOf('fill', [true, false, 'fade'], { other: normalizeFill, expected: 'true, false, fade, a color, thresholds or an entity' }),
+    fill          : oneOf('fill', [false, 'fade', true, 'solid'], { synonyms: { true: ['light'] }, other: normalizeFill, expected: 'false, fade, light (true), solid, a color, thresholds or an entity' }),
     // (the decimals: a whole number ≥ 0, else not set)
     rounding      : v => ( v !== null && v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0 ) ? Number(v) : undefined,
     // (an action's name alone stands for it)
@@ -633,7 +633,7 @@ export function withLook(config)
 
 // A curve's fills the Fill submenu offers (fill), by the name it gives each: none, its color
 // light, fading out downwards
-export const FILL_VALUES = { none: false, solid: true, fade: 'fade' };
+export const FILL_VALUES = { none: false, fade: 'fade', light: true, solid: 'solid' };
 // The line widths the Width submenu offers (lineWidth), in px
 export const LINE_WIDTHS = [1, 2, 3, 4, 5];
 

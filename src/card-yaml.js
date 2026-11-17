@@ -148,9 +148,10 @@ export class CardYaml
         if( k === 'color' ) return e.colorSet ? e.color : undefined;
         if( k === 'fill' ) {
             const f = e.fill;
-            if( e.type === 'bar' || f === undefined || f === null ) return undefined;
+            if( f === undefined || f === null ) return undefined;
             if( f === NO_FILL ) return false;
-            if( f === fillValue(true, e.color) ) return true;
+            if( f === fillValue(true, e.color) ) return 'light';
+            if( f === 'solid' ) return 'solid';
             return !e.colorSet && defaultColors.some(c => c.color === e.color && c.fill === f) ? undefined : f;
         }
         if( k === 'interval' ) return x.root === 'curve' && e.type === 'bar' ? e.interval : undefined;
@@ -176,7 +177,7 @@ export class CardYaml
         }
         if( k === 'type' ) return this.baseTypeOf(e.entity);
         if( k === 'lineMode' ) return this.defaultLineModeOf(e.type);
-        if( k === 'fill' ) return e.colorSet ? false : undefined;
+        if( k === 'fill' ) return e.type === 'bar' ? 'solid' : e.colorSet ? false : undefined;
         if( k === 'interval' ) return OPTION_DEFAULTS.interval;
         return OPTION_DEFAULTS[k];
     }
@@ -192,7 +193,7 @@ export class CardYaml
         const _keys = x.full ? new Set([..._exported.flatMap(([h, e]) => _written(h, e)), ..._exported.flatMap(([, e]) => this._curveKeys(x, e)).filter(k => k in x.look)]) : null;
         // (what curve e shows of option k: its own, its color and fill as drawn, else what the
         // levels give it)
-        const _shown = (e, k) => this._curveOwn(x, e, k) ?? ( k === 'color' ? e.color : k === 'fill' && e.type !== 'bar' ? e.fill : undefined ) ?? this._curveBase(x, g, e, k);
+        const _shown = (e, k) => this._curveOwn(x, e, k) ?? ( k === 'color' ? e.color : k === 'fill' ? e.fill : undefined ) ?? this._curveBase(x, g, e, k);
         return es.map(e => {
             const { entity, attribute } = seriesOf(e.entity);
             const o = { entity };

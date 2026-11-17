@@ -116,6 +116,7 @@ export class CardDatasets
     {
         if( f === undefined || f === false ) return undefined;
         if( f === 'fade' ) return { fade: c };
+        if( f === 'solid' ) return c;
         const _f = fillValue(f, c);
         return varies ? this._fillLike(c, _f) : _f;
     }

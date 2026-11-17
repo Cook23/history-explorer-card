@@ -334,9 +334,9 @@ export class CardOperations
             const _groupId = g.groupId;
             const _nextG = this.nextGroup(g);
             this.detachGraph(g);
-            // (fill not kept across a type change: derived from color and type — recomputed)
-            this.rebuildGraph(_others, _groupId, _nextG, { fill: null });
-            this.addGraph(_entity.entity, { color: _entry?.color ?? _entity.color, before: _nextG, interval: _entity.interval, groupId: _groupId, entry: _entry ?? _entity });
+            // (each keeps its own fill across a type change: back to its former type, it has it again)
+            this.rebuildGraph(_others, _groupId, _nextG);
+            this.addGraph(_entity.entity, { color: _entry?.color ?? _entity.color, fill: _entry?.fill ?? _entity.fill, before: _nextG, interval: _entity.interval, groupId: _groupId, entry: _entry ?? _entity });
             this._keepFill([_entity]);
             this.refreshGraphControls();
             this.updateHistory();
@@ -355,7 +355,7 @@ export class CardOperations
             this.updateHistory();
         } else {
             g.entities.forEach(e => { e.type = type; e.lineMode = lineMode; e.siConversionFactor = undefined; });
-            this._keepFill(this.rebuildInPlace(g, { fill: null }));
+            this._keepFill(this.rebuildInPlace(g));
         }
         this.writeLocalState();
     }

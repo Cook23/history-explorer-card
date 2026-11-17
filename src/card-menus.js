@@ -990,6 +990,16 @@ export class CardMenus
             .filter(({ curves }) => curves.length);
     }
 
+    // What the appearance list key acts on, graph by graph: the curves — and, for the fill,
+    // the bars and an arrowline's rows (the band under its arrows): all but a timeline's rows,
+    // which draw none
+    _lookByGraph(m, key)
+    {
+        return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e =>
+                this.isCurve(g, g.entities.indexOf(e)) || ( key === 'fill' && g.type !== 'timeline' )) }))
+            .filter(({ curves }) => curves.length);
+    }
+
     // The same curves one by one, each with its graph
     _menuCurves(m)
     {
@@ -1003,14 +1013,15 @@ export class CardMenus
     }
 
     // The appearance submenu's lines that apply to what menu m acts on: the color, for one
-    // entity, a curve or a bar (not a row of a timeline or an arrowline); the others, for
-    // curves
+    // entity — a curve, a bar or an arrowline's row (not a timeline's: its colors are its
+    // states') — or for arrowline rows only (each on a row of its own: one color for them all
+    // still tells them apart); the fill, for all but a timeline's rows; the others, for curves
     _appearanceLines(m)
     {
         const { kind, pairs } = this._scopeOf(m);
-        const _one = kind === 'entity' && pairs.length === 1 && pairs[0].entities.length > 0 && !this.isRowGraph(pairs[0].g);
-        const _curves = this._menuCurves(m).length > 0;
-        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? _one : _curves);
+        const _one = kind === 'entity' && pairs.length === 1 && pairs[0].entities.length > 0 && pairs[0].g.type !== 'timeline';
+        const _arrowsOnly = pairs.length > 0 && pairs.every(({ g }) => g.type === 'arrowline');
+        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? _one || _arrowsOnly : this._lookByGraph(m, k).length > 0);
     }
 
     // Curve e's value of appearance list key — its points (POINTS_VALUES); its extremes
@@ -1021,6 +1032,7 @@ export class CardMenus
     {
         if( key === 'fill' ) {
             if( e.fill === 'fade' ) return 'fade';
+            if( e.fill === 'solid' ) return 'solid';
             // (a fill read indirectly — thresholds, a series —: none of the list's)
             if( typeof e.fill === 'object' && e.fill !== null || optionSeriesOf(e, 'fill') ) return undefined;
             const _c = Chart.helpers.color(e.fill ?? 'rgba(0,0,0,0)');
@@ -1037,10 +1049,10 @@ export class CardMenus
     // one all the curves have in bold; a choice applied at once, saved (see setCurvesLook)
     _appearanceItems(m, level)
     {
-        const _curves = this._menuCurves(m);
-        const _byGraph = this._curvesByGraph(m);
         const _chosen = () => this._menuChosen(m);
         if( level !== null ) {
+            const _byGraph = this._lookByGraph(m, level);
+            const _curves = _byGraph.flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
             const _d = _APPEARANCE[level];
             const _values = new Set(_curves.map(({ e }) => this._lookValue(e, level)));
             const _cur = _values.size === 1 ? [..._values][0] : undefined;
@@ -1063,7 +1075,8 @@ export class CardMenus
     {
         const { entities } = this._menuTargets(input_idx);
         if( !entities.length ) return;
-        const _key = keyOf(entities[0]);
+        // (every entity the menu acts on: one, or a graph's arrowline rows)
+        const _keys = entities.map(keyOf);
         const _tb = this._menuParent(input_idx);
         const _p = _tb.getBoundingClientRect();
         const _c = Chart.helpers.color(this.entityColor(entities[0]) ?? '#000000');
@@ -1071,8 +1084,10 @@ export class CardMenus
         const _left = Math.max(0, ( window.innerWidth - PICKER_SIZE.width ) / 2) - _p.left;
         const _top = Math.max(0, ( window.innerHeight - PICKER_SIZE.height ) / 2) - _p.top;
         this.openNativePicker(_tb, 'color', _left, _top, _c.valid ? _c.hexString() : '#000000', v => {
-            const _g = this.graphs.find(g => g.entities.some(e => keyOf(e) === _key));
-            if( _g ) this.setCurvesLook(_g, _g.entities.filter(e => keyOf(e) === _key), 'color', v);
+            for( const _g of this.graphs ) {
+                const _es = _g.entities.filter(e => _keys.includes(keyOf(e)));
+                if( _es.length ) this.setCurvesLook(_g, _es, 'color', v);
+            }
         });
     }
 
