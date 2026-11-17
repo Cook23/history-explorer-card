@@ -79,8 +79,10 @@ Details: [CHANGELOG.md](https://github.com/Cook23/history-explorer-card/blob/v1.
 
 ## Install
 
-- **HACS** (recommended): add `https://github.com/Cook23/history-explorer-card` as a custom repository.
+- **Marketplace** (recommended; HACS before Home Assistant 2026.11): *Settings › Marketplace › Add from link*, `https://github.com/Cook23/history-explorer-card`, then **Install**.
 - **Manually**: copy `history-explorer-card.js` into `config/www`, then add the resource `/local/history-explorer-card.js` (*Settings → Dashboards → ⋮ → Resources*, type JavaScript module).
+
+Then reload the page (in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*) and add the card from *+ Add card*: *History Explorer Card*.
 
 ---
 

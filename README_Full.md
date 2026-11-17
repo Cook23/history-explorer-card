@@ -23,7 +23,7 @@ A highly interactive way to view the history of your entities in Home Assistant:
 ## Table of contents
 
 - [Install](#install)
-  - [HACS](#hacs)
+  - [Marketplace (HACS)](#marketplace-hacs)
   - [Manual install](#manual-install)
 - [Quick configuration](#quick-configuration)
   - [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs)
@@ -117,9 +117,17 @@ A highly interactive way to view the history of your entities in Home Assistant:
 
 ## Install
 
-### HACS
+### Marketplace (HACS)
 
-Add this repository as a custom repository in HACS: `https://github.com/Cook23/history-explorer-card`
+Home Assistant 2026.11 or later; on an older version, [HACS](https://hacs.xyz): *HACS › ⋮ › Custom repositories*, the same link, type *Dashboard*.
+
+1. **Settings › Marketplace** — the first time, accept its warning.
+2. **Add from link** (top right) — **GitHub link**: `https://github.com/Cook23/history-explorer-card` — **Add**. The first time, Home Assistant asks to connect GitHub: enter the code it shows on GitHub, approve.
+3. Select *history-explorer-card* in the list (type *Dashboard*), then **Install**, and **Install** again.
+4. Reload the page in the browser — in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
+5. Add the card: edit a dashboard, **+ Add card**, search *History Explorer Card*.
+
+The card's dashboard resource is added by itself (resources managed in YAML: the install dialog shows the one to add), and its new versions are shown as updates.
 
 ### Manual install
 
@@ -128,8 +136,8 @@ Add this repository as a custom repository in HACS: `https://github.com/Cook23/h
  3. Click on the `+ Add Resource` button
  4. Type `/local/history-explorer-card.js` into the URL field and make sure the resource type field says Javascript Module
  5. Hit create
-
-You can now add the card to your dashboard as usual. You may have to refresh the page in your browser once after adding the card to properly initialize it.
+ 6. Reload the page in the browser — in the Home Assistant app: *Settings › Companion app › Debugging › Reset frontend cache*.
+ 7. Add the card: edit a dashboard, **+ Add card**, search *History Explorer Card*.
 
 ---
 
