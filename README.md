@@ -121,9 +121,11 @@ An attribute that is a number is shown as a curve, in the unit Home Assistant sh
 
 ### YAML export
 
-The options menu (▾), a graph's menu or a curve's (the info panel's too): *Export ▸ YAML ▸* copies the settings of the card, the graph or the curve to the clipboard, the choices made in the menus included — *Simplified*: what differs from the defaults; *Complete*: everything that applies.
+*Export ▸ YAML ▸* (the options menu ▾, a graph's or a curve's menu) copies the settings of the card, the graph or the curve to the clipboard, the menus' choices included:
+- *Simplified* — what differs from the defaults;
+- *Complete* — everything that applies.
 
-**In Home Assistant's card editor**, it helps write a card's YAML: set the card up in the editor's preview with its menus, export it from the options menu, and paste it in place of the YAML there — it holds `type:` and `cardName:` too. In the editor's preview, the card keeps room under itself for its menus to open.
+**In Home Assistant's card editor**: set the card up in the preview with its menus, export it from the options menu, and paste it in place of the editor's YAML.
 
 📖 [Exporting the configuration as YAML](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#exporting-the-configuration-as-yaml)
 
@@ -141,7 +143,7 @@ The card on a page of its own, in Home Assistant's sidebar:
 
 ### Info panel
 
-The card can replace the history graph of Home Assistant's more info popup. Turn it on with the switch *Global ▸ Enhanced native history* of the options menu, or with `defaultInfoPanel: true`; `infoPanel:` holds the panel's own options. To have it on every page of Home Assistant, not only after a dashboard was opened:
+The card can replace the history graph of Home Assistant's more info popup: the switch *Global ▸ Enhanced native history* of the options menu, or `defaultInfoPanel: true`. To have it on every page, not only after a dashboard was opened:
 
 ```yaml
 # configuration.yaml
@@ -161,7 +163,8 @@ https://github.com/user-attachments/assets/ccc401af-be63-4838-b540-0079e92ca915
 ### Navigation
 
 - **Pan** — drag left or right on a graph.
-- **Zoom** — the range selector and its magnifiers − and +, Ctrl + the wheel, or a box: drag mostly up or down on a graph (a mouse), or turn the magnifying glass on (green) to draw one with any pointer. A long press on the glass chooses what the box zooms: the time ↔, the Y axis ↕ or both ⤢. A double-click on the glass gets the default range back.
+- **Zoom** — the magnifiers − and +, Ctrl + the wheel, or a box drawn on a graph (drag up or down with a mouse, or turn the magnifying glass on).
+- **Magnifying glass** — a long press chooses what its box zooms (the time, the Y axis or both); a double-click gets the default range back.
 - **Date** — `<` `>` move the window; a click on the date opens a calendar, a double-click goes back to the present.
 - **Real time** — a window reaching the present follows it: the curves grow and slide, the present always on the right.
 - **Points** — hover a curve to see its nearest value's point; a long press (or a right click) near a curve shows or hides all its points; **Alt** shows every curve's.
@@ -209,7 +212,9 @@ gestures:
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/adding-entities.png" alt="Adding an entity: the field, the matching entities" width="924">
 
-Type in the entity selector — it filters on the names and the ids, `*` as a wildcard (`*door*`, `sensor.*`) — and choose an entry with a click or Enter. An entity with attributes first offers its *Value* or one of its attributes. The curve menu then opens, the most fitting type pre-selected (*Timeline* for a state that isn't a number, *Bar* for energy that adds up, *Direction* for an angle, else a *Smart* line); nothing is added before a type is picked.
+1. Type in the entity selector: it filters on the names and the ids (`*` as a wildcard: `*door*`, `sensor.*`).
+2. Choose an entry with a click or Enter — for an entity with attributes, its *Value* or one of its attributes.
+3. Pick a type in the curve menu: the most fitting one is pre-selected (*Timeline*, *Bar*, *Direction* or *Smart* line).
 
 ```yaml
 recordedEntitiesOnly: true          # only the entities recorded in the database
@@ -237,7 +242,9 @@ combineSameUnits: true   # entities with compatible units (W and kW) added to th
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/y-lock.png" alt="The Y axis padlock" width="532">
 
-The Y axis scales itself (padlock open, green). Drag its labels to pan it, hold **Shift** to drag and zoom it on the graph; the padlock locks it (red). Two groups of units get an axis each, the second one on the right; more are shared between the two axes by the size of their values, each axis listing its units (`% / °C`); *Behavior ▸ Y axis* moves a curve to the other one.
+- **Automatic** — the Y axis scales itself (padlock open, green); the padlock locks it (red).
+- **Pan and zoom** — drag its labels to pan it; hold **Shift** to drag and zoom it on the graph.
+- **Two axes** — a second group of units goes on the right; *Behavior ▸ Y axis* moves a curve to the other axis.
 
 ```yaml
 graphs:
@@ -394,7 +401,9 @@ statistics:
 
 ### Values over a graph, look: mini
 
-`showState` shows each curve's value now over its graph, `showStats` its minimum, average and maximum over the window shown. `look: mini` gives the look of mini-graph-card at once — the time can still be panned and zoomed; any option set on the card wins.
+- `showState` — each curve's current value, over its graph.
+- `showStats` — its minimum, average and maximum over the window shown.
+- `look: mini` — the look of mini-graph-card at once; the time can still be panned and zoomed, and any option set on the card wins.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/narrow-and-mini-dark.png">
@@ -425,7 +434,7 @@ timeTicks:
   density: high        # low, medium, high, higher, highest
 ```
 
-**A narrow card** — under 300 px wide (two cards side by side on a phone), the card keeps its graphs readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, the text a little smaller, the legend's names shortened, a slim tooltip.
+**A narrow card** (under 300 px wide) stays readable, as mini-graph-card does: the toolbar on several lines, the Y labels inside the plot, smaller text, shortened names, a slim tooltip.
 
 📖 [Configuring the UI](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#configuring-the-ui)
 
@@ -433,7 +442,7 @@ timeTicks:
 
 ## Options
 
-Each option can be set on the **card**, in **`entityOptions`** (by entity id, device class, domain or pattern), on a **graph** (under `options:` or on the graph) or on an **entity**; the most specific wins: **entity → graph → `entityOptions` → card**. Every option below at the four levels, unless its description says otherwise (in italics).
+Each option can be set on the **card**, in **`entityOptions`**, on a **graph** or on an **entity**; the most specific wins: **entity → graph → `entityOptions` → card**. An option set at fewer levels says so in italics.
 
 ```yaml
 type: custom:history-explorer-card
