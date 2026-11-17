@@ -121,6 +121,11 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
 - **A question or a doubt about what is being done** ("why", "who asked for that"), or an
   interruption: answering it comes first, before continuing anything. Answer it and stop —
   no code, no test, no commit until the user gives the next instruction.
+- **A "why" gets the real reason — never one made up afterwards** (set by the user). Asked
+  why something was done or proposed, give the reason there actually was; if there was none
+  (added without thinking, a mistake), say so plainly. Never build a plausible justification
+  after the fact: the user may believe it and be misled. Once a justification is shown wrong,
+  say it was wrong — don't defend it with another.
 - **After an interruption by the user** (a command stopped, a request interrupted): check
   what was interrupted and clean it up, or finish it — a file written in part, a probe or
   scratch file left in the repository, a process still running —, never leave it behind.
