@@ -75,6 +75,17 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
   - [Values over a graph, look: mini](#values-over-a-graph-look-mini)
   - [UI configuration](#ui-configuration)
 - [Options](#options)
+  - [Graph and entity options](#graph-and-entity-options)
+  - [Curve and graph options](#curve-and-graph-options)
+  - [Color options](#color-options)
+  - [Value and header options](#value-and-header-options)
+  - [Y axis options](#y-axis-options)
+  - [Tooltip options](#tooltip-options)
+  - [Data options](#data-options)
+  - [Card options](#card-options)
+  - [CSV export options](#csv-export-options)
+  - [Gesture options](#gesture-options)
+  - [Notes](#notes)
 
 ---
 
@@ -461,6 +472,8 @@ graphs:
 
 Each option in **bold**, its aliases — other names it is read under — in *italics* under it.
 
+### Graph and entity options
+
 | Option | Description |
 |---|---|
 | **`graphs`** | **Default** not set: every entity added from the card<br>The graphs written in the YAML: each its `type`, `title`, `entities` and `options` — *the card's only* |
@@ -470,123 +483,189 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`entity`** | **Default** none: required<br>The entity's id — `*` as a wildcard (`sensor.*`) — *an entity's only* |
 | **`attribute`** | **Default** not set: the entity's state<br>One of the entity's attributes instead of its state (`forecast.0.temperature`: a sub-attribute) — *an entity's only* |
 | **`name`** | **Default** the entity's name<br>The curve's name — *an entity's only* |
+| **`exclude`** | **Default** not set<br>Entities left out of a wildcard `entity:`; a graph's and an entity's combine — see *3 — *a graph and an entity only* |
+| **`entityOptions`** | **Default** not set<br>Options given by entity id, device class, domain or pattern — see *2 — *the card's only* |
+| **`filterEntities`** | **Default** every entity listed<br>The entities the selector lists (`*` as a wildcard) — see *3 — *the card's only* |
+| **`excludeFilterEntities`** | **Default** none<br>The entities the selector leaves out of `filterEntities` — see *3 — *the card's only* |
+| **`recordedEntitiesOnly`** | **Default** `false`<br>`true`: the selector lists only the entities recorded in the database — *the card's only* |
+| **`combineSameUnits`** | **Default** `false`<br>`true`: an entity added from the card goes into a graph of compatible units — *the card's only* |
+
+### Curve and graph options
+
+| Option | Description |
+|---|---|
 | **`type`**<br>*`graph`* | **Default** automatic, by the entity<br>The graph type: `line`, `bar`, `timeline`, `arrowline` (compass arrows) — *an entity's only* |
-| **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
-| **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
-| **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
-| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light<br>The area under the curve: a color, `true` (light), `false` (none), `fade` — or thresholds on a value |
-| **`showState`**<br>*`show_state`* | **Default** `false`<br>`true`: its current value written large over the graph |
-| **`showIndicator`**<br>*`show_indicator`* | **Default** `false`<br>`true`: a dot in its color before its value over the graph |
-| **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: no current value in its legend label |
-| **`showName` / `showIcon` / `icon` / `iconImage`**<br>*`show_name` / `show_icon` / — / `icon_image`* | **Default** the graph's `title`; no icon<br>The graph's header: its name, its icon (`mdi:…`), or an image's address — see [Values over a graph](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#values-over-a-graph-a-compact-look) — *the card and a graph only* |
-| **`alignHeader` / `alignIcon` / `alignState`**<br>*`align_header` / `align_icon` / `align_state`* | **Default** `alignHeader`: `center`; `alignIcon`: `right`; `alignState`: `left`<br>Where the header, the icon and the values over the graph are placed — *the card and a graph only* |
-| **`fontSizeHeader` / `fontSize`**<br>*`font_size_header` / `font_size`* | **Default** `fontSizeHeader`: the theme's size; `fontSize`: `100` (%: unchanged)<br>The header's size, in px; the values' size over the graph, in % — *the card and a graph only* |
-| **`nameAdaptiveColor` / `iconAdaptiveColor`**<br>*`show_name_adaptive_color` / `show_icon_adaptive_color`* | **Default** `false`<br>`true`: the header in the first curve's current color — *the card and a graph only* |
-| **`showStats`**<br>*`show.extrema`, `show.average`* | **Default** `false`<br>Its `min`, `average`, `max` over the window, written over the graph (`true`: all three) |
-| **`showStateFor` / `showStatsFor`** | **Default** `all`<br>Which curves the graph's `showState` / `showStats` are for: `all`, or `first` only — *the card and a graph only* |
-| **`stateAdaptiveColor`**<br>*`state_adaptive_color`* | **Default** `true`<br>`false`: the values over the graph in the text's color, not their curve's |
-| **`lineWidth`**<br>*`width`, `line_width`* | **Default** `2`<br>The line's width, in px |
 | **`lineMode`**<br>*`smoothing`* | **Default** `curves` in the YAML, `smart` added from the card<br>How values are joined: `curves`, `lines`, `stepped`, `smart` (curves, silences dashed) |
 | **`interpolation`** | **Default** `monotone`<br>The curve's algorithm in `curves` and `smart`: `monotone`, `steffen`, `makima`, `catmullrom`, `bspline` |
+| **`lineWidth`**<br>*`width`, `line_width`* | **Default** `2`<br>The line's width, in px |
 | **`dashMode`**<br>*`line_style`* | **Default** `solid`<br>The line's style: `solid`, `points`, `shortlines`, `longlines`, `pointline`, or a dash pattern (`[10, 4]`) |
-| **`showLine`**<br>*`show_line`* | **Default** `true`<br>`false`: its points only, no line |
-| **`showGraph`**<br>*`show_graph`* | **Default** `true`<br>`false`: not drawn nor in the legend, its value still over the graph |
-| **`fixedValue`**<br>*`fixed_value`* | **Default** `false`<br>`true`: its last value drawn flat over the whole window |
 | **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover`<br>Dots on the values: `hover` (the one pointed at), `true` (all), `false` (none), or a radius |
 | **`sizePoints`** | **Default** the line width + 2 px<br>The dots' diameter, in px |
+| **`showLine`**<br>*`show_line`* | **Default** `true`<br>`false`: its points only, no line |
+| **`showMinMax`** | **Default** `false`<br>A min/max band around the curve: `all`, `max`, `min`, `statistics`, `history`, `false` |
+| **`hidden`** | **Default** `false`<br>`true`: hidden at first, its legend label struck through |
+| **`legendVisible`**<br>*`show_legend`* | **Default** `true`<br>`false`: no legend label; `auto`: a graph's legend only with several labels |
+| **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: no current value in its legend label |
+| **`showGraph`**<br>*`show_graph`* | **Default** `true`<br>`false`: not drawn nor in the legend, its value still over the graph |
+| **`fixedValue`**<br>*`fixed_value`* | **Default** `false`<br>`true`: its last value drawn flat over the whole window |
+| **`tapAction`**<br>*`tap_action`* | **Default** `more-info`<br>What a click on its value does: `more-info`, `navigate`, `url`, `perform-action`, `call-service`, `none` |
+| **`stateMap`**<br>*`state_map`* | **Default** not set<br>A text state drawn as a curve: each state at its place in the list — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
+| **`showUnavailable`** | **Default** `false`<br>`true`: gaps where the entity was unavailable — *the card's only* |
+| **`showMissingState`** | **Default** `false`<br>`true`: gaps where a text state isn't in its `stateMap` — *the card's only* |
+| **`circular`** | **Default** automatic: an angle is circular<br>Angles drawn without a jump at 0/360: automatic, `false`, a period, or `2pi` — see *4 |
+| **`interval`** | **Default** `hourly`<br>The bars' interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (drawn as curves) |
+| **`netBars`** | **Default** `false`<br>`true`: bars of a total that can decrease (net metering) |
+| **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *6 |
+| **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px — see *6 |
+| **`arrowLength`** | **Default** not set: every arrow its whole length<br>The arrows' length: 0 to 100 %, or an entity giving it, scaled automatically — see [Compass arrows](#compass-arrows) |
+| **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity giving the whole length; `~`: at least that |
+| **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *1 and *6 |
+| **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *6 |
+| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — see *6 |
+| **`labelsVisible`** | **Default** `true`<br>`false`: no names left of a timeline's rows — *the card's only* |
+
+### Color options
+
+| Option | Description |
+|---|---|
+| **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
+| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light<br>The area under the curve: a color, `true` (light), `false` (none), `fade` — or thresholds on a value |
+| **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
+| **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
+| **`stateColors`** | **Default** automatic colors<br>A timeline's colors by entity, device class, domain or state (`door.on: blue`) — *the card's only* |
+| **`stateColorSeed`** | **Default** `137`<br>The seed of the timelines' automatic colors — *the card's only* |
+
+### Value and header options
+
+| Option | Description |
+|---|---|
+| **`showState`**<br>*`show_state`* | **Default** `false`<br>`true`: its current value written large over the graph |
+| **`showStats`**<br>*`show.extrema`, `show.average`* | **Default** `false`<br>Its `min`, `average`, `max` over the window, written over the graph (`true`: all three) |
+| **`showStateFor` / `showStatsFor`** | **Default** `all`<br>Which curves the graph's `showState` / `showStats` are for: `all`, or `first` only — *the card and a graph only* |
+| **`showIndicator`**<br>*`show_indicator`* | **Default** `false`<br>`true`: a dot in its color before its value over the graph |
+| **`stateAdaptiveColor`**<br>*`state_adaptive_color`* | **Default** `true`<br>`false`: the values over the graph in the text's color, not their curve's |
+| **`alignState`**<br>*`align_state`* | **Default** `left`<br>Where the values over the graph go: `left`, `center`, `right` — *the card and a graph only* |
+| **`fontSize`**<br>*`font_size`* | **Default** `100`<br>The size of the values over the graph, in % — *the card and a graph only* |
+| **`rounding`**<br>*`decimals`* | **Default** not set: 2 decimals at most<br>The number of decimals shown |
+| **`stateTextMode`** | **Default** `auto`<br>The states' names in the timelines: `auto` (by device class), `raw`, `hide` — *the card's only* |
+| **`showName`**<br>*`show_name`* | **Default** the graph's `title`, when it has one<br>`true`: the header shows the graph's name — *the card and a graph only* |
+| **`showIcon`**<br>*`show_icon`* | **Default** `false`<br>`true`: the header shows an icon — *the card and a graph only* |
+| **`icon`** | **Default** the entity's own icon<br>The header's icon (`mdi:home`) — *the card and a graph only* |
+| **`iconImage`**<br>*`icon_image`* | **Default** not set<br>An image shown as the header's icon — *the card and a graph only* |
+| **`alignHeader`**<br>*`align_header`* | **Default** `center`<br>Where the header's name and icon go: `center`, `default`, `left`, `right` — *the card and a graph only* |
+| **`alignIcon`**<br>*`align_icon`* | **Default** `right`<br>Where the icon goes: `right`, `left`, `state` (beside the values) — *the card and a graph only* |
+| **`fontSizeHeader`**<br>*`font_size_header`* | **Default** the theme's size<br>The header's text size, in px — *the card and a graph only* |
+| **`nameAdaptiveColor` / `iconAdaptiveColor`**<br>*`show_name_adaptive_color` / `show_icon_adaptive_color`* | **Default** `false`<br>`true`: the header in the first curve's current color — *the card and a graph only* |
+| **`look`** | **Default** not set: the card's own look<br>`mini`: mini-graph-card's look — a set of defaults — see [Values over a graph](#values-over-a-graph-look-mini) — *the card's only* |
+| **`show`** | **Default** not set<br>mini-graph-card's block, read as the options it names (`show: { points: true }`) |
+
+### Y axis options
+
+| Option | Description |
+|---|---|
+| **`yAxis`**<br>*`y_axis`* | **Default** `auto`<br>Its Y axis: `auto`, `left`, `right` (`auto`: a second group of units on the right) |
+| **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic: fitted to the values<br>The Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
+| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `ymin` / `ymax`<br>The right Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
+| **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** not set<br>The smallest range the Y axis shows — see *6 |
+| **`yScaleSteadiness` / `yScaleSteadinessRight`**<br>*`yScaleSteadinessLeft` / —* | **Default** `50`<br>The automatic Y axis, 0 to 100: 0 follows the values, 100 keeps a steady scale — see *6 |
+| **`ylock`** | **Default** `false`<br>`true`: the Y axis can't be moved or zoomed by hand — see *6 |
+| **`logarithmic`** | **Default** `false`<br>`true`: a logarithmic Y axis — see *6 |
+| **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *6 |
+| **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
+| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
+| **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *6 |
+| **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`true`: room added under / over a line graph's values, for curves going past them — *the card's only* |
+
+### Tooltip options
+
+| Option | Description |
+|---|---|
 | **`tooltip.largeScreen`**<br>*`largeScreenTooltip`, `large_screen_tooltip`* | **Default** `mixed`<br>The tooltip on a screen 640 px wide or more: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.smallScreen`**<br>*`smallScreenTooltip`, `small_screen_tooltip`* | **Default** `selected`<br>The tooltip on a screen narrower than 640 px: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.largeChart`**<br>*`largeChartTooltip`, `large_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card 600 px wide or more, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.smallChart`**<br>*`smallChartTooltip`, `small_chart_tooltip`* | **Default** not set: the screen's tooltip<br>The tooltip in a card narrower than 600 px, instead of the screen's: `mixed`, `nearest`, `selected`, `all` |
 | **`tooltip.behavior`**<br>*`tooltipBehavior`, `tooltip_behavior`* | **Default** `auto`<br>`tooltip.largeScreen` and `tooltip.smallScreen` set at once; `auto` keeps theirs |
+| **`tooltip.size`**<br>*`tooltipSize`* | **Default** `auto`<br>How much a tooltip shows: `full`, `compact`, `slim`, `auto` (by the card's width) — *the card's only* |
+| **`tooltip.showLabel`** | **Default** `true`<br>`false`: no curve name before its value in the tooltip — *the card's only* |
+| **`tooltip.showDuration`**<br>*`tooltipShowDuration`* | **Default** `false`<br>`true`: a timeline's or arrowline's tooltip shows how long the state lasted — *the card's only* |
+| **`tooltip.showColorsLine` / `tooltip.showColorsTimeline`**<br>*`showTooltipColorsLine` / `showTooltipColorsTimeline`* | **Default** `true`<br>`false`: no color boxes in the tooltips of line and bar graphs / of timelines — *the card's only* |
+| **`tooltip.stateTextMode`** | **Default** `stateTextMode`'s<br>The states' names in the tooltip: `auto`, `raw`, `hide` — *the card's only* |
+
+### Data options
+
+| Option | Description |
+|---|---|
+| **`unit`** | **Default** the entity's own unit<br>The unit shown instead of the entity's — see *5 |
+| **`scale`** | **Default** `1`<br>The values multiplied by this factor — see *5 |
+| **`valueFactor`**<br>*`value_factor`* | **Default** `0`<br>The values multiplied by 10 to this power (`-3`: 400 W shown as 0.4) — see *5 |
+| **`process`** | **Default** not set: the values as they are<br>A JavaScript expression changing each value (`state`) before it's drawn |
 | **`pointsPerHour`**<br>*`points_per_hour`* | **Default** not set: a point per column of pixels<br>Points per hour (`2`: one per half hour), instead of one per column of pixels |
 | **`groupBy`**<br>*`group_by`* | **Default** `interval`<br>A point per `interval` (see `pointsPerHour`), per `hour`, or per `date` (day) |
 | **`aggregateFunc`**<br>*`aggregate_func`* | **Default** `avg`<br>A group's value: `avg`, `median`, `min`, `max`, `first`, `last`, `sum`, `delta`, `diff` |
-| **`showMinMax`** | **Default** `false`<br>A min/max band around the curve: `all`, `max`, `min`, `statistics`, `history`, `false` |
-| **`netBars`** | **Default** `false`<br>`true`: bars of a total that can decrease (net metering) |
-| **`arrowLength`** | **Default** not set: every arrow its whole length<br>The arrows' length: 0 to 100 %, or an entity giving it, scaled automatically — see [Compass arrows](#compass-arrows) |
-| **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity giving the whole length; `~`: at least that |
-| **`interval`** | **Default** `hourly`<br>The bars' interval: `10m`, `hourly`, `daily`, `weekly`, `monthly`, `raw` (drawn as curves) |
-| **`rounding`**<br>*`decimals`* | **Default** not set: 2 decimals at most<br>The number of decimals shown |
-| **`tapAction`**<br>*`tap_action`* | **Default** `more-info`<br>What a click on its value does: `more-info`, `navigate`, `url`, `perform-action`, `call-service`, `none` |
-| **`scale`** | **Default** `1`<br>The values multiplied by this factor — see *5 |
-| **`yAxis`**<br>*`y_axis`* | **Default** `auto`<br>Its Y axis: `auto`, `left`, `right` (`auto`: a second group of units on the right) |
-| **`unit`** | **Default** the entity's own unit<br>The unit shown instead of the entity's — see *5 |
-| **`valueFactor`**<br>*`value_factor`* | **Default** `0`<br>The values multiplied by 10 to this power (`-3`: 400 W shown as 0.4) — see *5 |
-| **`siConversionFactor`** | **Default** automatic, from the units<br>The factor converting the entity's unit into its graph's, when units are combined — *an entity's only* |
-| **`stateMap`**<br>*`state_map`* | **Default** not set<br>A text state drawn as a curve: each state at its place in the list — see [Text states as a curve](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#text-states-as-a-curve) |
-| **`showUnavailable` / `showMissingState`** | **Default** `false`<br>`true`: gaps where the entity was unavailable / where a text state isn't in its `stateMap` — *the card's only* |
-| **`hidden`** | **Default** `false`<br>`true`: hidden at first, its legend label struck through |
-| **`legendVisible`**<br>*`show_legend`* | **Default** `true`<br>`false`: no legend label; `auto`: a graph's legend only with several labels |
-| **`process`** | **Default** not set: the values as they are<br>A JavaScript expression changing each value (`state`) before it's drawn |
-| **`circular`** | **Default** automatic: an angle is circular<br>Angles drawn without a jump at 0/360: automatic, `false`, a period, or `2pi` — see *4 |
-| **`ymin` / `ymax`**<br>*`lower_bound` / `upper_bound`* | **Default** automatic: fitted to the values<br>The Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
-| **`yminRight` / `ymaxRight`**<br>*`lower_bound_secondary` / `upper_bound_secondary`* | **Default** `ymin` / `ymax`<br>The right Y axis' bounds when the card opens; `~` and a value: a soft bound — see *6 |
-| **`yrange` / `yrangeRight`**<br>*`min_bound_range` / `min_bound_range_secondary`* | **Default** not set<br>The smallest range the Y axis shows — see *6 |
-| **`yScaleSteadiness` / `yScaleSteadinessRight`**<br>*`yScaleSteadinessLeft` / —* | **Default** `50`<br>The automatic Y axis, 0 to 100: 0 follows the values, 100 keeps a steady scale — see *6 |
-| **`logarithmic`** | **Default** `false`<br>`true`: a logarithmic Y axis — see *6 |
-| **`labelsLeft`**<br>*`show_labels`* | **Default** `true`<br>The left Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
-| **`labelsRight`**<br>*`show_labels_secondary`* | **Default** `true`<br>The right Y axis' labels: `true`, `false`, `hover` (while the pointer is over the graph) — see *6 |
-| **`ystepSize`**<br>*`ystepsize`* | **Default** automatic: the tightest round step whose labels fit<br>The step between the Y axis' labels — see *6 |
-| **`ylock`** | **Default** `false`<br>`true`: the Y axis can't be moved or zoomed by hand — see *6 |
-| **`axisAddMarginMin` / `axisAddMarginMax`** | **Default** `false`<br>`true`: room added under / over a line graph's values, for curves going past them — *the card's only* |
-| **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *6 |
-| **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px — see *6 |
-| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — see *6 |
-| **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *1 and *6 |
-| **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *6 |
-| **`yLabels`** | **Default** beside the plot — inside on a card narrower than 300 px<br>The Y labels `inside` the plot, or `outside` — see *6 |
-| **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h`<br>The time range shown when the card opens — see [Time range](#time-range) — *the card's only* |
-| **`defaultMagnifierMode`** | **Default** `xy`<br>What the magnifying glass zooms: `x` the time, `y` the Y axis, `xy` both — *the card's only* |
-| **`tooltip.size`**<br>*`tooltipSize`* | **Default** `auto`<br>How much a tooltip shows: `full`, `compact`, `slim`, `auto` (by the card's width) — *the card's only* |
-| **`tooltip.showDuration`**<br>*`tooltipShowDuration`* | **Default** `false`<br>`true`: a timeline's or arrowline's tooltip shows how long the state lasted — *the card's only* |
-| **`tooltip.showColorsLine` / `tooltip.showColorsTimeline`**<br>*`showTooltipColorsLine` / `showTooltipColorsTimeline`* | **Default** `true`<br>`false`: no color boxes in the tooltips of line and bar graphs / of timelines — *the card's only* |
-| **`timeTicks.density`**<br>*`timeTickDensity`* | **Default** `high`<br>How many time labels: `low`, `medium`, `high`, `higher`, `highest` — *the card's only* |
-| **`uiColors.gridLines` / `uiColors.cursorLine`**<br>*`uiColors.gridlines` / `uiColors.cursorline`* | **Default** `uiColors.gridLines`: the theme's grid color; `uiColors.cursorLine`: the grid lines' color<br>The grid lines' color / the cursor line's color — *the card's only* |
-| **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none`<br>What the card remembers, on this device / on all the user's devices — see [Persistence](#persistence) — *the card and an entity only* |
-| **`labelsVisible`** | **Default** `true`<br>`false`: no names left of a timeline's rows — *the card's only* |
-| **`look`** | **Default** not set: the card's own look<br>`mini`: mini-graph-card's look — a set of defaults — see [Values over a graph](#values-over-a-graph-look-mini) — *the card's only* |
-| **`entityOptions`** | **Default** not set<br>Options given by entity id, device class, domain or pattern — see *2 — *the card's only* |
-| **`filterEntities` / `excludeFilterEntities`** | **Default** `filterEntities`: every entity listed; `excludeFilterEntities`: none excluded<br>The entities the selector lists / those it leaves out (`*` as a wildcard) — see *3 — *the card's only* |
-| **`exclude`** | **Default** not set<br>Entities left out of a wildcard `entity:`; a graph's and an entity's combine — see *3 — *a graph and an entity only* |
-| **`hour24`** | **Default** Home Assistant's clock setting<br>`true`: the 24-hour clock; `false`: the 12-hour one — *the card's only* |
-| **`header`** | **Default** `History explorer` and the card's version<br>The card's title; `' '`: none, its room kept; `hide`: none at all — *the card's only* |
-| **`uimode`** | **Default** Home Assistant's theme<br>`dark` or `light`: the card's colors forced — *the card's only* |
-| **`cardName`** | **Default** `default`<br>The card's name, under which its changes are kept — required for several cards on a dashboard — *the card's only* |
-| **`labelAreaWidth`** | **Default** `65`<br>The width of the Y labels' area, in px — *the card's only* |
-| **`lineGraphHeight` / `barGraphHeight`** | **Default** `250` / `150`<br>The height of the line graphs / of the bar graphs, in px — see *1 — *the card's only* |
-| **`timelineBarHeight` / `timelineBarSpacing`** | **Default** `24` / `40`<br>A timeline row's height / the distance from one row's top to the next one's, in px — *the card's only* |
-| **`uiLayout.toolbar` / `uiLayout.selector`** | **Default** `top`<br>Where the toolbar / the entity selector is: `top`, `bottom`, `both`, `hide` — *the card's only* |
-| **`uiLayout.sticky`** | **Default** `hide`<br>The toolbars kept visible while scrolling: `top`, `bottom`, `both`, `hide` — *the card's only* |
-| **`uiLayout.invertZoom`** | **Default** `false`<br>`true`: the magnifiers − and + swapped — *the card's only* |
-| **`uiLayout.interval`** | **Default** shown<br>`hide`: no bar interval selector — *the card's only* |
-| **`uiColors.labels` / `uiColors.buttons` / `uiColors.selector` / `uiColors.closeButton`** | **Default** the theme's colors<br>The color of the labels / the buttons / the entity selector's background / the bar interval selector's background — *the card's only* |
-| **`cursor.mode` / `cursor.types`** | **Default** `auto` / `[timeline]`<br>The cursor line: on the graph pointed at (`auto`), every graph (`all`) or none (`hide`) / the graph types showing it — *the card's only* |
-| **`timeTicks.densityOverride`** | **Default** not set<br>The time labels' density whatever the card's width: `low` … `highest` — *the card's only* |
-| **`timeTicks.dateFormat`** | **Default** `normal`<br>`short`: shorter dates under the graphs — *the card's only* |
-| **`defaultTimeOffset`** | **Default** not set: the window ends now<br>Where the window ends when the card opens: an offset (`-1d`), uppercase to snap (`1D`: the current day) — *the card's only* |
-| **`combineSameUnits`** | **Default** `false`<br>`true`: an entity added from the card goes into a graph of compatible units — *the card's only* |
-| **`recordedEntitiesOnly`** | **Default** `false`<br>`true`: the selector lists only the entities recorded in the database — *the card's only* |
-| **`refresh.automatic` / `refresh.interval`** | **Default** `true` / not set<br>`false`: no refresh as new values come in / a refresh every so many seconds — *the card's only* |
-| **`defaultInfoPanel`** | **Default** not set: the menu's switch<br>`true`: the card replaces the history of Home Assistant's more info popup — *the card's only* |
-| **`infoPanel`** | **Default** not set<br>The info panel's own options, as the card's — *the card's only* |
-| **`stateColors`** | **Default** automatic colors<br>A timeline's colors by entity, device class, domain or state (`door.on: blue`) — *the card's only* |
-| **`stateTextMode` / `tooltip.stateTextMode`** | **Default** `auto`<br>The states' names in the timelines / in the tooltip: `auto` (by device class), `raw`, `hide` — *the card's only* |
-| **`stateColorSeed`** | **Default** `137`<br>The seed of the timelines' automatic colors — *the card's only* |
-| **`tooltip.showLabel`** | **Default** `true`<br>`false`: no curve name before its value in the tooltip — *the card's only* |
 | **`statistics.enabled`** | **Default** `true`<br>`false`: the history only, no long term statistics — *the card's only* |
 | **`statistics.period`** | **Default** `hour`<br>The long term statistics' period: `5minute`, `hour`, `day`, `week`, `month` — *the card's only* |
 | **`statistics.force`** | **Default** `false`<br>`true`: the statistics only, the history only for the last minutes — *the card's only* |
+| **`refresh.automatic`** | **Default** `true`<br>`false`: no refresh as new values come in — *the card's only* |
+| **`refresh.interval`** | **Default** not set<br>A refresh every so many seconds — *the card's only* |
+| **`siConversionFactor`** | **Default** automatic, from the units<br>The factor converting the entity's unit into its graph's, when units are combined — *an entity's only* |
+| **`decimation`** | **Default** —<br>Accepted, no effect |
 | **`statistics.mode` / `statistics.retention`** | **Default** —<br>Accepted, no effect — *the card's only* |
-| **`csv.separator` / `csv.timeFormat`** | **Default** `,` / `YYYY-MM-DD HH:mm:ss`<br>The CSV's column separator / its time format — *the card's only* |
-| **`csv.exportAttributes`** | **Default** `false`<br>`true`: the attributes exported with the values — *the card's only* |
+
+### Card options
+
+| Option | Description |
+|---|---|
+| **`header`** | **Default** `History explorer` and the card's version<br>The card's title; `' '`: none, its room kept; `hide`: none at all — *the card's only* |
+| **`cardName`** | **Default** `default`<br>The card's name, under which its changes are kept — required for several cards on a dashboard — *the card's only* |
+| **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h`<br>The time range shown when the card opens — see [Time range](#time-range) — *the card's only* |
+| **`defaultTimeOffset`** | **Default** not set: the window ends now<br>Where the window ends when the card opens: an offset (`-1d`), uppercase to snap (`1D`: the current day) — *the card's only* |
+| **`defaultMagnifierMode`** | **Default** `xy`<br>What the magnifying glass zooms: `x` the time, `y` the Y axis, `xy` both — *the card's only* |
+| **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none`<br>What the card remembers, on this device / on all the user's devices — see [Persistence](#persistence) — *the card and an entity only* |
+| **`uimode`** | **Default** Home Assistant's theme<br>`dark` or `light`: the card's colors forced — *the card's only* |
+| **`hour24`** | **Default** Home Assistant's clock setting<br>`true`: the 24-hour clock; `false`: the 12-hour one — *the card's only* |
+| **`uiLayout.toolbar`** | **Default** `top`<br>Where the toolbar goes: `top`, `bottom`, `both`, `hide` — *the card's only* |
+| **`uiLayout.selector`** | **Default** `top`<br>Where the entity selector goes: `top`, `bottom`, `both`, `hide` — *the card's only* |
+| **`uiLayout.sticky`** | **Default** `hide`<br>The toolbars kept visible while scrolling: `top`, `bottom`, `both`, `hide` — *the card's only* |
+| **`uiLayout.interval`** | **Default** shown<br>`hide`: no bar interval selector — *the card's only* |
+| **`uiLayout.invertZoom`** | **Default** `false`<br>`true`: the magnifiers − and + swapped — *the card's only* |
+| **`lineGraphHeight`** | **Default** `250`<br>The line graphs' height, in px — see *1 — *the card's only* |
+| **`barGraphHeight`** | **Default** `150`<br>The bar graphs' height, in px — see *1 — *the card's only* |
+| **`timelineBarHeight`** | **Default** `24`<br>A timeline row's height, in px — *the card's only* |
+| **`timelineBarSpacing`** | **Default** `40`<br>The distance between the tops of two timeline rows, in px — *the card's only* |
+| **`labelAreaWidth`** | **Default** `65`<br>The width of the Y labels' area, in px — *the card's only* |
+| **`uiColors.gridLines`**<br>*`uiColors.gridlines`* | **Default** the theme's grid color<br>The grid lines' color — *the card's only* |
+| **`uiColors.cursorLine`**<br>*`uiColors.cursorline`* | **Default** the grid lines' color<br>The cursor line's color — *the card's only* |
+| **`uiColors.labels`** | **Default** the theme's<br>The labels' color — *the card's only* |
+| **`uiColors.buttons`** | **Default** the theme's primary color, light<br>The buttons' color — *the card's only* |
+| **`uiColors.selector`** | **Default** the card's background<br>The entity selector's background — *the card's only* |
+| **`uiColors.closeButton`** | **Default** `#0000001f`<br>The bar interval selector's background — *the card's only* |
+| **`cursor.mode`** | **Default** `auto`<br>The cursor line: on the graph pointed at (`auto`), every graph (`all`), none (`hide`) — *the card's only* |
+| **`cursor.types`** | **Default** `[timeline]`<br>The graph types showing the cursor line — *the card's only* |
+| **`timeTicks.density`**<br>*`timeTickDensity`* | **Default** `high`<br>How many time labels: `low`, `medium`, `high`, `higher`, `highest` — *the card's only* |
+| **`timeTicks.densityOverride`** | **Default** not set<br>The time labels' density whatever the card's width: `low` … `highest` — *the card's only* |
+| **`timeTicks.dateFormat`** | **Default** `normal`<br>`short`: shorter dates under the graphs — *the card's only* |
+| **`defaultInfoPanel`** | **Default** not set: the menu's switch<br>`true`: the card replaces the history of Home Assistant's more info popup — *the card's only* |
+| **`infoPanel`** | **Default** not set<br>The info panel's own options, as the card's — *the card's only* |
+
+### CSV export options
+
+| Option | Description |
+|---|---|
+| **`csv.separator`** | **Default** `,`<br>The CSV's column separator — *the card's only* |
+| **`csv.timeFormat`** | **Default** `YYYY-MM-DD HH:mm:ss`<br>The CSV's time format — *the card's only* |
 | **`csv.statisticsPeriod`** | **Default** `hour`<br>The statistics export's period: `5minute`, `hour`, `day`, `week`, `month` — *the card's only* |
+| **`csv.exportAttributes`** | **Default** `false`<br>`true`: the attributes exported with the values — *the card's only* |
 | **`csv.numberLocale`** | **Default** not set<br>The numbers written in a locale's format (`fr-FR`) — *the card's only* |
+
+### Gesture options
+
+| Option | Description |
+|---|---|
 | **`gestures.longPress` / `gestures.longPressTouch`** | **Default** `500`<br>A long press's duration, in ms (200 to 2000): mouse and pen / finger — *the card's only* |
 | **`gestures.precision` / `gestures.precisionTouch`** | **Default** `8` / `12`<br>The pointer's precision, in px (2 to 40): mouse and pen / finger — *the card's only* |
 | **`gestures.readingTimePerWord`** | **Default** `400`<br>How long a tooltip or a message stays per word, in ms (100 to 1000) — *the card's only* |
-| **`decimation`** | **Default** —<br>Accepted, no effect |
-| **`show`** | **Default** not set<br>mini-graph-card's block, read as the options it names (`show: { points: true }`) |
+
+### Notes
 
 *1 — `height` on the card: the height of every line and bar graph; `lineGraphHeight` / `barGraphHeight` win over it.
 
