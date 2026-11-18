@@ -4,6 +4,29 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.84] - 2026-11-18
+
+### Added
+- An automatic color by what a curve measures: its entity's device class (`temperature`, `humidity`, `power`, `energy`, `battery`, `voltage`, `current`, `pressure`, `illuminance`, `carbon_dioxide`, `pm25`, `wind_speed`, `precipitation`, `water`, `gas`… — the same in every language), else its unit's (`°C`, `W`, `kWh`, `hPa`…; an attribute: its unit's): its class's usual color; the next curves of its class in a graph, each the next color of its class, clearly told apart; the palette only for a curve of no class, or once its class's colors are all taken in the graph
+- *Appearance ▸ Color ▸ Automatic*: the curve's color as it's given when it's added — its configuration's (its YAML, `lineColor`, its graph's, `entityOptions`', the card's), else the automatic one —, in bold when it has it
+
+### Changed
+- A curve with no color set: the color of its class instead of the palette's next (the card's existing curves of a class change color); a curve dropped where its automatic color is taken: the next one of its class, else the palette's
+- The menus' widths, every menu alike (curve, graph, options, the entity selector's lists): the menu stays where it opened; each submenu takes its own width, and when the last one opened lacks room, it's taken from the submenus over it — the menu's lines shown beside them reduced first to their first three characters, then the first submenu's, and so on down —; only once all of them show no more than that are its own lines cut ('…'). A submenu closed, they take back their width. Before: a submenu as wide as its menu less a strip of 48 px, its lines cut
+- *Entity ▸*'s list in a menu: right-aligned on the menu, as wide as the entities' names (before: as the field), then fitted as a submenu
+
+### Fixed
+- `look: mini`, `showTimeLabels: false` ([#307](https://github.com/Cook23/history-explorer-card/issues/307)): the time labels hidden were only painted transparent — still laid out, the plot short of the card's sides (~17 px each) and bottom (~26 px); now out of the layout, the plot taking their room. A graph without time labels may then reach further right than one with them
+
+### Docs
+- README.md (a version highlight), README_Full.md: the automatic color, *Color ▸ Automatic*; the menus' widths; `showTimeLabels` for every graph, the plot taking the labels' room
+
+### Internal
+- `fitCascade`: the cascade of menus fitted when a box opens or closes; a field's line counts its first three characters as a line's
+- `CLASS_COLORS`, `UNIT_CLASSES` (history-default-colors.js); one rule for a curve's color when it's added and *Automatic* (`configuredColor`, `autoColor`); an automatic color's light fill not exported
+- Tests (`indirect`, `minigraph`, `colors`, `values`): the cascade fitted and restored; `look: mini`'s plot filling the card; the automatic color by class, *Automatic*
+
+
 ## [v1.2.83] - 2026-11-18
 
 ### Added

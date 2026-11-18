@@ -117,10 +117,10 @@ module.exports = async function()
     await t.step('look: mini — no header, toolbar nor selector; the value now, no statistics (none asked); time labels hidden; Y labels inside; fading fill; the card\'s own showGrid kept', async () => {
         const r = await t.E(`(()=>{ const c=el.instance.graphs[0].chart;
             return { header: el.querySelector('ha-card').getAttribute('header'), toolbar: !!el.querySelector('#b1_0'), selector: !!el.querySelector('#b7_0'),
-                     time: c.options.scales.xAxes[0].ticks.fontColor, mirror: c.options.scales.yAxes[0].ticks.mirror,
+                     time: c.options.scales.xAxes[0].ticks.display, mirror: c.options.scales.yAxes[0].ticks.mirror,
                      fade: c.data.datasets[0].backgroundColor instanceof CanvasGradient, grid: c.options.scales.yAxes[0].gridLines.color }; })()`);
         const v = await values(t);
-        const ok = !r.header && !r.toolbar && !r.selector && r.time === 'rgba(0,0,0,0)' && r.mirror && r.fade && r.grid !== 'rgba(0,0,0,0)'
+        const ok = !r.header && !r.toolbar && !r.selector && r.time === false && r.mirror && r.fade && r.grid !== 'rgba(0,0,0,0)'
             && JSON.stringify(v.states) === JSON.stringify(['rain=4 mm']) && !v.stats.length;
         return ok ? true : JSON.stringify({ r, v });
     });

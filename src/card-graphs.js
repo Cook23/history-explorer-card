@@ -3,7 +3,8 @@
 // rebuilt, removed. What one graph is for Chart.js is card-charts.js's. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
-import { defaultColors, colorSpec, fillValue, NO_FILL } from "./history-default-colors.js";
+import { defaultColors, colorSpec, fillValue, NO_FILL, CLASS_COLORS, UNIT_CLASSES } from "./history-default-colors.js";
+import { seriesOf } from "./history-series.js";
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
 import { areSICompatible } from "./history-units.js";
@@ -618,9 +619,7 @@ export class CardGraphs
         const _gid = entityOptions?.groupId ?? null;
         e.linePlace ??= this.graphs.find(g => g.groupId === _gid)?.entities.length ?? 0;
         if( color == null ) {
-            const _g = this.pconfig.graphs[_gid];
-            const _lc = _g?.lineColor?.[e.linePlace]
-                     ?? ( _g?.color === undefined && this.getEntityOptions(e.entity)?.color === undefined ? this.pconfig.cardOptions.lineColor?.[e.linePlace] : undefined );
+            const _lc = this._lineColorAt(e.entity, _gid, e.linePlace);
             if( _lc !== undefined ) { color = _lc; e.colorSet = true; }
         }
 
@@ -638,7 +637,9 @@ export class CardGraphs
             e.fill = _ownFill ?? entityOptions?.fill ?? NO_FILL;
             e.colorSet = true;
         } else if( e.color === "#000000" ) {
-            const c = this.getNextDefaultColor();
+            // (automatic: its class's color — the graph it joins gives it another one of its
+            // class if that one's taken there, see _freeColorIn —, else the palette's)
+            const c = this.autoColor(e, []);
             e.color = c.color;
             e.fill = _ownFill ?? entityOptions?.fill ?? c.fill;
         }
@@ -689,20 +690,63 @@ export class CardGraphs
             ? _last : null;
     }
 
-    // An entry joining graph g with a color another of its curves has: a free color of the
-    // palette instead — only for a color the card picked: one the configuration sets
-    // (colorSet) is kept. (Checked against the real target, whether or not the caller knew
-    // it — e.g. a brand-new entity created from the curve menu.)
+    // An entry joining graph g with a color another of its curves has: a free color instead —
+    // the next one of its class (classColors), else the palette's — only for a color the card
+    // picked: one the configuration sets (colorSet) is kept. (Checked against the real target,
+    // whether or not the caller knew it — e.g. a brand-new entity created from the curve menu.)
     _freeColorIn(g, e, ownFill)
     {
         if( e.color === undefined || e.colorSet ) return;
-        const _usedColors = g.entities.map(x => x.color);
+        const _usedColors = g.entities.filter(x => x !== e).map(x => x.color);
         if( !_usedColors.includes(e.color) ) return;
-        const _free = defaultColors.find(c => !_usedColors.includes(c.color));
+        const _free = this.autoColor(e, _usedColors);
         if( _free ) {
+            const _light = e.fill === fillValue(true, e.color) || defaultColors.some(c => c.color === e.color && c.fill === e.fill);
             e.color = _free.color;
-            e.fill  = fillValue(ownFill, e.color) ?? _free.fill;
+            e.fill  = fillValue(ownFill, e.color) ?? ( _light ? _free.fill : e.fill );
         }
+    }
+
+    // lineColor's color for entity at place in group gid: its graph's, else the card's when
+    // neither its graph nor entityOptions set a color (undefined: none)
+    _lineColorAt(entity, gid, place)
+    {
+        const _g = this.pconfig.graphs[gid];
+        return _g?.lineColor?.[place]
+            ?? ( _g?.color === undefined && this.getEntityOptions(entity)?.color === undefined ? this.pconfig.cardOptions.lineColor?.[place] : undefined );
+    }
+
+    // The color the configuration gives curve e, as when it's made (_applyEntityDefaults):
+    // its YAML line's, else lineColor's, else its graph's, entityOptions', the card's
+    // (undefined: none — its color automatic, autoColor)
+    configuredColor(e)
+    {
+        const _gid = e.groupId ?? null;
+        return this.yamlOwnOptionOf(e, 'color') ?? this._lineColorAt(e.entity, _gid, e.linePlace) ?? this._optionsInGraph(e.entity, _gid).options.color;
+    }
+
+    // The colors of what curve e measures, in order: its class's (CLASS_COLORS) — its entity's
+    // device class, else its unit's (UNIT_CLASSES); an attribute: its unit's —, none for a
+    // curve of no class
+    classColors(e)
+    {
+        const { entity, attribute } = seriesOf(e.entity);
+        const _dc = attribute ? undefined : this.stateOf(entity)?.attributes?.device_class;
+        const _cls = CLASS_COLORS[_dc] ? _dc : UNIT_CLASSES[this.getUnitOfMeasure(e.entity, e.unit)];
+        return CLASS_COLORS[_cls] ?? [];
+    }
+
+    // Curve e's automatic color, the colors used taken aside (used: its graph's other curves'
+    // — none when it's made, its graph given after: _freeColorIn): the first of its class's
+    // free, else the palette's next (the card's turn), else its first free → { color, fill }
+    // (null: every one taken)
+    autoColor(e, used)
+    {
+        const _c = this.classColors(e).find(c => !used.includes(c));
+        if( _c ) return { color: _c, fill: fillValue(true, _c) };
+        const _next = this.getNextDefaultColor();
+        if( !used.includes(_next.color) ) return _next;
+        return defaultColors.find(c => !used.includes(c.color)) ?? null;
     }
 
     // Each graph's graphIndex its place in the display order, 1 for the topmost — what a

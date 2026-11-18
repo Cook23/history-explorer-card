@@ -420,6 +420,25 @@ export class CardOperations
     // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
     // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
     // color chosen: kept as the curve's own (colorSet), its fill of its color following it
+    // The curves among entities of graph g given their automatic color back: the one the
+    // configuration gives them (configuredColor), else each its class's first free in the
+    // graph, else the palette's (autoColor); a light fill of their color following it —
+    // saved so, the graph rebuilt in its place
+    setCurvesAutoColor(g, entities)
+    {
+        for( const e of entities ) {
+            const _conf = this.configuredColor(e);
+            const _used = g.entities.filter(x => x !== e).map(x => x.color);
+            const c = _conf !== undefined ? { color: _conf } : this.autoColor(e, _used) ?? this.getNextDefaultColor();
+            const _light = e.fill === fillValue(true, e.color) || e.fill === undefined;
+            e.color = c.color;
+            e.colorSet = _conf !== undefined || undefined;
+            if( _light ) e.fill = fillValue(true, c.color);
+        }
+        this.rebuildInPlace(g);
+        this.writeLocalState();
+    }
+
     setCurvesLook(g, entities, field, value)
     {
         for( const e of entities ) {

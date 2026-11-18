@@ -329,7 +329,7 @@ graphs:
 *Export ▸ YAML ▸* copies to the clipboard, as YAML, the settings of what its menu acts on — what the YAML says and what was chosen in the menus: from the options menu, the whole card; from a graph's menu, that graph (an item of `graphs:`); from a curve's menu (the info panel's too), that curve (an item of a graph's `entities:`). Pasted into another card's YAML, it makes there a graph or a curve defined statically, shown as it is here. A message says it's copied — or that the clipboard refused it.
 
 It's written in the card's own syntax: each option under its own name, never a synonym (`lineWidth`, not `width` or `line_width`), a bar interval by its name (`daily`, `raw`). What is kept on each device is left out: a curve hidden, its points, the tooltip's modes, the Y axes locked (see [What is kept, and where](#what-is-kept-and-where)). Each level — the card, a graph, a curve — writes what it holds that the level above it gives otherwise; the first level copied, what differs from the option's default:
-- **Simplified** — what is necessary: those only. The card's `look:` and `entityOptions` are written as its YAML says them: the options they give are left to them. A curve's color is written when it was set (in the YAML, `entityOptions` or the menu), not when it's the palette's.
+- **Simplified** — what is necessary: those only. The card's `look:` and `entityOptions` are written as its YAML says them: the options they give are left to them. A curve's color is written when it was set (in the YAML, `entityOptions` or the menu), not when it's automatic.
 - **Complete** — what is useful to change it, the options at their default value included: those, plus, at each level, the options the look sets, and the ones any of its neighbours writes — the others of its level in the export: the card exported, every graph and every curve of the card; a graph, its curves; a curve alone, none —, each with its own value. No `entityOptions`: each curve writes what they give it.
 
 **In Home Assistant's card editor** — it helps write a card's YAML: set the card up in the editor's preview with its menus (the entities added, their display, their look), export it from the options menu (▾), and paste it in place of the YAML there — it holds `type:` and `cardName:` too. In the editor's window, the card keeps room under itself for its menus to open; on the dashboard being edited, none.
@@ -511,7 +511,7 @@ An entity whose current state can be read as a number can be shown as a line (*S
 The curve menu's items each open their submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; not for a timeline's row:
-  - *Color ▸* — *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
+  - *Color ▸* — *Automatic*: the color it's given when it's added (its configuration's, else the one of what it measures — see [Colors of curves and bars](#colors-of-curves-and-bars)), in bold when it has it; *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
   - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
   - *Fill ▸* — *None* (`fill: false`), *Fade* (`fill: fade`), *Light* (its color, light: `fill: light`), *Solid* (its color: `fill: solid`), *Entity ▸* (see below);
@@ -690,7 +690,7 @@ A curve's legend label dragged onto another graph moves the curve there (on a to
 - **Any line or bar graph** — accepts it, whatever its unit: lines and bars mixed, a YAML graph included, in or out of a group of linked graphs; a second group of units gets the right Y axis, more groups share one axis (see [Two Y axes](#two-y-axes)). Units only matter when an entity is added: `combineSameUnits` only joins compatible ones on its own;
 - **Another display type** — an entity whose state is a number takes the graph's: a curve dropped onto a timeline becomes one of its rows; an arrowline's entity dropped onto a line graph becomes a curve — its own default display when it fits that graph (*Smart* or its line mode, *Bar* for a quantity that adds up), else the graph's;
 - **A state that isn't a number** (on/off, text) — only a timeline: dropped onto any other graph, it's refused with a brief tooltip (`timeline ≠ line`);
-- **Its color** — kept; when the target graph already uses it, a free color of the palette is given.
+- **Its color** — kept; an automatic color the target graph already uses: the next free one of its class, else of the palette.
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/drag-label.png" alt="A curve's label dragged onto another graph" width="910">
 
@@ -912,7 +912,7 @@ A long-press — or a right click — opens a menu: on a curve's or a row's labe
   - a menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page, the dialog or the panel scrolls, even under a sticky toolbar; a submenu follows its line when its menu scrolls;
   - each shows in its zone — a menu, the screen minus what covers it (a sticky toolbar, the page's header); a submenu, its menu at the top and that zone at the bottom: what goes past is masked;
   - the menu closes once its first line is wholly out (a submenu opened from a first or last line isn't closed by the least scroll).
-- **Widths** — a menu is wider than each of its submenus, so its lines stay readable beside the one open — the last line's too; only without room for that may the last line's submenu, which hides no line below, be as wide as the menu. On a card or a screen too narrow, the menu opens without any submenu, and a submenu leaves at least 48 px and the first three characters of its lines; its own lines are cut ('…') if they don't fit.
+- **Widths** — a menu is wider than each of its submenus, so its lines stay readable beside the one open — the last line's too. On a card or a screen too narrow, the menu opens without any submenu. The menu stays where it opened; each submenu takes its own width, and when the last one opened lacks room, it's taken from the submenus over it — the menu's lines shown beside them reduced first to their first three characters, then the first submenu's, and so on down —; only once all of them show no more than that are its own lines cut ('…'). Every menu does so, the entity selector's lists too; a submenu closed, they take back their width.
 
 #### The options menu
 
@@ -1067,7 +1067,7 @@ A timeline shows an entity whose state isn't a number, as a row of colored state
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/timeline.png" alt="A timeline: motion, a lock, a person" width="652">
 
-`showTimeLabels: false` hides a timeline's or an arrowline's time labels, graph by graph:
+`showTimeLabels: false` hides a timeline's or an arrowline's time labels, graph by graph — the plot taking their room, below and on its sides:
 
 ```yaml
 graphs:
@@ -1414,6 +1414,8 @@ showMissingState: true   # a gap where its state isn't in its stateMap (default 
 ```
 
 ### Colors of curves and bars
+
+**Without a color set** — a curve or bars take the color of what they measure: their entity's device class (`temperature`, `humidity`, `power`, `energy`, `battery`…), else their unit's (`°C`, `W`, `kWh`, `hPa`…; an attribute: its unit's). Several curves of one class in a graph each take the next color of their class, clearly told apart from the others; a curve of no class, or once its class's colors are all taken in the graph, takes a color of the palette. *Color ▸ Automatic*, in a curve's menu, gives a curve its color back as it's given when it's added: its configuration's (its YAML, `lineColor`, its graph's, `entityOptions`', the card's), else this automatic one.
 
 The `color` of a curve or of bars is a value, or an entity holding that value. The same values are accepted everywhere — in a graph's entity, in `entityOptions`, and in the state of an entity:
 
@@ -2174,7 +2176,7 @@ This entity-level option only applies to static entities defined here in `graphs
 
 ### Entity options
 
-A line graph added from the entity list takes the default settings and a color of the palette. `entityOptions` overrides them for specific entities, device classes or whole domains: a fixed Y axis range for every humidity sensor, a color or a line mode for the power graphs.
+A line graph added from the entity list takes the default settings and its automatic color. `entityOptions` overrides them for specific entities, device classes or whole domains: a fixed Y axis range for every humidity sensor, a color or a line mode for the power graphs.
 
 ```yaml
 type: custom:history-explorer-card
@@ -2362,14 +2364,14 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity that gives an arrow its whole length; no automatic scale then. `~` and a value: at least that value, more when the values go past it — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px. On the card: the height of every line and bar graph — `lineGraphHeight` and `barGraphHeight` win over it — see [Graph sizes](#graph-sizes) |
 | **`showGrid`** | **Default** `true`<br>`false`: no grid lines in the graph's plot |
-| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — the graph takes less height |
+| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under the graph — the plot takes their room, below and on its sides |
 | **`labelsVisible`** | **Default** `true`<br>`false`: no entity names left of the timelines' rows — the rows take the whole width — see [Timeline graphs](#timeline-graphs) — *the card's only* |
 
 #### Color options
 
 | Option | Description |
 |---|---|
-| **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The color of the curve or the bars. A color; thresholds on the value (`{ 0: blue, 20: red }`, or a list); thresholds on another entity's or attribute's value (with `entity:`, `attribute:`); or an entity or attribute whose state is the color. Without it, a color of the automatic palette — see [Colors of curves and bars](#colors-of-curves-and-bars) |
+| **`color`**<br>*`color_thresholds`* | **Default** automatic: the color of what it measures (its device class, else its unit), else the palette's<br>The color of the curve or the bars. A color; thresholds on the value (`{ 0: blue, 20: red }`, or a list); thresholds on another entity's or attribute's value (with `entity:`, `attribute:`); or an entity or attribute whose state is the color. Without it, a color of the automatic palette — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | **`fill`**<br>*`show_fill`* | **Default** the curve's color, light — none when `color` is set; a bar: `solid`<br>The area under the curve, a bar's area: a color; `false`, none; `fade`, the curve's color fading out downwards; `light` (or `true`), the curve's color, light; `solid`, the curve's color. It also takes thresholds or an entity, as `color` does — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>How the color changes between number thresholds: `hard`, each value takes its threshold's color; `smooth`, the color is blended from one threshold to the next — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list of colors given by place: the first curve of a graph takes the first color, and so on. A curve with its own `color` keeps it. A graph's `lineColor` wins over its `color`; the card's is below `entityOptions` — see [Colors of curves and bars](#colors-of-curves-and-bars) — *the card and a graph only* |

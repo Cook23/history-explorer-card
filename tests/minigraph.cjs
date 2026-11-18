@@ -529,5 +529,14 @@ module.exports = async function()
     });
     done(await t.close());
 
+    // ── look: mini — its time labels hidden, out of the layout: the plot fills the card (#307) ──
+    t = await openCard({ type: 'custom:history-explorer-card', look: 'mini', height: 100, statistics: { enabled: false }, entities: ['sensor.power'] }, { mock: { series: true }, height: 600 });
+    await t.wait(1200);
+    await t.step('look: mini: the plot reaches the card\'s sides and nearly its bottom — the hidden time labels take no room (#307)', async () => {
+        const a = await t.E(`(()=>{ const c=el.instance.graphsInDisplayOrder()[0].chart, a=c.chartArea; return { l: Math.round(a.left), r: Math.round(a.right), b: Math.round(a.bottom), w: c.width, h: c.height }; })()`);
+        return a.l === 0 && a.r === a.w && a.h - a.b <= 6 ? true : JSON.stringify(a);
+    });
+    done(await t.close());
+
     return { passed, failed };
 };

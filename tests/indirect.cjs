@@ -63,6 +63,19 @@ module.exports = async function()
         return l0 === 'Default  — ▸ | + Add ▸' && /^\{"thresholds":\[\[100,"#[0-9a-f]{6}"\]\]/i.test(saved) && !saved.includes('entity')
             && l1 === '≥ 100 ▸ | Default  — ▸ | + Add ▸ | Blend' && blend === 'smooth' ? true : JSON.stringify({ l0, saved, l1, blend });
     });
+    await t.step('the cascade fitted: the menu where it is; the list of Entity ▸ given room by the menus over it — the farthest first, each down to its lines\' first three characters —, back as they were once another line is chosen', async () => {
+        const boxes = () => t.E(`(()=>{ const r=el.querySelector('#et_0'); const ch=[...(r._cascade||[r])]; const l=r._menuList; if(l&&l.style.display!=='none') ch.push(l); return ch.map(b=>{ const q=b.getBoundingClientRect(); return { id: b.id, l: Math.round(q.left), r: Math.round(q.right) }; }); })()`);
+        await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
+        const a = await boxes();
+        await click(t, '#et_0_appearance_color_entity'); await t.wait(250); await search(t, 's');
+        const b = await boxes();
+        await t.E(`(()=>{ el.instance.setDropdownVisibility(2, false); el.querySelector('#et_0_appearance_points').click(); })()`); await t.wait(250);
+        const c = await boxes(); await closeMenu(t);
+        const gaps = b.slice(1).map((x, k) => x.l - b[k].l);
+        const ok = b[0].l === a[0].l && b.every(x => Math.abs(x.r - b[0].r) <= 1) && b[b.length - 1].id === 'es_2'
+            && gaps.slice(0, 2).every(g => g > 20 && g < 60) && b[1].l < a[1].l && JSON.stringify(c.slice(0, 2)) === JSON.stringify(a.slice(0, 2)) && c[2]?.id === 'et_0_appearance_points_sub';
+        return ok ? true : JSON.stringify({ a, b, c, gaps });
+    });
     done(await t.close());
 
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }]), { height: 900 });

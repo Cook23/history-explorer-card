@@ -14,7 +14,7 @@ import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
 import { isColorSeries, colorSpec, isBlendable } from "./history-default-colors.js";
-import { maxOf } from "./history-arrays.js";
+import { maxOf, appendAll } from "./history-arrays.js";
 import { optionSeriesOf } from "./card-datasets.js";
 import { MENU_SELECTOR } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
@@ -365,9 +365,69 @@ export class CardMenus
         _root._cascade.push(box);
         line.style.fontWeight = 'bold';
         this.openSubmenu(box, line);
+        // (its width as opened — its own —, the one the cascade's fit starts from)
+        box._base = { minWidth: box.style.minWidth, maxWidth: box.style.maxWidth, width: box.style.width };
+        this.fitCascade(box);
         // (where it stands from its line: kept so, its menu scrolled — see followAnchor)
         box._fromLine = box.getBoundingClientRect().top - line.getBoundingClientRect().top;
         box.focus();
+    }
+
+    // The cascade box belongs to fitted, the boxes opened one over the other (the menu, its
+    // submenus, the entity selector's list of an Entity ▸ and its own submenus), all
+    // right-aligned: the menu stays as it is; each box opened after it takes its own width,
+    // one after the other — the room the last one lacks taken from the boxes over it, the
+    // farthest one first (the menu's lines shown beside the box over it reduced to their
+    // first three characters, _menuStrip), then the next one, and so on down; only once all of
+    // them show no more than that, the last one's lines cut ('…', an entity's name shortened)
+    fitCascade(box)
+    {
+        let _root = box?._root ?? box;
+        if( _root?._menuOf ) _root = _root._menuOf;
+        if( !_root ) return;
+        const _chain = [...( _root._cascade ?? [_root] )];
+        const _list = _root._menuList;
+        if( _list && _list.style.display !== 'none' ) appendAll(_chain, _list._cascade ?? [_list]);
+        // (each back to its width as opened)
+        for( const b of _chain.slice(1) ) if( b._base ) { Object.assign(b.style, b._base); if( b._fitWidth ) b._fitWidth(null); }
+        if( _chain.length < 2 ) return;
+        const R = _chain[0].getBoundingClientRect().right;
+        const _natural = _chain.map(b => b._naturalWidth?.() ?? b.getBoundingClientRect().width);
+        const _strip = _chain.map(b => this._menuStrip(b));
+        const L = [_chain[0].getBoundingClientRect().left];
+        for( let k = 1; k < _chain.length; k++ ) {
+            // (what each box over it shows of its lines: up to the next box; the one under
+            // it, its lines' text)
+            const _shown = L.map((x, j) => j < k - 1 ? L[j + 1] - x : this._readableWidth(_chain[j]));
+            let _lack = _natural[k] - ( R - L[k - 1] - _shown[k - 1] );
+            if( _lack <= 0 ) { L[k] = R - _natural[k]; continue; }
+            const _cut = _shown.map((v, j) => { const t = Math.max(0, Math.min(_lack, v - _strip[j])); _lack -= t; return t; });
+            for( let j = 1; j <= k; j++ ) L[j] = L[j - 1] + _shown[j - 1] - _cut[j - 1];
+        }
+        for( let k = 1; k < _chain.length; k++ ) {
+            const b = _chain[k], w = Math.max(0, Math.floor(R - L[k])) + 'px';
+            b.style.boxSizing = 'border-box';
+            Object.assign(b.style, { minWidth: w, maxWidth: w });
+            if( b._fitWidth ) b._fitWidth(R - L[k]);
+        }
+    }
+
+    // A box's lines' text, its widest — what it shows of them beside a box over it
+    _readableWidth(box)
+    {
+        return Math.max(0, maxOf(this._stripLines(box).map(a => this._lineTextWidth(a))));
+    }
+
+    // Menu i's entity selector's list (MENU_SELECTOR + i) in its menu's cascade, shown or
+    // hidden (list; null: none): the menu it belongs to — the one its Entity ▸ is in
+    menuListShown(i, list)
+    {
+        const m = this._menuSource?.m;
+        const _root = m && m.index === i ? this._this.querySelector(`#${m.prefix}`) : null;
+        if( !_root || !list ) return null;
+        _root._menuList = list;
+        list._menuOf = _root;
+        return _root;
     }
 
     // Menu menuEl, opened from anchorEl, kept on it while it's open — watched each frame
@@ -470,11 +530,14 @@ export class CardMenus
     // were opened from no longer in bold
     closeCascade(root, depth = 1)
     {
-        for( const _box of ( root._cascade ?? [] ).splice(Math.max(depth, 1)) ) {
+        const _closed = ( root._cascade ?? [] ).splice(Math.max(depth, 1));
+        for( const _box of _closed ) {
             _box.style.display = 'none';
             // (a line marked — the value in use — stays in bold)
             if( _box._line ) _box._line.style.fontWeight = _box._line.dataset.marked ? 'bold' : '';
         }
+        // (the boxes left back to the width they take without them)
+        if( _closed.length ) this.fitCascade(root);
     }
 
     // Submenu box closed — the ones over it too —, the keyboard back to the box before (or to
@@ -1084,8 +1147,12 @@ export class CardMenus
         const _d = _APPEARANCE[level];
         const _values = new Set(_curves.map(({ e }) => this._lookValue(e, level)));
         const _cur = _values.size === 1 ? [..._values][0] : undefined;
-        // (the color: the browser's picker; the others, their list's values)
-        const _lines = level === 'color' ? [{ id: `${m.prefix}_appearance_color_pick`, label: i18n('ui.menu.look_pick'), choose: () => this._pickCurveColor(m.index) }]
+        // (the color: Automatic — the configuration's, else the class's: in bold when the curves
+        // have it —, the browser's picker; the others, their list's values)
+        const _lines = level === 'color' ? [
+                { id: `${m.prefix}_appearance_color_auto`, label: i18n('ui.menu.look_auto'), final: true, marked: _curves.length > 0 && _curves.every(({ e }) => { const c = this.configuredColor(e); return c !== undefined ? JSON.stringify(c) === JSON.stringify(e.color) : !e.colorSet; }),
+                  choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesAutoColor(g, curves); _chosen(); } },
+                { id: `${m.prefix}_appearance_color_pick`, label: i18n('ui.menu.look_pick'), choose: () => this._pickCurveColor(m.index) }]
             : ( _d.values ?? [] ).map(([v, label]) => ({ label: label.startsWith('ui.') ? i18n(label) : label, marked: v === _cur, final: true,
                 choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesLook(g, curves, _d.field, v); _chosen(); } }));
         // (from an entity — the one in use in bold)
@@ -1701,17 +1768,22 @@ export class CardMenus
         });
     }
 
-    // What a submenu leaves of its menu's lines, at least: their first three characters, and
-    // 48 px — what a finger can still pick
+    // What a submenu leaves of its menu's lines, at least: their first three characters (a
+    // box without lines — a field —: nothing)
     _menuStrip(menuEl)
     {
-        return Math.max(48, maxOf(this._menuLines(menuEl).map(a => this._lineTextWidth(a, 3))));
+        return Math.max(0, maxOf(this._stripLines(menuEl).map(a => this._lineTextWidth(a, 3))));
     }
 
     // A menu's lines shown, and the submenu a line opens
     _menuLines(menuEl)
     {
         return [...menuEl.children].filter(a => a.tagName === 'A' && a.style.display !== 'none');
+    }
+    // (and its fields' lines: what a box over it leaves of each, see _menuStrip)
+    _stripLines(menuEl)
+    {
+        return [...menuEl.children].filter(a => ( a.tagName === 'A' || a.tagName === 'LABEL' ) && a.style.display !== 'none');
     }
     _submenuOf(line)
     {
@@ -1722,6 +1794,18 @@ export class CardMenus
     // with it: its left padding, a symbol (lead) —, and a gap
     _lineTextWidth(line, n = Infinity)
     {
+        // (a field's line: up to its first three characters, whatever n — a box over it covers
+        // what's typed but its start)
+        const _in = line.querySelector('input');
+        if( _in ) {
+            const _s = document.createElement('span');
+            _s.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${getComputedStyle(_in).font}`;
+            _s.textContent = ( _in.value || _in.placeholder || 'abc' ).slice(0, 3);
+            line.appendChild(_s);
+            const _w = _s.getBoundingClientRect().width;
+            _s.remove();
+            return _in.getBoundingClientRect().left - line.getBoundingClientRect().left + ( parseFloat(getComputedStyle(_in).paddingLeft) || 0 ) + _w + 8;
+        }
         const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
         if( !_text ) return 0;
         const _range = document.createRange();
@@ -1746,15 +1830,15 @@ export class CardMenus
     // menu's right edge — so it takes no room beside the menu — and, like every menu
     // (openMenu), kept within the card and the viewport. The submenu must share the menu's
     // positioned parent (both are its children).
-    // At most as wide as the menu less the strip of its lines it must leave (_menuStrip) —
-    // the last line's submenu: as wide as the menu —, its lines cut ('…') if they don't fit
+    // Its own width; the cascade then fitted (fitCascade): the room it lacks taken from the
+    // boxes over it, its lines cut ('…') only when they can give no more
     openSubmenu(subEl, itemEl)
     {
         const _menu = itemEl.offsetParent;
         const _cb = (_menu?.offsetParent ?? document.body).getBoundingClientRect();
         const _item = itemEl.getBoundingClientRect();
-        const _lines = this._menuLines(_menu);
-        subEl.dataset.room = _menu.offsetWidth - ( itemEl === _lines[_lines.length - 1] ? 0 : this._menuStrip(_menu) );
+        // (its own width — the cascade fitted after, fitCascade)
+        subEl.dataset.room = this._menuRoom();
         this.openMenu(subEl, (_item.top - _cb.top) + 'px', (_menu.getBoundingClientRect().right - _cb.left) + 'px', 'right');
         // (moved up to fit the screen: never above its menu — its first line within it, see
         // followAnchor —, the rest masked below)

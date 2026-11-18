@@ -105,11 +105,11 @@ module.exports = async function()
     done(await t.close());
 
     // ── A curve moved onto another graph where its color is taken ──
-    // (power's and tank's colors are set, power2's is the palette's first: the same one)
+    // (power's and tank's colors are set, power2's is automatic — a power's first: the same one)
     t = await openCard(card({ graphs: [
-        { type: 'line', entities: [{ entity: 'sensor.power', color: '#3e95cd' }] },
+        { type: 'line', entities: [{ entity: 'sensor.power', color: '#f9a825' }] },
         { type: 'line', entities: [{ entity: 'sensor.power2' }] },
-        { type: 'line', entities: [{ entity: 'sensor.tank', color: '#3e95cd' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank', color: '#f9a825' }] },
     ] }), { height: 1200, mock: { series: true } });
     await t.wait(800);
     const colorOf = id => t.E(`el.instance.graphs.flatMap(g=>g.entities).find(e=>e.entity==='${id}').color`);
@@ -118,16 +118,16 @@ module.exports = async function()
         return legendPt(gi, all[gi].entities.findIndex(e=>e.entity==='${id}')); })()`);
     const graphPtOf = id => t.E(`(()=>{ const gi=el.instance.graphsInDisplayOrder().findIndex(g=>g.entities.some(e=>e.entity==='${id}')); return graphPtAt(gi, 0.15); })()`);
     const dragOnto = async (id, ontoId) => { await t.drag(await legendPtOf(id), await graphPtOf(ontoId)); await t.wait(800); };
-    await t.step('a curve whose color the card picked, dropped where that color is taken: a free color of the palette', async () => {
+    await t.step('a curve whose color the card picked, dropped where that color is taken: the next one of its class', async () => {
         const before = await colorOf('sensor.power2');
         await dragOnto('sensor.power2', 'sensor.power');
         const r = { before, layout: await graphsOf(), power: await colorOf('sensor.power'), power2: await colorOf('sensor.power2') };
-        return before === '#3e95cd' && r.layout.startsWith('power+power2') && r.power === '#3e95cd' && r.power2 !== '#3e95cd' ? true : JSON.stringify(r);
+        return before === '#f9a825' && r.layout.startsWith('power+power2') && r.power === '#f9a825' && r.power2 === '#1e88e5' ? true : JSON.stringify(r);
     });
     await t.step('a curve whose color is set, dropped where that color is taken: it keeps it', async () => {
         await dragOnto('sensor.tank', 'sensor.power');
         const r = { layout: await graphsOf(), power: await colorOf('sensor.power'), tank: await colorOf('sensor.tank') };
-        return r.layout.startsWith('power+power2+tank') && r.power === '#3e95cd' && r.tank === '#3e95cd' ? true : JSON.stringify(r);
+        return r.layout.startsWith('power+power2+tank') && r.power === '#f9a825' && r.tank === '#f9a825' ? true : JSON.stringify(r);
     });
     done(await t.close());
 
@@ -171,6 +171,36 @@ module.exports = async function()
     await t.step('fill thresholds on another entity\'s state: its fill there (hot: fading out, cold: its color light, else none)', async () => {
         const f = await _fills(1);
         return f.length >= 2 && f.includes('fade') ? true : JSON.stringify(f);
+    });
+    done(await t.close());
+
+    // ── The automatic color: by class — a power's, then the next one of its class in its graph
+    // —; Color ▸ Automatic: the configuration's color back, else the class's ──
+    t = await openCard(card({ graphs: [
+        { type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power2' }] },
+        { type: 'line', entities: [{ entity: 'sensor.tank', color: '#0000ff' }] },
+    ] }), { height: 900, mock: { series: true } });
+    await t.wait(800);
+    const curveOf = id => `el.instance.graphs.flatMap(g=>g.entities).find(e=>e.entity==='${id}')`;
+    const graphOf = id => `el.instance.graphs.find(g=>g.entities.some(e=>e.entity==='${id}'))`;
+    await t.step('two curves of a class (power, in W), no color set: its color, then the next of its class — each told apart', async () => {
+        const r = await t.E(`[${curveOf('sensor.power')}.color, ${curveOf('sensor.power2')}.color]`);
+        return r[0] === '#f9a825' && r[1] === '#1e88e5' ? true : JSON.stringify(r);
+    });
+    await t.step('Color ▸ Automatic: a color chosen, then Automatic — the class\'s back (power2: the next free one), Automatic then in bold; the YAML\'s color back for a curve that has one', async () => {
+        await t.E(`(()=>{ const I=el.instance; I.setCurvesLook(${graphOf('sensor.power2')}, [${curveOf('sensor.power2')}], 'color', '#ff0000'); I.setCurvesLook(${graphOf('sensor.tank')}, [${curveOf('sensor.tank')}], 'color', '#ff0000'); })()`); await t.wait(600);
+        await t.E(`(()=>{ const I=el.instance; I.showEntityCurveMenu(0, 'sensor.power2', ${graphOf('sensor.power2')}, { from: 'label', clientX: 100, clientY: 100 }); })()`); await t.wait(250);
+        await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200); await t.E(`el.querySelector('#et_0_appearance_color').click()`); await t.wait(200);
+        const b0 = await t.E(`el.querySelector('#et_0_appearance_color_auto').style.fontWeight`);
+        await t.E(`el.querySelector('#et_0_appearance_color_auto').click()`); await t.wait(900);
+        const p2 = await t.E(`${curveOf('sensor.power2')}.color`);
+        await t.E(`(()=>{ const I=el.instance; I.showEntityCurveMenu(0, 'sensor.power2', ${graphOf('sensor.power2')}, { from: 'label', clientX: 100, clientY: 100 }); })()`); await t.wait(250);
+        await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200); await t.E(`el.querySelector('#et_0_appearance_color').click()`); await t.wait(200);
+        const b1 = await t.E(`el.querySelector('#et_0_appearance_color_auto').style.fontWeight`);
+        await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700);
+        await t.E(`el.instance.setCurvesAutoColor(${graphOf('sensor.tank')}, [${curveOf('sensor.tank')}])`); await t.wait(600);
+        const tank = await t.E(`${curveOf('sensor.tank')}.color`);
+        return b0 !== 'bold' && p2 === '#1e88e5' && b1 === 'bold' && tank === '#0000ff' ? true : JSON.stringify({ b0, p2, b1, tank });
     });
     done(await t.close());
 
