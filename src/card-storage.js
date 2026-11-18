@@ -156,6 +156,8 @@ const ENTITY_FIELD_SCOPE = {
     process       : 'devices',
     netBars       : 'devices',
     circular      : 'devices',
+    arrowLength   : 'devices',
+    colorTransition : 'devices',
     groupId       : 'devices',
     // (its graph's Y axes locked — the padlock, a gesture on a Y axis —: their ranges)
     yAxisLock     : 'local',

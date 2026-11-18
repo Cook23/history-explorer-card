@@ -446,6 +446,7 @@ class HistoryExplorerCard extends HTMLElement
 
     connectedCallback()
     {
+        this._keepEditorRoom();
         // (made off the page: built now — or the card it replaces, off the page by now, taken back)
         if( this._pendingHass ) { const h = this._pendingHass; this._pendingHass = null; this.hass = h; }
         perf.add('card', 0, { step: 'on the page', card: this.instance?.cid });
@@ -480,17 +481,34 @@ class HistoryExplorerCard extends HTMLElement
         return true;
     }
 
-    // Home Assistant's card editor shows the card in its preview (preview: true — hui-card.ts):
-    // room kept under it there, always, for its menus and the entity selector's lists to open
-    // in — the preview scrolls, and is no higher than the card when its YAML is short: a menu
-    // that doesn't fit in it closes at once (card-menus.js followAnchor)
+    // Home Assistant gives a card preview: true in its card editor's window (hui-dialog-edit-
+    // card.ts), and also on the dashboard while it's edited (hui-view.ts, hui-section.ts,
+    // hui-panel-view.ts) — so not used for the room. In the card editor's window only, room
+    // kept under the card for its menus and the entity selector's lists to open in: its
+    // preview scrolls, and is no higher than the card when its YAML is short — a menu that
+    // doesn't fit in it closes at once (card-menus.js followAnchor); on the dashboard, none
     set preview(on)
     {
         this._preview = !!on;
+    }
+    get preview() { return !!this._preview; }
+
+    // Whether the card is in Home Assistant's card editor's window: one of its parents, through
+    // the shadow roots, is it
+    _inCardEditor()
+    {
+        for( let n = this.parentNode ?? this.getRootNode()?.host; n; n = n.parentNode ?? n.host )
+            if( n.localName === 'hui-dialog-edit-card' ) return true;
+        return false;
+    }
+
+    // The room under the card in the card editor's window (see preview), on or off
+    _keepEditorRoom()
+    {
+        const on = this._inCardEditor();
         this.style.display = on ? 'block' : '';
         this.style.paddingBottom = on ? SELECTOR_LIST_MAX_HEIGHT : '';
     }
-    get preview() { return !!this._preview; }
 
     // Whenever the state changes, a new `hass` object is set. Use this to update your content.
     set hass(hass)

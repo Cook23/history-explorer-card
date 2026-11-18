@@ -14,15 +14,80 @@ const ADDED_CONFIRM_MS = 500;
 // The domains never offered by the entity selector (nothing to draw)
 const UNLISTED_DOMAINS = ['automation', 'script', 'zone', 'camera', 'persistent_notification', 'timer'];
 const moment = window.HXLocal_moment;
+const Chart = window.HXLocal_Chart;
 
 // A line of the entity list: its padding on each side (px)
 const LINE_PAD_X = 5;
+
+// The selectors: the toolbars' fields (0, 1: the top one's, the bottom one's) and, from
+// MENU_SELECTOR on, a menu's (Entity ▸ — the curve menu of toolbar i: MENU_SELECTOR + i), the
+// same in every way but what a choice does (a series chosen, not added: see _selectSeries)
+export const MENU_SELECTOR = 2;
+const _isMenuSelector = idx => idx >= MENU_SELECTOR;
 
 export class CardSelector
 {
     // --------------------------------------------------------------------------------------
     // The entity selector
     // --------------------------------------------------------------------------------------
+
+    // Selector i's field (input) listened to — its focus, its text, its keys — and its list's
+    // lines previewed under a pointer (a toolbar's: what adding it would do)
+    bindEntitySelector(i, input)
+    {
+        if( !input ) return;
+        input.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
+        input.addEventListener('click', this.entitySelectorFocus.bind(this), true);
+        input.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
+        input.addEventListener('input', this.entitySelectorEntered.bind(this), true);
+        input.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
+        if( _isMenuSelector(i) ) return;
+        // Pointer hover preview — mouse/pen only (touch has no hover event; it
+        // stays on pointerdown/pointerup, see the dropdown entry's own handling).
+        // Delegated on the dropdown container so it survives entries being
+        // recreated on every re-filter, instead of re-attaching per entry.
+        // (the entry a pointer is over previewed — once per entry —, on a sign that a pointer
+        // is there: a move — a mouse's or a pen's hover, a finger dragged along the list —, or
+        // a contact; never on an entry the list's scrolling brings under a pointer still or
+        // gone. Choosing still happens on the entry's own click)
+        // (its hover through Chart.hecUi.hover, as every hover of the card: a pen silent for a
+        // while, gone, ends it as a leaving does)
+        const _list = this._this.querySelector(`#es_${i}`);
+        let _previewed = null;
+        const _preview = (e) => {
+            const _a = e.target.closest('a[data-entity]');
+            if( _a && _a !== _previewed ) { _previewed = _a; this.previewEntityTooltip(_a.dataset.entity, i); }
+        };
+        if( _list ) Chart.hecUi.hover(_list, () => {}, () => { _previewed = null; }, _preview);
+    }
+
+    // The box selector idx's lists are placed in: a toolbar's (#tb_N), a menu's toolbar's
+    _selectorBar(idx)
+    {
+        return _isMenuSelector(idx) ? this.menuParent(idx - MENU_SELECTOR) : this._this.querySelector(`#tb_${idx}`);
+    }
+
+    // Menu i's selector (MENU_SELECTOR + i): its list and its series submenu made the first
+    // time, as a toolbar's (the same lines), in the menu's toolbar → its index
+    menuSelector(i)
+    {
+        const k = MENU_SELECTOR + i;
+        if( !this._this.querySelector(`#es_${k}`) ) {
+            const _bar = this._selectorBar(k), _ref = this._this.querySelector('#es_0') ?? this._this.querySelector('#es_1');
+            for( const [part, ref] of [['', _ref], ['_series', this._this.querySelector(`#${_ref?.id}_series`)]] ) {
+                const _t = document.createElement('template');
+                _t.innerHTML = `<div id="es_${k}${part}"></div>`;
+                const d = _t.content.firstChild;
+                d.style.cssText = ref?.style.cssText ?? 'display:none;position:absolute;';
+                d.style.display = 'none';
+                d.style.zIndex = '4';
+                if( ref?.hasAttribute('tabindex') ) d.tabIndex = 0;
+                _bar?.appendChild(d);
+            }
+            if( this._listedEntities ) this._fillSelectorLines(k, this._listedEntities);
+        }
+        return k;
+    }
 
     setDropdownVisibility(input_idx, show)
     {
@@ -40,11 +105,11 @@ export class CardSelector
             // point (before openMenu turns it on) on its very first open. #tb_N is already
             // known to be the real positioned ancestor (see its position:relative in the
             // HTML), so there's no need to read it back off an element that isn't shown yet.
-            const _tb = this._this.querySelector(`#tb_${input_idx}`);
+            const _tb = this._selectorBar(input_idx);
             const parentRect = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
             const leftPos = (inputRect.left - parentRect.left) + 'px';
             let topPos;
-            if( input_idx === 0 ) {
+            if( input_idx !== 1 ) {
                 // Top selector: show below
                 const maxH = Math.min(window.innerHeight * 0.5, window.innerHeight - inputRect.bottom);
                 topPos = (inputRect.bottom - parentRect.top) + 'px';
@@ -62,18 +127,9 @@ export class CardSelector
             this.followAnchor(dropdown, input, () => { this.hideSeriesMenu(input_idx); this.setDropdownVisibility(input_idx, false); });
             const filter = input.value.toLowerCase();
             const isWildcard = filter.indexOf('*') >= 0;
-            const wcRegex = isWildcard ? this.matchWildcardPattern(filter) : null;
+            const _matches = this.entityMatcher(filter);
             for( let i of dropdown.getElementsByTagName('a') ) {
-                const friendly = i.dataset.label.toLowerCase();
-                const entity   = i.dataset.entity?.toLowerCase() || '';
-                let match;
-                if( !filter ) {
-                    match = true;
-                } else if( isWildcard ) {
-                    match = wcRegex.test(friendly) || wcRegex.test(entity) || wcRegex.test(entity.split('.')[1] || '');
-                } else {
-                    match = friendly.indexOf(filter) >= 0 || entity.indexOf(filter) >= 0;
-                }
+                const match = _matches(i.dataset.label, i.dataset.entity);
                 i.style.display = match ? 'block' : 'none';
                 i.style.fontWeight = (match && isWildcard) ? 'bold' : 'normal';
             }
@@ -149,7 +205,7 @@ export class CardSelector
         // Entity selector-specific: Enter with an entity already selected triggers add
         // regardless of whether the dropdown happens to be open or closed — checked before
         // the generic menu navigation below, which only acts on an open menu.
-        if( event.key === 'Enter' && this._entitySelected?.[idx] ) {
+        if( event.key === 'Enter' && !_isMenuSelector(idx) && this._entitySelected?.[idx] ) {
             event.preventDefault();
             this.addEntitySelected(idx);
             return;
@@ -165,8 +221,9 @@ export class CardSelector
             onEnter: (_sel) => {
                 if( !this._entitySelected ) this._entitySelected = [false, false];
                 // Entity selector-specific: a wildcard pattern selects every currently
-                // visible entity at once, instead of activating a single item.
-                if( input.value.indexOf('*') >= 0 ) {
+                // visible entity at once, instead of activating a single item (a menu's
+                // selector chooses one series: never)
+                if( !_isMenuSelector(idx) && input.value.indexOf('*') >= 0 ) {
                     const visible = Array.from(dropdown.getElementsByTagName('a')).filter(a => a.style.display !== 'none');
                     const ids   = visible.map(a => a.dataset.entity);
                     const names = visible.map(a => a.dataset.label);
@@ -179,7 +236,7 @@ export class CardSelector
                 return false; // let the default click on _sel happen
             },
             onHighlight: (_el) => {
-                this.previewEntityTooltip(_el.dataset.entity, idx);
+                if( !_isMenuSelector(idx) ) this.previewEntityTooltip(_el.dataset.entity, idx);
             },
         });
     }
@@ -205,6 +262,12 @@ export class CardSelector
     {
         const input = this._this.querySelector(`#b7_${idx}`);
         input.value = label;
+        // (a menu's selector: the series chosen — the menu goes on with it)
+        if( _isMenuSelector(idx) ) {
+            this.hideSeriesMenu(idx);
+            this._this.querySelector(`#es_${idx}`).style.display = 'none';
+            return this.menuSeriesChosen(idx - MENU_SELECTOR, id);
+        }
         input.dataset.entityId = id;
         if( !this._entitySelected ) this._entitySelected = [false, false];
         this._entitySelected[idx] = true;
@@ -362,14 +425,10 @@ export class CardSelector
     // Fills the entity selectors' dropdowns with the candidate entities the card's
     // filterEntities / excludeFilterEntities keep, sorted by domain, friendly name and
     // entity id, each shown with its current value.
-    _fillEntitySelectors(candidates)
+    // Entity ids sorted as the entity selector lists them: by domain, friendly name, entity_id
+    sortEntities(ids)
     {
-        const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
-        const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
-        const entities = candidates.filter(e => this.matchRegexList(regex, e) && !this.matchExcludeRegexList(excludeRegex, e));
-
-        // Sort by domain / friendly name / entity_id
-        entities.sort((a, b) => {
+        return ids.sort((a, b) => {
             const da = a.split('.')[0], db = b.split('.')[0];
             if( da !== db ) return da.localeCompare(db);
             const fa = this.stateOf(a)?.attributes?.friendly_name || a;
@@ -377,11 +436,48 @@ export class CardSelector
             if( fa !== fb ) return fa.localeCompare(fb);
             return a.localeCompare(b);
         });
+    }
 
-        for( let i = 0; i < 2; ++i ) {
+    // What a search text (filter) matches, as the entity selector filters its list: a line's
+    // label (its name and value) or its entity_id containing it — with `*`, a wildcard pattern
+    // on the label, the entity_id or its object id; empty, everything. → (label, entity) → bool
+    entityMatcher(filter)
+    {
+        filter = ( filter ?? '' ).toLowerCase();
+        if( !filter ) return () => true;
+        if( filter.indexOf('*') < 0 ) return (label, entity) => ( label ?? '' ).toLowerCase().indexOf(filter) >= 0 || ( entity ?? '' ).toLowerCase().indexOf(filter) >= 0;
+        const wc = this.matchWildcardPattern(filter);
+        return (label, entity) => { entity = ( entity ?? '' ).toLowerCase(); return wc.test(( label ?? '' ).toLowerCase()) || wc.test(entity) || wc.test(entity.split('.')[1] || ''); };
+    }
 
+    _fillEntitySelectors(candidates)
+    {
+        const regex = this.buildFilterRegexList(this.pconfig.filterEntities);
+        const excludeRegex = this.buildFilterRegexList(this.pconfig.excludeFilterEntities);
+        const entities = candidates.filter(e => this.matchRegexList(regex, e) && !this.matchExcludeRegexList(excludeRegex, e));
+
+        this.sortEntities(entities);
+        this._listedEntities = entities;
+        for( let i = 0; i < MENU_SELECTOR + 2; ++i ) this._fillSelectorLines(i, entities);
+
+        for( let i of this.ui.inputField )
+            if( i ) i.placeholder = i18n("ui.label.type_to_search");
+        // (ready: the selector sized from its lines — measured once, kept on this device for
+        // the next time the card is shown, before its list is built)
+        this._entityList = { ready: true, widths: null, forms: null };
+        const _w = this.entityLineWidths();
+        if( _w.all ) this.keepSelectorWidths(_w);
+        this.resizeSelector();
+        this._prepareEntityForms();
+    }
+
+    // Selector i's list (#es_i): a line for each of entities — its name, its value, ▸ when it
+    // has attributes that can be shown —, chosen by a click
+    _fillSelectorLines(i, entities)
+    {
+        {
             const datalist = this._this.querySelector(`#es_${i}`);
-            if( !datalist ) continue;
+            if( !datalist ) return;
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
 
@@ -406,18 +502,7 @@ export class CardSelector
                 o.addEventListener('click', this.entitySelectorEntryClicked.bind(this), true);
                 datalist.appendChild(o);
             }
-
         }
-
-        for( let i of this.ui.inputField )
-            if( i ) i.placeholder = i18n("ui.label.type_to_search");
-        // (ready: the selector sized from its lines — measured once, kept on this device for
-        // the next time the card is shown, before its list is built)
-        this._entityList = { ready: true, widths: null, forms: null };
-        const _w = this.entityLineWidths();
-        if( _w.all ) this.keepSelectorWidths(_w);
-        this.resizeSelector();
-        this._prepareEntityForms();
     }
 
     // The lines' shorter forms (fitEntityLines) prepared out of the way, once the list is

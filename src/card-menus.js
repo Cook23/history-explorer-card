@@ -12,9 +12,11 @@ import { CARD_TESTS, openCardTest } from "./card-tests.js";
 import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
-import { seriesOfGraphs } from "./history-series.js";
+import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
+import { isColorSeries, colorSpec, isBlendable } from "./history-default-colors.js";
 import { maxOf } from "./history-arrays.js";
 import { optionSeriesOf } from "./card-datasets.js";
+import { MENU_SELECTOR } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the curve menu (et_N_<index>), in the order it shows them: a line in
@@ -54,14 +56,19 @@ const _TOOLTIP_MODES = TOOLTIP_MODES.map(v => [v, 'ui.menu.tooltip_' + v]);
 // its line's width, its line's style. Each line: the entry's field
 // it sets, its name; a list's values: the value set, its name
 const _APPEARANCE = {
-    color:  { label: 'ui.menu.look_color' },
+    color:  { field: 'color', label: 'ui.menu.look_color' },
     points: { field: 'showPoints', label: 'ui.menu.look_points', values: POINTS_VALUES.map(v => [v, 'ui.menu.points_' + v]) },
     minmax: { field: 'showMinMax', label: 'ui.menu.look_minmax', values: MIN_MAX_VALUES.map(v => [v, 'ui.menu.minmax_' + v]) },
     fill:   { field: 'fill', label: 'ui.menu.look_fill', values: Object.entries(FILL_VALUES).map(([k, v]) => [v, 'ui.menu.fill_' + k]) },
     width:  { field: 'width', label: 'ui.menu.look_width', values: LINE_WIDTHS.map(w => [w, `${w} px`]) },
     dash:   { field: 'dashMode', label: 'ui.menu.look_dash',
               values: Object.keys(DASH_MODES).map(k => [k, 'ui.menu.dash_' + k]) },
+    length: { field: 'arrowLength', label: 'ui.menu.look_length' },
 };
+// The appearance lists also set from an entity (Entity ▸): as it is (Value), or by thresholds
+// on its value (Thresholds ▸) — the options read indirectly (INDIRECT_OPTIONS)
+const _INDIRECT_LOOK = ['color', 'fill', 'length'];
+// (a part of a line's id made of an entity_id or an attribute's name: a CSS identifier)
 
 // The options menu's lines (the card's toolbar), each opening its submenu: the sections, for
 // every curve of the card; what the card exports, what concerns this card (the entities
@@ -241,7 +248,8 @@ export class CardMenus
     _fillBox(m, box, items)
     {
         this.fillMenuItems(box, items);
-        for( const it of items.filter(it => it.path) ) {
+        // (a lazy line's submenu filled only when it's opened: one of many — an entity found)
+        for( const it of items.filter(it => it.path && !it.lazy) ) {
             const _sub = this._this.querySelector(`#${it.id}_sub`) ?? this.cascadeBox(box, `${it.id}_sub`);
             if( _sub.style.display === 'none' ) this._fillBox(m, _sub, m.sub(it.path));
         }
@@ -269,11 +277,20 @@ export class CardMenus
         return this._openSubmenu(m, [key], this._this.querySelector(`#${m.prefix}_${key}`));
     }
 
-    // Menu m closed: its submenu remembered, its submenus and itself hidden
+    // The boxes of menu i's entity selector shown (its list, its series submenus)
+    _menuSelectorBoxes(i)
+    {
+        const _list = this._this.querySelector(`#es_${MENU_SELECTOR + i}`);
+        return _list ? ( _list._cascade ?? [_list] ) : [];
+    }
+
+    // Menu m closed: its submenu remembered, its submenus and itself hidden — its entity
+    // selector's lists too
     _closeMenu(m)
     {
         const _el = m.el();
         if( !_el ) return;
+        if( this._this.querySelector(`#es_${MENU_SELECTOR + m.index}`) ) { this.hideSeriesMenu(MENU_SELECTOR + m.index); this.setDropdownVisibility(MENU_SELECTOR + m.index, false); }
         this._cancelMenuClose(m.prefix);
         this._menuClosed(m.kind());
         this.closeCascade(_el);
@@ -293,7 +310,7 @@ export class CardMenus
     // as it is now (_fillMenu), shown at the page point `at` ({ x, y }; null: where it is),
     // aligned there (align: openMenu), kept on anchorEl as the page scrolls (followAnchor:
     // closed once out — m.close), given the keyboard. Placed relative to its positioned parent
-    // (_menuParent: #tb_N) read directly — not m.el().offsetParent, always null while it's
+    // (menuParent: #tb_N) read directly — not m.el().offsetParent, always null while it's
     // still hidden, as it is here (openMenu shows it)
     _openMenuAt(m, at, align, anchorEl)
     {
@@ -301,7 +318,7 @@ export class CardMenus
         this._cancelMenuClose(m.prefix);
         this.closeCascade(_el);
         this._fillMenu(m);
-        const _tb = this._menuParent(m.index);
+        const _tb = this.menuParent(m.index);
         const _p = _tb ? _tb.getBoundingClientRect() : { top: 0, left: 0 };
         this.openMenu(_el, at ? (at.y - _p.top) + 'px' : undefined, at ? (at.x - _p.left) + 'px' : undefined, align);
         this.followAnchor(_el, anchorEl, () => m.close());
@@ -319,7 +336,8 @@ export class CardMenus
             if( e.key === 'ArrowRight' && _sel?.style.background ) { e.preventDefault(); _sel.click(); return; }
             this.menuKeyDown(e, _el, { onClose: () => m.close() });
         });
-        _el._whenLeft = this.whenFocusLeaves(() => _el._cascade ?? [_el], () => m.close());
+        // (its entity selector's lists — Entity ▸ — are its own too)
+        _el._whenLeft = this.whenFocusLeaves(() => [...( _el._cascade ?? [_el] ), ...this._menuSelectorBoxes(m.index)], () => m.close());
         _el.addEventListener('focusout', _el._whenLeft);
         for( const k of m.keys ) {
             const _box = this._this.querySelector(`#${m.prefix}_${k}_sub`);
@@ -564,8 +582,8 @@ export class CardMenus
             const _id = it.id ? ` id="${it.id}"` : '';
             const _t = document.createElement('template');
             _t.innerHTML = it.title ? `<div${_id}></div>`
-                : it.input ? `<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span${it.labelId ? ` id="${it.labelId}"` : ''} style="overflow:hidden;text-overflow:ellipsis;min-width:0"></span>` +
-                             `<input${_id} type="number" style="width:5em;color:inherit;background:transparent;border:1px solid #888"></label>`
+                : it.input ? `<label${it.lineId ? ` id="${it.lineId}"` : ''} style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span${it.labelId ? ` id="${it.labelId}"` : ''} style="overflow:hidden;text-overflow:ellipsis;min-width:0"></span>` +
+                             `<input${_id} type="${it.input.text ? 'text' : 'number'}" style="width:${it.input.text ? '10em' : '5em'};color:inherit;background:transparent;border:1px solid #888"></label>`
                 : it.on !== undefined ? SWITCH_LINE_HTML.replace('<a ', `<a${_id} `)
                 : `<a${_id} href="#" style="${_MENU_LINE_STYLE}"></a>`;
             const _line = _t.content.firstChild;
@@ -575,8 +593,12 @@ export class CardMenus
             } else if( it.input ) {
                 const [_name, _in] = _line.children;
                 _name.textContent = it.label;
-                Object.assign(_in, { min: it.input.min, max: it.input.max, step: it.input.step, value: it.value });
-                _in.addEventListener('change', () => { _in.value = it.change(_in.value); });
+                Object.assign(_in, { min: it.input.min, max: it.input.max, step: it.input.step, value: it.value ?? '' });
+                if( it.input.placeholder ) _in.placeholder = it.input.placeholder;
+                // (a text searched: each change at once — live —; a value: once entered)
+                if( it.change ) _in.addEventListener(it.input.live ? 'input' : 'change', () => { const v = it.change(_in.value); if( !it.input.live ) _in.value = v; });
+                // (a field another part of the card listens to: the entity selector's)
+                if( it.bind ) it.bind(_in);
             } else {
                 // (a line shown by a symbol — an icon of the card's own: its markup)
                 if( it.icon ) _line.innerHTML = it.icon;
@@ -589,6 +611,8 @@ export class CardMenus
                 if( it.marked ) { _line.style[it.markedItalic ? 'fontStyle' : 'fontWeight'] = it.markedItalic ? 'italic' : 'bold'; _line.dataset.selected = '1'; if( !it.markedItalic ) _line.dataset.marked = '1'; }
                 if( it.strong ) { _line.style.fontWeight = 'bold'; _line.dataset.marked = '1'; }
                 if( it.disabled ) { _line.style.opacity = '0.45'; _line.setAttribute('aria-disabled', 'true'); }
+                // (a long press — or a right click — on the line: longPress, its click then nothing)
+                if( it.longPress ) this.listenLongPress(_line, () => it.longPress(_line));
                 _line.addEventListener('click', (e) => {
                     e.preventDefault();
                     if( it.disabled ) return;
@@ -796,9 +820,10 @@ export class CardMenus
     }
 
     // A section's lines in menu m (path: see _menuOf)
-    _sectionItems(m, [key, list])
+    _sectionItems(m, path)
     {
-        return { rep: () => this._representationLines(m), appearance: () => this._appearanceItems(m, list ?? null),
+        const [key, list] = path;
+        return { rep: () => this._representationLines(m), appearance: () => this._appearanceItems(m, path.slice(1)),
                  interp: () => this._interpolationLines(m), behavior: () => this._behaviorItems(m, list ?? null) }[key]();
     }
 
@@ -990,6 +1015,17 @@ export class CardMenus
             .filter(({ curves }) => curves.length);
     }
 
+    // What the appearance list key acts on, graph by graph: its color and its fill, all but a
+    // timeline's rows (their colors are their states'; they draw no fill) — curves, bars, an
+    // arrowline's rows (its arrows, the band under them); its length, an arrowline's rows; the
+    // others, the curves
+    _lookByGraph(m, key)
+    {
+        const _takes = (g, e) => key === 'color' || key === 'fill' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
+        return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
+            .filter(({ curves }) => curves.length);
+    }
+
     // The same curves one by one, each with its graph
     _menuCurves(m)
     {
@@ -1003,14 +1039,15 @@ export class CardMenus
     }
 
     // The appearance submenu's lines that apply to what menu m acts on: the color, for one
-    // entity, a curve or a bar (not a row of a timeline or an arrowline); the others, for
-    // curves
+    // entity — a curve, a bar or an arrowline's row (not a timeline's: its colors are its
+    // states') — or for arrowline rows only (each on a row of its own: one color for them all
+    // still tells them apart); the fill, for all but a timeline's rows; the others, for curves
     _appearanceLines(m)
     {
         const { kind, pairs } = this._scopeOf(m);
-        const _one = kind === 'entity' && pairs.length === 1 && pairs[0].entities.length > 0 && !this.isRowGraph(pairs[0].g);
-        const _curves = this._menuCurves(m).length > 0;
-        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? _one : _curves);
+        const _one = kind === 'entity' && pairs.length === 1 && pairs[0].entities.length > 0 && pairs[0].g.type !== 'timeline';
+        const _arrowsOnly = pairs.length > 0 && pairs.every(({ g }) => g.type === 'arrowline');
+        return Object.keys(_APPEARANCE).filter(k => k === 'color' ? ( _one || _arrowsOnly ) && this._lookByGraph(m, k).length > 0 : this._lookByGraph(m, k).length > 0);
     }
 
     // Curve e's value of appearance list key — its points (POINTS_VALUES); its extremes
@@ -1021,6 +1058,7 @@ export class CardMenus
     {
         if( key === 'fill' ) {
             if( e.fill === 'fade' ) return 'fade';
+            if( e.fill === 'solid' ) return 'solid';
             // (a fill read indirectly — thresholds, a series —: none of the list's)
             if( typeof e.fill === 'object' && e.fill !== null || optionSeriesOf(e, 'fill') ) return undefined;
             const _c = Chart.helpers.color(e.fill ?? 'rgba(0,0,0,0)');
@@ -1035,23 +1073,231 @@ export class CardMenus
     // The appearance submenu (list null): the color (▸: it opens the browser's picker), the
     // points, the extremes, the fill, the width and the style lists (▸, each a submenu over it) — or one list's values, the
     // one all the curves have in bold; a choice applied at once, saved (see setCurvesLook)
-    _appearanceItems(m, level)
+    _appearanceItems(m, [level = null, ...rest])
     {
-        const _curves = this._menuCurves(m);
-        const _byGraph = this._curvesByGraph(m);
         const _chosen = () => this._menuChosen(m);
-        if( level !== null ) {
-            const _d = _APPEARANCE[level];
-            const _values = new Set(_curves.map(({ e }) => this._lookValue(e, level)));
-            const _cur = _values.size === 1 ? [..._values][0] : undefined;
-            return _d.values.map(([v, label]) => ({ label: label.startsWith('ui.') ? i18n(label) : label, marked: v === _cur, final: true,
+        if( level === null )
+            return this._appearanceLines(m).map(k => this._submenuLine(m, `${m.prefix}_appearance_${k}`, i18n(_APPEARANCE[k].label), ['appearance', k]));
+        if( rest[0] === 'entity' ) return this._indirectItems(m, level, rest.slice(1));
+        const _byGraph = this._lookByGraph(m, level);
+        const _curves = _byGraph.flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
+        const _d = _APPEARANCE[level];
+        const _values = new Set(_curves.map(({ e }) => this._lookValue(e, level)));
+        const _cur = _values.size === 1 ? [..._values][0] : undefined;
+        // (the color: the browser's picker; the others, their list's values)
+        const _lines = level === 'color' ? [{ id: `${m.prefix}_appearance_color_pick`, label: i18n('ui.menu.look_pick'), choose: () => this._pickCurveColor(m.index) }]
+            : ( _d.values ?? [] ).map(([v, label]) => ({ label: label.startsWith('ui.') ? i18n(label) : label, marked: v === _cur, final: true,
                 choose: () => { for( const { g, curves } of _byGraph ) this.setCurvesLook(g, curves, _d.field, v); _chosen(); } }));
+        // (from an entity — the one in use in bold)
+        if( _INDIRECT_LOOK.includes(level) )
+            // (lazy: its box — the entity selector's field, one per menu — filled only when opened)
+            _lines.push({ ...this._submenuLine(m, `${m.prefix}_appearance_${level}_entity`, i18n('ui.menu.look_entity'), ['appearance', level, 'entity']), lazy: true,
+                          marked: _curves.length > 0 && this._sharedIndirect(_curves, _d.field) !== null });
+        return _lines;
+    }
+
+    // --------------------------------------------------------------------------------------
+    // A look from an entity (Entity ▸ of Color, Fill, Length): the entity searched, then its
+    // value or one of its attributes, then Value (the option is that series) or Thresholds ▸
+    // (thresholds on its value give the option: each threshold, its value and what it gives;
+    // Default; + Add; Blend — a color's number thresholds on the curve's own value)
+    // --------------------------------------------------------------------------------------
+
+    // What the curves (of { g, e }) read option field from, if they all read it from the same
+    // series the same way: { sid, how: 'value' | 'thresholds', spec } — a curve's own
+    // thresholds (no entity) on its own series —; else null
+    _sharedIndirect(curves, field)
+    {
+        const _of = e => {
+            const v = e[field];
+            if( typeof v === 'string' && isColorSeries(v) ) return { sid: v.trim(), how: 'value' };
+            if( v && typeof v === 'object' && Array.isArray(v.thresholds) )
+                return { sid: v.entity !== undefined ? seriesId(v.entity, v.attribute) : e.entity, how: 'thresholds', spec: v };
+            return null;
+        };
+        const _all = curves.map(({ e }) => _of(e));
+        const _first = _all[0];
+        return _first && _all.every(x => x && x.sid === _first.sid && x.how === _first.how && JSON.stringify(x.spec) === JSON.stringify(_first.spec)) ? _first : null;
+    }
+
+    // Entity ▸'s lines of list key (path: what is chosen after it — the entity, its series, …)
+    _indirectItems(m, key, path)
+    {
+        const _base = ['appearance', key, 'entity'];
+        const _id = `${m.prefix}_appearance_${key}_entity`;
+        const _field = _APPEARANCE[key].field;
+        const _curves = this._lookByGraph(m, key).flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
+        const _cur = this._sharedIndirect(_curves, _field);
+        const [eid, sid, th, item] = path;
+        // The entity: the entity selector's field (the menu's own, MENU_SELECTOR + its index —
+        // the same list, filtered as it's typed, its attributes ▸), the series chosen going on
+        // with what is done with it (menuSeriesChosen)
+        if( eid === undefined ) {
+            const k = this.menuSelector(m.index);
+            this._menuSource = { m, key };
+            return [{ id: `b7_${k}`, lineId: `${_id}_field`, label: '', input: { text: true, placeholder: i18n('ui.label.type_to_search') }, value: '',
+                      bind: el => this.bindEntitySelector(k, el) }];
         }
-        return this._appearanceLines(m).map(k => {
-            const _label = i18n(_APPEARANCE[k].label);
-            if( k === 'color' ) return { label: _label + ' ▸', choose: () => this._pickCurveColor(m.index) };
-            return this._submenuLine(m, `${m.prefix}_appearance_${k}`, _label, ['appearance', k]);
-        });
+        // (its lines' ids the card's own names, never the series': one series chosen at a time)
+        const _sid = `${_id}_series`;
+        // What is done with the series: its value as it is, or thresholds on it
+        if( th === undefined )
+            return [{ id: `${_sid}_value`, label: i18n('ui.menu.series_value'), marked: _cur?.sid === sid && _cur.how === 'value', final: true,
+                      choose: () => { this._setIndirect(m, key, () => sid); this._menuChosen(m); } },
+                    { ...this._submenuLine(m, `${_sid}_th`, i18n('ui.menu.look_thresholds'), [..._base, eid, sid, 'th']),
+                      marked: _cur?.sid === sid && _cur.how === 'thresholds' }];
+        return this._thresholdItems(m, key, sid, `${_sid}_th`, [..._base, eid, sid, 'th'], item, _cur);
+    }
+
+    // Series sid chosen in menu i's entity selector (Entity ▸ of list key): what is done with
+    // it opened over the field — Value, Thresholds ▸
+    menuSeriesChosen(i, sid)
+    {
+        const { m, key } = this._menuSource ?? {};
+        const _line = m && this._this.querySelector(`#${m.prefix}_appearance_${key}_entity_field`);
+        if( _line ) this._openSubmenu(m, ['appearance', key, 'entity', seriesOf(sid).entity, sid], _line);
+    }
+
+    // The thresholds being chosen for list key on series sid: the curves' own when they read
+    // it so (cur), else the ones being written (m._draft), else none yet
+    _thresholdsOf(m, key, sid, cur)
+    {
+        if( cur?.sid === sid && cur.how === 'thresholds' ) return cur.spec;
+        const d = m._draft;
+        return d?.key === key && d.sid === sid ? d.spec : { thresholds: [], states: {}, default: undefined };
+    }
+
+    // Thresholds ▸ (item undefined): each threshold — `≥ value`, a state `= state` — and what it
+    // gives (▸: its own submenu; a long press deletes it), Default ▸, + Add ▸, Blend (a
+    // color's number thresholds on the curve's own value: colorTransition smooth); a
+    // threshold's submenu (item: 't' and its index, 's' and its state's, 'd' the default, 'add')
+    _thresholdItems(m, key, sid, id, path, item, cur)
+    {
+        const spec = this._thresholdsOf(m, key, sid, cur);
+        const _states = Object.keys(spec.states ?? {});
+        const _write = s => this._writeThresholds(m, key, sid, s);
+        const _copy = () => ({ thresholds: spec.thresholds.map(t => [...t]), states: { ...spec.states }, default: spec.default });
+        if( item === undefined ) {
+            const _line = (k, label, v) => { const _t = this._resultText(key, v); return { ...this._submenuLine(m, `${id}_${k}`, _t ? `${label}  ${_t}` : label, [...path, k]), lead: this._resultSwatch(key, v) }; };
+            const _lines = [
+                ...spec.thresholds.map(([t, v], i) => ({ ..._line('t' + i, `≥ ${t}`, v),
+                    longPress: () => { const s = _copy(); s.thresholds.splice(i, 1); _write(s); } })),
+                ..._states.map((st, i) => ({ ..._line('s' + i, `= ${st}`, spec.states[st]),
+                    longPress: () => { const s = _copy(); delete s.states[st]; _write(s); } })),
+                _line('d', i18n('ui.menu.look_default'), spec.default),
+                this._submenuLine(m, `${id}_add`, i18n('ui.menu.look_add'), [...path, 'add']),
+            ];
+            const _own = { ...spec, entity: undefined };
+            if( key === 'color' && isBlendable(_own) && !spec.entity ) {
+                const _curves = this._lookByGraph(m, key).flatMap(({ g, curves }) => curves.map(e => ({ g, e })));
+                const _on = _curves.length > 0 && _curves.every(({ e }) => this.resolveOption(e, 'colorTransition') === 'smooth');
+                _lines.push({ id: `${id}_blend`, label: i18n('ui.menu.look_blend'), on: _on,
+                    choose: () => { for( const { g, curves } of this._lookByGraph(m, key) ) this.setCurvesLook(g, curves, 'colorTransition', _on ? 'hard' : 'smooth'); this._fillMenu(m); } });
+            }
+            return _lines;
+        }
+        // + Add: a value typed (a number: a threshold; a text: a state), or one of the series'
+        // known states — what it gives, the curve's own for now (changed in its own submenu)
+        if( item === 'add' ) {
+            const _add = v => {
+                const s = _copy(), n = Number(v), r = this._newResult(m, key);
+                if( v === '' || v === null || v === undefined ) return;
+                if( String(v).trim() !== '' && isFinite(n) ) { s.thresholds = s.thresholds.filter(t => t[0] !== n); s.thresholds.push([n, r]); s.thresholds.sort((a, b) => a[0] - b[0]); }
+                else s.states[String(v).trim()] = r;
+                _write(s);
+            };
+            return [{ id: `${id}_add_value`, label: i18n('ui.menu.series_value'), input: { text: true }, value: '', change: v => { _add(v); return ''; } },
+                    ...this._knownStates(sid).filter(st => !( st in ( spec.states ?? {} ) )).map((st, i) => ({ id: `${id}_add_${i}`, label: st, final: true, choose: () => _add(st) }))];
+        }
+        // A threshold's own submenu: its value (not the default's), what it gives
+        const _t = item[0] === 't' ? spec.thresholds[Number(item.slice(1))] : null;
+        const _st = item[0] === 's' ? _states[Number(item.slice(1))] : null;
+        const _v = _t ? _t[1] : _st !== null ? spec.states[_st] : spec.default;
+        const _set = r => {
+            const s = _copy();
+            if( _t ) s.thresholds[Number(item.slice(1))][1] = r; else if( _st !== null ) s.states[_st] = r; else s.default = r;
+            _write(s);
+        };
+        const _lines = [];
+        if( _t || _st !== null ) _lines.push({ id: `${id}_${item}_value`, label: i18n('ui.menu.series_value'), input: { text: true }, value: _t ? String(_t[0]) : _st,
+            change: v => {
+                const s = _copy(), n = Number(v), r = _v;
+                if( _t ) s.thresholds.splice(Number(item.slice(1)), 1); else delete s.states[_st];
+                if( String(v).trim() !== '' && isFinite(n) ) { s.thresholds.push([n, r]); s.thresholds.sort((a, b) => a[0] - b[0]); }
+                else if( String(v).trim() !== '' ) s.states[String(v).trim()] = r;
+                _write(s); return v; } });
+        return [..._lines, ...this._resultLines(m, key, `${id}_${item}`, _v, _set)];
+    }
+
+    // What a threshold of list key gives, its lines: a color, the picker; a fill, its list's
+    // values and the picker; a length, a number from 0 to 100
+    _resultLines(m, key, id, v, set)
+    {
+        const _pick = { id: `${id}_pick`, label: i18n('ui.menu.look_pick'), choose: () => this._pickColor(m.index, typeof v === 'string' ? v : null, c => set(c)) };
+        if( key === 'color' ) return [_pick];
+        if( key === 'fill' ) return [...Object.entries(FILL_VALUES).map(([k, f]) => ({ id: `${id}_${k}`, label: i18n('ui.menu.fill_' + k), marked: v === f, final: true, choose: () => set(f) })), _pick];
+        return [{ id: `${id}_length`, label: i18n('ui.menu.look_length'), input: { min: 0, max: 100, step: 1 }, value: v ?? '',
+                  change: x => { const n = Math.min(100, Math.max(0, Number(x))); if( isFinite(n) ) set(n); return n; } }];
+    }
+
+    // What a threshold gives, as a line shows it: a length in %, a fill's name; a color: none
+    // (its swatch, _resultSwatch); nothing given: —
+    _resultText(key, v)
+    {
+        if( v === undefined ) return '—';
+        if( key === 'length' ) return `${v} %`;
+        if( key === 'fill' ) { const k = Object.keys(FILL_VALUES).find(k => FILL_VALUES[k] === v); if( k ) return i18n('ui.menu.fill_' + k); }
+        return '';
+    }
+
+    // A threshold's color, as a swatch before its line (a color or a fill's color)
+    _resultSwatch(key, v)
+    {
+        const c = key !== 'length' && typeof v === 'string' && !Object.values(FILL_VALUES).includes(v) ? colorSpec(v)?.color : null;
+        return c ? `<span style="display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:2px;border:1px solid #888;background:${c}"></span>` : '';
+    }
+
+    // What a new threshold of list key gives at first: the curves' color, a light fill, the
+    // whole length
+    _newResult(m, key)
+    {
+        const _e = this._lookByGraph(m, key)[0]?.curves[0];
+        return key === 'color' ? ( colorSpec(this.entityColor(_e))?.color ?? '#000000' ) : key === 'fill' ? true : 100;
+    }
+
+    // The states series sid is known to take: its options (a select's), else its state now
+    _knownStates(sid)
+    {
+        const { entity, attribute } = seriesOf(sid);
+        const _s = this.stateOf(entity);
+        const _now = attribute ? _s?.attributes?.[attribute] : _s?.state;
+        const _opts = !attribute && Array.isArray(_s?.attributes?.options) ? _s.attributes.options : [];
+        return [...new Set([..._opts, _now].filter(x => typeof x === 'string' && x !== '' && !isFinite(Number(x))))];
+    }
+
+    // Thresholds s on series sid written for list key of menu m's curves — on each its own
+    // series, without an entity; on another, with it —, the menu showing them at once; none yet
+    // (no threshold, no default): kept being written (m._draft) until there is one
+    _writeThresholds(m, key, sid, s)
+    {
+        m._draft = { key, sid, spec: s };
+        if( s.thresholds.length || Object.keys(s.states).length || s.default !== undefined ) {
+            const { entity, attribute } = seriesOf(sid);
+            this._setIndirect(m, key, e => e.entity === sid ? { ...s } : { entity, ...( attribute ? { attribute } : {} ), ...s });
+        }
+        this._fillMenu(m);
+    }
+
+    // List key of menu m's curves set to what valueOf(curve) gives, graph by graph (the same
+    // value for curves alike: one rebuild each)
+    _setIndirect(m, key, valueOf)
+    {
+        const _field = _APPEARANCE[key].field;
+        for( const { g, curves } of this._lookByGraph(m, key) ) {
+            const _by = new Map();
+            for( const e of curves ) { const v = valueOf(e), k = JSON.stringify(v); if( !_by.has(k) ) _by.set(k, { v, es: [] }); _by.get(k).es.push(e); }
+            for( const { v, es } of _by.values() ) this.setCurvesLook(g, es, _field, v);
+        }
     }
 
     // The menu's curve colored as chosen in the browser's color picker — the menu closed (the
@@ -1063,17 +1309,27 @@ export class CardMenus
     {
         const { entities } = this._menuTargets(input_idx);
         if( !entities.length ) return;
-        const _key = keyOf(entities[0]);
-        const _tb = this._menuParent(input_idx);
+        // (every entity the menu acts on: one, or a graph's arrowline rows)
+        const _keys = entities.map(keyOf);
+        this._pickColor(input_idx, this.entityColor(entities[0]), v => {
+            for( const _g of this.graphs ) {
+                const _es = _g.entities.filter(e => _keys.includes(keyOf(e)));
+                if( _es.length ) this.setCurvesLook(_g, _es, 'color', v);
+            }
+        });
+    }
+
+    // A color chosen in the browser's picker, opened from menu input_idx (closed: the picker
+    // takes over) on color (null: black) — then apply(it)
+    _pickColor(input_idx, color, apply)
+    {
+        const _tb = this.menuParent(input_idx);
         const _p = _tb.getBoundingClientRect();
-        const _c = Chart.helpers.color(this.entityColor(entities[0]) ?? '#000000');
+        const _c = Chart.helpers.color(color ?? '#000000');
         this.hideEntityCurveMenu(input_idx);
         const _left = Math.max(0, ( window.innerWidth - PICKER_SIZE.width ) / 2) - _p.left;
         const _top = Math.max(0, ( window.innerHeight - PICKER_SIZE.height ) / 2) - _p.top;
-        this.openNativePicker(_tb, 'color', _left, _top, _c.valid ? _c.hexString() : '#000000', v => {
-            const _g = this.graphs.find(g => g.entities.some(e => keyOf(e) === _key));
-            if( _g ) this.setCurvesLook(_g, _g.entities.filter(e => keyOf(e) === _key), 'color', v);
-        });
+        this.openNativePicker(_tb, 'color', _left, _top, _c.valid ? _c.hexString() : '#000000', apply);
     }
 
     // --------------------------------------------------------------------------------------
@@ -1253,7 +1509,7 @@ export class CardMenus
         });
     }
 
-    // The magnifier's menu opened, under it (_menuParent: its positioned parent)
+    // The magnifier's menu opened, under it (menuParent: its positioned parent)
     showZoomMenu(i)
     {
         const m = this._zoomMenu(i), _bz = this._this.querySelector(`#bz_${i}`);
@@ -1378,7 +1634,7 @@ export class CardMenus
     //           no need to measure the menu's rendered width and recompute afterward.
     // The positioned parent of the menus of toolbar i: the toolbar, or on a card without any
     // entity selector, their own (menusOnlyHtml)
-    _menuParent(i)
+    menuParent(i)
     {
         return this._this.querySelector(`#tb_${i}`) ?? this._this.querySelector(`#hm_${i}`);
     }

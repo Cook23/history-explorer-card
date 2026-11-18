@@ -610,6 +610,8 @@ export class CardGraphs
     _applyEntityDefaults(e, type, entityOptions, { color, fill, hidden })
     {
         const _ownFill = e.fill;
+        // (a fill given — its own, asked for, a level's —, else the default: a bar's, solid)
+        const _fillGiven = _ownFill !== undefined || fill != null || entityOptions?.fill !== undefined;
         // (lineColor — a color by place in a graph, its place: the YAML's, else where it's added —:
         // its graph's above its graph's color, the card's above the card's color, below
         // entityOptions' — each level's the more precise of its own, below the levels above it)
@@ -652,7 +654,7 @@ export class CardGraphs
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
 
         if( type == 'bar' ) {
-            e.fill = e.color;
+            if( !_fillGiven ) e.fill = 'solid';
             e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? this.defaultLineModeOf(type);
         }
 
@@ -778,7 +780,7 @@ export class CardGraphs
     // Builds one graph of group groupId from entities (in that order), right before graph
     // nextG (null: at the end) — combined into one graph whatever their units, each with its
     // persisted entry of that group, its color and fill. options: more addGraph options for
-    // each (e.g. the graph's interval; fill: null to recompute it for a new type)
+    // each (e.g. the graph's interval)
     rebuildGraph(entities, groupId, nextG, options = {})
     {
         const _saved = this.pconfig.combineSameUnits;

@@ -29,6 +29,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
+- **v1.2.83** — Color, fill and arrow length from an entity or attribute, chosen in the menus.
 - **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
 - **v1.2.77** — YAML export of the card, a graph or a curve.
 - **v1.2.60** — A steady automatic Y axis; long ranges drawn at once (a year in 0.4 s).
@@ -242,7 +243,7 @@ graphs:
 
 <img src="https://github.com/Cook23/history-explorer-card/raw/v1.2-dev/images/screenshots/menu-curve.png" alt="A curve's menu, Appearance open" width="918">
 
-- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
+- **A curve's menu** — a long press (or a right click) on its label: *Display ▸* (its type), *Appearance ▸* (color, points, min/max band, fill, width, line style; an arrow's length), *Interpolation ▸*, *Behavior ▸* (tooltip, Y axis lock, separate, merge back, cut, delete), *Export ▸* (its CSV, its YAML).
 - **A graph's menu** — a long press on its ⠿ zone: the same for all its curves (*Export ▸* theirs), and *Cut* / *Delete the graph*.
 - **The options menu** — the ▾ button beside the entity selector: the same for every curve of the card, *Export ▸* (CSV, YAML), *Card ▸* (back to the YAML's graphs or display), *Global ▸* (the info panel's switch, the gesture settings), *Tests (beta) ▸* (diagnostics: pen events, performance).
 
@@ -342,11 +343,13 @@ entityOptions:
     arrowMax: ~50                    # the whole length: 50 at least (a number alone: fixed)
 ```
 
+In an arrow's menu, *Appearance ▸ Length ▸ Entity ▸*: an entity or attribute, then *Value* or *Thresholds ▸*, as for the color.
+
 📖 [Compass arrow graphs](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#compass-arrow-graphs)
 
 ### Colors
 
-`color` takes a color, thresholds on the value or on another entity's or attribute's value, or an entity holding the color. `fill` takes the same forms, plus `true`, `false` and `fade`:
+`color` takes a color, thresholds on the value or on another entity's or attribute's value, or an entity holding the color. `fill` takes the same forms, plus `false` (none), `fade`, `light` (`true`) and `solid`:
 
 ```yaml
 graphs:
@@ -359,6 +362,8 @@ graphs:
           cool: blue
           default: grey
 ```
+
+In a curve's menu, *Appearance ▸ Color ▸* or *Fill ▸* *▸ Entity ▸*: an entity or one of its attributes, searched as in the entity selector, then *Value* (it holds the color or fill) or *Thresholds ▸* (on its value; the curve's own entity: on the curve's value).
 
 📖 [Colors of curves and bars](https://github.com/Cook23/history-explorer-card/blob/v1.2-dev/README_Full.md#colors-of-curves-and-bars)
 
@@ -532,7 +537,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | Option | Description |
 |---|---|
 | **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
-| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light<br>The area under the curve: a color, `true` (light), `false` (none), `fade` — or thresholds on a value |
+| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light (a bar: solid)<br>The area under the curve (a bar: the bar): a color, `false` (none), `fade`, `light` (`true`), `solid` — or thresholds on a value |
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
 | **`stateColors`** | **Default** automatic colors<br>A timeline's colors by entity, device class, domain or state (`door.on: blue`) — *the card's only* |

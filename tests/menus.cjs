@@ -63,8 +63,8 @@ module.exports = async function()
         const ok = r.every(b => b.shown) && Math.abs(r[0].r - r[1].r) <= 1 && Math.abs(r[1].r - r[2].r) <= 1 && r[1].l - r[0].l >= 15 && r[2].l - r[1].l >= 15;
         return ok ? true : JSON.stringify(r);
     });
-    await t.step('a curve\'s menu: Color, Separate — closed at once', async () => {
-        await curve(); await click('#et_0_appearance'); await t.wait(250); await click([A, 'Color']); await t.wait(250);
+    await t.step('a curve\'s menu: Color ▸ Choose…, Separate — closed at once', async () => {
+        await curve(); await click('#et_0_appearance'); await t.wait(250); await click([A, 'Color']); await t.wait(250); await click('#et_0_appearance_color_pick'); await t.wait(250);
         const color = await shown('#et_0');
         await t.page.mouse.click(5, 880); await t.wait(300);
         await curve(); await click('#et_0_behavior'); await t.wait(250); await click('#et_0_split'); await t.wait(250);

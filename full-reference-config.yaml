@@ -50,12 +50,12 @@ graphs:
       # with `entity:` — and `attribute:` — on that entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
       color: null
 
-      # Fill colour of the area under the line in the graph, defaults to a lighter shade of 'color';
-      # fade: the line's colour fading out downwards; true: the line's colour, light; false: none —
+      # Fill colour of the area under the line in the graph (a bar's area), defaults to a lighter shade of 'color' (a bar: solid);
+      # false: none; fade: the line's colour fading out downwards; light (or true): the line's colour, light; solid: the line's colour —
       # or, as 'color', thresholds giving one (on the value, or with `entity:` on that entity's), or an entity holding one
       fill: null
 
-      # An arrowline's arrows' length: not set, their whole length; 0 to 100, that part of it (%);
+      # An arrowline's arrows' length: not set, their whole length; 0 to 100, that part of it (%); thresholds giving one, as 'color';
       # an entity (or attribute) whose value gives it, its scale automatic (its largest value around the window: the whole length)
       arrowLength: null
 

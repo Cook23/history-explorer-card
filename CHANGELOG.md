@@ -4,6 +4,35 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.83] - 2026-11-18
+
+### Added
+- A curve's color, fill and an arrowline's arrows' length from an entity or one of its attributes, chosen in the menus: *Appearance ▸ Color ▸*, *Fill ▸* and *Length ▸* (an arrowline's), *Entity ▸* — the entity searched as in the entity selector (the same list, filtered as it's typed, `filterEntities` and `excludeFilterEntities` applied; an entity's attributes ▸), then *Value* (the option is what it holds) or *Thresholds ▸* (on its value; the curve's own entity: on the curve's value, saved without `entity`): each threshold (`≥` a number, `=` a state) and what it gives, *Default*, *+ Add* (a value typed, or one of the entity's known states), *Blend* for a color's number thresholds on the curve's own value (`colorTransition: smooth`); a long press on a threshold deletes it
+- `fill: solid` — the curve's color, full; `fill: light`, the other name of `fill: true`. In the menus, *Fill ▸*: *None*, *Fade*, *Light*, *Solid*
+- `arrowLength` given by thresholds on a value, as `color`
+- An arrowline's row: *Appearance ▸* with *Color* and *Fill* (and *Length*); a graph of arrows: *Color* in its *Appearance ▸*
+
+### Changed
+- A bar drawn with its fill — `solid` by default, as before —; *Fill ▸* in a bar's *Appearance ▸*
+- An arrowline's tooltip: its color box the arrow's color (before: black)
+- *Appearance ▸ Color ▸*: a submenu, *Choose…* (the color picker) and *Entity ▸*
+
+### Fixed
+- Home Assistant's card editor ([#301](https://github.com/Cook23/history-explorer-card/issues/301)): the room kept under the card for its menus (1.2.82) was kept on the dashboard too while it's edited — a large gap under every card; Home Assistant tells a card it's previewed in both places (`preview`): the room now kept only in the card editor's window
+- A curve's fill lost on a change of its display type (a curve made an arrowline, a bar, then a curve again): kept — a timeline's row keeps it without showing it
+
+### Docs
+- README.md, README_Full.md, `full-reference-config.yaml`: *Entity ▸* under *Color*, *Fill* and *Length*; `fill`'s values `false`, `fade`, `light` (`true`), `solid`; a bar's fill; `arrowLength` thresholds; `arrowLength` and `colorTransition` in the persistence table
+- FORK_DESCRIPTION.md, FORK_DESCRIPTION_FR.md: the fill and the arrows' length read as the color, chosen from the curve menu too
+
+### Internal
+- The entity selector factored (`bindEntitySelector`, `menuSelector`, `sortEntities`, `entityMatcher`): the toolbars' and the menus' one (`MENU_SELECTOR`)
+- *Export ▸ YAML*: an option read indirectly written in YAML form (`indirectYaml`); the YAML writer takes a `Map` (its keys' order kept) and writes a number key unquoted
+- `arrowLength` and `colorTransition` saved with the entity, on every device (`ENTITY_FIELD_SCOPE`)
+- Tests (`indirect`, new): *Entity ▸* under *Color*, *Fill* and *Length* — the field and its list, *Value*, *Thresholds ▸* on the curve's own value with *Blend*, an attribute, a state, a length, `filterEntities`
+- Tests (`options`, `appearance`, `menus`, `features`): `fill: light` and `solid`, `arrowLength` thresholds; the new *Color ▸* and *Fill ▸*; the room in the card editor's window and none on the dashboard being edited
+
+
 ## [v1.2.82] - 2026-11-17
 
 ### Added

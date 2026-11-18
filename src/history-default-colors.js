@@ -290,7 +290,8 @@ const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.tr
 
 // A series a color is read from (no CSS color has a dot): an entity_id, or one of its
 // attributes after it (climate.salon.hvac_action) — see card-datasets.js optionSeriesOf
-export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(s.trim());
+// (an attribute after the entity_id — or a sub-attribute: its path, level by level)
+export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)*$/.test(s.trim());
 
 // Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
 // as an object of thresholds; a stop without a value (or a color alone) between two that
@@ -331,14 +332,15 @@ function _colorLeaf(v)
     return _isColor(c) ? c : undefined;
 }
 
-// A fill value itself: true (the curve's color, light), false (none), fade, or a color —
-// written as text too (an entity's state: 'true', 'Fade') —, or undefined
+// A fill value itself: light (true: the curve's color, light), solid (its color itself),
+// false (none), fade, or a color — written as text too (an entity's state: 'true', 'Fade') —,
+// or undefined
 export function fillLeaf(v)
 {
     if( v === true || v === false ) return v;
     const t = typeof v === 'string' ? v.trim().toLowerCase() : '';
-    if( t === 'true' || t === 'false' ) return t === 'true';
-    if( t === 'fade' ) return 'fade';
+    if( t === 'true' || t === 'light' || t === 'false' ) return t !== 'false';
+    if( t === 'fade' || t === 'solid' ) return t;
     return _colorLeaf(v);
 }
 
@@ -347,6 +349,21 @@ export function fillLeaf(v)
 export function normalizeFill(v)
 {
     return normalizeIndirect(v, fillLeaf);
+}
+
+// An option read directly or indirectly (see normalizeIndirect) as the YAML writes it: a
+// value by leafOut, a series as it is, thresholds by their keys in a Map (its order kept) —
+// entity, attribute, each threshold (a number), each state, default —, each value by leafOut
+export function indirectYaml(v, leafOut = x => x)
+{
+    if( !v || typeof v !== 'object' || !Array.isArray(v.thresholds) ) return typeof v === 'string' && isColorSeries(v) ? v : leafOut(v);
+    const o = new Map();
+    if( v.entity !== undefined ) o.set('entity', v.entity);
+    if( v.attribute !== undefined ) o.set('attribute', v.attribute);
+    for( const [t, c] of v.thresholds ) o.set(t, leafOut(c));
+    for( const [s, c] of Object.entries(v.states ?? {}) ) o.set(s, leafOut(c));
+    if( v.default !== undefined ) o.set('default', leafOut(v.default));
+    return o;
 }
 
 // An option read directly or indirectly — a color (normalizeColor), a fill (normalizeFill) —
@@ -399,10 +416,10 @@ export function parseFillValue(v)
 // A fill that fills nothing
 export const NO_FILL = 'rgba(0,0,0,0)';
 
-// The fill of a curve of color `color` (both in their one form): `fill` — true, its color as
-// transparent as the palette's fills (for a color that varies — thresholds, an entity's —
-// only that transparency, each point's fill taking its own color: see _fillLike); false,
-// none; any other value as it is
+// The fill of a curve of color `color` (both in their one form): `fill` — true (light), its
+// color as transparent as the palette's fills (for a color that varies — thresholds, an
+// entity's — only that transparency, each point's fill taking its own color: see _fillLike);
+// false, none; any other value as it is (solid: its color itself, see fillStyle)
 export function fillValue(fill, color)
 {
     if( fill === false ) return NO_FILL;

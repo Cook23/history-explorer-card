@@ -13,10 +13,10 @@
 //               what they give it
 
 import { OPTION_DEFAULTS, ENTITY_ONLY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
-         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText } from "./history-options.js";
+         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText, INDIRECT_OPTIONS } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { seriesOf } from "./history-series.js";
-import { defaultColors, fillValue, NO_FILL } from "./history-default-colors.js";
+import { defaultColors, fillValue, NO_FILL, indirectYaml } from "./history-default-colors.js";
 import { toYaml } from "./history-yaml.js";
 
 const _LOCAL = new Set(LOCAL_ONLY_FIELDS);
@@ -44,8 +44,12 @@ function _diff(v, base)
 }
 // (a bar interval's YAML name)
 const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? undefined;
-// (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its '~')
-const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v) : v;
+// (a fill's value as the YAML writes it: light for true)
+const _fillOut = f => f === true ? 'light' : f;
+// (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its
+// '~', a value read indirectly — thresholds, a series — as written: see indirectYaml)
+const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v)
+    : INDIRECT_OPTIONS.includes(k) && v !== undefined ? indirectYaml(v, k === 'fill' ? _fillOut : undefined) : v;
 
 export class CardYaml
 {
@@ -148,9 +152,10 @@ export class CardYaml
         if( k === 'color' ) return e.colorSet ? e.color : undefined;
         if( k === 'fill' ) {
             const f = e.fill;
-            if( e.type === 'bar' || f === undefined || f === null ) return undefined;
+            if( f === undefined || f === null ) return undefined;
             if( f === NO_FILL ) return false;
-            if( f === fillValue(true, e.color) ) return true;
+            if( f === fillValue(true, e.color) ) return 'light';
+            if( f === 'solid' ) return 'solid';
             return !e.colorSet && defaultColors.some(c => c.color === e.color && c.fill === f) ? undefined : f;
         }
         if( k === 'interval' ) return x.root === 'curve' && e.type === 'bar' ? e.interval : undefined;
@@ -176,7 +181,7 @@ export class CardYaml
         }
         if( k === 'type' ) return this.baseTypeOf(e.entity);
         if( k === 'lineMode' ) return this.defaultLineModeOf(e.type);
-        if( k === 'fill' ) return e.colorSet ? false : undefined;
+        if( k === 'fill' ) return e.type === 'bar' ? 'solid' : e.colorSet ? false : undefined;
         if( k === 'interval' ) return OPTION_DEFAULTS.interval;
         return OPTION_DEFAULTS[k];
     }
@@ -192,7 +197,7 @@ export class CardYaml
         const _keys = x.full ? new Set([..._exported.flatMap(([h, e]) => _written(h, e)), ..._exported.flatMap(([, e]) => this._curveKeys(x, e)).filter(k => k in x.look)]) : null;
         // (what curve e shows of option k: its own, its color and fill as drawn, else what the
         // levels give it)
-        const _shown = (e, k) => this._curveOwn(x, e, k) ?? ( k === 'color' ? e.color : k === 'fill' && e.type !== 'bar' ? e.fill : undefined ) ?? this._curveBase(x, g, e, k);
+        const _shown = (e, k) => this._curveOwn(x, e, k) ?? ( k === 'color' ? e.color : k === 'fill' ? e.fill : undefined ) ?? this._curveBase(x, g, e, k);
         return es.map(e => {
             const { entity, attribute } = seriesOf(e.entity);
             const o = { entity };
