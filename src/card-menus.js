@@ -388,7 +388,7 @@ export class CardMenus
         const _list = _root._menuList;
         if( _list && _list.style.display !== 'none' ) appendAll(_chain, _list._cascade ?? [_list]);
         // (each back to its width as opened)
-        for( const b of _chain.slice(1) ) if( b._base ) { Object.assign(b.style, b._base); if( b._fitWidth ) b._fitWidth(null); }
+        for( const b of _chain.slice(1) ) if( b._base ) Object.assign(b.style, b._base);
         if( _chain.length < 2 ) return;
         const R = _chain[0].getBoundingClientRect().right;
         const _natural = _chain.map(b => b._naturalWidth?.() ?? b.getBoundingClientRect().width);
@@ -414,6 +414,8 @@ export class CardMenus
     // A box's lines' text, its widest — what it shows of them beside a box over it
     _readableWidth(box)
     {
+        // (the entity selector's list: as wide as its lines whole, known — never measured again)
+        if( box._naturalWidth ) return box._naturalWidth();
         return Math.max(0, maxOf(this._stripLines(box).map(a => this._lineTextWidth(a))));
     }
 
@@ -645,7 +647,7 @@ export class CardMenus
             const _t = document.createElement('template');
             _t.innerHTML = it.title ? `<div${_id}></div>`
                 : it.input ? `<label${it.lineId ? ` id="${it.lineId}"` : ''} style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 5px;white-space:nowrap"><span${it.labelId ? ` id="${it.labelId}"` : ''} style="overflow:hidden;text-overflow:ellipsis;min-width:0"></span>` +
-                             `<input${_id} type="${it.input.text ? 'text' : 'number'}" style="width:${it.input.text ? '10em' : '5em'};min-width:3em;flex:0 1 auto;color:inherit;background:transparent;border:1px solid #888"></label>`
+                             `<input${_id} type="${it.input.text ? 'text' : 'number'}" style="${it.input.text ? 'flex:1 1 10em;width:10em' : 'flex:0 1 auto;width:5em'};min-width:3em;color:inherit;background:transparent;border:1px solid #888"></label>`
                 : it.on !== undefined ? SWITCH_LINE_HTML.replace('<a ', `<a${_id} `)
                 : `<a${_id} href="#" style="${_MENU_LINE_STYLE}"></a>`;
             const _line = _t.content.firstChild;
@@ -1808,7 +1810,9 @@ export class CardMenus
     // (and its fields' lines: what a box over it leaves of each, see _menuStrip)
     _stripLines(menuEl)
     {
-        return [...menuEl.children].filter(a => ( a.tagName === 'A' || a.tagName === 'LABEL' ) && a.style.display !== 'none');
+        const _lines = [...menuEl.children].filter(a => ( a.tagName === 'A' || a.tagName === 'LABEL' ) && a.style.display !== 'none');
+        // (the entity selector's list — its lines alike, by the hundred —: its first one)
+        return menuEl._naturalWidth ? _lines.slice(0, 1) : _lines;
     }
     _submenuOf(line)
     {

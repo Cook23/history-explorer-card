@@ -87,6 +87,17 @@ module.exports = async function()
         await closeMenu(t);
         return r.gaps.slice(0, -1).every(g => g > 10 && g < 40) && r.inRight <= r.R && r.inWidth > 20 ? true : JSON.stringify(r);
     });
+    await t.step('Entity ▸\'s field and list: the field as wide as its line; the list right under its box; typed, its lines fitted again only when its width changes — never measured line by line', async () => {
+        await curveMenu(t, 0, 'color');
+        await t.E(`(()=>{ const I=el.instance; I._fitCount=0; const f=I.fitEntityLines.bind(I); I.fitEntityLines=(...a)=>{ I._fitCount++; return f(...a); }; })()`);
+        await search(t, 'p'); const n0 = await t.E('el.instance._fitCount');
+        await t.page.keyboard.type('ower'); await t.wait(300); const n1 = await t.E('el.instance._fitCount');
+        const r = await t.E(`(()=>{ const box=el.querySelector('#et_0_appearance_color_entity_sub'), i=box.querySelector('input'), lab=i.parentElement, l=el.querySelector('#es_2');
+            return { boxBottom: Math.round(box.getBoundingClientRect().bottom), listTop: Math.round(l.getBoundingClientRect().top), input: Math.round(i.getBoundingClientRect().width), line: Math.round(lab.getBoundingClientRect().width) }; })()`);
+        await t.E(`delete el.instance.fitEntityLines`);
+        await closeMenu(t);
+        return n0 <= 1 && n1 === n0 && r.listTop === r.boxBottom && r.input >= r.line - 30 ? true : JSON.stringify({ n0, n1, r });
+    });
     done(await t.close());
 
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }]), { height: 900 });

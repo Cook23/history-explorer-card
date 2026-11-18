@@ -4,6 +4,17 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.86] - 2026-11-18
+
+### Fixed
+- *Entity ▸* in a menu: each key typed froze the card a moment — the menus' fit measured every line of the entity list (by the hundred, each forcing the page's layout) and fitted their names three times; now the list's width is its lines' whole one, measured once, its first line alone giving its strip, its names fitted again only when its width changes — as quick as the card's selector
+- *Entity ▸*'s list placed under its field's box (before: under the field, its box covering its first line)
+- A menu's field as wide as its line (before: 10em)
+
+### Internal
+- Tests (`indirect`): *Entity ▸*'s field as wide as its line, its list under its box, its names fitted once while typing
+
+
 ## [v1.2.85] - 2026-11-18
 
 ### Added
