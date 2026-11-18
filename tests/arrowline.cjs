@@ -117,5 +117,15 @@ module.exports = async function()
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }
+    // ── fill: fade on an arrowline: the band fading out, not light ──
+    {
+        const t = await openCard(card([{ entity: 'sensor.wind', fill: 'fade' }, { entity: 'sensor.wind', fill: { 0: 'fade', 200: 'light' } }]), { mock: { series: true } });
+        await t.wait(800);
+        await t.step('fill: fade on an arrowline — the band fading out (arrowFade), each block\'s too when it\'s read indirectly', async () => {
+            const r = await t.E(`[graphAt(0).chart.data.datasets[0].arrowFade, (graphAt(1).chart.data.datasets[0].arrowBackgrounds ?? []).some(f => typeof f === 'object' && f.fade)]`);
+            return typeof r[0] === 'string' && r[1] === true ? true : JSON.stringify(r);
+        });
+        const r = await t.close(); passed += r.passed; failed += r.failed;
+    }
     return { passed, failed };
 };

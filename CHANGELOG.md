@@ -7,6 +7,7 @@ Changelog for the HA History Explorer Card.
 ## [v1.2.87] - 2026-11-18
 
 ### Fixed
+- `fill: fade` on an arrowline drawn as `light`: the band behind the arrows now fades out downwards, given directly or read indirectly (each block's)
 - *Fill ▸ Entity ▸* and *Length ▸ Entity ▸* after *Color ▸ Entity ▸* in the same menu: the list placed at the top of the screen, what was typed filtering nothing — each *Entity ▸* made its own field, the selector reading the first one, *Color*'s, hidden. One field a menu: another *Entity ▸*'s emptied when one opens
 
 ### Changed
@@ -18,7 +19,7 @@ Changelog for the HA History Explorer Card.
 
 ### Internal
 - Tests (`indirect`): *Color ▸ Entity ▸* then *Fill ▸ Entity ▸* — one field, the list under Fill's box, filtered
-- Tests (`arrowline`): `fill: solid` ignored on an arrowline
+- Tests (`arrowline`): `fill: solid` ignored on an arrowline; `fill: fade` fading out
 
 
 ## [v1.2.86] - 2026-11-18

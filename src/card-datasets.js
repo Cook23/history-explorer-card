@@ -833,7 +833,9 @@ export class CardDatasets
             const c = colorFn ? colorFn(t, v) ?? e.paletteColor : _fixed;
             colors.push(c);
             // (a fill fading out: its color light, as an arrowline's fill: fade — see fillAsColor)
-            fills.push(fillFn ? this.fillAsColor(this.fillStyle(this.arrowFillOf(e, fillFn(t, v)), c, !!colorFn)) : undefined);
+            // (a fill fading out: as it is — { fade: its color }, drawn so, see deps/timeline.js.md)
+            const _st = fillFn ? this.fillStyle(this.arrowFillOf(e, fillFn(t, v)), c, !!colorFn) : undefined;
+            fills.push(fillFn ? ( typeof _st === 'object' ? _st : this.fillAsColor(_st) ) : undefined);
         }
         return { arrowColors: colorFn ? colors : undefined, arrowBackgrounds: fillFn ? fills : undefined };
     }

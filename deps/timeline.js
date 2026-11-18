@@ -925,15 +925,24 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         // arrowBackgrounds, under the block)
         const y0 = ybar - ARROW_BOX / 2;
         ctx.lineWidth = 0;
+        // (a fill fading out — { fade: color }, the dataset's arrowFade —: its color at the
+        // band's top, fading out downwards)
+        const _style = f => {
+            if( typeof f !== 'object' ) return f;
+            const g = ctx.createLinearGradient(0, y0-3, 0, y0+ARROW_BOX+3);
+            g.addColorStop(0, f.fade);
+            g.addColorStop(1, _color(f.fade).alpha(0).rgbString());
+            return g;
+        };
         if( ds?.arrowBackgrounds ) {
             metaData.forEach((m, k) => {
-                const f = ds.arrowBackgrounds[k], x0 = Math.max(area.left, m.getPosition(0)), x1 = Math.min(area.right, m.getPosition(1));
+                const f = ds.arrowBackgrounds[k], x0 = Math.round(Math.max(area.left, m.getPosition(0))), x1 = Math.round(Math.min(area.right, m.getPosition(1)));
                 if( !f || x1 <= x0 ) return;
-                ctx.fillStyle = f;
+                ctx.fillStyle = _style(f);
                 ctx.fillRect(x0, y0-3, x1 - x0, ARROW_BOX+6);
             });
-        } else if( fill ) {
-            ctx.fillStyle = fill;
+        } else if( ds?.arrowFade || fill ) {
+            ctx.fillStyle = _style(ds?.arrowFade ? { fade: ds.arrowFade } : fill);
             ctx.fillRect(area.left, y0-3, area.right - area.left, ARROW_BOX+6);
         }
 

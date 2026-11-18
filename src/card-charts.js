@@ -222,6 +222,8 @@ export class CardCharts
                 name: d.name,
                 arrowColor: d.bColor,
                 arrowBackground: d.fillColor,
+                // (a fill fading out: its color, the band fading out downwards)
+                arrowFade: d.fillFade ? d.bColor : undefined,
                 blockFill: d.blockFill,
                 arrowPeriod: d.arrowPeriod,
                 // (its row's tooltip, as a curve's: Chart.js hecTooltip)
