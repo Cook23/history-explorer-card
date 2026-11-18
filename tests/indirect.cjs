@@ -106,6 +106,14 @@ module.exports = async function()
         await closeMenu(t);
         return r.fields === 1 && r.listTop === r.box && r.shown.length > 0 && r.shown.every(e => e.includes('wind')) ? true : JSON.stringify(r);
     });
+    await t.step('a field\'s text where its list\'s lines\' text starts — the card\'s selector, and Entity ▸\'s', async () => {
+        const at = k => t.E(`(()=>{ const i=el.querySelector('#b7_${k}'), s=getComputedStyle(i), a=[...el.querySelectorAll('#es_${k} a')].find(x=>x.style.display!=='none'); const tn=document.createTreeWalker(a,NodeFilter.SHOW_TEXT).nextNode(); const r=document.createRange(); r.setStart(tn,0); r.setEnd(tn,1);
+            return [Math.round(i.getBoundingClientRect().left + parseFloat(s.paddingLeft) + parseFloat(s.borderLeftWidth)), Math.round(r.getBoundingClientRect().left)]; })()`);
+        await t.page.click('#b7_0'); await t.wait(400); const a = await at(0);
+        await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(400);
+        await curveMenu(t, 0, 'color'); await search(t, 's'); const b = await at(2); await closeMenu(t);
+        return a[0] === a[1] && b[0] === b[1] ? true : JSON.stringify({ card: a, menu: b });
+    });
     done(await t.close());
 
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }]), { height: 900 });

@@ -12,6 +12,7 @@ Changelog for the HA History Explorer Card.
 
 ### Changed
 - *Entity ▸*'s list in a menu: a submenu of the cascade, as wide as its field's box, both right-aligned — so left-aligned too —, hiding what's behind it (before: as wide as its names, the lines behind it showing on its left); the field's box as wide as the list needs, its names whole, the room it lacks taken from the menus over it
+- The entity selector's field — the card's and *Entity ▸*'s —: its text where its list's lines' text starts (before: a few pixels left of them); *Entity ▸*'s field its line's whole width
 - `fill: solid` ignored on an arrowline — the band behind the arrows hid them —: its default instead (`light`; `false` with its color defined), given directly or read indirectly
 - A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
 

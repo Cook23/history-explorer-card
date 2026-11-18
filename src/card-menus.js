@@ -15,7 +15,7 @@ import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
 import { isColorSeries, colorSpec, isBlendable, NO_FILL } from "./history-default-colors.js";
 import { maxOf } from "./history-arrays.js";
-import { MENU_SELECTOR } from "./card-selector.js";
+import { MENU_SELECTOR, LINE_PAD_X } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the curve menu (et_N_<index>), in the order it shows them: a line in
@@ -409,6 +409,18 @@ export class CardMenus
         }
     }
 
+    // Selector idx's field's text where its list's lines' text starts: its left padding from
+    // its border's end to there — the list's left edge (a toolbar's: the field's; a menu's: its
+    // field's box's, see setDropdownVisibility), its border, its lines' padding
+    alignFieldText(idx)
+    {
+        const input = this._this.querySelector(`#b7_${idx}`), list = this._this.querySelector(`#es_${idx}`);
+        if( !input?.isConnected || !list ) return;
+        const _left = ( idx >= MENU_SELECTOR ? input.closest('[id$="_sub"]') : input ).getBoundingClientRect().left;
+        const _textAt = _left + ( parseFloat(getComputedStyle(list).borderLeftWidth) || 0 ) + LINE_PAD_X;
+        input.style.paddingLeft = Math.max(0, _textAt - input.getBoundingClientRect().left - ( parseFloat(getComputedStyle(input).borderLeftWidth) || 0 )) + 'px';
+    }
+
     // A box's lines' text, its widest — what it shows of them beside a box over it
     _readableWidth(box)
     {
@@ -641,6 +653,9 @@ export class CardMenus
             } else if( it.input ) {
                 const [_name, _in] = _line.children;
                 _name.textContent = it.label;
+                // (a field without a name — the entity selector's —: the field alone, its line's
+                // width — its text placed as its list's lines', see setDropdownVisibility)
+                if( !it.label ) { _name.remove(); _line.style.paddingLeft = _line.style.paddingRight = '0'; }
                 Object.assign(_in, { min: it.input.min, max: it.input.max, step: it.input.step, value: it.value ?? '' });
                 if( it.input.placeholder ) _in.placeholder = it.input.placeholder;
                 // (a text searched: each change at once — live —; a value: once entered)

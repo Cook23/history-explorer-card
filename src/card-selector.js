@@ -17,7 +17,7 @@ const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
 // A line of the entity list: its padding on each side (px)
-const LINE_PAD_X = 5;
+export const LINE_PAD_X = 5;
 
 // The selectors: the toolbars' fields (0, 1: the top one's, the bottom one's) and, from
 // MENU_SELECTOR on, a menu's (Entity ▸ — the curve menu of toolbar i: MENU_SELECTOR + i), the
@@ -36,6 +36,8 @@ export class CardSelector
     bindEntitySelector(i, input)
     {
         if( !input ) return;
+        // (its text placed as its list's lines', once it's laid out)
+        requestAnimationFrame(() => this.alignFieldText(i));
         input.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
         input.addEventListener('click', this.entitySelectorFocus.bind(this), true);
         input.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
@@ -136,6 +138,7 @@ export class CardSelector
                 dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, window.innerHeight - _box.bottom)) + 'px';
                 this.openMenu(dropdown, ( _box.bottom - parentRect.top ) + 'px', ( _box.right - parentRect.left ) + 'px', 'right');
             } else this.openMenu(dropdown, topPos, leftPos);
+            this.alignFieldText(input_idx);
             // (kept on its field — see followAnchor)
             this.followAnchor(dropdown, input, () => { this.hideSeriesMenu(input_idx); this.setDropdownVisibility(input_idx, false); });
             const filter = input.value.toLowerCase();
