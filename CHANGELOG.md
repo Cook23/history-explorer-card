@@ -4,6 +4,19 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.85] - 2026-11-18
+
+### Changed
+- The menus' widths: a menu under a submenu shows two characters and a half of its lines (before: three, measured on the widest — up to four shown); a field's line too. The last submenu's field shrinks rather than going out of the menu
+- The menus' lines: their text's left and right margins halved (5 px; the titles too)
+
+### Docs
+- README_Full.md: the menus' widths, two characters and a half
+
+### Internal
+- Tests (`indirect`): a deep cascade (Color ▸ Entity ▸ Thresholds ▸ + Add ▸): each box leaving no more than the start of the lines under it, the last one's field within the menu
+
+
 ## [v1.2.84] - 2026-11-18
 
 ### Added
