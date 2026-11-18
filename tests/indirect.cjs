@@ -98,6 +98,13 @@ module.exports = async function()
         await closeMenu(t);
         return n0 <= 1 && n1 === n0 && r.listTop === r.boxBottom && r.input >= r.line - 30 ? true : JSON.stringify({ n0, n1, r });
     });
+    await t.step('Color ▸ Entity ▸, then Fill ▸ Entity ▸: one field in the menu — the list under Fill\'s box, filtered by what\'s typed there', async () => {
+        await curveMenu(t, 0, 'color'); await closeMenu(t);
+        await curveMenu(t, 0, 'fill'); await search(t, 'wind');
+        const r = await t.E(`(()=>{ const l=el.querySelector('#es_2'); return { fields: [...el.querySelectorAll('input')].filter(i=>i.id==='b7_2').length, listTop: Math.round(l.getBoundingClientRect().top), box: Math.round(el.querySelector('#et_0_appearance_fill_entity_sub').getBoundingClientRect().bottom), shown: [...l.querySelectorAll('a')].filter(a=>a.style.display!=='none').map(a=>a.dataset.entity) }; })()`);
+        await closeMenu(t);
+        return r.fields === 1 && r.listTop === r.box && r.shown.length > 0 && r.shown.every(e => e.includes('wind')) ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }]), { height: 900 });

@@ -1200,6 +1200,9 @@ export class CardMenus
         // with what is done with it (menuSeriesChosen)
         if( eid === undefined ) {
             const k = this.menuSelector(m.index);
+            // (one field a menu: another Entity ▸'s — of another list, opened before — emptied,
+            // so the selector reads this one — see setDropdownVisibility, #b7_k)
+            for( const other of _INDIRECT_LOOK ) if( other !== key ) this._this.querySelector(`#${m.prefix}_appearance_${other}_entity_sub`)?.replaceChildren();
             this._menuSource = { m, key };
             return [{ id: `b7_${k}`, lineId: `${_id}_field`, label: '', input: { text: true, placeholder: i18n('ui.label.type_to_search') }, value: '',
                       bind: el => this.bindEntitySelector(k, el) }];
