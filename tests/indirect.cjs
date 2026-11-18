@@ -24,7 +24,7 @@ module.exports = async function()
     const closeMenu = async t => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700); };
 
     let t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900 });
-    await t.step('Color ▸: Choose… and Entity ▸; Entity ▸: the entity selector\'s field — typed, the same entities as the card\'s selector', async () => {
+    await t.step('Color ▸: Automatic, Choose… and Entity ▸; Entity ▸: the entity selector\'s field — typed, the same entities as the card\'s selector', async () => {
         await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
         const l = await lines(t);
         await click(t, '#et_0_appearance_color_entity'); await t.wait(250);
@@ -35,7 +35,7 @@ module.exports = async function()
         await t.page.click('#b7_0'); await t.page.keyboard.type('wind'); await t.wait(400);
         const bar = await listed(t, 0);
         await t.page.keyboard.press('Control+A'); await t.page.keyboard.press('Backspace'); await t.page.mouse.click(5, 880); await t.wait(400);
-        return l === 'Choose… | Entity ▸' && field && menu !== '' && menu === bar ? true : JSON.stringify({ l, field, menu, bar });
+        return l === 'Automatic* | Choose… | Entity ▸' && field && menu !== '' && menu === bar ? true : JSON.stringify({ l, field, menu, bar });
     });
     await t.step('an entity chosen: Value | Thresholds ▸; Value: the curve\'s color is that entity, Entity ▸ then in bold', async () => {
         await curveMenu(t, 0, 'color'); await search(t, 'wind');
@@ -45,7 +45,7 @@ module.exports = async function()
         const saved = await t.E('graphAt(0).entities[0].color');
         await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
         const l2 = await lines(t); await closeMenu(t);
-        return l === 'Value | Thresholds ▸' && saved === 'sensor.wind' && l2 === 'Choose… | Entity ▸*' ? true : JSON.stringify({ l, saved, l2 });
+        return l === 'Value | Thresholds ▸' && saved === 'sensor.wind' && l2 === 'Automatic | Choose… | Entity ▸*' ? true : JSON.stringify({ l, saved, l2 });
     });
     await t.step('Thresholds ▸ on the curve\'s own entity: + Add ▸ 100 — a ≥ 100 threshold, saved without entity; Default; Blend: colorTransition smooth', async () => {
         await curveMenu(t, 1, 'color'); await search(t, 'power_kw');
