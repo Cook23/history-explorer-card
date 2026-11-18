@@ -95,9 +95,12 @@ export class CardSelector
         let dropdown = this._this.querySelector(`#es_${input_idx}`);
         if( !input || !dropdown ) return;
         if( show ) {
-            // (as wide as the field — its lines fitted to it, fitEntityLines)
-            dropdown.style.width = input.getBoundingClientRect().width + 'px';
-            this.fitEntityLines(input_idx, input.getBoundingClientRect().width);
+            // (a toolbar's: as wide as the field — its lines fitted to it, fitEntityLines; a
+            // menu's: see below)
+            if( !_isMenuSelector(input_idx) ) {
+                dropdown.style.width = input.getBoundingClientRect().width + 'px';
+                this.fitEntityLines(input_idx, input.getBoundingClientRect().width);
+            }
             // Position relative to input: below if top selector (idx=0), above if bottom selector (idx=1)
             const inputRect = input.getBoundingClientRect();
             // #tb_N directly, not dropdown.offsetParent — offsetParent of a display:none
@@ -126,11 +129,20 @@ export class CardSelector
             // whole, the room they lack taken from the menus over it — fitCascade)
             const _menu = _isMenuSelector(input_idx) ? this.menuListShown(input_idx - MENU_SELECTOR, dropdown) : null;
             if( _menu ) {
-                dropdown._naturalWidth = () => this.entityLineWidths().all;
-                dropdown._fitWidth = w => { dropdown.style.width = ( w ?? this.entityLineWidths().all ) + 'px'; this.fitEntityLines(input_idx, w ?? this.entityLineWidths().all); };
-                dropdown._fitWidth(null);
-                dropdown._base = { minWidth: '', maxWidth: '', width: dropdown.style.width };
-                this.openMenu(dropdown, topPos, ( _menu.getBoundingClientRect().right - parentRect.left ) + 'px', 'right');
+                // (as wide as its lines whole — their widths measured once, entityLineWidths —,
+                // its lines fitted again only when its width changes; under its field's box, as
+                // a submenu under its line)
+                const _all = Math.floor(this.entityLineWidths().all);
+                dropdown._naturalWidth = () => _all;
+                dropdown._fitWidth = w => {
+                    const _w = Math.floor(w ?? _all);
+                    dropdown.style.width = _w + 'px';
+                    if( dropdown._fitted !== _w ) { dropdown._fitted = _w; this.fitEntityLines(input_idx, _w); }
+                };
+                dropdown._base = { minWidth: '', maxWidth: '', width: _all + 'px' };
+                const _under = ( input.closest('[id$="_sub"]') ?? input ).getBoundingClientRect().bottom;
+                dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, window.innerHeight - _under)) + 'px';
+                this.openMenu(dropdown, ( _under - parentRect.top ) + 'px', ( _menu.getBoundingClientRect().right - parentRect.left ) + 'px', 'right');
                 this.fitCascade(dropdown);
             } else this.openMenu(dropdown, topPos, leftPos);
             // (kept on its field — see followAnchor)
@@ -491,6 +503,8 @@ export class CardSelector
         {
             const datalist = this._this.querySelector(`#es_${i}`);
             if( !datalist ) return;
+            // (its lines new: fitted again — see setDropdownVisibility)
+            datalist._fitted = undefined;
 
             while( datalist.firstChild ) datalist.removeChild(datalist.firstChild);
 
