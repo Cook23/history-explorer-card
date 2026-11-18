@@ -6,12 +6,16 @@ Changelog for the HA History Explorer Card.
 
 ## [v1.2.85] - 2026-11-18
 
+### Added
+- A timeline's fill: its blocks, each in its state's color, `solid` (its default — drawn as before), `light`, `fade` (fading out downwards) or `false` (their outline only), set as every fill — in the YAML, *Appearance ▸ Fill* on a timeline's row and on a graph of timelines (the same lines as elsewhere), read indirectly (thresholds, an entity: each block the fill of its middle's time); a color of its own ignored there
+
 ### Changed
-- The menus' widths: a menu under a submenu shows two characters and a half of its lines (before: three, measured on the widest — up to four shown); a field's line too. The last submenu's field shrinks rather than going out of the menu
+- The menus' widths: a menu under a submenu shows the start of its lines as wide as two wide characters ('MM') — two characters at least, two and a half or three most often (before: three, measured on the widest — up to four shown); a field's line too. The last submenu's field shrinks rather than going out of the menu
 - The menus' lines: their text's left and right margins halved (5 px; the titles too)
+- `fill: light` the value, `true` its alias (before: `true`, `light` its synonym) — kept, exported and shown in the menus as `light`; its default: `light` with the color not defined (the palette's light fill before), `false` with it defined; a bar's and a timeline's: `solid`
 
 ### Docs
-- README_Full.md: the menus' widths, two characters and a half
+- README.md, README_Full.md: the menus' widths, two wide characters; `fill`'s default by type, a timeline's fill
 
 ### Internal
 - Tests (`indirect`): a deep cascade (Color ▸ Entity ▸ Thresholds ▸ + Add ▸): each box leaving no more than the start of the lines under it, the last one's field within the menu

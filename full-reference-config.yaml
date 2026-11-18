@@ -50,8 +50,9 @@ graphs:
       # with `entity:` — and `attribute:` — on that entity's value), or an entity holding either (or one of its attributes: climate.salon.led_color)
       color: null
 
-      # Fill colour of the area under the line in the graph (a bar's area), defaults to a lighter shade of 'color' (a bar: solid);
-      # false: none; fade: the line's colour fading out downwards; light (or true): the line's colour, light; solid: the line's colour —
+      # Fill of the area under the line in the graph (a bar's area, a timeline's blocks) — default: light, false with a colour
+      # defined; a bar, a timeline: solid. false: none; fade: the colour fading out downwards; light (alias true): the colour,
+      # light; solid: the colour; a colour (not a timeline's) —
       # or, as 'color', thresholds giving one (on the value, or with `entity:` on that entity's), or an entity holding one
       fill: null
 

@@ -13,9 +13,8 @@ import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
-import { isColorSeries, colorSpec, isBlendable } from "./history-default-colors.js";
+import { isColorSeries, colorSpec, isBlendable, NO_FILL } from "./history-default-colors.js";
 import { maxOf, appendAll } from "./history-arrays.js";
-import { optionSeriesOf } from "./card-datasets.js";
 import { MENU_SELECTOR } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
 
@@ -1084,7 +1083,7 @@ export class CardMenus
     // others, the curves
     _lookByGraph(m, key)
     {
-        const _takes = (g, e) => key === 'color' || key === 'fill' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
+        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
             .filter(({ curves }) => curves.length);
     }
@@ -1120,12 +1119,10 @@ export class CardMenus
     _lookValue(e, key)
     {
         if( key === 'fill' ) {
-            if( e.fill === 'fade' ) return 'fade';
-            if( e.fill === 'solid' ) return 'solid';
-            // (a fill read indirectly — thresholds, a series —: none of the list's)
-            if( typeof e.fill === 'object' && e.fill !== null || optionSeriesOf(e, 'fill') ) return undefined;
-            const _c = Chart.helpers.color(e.fill ?? 'rgba(0,0,0,0)');
-            return !( _c.valid && _c.alpha() === 0 );
+            // (its value: none, fade, light, solid — a color of its own, or read indirectly:
+            // none of the list's)
+            if( e.fill === NO_FILL || e.fill === false ) return false;
+            return Object.values(FILL_VALUES).includes(e.fill) ? e.fill : undefined;
         }
         if( key === 'width' ) return e.width;
         if( key === 'minmax' ) return minMaxValue(e.showMinMax) ?? false;
@@ -1329,7 +1326,7 @@ export class CardMenus
     _newResult(m, key)
     {
         const _e = this._lookByGraph(m, key)[0]?.curves[0];
-        return key === 'color' ? ( colorSpec(this.entityColor(_e))?.color ?? '#000000' ) : key === 'fill' ? true : 100;
+        return key === 'color' ? ( colorSpec(this.entityColor(_e))?.color ?? '#000000' ) : key === 'fill' ? 'light' : 100;
     }
 
     // The states series sid is known to take: its options (a select's), else its state now
@@ -1768,22 +1765,13 @@ export class CardMenus
         });
     }
 
-    // What a submenu leaves of its menu's lines, at least: two characters and a half of each
-    // line's text, its own — a field's: of its input, 'MM' standing for them (a box without
+    // What a submenu leaves of its menu's lines, at least: the start of their text, the width
+    // of two wide characters ('MM', in the line's font) — in a proportional font, two of them
+    // at least, two and a half or three most often; a field's: of its input (a box without
     // lines: nothing)
     _menuStrip(menuEl)
     {
-        return Math.max(0, maxOf(this._stripLines(menuEl).map(a => this._lineStart(a) + this._firstChars(a, 2.5))));
-    }
-
-    // The width of a line's first n characters (n may hold a half: that part of the next one)
-    _firstChars(line, n)
-    {
-        const _text = line.querySelector('input') ? null : document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
-        if( !_text ) return this._wideChars(line, 2);
-        const _w = k => { const r = document.createRange(); r.setStart(_text, 0); r.setEnd(_text, Math.min(k, _text.length)); return r.getBoundingClientRect().width; };
-        const _whole = Math.floor(n);
-        return _w(_whole) + ( n - _whole ) * ( _w(_whole + 1) - _w(_whole) );
+        return Math.max(0, maxOf(this._stripLines(menuEl).map(a => this._lineStart(a) + this._wideChars(a, 2))));
     }
 
     // Where a line's text starts, from the line's left edge: after its left padding and a

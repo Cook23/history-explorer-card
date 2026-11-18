@@ -109,7 +109,7 @@ module.exports = async function()
         const b = await t.E('JSON.stringify(graphAt(0).entities[0].fill)');
         await closeMenu(t);
         return series.includes('Azimuth') && l === 'Value | Thresholds ▸' && a === 'sun.sun.azimuth' && add.includes('above_horizon')
-            && b === '{"entity":"sun.sun","thresholds":[],"states":{"above_horizon":true}}' ? true : JSON.stringify({ series, l, a, add, b });
+            && b === '{"entity":"sun.sun","thresholds":[],"states":{"above_horizon":"light"}}' ? true : JSON.stringify({ series, l, a, add, b });
     });
     done(await t.close());
 

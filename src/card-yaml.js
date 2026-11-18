@@ -16,7 +16,7 @@ import { OPTION_DEFAULTS, ENTITY_ONLY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS,
          CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText, INDIRECT_OPTIONS } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { seriesOf } from "./history-series.js";
-import { defaultColors, fillValue, NO_FILL, indirectYaml } from "./history-default-colors.js";
+import { NO_FILL, indirectYaml } from "./history-default-colors.js";
 import { toYaml } from "./history-yaml.js";
 
 const _LOCAL = new Set(LOCAL_ONLY_FIELDS);
@@ -45,11 +45,10 @@ function _diff(v, base)
 // (a bar interval's YAML name)
 const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? undefined;
 // (a fill's value as the YAML writes it: light for true)
-const _fillOut = f => f === true ? 'light' : f;
 // (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its
 // '~', a value read indirectly — thresholds, a series — as written: see indirectYaml)
 const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v)
-    : INDIRECT_OPTIONS.includes(k) && v !== undefined ? indirectYaml(v, k === 'fill' ? _fillOut : undefined) : v;
+    : INDIRECT_OPTIONS.includes(k) && v !== undefined ? indirectYaml(v) : v;
 
 export class CardYaml
 {
@@ -145,8 +144,8 @@ export class CardYaml
     }
 
     // Curve e's option k as its entry holds it: its color when it's its own (colorSet — the
-    // palette's: none), its fill in the YAML's terms (none: false, its color's: true — the
-    // palette's, a bar's: none); its interval only exported alone (else its graph's)
+    // default one: none), its fill in the YAML's terms (none: false; light, solid, fade as
+    // they are); its interval only exported alone (else its graph's)
     _curveOwn(x, e, k)
     {
         if( k === 'color' ) return e.colorSet ? e.color : undefined;
@@ -154,10 +153,7 @@ export class CardYaml
             const f = e.fill;
             if( f === undefined || f === null ) return undefined;
             if( f === NO_FILL ) return false;
-            // (its color's, light: an automatic color's default — none; a bar's default: solid)
-            if( f === fillValue(true, e.color) ) return e.colorSet || e.type === 'bar' ? 'light' : undefined;
-            if( f === 'solid' ) return 'solid';
-            return !e.colorSet && defaultColors.some(c => c.color === e.color && c.fill === f) ? undefined : f;
+            return f;
         }
         if( k === 'interval' ) return x.root === 'curve' && e.type === 'bar' ? e.interval : undefined;
         // (its band by the value's own name — all, not true)
@@ -182,7 +178,8 @@ export class CardYaml
         }
         if( k === 'type' ) return this.baseTypeOf(e.entity);
         if( k === 'lineMode' ) return this.defaultLineModeOf(e.type);
-        if( k === 'fill' ) return e.type === 'bar' ? 'solid' : e.colorSet ? false : undefined;
+        // (the default fill: a bar's and a timeline's solid; light, none with a color defined)
+        if( k === 'fill' ) return e.type === 'bar' || e.type === 'timeline' ? 'solid' : e.colorSet ? false : 'light';
         if( k === 'interval' ) return OPTION_DEFAULTS.interval;
         return OPTION_DEFAULTS[k];
     }

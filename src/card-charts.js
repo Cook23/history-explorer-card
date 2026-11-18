@@ -222,6 +222,7 @@ export class CardCharts
                 name: d.name,
                 arrowColor: d.bColor,
                 arrowBackground: d.fillColor,
+                blockFill: d.blockFill,
                 arrowPeriod: d.arrowPeriod,
                 // (its row's tooltip, as a curve's: Chart.js hecTooltip)
                 hecTooltip: d.tooltip,
@@ -1034,7 +1035,10 @@ export class CardCharts
                 // a bar, a curve, an arrowline's band: its fill — solid, its own color)
                 "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === 'solid' || d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d))
                     // (read indirectly: its fill now — its steps, when it varies, see _applyPointColors)
-                    : typeof d.fill === 'object' || optionSeriesOf(d, 'fill') ? this.fillAsColor(this.entityFill(d)) : d.fill,
+                    : typeof d.fill === 'object' || optionSeriesOf(d, 'fill') ? this.fillAsColor(this.entityFill(d)) : fillValue(d.fill, this.entityColor(d)),
+                // (a timeline's blocks: their fill — each block's when it's read indirectly, see
+                // _timelineFills)
+                "blockFill": d.type === 'timeline' ? this.blockFillOf(typeof d.fill === 'object' || optionSeriesOf(d, 'fill') ? undefined : d.fill) : undefined,
                 "fillFade": d.fill === 'fade',
                 "dashMode": d.dashMode,
                 "mode": this.lineModeOf(d),

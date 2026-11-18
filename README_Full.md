@@ -510,7 +510,7 @@ An entity whose current state can be read as a number can be shown as a line (*S
 
 The curve menu's items each open their submenu over the menu, level with it — its right edge on the menu's right edge; the item whose submenu is open is in bold:
 - **Display ▸** — open as soon as the menu opens: *Smart*, *Curve*, *Straight*, *Stepped*, *Bar*, *Direction*, *Timeline*;
-- **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; not for a timeline's row:
+- **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; for a timeline's row, *Fill* only:
   - *Color ▸* — *Automatic*: the color it's given when it's added (its configuration's, else the one of what it measures — see [Colors of curves and bars](#colors-of-curves-and-bars)), in bold when it has it; *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
   - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
@@ -912,7 +912,7 @@ A long-press — or a right click — opens a menu: on a curve's or a row's labe
   - a menu follows what it was opened from (a curve's label, a graph's ⠿ zone, the entity field, the ▾ button), its submenus with it, when the page, the dialog or the panel scrolls, even under a sticky toolbar; a submenu follows its line when its menu scrolls;
   - each shows in its zone — a menu, the screen minus what covers it (a sticky toolbar, the page's header); a submenu, its menu at the top and that zone at the bottom: what goes past is masked;
   - the menu closes once its first line is wholly out (a submenu opened from a first or last line isn't closed by the least scroll).
-- **Widths** — a menu is wider than each of its submenus, so its lines stay readable beside the one open — the last line's too. On a card or a screen too narrow, the menu opens without any submenu. The menu stays where it opened; each submenu takes its own width, and when the last one opened lacks room, it's taken from the submenus over it — the menu's lines shown beside them reduced first to two characters and a half, then the first submenu's, and so on down —; only once all of them show no more than that are its own lines cut ('…'). Every menu does so, the entity selector's lists too; a submenu closed, they take back their width.
+- **Widths** — a menu is wider than each of its submenus, so its lines stay readable beside the one open — the last line's too. On a card or a screen too narrow, the menu opens without any submenu. The menu stays where it opened; each submenu takes its own width, and when the last one opened lacks room, it's taken from the submenus over it — the menu's lines shown beside them reduced first to the width of two wide characters (two to three characters), then the first submenu's, and so on down —; only once all of them show no more than that are its own lines cut ('…'). Every menu does so, the entity selector's lists too; a submenu closed, they take back their width.
 
 #### The options menu
 
@@ -1488,7 +1488,16 @@ graphs:
 
 **A color for each entity of a graph** — `lineColor` on a graph or on the card: a color, or a list of colors — each entity of a graph without its own `color` takes the one at its place in the graph, the others the palette's. A graph's `lineColor` comes above its `color`; the card's, as every option of the card, below a graph's `color` and `entityOptions`', above the card's `color`.
 
-**The fill** — `fill` takes the same forms as `color`, its values being a fill's — `false` (none), `fade` (the curve's color fading out downwards), `light` or `true` (the curve's color, light), `solid` (the curve's color) or a color: thresholds on the value shown, thresholds on the value of another entity or attribute, or an entity holding a fill. It's evaluated at each point, as the color. A bar is drawn with its fill (`solid` by default); a timeline's row keeps its fill but doesn't show it.
+**The fill** — `fill` takes the same forms as `color`, its values being a fill's — `false` (none), `fade` (the curve's color fading out downwards), `light` or `true` (the curve's color, light), `solid` (the curve's color) or a color: thresholds on the value shown, thresholds on the value of another entity or attribute, or an entity holding a fill. It's evaluated at each point, as the color.
+
+**Its default** — calculated by the type, and by whether the color is defined (by the YAML, `lineColor`, `entityOptions`, or chosen in the menu):
+
+| Type | Color not defined | Color defined |
+|---|---|---|
+| Curve, arrowline | `light` | `false` |
+| Bar, timeline | `solid` | `solid` |
+
+**A timeline's blocks** — each in its state's color: `solid` filled, `light` light, `fade` fading out downwards, `false` its outline only; a color of its own (`fill` a color, or read indirectly) is ignored there. Read indirectly, each block takes the fill of its middle's time.
 
 ```yaml
       - entity: sensor.heat_pump_power
@@ -2372,7 +2381,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | Option | Description |
 |---|---|
 | **`color`**<br>*`color_thresholds`* | **Default** automatic: the color of what it measures (its device class, else its unit), else the palette's<br>The color of the curve or the bars. A color; thresholds on the value (`{ 0: blue, 20: red }`, or a list); thresholds on another entity's or attribute's value (with `entity:`, `attribute:`); or an entity or attribute whose state is the color. Without it, a color of the automatic palette — see [Colors of curves and bars](#colors-of-curves-and-bars) |
-| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light — none when `color` is set; a bar: `solid`<br>The area under the curve, a bar's area: a color; `false`, none; `fade`, the curve's color fading out downwards; `light` (or `true`), the curve's color, light; `solid`, the curve's color. It also takes thresholds or an entity, as `color` does — see [Colors of curves and bars](#colors-of-curves-and-bars) |
+| **`fill`**<br>*`show_fill`* | **Default** `light` — `false` when the color is defined; a bar, a timeline: `solid`<br>The area under the curve, a bar's area, a timeline's blocks: a color (not a timeline's); `false`, none; `fade`, the color fading out downwards; `light` (alias `true`), the color, light; `solid`, the color. It also takes thresholds or an entity, as `color` does — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>How the color changes between number thresholds: `hard`, each value takes its threshold's color; `smooth`, the color is blended from one threshold to the next — see [Colors of curves and bars](#colors-of-curves-and-bars) |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list of colors given by place: the first curve of a graph takes the first color, and so on. A curve with its own `color` keeps it. A graph's `lineColor` wins over its `color`; the card's is below `entityOptions` — see [Colors of curves and bars](#colors-of-curves-and-bars) — *the card and a graph only* |
 | **`stateColors`** | **Default** automatic colors<br>The timelines' colors: an entity, a device class or a domain followed by the state (`door.on`, `binary_sensor.off`), or a state alone (`off`) — see [Customizing state colors](#customizing-state-colors) — *the card's only* |

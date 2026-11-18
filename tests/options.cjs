@@ -51,13 +51,13 @@ module.exports = async function()
             const f = v => JSON.stringify(normalizeOptions({ fill: v }).fill);
             const r = [f('Fade'), f({ 0: false, 20: 'fade', 30: '#ff0000' }), f({ entity: 'climate.salon', heating: true, default: false }), f('sensor.fill_now')];
             const want = ['"fade"', '{"thresholds":[[0,false],[20,"fade"],[30,"#ff0000"]],"states":{}}',
-                          '{"thresholds":[],"states":{"heating":true},"default":false,"entity":"climate.salon"}', '"sensor.fill_now"'];
+                          '{"thresholds":[],"states":{"heating":"light"},"default":false,"entity":"climate.salon"}', '"sensor.fill_now"'];
             return JSON.stringify(r) === JSON.stringify(want) ? true : JSON.stringify(r);
         });
-        step('fill: light (true\'s other name) and solid, as values and given by thresholds; arrowLength: thresholds giving a length', () => {
+        step('fill: light (true its alias) and solid, as values and given by thresholds; arrowLength: thresholds giving a length', () => {
             const f = v => JSON.stringify(normalizeOptions({ fill: v }).fill);
             const r = [f('light'), f('Solid'), f(true), f({ 0: 'light', 10: 'solid' }), JSON.stringify(normalizeOptions({ arrowLength: { entity: 'sensor.power', 0: 20, 500: 80 } }).arrowLength)];
-            const want = ['true', '"solid"', 'true', '{"thresholds":[[0,true],[10,"solid"]],"states":{}}', '{"thresholds":[[0,20],[500,80]],"states":{},"entity":"sensor.power"}'];
+            const want = ['"light"', '"solid"', '"light"', '{"thresholds":[[0,"light"],[10,"solid"]],"states":{}}', '{"thresholds":[[0,20],[500,80]],"states":{},"entity":"sensor.power"}'];
             return JSON.stringify(r) === JSON.stringify(want) ? true : JSON.stringify(r);
         });
     }

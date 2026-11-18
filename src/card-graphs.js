@@ -3,7 +3,7 @@
 // rebuilt, removed. What one graph is for Chart.js is card-charts.js's. Part of
 // HistoryCardState (added to it in history-explorer-card.js).
 
-import { defaultColors, colorSpec, fillValue, NO_FILL, CLASS_COLORS, UNIT_CLASSES } from "./history-default-colors.js";
+import { defaultColors, colorSpec, fillKept, NO_FILL, CLASS_COLORS, UNIT_CLASSES } from "./history-default-colors.js";
 import { seriesOf } from "./history-series.js";
 import { i18n } from "./languages.js";
 import { keyOf, entityIdOf } from "./history-entity-store.js";
@@ -639,11 +639,10 @@ export class CardGraphs
         } else if( e.color === "#000000" ) {
             // (automatic: its class's color — the graph it joins gives it another one of its
             // class if that one's taken there, see _freeColorIn —, else the palette's)
-            const c = this.autoColor(e, []);
-            e.color = c.color;
-            e.fill = _ownFill ?? entityOptions?.fill ?? c.fill;
+            e.color = this.autoColor(e, []);
+            e.fill = _ownFill ?? entityOptions?.fill ?? 'light';
         }
-        e.fill = fillValue(e.fill, e.color);
+        e.fill = fillKept(e.fill);
         // A color that isn't a constant (an entity's, thresholds) or isn't valid: the
         // palette's where none applies (see entityColor)
         if( !colorSpec(e.color)?.color )
@@ -654,10 +653,9 @@ export class CardGraphs
         for( const k in L ) e[k] = e[k] ?? L[k];
         e.hidden     = hidden !== undefined ? hidden : (e.hidden ?? entityOptions?.hidden);
 
-        if( type == 'bar' ) {
-            if( !_fillGiven ) e.fill = 'solid';
-            e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? this.defaultLineModeOf(type);
-        }
+        // (a bar's and a timeline's default fill: solid, its color defined or not)
+        if( ( type == 'bar' || type == 'timeline' ) && !_fillGiven ) e.fill = 'solid';
+        if( type == 'bar' ) e.lineMode = e.lineMode ?? entityOptions?.lineMode ?? this.defaultLineModeOf(type);
 
         return _ownFill;
     }
@@ -701,9 +699,8 @@ export class CardGraphs
         if( !_usedColors.includes(e.color) ) return;
         const _free = this.autoColor(e, _usedColors);
         if( _free ) {
-            const _light = e.fill === fillValue(true, e.color) || defaultColors.some(c => c.color === e.color && c.fill === e.fill);
-            e.color = _free.color;
-            e.fill  = fillValue(ownFill, e.color) ?? ( _light ? _free.fill : e.fill );
+            e.color = _free;
+            if( ownFill !== undefined ) e.fill = fillKept(ownFill);
         }
     }
 
@@ -738,15 +735,15 @@ export class CardGraphs
 
     // Curve e's automatic color, the colors used taken aside (used: its graph's other curves'
     // — none when it's made, its graph given after: _freeColorIn): the first of its class's
-    // free, else the palette's next (the card's turn), else its first free → { color, fill }
-    // (null: every one taken)
+    // free, else the palette's next (the card's turn), else its first free (null: every one
+    // taken)
     autoColor(e, used)
     {
         const _c = this.classColors(e).find(c => !used.includes(c));
-        if( _c ) return { color: _c, fill: fillValue(true, _c) };
-        const _next = this.getNextDefaultColor();
-        if( !used.includes(_next.color) ) return _next;
-        return defaultColors.find(c => !used.includes(c.color)) ?? null;
+        if( _c ) return _c;
+        const _next = this.getNextDefaultColor().color;
+        if( !used.includes(_next) ) return _next;
+        return defaultColors.find(c => !used.includes(c.color))?.color ?? null;
     }
 
     // Each graph's graphIndex its place in the display order, 1 for the topmost — what a
