@@ -13,6 +13,9 @@ Changelog for the HA History Explorer Card.
 - `fill: solid` ignored on an arrowline — the band behind the arrows hid them —: its default instead (`light`; `false` with its color defined), given directly or read indirectly
 - A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
 
+### Docs
+- README_Full.md: a timeline's blocks outlined; `fill: solid` ignored on an arrowline
+
 ### Internal
 - Tests (`indirect`): *Color ▸ Entity ▸* then *Fill ▸ Entity ▸* — one field, the list under Fill's box, filtered
 - Tests (`arrowline`): `fill: solid` ignored on an arrowline
