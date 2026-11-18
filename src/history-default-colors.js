@@ -20,6 +20,81 @@ export const defaultColors = [
 
 
 // --------------------------------------------------------------------------------------
+// A curve's automatic color, by what it measures — its device class (Home Assistant's, the
+// same in every language), else its unit's (UNIT_CLASSES): its class's usual color first,
+// then colors clearly told apart from it and from each other, for the next curves of its
+// class in a graph; the palette (defaultColors) only once they're all taken, or for a curve
+// of no class
+// --------------------------------------------------------------------------------------
+
+// (the lists several classes share, each written once)
+const _HUMIDITY = ['#1e88e5', '#fb8c00', '#43a047', '#d81b60'];
+const _POWER    = ['#f9a825', '#1e88e5', '#e53935', '#43a047'];
+const _ENERGY   = ['#fb8c00', '#3949ab', '#43a047', '#e53935'];
+const _CURRENT  = ['#00897b', '#e53935', '#3949ab', '#f9a825'];
+const _PRESSURE = ['#795548', '#1e88e5', '#e53935', '#43a047'];
+const _LIGHT    = ['#fdd835', '#5e35b1', '#00897b', '#e53935'];
+const _PARTICLE = ['#8d6e63', '#1e88e5', '#d81b60', '#43a047'];
+const _WIND     = ['#00acc1', '#e53935', '#fb8c00', '#5e35b1'];
+const _RAIN     = ['#1565c0', '#fb8c00', '#43a047', '#d81b60'];
+const _WATER    = ['#039be5', '#e53935', '#43a047', '#fb8c00'];
+const _SIZE     = ['#6d4c41', '#1e88e5', '#fb8c00', '#43a047'];
+const _DATA     = ['#3949ab', '#43a047', '#fb8c00', '#d81b60'];
+
+export const CLASS_COLORS = {
+    temperature                 : ['#e8533b', '#1e88e5', '#43a047', '#8e24aa'],
+    humidity                    : _HUMIDITY,
+    moisture                    : _HUMIDITY,
+    power                       : _POWER,
+    apparent_power              : _POWER,
+    reactive_power              : _POWER,
+    energy                      : _ENERGY,
+    battery                     : ['#43a047', '#fb8c00', '#1e88e5', '#8e24aa'],
+    voltage                     : ['#8e24aa', '#f9a825', '#00897b', '#e53935'],
+    current                     : _CURRENT,
+    pressure                    : _PRESSURE,
+    atmospheric_pressure        : _PRESSURE,
+    illuminance                 : _LIGHT,
+    irradiance                  : _LIGHT,
+    carbon_dioxide              : ['#7cb342', '#8e24aa', '#fb8c00', '#1e88e5'],
+    carbon_monoxide             : ['#e53935', '#1e88e5', '#7cb342', '#fb8c00'],
+    volatile_organic_compounds  : _PARTICLE,
+    pm25                        : _PARTICLE,
+    pm10                        : ['#a1887f', '#1e88e5', '#d81b60', '#43a047'],
+    wind_speed                  : _WIND,
+    speed                       : _WIND,
+    precipitation               : _RAIN,
+    precipitation_intensity     : _RAIN,
+    water                       : _WATER,
+    volume                      : _WATER,
+    volume_storage              : _WATER,
+    gas                         : ['#ef6c00', '#1e88e5', '#43a047', '#8e24aa'],
+    signal_strength             : ['#5e35b1', '#fb8c00', '#00897b', '#e53935'],
+    frequency                   : ['#3949ab', '#f9a825', '#e53935', '#43a047'],
+    distance                    : _SIZE,
+    weight                      : _SIZE,
+    monetary                    : ['#2e7d32', '#e53935', '#1e88e5', '#fb8c00'],
+    sound_pressure              : ['#d81b60', '#1e88e5', '#43a047', '#8e24aa'],
+    data_rate                   : _DATA,
+    data_size                   : _DATA,
+};
+
+// A unit's class, for a series without a device class (an attribute, a template): the units
+// only one class takes
+export const UNIT_CLASSES = {
+    '°C': 'temperature', '°F': 'temperature', 'K': 'temperature',
+    'W': 'power', 'kW': 'power', 'MW': 'power',
+    'Wh': 'energy', 'kWh': 'energy', 'MWh': 'energy',
+    'V': 'voltage', 'mV': 'voltage', 'A': 'current', 'mA': 'current',
+    'hPa': 'pressure', 'mbar': 'pressure', 'bar': 'pressure', 'Pa': 'pressure', 'kPa': 'pressure', 'inHg': 'pressure', 'psi': 'pressure',
+    'lx': 'illuminance', 'W/m²': 'irradiance', 'ppm': 'carbon_dioxide', 'µg/m³': 'pm25',
+    'km/h': 'wind_speed', 'm/s': 'wind_speed', 'mph': 'wind_speed', 'kn': 'wind_speed',
+    'mm': 'precipitation', 'mm/h': 'precipitation_intensity', 'in': 'precipitation',
+    'L': 'water', 'm³': 'water', 'gal': 'water',
+    'dBm': 'signal_strength', 'dB': 'sound_pressure', 'Hz': 'frequency', 'kHz': 'frequency',
+};
+
+// --------------------------------------------------------------------------------------
 // Predefined state colors for timeline history
 // --------------------------------------------------------------------------------------
 

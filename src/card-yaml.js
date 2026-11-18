@@ -154,7 +154,8 @@ export class CardYaml
             const f = e.fill;
             if( f === undefined || f === null ) return undefined;
             if( f === NO_FILL ) return false;
-            if( f === fillValue(true, e.color) ) return 'light';
+            // (its color's, light: an automatic color's default — none; a bar's default: solid)
+            if( f === fillValue(true, e.color) ) return e.colorSet || e.type === 'bar' ? 'light' : undefined;
             if( f === 'solid' ) return 'solid';
             return !e.colorSet && defaultColors.some(c => c.color === e.color && c.fill === f) ? undefined : f;
         }

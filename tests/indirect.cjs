@@ -24,7 +24,7 @@ module.exports = async function()
     const closeMenu = async t => { await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.keyboard.press('Escape'); await t.page.mouse.click(5, 880); await t.wait(700); };
 
     let t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }, { entity: 'sensor.power_kw' }] }]), { height: 900 });
-    await t.step('Color ▸: Choose… and Entity ▸; Entity ▸: the entity selector\'s field — typed, the same entities as the card\'s selector', async () => {
+    await t.step('Color ▸: Automatic, Choose… and Entity ▸; Entity ▸: the entity selector\'s field — typed, the same entities as the card\'s selector', async () => {
         await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
         const l = await lines(t);
         await click(t, '#et_0_appearance_color_entity'); await t.wait(250);
@@ -35,7 +35,7 @@ module.exports = async function()
         await t.page.click('#b7_0'); await t.page.keyboard.type('wind'); await t.wait(400);
         const bar = await listed(t, 0);
         await t.page.keyboard.press('Control+A'); await t.page.keyboard.press('Backspace'); await t.page.mouse.click(5, 880); await t.wait(400);
-        return l === 'Choose… | Entity ▸' && field && menu !== '' && menu === bar ? true : JSON.stringify({ l, field, menu, bar });
+        return l === 'Automatic* | Choose… | Entity ▸' && field && menu !== '' && menu === bar ? true : JSON.stringify({ l, field, menu, bar });
     });
     await t.step('an entity chosen: Value | Thresholds ▸; Value: the curve\'s color is that entity, Entity ▸ then in bold', async () => {
         await curveMenu(t, 0, 'color'); await search(t, 'wind');
@@ -45,7 +45,7 @@ module.exports = async function()
         const saved = await t.E('graphAt(0).entities[0].color');
         await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
         const l2 = await lines(t); await closeMenu(t);
-        return l === 'Value | Thresholds ▸' && saved === 'sensor.wind' && l2 === 'Choose… | Entity ▸*' ? true : JSON.stringify({ l, saved, l2 });
+        return l === 'Value | Thresholds ▸' && saved === 'sensor.wind' && l2 === 'Automatic | Choose… | Entity ▸*' ? true : JSON.stringify({ l, saved, l2 });
     });
     await t.step('Thresholds ▸ on the curve\'s own entity: + Add ▸ 100 — a ≥ 100 threshold, saved without entity; Default; Blend: colorTransition smooth', async () => {
         await curveMenu(t, 1, 'color'); await search(t, 'power_kw');
@@ -62,6 +62,19 @@ module.exports = async function()
         const blend = await t.E(`graphAt(0).entities[1].colorTransition`);
         return l0 === 'Default  — ▸ | + Add ▸' && /^\{"thresholds":\[\[100,"#[0-9a-f]{6}"\]\]/i.test(saved) && !saved.includes('entity')
             && l1 === '≥ 100 ▸ | Default  — ▸ | + Add ▸ | Blend' && blend === 'smooth' ? true : JSON.stringify({ l0, saved, l1, blend });
+    });
+    await t.step('the cascade fitted: the menu where it is; the list of Entity ▸ given room by the menus over it — the farthest first, each down to its lines\' first three characters —, back as they were once another line is chosen', async () => {
+        const boxes = () => t.E(`(()=>{ const r=el.querySelector('#et_0'); const ch=[...(r._cascade||[r])]; const l=r._menuList; if(l&&l.style.display!=='none') ch.push(l); return ch.map(b=>{ const q=b.getBoundingClientRect(); return { id: b.id, l: Math.round(q.left), r: Math.round(q.right) }; }); })()`);
+        await open(t, 0); await click(t, '#et_0_appearance'); await t.wait(200); await click(t, '#et_0_appearance_color'); await t.wait(200);
+        const a = await boxes();
+        await click(t, '#et_0_appearance_color_entity'); await t.wait(250); await search(t, 's');
+        const b = await boxes();
+        await t.E(`(()=>{ el.instance.setDropdownVisibility(2, false); el.querySelector('#et_0_appearance_points').click(); })()`); await t.wait(250);
+        const c = await boxes(); await closeMenu(t);
+        const gaps = b.slice(1).map((x, k) => x.l - b[k].l);
+        const ok = b[0].l === a[0].l && b.every(x => Math.abs(x.r - b[0].r) <= 1) && b[b.length - 1].id === 'es_2'
+            && gaps.slice(0, 2).every(g => g > 20 && g < 60) && b[1].l < a[1].l && JSON.stringify(c.slice(0, 2)) === JSON.stringify(a.slice(0, 2)) && c[2]?.id === 'et_0_appearance_points_sub';
+        return ok ? true : JSON.stringify({ a, b, c, gaps });
     });
     done(await t.close());
 

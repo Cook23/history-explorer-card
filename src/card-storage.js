@@ -569,6 +569,13 @@ export class CardStorage
         return this.yamlEntryOf(_own)[k];
     }
 
+    // Option k of curve e as its own YAML line writes it (undefined: not there, or a curve
+    // added from the card)
+    yamlOwnOptionOf(e, k)
+    {
+        return this._pureYamlEntities?.find(m => keyOf(m) === keyOf(e))?.[k];
+    }
+
     // One entity's entry, from its YAML entry — and as every level of the YAML gives it
     // (_yamlSeenE, see yamlEntryOf) — and its image, its HA entry and its image, and its
     // entry on this device

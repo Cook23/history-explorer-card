@@ -122,7 +122,17 @@ export class CardSelector
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
-            this.openMenu(dropdown, topPos, leftPos);
+            // (a menu's — Entity ▸ —: in its menu's cascade, right-aligned on it, its lines
+            // whole, the room they lack taken from the menus over it — fitCascade)
+            const _menu = _isMenuSelector(input_idx) ? this.menuListShown(input_idx - MENU_SELECTOR, dropdown) : null;
+            if( _menu ) {
+                dropdown._naturalWidth = () => this.entityLineWidths().all;
+                dropdown._fitWidth = w => { dropdown.style.width = ( w ?? this.entityLineWidths().all ) + 'px'; this.fitEntityLines(input_idx, w ?? this.entityLineWidths().all); };
+                dropdown._fitWidth(null);
+                dropdown._base = { minWidth: '', maxWidth: '', width: dropdown.style.width };
+                this.openMenu(dropdown, topPos, ( _menu.getBoundingClientRect().right - parentRect.left ) + 'px', 'right');
+                this.fitCascade(dropdown);
+            } else this.openMenu(dropdown, topPos, leftPos);
             // (kept on its field — see followAnchor)
             this.followAnchor(dropdown, input, () => { this.hideSeriesMenu(input_idx); this.setDropdownVisibility(input_idx, false); });
             const filter = input.value.toLowerCase();
@@ -136,8 +146,11 @@ export class CardSelector
             // Filtering means user is searching again — reset selection flag
             if( !this._entitySelected ) this._entitySelected = [false, false];
             this._entitySelected[input_idx] = false;
-        } else
+        } else {
             dropdown.style.display = 'none';
+            // (a menu's: the menus over it back to the width they take without it)
+            if( dropdown._menuOf ) this.fitCascade(dropdown._menuOf);
+        }
     }
 
     entitySelectorFocus(event)

@@ -415,7 +415,10 @@ export class CardCharts
                 tooltipFormat: this.i18n.styleDateTimeTooltip,
             },
             ticks: {
-                fontColor: config.showTimeLabels ? this.pconfig.graphLabelColor : 'rgba(0,0,0,0)',
+                // (hidden: out of the layout — the plot taking their room, below and on its
+                // sides —, never only painted transparent)
+                display: !!config.showTimeLabels,
+                fontColor: this.pconfig.graphLabelColor,
                 fontSize: this.textSizes().text,
                 major: {
                     enabled: true,
@@ -434,7 +437,8 @@ export class CardCharts
                 autoSkipPadding: TICK_LABEL_GAP_PX
             },
             gridLines: {
-                color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)'
+                color: config.showGrid ? this.pconfig.graphGridColor : 'rgba(0,0,0,0)',
+                drawTicks: !!config.showTimeLabels
             },
             stacked: config?.stacked
         };

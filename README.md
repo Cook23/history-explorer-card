@@ -29,6 +29,7 @@ A highly interactive history card for Home Assistant. Pan, zoom, and explore the
 
 ## 📋 Version highlights
 
+- **v1.2.84** — Automatic colors by what a curve measures.
 - **v1.2.83** — Color, fill and arrow length from an entity or attribute, chosen in the menus.
 - **v1.2.82** — Arrows as long as an entity's value; the fill read indirectly, as the color.
 - **v1.2.77** — YAML export of the card, a graph or a curve.
@@ -349,6 +350,8 @@ In an arrow's menu, *Appearance ▸ Length ▸ Entity ▸*: an entity or attribu
 
 ### Colors
 
+Without a color set, a curve takes the color of what it measures (its device class, else its unit), the next ones of its class in a graph each a color clearly told apart; *Color ▸ Automatic* gives it back.
+
 `color` takes a color, thresholds on the value or on another entity's or attribute's value, or an entity holding the color. `fill` takes the same forms, plus `false` (none), `fade`, `light` (`true`) and `solid`:
 
 ```yaml
@@ -523,7 +526,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity giving the whole length; `~`: at least that |
 | **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *2 and *3 |
 | **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *2 |
-| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under a timeline or arrowline graph — see *2 |
+| **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under the graph — see *2 |
 | **`labelsVisible`** | **Default** `true`<br>`false`: no names left of a timeline's rows — *the card's only* |
 
 *1 — `circular`: automatic for an angle (unit `°`, state class `measurement_angle`, an attribute named as a direction); `false` off; a number the period; `2pi` 2π. On an arrowline: a full turn of the arrows.
@@ -536,7 +539,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 
 | Option | Description |
 |---|---|
-| **`color`**<br>*`color_thresholds`* | **Default** a color of the automatic palette<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
+| **`color`**<br>*`color_thresholds`* | **Default** automatic: the color of what it measures (device class, else unit), else the palette's<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
 | **`fill`**<br>*`show_fill`* | **Default** the curve's color, light (a bar: solid)<br>The area under the curve (a bar: the bar): a color, `false` (none), `fade`, `light` (`true`), `solid` — or thresholds on a value |
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
