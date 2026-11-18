@@ -10,10 +10,12 @@ Changelog for the HA History Explorer Card.
 - *Fill ▸ Entity ▸* and *Length ▸ Entity ▸* after *Color ▸ Entity ▸* in the same menu: the list placed at the top of the screen, what was typed filtering nothing — each *Entity ▸* made its own field, the selector reading the first one, *Color*'s, hidden. One field a menu: another *Entity ▸*'s emptied when one opens
 
 ### Changed
+- `fill: solid` ignored on an arrowline — the band behind the arrows hid them —: its default instead (`light`; `false` with its color defined), given directly or read indirectly
 - A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
 
 ### Internal
 - Tests (`indirect`): *Color ▸ Entity ▸* then *Fill ▸ Entity ▸* — one field, the list under Fill's box, filtered
+- Tests (`arrowline`): `fill: solid` ignored on an arrowline
 
 
 ## [v1.2.86] - 2026-11-18

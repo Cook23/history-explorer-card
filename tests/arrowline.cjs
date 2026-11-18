@@ -107,5 +107,15 @@ module.exports = async function()
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }
+    // ── fill: solid ignored on an arrowline (it would hide the arrows): its default instead ──
+    {
+        const t = await openCard(card([{ entity: 'sensor.wind', fill: 'solid' }, { entity: 'sensor.wind', color: '#ff0000', fill: 'solid' }]));
+        await t.step('fill: solid ignored on an arrowline — the arrows\' band light (its color not defined), none (its color defined)', async () => {
+            const r = await t.E(`[0,1].map(i=>{ const d=graphAt(i).chart.data.datasets[0]; return [d.arrowColor, d.arrowBackground]; })`);
+            const light = c => /rgba\(.*0\.15\)/.test(c ?? '');
+            return light(r[0][1]) && r[0][1] !== r[0][0] && /rgba\(0,\s*0,\s*0,\s*0\)/.test(r[1][1]) ? true : JSON.stringify(r);
+        });
+        const r = await t.close(); passed += r.passed; failed += r.failed;
+    }
     return { passed, failed };
 };

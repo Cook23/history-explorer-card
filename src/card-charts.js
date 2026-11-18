@@ -1033,7 +1033,7 @@ export class CardCharts
                 "bColor": this.entityColor(d),
                 // (a bar entity shown as a raw curve — interval 4 — isn't filled like a bar;
                 // a bar, a curve, an arrowline's band: its fill — solid, its own color)
-                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : ( d.fill === 'solid' || d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d))
+                "fillColor": ( d.type === 'bar' && _kind === 'line' ) ? 'rgba(0,0,0,0)' : d.type === 'arrowline' && d.fill === 'solid' ? fillValue(this.arrowFillOf(d, d.fill), this.entityColor(d)) : ( d.fill === 'solid' || d.fill === d.color ) ? this.entityColor(d) : d.fill === 'fade' ? fillValue(true, this.entityColor(d))
                     // (read indirectly: its fill now — its steps, when it varies, see _applyPointColors)
                     : typeof d.fill === 'object' || optionSeriesOf(d, 'fill') ? this.fillAsColor(this.entityFill(d)) : fillValue(d.fill, this.entityColor(d)),
                 // (a timeline's blocks: their fill — each block's when it's read indirectly, see

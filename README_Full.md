@@ -1497,6 +1497,8 @@ graphs:
 | Curve, arrowline | `light` | `false` |
 | Bar, timeline | `solid` | `solid` |
 
+On an arrowline, `solid` — which would hide the arrows — is ignored: its default applies.
+
 **A timeline's blocks** — each in its state's color, outlined in it: `solid` filled, `light` light, `fade` fading out downwards, `false` its outline only; a color of its own (`fill` a color, or read indirectly) is ignored there. Read indirectly, each block takes the fill of its middle's time.
 
 ```yaml
