@@ -12,7 +12,7 @@
 import { i18n } from "./languages.js";
 import { keyOf } from "./history-entity-store.js";
 import { typesCompatible, RAW_INTERVAL, STATS_EXPORT_PERIODS, allPointsShown } from "./history-options.js";
-import { fillValue } from "./history-default-colors.js";
+import { fillKept } from "./history-default-colors.js";
 
 // The Y axes' locked ranges saved this long after they last changed (keepYAxisLock)
 const YAXIS_LOCK_SAVE_MS = 500;
@@ -414,40 +414,35 @@ export class CardOperations
         return _entities;
     }
 
-    // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
-    // showMinMax, showPoints, yAxis — its side, the Behavior submenu's) set to value on each, saved so — the graph rebuilt in its place
-    // (showPoints: shown as it is, see showCurvePoints). A width:
-    // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
-    // none (false), the curve's color, light (true), or fading out downwards ('fade'); a
-    // color chosen: kept as the curve's own (colorSet), its fill of its color following it
-    // The curves among entities of graph g given their automatic color back: the one the
+    // The curves among entities of graph g given their default color back: the one the
     // configuration gives them (configuredColor), else each its class's first free in the
-    // graph, else the palette's (autoColor); a light fill of their color following it —
-    // saved so, the graph rebuilt in its place
+    // graph, else the palette's (autoColor) — saved so, the graph rebuilt in its place
     setCurvesAutoColor(g, entities)
     {
         for( const e of entities ) {
             const _conf = this.configuredColor(e);
             const _used = g.entities.filter(x => x !== e).map(x => x.color);
-            const c = _conf !== undefined ? { color: _conf } : this.autoColor(e, _used) ?? this.getNextDefaultColor();
-            const _light = e.fill === fillValue(true, e.color) || e.fill === undefined;
-            e.color = c.color;
+            e.color = _conf ?? this.autoColor(e, _used) ?? this.getNextDefaultColor().color;
             e.colorSet = _conf !== undefined || undefined;
-            if( _light ) e.fill = fillValue(true, c.color);
         }
         this.rebuildInPlace(g);
         this.writeLocalState();
     }
 
+    // The look of the curves among entities of graph g — field (color, fill, width, dashMode,
+    // showMinMax, showPoints, yAxis — its side, the Behavior submenu's) set to value on each, saved so — the graph rebuilt in its place
+    // (showPoints: shown as it is, see showCurvePoints). A width:
+    // a sizePoints the YAML sets, the larger of it and its dots' default (dotDiameterOf). A fill:
+    // none (false), light (true its alias: the curve's color, light — following it), solid, or
+    // fading out downwards ('fade'); a color chosen: kept as the curve's own (colorSet)
     setCurvesLook(g, entities, field, value)
     {
         for( const e of entities ) {
             if( field === 'color' ) {
-                if( e.fill === fillValue(true, e.color) ) e.fill = fillValue(true, value);
                 e.color = value;
                 e.colorSet = true;
             } else
-                e[field] = field === 'fill' ? fillValue(value, e.color) : value;
+                e[field] = field === 'fill' ? fillKept(value) : value;
             // (a width: a sizePoints the YAML sets, the larger of it and the dots' default for
             // that width — never a dot hidden by its own line; back to the YAML's for a thinner one)
             const _yamlSize = field === 'width' ? this.yamlOptionOf(e, 'sizePoints') : undefined;

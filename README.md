@@ -540,7 +540,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | Option | Description |
 |---|---|
 | **`color`**<br>*`color_thresholds`* | **Default** automatic: the color of what it measures (device class, else unit), else the palette's<br>The curve's color: a color, thresholds on a value, or an entity or attribute holding the color |
-| **`fill`**<br>*`show_fill`* | **Default** the curve's color, light (a bar: solid)<br>The area under the curve (a bar: the bar): a color, `false` (none), `fade`, `light` (`true`), `solid` — or thresholds on a value |
+| **`fill`**<br>*`show_fill`* | **Default** `light` — `false` with a color defined; a bar, a timeline: `solid`<br>The area under the curve (a bar, a timeline's blocks: theirs): a color, `false` (none), `fade`, `light` (alias `true`), `solid` — or thresholds on a value |
 | **`colorTransition`**<br>*`color_thresholds_transition`* | **Default** `hard`<br>Between color thresholds: `smooth` blended, `hard` one color per threshold |
 | **`lineColor`**<br>*`line_color`* | **Default** not set: each curve its own color<br>A color, or a list giving each curve without its own `color` the one at its place in the graph — *the card and a graph only* |
 | **`stateColors`** | **Default** automatic colors<br>A timeline's colors by entity, device class, domain or state (`door.on: blue`) — *the card's only* |

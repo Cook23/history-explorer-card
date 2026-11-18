@@ -407,14 +407,16 @@ function _colorLeaf(v)
     return _isColor(c) ? c : undefined;
 }
 
-// A fill value itself: light (true: the curve's color, light), solid (its color itself),
-// false (none), fade, or a color — written as text too (an entity's state: 'true', 'Fade') —,
-// or undefined
+// A fill value itself: light (the curve's color, light — true its alias), solid (its color
+// itself), false (none), fade, or a color — written as text too (an entity's state: 'true',
+// 'Fade') —, or undefined
 export function fillLeaf(v)
 {
-    if( v === true || v === false ) return v;
+    if( v === true ) return 'light';
+    if( v === false ) return false;
     const t = typeof v === 'string' ? v.trim().toLowerCase() : '';
-    if( t === 'true' || t === 'light' || t === 'false' ) return t !== 'false';
+    if( t === 'true' || t === 'light' ) return 'light';
+    if( t === 'false' ) return false;
     if( t === 'fade' || t === 'solid' ) return t;
     return _colorLeaf(v);
 }
@@ -491,14 +493,21 @@ export function parseFillValue(v)
 // A fill that fills nothing
 export const NO_FILL = 'rgba(0,0,0,0)';
 
-// The fill of a curve of color `color` (both in their one form): `fill` — true (light), its
-// color as transparent as the palette's fills (for a color that varies — thresholds, an
-// entity's — only that transparency, each point's fill taking its own color: see _fillLike);
-// false, none; any other value as it is (solid: its color itself, see fillStyle)
+// A fill as a curve keeps it: light (true its alias), none (false: NO_FILL), any other as it is
+export function fillKept(fill)
+{
+    return fill === true ? 'light' : fill === false ? NO_FILL : fill;
+}
+
+// The fill of a curve of color `color` (both in their one form), as it's drawn: `fill` —
+// light (true its alias), its color as transparent as the palette's fills (for a color that
+// varies — thresholds, an entity's — only that transparency, each point's fill taking its own
+// color: see _fillLike); false, none; any other value as it is (solid: its color itself, see
+// fillStyle)
 export function fillValue(fill, color)
 {
     if( fill === false ) return NO_FILL;
-    if( fill !== true ) return fill;
+    if( fill !== true && fill !== 'light' ) return fill;
     const c = colorSpec(color)?.color;
     const _c = c ? window.HXLocal_Chart?.helpers?.color(c) : null;
     return _c?.valid ? _c.alpha(0.15).rgbString() : 'rgba(0,0,0,0.15)';

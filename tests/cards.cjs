@@ -43,11 +43,11 @@ module.exports = async function()
         await closeMenu();
         return m === 'Display ▸* | Appearance ▸ | Interpolation ▸ | Behavior ▸ | Info | Export ▸ || open: rep || Smart* | Curve | Straight | Stepped | Bar | Direction | Timeline || Tooltip ▸ | Y axis ▸ | Cut | Delete' ? true : m;
     });
-    await t.step('curve menu of a binary sensor: Display (timeline only), Behavior (cut, delete: no curve, no Y axis), Info, Export — no Appearance', async () => {
+    await t.step('curve menu of a binary sensor: Display (timeline only), Appearance (its fill), Behavior (cut, delete: no curve, no Y axis), Info, Export', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
         const m = await t.E(menu);
         await closeMenu();
-        return m === 'Display ▸* | Behavior ▸ | Info | Export ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
+        return m === 'Display ▸* | Appearance ▸ | Behavior ▸ | Info | Export ▸ || open: rep || Timeline* || Cut | Delete' ? true : m;
     });
     done(await t.close());
 

@@ -370,7 +370,12 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
             label: me.chart.data.labels[index],
             datasetLabel: dataset.label,
             text: text,
-            textColor: color.luminosity() > 0.5 ? '#333333' : '#ffffff',
+            // (its fill: the dataset's blockFills, each block's, else its blockFill — solid by
+            // default; a block not solid: its text in the page's text color)
+            fill: dataset.blockFills?.[index] ?? dataset.blockFill ?? 'solid',
+            textColor: ( dataset.blockFills?.[index] ?? dataset.blockFill ?? 'solid' ) !== 'solid'
+                ? ( getComputedStyle(me.chart.canvas).getPropertyValue('--primary-text-color').trim() || '#000' )
+                : color.luminosity() > 0.5 ? '#333333' : '#ffffff',
         };
 
         rectangle.draw = function() {
@@ -379,15 +384,34 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
             var oldAlpha = ctx.globalAlpha;
             var oldOperation = ctx.globalCompositeOperation;
 
-            // Draw new rectangle with Alpha-Mix.
-            ctx.fillStyle = vm.backgroundColor;
+            // Its fill (vm.fill): solid — the rectangle drawn with Alpha-Mix —; light — its
+            // color, as transparent as a curve's light fill —; fade — its color fading out
+            // downwards —; none — its outline only
             ctx.lineWidth = vm.borderWidth;
-            ctx.globalCompositeOperation = 'destination-over';
-            ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
+            if( vm.fill === 'none' ) {
+                ctx.strokeStyle = vm.backgroundColor;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(vm.x + 0.5, vm.y + 0.5, Math.max(0, vm.width - 1), Math.max(0, vm.height - 1));
+            } else if( vm.fill === 'light' ) {
+                ctx.fillStyle = vm.backgroundColor;
+                ctx.globalAlpha = 0.15;
+                ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
+            } else if( vm.fill === 'fade' ) {
+                const _g = ctx.createLinearGradient(0, vm.y, 0, vm.y + vm.height);
+                _g.addColorStop(0, vm.backgroundColor);
+                _g.addColorStop(1, _color(vm.backgroundColor).alpha(0).rgbString());
+                ctx.fillStyle = _g;
+                ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
+            } else {
+                // Draw new rectangle with Alpha-Mix.
+                ctx.fillStyle = vm.backgroundColor;
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
 
-            ctx.globalAlpha = 0.5;
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
+                ctx.globalAlpha = 0.5;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
+            }
 
             ctx.globalAlpha = oldAlpha;
             ctx.globalCompositeOperation = oldOperation;

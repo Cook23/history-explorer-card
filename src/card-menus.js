@@ -13,9 +13,8 @@ import { GESTURE_SETTINGS } from "./gesture-settings.js";
 import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
-import { isColorSeries, colorSpec, isBlendable } from "./history-default-colors.js";
+import { isColorSeries, colorSpec, isBlendable, NO_FILL } from "./history-default-colors.js";
 import { maxOf, appendAll } from "./history-arrays.js";
-import { optionSeriesOf } from "./card-datasets.js";
 import { MENU_SELECTOR } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
 
@@ -28,7 +27,7 @@ const _CURVE_MENU_DEFS = [
     { type: 'timeline',  lineMode: null, label: 'ui.menu.type_timeline' },
 ];
 // A menu line's style
-const _MENU_LINE_STYLE = 'display:block;padding:5px 10px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+const _MENU_LINE_STYLE = 'display:block;padding:5px 5px;text-decoration:none;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
 
 // The sections of the menus acting on curves — an entity's curve menu, a graph's, the card's
 // options menu (every graph of the card) —, each a line opening its submenu over the menu,
@@ -95,7 +94,7 @@ const _CLIPBOARD_ICON = _LEAD('M9 4H6v18h12V4h-3 M9 2h6v4H9z');
 const _CURVE_MENU_MIN_WIDTH = 260;
 const _MENU_BOX_STYLE = 'display:none;position:absolute;text-align:left;border:1px solid #444;box-shadow:0px 8px 16px 0px rgba(0,0,0,0.2);color:var(--primary-text-color);background-color:var(--card-background-color);outline:none';
 // A menu's title line
-const _TITLE_STYLE = 'margin:1px;padding:4px 9px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+const _TITLE_STYLE = 'margin:1px;padding:4px 4px;font-weight:600;background-color:var(--secondary-background-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
 // A menu box (id), empty — filled when it opens (fillMenuItems) — and its submenus' boxes
 // (`${id}_${key}_sub`, its siblings: the same positioned parent), each a line wide at least;
@@ -645,8 +644,8 @@ export class CardMenus
             const _id = it.id ? ` id="${it.id}"` : '';
             const _t = document.createElement('template');
             _t.innerHTML = it.title ? `<div${_id}></div>`
-                : it.input ? `<label${it.lineId ? ` id="${it.lineId}"` : ''} style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 10px;white-space:nowrap"><span${it.labelId ? ` id="${it.labelId}"` : ''} style="overflow:hidden;text-overflow:ellipsis;min-width:0"></span>` +
-                             `<input${_id} type="${it.input.text ? 'text' : 'number'}" style="width:${it.input.text ? '10em' : '5em'};color:inherit;background:transparent;border:1px solid #888"></label>`
+                : it.input ? `<label${it.lineId ? ` id="${it.lineId}"` : ''} style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 5px;white-space:nowrap"><span${it.labelId ? ` id="${it.labelId}"` : ''} style="overflow:hidden;text-overflow:ellipsis;min-width:0"></span>` +
+                             `<input${_id} type="${it.input.text ? 'text' : 'number'}" style="width:${it.input.text ? '10em' : '5em'};min-width:3em;flex:0 1 auto;color:inherit;background:transparent;border:1px solid #888"></label>`
                 : it.on !== undefined ? SWITCH_LINE_HTML.replace('<a ', `<a${_id} `)
                 : `<a${_id} href="#" style="${_MENU_LINE_STYLE}"></a>`;
             const _line = _t.content.firstChild;
@@ -1084,7 +1083,7 @@ export class CardMenus
     // others, the curves
     _lookByGraph(m, key)
     {
-        const _takes = (g, e) => key === 'color' || key === 'fill' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
+        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
             .filter(({ curves }) => curves.length);
     }
@@ -1120,12 +1119,10 @@ export class CardMenus
     _lookValue(e, key)
     {
         if( key === 'fill' ) {
-            if( e.fill === 'fade' ) return 'fade';
-            if( e.fill === 'solid' ) return 'solid';
-            // (a fill read indirectly — thresholds, a series —: none of the list's)
-            if( typeof e.fill === 'object' && e.fill !== null || optionSeriesOf(e, 'fill') ) return undefined;
-            const _c = Chart.helpers.color(e.fill ?? 'rgba(0,0,0,0)');
-            return !( _c.valid && _c.alpha() === 0 );
+            // (its value: none, fade, light, solid — a color of its own, or read indirectly:
+            // none of the list's)
+            if( e.fill === NO_FILL || e.fill === false ) return false;
+            return Object.values(FILL_VALUES).includes(e.fill) ? e.fill : undefined;
         }
         if( key === 'width' ) return e.width;
         if( key === 'minmax' ) return minMaxValue(e.showMinMax) ?? false;
@@ -1329,7 +1326,7 @@ export class CardMenus
     _newResult(m, key)
     {
         const _e = this._lookByGraph(m, key)[0]?.curves[0];
-        return key === 'color' ? ( colorSpec(this.entityColor(_e))?.color ?? '#000000' ) : key === 'fill' ? true : 100;
+        return key === 'color' ? ( colorSpec(this.entityColor(_e))?.color ?? '#000000' ) : key === 'fill' ? 'light' : 100;
     }
 
     // The states series sid is known to take: its options (a select's), else its state now
@@ -1768,11 +1765,39 @@ export class CardMenus
         });
     }
 
-    // What a submenu leaves of its menu's lines, at least: their first three characters (a
-    // box without lines — a field —: nothing)
+    // What a submenu leaves of its menu's lines, at least: the start of their text, the width
+    // of two wide characters ('MM', in the line's font) — in a proportional font, two of them
+    // at least, two and a half or three most often; a field's: of its input (a box without
+    // lines: nothing)
     _menuStrip(menuEl)
     {
-        return Math.max(0, maxOf(this._stripLines(menuEl).map(a => this._lineTextWidth(a, 3))));
+        return Math.max(0, maxOf(this._stripLines(menuEl).map(a => this._lineStart(a) + this._wideChars(a, 2))));
+    }
+
+    // Where a line's text starts, from the line's left edge: after its left padding and a
+    // symbol (lead) — a field's: its input's text
+    _lineStart(line)
+    {
+        const _in = line.querySelector('input');
+        if( _in ) return _in.getBoundingClientRect().left - line.getBoundingClientRect().left + ( parseFloat(getComputedStyle(_in).paddingLeft) || 0 );
+        const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
+        if( !_text ) return 0;
+        const _range = document.createRange();
+        _range.setStart(_text, 0);
+        _range.setEnd(_text, 0);
+        return _range.getBoundingClientRect().left - line.getBoundingClientRect().left;
+    }
+
+    // The width of n wide characters ('M') in line's font — its input's for a field
+    _wideChars(line, n)
+    {
+        const _s = document.createElement('span');
+        _s.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${getComputedStyle(line.querySelector('input') ?? line).font}`;
+        _s.textContent = 'M'.repeat(n);
+        line.appendChild(_s);
+        const _w = _s.getBoundingClientRect().width;
+        _s.remove();
+        return _w;
     }
 
     // A menu's lines shown, and the submenu a line opens
@@ -1791,27 +1816,18 @@ export class CardMenus
     }
 
     // A line's width up to its text's end (its first n characters) — what's before the text
-    // with it: its left padding, a symbol (lead) —, and a gap
+    // with it: its left padding, a symbol (lead) —, and a gap after its whole text
     _lineTextWidth(line, n = Infinity)
     {
-        // (a field's line: up to its first three characters, whatever n — a box over it covers
-        // what's typed but its start)
-        const _in = line.querySelector('input');
-        if( _in ) {
-            const _s = document.createElement('span');
-            _s.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${getComputedStyle(_in).font}`;
-            _s.textContent = ( _in.value || _in.placeholder || 'abc' ).slice(0, 3);
-            line.appendChild(_s);
-            const _w = _s.getBoundingClientRect().width;
-            _s.remove();
-            return _in.getBoundingClientRect().left - line.getBoundingClientRect().left + ( parseFloat(getComputedStyle(_in).paddingLeft) || 0 ) + _w + 8;
-        }
+        // (a field's line: its strip, whatever n — a box over it covers what's typed but its start)
+        if( line.querySelector('input') ) return this._lineStart(line) + this._wideChars(line, 2);
         const _text = document.createTreeWalker(line, NodeFilter.SHOW_TEXT).nextNode();
         if( !_text ) return 0;
         const _range = document.createRange();
         _range.setStart(_text, 0);
         _range.setEnd(_text, Math.min(n, _text.length));
-        return _range.getBoundingClientRect().right - line.getBoundingClientRect().left + 8;
+        // (its first characters: no more — a box over it starts right after; its whole text: a gap)
+        return _range.getBoundingClientRect().right - line.getBoundingClientRect().left + ( n === Infinity ? 8 : 0 );
     }
 
     // fn() run with el laid out at its own width — shown (hidden from sight) if it isn't,

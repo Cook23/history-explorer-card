@@ -80,10 +80,16 @@ module.exports = async function()
         const d = await ds(t, 0, 1), saved = await t.E('graphAt(0).entities[1].color');
         return p?.type === 'color' && /^#[0-9a-f]{6}$/i.test(p.value) && !open && /255,\s*0,\s*0|#ff0000/i.test(d.color) && saved === '#ff0000' ? true : JSON.stringify({ p, open, d, saved });
     });
-    await t.step('a timeline row\'s menu: no Appearance', async () => {
+    await t.step('a timeline row\'s menu: Appearance ▸ Fill only — its list (Solid in bold, a timeline\'s default); None chosen: its blocks their outline only, saved as false', async () => {
         await t.longPress(await t.E('tlPt(1,0)'));
-        const a = await t.E(`!!el.querySelector('#et_0_appearance')`); await closeMenu(t);
-        return !a ? true : a;
+        await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200);
+        const l = await lines(t);
+        await t.E(`el.querySelector('#et_0_appearance_fill').click()`); await t.wait(200);
+        const f = await lines(t);
+        await t.E(`[...el.querySelectorAll('#et_0_appearance_fill_sub a')].find(a=>a.textContent==='None').click()`); await t.wait(900);
+        const r = await t.E(`(()=>{ const d=graphAt(1).chart.data.datasets[0]; return { fill: d.blockFill, saved: graphAt(1).entities[0].fill }; })()`);
+        await closeMenu(t);
+        return l === 'Fill ▸' && f === 'None | Fade | Light | Solid* | Entity ▸' && r.fill === 'none' && ( r.saved === false || r.saved === 'rgba(0,0,0,0)' ) ? true : JSON.stringify({ l, f, r });
     });
     await t.step('the graph\'s menu: Appearance without Color, for every curve; Width 3 px: both curves', async () => {
         await t.E(`(()=>{ const I=el.instance; I.showGraphMenu(0, I.graphsInDisplayOrder()[0], 100, 100, false); I.showCurveSubmenu(0, 'appearance'); })()`); await t.wait(200);

@@ -13,6 +13,9 @@ Compare to source here: https://raw.githubusercontent.com/fanthos/chartjs-chart-
 There are a lot of changes. Formatting tweaks, moment.js caching, and the entire Arrowline chart is added.
 That would make using the original source very hard.
 
+### Timeline: its dataset's options
+- `blockFill`: its blocks' fill — `solid` (the default: drawn as before), `light` (its color at 15 %), `fade` (its color fading out downwards), `none` (its outline only); `blockFills`: each block's (by its index in `data`), else the dataset's. A block not solid: its text in the page's text color (`--primary-text-color`).
+
 ### Arrowline: its dataset's options
 - `arrowColor`, `arrowBackground`: its arrows' color, the band's behind them; `arrowColors`, `arrowBackgrounds`: each block's (by its index in `data`) — an arrow the color of the block it shows, the band under each block its own —, else the dataset's.
 - `arrowPeriod`: a full turn of the arrows (360 by default).

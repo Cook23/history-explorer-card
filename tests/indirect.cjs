@@ -76,6 +76,17 @@ module.exports = async function()
             && gaps.slice(0, 2).every(g => g > 20 && g < 60) && b[1].l < a[1].l && JSON.stringify(c.slice(0, 2)) === JSON.stringify(a.slice(0, 2)) && c[2]?.id === 'et_0_appearance_points_sub';
         return ok ? true : JSON.stringify({ a, b, c, gaps });
     });
+    await t.step('a deep cascade (Color ▸ Entity ▸ power ▸ Thresholds ▸ + Add ▸): each box over the one before leaves the start of its lines — two wide characters —, no more; the last one\'s field within the menu', async () => {
+        await curveMenu(t, 0, 'color'); await search(t, 'power');
+        await t.page.click('#es_2 a[data-entity="sensor.power"]'); await t.wait(300);
+        await click(t, '#et_0_appearance_color_entity_series_th'); await t.wait(250);
+        await click(t, '#et_0_appearance_color_entity_series_th_add'); await t.wait(250);
+        const r = await t.E(`(()=>{ const r=el.querySelector('#et_0'); const ch=r._cascade; const R=ch[0].getBoundingClientRect().right;
+            const box = ch.map(b=>Math.round(b.getBoundingClientRect().left)); const last=ch[ch.length-1].querySelector('input').getBoundingClientRect();
+            return { gaps: box.slice(1).map((x,k)=>x-box[k]), inRight: Math.round(last.right), R: Math.round(R), inWidth: Math.round(last.width) }; })()`);
+        await closeMenu(t);
+        return r.gaps.slice(0, -1).every(g => g > 10 && g < 40) && r.inRight <= r.R && r.inWidth > 20 ? true : JSON.stringify(r);
+    });
     done(await t.close());
 
     t = await openCard(card([{ type: 'line', entities: [{ entity: 'sensor.power' }] }]), { height: 900 });
@@ -98,7 +109,7 @@ module.exports = async function()
         const b = await t.E('JSON.stringify(graphAt(0).entities[0].fill)');
         await closeMenu(t);
         return series.includes('Azimuth') && l === 'Value | Thresholds ▸' && a === 'sun.sun.azimuth' && add.includes('above_horizon')
-            && b === '{"entity":"sun.sun","thresholds":[],"states":{"above_horizon":true}}' ? true : JSON.stringify({ series, l, a, add, b });
+            && b === '{"entity":"sun.sun","thresholds":[],"states":{"above_horizon":"light"}}' ? true : JSON.stringify({ series, l, a, add, b });
     });
     done(await t.close());
 

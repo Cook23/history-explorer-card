@@ -352,6 +352,7 @@ export class CardDatasets
                         ({ s, bcol } = this._barSamples(g, e, result[id], process, w, this._colorFunction(e, colorHistory)));
                     } else if( g.type == 'timeline' || g.type == 'arrowline' ) {
                         s = this._timelineRows(g, e, result[id], process, w);
+                        if( g.type == 'timeline' ) _dataset.blockFills = this._timelineFills(e, s, colorHistory);
                         if( g.type == 'arrowline' ) {
                             _dataset.arrowLength = this._arrowLengths(g, e, s, colorHistory);
                             Object.assign(_dataset, this._arrowColors(e, s, colorHistory));
@@ -835,6 +836,24 @@ export class CardDatasets
             fills.push(fillFn ? this.fillAsColor(this.fillStyle(fillFn(t, v), c, !!colorFn)) : undefined);
         }
         return { arrowColors: colorFn ? colors : undefined, arrowBackgrounds: fillFn ? fills : undefined };
+    }
+
+    // A timeline's blocks' fill, each block's (its rows s, [start, end, state]: at its middle,
+    // as an arrowline's): the dataset's blockFills (deps/timeline.js.md) — undefined when e's
+    // fill is a value itself (the dataset's blockFill, the same for every block). history:
+    // the history of the series read, by id
+    _timelineFills(e, s, history)
+    {
+        const fillFn = this._optionFunction(e, 'fill', history);
+        return fillFn ? s.map(b => this.blockFillOf(fillFn(( msOf(b[0]) + msOf(b[1]) ) / 2, Number(b[2])))) : undefined;
+    }
+
+    // A timeline block's fill, from a fill value: none, fade, light, solid — any other (a color
+    // of its own, none given) ignored: solid, a timeline's default
+    blockFillOf(f)
+    {
+        if( f === false || f === NO_FILL ) return 'none';
+        return f === 'fade' || f === 'light' ? f : 'solid';
     }
 
     // The value of series id giving entity e's arrows (of graph g) their whole length: arrowMax
