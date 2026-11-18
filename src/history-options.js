@@ -1,7 +1,7 @@
 // The card's options: the curve interpolation algorithms, the synonyms of the option
 // names, and which options can be set at which level (card, entityOptions, graph, entity).
 
-import { normalizeColor, normalizeFill, isColorSeries } from "./history-default-colors.js";
+import { normalizeColor, normalizeFill, normalizeIndirect, isColorSeries } from "./history-default-colors.js";
 
 // Curve interpolation algorithms (the `interpolation` option, for the curves and smart
 // line modes), each as the Interpolation submenu names it (not translated) — the first one is
@@ -43,7 +43,8 @@ export function oneOf(option, values, { synonyms = {}, other, expected } = {})
         if( !_map ) {
             _map = new Map();
             for( const x of typeof values === 'function' ? values() : values ) _map.set(_listKey(x), x);
-            for( const [x, names] of Object.entries(synonyms) ) for( const n of names ) _map.set(_listKey(n), _map.get(_listKey(x)));
+            // (a synonym's value by its name — true, false: a value that isn't a string)
+            for( const [x, names] of Object.entries(synonyms) ) for( const n of names ) _map.set(_listKey(n), [..._map.values()].find(y => String(y) === x) ?? _map.get(_listKey(x)));
         }
         const k = _listKey(v);
         if( _map.has(k) ) return _map.get(k);
@@ -225,19 +226,25 @@ export function boundText(v)
     return v && typeof v === 'object' && v.soft !== undefined ? `~${v.soft}` : v;
 }
 
-// An arrowline's arrows' length (arrowLength): a number — a part of their whole length, in %,
-// kept within 0 to 100 (a warning outside) —, or a series — an entity_id, or one of its
-// attributes after it — whose value gives it; else not set, with a warning
-function _arrowLength(v)
+// An arrows' length itself: a number — a part of their whole length, in %, kept within 0 to
+// 100 (a warning outside) —, or undefined
+function _lengthLeaf(v)
 {
-    if( isColorSeries(v) ) return v.trim();
     const n = Number(v);
-    if( v === '' || v === true || v === false || !isFinite(n) ) {
-        configWarning('arrowLength', v, 'unknown value, ignored — expected a number from 0 to 100, or an entity');
-        return undefined;
-    }
+    if( v === '' || v === null || v === true || v === false || !isFinite(n) ) return undefined;
     if( n < 0 || n > 100 ) configWarning('arrowLength', v, 'out of 0 to 100, kept within');
     return Math.min(100, Math.max(0, n));
+}
+
+// An arrowline's arrows' length (arrowLength): a length (see _lengthLeaf), a series — an
+// entity_id, or one of its attributes after it — whose value gives it, or thresholds on the
+// value or on a series' value giving one (as color's: see normalizeIndirect); else not set,
+// with a warning
+function _arrowLength(v)
+{
+    const L = isColorSeries(v) ? v.trim() : v && typeof v === 'object' || typeof v === 'string' && v.trim().startsWith('{') ? normalizeIndirect(v, _lengthLeaf) : _lengthLeaf(v);
+    if( L === undefined ) configWarning('arrowLength', v, 'unknown value, ignored — expected a number from 0 to 100, an entity or thresholds');
+    return L;
 }
 
 // A state a stateMap doesn't list, once mapped (see processOf): no value — a gap in the curve

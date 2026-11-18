@@ -13,10 +13,10 @@
 //               what they give it
 
 import { OPTION_DEFAULTS, ENTITY_ONLY_KEYS, GRAPH_STORED_KEYS, GRAPH_SCOPE_KEYS, BAR_INTERVALS, CURVE_GRAPH_KEYS,
-         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText } from "./history-options.js";
+         CURVE_LOOK_KEYS, CURVE_FIELD_OF, lookParts, minMaxValue, BOUND_OPTIONS, boundText, INDIRECT_OPTIONS } from "./history-options.js";
 import { LOCAL_ONLY_FIELDS } from "./card-storage.js";
 import { seriesOf } from "./history-series.js";
-import { defaultColors, fillValue, NO_FILL } from "./history-default-colors.js";
+import { defaultColors, fillValue, NO_FILL, indirectYaml } from "./history-default-colors.js";
 import { toYaml } from "./history-yaml.js";
 
 const _LOCAL = new Set(LOCAL_ONLY_FIELDS);
@@ -44,8 +44,12 @@ function _diff(v, base)
 }
 // (a bar interval's YAML name)
 const _intervalName = code => BAR_INTERVALS.find(i => i.code === code)?.yaml ?? undefined;
-// (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its '~')
-const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v) : v;
+// (a fill's value as the YAML writes it: light for true)
+const _fillOut = f => f === true ? 'light' : f;
+// (option k's value v as the YAML writes it: a bar interval by its name, a soft bound with its
+// '~', a value read indirectly — thresholds, a series — as written: see indirectYaml)
+const _yamlValue = (k, v) => k === 'interval' ? _intervalName(v) : BOUND_OPTIONS.includes(k) ? boundText(v)
+    : INDIRECT_OPTIONS.includes(k) && v !== undefined ? indirectYaml(v, k === 'fill' ? _fillOut : undefined) : v;
 
 export class CardYaml
 {

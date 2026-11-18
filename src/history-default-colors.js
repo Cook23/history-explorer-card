@@ -290,7 +290,8 @@ const _number = v => typeof v === 'number' ? v : ( typeof v === 'string' && v.tr
 
 // A series a color is read from (no CSS color has a dot): an entity_id, or one of its
 // attributes after it (climate.salon.hvac_action) — see card-datasets.js optionSeriesOf
-export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)?$/.test(s.trim());
+// (an attribute after the entity_id — or a sub-attribute: its path, level by level)
+export const isColorSeries = s => typeof s === 'string' && /^[a-z_]+\.[a-z0-9_]+(\.[A-Za-z0-9_]+)*$/.test(s.trim());
 
 // Thresholds written as a list, as mini-graph-card writes them — [{ value, color }, ...]:
 // as an object of thresholds; a stop without a value (or a color alone) between two that
@@ -348,6 +349,21 @@ export function fillLeaf(v)
 export function normalizeFill(v)
 {
     return normalizeIndirect(v, fillLeaf);
+}
+
+// An option read directly or indirectly (see normalizeIndirect) as the YAML writes it: a
+// value by leafOut, a series as it is, thresholds by their keys in a Map (its order kept) —
+// entity, attribute, each threshold (a number), each state, default —, each value by leafOut
+export function indirectYaml(v, leafOut = x => x)
+{
+    if( !v || typeof v !== 'object' || !Array.isArray(v.thresholds) ) return typeof v === 'string' && isColorSeries(v) ? v : leafOut(v);
+    const o = new Map();
+    if( v.entity !== undefined ) o.set('entity', v.entity);
+    if( v.attribute !== undefined ) o.set('attribute', v.attribute);
+    for( const [t, c] of v.thresholds ) o.set(t, leafOut(c));
+    for( const [s, c] of Object.entries(v.states ?? {}) ) o.set(s, leafOut(c));
+    if( v.default !== undefined ) o.set('default', leafOut(v.default));
+    return o;
 }
 
 // An option read directly or indirectly — a color (normalizeColor), a fill (normalizeFill) —

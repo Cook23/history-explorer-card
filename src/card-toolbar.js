@@ -186,28 +186,7 @@ export class CardToolbar
         }, false);
         this.initOptionsMenu(i);
 
-        this._this.querySelector(`#b7_${i}`)?.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
-        this._this.querySelector(`#b7_${i}`)?.addEventListener('click', this.entitySelectorFocus.bind(this), true);
-        this._this.querySelector(`#b7_${i}`)?.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
-        this._this.querySelector(`#b7_${i}`)?.addEventListener('input', this.entitySelectorEntered.bind(this), true);
-        this._this.querySelector(`#b7_${i}`)?.addEventListener('keydown', this.entitySelectorKeyDown.bind(this), true);
-        // Pointer hover preview — mouse/pen only (touch has no hover event; it
-        // stays on pointerdown/pointerup, see the dropdown entry's own handling).
-        // Delegated on the dropdown container so it survives entries being
-        // recreated on every re-filter, instead of re-attaching per entry.
-        // (the entry a pointer is over previewed — once per entry —, on a sign that a pointer
-        // is there: a move — a mouse's or a pen's hover, a finger dragged along the list —, or
-        // a contact; never on an entry the list's scrolling brings under a pointer still or
-        // gone. Choosing still happens on the entry's own click)
-        // (its hover through Chart.hecUi.hover, as every hover of the card: a pen silent for a
-        // while, gone, ends it as a leaving does)
-        const _list = this._this.querySelector(`#es_${i}`);
-        let _previewed = null;
-        const _preview = (e) => {
-            const _a = e.target.closest('a[data-entity]');
-            if( _a && _a !== _previewed ) { _previewed = _a; this.previewEntityTooltip(_a.dataset.entity, i); }
-        };
-        if( _list ) Chart.hecUi.hover(_list, () => {}, () => { _previewed = null; }, _preview);
+        this.bindEntitySelector(i, this._this.querySelector(`#b7_${i}`));
 
         this.ui.dateSelector[i] = this._this.querySelector(`#bx_${i}`);
         this.ui.rangeSelector[i] = this._this.querySelector(`#by_${i}`);

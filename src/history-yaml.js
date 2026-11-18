@@ -4,7 +4,8 @@
 // null, a special character first, `: ` or ` #` inside, spaces around it, a line break)
 
 const _isBlock = v => !!v && typeof v === 'object';
-const _size = v => Array.isArray(v) ? v.length : Object.keys(v).length;
+// (a Map: its keys in their own order — an indirect value's: entity first, then its thresholds)
+const _size = v => Array.isArray(v) ? v.length : v instanceof Map ? v.size : Object.keys(v).length;
 
 // (YAML's words for true, false and null, in every case it reads them so)
 const _RESERVED = /^(true|false|yes|no|on|off|y|n|null|~)$/i;
@@ -21,9 +22,10 @@ function _scalar(v)
     return _quoted ? JSON.stringify(v) : v;
 }
 
+// (a number as a key written as is: a threshold, read back as that number)
 function _key(k)
 {
-    return _scalar(String(k));
+    return typeof k === 'number' ? String(k) : _scalar(String(k));
 }
 
 // v (an object or a list, not empty) as lines, each starting with pad
@@ -31,7 +33,7 @@ function _block(v, pad)
 {
     if( Array.isArray(v) )
         return v.map(x => _isBlock(x) && _size(x) ? pad + '- ' + _block(x, pad + '  ').slice(pad.length + 2) : pad + '- ' + _scalar(x)).join('\n');
-    return Object.entries(v).filter(([, x]) => x !== undefined)
+    return ( v instanceof Map ? [...v] : Object.entries(v) ).filter(([, x]) => x !== undefined)
         .map(([k, x]) => _isBlock(x) && _size(x) ? `${pad}${_key(k)}:\n${_block(x, pad + '  ')}` : `${pad}${_key(k)}: ${_scalar(x)}`).join('\n');
 }
 

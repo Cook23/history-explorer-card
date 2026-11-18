@@ -811,7 +811,9 @@ export class CardDatasets
         if( L === undefined || L === null ) return undefined;
         if( typeof L === 'number' ) return { fraction: L / 100 };
         const fn = this._optionFunction({ ...e, arrowLength: L }, 'arrowLength', history);
-        for( const b of s ) { const v = fn(( msOf(b[0]) + msOf(b[1]) ) / 2); b[3] = typeof v === 'number' ? v : undefined; }
+        for( const b of s ) { const v = fn(( msOf(b[0]) + msOf(b[1]) ) / 2, Number(b[2])); b[3] = typeof v === 'number' ? v : undefined; }
+        // (thresholds: each gives a length itself, in % of the whole one)
+        if( typeof L === 'object' ) return { max: 100, unit: '%' };
         return { max: this.arrowLengthMax(g, e, L, history), unit: this.getUnitOfMeasure(L) };
     }
 

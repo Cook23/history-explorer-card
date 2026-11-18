@@ -52,7 +52,7 @@ module.exports = async function()
         return l0 === 'None* | All | Maximum | Minimum | Statistics | History' && l1 === 'None | All | Maximum* | Minimum | Statistics | History'
             && a.minmax === true && !b.minmax && saved === 'max' ? true : JSON.stringify({ l0, l1, a, b, saved });
     });
-    await t.step('Fill ▸: its list in a submenu over Appearance (the palette\'s fill: Solid in bold); Fade chosen: the curve fading out; Escape closes it, back to Appearance', async () => {
+    await t.step('Fill ▸: its list in a submenu over Appearance (the palette\'s fill: Light in bold); Fade chosen: the curve fading out; Escape closes it, back to Appearance', async () => {
         await curveMenu(t, 0, 0); await line(t, 3); await t.wait(150);
         const l0 = await lines(t);
         await t.E(`[...el.querySelectorAll('#et_0_appearance_fill_sub a')].find(a=>a.textContent==='Fade').click()`); await t.wait(150);
@@ -60,7 +60,7 @@ module.exports = async function()
         await t.page.keyboard.press('Escape'); await t.wait(150);
         const l2 = await lines(t); await t.wait(800);
         const d = await ds(t, 0, 0), saved = await t.E('graphAt(0).entities[0].fill');
-        return l0 === 'None | Solid* | Fade' && l1 === 'None | Solid | Fade*' && l2.startsWith('Color ▸ |') && d.fade && saved === 'fade' ? true : JSON.stringify({ l0, l1, l2, d, saved });
+        return l0 === 'None | Fade | Light* | Solid | Entity ▸' && l1 === 'None | Fade* | Light | Solid | Entity ▸' && l2.startsWith('Color ▸ |') && d.fade && saved === 'fade' ? true : JSON.stringify({ l0, l1, l2, d, saved });
     });
     await t.step('Width ▸ 4 px and Line style ▸ Short dashes: the curve drawn so', async () => {
         await curveMenu(t, 0, 0); await line(t, 4); await t.wait(150);
@@ -72,8 +72,8 @@ module.exports = async function()
         const d = await ds(t, 0, 0);
         return w === '1 px | 2 px* | 3 px | 4 px | 5 px' && s === 'Solid* | Dots | Short dashes | Long dashes | Dash-dot' && d.width === 4 && d.dash?.join() === '5,5' ? true : JSON.stringify({ w, s, d });
     });
-    await t.step('Color: the browser\'s color picker, the curve\'s color preselected, the menu closed; a color picked: the curve\'s', async () => {
-        await curveMenu(t, 0, 1); await line(t, 0); await t.wait(300);
+    await t.step('Color ▸ Choose…: the browser\'s color picker, the curve\'s color preselected, the menu closed; a color picked: the curve\'s', async () => {
+        await curveMenu(t, 0, 1); await line(t, 0); await t.wait(300); await t.E(`el.querySelector('#et_0_appearance_color_pick').click()`); await t.wait(300);
         const p = await t.E(`(()=>{ const i=el.querySelector('#tb_0')._pickers?.color; return i ? { type: i.type, value: i.value } : null; })()`);
         const open = await menuOpen(t);
         await t.E(`(()=>{ const i=el.querySelector('#tb_0')._pickers.color; i.value='#ff0000'; i.dispatchEvent(new Event('change')); })()`); await t.wait(800);

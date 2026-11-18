@@ -317,18 +317,24 @@ module.exports = async function()
     done(await t.close());
 
     // ── Home Assistant's card editor: the card in its preview, a box that scrolls as high as
-    // what it holds — room kept under the card for its menus (preview: true) ──
-    for( const preview of [false, true] ) {
+    // what it holds, in its window (hui-dialog-edit-card, the box in its shadow root) — room
+    // kept under the card for its menus; on the dashboard being edited (preview: true too, no
+    // such window): none ──
+    for( const where of ['dashboard', 'editor'] ) {
         t = await openCard(card({ statistics: { enabled: false } }), { mock: { series: true }, height: 900 });
         await t.wait(800);
-        await t.E(`(()=>{ const box=document.createElement('div'); box.style.cssText='overflow:auto;position:relative;width:600px'; el.parentNode.insertBefore(box, el); box.appendChild(el); el.preview=${preview}; })()`);
+        await t.E(`(()=>{ const box=document.createElement('div'); box.style.cssText='overflow:auto;position:relative;width:600px';
+            if( '${where}' === 'editor' ) { const d=document.createElement('hui-dialog-edit-card'); el.parentNode.insertBefore(d, el); d.attachShadow({ mode: 'open' }).appendChild(box); }
+            else el.parentNode.insertBefore(box, el);
+            el.preview=true; box.appendChild(el); })()`);
         await t.wait(400);
+        const _room = await t.E(`el.style.paddingBottom`);
         await t.page.click('#b7_0'); await t.page.keyboard.type('power'); await t.wait(400);
         const _id = await t.E(`[...el.querySelectorAll('#es_0 a')].find(a=>a.style.display!=='none' && !a.textContent.endsWith(' ▸')).dataset.entity`);
         await t.page.click(`#es_0 a[data-entity="${_id}"]`); await t.wait(600);
         const _open = await t.E(`el.querySelector('#et_0').style.display !== 'none'`);
-        if( preview ) await t.step('in the card editor\'s preview (preview: true): room kept under the card — an entity chosen there, its menu opens, the entity can be added', async () => _open ? true : 'closed');
-        else await t.step('(without that room, in a box no higher than the card, the menu closes at once: what the room is for)', async () => !_open ? true : 'open');
+        if( where === 'editor' ) await t.step('in the card editor\'s window, its preview: room kept under the card — an entity chosen there, its menu opens, the entity can be added', async () => _open && _room !== '' ? true : JSON.stringify({ _open, _room }));
+        else await t.step('on the dashboard being edited (preview: true, not in the card editor\'s window): no room under the card (in a box no higher than the card, the menu closes at once: what the room is for)', async () => !_open && _room === '' ? true : JSON.stringify({ _open, _room }));
         done(await t.close());
     }
 
