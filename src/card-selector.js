@@ -17,7 +17,7 @@ const moment = window.HXLocal_moment;
 const Chart = window.HXLocal_Chart;
 
 // A line of the entity list: its padding on each side (px)
-const LINE_PAD_X = 5;
+export const LINE_PAD_X = 5;
 
 // The selectors: the toolbars' fields (0, 1: the top one's, the bottom one's) and, from
 // MENU_SELECTOR on, a menu's (Entity ▸ — the curve menu of toolbar i: MENU_SELECTOR + i), the
@@ -36,6 +36,8 @@ export class CardSelector
     bindEntitySelector(i, input)
     {
         if( !input ) return;
+        // (its text placed as its list's lines', once it's laid out)
+        requestAnimationFrame(() => this.alignFieldText(i));
         input.addEventListener('focusin', this.entitySelectorFocus.bind(this), true);
         input.addEventListener('click', this.entitySelectorFocus.bind(this), true);
         input.addEventListener('focusout', this.entitySelectorFocusOut.bind(this), true);
@@ -125,26 +127,18 @@ export class CardSelector
                 dropdown.style.bottom = (parentRect.bottom - inputRect.top) + 'px';
                 dropdown.style.maxHeight = Math.max(0, maxH) + 'px';
             }
-            // (a menu's — Entity ▸ —: in its menu's cascade, right-aligned on it, its lines
-            // whole, the room they lack taken from the menus over it — fitCascade)
-            const _menu = _isMenuSelector(input_idx) ? this.menuListShown(input_idx - MENU_SELECTOR, dropdown) : null;
-            if( _menu ) {
-                // (as wide as its lines whole — their widths measured once, entityLineWidths —,
-                // its lines fitted again only when its width changes; under its field's box, as
-                // a submenu under its line)
-                const _all = Math.floor(this.entityLineWidths().all);
-                dropdown._naturalWidth = () => _all;
-                dropdown._fitWidth = w => {
-                    const _w = Math.floor(w ?? _all);
-                    dropdown.style.width = _w + 'px';
-                    if( dropdown._fitted !== _w ) { dropdown._fitted = _w; this.fitEntityLines(input_idx, _w); }
-                };
-                dropdown._base = { minWidth: '', maxWidth: '', width: _all + 'px' };
-                const _under = ( input.closest('[id$="_sub"]') ?? input ).getBoundingClientRect().bottom;
-                dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, window.innerHeight - _under)) + 'px';
-                this.openMenu(dropdown, ( _under - parentRect.top ) + 'px', ( _menu.getBoundingClientRect().right - parentRect.left ) + 'px', 'right');
-                this.fitCascade(dropdown);
+            // (a menu's — Entity ▸ —: a submenu of the cascade under its field's box, as wide —
+            // both right-aligned, so left-aligned too —, its lines fitted again only when that
+            // width changes)
+            if( _isMenuSelector(input_idx) ) {
+                const _box = input.closest('[id$="_sub"]').getBoundingClientRect(), _w = Math.floor(_box.width);
+                dropdown.style.boxSizing = 'border-box';
+                dropdown.style.width = _w + 'px';
+                if( dropdown._fitted !== _w ) { dropdown._fitted = _w; this.fitEntityLines(input_idx, _w); }
+                dropdown.style.maxHeight = Math.max(0, Math.min(window.innerHeight * 0.5, window.innerHeight - _box.bottom)) + 'px';
+                this.openMenu(dropdown, ( _box.bottom - parentRect.top ) + 'px', ( _box.right - parentRect.left ) + 'px', 'right');
             } else this.openMenu(dropdown, topPos, leftPos);
+            this.alignFieldText(input_idx);
             // (kept on its field — see followAnchor)
             this.followAnchor(dropdown, input, () => { this.hideSeriesMenu(input_idx); this.setDropdownVisibility(input_idx, false); });
             const filter = input.value.toLowerCase();
@@ -158,11 +152,8 @@ export class CardSelector
             // Filtering means user is searching again — reset selection flag
             if( !this._entitySelected ) this._entitySelected = [false, false];
             this._entitySelected[input_idx] = false;
-        } else {
+        } else
             dropdown.style.display = 'none';
-            // (a menu's: the menus over it back to the width they take without it)
-            if( dropdown._menuOf ) this.fitCascade(dropdown._menuOf);
-        }
     }
 
     entitySelectorFocus(event)

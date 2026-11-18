@@ -4,6 +4,27 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.87] - 2026-11-18
+
+### Fixed
+- `fill: fade` on an arrowline drawn as `light`: the band behind the arrows now fades out downwards, given directly or read indirectly (each block's)
+- *Fill ▸ Entity ▸* and *Length ▸ Entity ▸* after *Color ▸ Entity ▸* in the same menu: the list placed at the top of the screen, what was typed filtering nothing — each *Entity ▸* made its own field, the selector reading the first one, *Color*'s, hidden. One field a menu: another *Entity ▸*'s emptied when one opens
+
+### Changed
+- *Entity ▸*'s list in a menu: a submenu of the cascade, as wide as its field's box, both right-aligned — so left-aligned too —, hiding what's behind it (before: as wide as its names, the lines behind it showing on its left); the field's box as wide as the list needs, its names whole, the room it lacks taken from the menus over it
+- The entity selector's field — the card's and *Entity ▸*'s —: its text where its list's lines' text starts (before: a few pixels left of them); *Entity ▸*'s field its line's whole width
+- `fill: solid` ignored on an arrowline — the band behind the arrows hid them —: its default instead (`light`; `false` with its color defined), given directly or read indirectly
+- A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
+
+### Docs
+- README_Full.md: a timeline's blocks outlined; `fill: solid` ignored on an arrowline
+
+### Internal
+- Tests (`indirect`): *Color ▸ Entity ▸* then *Fill ▸ Entity ▸* — one field, the list under Fill's box, filtered
+- Tests (`arrowline`): `fill: solid` ignored on an arrowline; `fill: fade` fading out
+- Tests (`indirect`): the menus end to end, as a user does it, in a page scrolled down — on a curve, an arrowline and a timeline, each *Entity ▸* after the others in the same menu: the field typed into key by key, one field, the list under its box, on screen, filtered, an entity clicked, *Value*: the option is that entity
+
+
 ## [v1.2.86] - 2026-11-18
 
 ### Fixed

@@ -14,8 +14,8 @@ import { localGestures, infoPanelEnabled } from "./card-storage.js";
 import { keyOf } from "./history-entity-store.js";
 import { seriesOfGraphs, seriesOf, seriesId } from "./history-series.js";
 import { isColorSeries, colorSpec, isBlendable, NO_FILL } from "./history-default-colors.js";
-import { maxOf, appendAll } from "./history-arrays.js";
-import { MENU_SELECTOR } from "./card-selector.js";
+import { maxOf } from "./history-arrays.js";
+import { MENU_SELECTOR, LINE_PAD_X } from "./card-selector.js";
 const Chart = window.HXLocal_Chart;
 
 // The display types of the curve menu (et_N_<index>), in the order it shows them: a line in
@@ -381,17 +381,16 @@ export class CardMenus
     // them show no more than that, the last one's lines cut ('…', an entity's name shortened)
     fitCascade(box)
     {
-        let _root = box?._root ?? box;
-        if( _root?._menuOf ) _root = _root._menuOf;
+        const _root = box?._root ?? box;
         if( !_root ) return;
         const _chain = [...( _root._cascade ?? [_root] )];
-        const _list = _root._menuList;
-        if( _list && _list.style.display !== 'none' ) appendAll(_chain, _list._cascade ?? [_list]);
         // (each back to its width as opened)
         for( const b of _chain.slice(1) ) if( b._base ) Object.assign(b.style, b._base);
         if( _chain.length < 2 ) return;
         const R = _chain[0].getBoundingClientRect().right;
-        const _natural = _chain.map(b => b._naturalWidth?.() ?? b.getBoundingClientRect().width);
+        // (a box wanting more than its lines: one holding an Entity ▸'s field, as wide as its
+        // list's names whole — the field's _wantWidth)
+        const _natural = _chain.map(b => Math.max(b.getBoundingClientRect().width, [...b.querySelectorAll('input')].reduce((w, i) => Math.max(w, i._wantWidth?.() ?? 0), 0)));
         const _strip = _chain.map(b => this._menuStrip(b));
         const L = [_chain[0].getBoundingClientRect().left];
         for( let k = 1; k < _chain.length; k++ ) {
@@ -407,28 +406,25 @@ export class CardMenus
             const b = _chain[k], w = Math.max(0, Math.floor(R - L[k])) + 'px';
             b.style.boxSizing = 'border-box';
             Object.assign(b.style, { minWidth: w, maxWidth: w });
-            if( b._fitWidth ) b._fitWidth(R - L[k]);
         }
+    }
+
+    // Selector idx's field's text where its list's lines' text starts: its left padding from
+    // its border's end to there — the list's left edge (a toolbar's: the field's; a menu's: its
+    // field's box's, see setDropdownVisibility), its border, its lines' padding
+    alignFieldText(idx)
+    {
+        const input = this._this.querySelector(`#b7_${idx}`), list = this._this.querySelector(`#es_${idx}`);
+        if( !input?.isConnected || !list ) return;
+        const _left = ( idx >= MENU_SELECTOR ? input.closest('[id$="_sub"]') : input ).getBoundingClientRect().left;
+        const _textAt = _left + ( parseFloat(getComputedStyle(list).borderLeftWidth) || 0 ) + LINE_PAD_X;
+        input.style.paddingLeft = Math.max(0, _textAt - input.getBoundingClientRect().left - ( parseFloat(getComputedStyle(input).borderLeftWidth) || 0 )) + 'px';
     }
 
     // A box's lines' text, its widest — what it shows of them beside a box over it
     _readableWidth(box)
     {
-        // (the entity selector's list: as wide as its lines whole, known — never measured again)
-        if( box._naturalWidth ) return box._naturalWidth();
         return Math.max(0, maxOf(this._stripLines(box).map(a => this._lineTextWidth(a))));
-    }
-
-    // Menu i's entity selector's list (MENU_SELECTOR + i) in its menu's cascade, shown or
-    // hidden (list; null: none): the menu it belongs to — the one its Entity ▸ is in
-    menuListShown(i, list)
-    {
-        const m = this._menuSource?.m;
-        const _root = m && m.index === i ? this._this.querySelector(`#${m.prefix}`) : null;
-        if( !_root || !list ) return null;
-        _root._menuList = list;
-        list._menuOf = _root;
-        return _root;
     }
 
     // Menu menuEl, opened from anchorEl, kept on it while it's open — watched each frame
@@ -657,6 +653,9 @@ export class CardMenus
             } else if( it.input ) {
                 const [_name, _in] = _line.children;
                 _name.textContent = it.label;
+                // (a field without a name — the entity selector's —: the field alone, its line's
+                // width — its text placed as its list's lines', see setDropdownVisibility)
+                if( !it.label ) { _name.remove(); _line.style.paddingLeft = _line.style.paddingRight = '0'; }
                 Object.assign(_in, { min: it.input.min, max: it.input.max, step: it.input.step, value: it.value ?? '' });
                 if( it.input.placeholder ) _in.placeholder = it.input.placeholder;
                 // (a text searched: each change at once — live —; a value: once entered)
@@ -1200,9 +1199,17 @@ export class CardMenus
         // with what is done with it (menuSeriesChosen)
         if( eid === undefined ) {
             const k = this.menuSelector(m.index);
+            // (one field a menu: another Entity ▸'s — of another list, opened before — emptied,
+            // so the selector reads this one — see setDropdownVisibility, #b7_k)
+            for( const other of _INDIRECT_LOOK ) if( other !== key ) this._this.querySelector(`#${m.prefix}_appearance_${other}_entity_sub`)?.replaceChildren();
             this._menuSource = { m, key };
             return [{ id: `b7_${k}`, lineId: `${_id}_field`, label: '', input: { text: true, placeholder: i18n('ui.label.type_to_search') }, value: '',
-                      bind: el => this.bindEntitySelector(k, el) }];
+                      bind: el => {
+                          this.bindEntitySelector(k, el);
+                          // (its box as wide as the list under it needs, its names whole — the list as
+                          // wide as the box, see setDropdownVisibility and fitCascade)
+                          el._wantWidth = () => Math.ceil(this.entityLineWidths().all);
+                      } }];
         }
         // (its lines' ids the card's own names, never the series': one series chosen at a time)
         const _sid = `${_id}_series`;
@@ -1810,9 +1817,7 @@ export class CardMenus
     // (and its fields' lines: what a box over it leaves of each, see _menuStrip)
     _stripLines(menuEl)
     {
-        const _lines = [...menuEl.children].filter(a => ( a.tagName === 'A' || a.tagName === 'LABEL' ) && a.style.display !== 'none');
-        // (the entity selector's list — its lines alike, by the hundred —: its first one)
-        return menuEl._naturalWidth ? _lines.slice(0, 1) : _lines;
+        return [...menuEl.children].filter(a => ( a.tagName === 'A' || a.tagName === 'LABEL' ) && a.style.display !== 'none');
     }
     _submenuOf(line)
     {

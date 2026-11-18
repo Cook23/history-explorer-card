@@ -386,13 +386,9 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
 
             // Its fill (vm.fill): solid — the rectangle drawn with Alpha-Mix —; light — its
             // color, as transparent as a curve's light fill —; fade — its color fading out
-            // downwards —; none — its outline only
+            // downwards —; none — nothing; then, whatever its fill, its outline in its color
             ctx.lineWidth = vm.borderWidth;
-            if( vm.fill === 'none' ) {
-                ctx.strokeStyle = vm.backgroundColor;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(vm.x + 0.5, vm.y + 0.5, Math.max(0, vm.width - 1), Math.max(0, vm.height - 1));
-            } else if( vm.fill === 'light' ) {
+            if( vm.fill === 'light' ) {
                 ctx.fillStyle = vm.backgroundColor;
                 ctx.globalAlpha = 0.15;
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
@@ -402,7 +398,7 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
                 _g.addColorStop(1, _color(vm.backgroundColor).alpha(0).rgbString());
                 ctx.fillStyle = _g;
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
-            } else {
+            } else if( vm.fill !== 'none' ) {
                 // Draw new rectangle with Alpha-Mix.
                 ctx.fillStyle = vm.backgroundColor;
                 ctx.globalCompositeOperation = 'destination-over';
@@ -412,6 +408,11 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
             }
+            ctx.globalAlpha = oldAlpha;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = vm.backgroundColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(vm.x + 0.5, vm.y + 0.5, Math.max(0, vm.width - 1), Math.max(0, vm.height - 1));
 
             ctx.globalAlpha = oldAlpha;
             ctx.globalCompositeOperation = oldOperation;
@@ -924,15 +925,24 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
         // arrowBackgrounds, under the block)
         const y0 = ybar - ARROW_BOX / 2;
         ctx.lineWidth = 0;
+        // (a fill fading out — { fade: color }, the dataset's arrowFade —: its color at the
+        // band's top, fading out downwards)
+        const _style = f => {
+            if( typeof f !== 'object' ) return f;
+            const g = ctx.createLinearGradient(0, y0-3, 0, y0+ARROW_BOX+3);
+            g.addColorStop(0, f.fade);
+            g.addColorStop(1, _color(f.fade).alpha(0).rgbString());
+            return g;
+        };
         if( ds?.arrowBackgrounds ) {
             metaData.forEach((m, k) => {
-                const f = ds.arrowBackgrounds[k], x0 = Math.max(area.left, m.getPosition(0)), x1 = Math.min(area.right, m.getPosition(1));
+                const f = ds.arrowBackgrounds[k], x0 = Math.round(Math.max(area.left, m.getPosition(0))), x1 = Math.round(Math.min(area.right, m.getPosition(1)));
                 if( !f || x1 <= x0 ) return;
-                ctx.fillStyle = f;
+                ctx.fillStyle = _style(f);
                 ctx.fillRect(x0, y0-3, x1 - x0, ARROW_BOX+6);
             });
-        } else if( fill ) {
-            ctx.fillStyle = fill;
+        } else if( ds?.arrowFade || fill ) {
+            ctx.fillStyle = _style(ds?.arrowFade ? { fade: ds.arrowFade } : fill);
             ctx.fillRect(area.left, y0-3, area.right - area.left, ARROW_BOX+6);
         }
 

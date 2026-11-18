@@ -833,9 +833,18 @@ export class CardDatasets
             const c = colorFn ? colorFn(t, v) ?? e.paletteColor : _fixed;
             colors.push(c);
             // (a fill fading out: its color light, as an arrowline's fill: fade — see fillAsColor)
-            fills.push(fillFn ? this.fillAsColor(this.fillStyle(fillFn(t, v), c, !!colorFn)) : undefined);
+            // (a fill fading out: as it is — { fade: its color }, drawn so, see deps/timeline.js.md)
+            const _st = fillFn ? this.fillStyle(this.arrowFillOf(e, fillFn(t, v)), c, !!colorFn) : undefined;
+            fills.push(fillFn ? ( typeof _st === 'object' ? _st : this.fillAsColor(_st) ) : undefined);
         }
         return { arrowColors: colorFn ? colors : undefined, arrowBackgrounds: fillFn ? fills : undefined };
+    }
+
+    // An arrowline's fill f (of curve e): solid ignored — it would hide the arrows —, the
+    // default fill of an arrowline instead (light; none with its color defined)
+    arrowFillOf(e, f)
+    {
+        return f === 'solid' ? ( e.colorSet ? false : 'light' ) : f;
     }
 
     // A timeline's blocks' fill, each block's (its rows s, [start, end, state]: at its middle,
