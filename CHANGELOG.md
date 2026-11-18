@@ -4,6 +4,12 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.87] - 2026-11-18
+
+### Changed
+- A timeline's blocks outlined in their state's color whatever their fill (before: with `fill: false` only) — `light` and `fade` blocks told apart; `solid` looks the same
+
+
 ## [v1.2.86] - 2026-11-18
 
 ### Fixed

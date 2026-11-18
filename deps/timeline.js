@@ -386,13 +386,9 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
 
             // Its fill (vm.fill): solid — the rectangle drawn with Alpha-Mix —; light — its
             // color, as transparent as a curve's light fill —; fade — its color fading out
-            // downwards —; none — its outline only
+            // downwards —; none — nothing; then, whatever its fill, its outline in its color
             ctx.lineWidth = vm.borderWidth;
-            if( vm.fill === 'none' ) {
-                ctx.strokeStyle = vm.backgroundColor;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(vm.x + 0.5, vm.y + 0.5, Math.max(0, vm.width - 1), Math.max(0, vm.height - 1));
-            } else if( vm.fill === 'light' ) {
+            if( vm.fill === 'light' ) {
                 ctx.fillStyle = vm.backgroundColor;
                 ctx.globalAlpha = 0.15;
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
@@ -402,7 +398,7 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
                 _g.addColorStop(1, _color(vm.backgroundColor).alpha(0).rgbString());
                 ctx.fillStyle = _g;
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
-            } else {
+            } else if( vm.fill !== 'none' ) {
                 // Draw new rectangle with Alpha-Mix.
                 ctx.fillStyle = vm.backgroundColor;
                 ctx.globalCompositeOperation = 'destination-over';
@@ -412,6 +408,11 @@ Chart.controllers.timeline = Chart.controllers.bar.extend({
                 ctx.globalCompositeOperation = 'source-over';
                 ctx.fillRect(vm.x, vm.y, vm.width, vm.height);
             }
+            ctx.globalAlpha = oldAlpha;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = vm.backgroundColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(vm.x + 0.5, vm.y + 0.5, Math.max(0, vm.width - 1), Math.max(0, vm.height - 1));
 
             ctx.globalAlpha = oldAlpha;
             ctx.globalCompositeOperation = oldOperation;
