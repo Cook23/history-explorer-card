@@ -17,8 +17,15 @@ export const TICK_LABEL_GAP_PX = 8;
 // A window ending this close to the end (realTimeEnd) ends there (its end is set to the second)
 const END_MS = 1000;
 // The toolbar's '<' '>' (stepDay): the window moved by STEP_MOST of it at most — less half a
-// graduation —, STEP_LEAST at least
+// graduation —, STEP_LEAST at least: 10 % to 20 % of it still shown after
 const STEP_MOST = 0.9, STEP_LEAST = 0.8;
+// (its start then on a round time: the coarsest of STEP_UNITS — [unit, how many] — the
+// window's length allows, STEP_ROUND_FROM — [length under, in hours; the first of
+// STEP_UNITS tried]: under 1 h a minute, under 6 h 10 minutes, under 3 days an hour, under
+// 2 weeks a day, under 3 months a week (from Monday), longer a month (from the 1st) —, or a
+// finer one when none of its round times keeps the move within STEP_LEAST to STEP_MOST)
+const STEP_UNITS = [['month', 1], ['isoWeek', 1], ['day', 1], ['hour', 1], ['minute', 10], ['minute', 1]];
+const STEP_ROUND_FROM = [[1, 5], [6, 4], [72, 3], [336, 2], [2184, 1], [Infinity, 0]];
 
 export class CardTimeRange
 {
@@ -133,21 +140,43 @@ export class CardTimeRange
     }
 
     // The toolbar's '<' (dir -1) and '>' (dir 1), the range kept: the window moved by
-    // max(min(90 % of it, it less half a graduation of the time axis), 80 % of it) — some of
-    // what was on one edge still on the other; nothing set on a graduation (Chart.js draws its
-    // own where they fall). The end (realTimeEnd) a stop: '>' passing it stops with it on the
-    // right edge, the next one goes after it (a graduation at most, _settleWindow); '<' from
+    // max(min(90 % of it, it less half a graduation of the time axis), 80 % of it) — 10 % to
+    // 20 % of what was shown still shown —, its start then on the roundest time nearest it
+    // that keeps the move within 80 % to 90 % (_roundStart). The end (realTimeEnd) a stop: '>' passing it, or leaving it less
+    // than 20 % of the window ahead, stops with it on the right edge, the next one goes after it (a graduation at most, _settleWindow); '<' from
     // after it comes back with it on the right edge
     stepDay(dir)
     {
         const t0 = moment(this.startTime).valueOf(), t1 = moment(this.endTime).valueOf(), span = t1 - t0, G = this.graduationMs();
         const P = this.realTimeEnd().valueOf(), step = Math.max(Math.min(STEP_MOST * span, span - G / 2), STEP_LEAST * span);
         let end;
-        if( dir > 0 ) end = t1 >= P - END_MS ? P + G : Math.min(t1 + step, P);
-        else end = t1 > P + END_MS ? P : t1 - step;
+        if( dir > 0 && t1 >= P - END_MS ) end = P + G;
+        else if( dir < 0 && t1 > P + END_MS ) end = P;
+        else {
+            const start = this._roundStart(t0 + dir * step, span, t0, dir);
+            // ('>' leaving the end less than what stays shown — 1 - STEP_LEAST of the window — before
+            // it: on it, a move too small for another '>')
+            end = dir > 0 ? ( P - ( start + span ) < ( 1 - STEP_LEAST ) * span ? P : start + span ) : start + span;
+        }
         this._setWindow(moment(end - span), moment(end));
 
         this.updateHistory(true);
+    }
+
+    // A window's new start near t (a move from t0, dir: -1 back, 1 forward), span ms long: the
+    // round time nearest t whose move from t0 is within STEP_LEAST to STEP_MOST of span — of
+    // the coarsest unit that has one (STEP_UNITS, from STEP_ROUND_FROM's) —, else t itself
+    _roundStart(t, span, t0, dir)
+    {
+        const _in = x => { const d = dir * ( x - t0 ); return d >= STEP_LEAST * span && d <= STEP_MOST * span; };
+        for( const [unit, n] of STEP_UNITS.slice(STEP_ROUND_FROM.find(([h]) => span < h * 3600e3)[1]) ) {
+            const m = moment(t).startOf(unit === 'minute' ? 'minute' : unit);
+            if( unit === 'minute' ) m.minute(Math.floor(m.minute() / n) * n);
+            const a = m.valueOf(), b = a === t ? a : m.add(n, unit === 'isoWeek' ? 'week' : unit).valueOf();
+            const fit = [a, b].filter(_in).sort((x, y) => Math.abs(x - t) - Math.abs(y - t));
+            if( fit.length ) return fit[0];
+        }
+        return t;
     }
 
     // The magnifier — the elastic box's mode: turned on by a click on it, or by a mouse's drag

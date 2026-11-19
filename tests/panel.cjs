@@ -26,12 +26,12 @@ module.exports = async function()
         await t.page.mouse.click(p.x, p.y); await t.wait(400);
         return !l0 && l1 ? true : JSON.stringify({ l0, l1 });
     });
-    await t.step('the toolbar moves the time window (back by max(min(90 %, less half a graduation), 80 %) of it)', async () => {
+    await t.step('the toolbar moves the time window (back by 80 % to 90 % of it, its start on a round time)', async () => {
         const t0 = await t.E('timeRange()'), G = await t.E('inst().graduationMs()');
         await t.E(`inst()._this.querySelector('#b1_0').click()`); await t.wait(1200);
         const t1 = await t.E('timeRange()');
         const back = Date.parse(t0[1]) - Date.parse(t1[1]), span = Date.parse(t0[1]) - Date.parse(t0[0]);
-        return Math.abs(back - Math.max(Math.min(0.9 * span, span - G / 2), 0.8 * span)) <= 1000 ? true : `${t0} -> ${t1} (graduation ${G / HOUR} h)`;
+        return back >= 0.8 * span - 1000 && back <= 0.9 * span + 1000 ? true : `${t0} -> ${t1} (graduation ${G / HOUR} h)`;
     });
     await t.step('the curve menu has Export ▸, as the card\'s curve menu: its history exported — the panel\'s entity\'s only', async () => {
         await t.E(`(()=>{ const I=inst(); const g=I.graphs[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'panel', align: 'center' }); })()`); await t.wait(400);
