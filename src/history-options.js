@@ -100,6 +100,7 @@ const OPTION_SYNONYMS = {
     legendVisible    : ['show_legend'],
     labelsLeft       : ['show_labels'],
     defaultTimeRange : ['hours_to_show'],
+    realTimeStep     : ['defaultTimeOffset'],
     rounding         : ['decimals'],
     lineMode         : ['smoothing'],
     dashMode         : ['line_style'],

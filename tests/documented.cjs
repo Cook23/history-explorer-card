@@ -94,7 +94,7 @@ module.exports = async function()
             await t.page.keyboard.press('Escape');
             return ok ? true : JSON.stringify(r);
         });
-        await t.step('defaultTimeOffset: 1h — the present an hour after now, the window ending there', async () => {
+        await t.step('defaultTimeOffset (realTimeStep\'s other name): 1h — the present an hour after now, the window ending there', async () => {
             const r = await t.E(`Math.round((el.instance.presentTime().valueOf() - Date.now()) / 60e3)`);
             return r === 60 ? true : `${r} min`;
         });
@@ -207,38 +207,78 @@ module.exports = async function()
         done(await t.close());
     }
 
-    // ── defaultTimeOffset: an empty space after now, on the right of the latest values ──
+    // ── realTimeStep: real time — the time the new values come to on screen —, nothing after a
+    // graduation past the present; the time shown after it kept ──
     {
-        const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6h', defaultTimeOffset: '1h', statistics: { enabled: false },
+        const open = more => openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6h', statistics: { enabled: false }, ...more,
             graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true } });
-        await t.wait(1500);
         // (the window's end and start from now, in s; the curve's last point from now, in s;
-        // whether the window follows the present)
-        const win = () => t.E(`(()=>{ const i=el.instance, n=Date.now(), d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null), last=d[d.length-1];
-            return { end: Math.round((Date.parse(i.endTime)-n)/1e3), start: Math.round((Date.parse(i.startTime)-n)/1e3), last: last ? Math.round((+new Date(last.x)-n)/1e3) : null, live: !!i.state.autoScroll }; })()`);
-        const _hour = r => Math.abs(r.end - 3600) <= 5;
-        await t.step('defaultTimeOffset: 1h — loaded: the window ends an hour after now (6 h long), the curve stops at now: an hour empty on its right; live', async () => {
-            const r = await win();
-            return _hour(r) && Math.abs(r.end - r.start - 6 * 3600) <= 1 && r.last !== null && Math.abs(r.last) <= 5 && r.live ? true : JSON.stringify(r);
+        // real time, nothing after; the graduation, in s; the '>' greyed, its mark shown)
+        const win = t => t.E(`(()=>{ const i=el.instance, n=Date.now(), d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null), last=d[d.length-1];
+            return { end: Math.round((Date.parse(i.endTime)-n)/1e3), start: Math.round((Date.parse(i.startTime)-n)/1e3), last: last ? Math.round((+new Date(last.x)-n)/1e3) : null,
+                     live: !!i.state.autoScroll, after: !!i.state.nothingAfter, grad: Math.round(i.graduationMs()/1e3),
+                     greyed: el.querySelector('#b2_0').disabled, mark: getComputedStyle(el.querySelector('#rt_0')).display !== 'none' }; })()`);
+        const near = (a, b) => Math.abs(a - b) <= 5;
+        const pan = async (t, dx) => { const a = await t.E('graphPtAt(0,0.5)'); await t.drag(a, { x: a.x + dx, y: a.y }); await t.wait(1500); };
+        let t = await open({ realTimeStep: '1h' });
+        await t.wait(1500);
+        await t.step('realTimeStep: 1h — loaded: the window ends an hour after now (6 h long), the curve stops at now; real time — its mark turning under \'>\' —, the \'>\' not greyed: a graduation after it still', async () => {
+            const r = await win(t);
+            return near(r.end, 3600) && near(r.end - r.start, 6 * 3600) && r.last !== null && Math.abs(r.last) <= 5 && r.live && r.mark && !r.after && !r.greyed ? true : JSON.stringify(r);
         });
-        await t.step('defaultTimeOffset: 1h — dragged towards the future: the window stops an hour after now, never further', async () => {
-            const a = await t.E('graphPtAt(0,0.5)');
-            await t.drag(a, { x: a.x - 300, y: a.y }); await t.wait(1500);
-            const r = await win();
-            return _hour(r) && r.live ? true : JSON.stringify(r);
+        await t.step('realTimeStep: 1h — dragged towards the future: a graduation past the present at most — nothing after, the \'>\' greyed —, still real time', async () => {
+            await pan(t, -300);
+            const r = await win(t);
+            return r.grad > 0 && near(r.end, 3600 + r.grad) && r.live && r.mark && r.after && r.greyed ? true : JSON.stringify(r);
         });
-        await t.step('defaultTimeOffset: 1h — dragged into the past, then far towards the future: back to an hour after now, live again', async () => {
-            const a = await t.E('graphPtAt(0,0.5)');
-            await t.drag(a, { x: a.x + 300, y: a.y }); await t.wait(1500);
-            const past = await win();
-            await t.drag(a, { x: a.x - 600, y: a.y }); await t.wait(1500);
-            const r = await win();
-            return past.end < 0 && !past.live && _hour(r) && r.live ? true : JSON.stringify({ past, r });
-        });
-        await t.step('defaultTimeOffset: 1h — a new value: drawn at now, the window still ending an hour after it', async () => {
+        await t.step('realTimeStep: 1h — a new value: drawn at now, the time shown after the present kept', async () => {
+            const g = await win(t);
             await t.E(`setState('sensor.power', '777')`); await t.wait(2500);
-            const r = await win(), y = await t.E(`(()=>{ const d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null); return d[d.length-1].y; })()`);
-            return _hour(r) && Math.abs(r.last) <= 5 && y === 777 && r.live ? true : JSON.stringify({ r, y });
+            const r = await win(t), y = await t.E(`(()=>{ const d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null); return d[d.length-1].y; })()`);
+            return near(r.end, g.end) && Math.abs(r.last) <= 5 && y === 777 && r.live ? true : JSON.stringify({ g, r, y });
+        });
+        await t.step('realTimeStep: 1h — dragged back a little, the step not wholly on screen (now to an hour after it): no longer real time, no mark, the \'>\' active', async () => {
+            // (from a graduation past the present — 2 h after now —, about 1 h 30 back)
+            const _px = await t.E(`(()=>{ const i=el.instance; return 5400e3 / ((Date.parse(i.endTime)-Date.parse(i.startTime)) / graphAt(0).chart.hecPlotWidth()); })()`);
+            await pan(t, Math.round(_px));
+            const r = await win(t);
+            return r.end > 0 && r.end < 3600 && !r.live && !r.mark && !r.after && !r.greyed ? true : JSON.stringify(r);
+        });
+        await t.step('realTimeStep: 1h — a double click on the date: back to the present, an hour after now, real time', async () => {
+            await t.E(`el.querySelector('#bx_0').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`); await t.wait(1500);
+            const r = await win(t);
+            return near(r.end, 3600) && r.live && !r.after ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+        t = await open({});
+        await t.wait(1500);
+        await t.step('realTimeStep not set: dragged a graduation past now — the latest values off the right edge —, real time, the window following now as new values come, that time kept', async () => {
+            await pan(t, -300);
+            const a = await win(t);
+            await t.E(`setState('sensor.power', '555')`); await t.wait(2500);
+            const r = await win(t);
+            return a.grad > 0 && near(a.end, a.grad) && a.live && a.after && near(r.end, a.grad) && Math.abs(r.last) <= 5 ? true : JSON.stringify({ a, r });
+        });
+        await t.step('realTimeStep not set: dragged back past now — now off screen —: the history, no mark', async () => {
+            await pan(t, 600);
+            const r = await win(t);
+            return r.end < 0 && !r.live && !r.mark ? true : JSON.stringify(r);
+        });
+        done(await t.close());
+        t = await open({ realTimeStep: '-1d' });
+        await t.wait(1500);
+        await t.step('realTimeStep: -1d — the window ending a day before now, real time (the present, a day ago, on screen); a graduation past it at most', async () => {
+            const a = await win(t);
+            await pan(t, -300);
+            const r = await win(t);
+            return near(a.end, -86400) && a.live && near(r.end, -86400 + r.grad) && r.live && r.after ? true : JSON.stringify({ a, r });
+        });
+        done(await t.close());
+        t = await open({ defaultTimeOffset: '1h' });
+        await t.wait(1500);
+        await t.step('defaultTimeOffset: realTimeStep\'s other name — the same', async () => {
+            const r = await win(t);
+            return near(r.end, 3600) && r.live ? true : JSON.stringify(r);
         });
         done(await t.close());
     }

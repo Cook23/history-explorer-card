@@ -23,23 +23,27 @@ export class CardTimeRange
     // Moving the time window
     // --------------------------------------------------------------------------------------
 
-    today(resetRange = false)
+    // The window back to the present (setPresentWindow) — gap: the time kept after it, the
+    // real time's (state.realTimeGap: following the present, see updateHistoryAutoRefresh)
+    today(resetRange = false, gap = 0)
     {
         if( resetRange )
             this.setTimeRangeFromString(this.pconfig.defaultTimeRange);
 
-        this.setPresentWindow();
+        this.setPresentWindow(gap);
         this.updateHistory(!resetRange);
     }
 
-    // The present, as the window shows it: now, moved by defaultTimeOffset (an empty space
-    // after now, or the end of the hour, the day…) — no window goes past it
+    // The present, as the window shows it: now, moved by realTimeStep (an empty space after
+    // now — the window filled, then moved a step on —, or the end of the hour, the day…; a
+    // negative one: a time before now, followed) — where the new values come to, the window
+    // going a time-axis graduation past it at most (_settleWindow)
     presentTime()
     {
         let endTime = moment();
-        if( this.pconfig.defaultTimeOffset ) {
-            const s = this.pconfig.defaultTimeOffset.slice(0, -1);
-            switch( this.pconfig.defaultTimeOffset.slice(-1)[0] ) {
+        if( this.pconfig.realTimeStep ) {
+            const s = this.pconfig.realTimeStep.slice(0, -1);
+            switch( this.pconfig.realTimeStep.slice(-1)[0] ) {
                 case 'm': endTime = endTime.add(s, 'minute'); break;
                 case 'h': endTime = endTime.add(s, 'hour'); break;
                 case 'd': endTime = endTime.add(s, 'day'); break;
@@ -57,9 +61,9 @@ export class CardTimeRange
 
     // The time window ending at the present (presentTime), over the active range — real
     // time; set before the graphs are first built, so their time axis has it from the start
-    setPresentWindow()
+    setPresentWindow(gap = 0)
     {
-        const t1 = this.presentTime().startOf('second');
+        const t1 = this.presentTime().add(gap, 'ms').startOf('second');
         this._setWindow(moment(t1).subtract(this.activeRange.timeRangeHours, "hour").subtract(this.activeRange.timeRangeMinutes, "minute"), t1);
     }
 
@@ -72,19 +76,32 @@ export class CardTimeRange
     }
 
     // Every window set (a range, a zoom, a drag, a day before or after, the calendar, the
-    // present): never past the present — moved back to end there, whatever asked it —, and
-    // real time exactly when it ends there (the present on the right, the window following
-    // it as new values come); else the history, the window staying where it is. The toolbar
-    // shows it ('>' greyed in real time: there's nothing after)
+    // present): never more than a graduation of the time axis past the present
+    // (presentTime) — moved back to end there, whatever asked it: nothing after
+    // (state.nothingAfter, '>' greyed) —; real time (state.autoScroll) when the time the new
+    // values come to is on screen — from now to the present (realTimeStep: the step filling;
+    // none: now; negative: the present, before now) —, the window following them as they
+    // come with the time it shows after the present kept (state.realTimeGap); else the
+    // history, the window staying where it is. The toolbar shows both (showRealTime)
     _settleWindow()
     {
-        const _present = this.presentTime(), _over = moment(this.endTime).diff(_present);
+        const _present = this.presentTime(), _limit = moment(_present).add(this.graduationMs(), 'ms'), _over = moment(this.endTime).diff(_limit);
         if( _over > 0 ) {
             this.startTime = moment(this.startTime).subtract(_over, 'ms').format('YYYY-MM-DDTHH:mm:ss');
-            this.endTime = _present.format('YYYY-MM-DDTHH:mm:ss');
+            this.endTime = _limit.format('YYYY-MM-DDTHH:mm:ss');
         }
-        this.state.autoScroll = moment(this.endTime).diff(_present) > -PRESENT_MS;
+        const _after = moment(this.endTime).diff(_present);
+        this.state.nothingAfter = moment(this.endTime).diff(_limit) > -PRESENT_MS;
+        this.state.autoScroll = _after > -PRESENT_MS && moment(this.startTime).diff(moment.min(moment(), _present)) <= PRESENT_MS;
+        this.state.realTimeGap = this.state.autoScroll ? Math.max(0, _after) : 0;
         this.showRealTime();
+    }
+
+    // A graduation of the time axis, in ms: its step, as Chart.js drew it (timeTickStep)
+    graduationMs()
+    {
+        const [n, unit] = this.timeTickStep();
+        return moment.duration(n, unit).asMilliseconds() || 0;
     }
 
     todayNoReset()
@@ -209,13 +226,21 @@ export class CardTimeRange
     }
 
     // Where a range change without a point of its own keeps the window: [time, position
-    // along it] — the present in real time: it stays on the right; its middle when looking
-    // at the history. The one rule of every range change (applyTimeRange,
+    // along it] — the present in real time: it stays where it is (presentAnchor); its middle
+    // when looking at the history. The one rule of every range change (applyTimeRange,
     // applyTimeRangeMinutes): the buttons, the duration menu, the magnifier's default range,
     // a zoom gesture in real time keeping the present (onTimeZoom)
     _rangeAnchor()
     {
-        return this.isLive() ? [this.presentTime(), 1.0] : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
+        return this.isLive() ? this.presentAnchor() : [moment((moment(this.startTime) + moment(this.endTime)) / 2), 0.5];
+    }
+
+    // The present and where it is along the window — [time, position]: on the right, or
+    // before the time shown after it (state.realTimeGap)
+    presentAnchor()
+    {
+        const t0 = moment(this.startTime), _span = moment(this.endTime).diff(t0), P = this.presentTime();
+        return [P, _span > 0 ? Math.min(1, Math.max(0, P.diff(t0) / _span)) : 1.0];
     }
 
     // --------------------------------------------------------------------------------------

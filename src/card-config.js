@@ -122,7 +122,7 @@ export class CardConfig
         P.excludeFilterEntities =  c.excludeFilterEntities;
         P.combineSameUnits =       c.combineSameUnits === true;
         P.defaultTimeRange =       c.defaultTimeRange ?? D.defaultTimeRange;
-        P.defaultTimeOffset =      c.defaultTimeOffset ?? undefined;
+        P.realTimeStep =           c.realTimeStep ?? undefined;
         P.defaultMagnifierMode =   c.defaultMagnifierMode ?? D.defaultMagnifierMode;
         P.timeTickDensity =        c.timeTicks?.density ?? D.timeTicks.density;
         P.timeTickOverride =       c.timeTicks?.densityOverride ?? undefined;

@@ -9,17 +9,22 @@ Changelog for the HA History Explorer Card.
 ### Added
 - An arrowline's extremes (`showMinMax`, *Appearance ▸ Extremes*, the curves' values): from each arrow's base, a light triangle on each side, to the lowest and highest direction of its zone, as long as its longest length there, in its color at the min/max band's opacity — `max` the clockwise side, `min` the anticlockwise one
 - `arrowWeighting`: an arrowline's arrows' direction weighted by how long and by the length `arrowLength`'s entity gives (`length`, the default), or by how long only (`none`)
+- Real time's mark: a three-quarter circle turning under the date's `>` while the window shows where the new values come
+- `realTimeStep`: `defaultTimeOffset`'s new name (still accepted) — what it does: the present, and how real time follows the new values (in steps, snapped, or a time before now)
 
 ### Changed
+- Real time: the window can go a graduation of the time axis past the present — that graduation shown empty, the latest values clear of the right edge, kept as new values come; then nothing after, the `>` greyed (before: the window stopped at the present, the latest values on the edge)
+- Real time while the place of the new values is on screen — from now to the present with `realTimeStep`, now without, the present when it's negative (before: only while the window ended at the present); the `>` greyed only when there's nothing after (before: in real time)
 - An arrowline's arrows: each the mean of its zone — the time under it, as wide as the space between two arrows —, from the most precise data for each column of pixels: the direction's mean — circular for a circular entity, for its own period, Chart.js told the period (`circularPeriod`), never guessing 360 —, the length's mean, each value weighted by how long it lasts (before: the one value in force at the arrow's middle, the length read at the middle of that value's time)
 - An arrowline's tooltip: a column of pixels, as a curve's — the direction, then the length, each `min / mean / max` of the column (before: the one value in force there); its title the statistics where its values come from them (before: always the history)
 
 ### Docs
 - README_Full.md, full-reference-config.yaml: each arrow the mean of its zone, `arrowWeighting`, an arrowline's extremes
+- README.md, README_Full.md, full-reference-config.yaml: `realTimeStep` — its three kinds of present, real time, a graduation past the present
 
 ### Internal
 - `deps/timeline.js` imports `src/history-stats.js` (the one rule of means), documented in `deps/Chart Custom.js.md` (the contract) and `deps/timeline.js.md`; `tests/architecture.cjs`: Chart.js imports nothing of the card but it (`chart-imports`)
-- Tests (`documented`): `defaultTimeOffset` in the browser — loaded, dragged towards the future and back from the past, a new value: the window ending an hour after now, the curve stopping at now
+- Tests (`documented`): `realTimeStep` in the browser — `1h`, not set, `-1d`, `defaultTimeOffset`: loaded, dragged a graduation past the present and back, a new value, the date double-clicked; real time, its mark, the `>` greyed only with nothing after
 - Tests (`arrowline`): a row a column, a value alone over several columns; each arrow the mean of its zone, weighted by its length or not; the extremes' triangles, their sides; *Appearance ▸ Extremes* on an arrowline
 
 

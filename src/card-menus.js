@@ -162,6 +162,15 @@ export function magnifierSvg(mode, color, size = 24)
         `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
 }
 
+// Real time's mark (under the toolbar's '>', see card-toolbar.js timeButtonsHtml): three
+// quarters of the magnifier's ring — its size at size px, its stroke, its color —, turning
+export function realTimeSvg(size = 24)
+{
+    const r = 7.5, _arc = 0.75 * 2 * Math.PI * r;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display:block">` +
+        `<circle cx="12" cy="12" r="${r}" fill="none" stroke="${_GLASS}" stroke-width="2" stroke-dasharray="${_arc} ${2 * Math.PI * r}" /></svg>`;
+}
+
 // The magnifier's menu ez_N: its modes
 export function zoomMenuHtml(i)
 {

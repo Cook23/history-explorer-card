@@ -101,6 +101,10 @@ export class HistoryCardState {
         // exportStatsPeriod)
         this.state.exportStatsPeriod = null;
         this.state.autoScroll    = false;
+        // (see card-timerange.js _settleWindow: nothing after the window — '>' greyed —; the time
+        // shown after the present, kept in real time)
+        this.state.nothingAfter  = false;
+        this.state.realTimeGap   = 0;
 
         this._drag = null;   // label or graph being dragged (_onDragStart)
         this._lastBuildMs = 0;   // what drawing the graphs again last took (scheduleAutoRefresh)

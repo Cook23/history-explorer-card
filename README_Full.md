@@ -578,7 +578,7 @@ The card opens on the last 24 hours (see [Default view and time ranges](#default
   - *a long press* (or a right click, a pen's button) — opens the menu of what the box zooms: the time (↔ — a band the curves' whole height), the Y axis (↕ — a band their whole width) or both (⤢); the glass shows its symbol, kept as the time range is; its default: `defaultMagnifierMode` (see [Default view and time ranges](#default-view-and-time-ranges)).
 - **Date** — the `<` `>` buttons move a day back or forward. The date shown is the window's first day: a click opens the browser's calendar, the day chosen starts the window, the range kept (a day whose window reaches the present: real time). A double click brings the window back to the present, the zoom kept.
 
-**Real time** — the window shows the present, on its right: the curves grow and slide as new values come. The window never goes past the present — dragged towards the future, zoomed, the day after: it stops at the present, and is in real time again; the date's `>` is greyed then. Dragged or moved back, the window stays where it is while new values keep coming. With `defaultTimeOffset`, the present is the time it gives (`1h`: an hour after now, `1D`: the end of the day).
+**Real time** — the window shows where the new values come: the curves grow and slide as they come, and a three-quarter circle turns under the date's `>`. The window goes at most one graduation of the time axis past the present — dragged towards the future, zoomed, the day after —: there is nothing after, the `>` is greyed. That graduation is shown empty, the latest values clear of the right edge, and kept as new values come. Dragged back until the place of the new values leaves the screen, the window stays where it is while new values keep coming — the history. The present is now, or the time `realTimeStep` gives (see [Default view and time ranges](#default-view-and-time-ranges)).
 
 Where a zoom keeps the window:
 - **In real time** — every change of the range keeps the present on the right: the selector, the magnifiers − and +, the default range. The wheel does too when the pointer is in the right 10 % of the plot area, and a pinch when a finger is in its right 20 % at its start or its end; elsewhere they zoom around the pointer or the fingers, and the window stops following the present (the date brings it back).
@@ -1657,14 +1657,20 @@ type: custom:history-explorer-card
 defaultMagnifierMode: x   # the time (↔); y: the Y axis (↕); xy: both (⤢, the default)
 ```
 
-The card opens with the present on the graphs' right. `defaultTimeOffset` sets another end, when the card opens or the date is clicked: an offset from now, in lowercase units (`h`, `d`, `w`, `o`, `y`), or snapped to the current hour, day, month or year, in uppercase (`H`, `D`, `O`, `Y`):
+The card opens with the present on the graphs' right. `realTimeStep` (also `defaultTimeOffset`) sets the present — where the window ends when the card opens or the date is double-clicked, and how it follows the new values in real time:
+- not set (or 0): the present is now; the window slides with each new value;
+- a time after now, in lowercase units (`m`, `h`, `d`, `w`, `o`, `y`) — `1h`: the window ends an hour after now; it stays still while the new values fill that hour, then moves on by a step when they reach its end;
+- snapped to the current hour, day, month or year, in uppercase (`H`, `D`, `O`, `Y`) — `1D`: the window ends at midnight tonight; it stays still while the day fills, then moves on to the next one;
+- negative — `-1d`: the present is a day before now, followed as new values come: the window slides a day behind, the last day never shown.
+
+Real time lasts as long as the place of the new values is on screen: from now to the present (with a step), now (without), the present (negative). The window goes at most one graduation of the time axis past the present.
 
 ```yaml
 type: custom:history-explorer-card
-defaultTimeOffset: 1h       # an hour of empty space after now
-                            # or: -1d — show the previous day's data
-                            # or: 1D — show the current day from midnight to midnight
-                            # or: 1O — show the entire current month, starting at the 1st
+realTimeStep: 1h            # an hour of empty space after now, filled, then a step on
+                            # or: -1d — the previous day's data, sliding a day behind
+                            # or: 1D — the current day from midnight to midnight
+                            # or: 1O — the entire current month, starting at the 1st
 ```
 
 ### Long term statistics
@@ -2484,7 +2490,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`header`** | **Default** `History explorer` and the card's version<br>The card's title, over its toolbar. `' '` (a space): no title, its room kept; `hide`: no title nor room — see [Header text](#header-text) — *the card's only* |
 | **`cardName`** | **Default** `default`<br>The card's name, under which what is changed on it is kept (its entities, its range). Several cards on a dashboard each need their own name — see [Multiple cards](#multiple-cards) — *the card's only* |
 | **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h`<br>The time range shown when the card opens: a number and a unit — `m`, `h`, `d`, `w`, `o` (months), `y`; a number alone is in hours. 10 years at most — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
-| **`defaultTimeOffset`** | **Default** not set: the window ends now<br>Where the window ends when the card opens: an offset from now (`-1d`, a day ago); in uppercase, snapped to the unit (`1D`: the current day, from midnight) — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
+| **`realTimeStep`** | **Default** not set: the present is now, the window sliding with each new value<br>The present — where the window ends when the card opens, and how it follows the new values in real time —: a time after now (`1h`: filled, then a step on); in uppercase, snapped to the unit (`1D`: the current day, from midnight); negative (`-1d`: a day behind, sliding). Also `defaultTimeOffset` — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
 | **`defaultMagnifierMode`** | **Default** `xy`<br>What the magnifying glass's box zooms when the card opens: `x`, the time; `y`, the Y axis; `xy`, both. A long press on the glass changes it — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
 | **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none` — `entities` for the entities added from the card, `all` on a card without YAML graphs<br>What the card keeps of the changes made on it: `range`, `entities`, `order`, `all` or `none`, or a list of them. `enablePersistence` keeps them on this device; `enableMultidevicePersistence` on every device of the user. On an entity, for its own fields — see [Persistence](#persistence) — *the card and an entity only* |
 | **`uimode`** | **Default** Home Assistant's theme<br>`dark` or `light`: the card's colors forced, whatever Home Assistant's theme — see [Dark mode](#dark-mode) — *the card's only* |
