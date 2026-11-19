@@ -980,6 +980,12 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
 
         let j = 0;
 
+        // (the arrows and their extremes cut at the chart's area)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+        ctx.clip();
+
         for( let i = 0; i < n; i++ ) {
 
             const x0 = i * arrow_spacing + area.left + ofs;
@@ -1049,16 +1055,6 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
             // its height above: the same whatever its direction)
             const base = ( ARROW_SHAFT[1] - ARROW_BOX / 2 ) * k;
             const reach = Math.min(( ARROW_SHAFT[1] - ARROW_TIP ) * lengthOf(_max).k, ( ARROW_BOX + 6 ) / 2 + base);
-            // (the extremes cut at the chart's area — the arrow itself not)
-            const _clipped = ( _whole || lo < 0 || hi > 0 ) && reach > 0;
-            if( _clipped ) {
-                ctx.save();
-                ctx.setTransform(origMatrix);
-                ctx.beginPath();
-                ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
-                ctx.clip();
-                ctx.translate(xmid, ybar);
-            }
             if( _whole && reach > 0 ) {
                 // (a whole disc about the arrow's middle — no side to start from —, within the
                 // band; ARROW_NO_LENGTH of that with no length given)
@@ -1082,7 +1078,6 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
                     ctx.fill();
                 }
             }
-            if( _clipped ) ctx.restore();
 
             if( k <= 0 ) {
                 // (no length: a point)
@@ -1114,6 +1109,7 @@ Chart.controllers.arrowline = Chart.controllers.bar.extend({
 
         }
 
+        ctx.restore();
         this.chart.ctx.setTransform(origMatrix);
     },
 

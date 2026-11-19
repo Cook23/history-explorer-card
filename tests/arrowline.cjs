@@ -220,7 +220,7 @@ module.exports = async function()
             const discs = r.sec.filter(x => Math.abs(x[3]) < 1e-3 && Math.abs(x[4] - 2 * Math.PI) < 1e-3 && x[0] === 0 && x[1] === 0);
             return discs.length > 5 && discs.every(x => x[2] === 12) && r.a.length > 0 ? true : JSON.stringify({ discs: discs.length, sec: r.sec.slice(0, 2), a: r.a.length });
         });
-        await t.step('the extremes cut at the graph\'s area — the sectors and the whole disc drawn within a clip of the chart area, the arrows outside of it', async () => {
+        await t.step('the arrows and their extremes cut at the graph\'s area — the arrows, the sectors and the whole disc drawn within a clip of the chart area', async () => {
             const clipped = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, A=c.chartArea, r={ inClip: 0, outClip: 0, arrowsInClip: 0, arrows: 0 }, o={ rect: ctx.rect, clip: ctx.clip, save: ctx.save, restore: ctx.restore, fill: ctx.fill };
                 let last=null, depth=0, clipAt=-1;
                 ctx.rect=function(...a){ last=a; return o.rect.apply(this,a); };
@@ -233,7 +233,7 @@ module.exports = async function()
             const disc = await clipped(3);
             await rows(3, 'k=>k%2?10:350', 'k=>undefined', { min: true, max: true });
             const sec = await clipped(3);
-            return [disc, sec].every(r => r.inClip > 5 && !r.outClip && r.arrows > 5 && !r.arrowsInClip) ? true : JSON.stringify({ disc, sec });
+            return [disc, sec].every(r => r.inClip > 5 && !r.outClip && r.arrows > 5 && r.arrowsInClip === r.arrows) ? true : JSON.stringify({ disc, sec });
         });
         await t.step('extremes from the YAML (showMinMax: true) on real values: sectors drawn where the values vary in an arrow\'s zone', async () => {
             const r = await drawn(4);
