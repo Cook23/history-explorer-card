@@ -114,7 +114,7 @@ graphs:
       unit: null
 
       # (line graph and arrowline) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them);
-      # an arrowline's: a light triangle each side of its arrows, to the lowest and highest direction of their zone (max: clockwise, min: anticlockwise)
+      # an arrowline's: a light sector of a disc each side of its arrows, to the lowest and highest direction of their zone (max: clockwise, min: anticlockwise)
       showMinMax: False
 
       # (line graph only) If true, show permanent dots at each measurement point making up the line — the line

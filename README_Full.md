@@ -513,7 +513,7 @@ The curve menu's items each open their submenu over the menu, level with it — 
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; for a timeline's row, *Fill* only:
   - *Color ▸* — *Automatic*: the color it's given when it's added (its configuration's, else the one of what it measures — see [Colors of curves and bars](#colors-of-curves-and-bars)), in bold when it has it; *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
-  - *Extremes ▸* — its min/max band (`showMinMax`) — an arrowline's: its triangles —, a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range), [Compass arrow graphs](#compass-arrow-graphs));
+  - *Extremes ▸* — its min/max band (`showMinMax`) — an arrowline's: its sectors —, a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range), [Compass arrow graphs](#compass-arrow-graphs));
   - *Fill ▸* — *None* (`fill: false`), *Fade* (`fill: fade`), *Light* (its color, light: `fill: light`), *Solid* (its color: `fill: solid`), *Entity ▸* (see below);
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
@@ -1160,14 +1160,14 @@ A compass arrow graph is the `arrowline` type, for the entities added from the c
 
 The tooltip shows a column of pixels, as a curve's: the direction, then the length, each `min / mean / max` of the column (the value alone when, rounded, the three are the same).
 
-**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light triangle on each side, to the lowest and the highest direction of its zone around its own, as long as the longest length there, in the arrow's color. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
+**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light sector of a disc on each side, to the lowest and the highest direction of its zone around its own, its radius the longest length there, in the arrow's color. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
 
 **The arrows' length** — `arrowLength`, on the card, in `entityOptions`, on a graph or on an entity:
 - not set: every arrow its whole length;
 - a number from 0 to 100: every arrow that part of its whole length, in % (0: a point); out of 0 to 100, it's kept within, with a warning in the browser's console;
 - thresholds on an entity's or attribute's value, as for `color` (see [Colors of curves and bars](#colors-of-curves-and-bars)), each giving a length from 0 to 100;
 - an entity, or one of its attributes (`weather.home.wind_speed`): each arrow the mean of its values in the arrow's zone — the wind's speed with its direction:
-  - its scale is chosen as the [automatic Y axis](#the-automatic-scale) chooses its top, with `yScaleSteadiness` at 50: the largest value in the window and around it gives the whole length, 0 a point; a negative value is drawn by its absolute value;
+  - its scale is chosen as the [automatic Y axis](#the-automatic-scale) chooses its top, with `yScaleSteadiness` at 50, from the entity's means over the time of an arrow's zone: the longest arrow in the window and around it at its whole length — about 80 % of the row's height —, 0 a point; a negative value is drawn by its absolute value;
   - where the entity has no value, the arrow is drawn its whole length, its shaft dashed;
   - the tooltip shows its values, signed, in its unit, after the direction.
 
@@ -1179,7 +1179,7 @@ graphs:
   - type: arrowline
     title: Wind
     arrowMax: ~50                          # the whole length: 50 km/h at least
-    showMinMax: true                       # the directions' spread: a light triangle each side
+    showMinMax: true                       # the directions' spread: a light sector each side
     entities:
       - entity: sensor.wind_bearing
         arrowLength: sensor.wind_speed     # each arrow as long as the wind is fast
@@ -2373,7 +2373,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover`<br>Dots on the measured values: `hover`, only the one under the pointer; `true`, all of them; `false`, none; a number, all of them with that radius in px. A long press near the curve shows or hides them — see [Displaying individual samples](#displaying-individual-samples) |
 | **`sizePoints`** | **Default** the line width + 2 px<br>The diameter of the dots on the values, in px; without it, the line's width + 2 — see [Displaying individual samples](#displaying-individual-samples) |
 | **`showLine`**<br>*`show_line`* | **Default** `true`<br>`false`: the curve's points only, without the line between them — with `showPoints: true` to see them — see [Displaying individual samples](#displaying-individual-samples) |
-| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range). An arrowline's: a light triangle each side of its arrows (`max` clockwise, `min` anticlockwise) — see [Compass arrow graphs](#compass-arrow-graphs) |
+| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range). An arrowline's: a light sector of a disc each side of its arrows (`max` clockwise, `min` anticlockwise) — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`hidden`** | **Default** `false`<br>`true`: the curve hidden when the card opens; its legend label is struck through, and a click on it shows the curve — see [Legend / entity labels](#legend--entity-labels) |
 | **`legendVisible`**<br>*`show_legend`* | **Default** `true`<br>`false`: no legend label for the curves it's set for — set on every one, the graph has no legend. `auto`, on a graph or the card: a graph's legend only when it has several labels — see [Legend / entity labels](#legend--entity-labels) |
 | **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: the legend label shows the curve's name only, without its current value — see [Showing current sensor values](#showing-current-sensor-values) |

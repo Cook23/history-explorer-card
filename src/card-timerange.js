@@ -299,7 +299,7 @@ export class CardTimeRange
     // limit, see _settleWindow)
     setStepSize(update = false)
     {
-        this._timeTickApplied = undefined;
+        this.timeTicksAsked();
         const width = this.cardWidth();
 
         const tdensity = this.computeTickDensity(width);
