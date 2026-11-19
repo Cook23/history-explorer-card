@@ -847,6 +847,8 @@
   // (any CSS color — a name, #rgb, #rrggbb(aa), rgb(a)(), hsl(a)() — with that alpha; black otherwise)
   // (the band's opacity: twice the light fill's — fill: true —, so it shows over it)
   var MINMAX_BAND_ALPHA = 0.3;
+  // (the same for an arrowline's extremes: deps/timeline.js)
+  Chart.hecMinMaxBandAlpha = MINMAX_BAND_ALPHA;
   function hecColorWithAlpha(color, alpha) {
     var c = typeof color === 'string' ? helpers.color(color) : null;
     return c && c.valid ? c.alpha(alpha).rgbString() : 'rgba(0,0,0,' + alpha + ')';

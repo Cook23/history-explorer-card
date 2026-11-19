@@ -393,7 +393,7 @@ The time range shown when the card opens, where its window ends, and what the ma
 
 ```yaml
 defaultTimeRange: 4h     # 24h by default; m, h, d, w, o (months), y — 10 years at most
-defaultTimeOffset: 1D    # uppercase: snapped — here the current day, from midnight
+realTimeStep: 1D         # the present: the current day, from midnight (uppercase: snapped); 1h: an hour after now
 defaultMagnifierMode: x  # what the magnifying glass's box zooms: x the time, y the Y axis, xy both (default)
 ```
 
@@ -633,7 +633,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`header`** | **Default** `History explorer` and the card's version<br>The card's title; `' '`: none, its room kept; `hide`: none at all — *the card's only* |
 | **`cardName`** | **Default** `default`<br>The card's name, under which its changes are kept — required for several cards on a dashboard — *the card's only* |
 | **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h`<br>The time range shown when the card opens — see [Time range](#time-range) — *the card's only* |
-| **`defaultTimeOffset`** | **Default** not set: the window ends now<br>Where the window ends when the card opens: an offset (`-1d`), uppercase to snap (`1D`: the current day) — *the card's only* |
+| **`realTimeStep`** | **Default** not set: the present is now<br>The present, and how real time follows it: a step after now (`1h`), uppercase to snap (`1D`: the current day), negative (`-1d`) — also `defaultTimeOffset` — *the card's only* |
 | **`defaultMagnifierMode`** | **Default** `xy`<br>What the magnifying glass zooms: `x` the time, `y` the Y axis, `xy` both — *the card's only* |
 | **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none`<br>What the card remembers, on this device / on all the user's devices — see [Persistence](#persistence) — *the card and an entity only* |
 | **`uimode`** | **Default** Home Assistant's theme<br>`dark` or `light`: the card's colors forced — *the card's only* |

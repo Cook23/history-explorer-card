@@ -1379,43 +1379,46 @@ module.exports = async function()
     });
     done(await t.close());
 
-    // ── Real time: the present always on the right, never past it; the history: the window
-    // staying where it is; '>' greyed in real time ──
+    // ── Real time: while the present is on screen; the window a graduation past it at most —
+    // nothing after, '>' greyed —; the history: the window staying where it is ──
     t = await openCard(card({ defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }), { mock: { series: true } });
     await t.wait(1500);
     const liveWin = () => t.E(`(()=>{ const I=el.instance, b=el.querySelector('#b2_0'); return { live: !!I.state.autoScroll, toNow: Math.round((+new Date(I.endTime) - Date.now()) / 1000),
-        span: Math.round((+new Date(I.endTime) - +new Date(I.startTime)) / 1000), next: b.disabled }; })()`);
-    await t.step('real time: the window ends at the present, \'>\' greyed; dragged towards the future, it stays there', async () => {
+        span: Math.round((+new Date(I.endTime) - +new Date(I.startTime)) / 1000), next: b.disabled, grad: Math.round(I.graduationMs() / 1000) }; })()`);
+    // (a window ending at the present, or a graduation past it: the present set when it was, a few seconds ago)
+    const atPresent = (r, s) => r.toNow <= s + 1 && r.toNow >= s - 10;
+    await t.step('real time: the window ends at the present, \'>\' active; dragged towards the future, or the day after: a graduation past it at most, \'>\' greyed, still real time', async () => {
         const r0 = await liveWin();
-        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 3 * 3600e3))`);
+        // (further than a graduation — 4 h on a day here)
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 9 * 3600e3))`);
         const r1 = await liveWin();
         await t.E('el.instance.stepDay(1)');
         const r2 = await liveWin();
-        // (the window set when the card opened: the present then, a few seconds ago)
-        const ok = r0.live && r0.next && r0.toNow <= 1 && [r1, r2].every(r => r.live && r.next && r.toNow <= 1 && r.toNow >= -2 && r.span === 86400);
+        const ok = r0.live && !r0.next && atPresent(r0, 0) && r0.grad > 0 && [r1, r2].every(r => r.live && r.next && atPresent(r, r.grad) && r.span === 86400);
         return ok ? true : JSON.stringify({ r0, r1, r2 });
     });
-    await t.step('zoomed out or in, in real time: the present kept on the right', async () => {
+    await t.step('zoomed out or in, in real time: the present kept where it is', async () => {
+        await t.E('el.instance.today()');
         await t.E('el.instance.decZoom()'); const out = await liveWin();
         await t.E('el.instance.incZoom()'); const back = await liveWin();
-        return out.live && back.live && Math.abs(out.toNow) <= 2 && Math.abs(back.toNow) <= 2 && out.span === 2 * 86400 && back.span === 86400 ? true : JSON.stringify({ out, back });
+        return out.live && back.live && atPresent(out, 0) && atPresent(back, 0) && out.span === 2 * 86400 && back.span === 86400 ? true : JSON.stringify({ out, back });
     });
-    await t.step('dragged back: the history — \'>\' active, the window kept as new values come; dragged forward past the present: real time again, on the right', async () => {
+    await t.step('dragged back: the history — \'>\' active, the window kept as new values come; dragged forward past the present: real time again, a graduation past it', async () => {
         await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) - 2 * 3600e3))`);
         const past = await liveWin(), end0 = await t.E('el.instance.endTime');
         await t.E(`setState('sensor.power', '321')`); await t.wait(3500);
         const kept = await t.E('el.instance.endTime') === end0;
-        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 5 * 3600e3))`);
+        await t.E(`el.instance.moveTimeWindow(new Date(+new Date(el.instance.startTime) + 12 * 3600e3))`);
         const again = await liveWin();
-        const ok = !past.live && !past.next && past.toNow <= -7000 && kept && again.live && again.next && Math.abs(again.toNow) <= 2;
+        const ok = !past.live && !past.next && past.toNow <= -7000 && kept && again.live && again.next && atPresent(again, again.grad);
         return ok ? true : JSON.stringify({ past, kept, again });
     });
-    await t.step('the day before then the day after: back in real time when it reaches the present, never past it', async () => {
+    await t.step('the day before then the day after: back in real time when the present is on screen, never more than a graduation past it', async () => {
         await t.E('el.instance.today()');
         await t.E('el.instance.stepDay(-1)'); const before = await liveWin();
         await t.E('el.instance.stepDay(1)'); const after = await liveWin();
         await t.E('el.instance.stepDay(1)'); const again = await liveWin();
-        const ok = !before.live && !before.next && after.toNow <= 2 && again.live && again.next && Math.abs(again.toNow) <= 2;
+        const ok = !before.live && !before.next && after.toNow <= after.grad + 1 && again.live && again.next && atPresent(again, again.grad);
         return ok ? true : JSON.stringify({ before, after, again });
     });
     done(await t.close());
@@ -1571,6 +1574,16 @@ module.exports = async function()
         await t.E('MOCK.dark = true; el.hass = mkHass()'); await t.wait(1200); const dark = await look();
         const isLight = c => !c[0] && /#333|51, ?51, ?51/.test(c[1]) && /0, ?0, ?0, ?0\.1/.test(c[2]), isDark = c => c[0] && /9b9b9b|155, ?155, ?155/i.test(c[1]) && /255, ?255, ?255, ?0\.1/.test(c[2]);
         return isLight(light) && isDark(dark) ? true : JSON.stringify({ light, dark });
+    });
+    await t.step('Home Assistant switched to light, the card\'s background fading from dark to light (ha-card: 0.3 s): the light theme\'s colors once it\'s light — not kept dark by the frame after the switch', async () => {
+        const look = () => t.E(`(()=>{ const o = graphAt(0).chart.options.scales.yAxes[0]; return [el.instance.ui.darkMode, String(o.ticks.fontColor), String(o.gridLines.color)]; })()`);
+        await t.E(`(()=>{ const c=el.querySelector('#maincard'); c.style.transition='none'; c.style.backgroundColor='rgb(28, 28, 28)'; c.offsetWidth; c.style.transition='all 0.3s ease-out'; })()`);
+        const dark = await look();
+        await t.E(`(()=>{ el.querySelector('#maincard').style.backgroundColor='rgb(255, 255, 255)'; MOCK.dark = false; el.hass = mkHass(); })()`); await t.wait(1200);
+        const light = await look();
+        await t.E(`(()=>{ const c=el.querySelector('#maincard'); c.style.transition=''; c.style.backgroundColor=''; MOCK.dark = true; el.hass = mkHass(); })()`); await t.wait(1200);
+        const isLight = c => !c[0] && /#333|51, ?51, ?51/.test(c[1]) && /0, ?0, ?0, ?0\.1/.test(c[2]);
+        return dark[0] && isLight(light) ? true : JSON.stringify({ dark, light });
     });
     await t.step('dark theme: the entity selector in the theme\'s colors, not the browser\'s white field', async () => {
         const c = await t.E(`(()=>{ const s=getComputedStyle(el.querySelector('#b7_0')); return [s.backgroundColor, s.color]; })()`);

@@ -4,7 +4,7 @@
 
 import { i18n } from "./languages.js";
 import { BAR_INTERVALS, TIME_RANGES } from "./history-options.js";
-import { curveMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg } from "./card-menus.js";
+import { curveMenuHtml, optionsMenuHtml, zoomMenuHtml, magnifierSvg, realTimeSvg } from "./card-menus.js";
 import { perf } from "./card-perf.js";
 import { seriesOfGraphs } from "./history-series.js";
 const moment = window.HXLocal_moment;
@@ -19,12 +19,18 @@ export const SELECTOR_LIST_MAX_HEIGHT = '50vh';
 
 // The toolbar's time buttons, its left part (#dl_N's content): '<', the date, '>' — the
 // card's and the info panel's. (Side by side, '<' and '>' in bold, the date's padding
-// narrower: about as far from each other as the zoom controls are — see rangeControlsHtml)
+// narrower: about as far from each other as the zoom controls are — see rangeControlsHtml).
+// Under the '>', in real time, its mark turning (rt_N: realTimeSvg, as large as the
+// magnifiers — a CSS rotation, the browser's compositor's: no work for the page); the '>'
+// over it, greyed alone when there's nothing after (showRealTime)
 export function timeButtonsHtml(i)
 {
-    return `<button id="b1_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold"><</button>` +
+    return `<style>@keyframes hec-turn{to{transform:rotate(360deg)}}</style>` +
+        `<button id="b1_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold"><</button>` +
         `<button id="bx_${i}" style="${BUTTON_STYLE};height:30px;padding:1px 5px">-</button>` +
-        `<button id="b2_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold">></button>`;
+        `<button id="b2_${i}" style="${BUTTON_STYLE};height:30px;font-weight:bold;position:relative">` +
+            `<span id="rt_${i}" style="position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;pointer-events:none;display:none;animation:hec-turn 2s linear infinite">${realTimeSvg(20)}</span>` +
+            `<span id="ra_${i}" style="position:relative">></span></button>`;
 }
 
 // The toolbar's zoom controls, its right part (#dr_N's content): the magnifier (and its
@@ -129,16 +135,19 @@ export class CardToolbar
         return html;
     }
 
-    // Real time shown in the toolbars: their '>' greyed and inactive — the window ends at the
-    // present, there's nothing after it (see _settleWindow)
+    // The toolbars' '>': greyed and inactive when there's nothing after the window (a
+    // graduation past the present, see _settleWindow); its mark turning under it in real time
     showRealTime()
     {
         for( let i = 0; i < 2; i++ ) {
             const _b = this._this?.querySelector(`#b2_${i}`);
             if( !_b ) continue;
-            _b.disabled = !!this.state.autoScroll;
-            _b.style.opacity = this.state.autoScroll ? '0.38' : '';
-            _b.style.cursor = this.state.autoScroll ? 'default' : '';
+            const _end = !!this.state.nothingAfter;
+            _b.disabled = _end;
+            _b.style.cursor = _end ? 'default' : '';
+            const _a = this._this.querySelector(`#ra_${i}`), _rt = this._this.querySelector(`#rt_${i}`);
+            if( _a ) _a.style.opacity = _end ? '0.38' : '';
+            if( _rt ) _rt.style.display = this.state.autoScroll ? 'block' : 'none';
         }
     }
 

@@ -513,7 +513,7 @@ The curve menu's items each open their submenu over the menu, level with it — 
 - **Appearance ▸** — how an entity shown looks, for a curve or a bar; for an arrowline's row, *Color*, *Fill* and *Length* only; for a timeline's row, *Fill* only:
   - *Color ▸* — *Automatic*: the color it's given when it's added (its configuration's, else the one of what it measures — see [Colors of curves and bars](#colors-of-curves-and-bars)), in bold when it has it; *Choose…*: the browser's own color picker, the curve's color preselected, opened in the middle of the screen (Firefox on Windows opens the system's own, where Windows places it); the color chosen is the curve's own (`color`), a fill of its color following it — for a bar too. *Entity ▸*: the color from an entity (see below);
   - *Points ▸* — the curve's samples' dots (`showPoints`), a list: *None* (`false`), *Hovered* (`hover`), *All* (`true`) — see [Displaying individual samples](#displaying-individual-samples);
-  - *Extremes ▸* — its min/max band (`showMinMax`), a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range));
+  - *Extremes ▸* — its min/max band (`showMinMax`) — an arrowline's: its triangles —, a list: *None*, *All*, *Maximum*, *Minimum*, *Statistics*, *History* (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range), [Compass arrow graphs](#compass-arrow-graphs));
   - *Fill ▸* — *None* (`fill: false`), *Fade* (`fill: fade`), *Light* (its color, light: `fill: light`), *Solid* (its color: `fill: solid`), *Entity ▸* (see below);
   - *Width ▸* — 1 to 5 px (`lineWidth`);
   - *Line style ▸* — *Solid*, *Dots*, *Short dashes*, *Long dashes*, *Dash-dot* (`dashMode`);
@@ -578,7 +578,7 @@ The card opens on the last 24 hours (see [Default view and time ranges](#default
   - *a long press* (or a right click, a pen's button) — opens the menu of what the box zooms: the time (↔ — a band the curves' whole height), the Y axis (↕ — a band their whole width) or both (⤢); the glass shows its symbol, kept as the time range is; its default: `defaultMagnifierMode` (see [Default view and time ranges](#default-view-and-time-ranges)).
 - **Date** — the `<` `>` buttons move a day back or forward. The date shown is the window's first day: a click opens the browser's calendar, the day chosen starts the window, the range kept (a day whose window reaches the present: real time). A double click brings the window back to the present, the zoom kept.
 
-**Real time** — the window shows the present, on its right: the curves grow and slide as new values come. The window never goes past the present — dragged towards the future, zoomed, the day after: it stops at the present, and is in real time again; the date's `>` is greyed then. Dragged or moved back, the window stays where it is while new values keep coming. With `defaultTimeOffset`, the present is the time it gives (`1h`: an hour after now, `1D`: the end of the day).
+**Real time** — the window shows where the new values come: the curves grow and slide as they come, and a three-quarter circle turns under the date's `>`. The window goes at most one graduation of the time axis past the present — dragged towards the future, zoomed, the day after —: there is nothing after, the `>` is greyed. That graduation is shown empty, the latest values clear of the right edge, and kept as new values come. Dragged back until the place of the new values leaves the screen, the window stays where it is while new values keep coming — the history. The present is now, or the time `realTimeStep` gives (see [Default view and time ranges](#default-view-and-time-ranges)).
 
 Where a zoom keeps the window:
 - **In real time** — every change of the range keeps the present on the right: the selector, the magnifiers − and +, the default range. The wheel does too when the pointer is in the right 10 % of the plot area, and a pinch when a finger is in its right 20 % at its start or its end; elsewhere they zoom around the pointer or the fingers, and the window stops following the present (the date brings it back).
@@ -1153,14 +1153,23 @@ An angle — a bearing, a direction, the wind's — is shown as a row of compass
 
 A compass arrow graph is the `arrowline` type, for the entities added from the card and the YAML's alike — examples in [Entity options](#entity-options) and in the complete example of [YAML configuration for preconfigured graphs](#yaml-configuration-for-preconfigured-graphs).
 
+**Each arrow** shows its zone — the time under it, as wide as the space between two arrows: the mean of the values there, from the most precise data the card has for each column of pixels (the history where it's kept, else the statistics), each weighted by how long it lasts:
+- a circular entity's direction (see [Circular values (angles)](#circular-values-angles)) has a circular mean, for its own period (350° and 10° give 0°, not 180°), by the same rule as every mean of an angle; an entity that isn't circular (`circular: false`), the mean of a number;
+- with a length from an entity (`arrowLength`, below), the direction is also weighted by the length — a strong wind counts more than a weak one —: `arrowWeighting: length`, the default; `arrowWeighting: none`, by how long only. A value without a length there doesn't count in it; none with one: by how long only;
+- the length is the mean of the length's values there.
+
+The tooltip shows a column of pixels, as a curve's: the direction, then the length, each `min / mean / max` of the column (the value alone when, rounded, the three are the same).
+
+**The extremes** — `showMinMax`, as a curve's band (see [Showing the min/max statistical range](#showing-the-minmax-statistical-range)): from the arrow's base, a light triangle on each side, to the lowest and the highest direction of its zone around its own, as long as the longest length there, in the arrow's color. `max` is the clockwise side, `min` the anticlockwise one; `all` (or `true`) both; `statistics` / `history` both, only where the arrow comes from them.
+
 **The arrows' length** — `arrowLength`, on the card, in `entityOptions`, on a graph or on an entity:
 - not set: every arrow its whole length;
 - a number from 0 to 100: every arrow that part of its whole length, in % (0: a point); out of 0 to 100, it's kept within, with a warning in the browser's console;
 - thresholds on an entity's or attribute's value, as for `color` (see [Colors of curves and bars](#colors-of-curves-and-bars)), each giving a length from 0 to 100;
-- an entity, or one of its attributes (`weather.home.wind_speed`): each arrow its value at that time — the wind's speed with its direction:
+- an entity, or one of its attributes (`weather.home.wind_speed`): each arrow the mean of its values in the arrow's zone — the wind's speed with its direction:
   - its scale is chosen as the [automatic Y axis](#the-automatic-scale) chooses its top, with `yScaleSteadiness` at 50: the largest value in the window and around it gives the whole length, 0 a point; a negative value is drawn by its absolute value;
   - where the entity has no value, the arrow is drawn its whole length, its shaft dashed;
-  - the tooltip shows the value, signed, in its unit, after the direction.
+  - the tooltip shows its values, signed, in its unit, after the direction.
 
 `arrowMax` sets the value giving the whole length, as `ymax` sets a Y axis' top: a number — fixed, no automatic scale, a larger value drawn its whole length —, or `~` and a number — soft: the whole length at least that value, more where the values go past it. The bottom is always 0.
 
@@ -1170,9 +1179,11 @@ graphs:
   - type: arrowline
     title: Wind
     arrowMax: ~50                          # the whole length: 50 km/h at least
+    showMinMax: true                       # the directions' spread: a light triangle each side
     entities:
       - entity: sensor.wind_bearing
         arrowLength: sensor.wind_speed     # each arrow as long as the wind is fast
+        arrowWeighting: length             # (the default) the direction weighted by the speed
 ```
 
 ### Line appearance
@@ -1646,14 +1657,20 @@ type: custom:history-explorer-card
 defaultMagnifierMode: x   # the time (↔); y: the Y axis (↕); xy: both (⤢, the default)
 ```
 
-The card opens with the present on the graphs' right. `defaultTimeOffset` sets another end, when the card opens or the date is clicked: an offset from now, in lowercase units (`h`, `d`, `w`, `o`, `y`), or snapped to the current hour, day, month or year, in uppercase (`H`, `D`, `O`, `Y`):
+The card opens with the present on the graphs' right. `realTimeStep` (also `defaultTimeOffset`) sets the present — where the window ends when the card opens or the date is double-clicked, and how it follows the new values in real time:
+- not set (or 0): the present is now; the window slides with each new value;
+- a time after now, in lowercase units (`m`, `h`, `d`, `w`, `o`, `y`) — `1h`: the window ends an hour after now; it stays still while the new values fill that hour, then moves on by a step when they reach its end;
+- snapped to the current hour, day, month or year, in uppercase (`H`, `D`, `O`, `Y`) — `1D`: the window ends at midnight tonight; it stays still while the day fills, then moves on to the next one;
+- negative — `-1d`: the present is a day before now, followed as new values come: the window slides a day behind, the last day never shown.
+
+Real time lasts as long as the place of the new values is on screen: from now to the present (with a step), now (without), the present (negative). The window goes at most one graduation of the time axis past the present.
 
 ```yaml
 type: custom:history-explorer-card
-defaultTimeOffset: 1h       # an hour of empty space after now
-                            # or: -1d — show the previous day's data
-                            # or: 1D — show the current day from midnight to midnight
-                            # or: 1O — show the entire current month, starting at the 1st
+realTimeStep: 1h            # an hour of empty space after now, filled, then a step on
+                            # or: -1d — the previous day's data, sliding a day behind
+                            # or: 1D — the current day from midnight to midnight
+                            # or: 1O — the entire current month, starting at the 1st
 ```
 
 ### Long term statistics
@@ -2356,7 +2373,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`showPoints`**<br>*`showSamples`, `show_points`* | **Default** `hover`<br>Dots on the measured values: `hover`, only the one under the pointer; `true`, all of them; `false`, none; a number, all of them with that radius in px. A long press near the curve shows or hides them — see [Displaying individual samples](#displaying-individual-samples) |
 | **`sizePoints`** | **Default** the line width + 2 px<br>The diameter of the dots on the values, in px; without it, the line's width + 2 — see [Displaying individual samples](#displaying-individual-samples) |
 | **`showLine`**<br>*`show_line`* | **Default** `true`<br>`false`: the curve's points only, without the line between them — with `showPoints: true` to see them — see [Displaying individual samples](#displaying-individual-samples) |
-| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range) |
+| **`showMinMax`** | **Default** `false`<br>A band between the minimum and the maximum around the curve, where several values fall in one point: `all` (or `true`), everywhere; `max` / `min`, only its half above / below the curve; `statistics` / `history`, only where the curve comes from them; `false`, none — see [Showing the min/max statistical range](#showing-the-minmax-statistical-range). An arrowline's: a light triangle each side of its arrows (`max` clockwise, `min` anticlockwise) — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`hidden`** | **Default** `false`<br>`true`: the curve hidden when the card opens; its legend label is struck through, and a click on it shows the curve — see [Legend / entity labels](#legend--entity-labels) |
 | **`legendVisible`**<br>*`show_legend`* | **Default** `true`<br>`false`: no legend label for the curves it's set for — set on every one, the graph has no legend. `auto`, on a graph or the card: a graph's legend only when it has several labels — see [Legend / entity labels](#legend--entity-labels) |
 | **`showCurrentValues`**<br>*`show_legend_state`* | **Default** `true`<br>`false`: the legend label shows the curve's name only, without its current value — see [Showing current sensor values](#showing-current-sensor-values) |
@@ -2373,6 +2390,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px; without it, a gap in proportion to each bar's interval — see [Bar graphs for total increasing entities](#bar-graphs-for-total-increasing-entities) |
 | **`arrowLength`** | **Default** not set: every arrow its whole length<br>The length of an arrowline's arrows: a number from 0 to 100, that part of their whole length; thresholds on a value giving one; or an entity or attribute whose value gives each arrow its length, scaled automatically on its largest value around the window (see `arrowMax`) — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity that gives an arrow its whole length; no automatic scale then. `~` and a value: at least that value, more when the values go past it — see [Compass arrow graphs](#compass-arrow-graphs) |
+| **`arrowWeighting`** | **Default** `length`<br>An arrowline's arrows' direction over their zone: `length`, weighted by how long and by the length `arrowLength`'s entity gives (by how long only without one); `none`, by how long only — see [Compass arrow graphs](#compass-arrow-graphs) |
 | **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px. On the card: the height of every line and bar graph — `lineGraphHeight` and `barGraphHeight` win over it — see [Graph sizes](#graph-sizes) |
 | **`showGrid`** | **Default** `true`<br>`false`: no grid lines in the graph's plot |
 | **`showTimeLabels`** | **Default** `true`<br>`false`: no time labels under the graph — the plot takes their room, below and on its sides |
@@ -2472,7 +2490,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`header`** | **Default** `History explorer` and the card's version<br>The card's title, over its toolbar. `' '` (a space): no title, its room kept; `hide`: no title nor room — see [Header text](#header-text) — *the card's only* |
 | **`cardName`** | **Default** `default`<br>The card's name, under which what is changed on it is kept (its entities, its range). Several cards on a dashboard each need their own name — see [Multiple cards](#multiple-cards) — *the card's only* |
 | **`defaultTimeRange`**<br>*`hours_to_show`* | **Default** `24h`<br>The time range shown when the card opens: a number and a unit — `m`, `h`, `d`, `w`, `o` (months), `y`; a number alone is in hours. 10 years at most — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
-| **`defaultTimeOffset`** | **Default** not set: the window ends now<br>Where the window ends when the card opens: an offset from now (`-1d`, a day ago); in uppercase, snapped to the unit (`1D`: the current day, from midnight) — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
+| **`realTimeStep`** | **Default** not set: the present is now, the window sliding with each new value<br>The present — where the window ends when the card opens, and how it follows the new values in real time —: a time after now (`1h`: filled, then a step on); in uppercase, snapped to the unit (`1D`: the current day, from midnight); negative (`-1d`: a day behind, sliding). Also `defaultTimeOffset` — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
 | **`defaultMagnifierMode`** | **Default** `xy`<br>What the magnifying glass's box zooms when the card opens: `x`, the time; `y`, the Y axis; `xy`, both. A long press on the glass changes it — see [Default view and time ranges](#default-view-and-time-ranges) — *the card's only* |
 | **`enablePersistence` / `enableMultidevicePersistence`**<br>*`enable_persistence` / `enable_multidevice_persistence`* | **Default** `none` — `entities` for the entities added from the card, `all` on a card without YAML graphs<br>What the card keeps of the changes made on it: `range`, `entities`, `order`, `all` or `none`, or a list of them. `enablePersistence` keeps them on this device; `enableMultidevicePersistence` on every device of the user. On an entity, for its own fields — see [Persistence](#persistence) — *the card and an entity only* |
 | **`uimode`** | **Default** Home Assistant's theme<br>`dark` or `light`: the card's colors forced, whatever Home Assistant's theme — see [Dark mode](#dark-mode) — *the card's only* |

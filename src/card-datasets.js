@@ -350,13 +350,15 @@ export class CardDatasets
                             this._applyPointColors(_dataset, e, s, _colorFn, _fillFn, scale);
                     } else if( _kind == 'bar' && result[id].length > 0 ) {
                         ({ s, bcol } = this._barSamples(g, e, result[id], process, w, this._colorFunction(e, colorHistory)));
-                    } else if( g.type == 'timeline' || g.type == 'arrowline' ) {
+                    } else if( g.type == 'timeline' ) {
                         s = this._timelineRows(g, e, result[id], process, w);
-                        if( g.type == 'timeline' ) _dataset.blockFills = this._timelineFills(e, s, colorHistory);
-                        if( g.type == 'arrowline' ) {
-                            _dataset.arrowLength = this._arrowLengths(g, e, s, colorHistory);
-                            Object.assign(_dataset, this._arrowColors(e, s, colorHistory));
-                        }
+                        _dataset.blockFills = this._timelineFills(e, s, colorHistory);
+                    } else if( g.type == 'arrowline' ) {
+                        const _len = this._arrowLengths(g, e, colorHistory);
+                        s = this._arrowColumns(e, result[id], process, w, g.chart.hecPlotWidth(), _len);
+                        _dataset.arrowLength = _len?.drawn;
+                        _dataset.arrowWeighting = this.resolveOption(e, 'arrowWeighting');
+                        Object.assign(_dataset, this._arrowColors(e, s, colorHistory));
                     }
 
                 }
@@ -733,17 +735,17 @@ export class CardDatasets
         return { s, bcol };
     }
 
-    // A timeline's or arrowline's rows: [start, end, state] blocks within the window — on a
-    // timeline, states following each other that are each narrower than MERGE_PX pixels
-    // merged into one block ('multiple'): too thin to tell apart or to point at, unlike a
-    // wider one, always drawn; a short state alone keeps its own. Never on an arrowline,
-    // nor with a process function (its states aren't shown as such)
+    // A timeline's rows: [start, end, state] blocks within the window — states following
+    // each other that are each narrower than MERGE_PX pixels merged into one block
+    // ('multiple'): too thin to tell apart or to point at, unlike a wider one, always drawn; a
+    // short state alone keeps its own. Never with a process function (its states aren't shown
+    // as such)
     _timelineRows(g, e, data, process, w)
     {
         const n = data.length;
         const s = [];
         const _start = w.start.valueOf(), _end = w.end.valueOf();
-        const _merge = g.type == 'arrowline' || process ? 0 : MERGE_PX * ( _end - _start ) / Math.max(1, g.chart.hecPlotWidth());
+        const _merge = process ? 0 : MERGE_PX * ( _end - _start ) / Math.max(1, g.chart.hecPlotWidth());
 
         let merged = 0;
         let mt0, mt1;
@@ -797,25 +799,28 @@ export class CardDatasets
 
         }
 
-        return g.type == 'arrowline' ? this._arrowColumns(s, _start, _end, g.chart.hecPlotWidth()) : s;
+        return s;
     }
 
-    // An arrowline's arrows' length (arrowLength) for entity e of graph g — the dataset's
-    // arrowLength, see deps/timeline.js.md —: undefined, none set (their whole length);
-    // { fraction }, a number (that part of it, in %); { max, unit }, a series: each of its rows s
-    // ([start, end, state]) given the series' value at its middle ([3] — undefined where it has
-    // none), max its value giving the whole length (arrowLengthMax), unit its unit (the
-    // tooltip's). history: the history of the series read, by id
-    _arrowLengths(g, e, s, history)
+    // An arrowline's arrows' length (arrowLength) for entity e of graph g: undefined, none set
+    // (their whole length); else { drawn } — the dataset's arrowLength, see deps/timeline.js.md:
+    // { fraction }, a number (that part of it, in %); { max, unit }, a series or thresholds,
+    // max its value giving the whole length (arrowLengthMax; thresholds: 100, each a length
+    // in %), unit its unit (the tooltip's) —, with, read from a series or thresholds, at(t, v)
+    // its value at time t for the value v (a number, else undefined; the calls in increasing
+    // time) and the times its series changes (times: the values of an arrow's zone split
+    // there, see _arrowColumns). history: the history of the series read, by id
+    _arrowLengths(g, e, history)
     {
         const L = this.resolveOption(e, 'arrowLength');
         if( L === undefined || L === null ) return undefined;
-        if( typeof L === 'number' ) return { fraction: L / 100 };
-        const fn = this._optionFunction({ ...e, arrowLength: L }, 'arrowLength', history);
-        for( const b of s ) { const v = fn(( msOf(b[0]) + msOf(b[1]) ) / 2, Number(b[2])); b[3] = typeof v === 'number' ? v : undefined; }
+        if( typeof L === 'number' ) return { drawn: { fraction: L / 100 } };
+        const _e = { ...e, arrowLength: L }, fn = this._optionFunction(_e, 'arrowLength', history);
+        const _times = ( history?.[optionSeriesOf(_e, 'arrowLength')] ?? [] ).map(p => msOf(p.last_changed));
+        const at = (t, v) => { const x = fn(t, v); return typeof x === 'number' ? x : undefined; };
         // (thresholds: each gives a length itself, in % of the whole one)
-        if( typeof L === 'object' ) return { max: 100, unit: '%' };
-        return { max: this.arrowLengthMax(g, e, L, history), unit: this.getUnitOfMeasure(L) };
+        const drawn = typeof L === 'object' ? { max: 100, unit: '%' } : { max: this.arrowLengthMax(g, e, L, history), unit: this.getUnitOfMeasure(L) };
+        return { drawn, at, times: _times };
     }
 
     // An arrowline's arrows' colors and backgrounds, each block's (its rows s, [start, end,
@@ -894,20 +899,96 @@ export class CardDatasets
         return a?.max;
     }
 
-    // An arrowline's rows (see _timelineRows) a block at most per pixel column of a plot w px
-    // wide over _start to _end (ms): a block kept only where a column's middle falls in it —
-    // the one the arrow there shows —, from where the one kept before it ends (the first, from
-    // the first row's start: no gap)
-    _arrowColumns(s, _start, _end, w)
+    // An arrowline's rows, from the values of its entity (data; process: its process
+    // function) within the time window w, in the columns of pixels of its plot (columns of
+    // them; as a curve's, on a grid of time fixed from 1970) — what Chart.js averages over
+    // each arrow's zone, and the tooltip shows (deps/timeline.js.md): a value alone in its
+    // columns, its own row — over the columns it fills alone, joined —; a column holding
+    // several, one row: their mean — each value weighted by how long it lasts in the column;
+    // a circular entity's (circularPeriodOf) circular, the one rule, circularMean —, with
+    // their lowest and highest around it (the statistics' own min and max), as a curve's.
+    // Each row [from, to, mean (a circular entity's in [0, period)), its length's mean (len: _arrowLengths, its values split where its
+    // series changes; undefined: none), { lo, hi — the lowest and highest, as differences
+    // to the mean —, lenMin, lenMax, span — how long its values last —, lenSpan — those
+    // with a length —, lenWeight — Σ how long × |length| —, byLen — their mean weighted by
+    // it (arrowWeighting: length) —, statistics, statisticsPeriod, sides — showMinMax's
+    // sides there (bandWanted) }]. A value that isn't a number: no row (a gap)
+    _arrowColumns(e, data, process, w, columns, len)
     {
-        // (_mid(t): how many columns' middles come before t)
-        const cw = ( _end - _start ) / Math.max(1, w), _mid = t => Math.ceil(( msOf(t) - _start ) / cw - 0.5);
-        const out = [];
-        for( const r of s ) {
-            if( _mid(r[0]) === _mid(r[1]) ) continue;
-            out.push([out.length ? out[out.length - 1][1] : s[0][0], r[1], r[2]]);
+        // (its means circular for a circular entity only — see circularPeriodOf; null: as a number's)
+        const P = this.circularPeriodOf(e);
+        const _start = msOf(w.start), _end = msOf(w.end), _until = Math.min(_end, msOf(w.now));
+        const cw = ( _end - _start ) / Math.max(1, columns);
+        const _num = x => { if( x === null || x === undefined || x === '' ) return undefined; const v = Number(this.processRaw(x, process)); return Number.isFinite(v) ? v : undefined; };
+        // (each value's parts: its time within the window, cut where its length's series
+        // changes, each with its length there)
+        const _parts = [], _cuts = len?.times ?? [];
+        let c = 0;
+        for( let i = 0; i < data.length; i++ ) {
+            const v = _num(data[i].state);
+            if( v === undefined ) continue;
+            const a = Math.max(_start, msOf(data[i].last_changed)), b = Math.min(_until, i + 1 < data.length ? msOf(data[i + 1].last_changed) : _until);
+            if( b <= a ) continue;
+            const st = data[i].statistics;
+            const value = { v, lo: st ? _num(st.min) ?? v : v, hi: st ? _num(st.max) ?? v : v, statistics: !!st, period: st ? st.period ?? msOf(st.end) - msOf(data[i].last_changed) : 0 };
+            while( c < _cuts.length && _cuts[c] <= a ) c++;
+            let t = a;
+            for( let k = c; k < _cuts.length && _cuts[k] < b; k++ ) { _parts.push({ ...value, a: t, b: _cuts[k] }); t = _cuts[k]; }
+            _parts.push({ ...value, a: t, b });
         }
+        for( const p of _parts ) p.len = len?.at ? len.at(( p.a + p.b ) / 2, p.v) : undefined;
+        // (each column's parts: a part cut where a column ends)
+        const out = [];
+        let col = [], k0 = null;
+        const _flush = () => {
+            if( !col.length ) return;
+            const _last = out[out.length - 1];
+            // (a value alone in its column, after itself alone in the one before: the same row)
+            if( col.length === 1 && _last?.[4].alone === col[0].of && _last[1] === col[0].a ) {
+                const x = col[0], d = x.b - x.a, r = _last[4];
+                _last[1] = x.b; r.span += d;
+                if( x.len !== undefined ) { r.lenSpan += d; r.lenWeight += d * Math.abs(x.len); }
+            } else out.push(this._arrowRow(e, col, P));
+        };
+        for( const p of _parts ) {
+            for( let a = p.a; a < p.b; ) {
+                let k = Math.floor(a / cw);
+                if( ( k + 1 ) * cw <= a ) k++;
+                const b = Math.min(p.b, ( k + 1 ) * cw);
+                if( k !== k0 ) { _flush(); col = []; k0 = k; }
+                col.push({ ...p, a, b, of: p });
+                a = b;
+            }
+        }
+        _flush();
         return out;
+    }
+
+    // An arrowline's row (see _arrowColumns) of the parts of its values in a column (each: its
+    // time a to b, its value v, its lowest and highest lo, hi, its length len), P its entity's
+    // circular period — its means circular (the one rule, circularMean) —, null: a number's
+    // (timeWeightedMean, its lowest and highest as they are)
+    _arrowRow(e, parts, P)
+    {
+        const _d = x => x.b - x.a, _withLen = parts.filter(x => x.len !== undefined);
+        // (the mean of items, each weighted by w — with its lowest and highest around it)
+        const _mean = (items, value, w, low, high) => P ? circularMean(items, value, () => 0, w, P, value(items[0]), low, high)
+            : { mean: timeWeightedMean(items, value, () => 0, w), lo: low ? minOf(items.map(low)) : undefined, hi: high ? maxOf(items.map(high)) : undefined };
+        const m = _mean(parts, x => x.v, _d, x => x.lo, x => x.hi);
+        const lenWeight = _withLen.reduce((s, x) => s + _d(x) * Math.abs(x.len), 0);
+        // (the direction weighted by how long × |length|: each part's weight its own)
+        const byLen = lenWeight > 0 ? _mean(_withLen, x => x.v, x => _d(x) * Math.abs(x.len)).mean : undefined;
+        const _shown = v => P ? Chart.hecCircular.wrap(v, P) : v;
+        const statistics = parts.some(x => x.statistics), statisticsPeriod = maxOf(parts.map(x => x.period));
+        return [parts[0].a, parts[parts.length - 1].b, _shown(m.mean),
+                _withLen.length ? timeWeightedMean(_withLen, x => x.len, x => x.a, x => x.b) : undefined,
+                { lo: m.lo - m.mean, hi: m.hi - m.mean,
+                  lenMin: _withLen.length ? minOf(_withLen.map(x => x.len)) : undefined, lenMax: _withLen.length ? maxOf(_withLen.map(x => x.len)) : undefined,
+                  span: parts.reduce((s, x) => s + _d(x), 0), lenSpan: _withLen.reduce((s, x) => s + _d(x), 0), lenWeight,
+                  byLen: byLen === undefined ? undefined : _shown(byLen),
+                  statistics, ...( statisticsPeriod ? { statisticsPeriod } : {} ), sides: this.bandWanted(e, statistics, 2),
+                  // (a value alone: which one — its row joined to the next column's when it's alone there too)
+                  alone: parts.length === 1 ? parts[0].of : undefined }];
     }
 
     // --------------------------------------------------------------------------------------

@@ -281,7 +281,7 @@ export class CardGestures
             this.state.drag = false;
             this.state.updateCanvas = null;
             if( info.source === 'pinch' && this._pinchLive && this._keepsPresent(info) ) {
-                this.today();
+                this.today(false, this.state.realTimeGap);
             } else {
                 this.updateHistory();
             }
@@ -308,7 +308,7 @@ export class CardGestures
     {
         if( info.centerFactor === undefined ) return;
         const _live = info.source === 'pinch' ? this._pinchLive : this.isLive();
-        const [tc, tp] = ( _live && this._keepsPresent(info) ) ? [this.presentTime(), 1.0] : [this.factorToTimecode(info.centerFactor), info.centerFactor];
+        const [tc, tp] = ( _live && this._keepsPresent(info) ) ? this.presentAnchor() : [this.factorToTimecode(info.centerFactor), info.centerFactor];
         if( info.step > 0 ) this.incZoomStep(tc, tp); else this.decZoomStep(tc, tp);
     }
 

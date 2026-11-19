@@ -39,13 +39,30 @@ module.exports = async function()
                 return { n: d.length, w, gaps, from: +new Date(d[0][0]) - t0 }; })()`);
             return r.n > 50 && r.n <= r.w + 2 && r.gaps === 0 && r.from <= 0 ? true : JSON.stringify(r);
         });
-        await t.step('blocks narrower than a column: at each column\'s middle, the value in force there — the one its arrow shows', async () => {
-            const r = await t.E(`(()=>{ const t0=Date.parse('2026-01-01T00:00:00Z'), t1=t0+7*86400e3, w=500, cw=(t1-t0)/w, s=[];
-                for( let t=t0, k=0; t<t1; t+=60e3, k++ ) s.push([t, t+60e3, String(k)]);
-                const o=el.instance._arrowColumns(s, t0, t1, w), at=(a,m)=>a.find(x=>+x[0]<=m && m<+x[1])?.[2];
-                let wrong=0; for( let i=0; i<w; i++ ){ const m=t0+(i+0.5)*cw; if( at(o,m)!==at(s,m) ) wrong++; }
-                return { n: o.length, wrong }; })()`);
-            return r.n <= 501 && r.wrong === 0 ? true : JSON.stringify(r);
+        await t.step('values narrower than a column: a row a column — their circular mean, weighted by how long each lasts, with their lowest and highest around it (350° and 10° each a minute, 20-minute columns: 0°, −10°, +10°)', async () => {
+            const r = await t.E(`(()=>{ const t0=Date.parse('2026-01-01T00:00:00Z'), t1=t0+7*86400e3, data=[];
+                for( let t=t0, k=0; t<t1; t+=60e3, k++ ) data.push({ last_changed: t, state: String(k % 2 ? 10 : 350) });
+                const o=el.instance._arrowColumns({ entity: 'sensor.wind' }, data, undefined, { start: t0, end: t1, now: t1 }, 504);
+                const d=v=>Math.min(Math.abs(v), Math.abs(360-v));
+                return { n: o.length, mean: Math.max(...o.map(x=>d(x[2]))), lo: Math.max(...o.map(x=>Math.abs(x[4].lo+10))), hi: Math.max(...o.map(x=>Math.abs(x[4].hi-10))) }; })()`);
+            return r.n === 504 && r.mean < 1e-6 && r.lo < 1e-6 && r.hi < 1e-6 ? true : JSON.stringify(r);
+        });
+        await t.step('an entity that isn\'t circular (circular: false): a number\'s mean, lowest and highest — 350 and 10: 180, 10, 350; circular: 400 (grads) — 390 and 10: 0, in its own period', async () => {
+            const r = await t.E(`(()=>{ const t0=Date.parse('2026-01-01T00:00:00Z'), t1=t0+7*86400e3, mk=(a,b)=>{ const d=[]; for( let t=t0, k=0; t<t1; t+=60e3, k++ ) d.push({ last_changed: t, state: String(k % 2 ? b : a) }); return d; };
+                const w={ start: t0, end: t1, now: t1 }, I=el.instance;
+                const p=I._arrowColumns({ entity: 'sensor.wind', circular: false }, mk(350, 10), undefined, w, 504)[3];
+                const g=I._arrowColumns({ entity: 'sensor.wind_grad', circular: 400 }, mk(390, 10), undefined, w, 504)[3];
+                return { plain: [p[2], p[2]+p[4].lo, p[2]+p[4].hi].map(v=>Math.round(v*1000)/1000), grads: Math.round(Math.min(g[2], 400-g[2])*1000)/1000 }; })()`);
+            return JSON.stringify(r.plain) === '[180,10,350]' && r.grads === 0 ? true : JSON.stringify(r);
+        });
+        await t.step('a value alone over several columns: one row, as long as it lasts (its own, as the tooltip shows it)', async () => {
+            const r = await t.E(`(()=>{ const t0=Date.parse('2026-01-01T00:00:00Z'), t1=t0+86400e3, h=3600e3;
+                const data=[{ last_changed: t0, state: '90' }, { last_changed: t0+6*h, state: '180' }, { last_changed: t0+6*h+60e3, state: '270' }];
+                const o=el.instance._arrowColumns({ entity: 'sensor.wind' }, data, undefined, { start: t0, end: t1, now: t1 }, 480);
+                return o.map(x=>[(x[0]-t0)/60e3, (x[1]-t0)/60e3, Math.round(x[2])]); })()`);
+            // (480 columns of 3 min: 90 alone to 6 h; the column of 6 h — 180 a minute, then 270 —, one row; 270 alone after it)
+            const s = JSON.stringify(r);
+            return r.length === 3 && s.startsWith('[[0,360,90],[360,363,') && JSON.stringify(r[2]) === '[363,1440,270]' ? true : s;
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }
@@ -88,7 +105,7 @@ module.exports = async function()
             return m3 === 1200 && m4 >= 2400 && a.k.every(k => k <= 0.51) ? true : JSON.stringify({ a, m3, m4 });
         });
         await t.step('a negative value: drawn by its absolute value, signed in the tooltip', async () => {
-            await t.E(`(()=>{ for( const b of graphAt(3).chart.data.datasets[0].data ) b[3] = -600; })()`);
+            await t.E(`(()=>{ for( const b of graphAt(3).chart.data.datasets[0].data ) { b[3] = -600; b[4].lenMin = b[4].lenMax = -600; } })()`);
             const a = await drawn(3), tip = await t.E(`el.instance._tooltipValue('arrowline', graphAt(3).chart.data.datasets[0], { index: 5 })`);
             return a.k.length > 5 && a.k.every(k => k === 0.5) && / · -600 W$/.test(tip) ? true : JSON.stringify({ a, tip });
         });
@@ -100,10 +117,15 @@ module.exports = async function()
             const r = await drawn(5);
             return r.dashed > 5 && r.k.every(k => k === 1) ? true : JSON.stringify(r);
         });
-        await t.step('the tooltip: the direction, then the length\'s value, signed, in its unit', async () => {
-            const tip = await t.E(`(()=>{ const ds=graphAt(2).chart.data.datasets[0]; return el.instance._tooltipValue('arrowline', ds, { index: 5 }) + ' | ' + ds.data[5][3]; })()`);
-            const [text, v] = tip.split(' | ');
-            return new RegExp('^-?[\\d.]+ ° · ' + v.replace('.', '\\.') + ' W$').test(text) ? true : tip;
+        await t.step('the tooltip: the direction, then the length — each its column\'s min / mean / max, as a curve\'s (one value: itself) —, in its unit', async () => {
+            const r = await t.E(`(()=>{ const ds=graphAt(2).chart.data.datasets[0], P=360, w=v=>((v%P)+P)%P;
+                const k=ds.data.findIndex(x=>x[4].lenMax-x[4].lenMin>1 && x[4].hi-x[4].lo>0.1), one=ds.data.findIndex(x=>x[4].lenMin===x[4].lenMax && x[4].lo===0 && x[4].hi===0);
+                const x=ds.data[k], y=ds.data[one];
+                return { tip: el.instance._tooltipValue('arrowline', ds, { index: k }), want: [w(x[2]+x[4].lo), x[2], w(x[2]+x[4].hi), x[4].lenMin, x[3], x[4].lenMax],
+                         tip1: el.instance._tooltipValue('arrowline', ds, { index: one }), want1: [y[2], y[3]] }; })()`);
+            const nums = s => ( s.match(/-?[\d.]+/g) ?? [] ).map(Number), near = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 0.01);
+            return /^[\d.]+ \/ [\d.]+ \/ [\d.]+ ° · [\d.]+ \/ [\d.]+ \/ [\d.]+ W$/.test(r.tip) && near(nums(r.tip), r.want)
+                && /^[\d.]+ ° · [\d.]+ W$/.test(r.tip1) && near(nums(r.tip1), r.want1) ? true : JSON.stringify(r);
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }
@@ -124,6 +146,85 @@ module.exports = async function()
         await t.step('fill: fade on an arrowline — the band fading out (arrowFade), each block\'s too when it\'s read indirectly', async () => {
             const r = await t.E(`[graphAt(0).chart.data.datasets[0].arrowFade, (graphAt(1).chart.data.datasets[0].arrowBackgrounds ?? []).some(f => typeof f === 'object' && f.fade)]`);
             return typeof r[0] === 'string' && r[1] === true ? true : JSON.stringify(r);
+        });
+        const r = await t.close(); passed += r.passed; failed += r.failed;
+    }
+    // ── Each arrow: the mean of its zone (the rows under it), weighted by how long — times the
+    // length (arrowWeighting: length, the default) —; its extremes a triangle each side ──
+    {
+        const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '24h', statistics: { enabled: false }, graphs: [
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', arrowLength: 'sensor.power', arrowWeighting: 'none' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind' }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', showMinMax: true }] },
+            { type: 'arrowline', entities: [{ entity: 'sensor.wind', circular: false }] },
+        ] }, { mock: { series: true }, height: 1600 });
+        await t.wait(1500);
+        // (graph gi's rows made up: n of the same length over the window, each its direction
+        // and length (k: its place) — none wider than a pixel column; sides: showMinMax's)
+        const rows = (gi, dir, len, sides) => t.E(`(()=>{ const c=graphAt(${gi}).chart, ds=c.data.datasets[0], t0=+new Date(el.instance.startTime), t1=+new Date(el.instance.endTime), n=4000, d=(t1-t0)/n;
+            const dir=${dir}, len=${len};
+            ds.data=Array.from({ length: n }, (_, k)=>{ const v=dir(k), L=len(k); return [t0+k*d, t0+(k+1)*d, v, L,
+                { lo: 0, hi: 0, lenMin: L, lenMax: L, span: d, lenSpan: L===undefined?0:d, lenWeight: L===undefined?0:d*Math.abs(L), byLen: v, sides: ${JSON.stringify(sides ?? null)} }]; });
+            c.update(0); })()`);
+        // (the angles its arrows are drawn at; the light triangles drawn: their points, from
+        // the arrow's middle)
+        const drawn = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, r={ a: new Set(), tri: [], style: new Set() }, o={ rotate: ctx.rotate, moveTo: ctx.moveTo, lineTo: ctx.lineTo, fill: ctx.fill };
+            let path=[];
+            ctx.rotate=function(a){ if(a) r.a.add(Math.round(((a*180/Math.PI-180)%360+360)%360)); return o.rotate.call(this,a); };
+            ctx.moveTo=function(x,y){ path=[[x,y]]; return o.moveTo.call(this,x,y); };
+            ctx.lineTo=function(x,y){ path.push([x,y]); return o.lineTo.call(this,x,y); };
+            ctx.fill=function(...a){ if( !a.length && path.length===3 && /0[.]3[)]$/.test(String(this.fillStyle)) ) { r.tri.push(path.map(p=>p.map(v=>Math.round(v*10)/10))); r.style.add(String(this.fillStyle)); } path=[]; return o.fill.apply(this,a); };
+            c.render(0); for( const k in o ) delete ctx[k]; return { a: [...r.a], tri: r.tri, style: [...r.style] }; })()`);
+        await t.step('an arrow\'s direction: the mean of the rows in its zone, each weighted by how long — 350° and 10° alternating: 0°', async () => {
+            await rows(0, 'k=>k%2?10:350', 'k=>undefined');
+            const r = await drawn(0);
+            return r.a.length >= 1 && r.a.every(x => x === 0 || x === 360) ? true : JSON.stringify(r);
+        });
+        await t.step('Chart.js told whether the entity is circular (circularPeriod, never guessed): circular — 360 —, 350° and 10°: 0°; not circular (circular: false: null), a number\'s mean: 180', async () => {
+            const P = await t.E(`[graphAt(0).chart.data.datasets[0].circularPeriod, graphAt(5).chart.data.datasets[0].circularPeriod, graphAt(5).chart.data.datasets[0].arrowPeriod]`);
+            await rows(5, 'k=>k%2?10:350', 'k=>undefined');
+            const r = await drawn(5);
+            // (an arrow at the window's edge: its zone partly covered — a row more of one value, a degree off)
+            return JSON.stringify(P) === '[360,null,360]' && r.a.includes(180) && r.a.every(a => Math.abs(a - 180) <= 1) ? true : JSON.stringify({ P, r });
+        });
+        await t.step('arrowWeighting: length (the default) — each also weighted by its length: 350° of 3 and 10° of 1, 355°; none: 0°', async () => {
+            await rows(1, 'k=>k%2?10:350', 'k=>k%2?1:3'); await rows(2, 'k=>k%2?10:350', 'k=>k%2?1:3');
+            const a = await drawn(1), b = await drawn(2);
+            return JSON.stringify(a.a) === '[355]' && b.a.length >= 1 && b.a.every(x => x === 0 || x === 360) ? true : JSON.stringify({ a, b });
+        });
+        await t.step('extremes (showMinMax: all): a triangle each side of the arrow, from its base, in its color at the min/max band\'s alpha (0.3); max only: the clockwise one', async () => {
+            await rows(3, 'k=>k%2?10:350', 'k=>undefined', { min: true, max: true });
+            const both = await drawn(3);
+            await rows(3, 'k=>k%2?10:350', 'k=>undefined', { min: false, max: true });
+            const max = await drawn(3);
+            // (the arrow at 0° points down — the wind coming from the north —: clockwise on the
+            // screen, from down, is to the left — the triangle's far points: one straight down, x 0;
+            // the other to the left, x < 0)
+            const _left = tr => tr.every(p => Math.abs(p[1][0]) < 0.2 && p[2][0] < -0.5);
+            return both.tri.length > 5 && both.tri.length === 2 * Math.round(both.tri.length / 2) && max.tri.length * 2 === both.tri.length
+                && _left(max.tri) && both.style.every(c => /, ?0\.3\)$/.test(c)) ? true : JSON.stringify({ both: both.tri.length, max: max.tri.slice(0, 2), style: both.style });
+        });
+        await t.step('extremes from the YAML (showMinMax: true) on real values: triangles drawn where the values vary in an arrow\'s zone', async () => {
+            const r = await drawn(4);
+            return r.tri.length > 5 ? true : JSON.stringify({ tri: r.tri.length });
+        });
+        const r = await t.close(); passed += r.passed; failed += r.failed;
+    }
+    // ── Appearance ▸ Extremes on an arrowline ──
+    {
+        const t = await openCard(card([{ entity: 'sensor.wind' }]), { mock: { series: true } });
+        await t.wait(800);
+        await t.step('Appearance ▸ Extremes on an arrowline: the curves\' list; Maximum chosen: saved as max, triangles drawn', async () => {
+            await t.E(`(()=>{ const I=el.instance, g=I.graphsInDisplayOrder()[0]; I.showEntityCurveMenu(0, g.entities[0].entity, g, { from: 'label', clientX: 100, clientY: 100 }); })()`); await t.wait(250);
+            await t.E(`el.querySelector('#et_0_appearance').click()`); await t.wait(200);
+            const has = await t.E(`!!el.querySelector('#et_0_appearance_minmax')`);
+            await t.E(`el.querySelector('#et_0_appearance_minmax').click()`); await t.wait(200);
+            const l = await t.E(`[...el.querySelectorAll('#et_0_appearance_minmax_sub a')].map(a=>a.textContent).join(' | ')`);
+            await t.E(`[...el.querySelectorAll('#et_0_appearance_minmax_sub a')].find(a=>a.textContent==='Maximum').click()`); await t.wait(1200);
+            const saved = await t.E('graphAt(0).entities[0].showMinMax'), sides = await t.E(`graphAt(0).chart.data.datasets[0].data.some(x=>x[4].sides?.max && !x[4].sides.min)`);
+            return has && l === 'None | All | Maximum | Minimum | Statistics | History' && saved === 'max' && sides ? true : JSON.stringify({ has, l, saved, sides });
         });
         const r = await t.close(); passed += r.passed; failed += r.failed;
     }

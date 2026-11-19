@@ -107,6 +107,10 @@ README_Full's *What is kept, and where* tells the user what each value obeys.
 - **Code what is asked, exactly.** A problem detected, something to correct, a case the
   instruction doesn't cover (a device, a pointer, a condition, an exception): say it and ask
   before coding it — never decide it alone, even when it looks obvious.
+- **Read the code before asking.** Before a question on how the card behaves or what to do,
+  read the code it's about: a question its code answers (what `<` / `>` do, what Chart.js
+  already gives the card…) is not asked — what it does is said, with the line. Only what the
+  code can't tell is asked: the user's choice.
 - **An instruction unclear:** reformulate it and wait for the answer — don't interpret.
 - **An instruction too summarized** to be coded as is: say so and ask the user to detail it, before
   coding.

@@ -101,6 +101,10 @@ export class HistoryCardState {
         // exportStatsPeriod)
         this.state.exportStatsPeriod = null;
         this.state.autoScroll    = false;
+        // (see card-timerange.js _settleWindow: nothing after the window — '>' greyed —; the time
+        // shown after the present, kept in real time)
+        this.state.nothingAfter  = false;
+        this.state.realTimeGap   = 0;
 
         this._drag = null;   // label or graph being dragged (_onDragStart)
         this._lastBuildMs = 0;   // what drawing the graphs again last took (scheduleAutoRefresh)
@@ -217,6 +221,12 @@ export class HistoryCardState {
                 this.insertUIHtmlText(i);
 
             this.applyTheme(this._darkBackground());
+            // (the card's background changing in a fade when the theme switches — Home
+            // Assistant's ha-card: transition all 0.3 s —: read again once at its color, the
+            // frame after the switch finding it still dark, see followTheme)
+            this._this.querySelector('#maincard')?.addEventListener('transitionend', e => {
+                if( e.target.id === 'maincard' && /background/.test(e.propertyName) && this.contentValid ) this.followTheme(this._darkBackground());
+            });
 
             this.clearGraphs();
 

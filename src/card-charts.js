@@ -226,6 +226,8 @@ export class CardCharts
                 arrowFade: d.fillFade ? d.bColor : undefined,
                 blockFill: d.blockFill,
                 arrowPeriod: d.arrowPeriod,
+                // (its entity's circular period — its means circular —, null: not circular)
+                circularPeriod: d.circular ?? null,
                 // (its row's tooltip, as a curve's: Chart.js hecTooltip)
                 hecTooltip: d.tooltip,
                 data: [ ]
@@ -858,18 +860,26 @@ export class CardCharts
     // An element's value in its tooltip: a curve's or a bar's in its unit (circular ones in
     // [0, period); a column of values: their min / mean / max — see _lineSamples), a
     // timeline's state (named as Home Assistant names it: tooltip.stateTextMode auto), an
-    // arrowline's value in its unit — and its arrows' length's, when a series gives it
+    // arrowline's value in its unit — and its arrows' length's, when a series or thresholds
+    // give it —, a column of values: their min / mean / max, as a curve's (see
+    // card-datasets.js _arrowColumns)
     _tooltipValue(graphtype, ds, item)
     {
         const _unit = ' ' + ( ds.unit || '' );
-        if( graphtype == 'timeline' || graphtype == 'arrowline' ) {
-            const _state = ds.data[item.index][2];
-            // (an arrowline's arrows' length from a series: its value there, signed, in its unit)
-            const _len = ds.arrowLength?.unit !== undefined ? ds.data[item.index][3] : undefined;
-            if( graphtype == 'arrowline' ) return formatNumber(_state, ds.rounding) + _unit
-                + ( _len !== undefined ? ' · ' + formatNumber(_len, ds.rounding) + ( ds.arrowLength.unit ? ' ' + ds.arrowLength.unit : '' ) : '' );
-            return this._stateText(_state, ds, this.pconfig.tooltipStateTextMode);
+        // (a column's min / mean / max — only when they differ as shown, rounded: else its mean)
+        const _span = (min, mean, max, shown) => {
+            const _m = shown(mean), _lo = shown(min), _hi = shown(max);
+            return _lo === _m && _hi === _m ? _m : `${_lo} / ${_m} / ${_hi}`;
+        };
+        if( graphtype == 'arrowline' ) {
+            // (a circular entity: its values in [0, period))
+            const r = ds.data[item.index], x = r[4], P = ds.circularPeriod;
+            const _dir = _span(r[2] + x.lo, r[2], r[2] + x.hi, v => formatNumber(P ? Chart.hecCircular.wrap(v, P) : v, ds.rounding)) + _unit;
+            // (its arrows' length: in its unit, signed)
+            if( ds.arrowLength?.unit === undefined || r[3] === undefined ) return _dir;
+            return _dir + ' · ' + _span(x.lenMin, r[3], x.lenMax, v => formatNumber(v, ds.rounding)) + ( ds.arrowLength.unit ? ' ' + ds.arrowLength.unit : '' );
         }
+        if( graphtype == 'timeline' ) return this._stateText(ds.data[item.index][2], ds, this.pconfig.tooltipStateTextMode);
         const _siFactor = ds.siConversionFactor ?? 1;
         // (from the value drawn back to the value shown: see shownScale)
         const _tf = ds.textFactor ?? 1;
@@ -881,11 +891,8 @@ export class CardCharts
             return formatNumber(_circQ ? Chart.hecCircular.wrap(v, _circQ * Math.abs(_tf)) : v, ds.rounding);
         };
         const _p = ds.data[item.index];
-        // (a column's min / mean / max — only when they differ as shown, rounded: else its mean)
-        const _mean = _shown(item.yLabel);
-        if( _p?.columnMin == null ) return _mean + _unit;
-        const _min = _shown(_p.columnMin), _max = _shown(_p.columnMax);
-        return ( _min === _mean && _max === _mean ? _mean : `${_min} / ${_mean} / ${_max}` ) + _unit;
+        if( _p?.columnMin == null ) return _shown(item.yLabel) + _unit;
+        return _span(_p.columnMin, item.yLabel, _p.columnMax, _shown) + _unit;
     }
 
     // A timeline's state as it is shown (its segment, its tooltip): named as Home Assistant
@@ -902,8 +909,9 @@ export class CardCharts
     _tooltipTitle(p, xLabel)
     {
         const _time = this._tooltipTime(p, xLabel);
-        // (a timeline's or arrowline's state, [start, end, state]: from the history)
-        if( Array.isArray(p) ) p = { x: p[0] };
+        // (a timeline's or arrowline's row, [start, end, state…]: from the history — an
+        // arrowline's, unless its row says statistics are in it, see card-datasets.js _arrowColumns)
+        if( Array.isArray(p) ) p = { x: p[0], statistics: p[4]?.statistics, statisticsPeriod: p[4]?.statisticsPeriod };
         if( !p || typeof p !== 'object' || ( p.x === undefined && p.columnFrom == null ) ) return _time;
         // (statistics: their period too — 5 min, 1 h, 1 d)
         const _ms = p.statisticsPeriod, _source = this.sourceLabel(p.statistics ? ( _ms > 0 ? _ms : 0 ) : null);
@@ -1053,7 +1061,8 @@ export class CardCharts
                 "showMinMax": d.showMinMax,
                 "tooltip": this.tooltipModeOf(d),
                 // (period of a circular entity in the units shown, before SI conversion)
-                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : null,
+                // (an arrowline's: its entity's own, as it is — its means circular, see _arrowColumns)
+                "circular": ( _kind === 'line' || _kind === 'bar' ) ? ( this.circularPeriodOf(d) ?? 0 ) * Math.abs(this.drawScaleOf(d)) || null : _kind === 'arrowline' ? this.circularPeriodOf(d) : null,
                 // (an arrowline's values are angles: a full turn is the entity's circular
                 // period, else the default one)
                 "arrowPeriod": ( _kind === 'arrowline' ) ? ( this.circularPeriodOf(d) ?? OPTION_DEFAULTS.arrowlinePeriod ) : undefined,

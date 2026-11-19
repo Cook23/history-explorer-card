@@ -162,6 +162,15 @@ export function magnifierSvg(mode, color, size = 24)
         `<path fill="none" stroke="${color ?? _SYMBOL}" stroke-width="${_w.line}" stroke-linecap="round" d="${_d}" /></svg>`;
 }
 
+// Real time's mark (under the toolbar's '>', see card-toolbar.js timeButtonsHtml): three
+// quarters of the magnifier's ring — its size at size px, its stroke, its color —, turning
+export function realTimeSvg(size = 24)
+{
+    const r = 7.5, _arc = 0.75 * 2 * Math.PI * r;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="display:block">` +
+        `<circle cx="12" cy="12" r="${r}" fill="none" stroke="${_GLASS}" stroke-width="2" stroke-dasharray="${_arc} ${2 * Math.PI * r}" /></svg>`;
+}
+
 // The magnifier's menu ez_N: its modes
 export function zoomMenuHtml(i)
 {
@@ -1084,7 +1093,8 @@ export class CardMenus
     // others, the curves
     _lookByGraph(m, key)
     {
-        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline' : this.isCurve(g, g.entities.indexOf(e));
+        const _takes = (g, e) => key === 'fill' ? true : key === 'color' ? g.type !== 'timeline' : key === 'length' ? g.type === 'arrowline'
+            : key === 'minmax' && g.type === 'arrowline' ? true : this.isCurve(g, g.entities.indexOf(e));
         return this._scopeOf(m).pairs.map(({ g, entities }) => ({ g, curves: entities.filter(e => _takes(g, e)) }))
             .filter(({ curves }) => curves.length);
     }
@@ -1104,7 +1114,8 @@ export class CardMenus
     // The appearance submenu's lines that apply to what menu m acts on: the color, for one
     // entity — a curve, a bar or an arrowline's row (not a timeline's: its colors are its
     // states') — or for arrowline rows only (each on a row of its own: one color for them all
-    // still tells them apart); the fill, for all but a timeline's rows; the others, for curves
+    // still tells them apart); the fill, for all; the length, for arrowline rows; the extremes,
+    // for curves and arrowline rows; the others, for curves
     _appearanceLines(m)
     {
         const { kind, pairs } = this._scopeOf(m);

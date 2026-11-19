@@ -63,6 +63,10 @@ graphs:
       # The value of arrowLength's entity giving the whole length (no automatic scale); '~' and a value: at least that one
       arrowMax: null
 
+      # An arrowline's arrows' direction, the mean of their zone: length, weighted by how long and by arrowLength's entity's value
+      # (by how long only without one); none, by how long only
+      arrowWeighting: length
+
       # The value now, in large, over the graph (the curve's colour and unit)
       showState: false
 
@@ -109,7 +113,8 @@ graphs:
       # Overrides the unit of measurement shown for this entity, instead of the one reported by HA
       unit: null
 
-      # (line graph only) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them)
+      # (line graph and arrowline) If true, show a lighter min/max band around the mean curve (statistics or history: only where the curve comes from them);
+      # an arrowline's: a light triangle each side of its arrows, to the lowest and highest direction of their zone (max: clockwise, min: anticlockwise)
       showMinMax: False
 
       # (line graph only) If true, show permanent dots at each measurement point making up the line — the line
@@ -566,8 +571,11 @@ defaultTimeRange: '24'
 # What the magnifying glass's elastic box zooms when the card opens: x (the time), y (the Y axis) or xy (both). Kept or not as the time range is.
 defaultMagnifierMode: 'xy'
 
-# By default, the right side of the graph will be the current time. Use this to offset the time range the graph should display. Using lower case suffices for relative offsets, and using upper case units to display the current hour, day, month or year.
-defaultTimeOffset: undefined
+# The present — where the window ends when the card opens, and how real time follows the new values (also: defaultTimeOffset).
+# Not set: now, the window sliding with each new value. Lower case (1h): an hour after now — filled, then a step on.
+# Upper case (1D): snapped to the current hour, day, month or year. Negative (-1d): a day behind now, sliding.
+# Real time while the place of the new values is on screen; the window goes a time-axis graduation past the present at most.
+realTimeStep: undefined
 
 # The gesture thresholds — for every card and info panel of the page, and every device (the last one to speak,
 # this YAML or the options menu's All cards submenu, wins). Each kept within its bounds
