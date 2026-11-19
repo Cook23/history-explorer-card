@@ -88,9 +88,9 @@ module.exports = async function()
             ctx.setLineDash=function(d){ if(d.length) r.dashed++; return o.setLineDash.call(this,d); };
             ctx.arc=function(...a){ r.points++; return o.arc.apply(this,a); };
             c.render(0); Object.assign(ctx, o); delete ctx.scale; delete ctx.setLineDash; delete ctx.arc; return r; })()`);
-        await t.step('arrowLength unset: every arrow its whole length', async () => {
+        await t.step('arrowLength unset: every arrow 80 % of its whole length', async () => {
             const r = await drawn(0);
-            return r.k.length > 5 && r.k.every(k => k === 1) && !r.dashed && !r.points ? true : JSON.stringify(r);
+            return r.k.length > 5 && r.k.every(k => k === 0.8) && !r.dashed && !r.points ? true : JSON.stringify(r);
         });
         await t.step('arrowLength: 50 — every arrow half its whole length; 0 (on the graph): a point each', async () => {
             const a = await drawn(1), b = await drawn(6);
@@ -113,9 +113,9 @@ module.exports = async function()
             const r = await t.E(`(()=>{ const ds=graphAt(7).chart.data.datasets[0]; return { c: [...new Set(ds.arrowColors ?? [])], f: [...new Set(ds.arrowBackgrounds ?? [])] }; })()`);
             return r.c.length === 2 && r.c.includes('#ff0000') && r.c.includes('#0000ff') && r.f.length >= 2 ? true : JSON.stringify(r);
         });
-        await t.step('arrowLength from an entity without a value there: each arrow its whole length, dashed', async () => {
+        await t.step('arrowLength from an entity without a value there: each arrow 80 % of its whole length, dashed', async () => {
             const r = await drawn(5);
-            return r.dashed > 5 && r.k.every(k => k === 1) ? true : JSON.stringify(r);
+            return r.dashed > 5 && r.k.every(k => k === 0.8) ? true : JSON.stringify(r);
         });
         await t.step('the tooltip: the direction, then the length — each its column\'s min / mean / max, as a curve\'s (one value: itself) —, in its unit', async () => {
             const r = await t.E(`(()=>{ const ds=graphAt(2).chart.data.datasets[0], P=360, w=v=>((v%P)+P)%P;
@@ -214,11 +214,26 @@ module.exports = async function()
             const over = r.sec.filter(x => x[2] > 15 + Math.hypot(x[0], x[1]) + 0.01);
             return r.sec.length > 5 && !over.length ? true : JSON.stringify({ n: r.sec.length, over: over.slice(0, 3) });
         });
-        await t.step('a whole turn or more in an arrow\'s zone (10° more each row): the extremes a whole disc about the arrow\'s middle, within the band; the arrow still its mean direction', async () => {
+        await t.step('a whole turn or more in an arrow\'s zone (10° more each row): the extremes a whole disc about the arrow\'s middle, within the band — no length given: 80 % of it, 12 px —; the arrow still its mean direction', async () => {
             await rows(3, 'k=>(k*10)%360', 'k=>undefined', { min: true, max: true });
             const r = await drawn(3);
-            const discs = r.sec.filter(x => Math.abs(x[3]) < 1e-3 && Math.abs(x[4] - 2 * Math.PI) < 1e-3 && x[0] === 0 && x[1] === 0 && x[2] <= 15);
-            return discs.length > 5 && r.a.length > 0 ? true : JSON.stringify({ discs: discs.length, sec: r.sec.slice(0, 2), a: r.a.length });
+            const discs = r.sec.filter(x => Math.abs(x[3]) < 1e-3 && Math.abs(x[4] - 2 * Math.PI) < 1e-3 && x[0] === 0 && x[1] === 0);
+            return discs.length > 5 && discs.every(x => x[2] === 12) && r.a.length > 0 ? true : JSON.stringify({ discs: discs.length, sec: r.sec.slice(0, 2), a: r.a.length });
+        });
+        await t.step('the arrows and their extremes cut at the graph\'s area — the arrows, the sectors and the whole disc drawn within a clip of the chart area', async () => {
+            const clipped = gi => t.E(`(()=>{ const c=graphAt(${gi}).chart, ctx=c.ctx, A=c.chartArea, r={ inClip: 0, outClip: 0, arrowsInClip: 0, arrows: 0 }, o={ rect: ctx.rect, clip: ctx.clip, save: ctx.save, restore: ctx.restore, fill: ctx.fill };
+                let last=null, depth=0, clipAt=-1;
+                ctx.rect=function(...a){ last=a; return o.rect.apply(this,a); };
+                ctx.clip=function(...a){ const ok=last && Math.abs(last[0]-A.left)<0.5 && Math.abs(last[1]-A.top)<0.5 && Math.abs(last[0]+last[2]-A.right)<0.5 && Math.abs(last[1]+last[3]-A.bottom)<0.5; if( ok ) clipAt=depth; return o.clip.apply(this,a); };
+                ctx.save=function(){ depth++; return o.save.call(this); };
+                ctx.restore=function(){ if( clipAt===depth ) clipAt=-1; depth--; return o.restore.call(this); };
+                ctx.fill=function(...a){ const light=/0[.]3[)]$/.test(String(this.fillStyle)); if( a.length ) { r.arrows++; if( clipAt>=0 ) r.arrowsInClip++; } else if( light ) { if( clipAt>=0 ) r.inClip++; else r.outClip++; } return o.fill.apply(this,a); };
+                c.render(0); for( const k in o ) delete ctx[k]; return r; })()`);
+            await rows(3, 'k=>(k*10)%360', 'k=>undefined', { min: true, max: true });
+            const disc = await clipped(3);
+            await rows(3, 'k=>k%2?10:350', 'k=>undefined', { min: true, max: true });
+            const sec = await clipped(3);
+            return [disc, sec].every(r => r.inClip > 5 && !r.outClip && r.arrows > 5 && r.arrowsInClip === r.arrows) ? true : JSON.stringify({ disc, sec });
         });
         await t.step('extremes from the YAML (showMinMax: true) on real values: sectors drawn where the values vary in an arrow\'s zone', async () => {
             const r = await drawn(4);

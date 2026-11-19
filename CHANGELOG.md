@@ -4,6 +4,22 @@ Changelog for the HA History Explorer Card.
 (Using format and definitions from https://keepachangelog.com/en/1.0.0/)
 
 
+## [v1.2.90] - 2026-11-19
+
+### Changed
+- An arrowline's arrows without a length — no `arrowLength`, or its entity without a value there — drawn at 80 % of their whole length (before: their whole length), their extremes' sectors and whole disc at 80 % of theirs as well
+
+### Fixed
+- An arrowline's arrows and extremes past the graph's area (at its edges): drawn over the card's edge. Cut at the graph's area
+- The toolbar's `>` at the end, in real time: it moved the window back to the end instead of a graduation past it, unless pressed less than a second after real time last moved the window (or the window a little past the end) — the end told by comparing the window's end with now, behind it until real time's next move. The end told by being on screen, as the window was last set
+
+### Docs
+- README.md, README_Full.md, full-reference-config.yaml, `deps/timeline.js.md`: an arrowline's arrows without a length at 80 %, its arrows and extremes cut at the graph's area
+
+### Internal
+- Tests (`arrowline`): the arrows without a length at 80 %, the whole disc at 12 px, the arrows and their extremes within a clip of the chart area; (`features`): `>` at the end some seconds after real time last moved the window
+
+
 ## [v1.2.89] - 2026-11-19
 
 ### Changed

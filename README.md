@@ -522,7 +522,7 @@ Each option in **bold**, its aliases — other names it is read under — in *it
 | **`netBars`** | **Default** `false`<br>`true`: bars of a total that can decrease (net metering) |
 | **`stacked`** | **Default** `false`<br>`true`: the bars stacked, not side by side — see *2 |
 | **`barSpacing`**<br>*`bar_spacing`* | **Default** automatic: a small gap on both sides of each bar, by its interval<br>The room between two bars, in px — see *2 |
-| **`arrowLength`** | **Default** not set: every arrow its whole length<br>The arrows' length: 0 to 100 %, or an entity giving it, scaled automatically — see [Compass arrows](#compass-arrows) |
+| **`arrowLength`** | **Default** not set: every arrow 80 % of its whole length<br>The arrows' length: 0 to 100 %, or an entity giving it, scaled automatically — see [Compass arrows](#compass-arrows) |
 | **`arrowMax`** | **Default** automatic: the largest value in the window and around it<br>The value of `arrowLength`'s entity giving the whole length; `~`: at least that |
 | **`height`** | **Default** `lineGraphHeight` (250), `barGraphHeight` (150)<br>The graph's height, in px — see *2 and *3 |
 | **`showGrid`** | **Default** `true`<br>`false`: no grid lines — see *2 |

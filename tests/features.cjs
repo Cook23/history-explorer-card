@@ -1454,6 +1454,13 @@ module.exports = async function()
             && near(r1.b, r1.P) && r1.live && !r1.greyed && S(r1.b - r2.b) && r2.hour && [b1, b2, f1, r2].every(w => near(w.b - w.a, span));
         return ok ? true : JSON.stringify({ span, G: w0.G, w0, b1, b2, f1, f2, f3, f4, r1, r2 });
     });
+    await t.step('\'>\' at the end some seconds after real time last moved the window — its end behind now —: a graduation after the end, greyed', async () => {
+        await t.E('el.instance.today()'); await t.wait(4000);
+        const before = await t.E(`(()=>{ const I=el.instance; return { lag: +I.realTimeEnd() - +new Date(I.endTime), live: !!I.state.autoScroll }; })()`);
+        await t.E('el.instance.stepDay(1)'); await t.wait(400);
+        const W = await t.E(`(()=>{ const I=el.instance; return { b: +new Date(I.endTime), P: +I.realTimeEnd(), G: I.graduationMs(), greyed: el.querySelector('#b2_0').disabled }; })()`);
+        return before.lag > 2000 && before.live && Math.abs(W.b - W.P - W.G) <= 1500 && W.greyed ? true : JSON.stringify({ before, W });
+    });
     done(await t.close());
 
     // ── Midnight, in the browser's time zone (Paris: a day starting 2 h before UTC's) ──
