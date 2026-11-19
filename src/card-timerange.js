@@ -294,8 +294,12 @@ export class CardTimeRange
             return _density(this.pconfig.timeTickOverride);
     }
 
+    // The time axis' step asked for the range now set — the step Chart.js drew the one before
+    // with let go (timeTickStep: this one's until it draws it, its graduation the window's
+    // limit, see _settleWindow)
     setStepSize(update = false)
     {
+        this._timeTickApplied = undefined;
         const width = this.cardWidth();
 
         const tdensity = this.computeTickDensity(width);
