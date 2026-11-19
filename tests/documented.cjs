@@ -207,5 +207,41 @@ module.exports = async function()
         done(await t.close());
     }
 
+    // ── defaultTimeOffset: an empty space after now, on the right of the latest values ──
+    {
+        const t = await openCard({ type: 'custom:history-explorer-card', defaultTimeRange: '6h', defaultTimeOffset: '1h', statistics: { enabled: false },
+            graphs: [{ type: 'line', entities: [{ entity: 'sensor.power' }] }] }, { mock: { series: true } });
+        await t.wait(1500);
+        // (the window's end and start from now, in s; the curve's last point from now, in s;
+        // whether the window follows the present)
+        const win = () => t.E(`(()=>{ const i=el.instance, n=Date.now(), d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null), last=d[d.length-1];
+            return { end: Math.round((Date.parse(i.endTime)-n)/1e3), start: Math.round((Date.parse(i.startTime)-n)/1e3), last: last ? Math.round((+new Date(last.x)-n)/1e3) : null, live: !!i.state.autoScroll }; })()`);
+        const _hour = r => Math.abs(r.end - 3600) <= 5;
+        await t.step('defaultTimeOffset: 1h — loaded: the window ends an hour after now (6 h long), the curve stops at now: an hour empty on its right; live', async () => {
+            const r = await win();
+            return _hour(r) && Math.abs(r.end - r.start - 6 * 3600) <= 1 && r.last !== null && Math.abs(r.last) <= 5 && r.live ? true : JSON.stringify(r);
+        });
+        await t.step('defaultTimeOffset: 1h — dragged towards the future: the window stops an hour after now, never further', async () => {
+            const a = await t.E('graphPtAt(0,0.5)');
+            await t.drag(a, { x: a.x - 300, y: a.y }); await t.wait(1500);
+            const r = await win();
+            return _hour(r) && r.live ? true : JSON.stringify(r);
+        });
+        await t.step('defaultTimeOffset: 1h — dragged into the past, then far towards the future: back to an hour after now, live again', async () => {
+            const a = await t.E('graphPtAt(0,0.5)');
+            await t.drag(a, { x: a.x + 300, y: a.y }); await t.wait(1500);
+            const past = await win();
+            await t.drag(a, { x: a.x - 600, y: a.y }); await t.wait(1500);
+            const r = await win();
+            return past.end < 0 && !past.live && _hour(r) && r.live ? true : JSON.stringify({ past, r });
+        });
+        await t.step('defaultTimeOffset: 1h — a new value: drawn at now, the window still ending an hour after it', async () => {
+            await t.E(`setState('sensor.power', '777')`); await t.wait(2500);
+            const r = await win(), y = await t.E(`(()=>{ const d=graphAt(0).chart.data.datasets[0].data.filter(p=>p && p.y!=null); return d[d.length-1].y; })()`);
+            return _hour(r) && Math.abs(r.last) <= 5 && y === 777 && r.live ? true : JSON.stringify({ r, y });
+        });
+        done(await t.close());
+    }
+
     return { passed, failed };
 };
