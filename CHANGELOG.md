@@ -8,9 +8,11 @@ Changelog for the HA History Explorer Card.
 
 ### Changed
 - An angle of state class `measurement_angle` drawn from its statistics as any other curve — Home Assistant's mean of it circular, right across 0 (before: its history asked besides wherever drawn from statistics, as for an angle Home Assistant averages as a plain number)
+- The mean of an angle — a column of pixels, the average over a graph (`showStats`), an arrowline's arrow — Home Assistant's circular mean, as its statistics of a `measurement_angle`: the direction of the sum of unit vectors, each weighted by how long it lasted (before: lowpass_dt's, the mean by the shortest-way differences — with several solutions when the values are spread, and not the same as Home Assistant's statistics); its min and max still the largest differences to it each way
 
 ### Docs
-- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`
+- README_Full.md: Home Assistant's statistics of an angle wrong only when its state class isn't `measurement_angle`; the mean of an angle, Home Assistant's
+- `deps/timeline.js.md`, `deps/Chart Custom.js.md`: an angle's mean, Home Assistant's circular one
 
 ### Internal
 - Tests (`yscale`): an angle of state class `measurement_angle` drawn from its statistics, its history not asked besides; the mocked Home Assistant compiles a `measurement_angle`'s statistics as it does — a circular mean alone

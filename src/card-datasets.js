@@ -417,7 +417,7 @@ export class CardDatasets
         const n = data.length;
         let s = [];
         const _width = columns > 0 ? ( w.end.valueOf() - w.start.valueOf() ) / columns : 0;
-        // (an angle: its period in the curve's units — its mean by lowpass_dt's rule, see _flush)
+        // (an angle: its period in the curve's units — its mean Home Assistant's circular one, see _flush)
         const _P = ( this.circularPeriodOf(e) ?? 0 ) * Math.abs(scale);
         const _until = ( w.now > w.end ? w.end : w.now ).valueOf();
         const _num = v => { const x = this.process(v, process); return w.isValid(x) ? x * scale : NaN; };
@@ -476,8 +476,8 @@ export class CardDatasets
             const _from = _agg.explicit ? gs : group[0].t;
             const _to = _agg.explicit ? Math.min(ge, Math.max(_until, gs)) : Math.max(_from, _end(group[group.length - 1]));
             let y = this._aggregate(_agg.func, group, _end, min, max);
-            // (an angle's mean, and its min and max around it: lowpass_dt's rule — the
-            // differences by the shortest way round —, in the turn of the values unwrapped)
+            // (an angle's mean — Home Assistant's circular one —, and its min and max around it
+            // by the shortest way round, in the turn of the values unwrapped)
             if( _P > 0 && !AGGREGATES_NOT_MEAN.has(_agg.func) ) {
                 const c = circularMean(group, v => v.y, v => v.t, _end, _P, y, v => v.min, v => v.max);
                 if( c ) ({ mean: y, lo: min, hi: max } = c);
